@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <title>Assinador SERPRO</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- jquery e bootstrap são usados nesse exemplo -->
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <!-- is.min.js serve para identificar se o usuário está no Windows ou Linux -->
+    <script src="js/lib/serpro/is.min.js" type="text/javascript"></script>
+
+    <!-- os próximos dois arquivos - em Javascript puro - são a API de comunicação com o Assinador SERPRO -->
+    <script src="js/lib/serpro/serpro-signer-promise.js" type="text/javascript"></script>
+    <script src="js/lib/serpro/serpro-signer-client.js" type="text/javascript"></script>
+
+    <!-- este componente jquery serve apenas para automatizar o tamanho de uma text area -->
+    <script src="js/lib/jquery-grab-bag/jquery.autogrow-textarea.js" type="text/javascript"></script>
+  </head>
+  <body>
+    <div class="container">
+
+      <h1>Assinador SERPRO</h1>
+      <h3>Exemplo Minimalista - Assinar TEXTO</h3>
+      <p>Nesse exemplo vamos assinar um texto definido pelo usuário. Por se tratar de um texto, talvez seja interessante incluir o conteúdo na assinatura. Esse conteúdo pode então ser extraído a partir da assinatura gerada.</p>
+
+      <div class="">
+        <div class="px-2 font-weight-bold">WebSocket Server está:</div>
+        <div class="label label-success badge-pill js-server-status js-server-status-on">ONLINE</div>
+        <div class="label label-danger badge-pill js-server-status js-server-status-off">OFFLINE</div>
+      </div>
+      <p><a class="js-server-authorization" href="http://127.0.0.1:65056/" target="_blank">Favor autorizar o assinador!</a></p>
+
+      </br></br>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Texto</h3>
+          </div>
+          <div class="panel-body">
+            <form id="assinarTexto">
+              <div class="form-group">
+                <label for="texto">Escreva aqui:</label>
+                <textarea class="form-control" id="texto" rows="5">Escreva aqui o seu texto!</textarea>
+              </div>
+              <div class="form-group row">
+                <div class="col-sm-2">
+                  <button type="submit" id="sign-text" class="btn btn-primary">Assinar Texto</button>
+                </div>
+                <div class="form-check col-sm-10">
+                  <input class="form-check-input" type="checkbox" checked id="incluir-coteudo">
+                  <label class="form-check-label" for="incluir-coteudo">Incluir Conteúdo</label>
+                </div>
+              </div>
+            </form>
+            <div class="form-group">
+              <label for="texto-websocket">Comando Websocket</label>
+              <textarea class="form-control" id="texto-websocket" rows="8" disabled></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Assinatura</h3>
+          </div>
+          <div class="panel-body">
+            <form>
+              <div class="form-group">
+                <label for="resultado">Assinatura (Base 64)</label>
+                <textarea id="assinatura" class="form-control" rows="5" disabled></textarea>
+              </div>
+              <div class="form-group">
+                <button id="validar-assinatura-texto" type="button" class="btn btn-primary">Validar Assinatura</button>
+              </div>
+            </form>
+            <div class="form-group">
+              <label for="assinatura-websocket">Comando Websocket</label>
+              <textarea class="form-control" id="assinatura-websocket" rows="6" disabled></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Dados do Certificado</h3>
+          </div>
+          <div class="panel-body">
+            <form id="by">
+              <div class="form-group row">
+                <label for="ass_assinante" class="col-sm-2 col-sm-form-label">Assinante</label>
+                <div class="col-sm-10">
+                  <input type="text" class="form-control" id="ass_assinante" disabled>
+                </div>
+              </div>
+              <div class="form-group row">
+                <label for="ass_cadeia" class="col-sm-2 col-sm-form-label">Cadeia</label>
+                <div class="col-sm-10">
+                  <textarea id="ass_cadeia" class="form-control" rows="3" disabled></textarea>
+                </div>
+              </div>
+              <div class="form-group row">
+                <label for="ass_data" class="col-sm-2 col-sm-form-label">Data</label>
+                <div class="col-sm-10">
+                  <input type="text" class="form-control" id="ass_data" disabled>
+                </div>
+              </div>
+              <div class="form-group row">
+                <label for="ass_politica" class="col-sm-2 col-sm-form-label">Política</label>
+                <div class="col-sm-10">
+                  <input type="text" class="form-control" id="ass_politica" disabled>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Conteúdo Extraído da Assinatura</h3>
+          </div>
+          <div class="panel-body">
+            <form id="conteudo_form">
+              <div class="form-group">
+                <label for="conteudo-websocket">Comando Websocket</label>
+                <textarea class="form-control" id="conteudo-websocket" rows="4" disabled></textarea>
+              </div>
+              <div class="form-group">
+                <button id="extrairConteudo" type="button" class="btn btn-primary">Extrair Conteúdo</button>
+              </div>
+              <div class="form-group row">
+                <label for="conteudo_base64" class="col-sm-3 col-sm-form-label">Conteúdo que retorna da resposta do assinador (base64):</label>
+                <div class="col-sm-9">
+                  <textarea id="conteudo_base64" class="form-control" rows="5" disabled></textarea>
+                  <span class="help-block">O conteúdo retornado está em base 64. Verificar aqui: <a href="https://www.base64decode.org/">https://www.base64decode.org/</a></span>
+                </div>
+              </div>
+              <div class="form-group row">
+                <label for="conteudo_atob" class="col-sm-3 col-sm-form-label">Conteúdo convertido para texto legível:</label>
+                <div class="col-sm-9">
+                  <textarea id="conteudo_atob" class="form-control" rows="5" disabled></textarea>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      function prettyCommandSign() {
+        $('#texto-websocket').val(JSON.stringify({
+          command: "sign",
+          inputData: $('#texto').val(),
+          attached: $('#incluir-coteudo').prop('checked'),
+          outputDataType: "base64",
+          textEncoding: "UTF-8",
+          type: "text",
+        }, null, 2));
+      }
+      prettyCommandSign();
+      $('#sign-text').click(prettyCommandSign);
+
+      function prettyCommandVerify() {
+        $('#assinatura-websocket').val(JSON.stringify({
+          command: "verify",
+          inputData: $('#texto').val(),
+          inputSignature: $('#assinatura').val(),
+          type: "text"
+        }, null, 2));
+      }
+      prettyCommandVerify();
+      $('#validar-assinatura-texto').click(prettyCommandVerify);
+
+      function prettyCommandExtract() {
+        $('#conteudo-websocket').val(JSON.stringify({
+          command: "attached",
+          inputSignature: $('#assinatura').val()
+        }, null, 2));
+      }
+      prettyCommandExtract();
+      $('#validar-assinatura-texto').click(prettyCommandExtract);
+    </script>
+
+    <!-- serpro-client-connector.js é o equivalente ao cliente, modifique ou use esta classe conforme sua necessidade -->
+    <script src="js/app/serpro-client-connector.js" type="text/javascript"></script>
+  </body>
+</html>

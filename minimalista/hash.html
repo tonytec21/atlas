@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <title>Assinador SERPRO</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- jquery e bootstrap são usados nesse exemplo -->
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <!-- is.min.js serve para identificar se o usuário está no Windows ou Linux -->
+    <script src="js/lib/serpro/is.min.js" type="text/javascript"></script>
+
+    <!-- os próximos dois arquivos - em Javascript puro - são a API de comunicação com o Assinador SERPRO -->
+    <script src="js/lib/serpro/serpro-signer-promise.js" type="text/javascript"></script>
+    <script src="js/lib/serpro/serpro-signer-client.js" type="text/javascript"></script>
+
+    <!-- este componente jquery serve apenas para automatizar o tamanho de uma text area -->
+    <script src="js/lib/jquery-grab-bag/jquery.autogrow-textarea.js" type="text/javascript"></script>
+  </head>
+  <body>
+    <div class="container">
+
+      <h1>Assinador SERPRO</h1>
+      <h3>Exemplo Minimalista - Assinar HASH</h3>
+      <p>Nesse exemplo demonstramos como gerar um hash a partir de um arquivo. A partir desse hash geramos a assinatura.</p>
+      <p><b>Por restrições de como o driver do Sistema Operacional Windows acessa o token, se o você estiver utilizando este SO, o tipo de algoritmo utilizado para gerar o hash é o SHA-256 ou invés de SHA-512.</b></p>
+      <p>Se o algoritmo SHA-512 for utilizado para Windows, a verificação irá falhar.</p>
+
+      <div class="">
+        <div class="px-2 font-weight-bold">WebSocket Server está:</div>
+        <div class="label label-success badge-pill js-server-status js-server-status-on">ONLINE</div>
+        <div class="label label-danger badge-pill js-server-status js-server-status-off">OFFLINE</div>
+      </div>
+      <p><a class="js-server-authorization" href="http://127.0.0.1:65056/" target="_blank">Favor autorizar o assinador!</a></p>
+
+      </br></br>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Hash</h3>
+          </div>
+          <div class="panel-body">
+            <form id="assinarHash">
+              <div class="form-group">
+                <label for="file_example">Exemplo de Arquivo (hash.function.png)</label>
+                <img id="file_example" src="res/hash.function.png">
+              </div>
+              <label for="hash-algorithm">Algoritmo (SHA-256 se Windows, SHA-512 se não)</label>
+              <div class="form-group row">
+                <div class="col-sm-12">
+                  <input type="text" class="form-control" id="hash-algorithm" disabled>
+                </div>
+              </div>
+              <label for="hash-value">Hash (Base 64)</label>
+              <div class="form-group row">
+                <div class="col-sm-11">
+                  <input type="text" class="form-control" id="hash-value" value="HwhcmZvcqaV1DluCvVeYxcPCrqqme6lwWHBMXLkH+PTQQNtJpjK2Mqq2EdKyqwrBDuvTIDznLzVbqfQfq3/Evg==">
+                </div>
+                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#hashModal">
+                  Ajuda
+                </button>
+              </div>
+              <div class="form-group row">
+                <div class="col-sm-2">
+                  <button type="submit" id="hash-text" class="btn btn-primary">Assinar Hash</button>
+                </div>
+              </div>
+            </form>
+            <div class="form-group">
+              <label for="hash-websocket">Comando Websocket</label>
+              <textarea class="form-control" id="hash-websocket" rows="5" disabled></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Assinatura</h3>
+          </div>
+          <div class="panel-body">
+            <form>
+              <div class="form-group">
+                <label for="assinatura">Assinatura (Base 64)</label>
+                <textarea disabled id="assinatura" class="form-control" rows="5">MIAGCSqGSIb3DQEHAqCAMIACAQExDzANBglghkgBZQMEAgMFADCABgkqhkiG9w0BBwEAAKCAMIIG7zCCBNegAwIBAgIDGJbtMA0GCSqGSIb3DQEBCwUAMIGVMQswCQYDVQQGEwJCUjETMBEGA1UECgwKSUNQLUJyYXNpbDE7MDkGA1UECwwyU2VydmljbyBGZWRlcmFsIGRlIFByb2Nlc3NhbWVudG8gZGUgRGFkb3MgLSBTRVJQUk8xNDAyBgNVBAMMK0F1dG9yaWRhZGUgQ2VydGlmaWNhZG9yYSBkbyBTRVJQUk8gRmluYWwgdjUwHhcNMTcwODMxMTM0MTI0WhcNMjAwODMwMTM0MTI0WjCBoDELMAkGA1UEBhMCQlIxEzARBgNVBAoMCklDUC1CcmFzaWwxGTAXBgNVBAsMEFBlc3NvYSBGaXNpY2EgQTMxETAPBgNVBAsMCEFSU0VSUFJPMSswKQYDVQQLDCJBdXRvcmlkYWRlIENlcnRpZmljYWRvcmEgU0VSUFJPQUNGMSEwHwYDVQQDDBhKRUZFUlNPTiBKT1NFIERFIE1JUkFOREEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDDPOGut+s5XXTzqZOywtmqxU2JDpbdr3tT4hmnFYzudNLs4l3mA6of5ZcZj3/mw349lIF+2HK0dRksfhKI+NAdZkS7xPNC5J7FWSgnSGK5SARIKeKlVeAMLnCKkbDmcaY2UnIzTp037aa2bm9Q8n61L3hhMe4MN2tacCh43gKZFYmqtjat/LXGEkVHAqqkkR0Z+m/lvA/ephbRPS4pQ09jPHP/J4sM+hUdisWZyTbh40J3P830Y6tF+HvolPXVlnO9C2Mm3jth0guXoPIWlM1xbwz99DyQHO0CAMzoDqfSAYALoyE0+zUQquu/VdJ3GtJQkiRK5Ehb7g0OQLVsBMVhAgMBAAGjggI5MIICNTAfBgNVHSMEGDAWgBTok6vjd8dR6Bqc7mRcj3+/qslvkDBZBgNVHSAEUjBQME4GBmBMAQIDDTBEMEIGCCsGAQUFBwIBFjZodHRwOi8vcmVwb3NpdG9yaW8uc2VycHJvLmdvdi5ici9kb2NzL2RwY3NlcnByb2FjZi5wZGYwgYgGA1UdHwSBgDB+MDygOqA4hjZodHRwOi8vcmVwb3NpdG9yaW8uc2VycHJvLmdvdi5ici9sY3IvYWNzZXJwcm9hY2Z2NS5jcmwwPqA8oDqGOGh0dHA6Ly9jZXJ0aWZpY2Fkb3MyLnNlcnByby5nb3YuYnIvbGNyL2Fjc2VycHJvYWNmdjUuY3JsMFYGCCsGAQUFBwEBBEowSDBGBggrBgEFBQcwAoY6aHR0cDovL3JlcG9zaXRvcmlvLnNlcnByby5nb3YuYnIvY2FkZWlhcy9hY3NlcnByb2FjZnY1LnA3YjCBpAYDVR0RBIGcMIGZoD4GBWBMAQMBoDUEMzEwMDMxOTgzMDQyNjM3Njc5MDAwMDAwMDAwMDAwMDAwMDAwMDAwNDI1MTU4OVNFU1BTQ6AXBgVgTAEDBqAOBAwwMDAwMDAwMDAwMDCgHgYFYEwBAwWgFQQTMDAwMDAwMDAwMDAwMDAwMDAwMIEeamVmZXJzb24ubWlyYW5kYUBzZXJwcm8uZ292LmJyMA4GA1UdDwEB/wQEAwIF4DAdBgNVHSUEFjAUBggrBgEFBQcDBAYIKwYBBQUHAwIwDQYJKoZIhvcNAQELBQADggIBAFMalTlhX4zeOgKjsYCikFE6q7des9q2IA5WcJFoGMopr65OIBOuBEuYfGckvcHiohf4uAAx0jz9qCUHg/GvFAFwbCSQ3+e4BiSUyjZiSmAKKAxNYwUFTFvWZRbN+O0ZGHace5UMoqv0czo7LCeQpwOOrLZvcEk3JmF1crVYhNM1lk4GvjgohmTulUsFfFlU4GHzzn5QaZMHEyFXimLFFTnIYX4cIuslMAGb17TljJvGJtWTkAciSwzrZAro8RX4QNoLgNpEg/7WSDmZVtnjOK2Q4NQlzDfGJLx0PMstudTgKWMaq7qY1+YDitMRsBlhuLsBfBwPXfdWLfpH7/c3GVdrPB421NQ+CBXwhp9MR5h62yrrS4k0RczvHy2pPcsD89T1GkmQ1Wh9/hQbTkYw2lalCwFKLoD2nNogIGY33OnbBdeiaXFQfMiLTegCMYbbiWAJJZdYJOy3fMCIcjdXJQr9N93VBZ+Z+8M+rD946xPfg0oyEFdFOf94YxSdBX50S8/WWzMYZFVcckoTkfFFFOu2rl+AXfSbjPo+wC99/iIcPUnyw9QSMXjjt6FAd8EH7XcRj71mIqNsywzVdi+5zpiX8rGMv6APkn/JB2LLUBwSYt1B5ySzUun2AUpQ4IdJJa5th3CHjmDdeaN5lh+iHD+4kLuvuAWDZFfhCmxQjQuFAAAxggPRMIIDzQIBATCBnTCBlTELMAkGA1UEBhMCQlIxEzARBgNVBAoMCklDUC1CcmFzaWwxOzA5BgNVBAsMMlNlcnZpY28gRmVkZXJhbCBkZSBQcm9jZXNzYW1lbnRvIGRlIERhZG9zIC0gU0VSUFJPMTQwMgYDVQQDDCtBdXRvcmlkYWRlIENlcnRpZmljYWRvcmEgZG8gU0VSUFJPIEZpbmFsIHY1AgMYlu0wDQYJYIZIAWUDBAIDBQCgggIEMBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE5MDMwNzIwMTUxNlowTwYJKoZIhvcNAQkEMUIEQB8IXJmb3KmldQ5bgr1XmMXDwq6qpnupcFhwTFy5B/j00EDbSaYytjKqthHSsqsKwQ7r0yA85y81W6n0H6t/xL4wgZQGCyqGSIb3DQEJEAIPMYGEMIGBBghgTAEHAQECAzAvMAsGCWCGSAFlAwQCAwQgsW6Iu/dzIqZ5lbeQeHeO09DqfIhYe29tUYtxXo92o9UwRDBCBgsqhkiG9w0BCRAFARYzaHR0cDovL3BvbGl0aWNhcy5pY3BicmFzaWwuZ292LmJyL1BBX0FEX1JCX3YyXzMuZGVyMIHhBgsqhkiG9w0BCRACLzGB0TCBzjCByzCByAQgRqX1Owy4sO7iIBeyOKzoedYEzVwNlKyNZiPOU6JAlg8wgaMwgZukgZgwgZUxNDAyBgNVBAMMK0F1dG9yaWRhZGUgQ2VydGlmaWNhZG9yYSBkbyBTRVJQUk8gRmluYWwgdjUxOzA5BgNVBAsMMlNlcnZpY28gRmVkZXJhbCBkZSBQcm9jZXNzYW1lbnRvIGRlIERhZG9zIC0gU0VSUFJPMRMwEQYDVQQKDApJQ1AtQnJhc2lsMQswCQYDVQQGEwJCUgIDGJbtMA0GCSqGSIb3DQEBAQUABIIBABuADWVOpgPGCeHRHxB21VF7Pngm2CT8eNTvxZFy/lGpOFphB6fft41ZI6j5gnrHZnOaocvGJtEE49lrYHPp4uY1vHlbPLs+81pOoiLMsdDxbekPkoyxpuem6x+l00rsBNd8SN61aJM+EJQktCpujtmnVPlJR5EfNl9N7jBQb3Lmr84+n4llgqUNPbD261yUOttbNAxXNFu80qY0p3ry5DlxNOpzD2pZBX8lsTpKCSIHkRdrDhuIALV19wCQi8l6R1brlLE2w6mGSkZNv4RGePvmp9ZqspY3Jo9/Bt1VHAULyF8SxCzH2mQmb+GnpR15Md7uEpN51PDGkjTkTZQMQ7UAAAAAAAA=</textarea>
+              </div>
+              <div class="form-group">
+                <button id="validar-assinatura-hash" type="button" class="btn btn-primary">Validar Assinatura</button>
+              </div>
+            </form>
+            <div class="form-group">
+              <label for="assinatura-websocket">Comando Websocket</label>
+              <textarea class="form-control" id="assinatura-websocket" rows="6" disabled></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row col-12 panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Dados do Certificado</h3>
+        </div>
+        <div class="panel-body">
+          <form id="by">
+            <div class="form-group row">
+              <label for="ass_assinante" class="col-sm-2 col-sm-form-label">Assinante</label>
+              <div class="col-sm-10">
+                <input type="text" class="form-control" id="ass_assinante" disabled>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="ass_cadeia" class="col-sm-2 col-sm-form-label">Cadeia</label>
+              <div class="col-sm-10">
+                <textarea id="ass_cadeia" class="form-control" rows="3" disabled></textarea>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="ass_data" class="col-sm-2 col-sm-form-label">Data</label>
+              <div class="col-sm-10">
+                <input type="text" class="form-control" id="ass_data" disabled>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="ass_politica" class="col-sm-2 col-sm-form-label">Política</label>
+              <div class="col-sm-10">
+                <input type="text" class="form-control" id="ass_politica" disabled>
+              </div>
+            </div>
+            <button id="baixarP7S" type="button" class="btn btn-primary">Download P7S</button>
+          </form>
+        </div>
+      </div>
+      
+      <button type="button" class="btn btn-info" data-toggle="modal" data-target="#assinadorModal">
+        Como validar com o Assinador SERPRO
+      </button>
+
+    </div>
+
+    <!-- serpro-client-connector.js é o equivalente ao cliente, modifique ou use esta classe conforme sua necessidade -->
+    <script src="js/app/serpro-client-connector.js" type="text/javascript"></script>
+
+    <!-- para download do arquivo de assinatura p7s -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js" integrity="sha512-csNcFYJniKjJxRWRV1R7fvnXrycHP6qDR21mgz1ZP55xY5d+aHLfo9/FcGDQLfn2IfngbAHd8LdfsagcCqgTcQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script>
+      function prettyCommandSign() {
+        $('#hash-websocket').val(JSON.stringify({
+          command: "sign",
+          type: "hash",
+          inputData: $('#hash-value').val()
+        }, null, 2));
+      }
+      prettyCommandSign();
+      $('#hash-text').click(prettyCommandSign);
+      
+      function prettyCommandVerify() {
+        $('#assinatura-websocket').val(JSON.stringify({
+          command: "verify",
+          type: "hash",
+          inputData: $('#texto').val(),
+          inputSignature: $('#assinatura').val()
+        }, null, 2));
+      }
+      prettyCommandVerify();
+      $('#validar-assinatura-hash').click(prettyCommandVerify);
+
+      function isWindows() {
+        const data = $('#hash-algorithm');
+        if (window.navigator.platform.indexOf('Win')!=-1) {
+          data.val('SHA-256');
+        } else {
+          data.val('SHA-512');
+        }
+      }
+      isWindows();
+
+      $('#baixarP7S').click(downloadP7S);
+      function downloadP7S() {
+        const data = $('#assinatura').val();
+        const blob = b64toBlob(data, 'application/pkcs7-signature');
+        saveAs(blob, 'assinatura.p7s');
+      }
+      function b64toBlob(b64Data, contentType, sliceSize=512) {
+        const byteCharacters = atob(b64Data);
+        const byteArrays = [];
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+          const slice = byteCharacters.slice(offset, offset + sliceSize);
+          const byteNumbers = new Array(slice.length);
+          for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          byteArrays.push(byteArray);
+        }
+        const blob = new Blob(byteArrays, {type: contentType});
+        return blob;
+      }
+    </script>
+  </body>
+</html>
+
+<!-- Ajuda para gerar o Hash -->
+<div class="modal fade" id="hashModal" tabindex="-1" role="dialog" aria-labelledby="hashModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="hashModalLabel">Como gerar o Hash para teste:</h3>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <ol>
+          <li>Acesse um conversor SHA-512 online. <a href="https://hash.online-convert.com/sha512-generator" target="_blank">Exemplo.</a></li>
+          <li>Se estiver no Windows utilize <a href="https://hash.online-convert.com/sha256-generator" target="_blank">SHA-256!</a></li>
+          <li>Clique em "Escolher arquivo".</li>
+          <li>Clique em "Convert file".</li>
+          <li>Copie o conteúdo gerado em base64.</li>
+          <li>Cole esse conteúdo no campo Hash (Base 64)</li>
+        </ol>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ajuda para validar com o Assinador SERPRO -->
+<div class="modal fade" id="assinadorModal" tabindex="-1" role="dialog" aria-labelledby="assinadorModal" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="assinadorModal">Como validar com o Assinador SERPRO:</h3>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <ol>
+          <li>Clique em "Download P7S".</li>
+          <li>No Assinador SERPRO clique em "Validar Assinatura".</li>
+          <li>Clique em "OK".</li>
+          <li>Selecione o arquivo P7S que você baixou.</li>
+          <li>Selecione o arquivo original, do qual o hash foi gerado (no caso do exemplo é a imagem hash.function.png).</li>
+        </ol>
+        <hr>
+        <p>O resultado será algo do tipo:</p>
+        <p><img id="file_example" src="res/hash.function.validado.png"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>

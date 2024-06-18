@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <title>Assinador SERPRO</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- jquery e bootstrap são usados nesse exemplo -->
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <!-- is.min.js serve para identificar se o usuário está no Windows ou Linux -->
+    <script src="js/lib/serpro/is.min.js" type="text/javascript"></script>
+
+    <!-- os próximos dois arquivos - em Javascript puro - são a API de comunicação com o Assinador SERPRO -->
+    <script src="js/lib/serpro/serpro-signer-promise.js" type="text/javascript"></script>
+    <script src="js/lib/serpro/serpro-signer-client.js" type="text/javascript"></script>
+
+    <!-- este componente jquery serve apenas para automatizar o tamanho de uma text area -->
+    <script src="js/lib/jquery-grab-bag/jquery.autogrow-textarea.js" type="text/javascript"></script>
+  </head>
+  <body>
+    <div class="container">
+
+      <h1>Assinador SERPRO</h1>
+      <h3>Exemplo Minimalista - Assinar ARQUIVO</h3>
+      <p>Nesse exemplo vamos assinar um arquivo qualquer. O Assinador SERPRO se encarrega de abrir e processar o arquivo, devolvendo o conteúdo da assinatura. Esse comando não tem um "verify" correspondente.</p>
+      <p><b>Este é um exemplo simples para prova de conceito. Escolha um arquivo menor que 1 Megabyte!</b></p>
+      <div class="">
+        <div class="px-2 font-weight-bold">WebSocket Server está:</div>
+        <div class="label label-success badge-pill js-server-status js-server-status-on">ONLINE</div>
+        <div class="label label-danger badge-pill js-server-status js-server-status-off">OFFLINE</div>
+      </div>
+      <p><a class="js-server-authorization" href="http://127.0.0.1:65056/" target="_blank">Favor autorizar o assinador!</a></p>
+
+      </br></br>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Arquivo</h3>
+          </div>
+          <div class="panel-body">
+            <form id="assinarArquivo">
+              <div class="form-group row">
+                <div class="col-sm-2">
+                  <button type="submit" class="btn btn-primary">Assinar Arquivo</button>
+                </div>
+              </div>
+            </form>
+            <form>
+              <div class="form-group">
+                <label for="filename-value">Nome do Arquivo</label>
+                <input type="text" class="form-control" id="filename-value" disabled>
+              </div>
+              <!--
+              <div class="form-group">
+                <label for="file-base64">Conteúdo do Arquivo (Base 64)</label>
+                <textarea id="file-base64" class="form-control" rows="5" disabled></textarea>
+              </div>
+              -->
+              <div class="form-group">
+                <label for="texto-websocket">Comando Websocket</label>
+                <textarea class="form-control" id="texto-websocket" rows="4" disabled></textarea>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Assinatura</h3>
+          </div>
+          <div class="panel-body">
+            <form>
+              <div class="form-group">
+                <label for="assinatura">Assinatura (Base 64)</label>
+                <textarea disabled id="assinatura" class="form-control" rows="5"></textarea>
+              </div>
+            </form>
+            <button id="baixarP7S" type="button" class="btn btn-primary">Download P7S</button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-info" data-toggle="modal" data-target="#assinadorModal">
+          Como validar com o Assinador SERPRO
+        </button>
+      </div>
+
+    </div>
+
+    <!-- serpro-client-connector.js é o equivalente ao cliente, modifique ou use esta classe conforme sua necessidade -->
+    <script src="js/app/serpro-client-connector.js" type="text/javascript"></script>
+
+    <!-- para download do arquivo de assinatura p7s -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js" integrity="sha512-csNcFYJniKjJxRWRV1R7fvnXrycHP6qDR21mgz1ZP55xY5d+aHLfo9/FcGDQLfn2IfngbAHd8LdfsagcCqgTcQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script>
+        function prettyCommandSign() {
+        $('#texto-websocket').val(JSON.stringify({
+          command: "sign",
+          type: "file",
+        }, null, 2));
+      }
+      prettyCommandSign();
+      $('#sign-text').click(prettyCommandSign);
+
+      $('#baixarP7S').click(downloadP7S);
+      function downloadP7S() {
+        const data = $('#assinatura').val();
+        const blob = b64toBlob(data, 'application/pkcs7-signature');
+        saveAs(blob, 'assinatura.p7s');
+      }
+      function b64toBlob(b64Data, contentType, sliceSize=512) {
+        const byteCharacters = atob(b64Data);
+        const byteArrays = [];
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+          const slice = byteCharacters.slice(offset, offset + sliceSize);
+          const byteNumbers = new Array(slice.length);
+          for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          byteArrays.push(byteArray);
+        }
+        const blob = new Blob(byteArrays, {type: contentType});
+        return blob;
+      }
+    </script>
+
+  </body>
+</html>
+
+<!-- Ajuda para validar com o Assinador SERPRO -->
+<div class="modal fade" id="assinadorModal" tabindex="-1" role="dialog" aria-labelledby="assinadorModal" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="assinadorModal">Como validar com o Assinador SERPRO:</h3>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <ol>
+          <li>Clique em "Download P7S".</li>
+          <li>No Assinador SERPRO clique em "Validar Assinatura".</li>
+          <li>Clique em "OK".</li>
+          <li>Selecione o arquivo P7S que você baixou.</li>
+          <li>Selecione o arquivo original, do qual o hash foi gerado.</li>
+        </ol>
+        <hr>
+        <p>O resultado será algo do tipo:</p>
+        <p><img id="file_example" src="res/hash.function.validado.png"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>

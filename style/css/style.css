@@ -1,0 +1,345 @@
+.table-responsive {
+    zoom: 90%;
+}
+.sidebar {
+    height: 100%;
+    width: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: #343a40;
+    overflow-x: hidden;
+    transition: 0.5s;
+    padding-top: 60px;
+}
+
+.sidebar a {
+    padding: 10px 15px;
+    text-decoration: none;
+    font-size: 16px;
+    color: white;
+    display: block;
+    transition: 0.3s;
+}
+
+.sidebar a:hover {
+    background-color: #575d63;
+}
+
+.sidebar .closebtn {
+    position: absolute;
+    top: 0;
+    right: 25px;
+    font-size: 36px;
+}
+
+.openbtn {
+    font-size: 20px;
+    cursor: pointer;
+    background-color: #343a40;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+}
+
+.main-content {
+    transition: margin-left 0.5s;
+    padding: 16px;
+}
+
+.dark-mode {
+    background-color: #333;
+    color: #fff;
+}
+
+.light-mode {
+    background-color: #fff;
+    color: #000;
+}
+
+.dark-mode .table thead th {
+    color: #fff;
+}
+
+.dark-mode .table-striped tbody tr {
+    color: #fff;
+}
+
+.dark-mode .table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, .05);
+}
+
+.dark-mode .table-striped tbody tr:nth-of-type(even) {
+    background-color: rgba(255, 255, 255, .15);
+}
+
+.dark-mode .modal-content {
+    background-color: #444;
+    color: #fff;
+}
+
+.mode-switch {
+    background-color: #f0ad4e;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-size: 14px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.mode-switch:hover {
+    background-color: #e09c39;
+}
+
+.dark-mode .mode-switch {
+    background-color: #4e5d6c;
+    color: #fff;
+}
+
+.dark-mode .mode-switch:hover {
+    background-color: #3d4c5b;
+}
+
+.light-mode .mode-switch {
+    background-color: #f0ad4e;
+    color: #fff;
+}
+
+.light-mode .mode-switch:hover {
+    background-color: #e09c39;
+}
+
+.btn-info {
+    background-color: #17a2b8;
+    color: white;
+    margin-bottom: 5px;
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    border: none;
+}
+
+.btn-success2 {
+    background-color: #28a745;
+    color: white;
+    margin-bottom: 5px;
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    border: none;
+}
+
+.btn-edit {
+    background-color: #ffc107;
+    color: white;
+    margin-bottom: 5px;
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    border: none;
+}
+
+.btn-delete {
+    background-color: #dc3545;
+    color: white;
+    margin-bottom: 5px;
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    border: none;
+}
+
+.btn-info:hover, .btn-edit:hover, .btn-delete:hover, .btn-success2:hover {
+    opacity: 0.8;
+    color: #212529;
+}
+
+.btn-add {
+    background-color: #28a745;
+    color: white;
+}
+
+.modal-dialog {
+    max-width: 50%;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+body.dark-mode .table td, 
+body.dark-mode .table th {
+    color: white;
+    background-color: #444;
+}
+
+body.dark-mode .table td, 
+body.dark-mode .table th,
+body.dark-mode .table {
+    color: white;
+}
+.attachment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #ccc;
+    background-color: none;
+}
+body.dark-mode .attachment-item {
+    background-color: #444;
+    color: white;
+}
+.attachment-id, .attachment-actions {
+    flex: 0 0 auto;
+}
+.attachment-id {
+    margin-right: 10px;
+}
+.attachment-actions button {
+    margin-left: 5px;
+}
+body.dark-mode .modal-content {
+    background-color: #343a40;
+    color: white;
+}
+.anexo-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+}
+body.dark-mode .anexo-item {
+    background-color: #495057;
+}
+.anexo-id {
+    width: 5%;
+}
+.anexo-nome {
+    width: 75%;
+    overflow-wrap: break-word;
+}
+.anexo-acoes {
+    width: 20%;
+    display: flex;
+    justify-content: flex-end;
+}
+.anexo-acoes button {
+    margin-left: 5px;
+}
+.readonly-field {
+    background-color: #e9ecef;
+    opacity: 1;
+}
+.w-40 {
+    width: 49%!important;
+    margin-top: 31px;
+}
+
+.w-100 {
+    width: 100%!important;
+    margin-top: 31px;
+}
+
+#main-content-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin: 0px 0; /* Ajuste conforme necessário */
+}
+
+.welcome-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: baseline;
+    margin-right: 10px;
+}
+
+#logout-button {
+    height: fit-content; /* Para garantir que o botão se ajuste ao conteúdo */
+}
+
+#main-content-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #343a40;
+    color: white;
+    padding: 0px;
+}
+
+#welcome-section {
+    display: flex;
+    align-items: flex-end;
+}
+
+#welcome-section p {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+#welcome-section h2 {
+    line-height: 0.2;
+    font-size: 1.2rem;
+}
+
+#welcome-section a {
+    margin-left: 20px;
+    margin-right: 10px;
+}
+
+#system-name {
+    font-size: 24px;
+    font-weight: bold;
+    font-family: 'Poppins';
+}
+
+#main-content-wrapper button.openbtn {
+    background-color: #343a40;
+    color: white;
+    border: none;
+    font-size: 20px;
+}
+@media (max-width: 768px) {
+    #main-content-wrapper {
+        flex-direction: column;
+        text-align: left;
+        /* align-items: baseline; */
+    }
+
+    #main-content-wrapper .brand {
+        margin-bottom: 10px;
+    }
+
+    #main-content-wrapper .welcome-info {
+        align-items: left;
+        text-align: left;
+    }
+    #welcome-section h2 {
+        line-height: 0.2;
+        font-size: 1rem;
+    }
+    #welcome-section p {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .modal-dialog {
+        max-width: 100%;
+        margin: 0 15px;
+    }
+    .modal-content {
+        width: 100%;
+    }
+}

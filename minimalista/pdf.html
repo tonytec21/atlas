@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <title>Assinador SERPRO</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- jquery e bootstrap são usados nesse exemplo -->
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <!-- is.min.js serve para identificar se o usuário está no Windows ou Linux -->
+    <script src="js/lib/serpro/is.min.js" type="text/javascript"></script>
+
+    <!-- os próximos dois arquivos - em Javascript puro - são a API de comunicação com o Assinador SERPRO -->
+    <script src="js/lib/serpro/serpro-signer-promise.js" type="text/javascript"></script>
+    <script src="js/lib/serpro/serpro-signer-client.js" type="text/javascript"></script>
+
+    <!-- PDFJS, para converter bas364 em PDF -->
+    <script src="//mozilla.github.io/pdf.js/build/pdf.js"></script>
+
+    <!-- este componente jquery serve apenas para automatizar o tamanho de uma text area -->
+    <script src="js/lib/jquery-grab-bag/jquery.autogrow-textarea.js" type="text/javascript"></script>
+  </head>
+  <body>
+    <div class="container">
+
+      <h1>Assinador SERPRO</h1>
+      <h3>Exemplo Minimalista - Assinar PDF</h3>
+      <p>Nesse exemplo abrimos um arquivo PDF e convertemos seu conteúdo para base64. Este conteúdo é então assinado, gerando um base64 contendo o conteúdo mais a assinatura do documento.</p>
+
+      <div class="">
+        <div class="px-2 font-weight-bold">WebSocket Server está:</div>
+        <div class="label label-success badge-pill js-server-status js-server-status-on">ONLINE</div>
+        <div class="label label-danger badge-pill js-server-status js-server-status-off">OFFLINE</div>
+      </div>
+      <p><a class="js-server-authorization" href="http://127.0.0.1:65056/" target="_blank">Favor autorizar o assinador!</a></p>
+
+      </br></br>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Assinar PDF</h3>
+          </div>
+          <div class="panel-body">
+            <form id="assinarPdf">
+              <div class="form-group">
+                <label for="file_input">Escolher Arquivo PDF</label>
+                <input id="input-file" type="file" onchange="convertToBase64();" />
+              </div>
+              <div class="form-group">
+                <label for="content-value">Conteúdo do PDF (Base 64)</label>
+                <textarea id="content-value" class="form-control" rows="5" disabled></textarea>
+              </div>
+              <div class="form-group row">
+                <div class="col-sm-2">
+                  <button type="submit" class="btn btn-primary">Assinar PDF</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="sign-websocket">Comando WebSocket</label>
+                <textarea id="sign-websocket" class="form-control" rows="7" disabled></textarea>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="row col-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">PDF Assinado</h3>
+          </div>
+          <div class="panel-body">
+            <form>
+              <div class="form-group">
+                <label for="resultado">Arquivo Assinado (PDF + Assinatura em Base 64)</label>
+                <textarea id="assinatura" class="form-control" rows="5" disabled></textarea>
+              </div>
+              <div class="form-group">
+                <button id="validarAssinaturaPdf" type="button" class="btn btn-primary">Validar Assinatura</button>
+                <button type="button" class="btn btn-primary" onclick="downloadPdf();">Download PDF</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    <!-- serpro-client-connector.js é o equivalente ao cliente, modifique ou use esta classe conforme sua necessidade -->
+    <script src="js/app/serpro-client-connector.js" type="text/javascript"></script>
+    <script>
+      function prettyCommandSign() {
+        $('#sign-websocket').val(JSON.stringify({
+          command: "sign",
+          type: "pdf",
+          inputData: $('#content-value').val()
+        }, null, 2));
+      }
+      prettyCommandSign();
+      
+      // BASE 64
+      // https://stackoverflow.com/questions/13538832/convert-pdf-to-a-base64-encoded-string-in-javascript
+      function convertToBase64() {
+        var selectedFile = document.getElementById("input-file").files;
+        if (selectedFile.length > 0) {
+          var fileToLoad = selectedFile[0];
+          var fileReader = new FileReader();
+          var base64;
+          fileReader.onload = function(fileLoadedEvent) {
+            base64 = fileLoadedEvent.target.result;
+            if (base64.indexOf('data:application/pdf;base64,')==0) {
+              base64 = base64.substring('data:application/pdf;base64,'.length, base64.length);
+            } else {
+              alert('O cabeçalho PDF não foi encontrado. Esse é mesmo um arquivo PDF?');
+            }
+            document.getElementById("content-value").value = base64;
+            prettyCommandSign();
+          };
+          fileReader.readAsDataURL(fileToLoad);
+        }
+      }
+      // Download PDF
+      function downloadPdf() {
+        const data = $('#assinatura').val();
+        const linkSource = `data:application/pdf;base64,${data}`;
+        const downloadLink = document.createElement("a");
+        const fileName = "assinado.pdf";
+        downloadLink.href = linkSource;
+        downloadLink.download = fileName;
+        downloadLink.click();
+      }
+    </script>
+  </body>
+</html>

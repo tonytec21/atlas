@@ -1,0 +1,914 @@
+<html>
+ <head>
+    <title>Assinador SERPRO</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- jquery e bootstrap são usados nesse exemplo -->
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <!-- is.min.js serve para identificar se o usuário está no Windows ou Linux -->
+    <script src="js/lib/serpro/is.min.js" type="text/javascript"></script>
+
+    <!-- os próximos dois arquivos - em Javascript puro - são a API de comunicação com o Assinador SERPRO -->
+    <script src="js/lib/serpro/serpro-signer-promise.js" type="text/javascript"></script>
+    <script src="js/lib/serpro/serpro-signer-client.js" type="text/javascript"></script>
+
+    <!-- este componente jquery serve apenas para automatizar o tamanho de uma text area -->
+    <script src="js/lib/jquery-grab-bag/jquery.autogrow-textarea.js" type="text/javascript"></script>
+ </head>
+<script>
+
+  const commands = [
+    {"command": "sign","type": "text", "inputData": "teste"},
+    {"command": "sign","type": "text", "inputData": "teste", "signaturePolicy":"RT"},
+    {"command": "sign","type": "text", "inputData": "teste", "textEncoding": "ISO-8859-1"},
+    {"command": "sign","type": "text", "inputData": "teste","attached": "true"},
+    {"command": "sign","type": "hash", "inputData": " hash em base64 "},
+    {"command": "sign","type": "base64", "inputData": "conteúdo em base64"},
+    {"command": "sign","type": "PDF", "inputData": "arquivo PDF em base64"},
+    {"command": "verify","type": "text", "inputData": "texto assinado", "inputSignature":" Assinatura em base64"},
+    {"command": "verify","type": "base64", "inputData": " Contéudo em base64", "inputSignature":" Assinatura em base64"},
+    {"command": "verify","type": "base64", "inputSignature":" Assinatura em base64"},
+    {"command": "verify","type": "hash", "inputData": "hash em base64", "algorithmOIDHash": " oid do algoritmo"},
+    {"command": "verify","type": "pdf", "inputData": "arquivo PDF em base64"},
+    {"command": "TimeStamp","inputContent":"Contéudo em base64", "type":"raw"},
+    {"command": "TimeStamp","inputContent":"Contéudo em base64", "type":"Signature"},
+    {"command": "TimeStamp","inputContent":"Contéudo em base64", "type":"raw"},
+    {"command": "attached","inputSignature":"Assinatura em base64"},
+    {"command": "cosign", "type": "hash","inputData": "hash em base64", "signatureToCoSign":"Assinatura em base64"},
+    {"command": "cosign", "type": "base64","inputData": "Contéudo em base64", "signatureToCoSign":"Assinatura em base64"},
+    {"command": "cosign", "type": "base64","inputData": "Contéudo em base64", "signatureToCoSign":"Assinatura em base64","signaturePolicy":"RT"}
+  ];
+
+  var conn = new WebSocket("wss://127.0.0.1:65156/signer");
+  conn.onmessage = function(e) { 
+    const result = JSON.parse(e.data);
+    console.log('#', result);
+    if (result.error) {  
+      prettyResult(result.error);
+    } else {
+      prettyResult(result);
+    }
+  }
+
+  function sendData(value){
+    console.log('command', value);
+    conn.send(value);
+  }
+
+  function exec(index){
+    cmd = commands[index];
+    sendData(JSON.stringify(cmd));
+  }
+
+  function customExec(){
+    cmd = $('#custom-websocket').val();
+    sendData(cmd);
+  }
+
+</script>
+<body>
+  <div class="container">
+
+    <h1>Assinador SERPRO</h1>
+    <h3>Exemplo Minimalista - Websocket</h3>
+    <p>Um frontend em Javascript se comunica com o Assinador SERPRO através de comandos websocket. Aqui vemos alguns exemplos.</p>
+    <p>Edite o campo com o comando que deseja executar ou clique em "Testar" para qualquer um dos exemplos pré-definidos para copiá-lo para a área de execução.</p>
+
+    <div class="">
+      <div class="px-2 font-weight-bold">WebSocket Server está:</div>
+      <div class="label label-success badge-pill js-server-status js-server-status-on">ONLINE</div>
+      <div class="label label-danger badge-pill js-server-status js-server-status-off">OFFLINE</div>
+    </div>
+    <p><a class="js-server-authorization" href="http://127.0.0.1:65056/" target="_blank">Favor autorizar o assinador!</a></p>
+
+    </br></br>
+
+    <div class="row col-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Executar WebSocket</h3>
+        </div>
+        <div class="panel-body">
+          <div>
+            <div class="form-group">
+              <label for="custom-websocket">Comando websocket para teste:</label>
+              <textarea class="form-control" id="custom-websocket" rows="10"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="javascript:customExec()">Executar</button>            
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row col-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Resultado</h3>
+        </div>
+        <div class="panel-body">
+          <div>
+            <div class="form-group">
+              <label for="resultado">Resultado:</label>
+              <textarea class="form-control" id="resultado" rows="10" disabled></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row col-12">
+      
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Comando Sign</h3>
+        </div>
+        <div class="panel-body">
+
+          <div class="form-group" style="border: 2px solid #ccc; border-radius: 5px;">
+            <div style="padding: 20px;">
+              <h3>Parâmetros</h3>
+              <ul class="list-group">
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  command
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>sign</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  type
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>file</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>text</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>hash</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>base64</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>pdf</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  inputData
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>null / branco</td>
+                        <td>para tipo <i>file</i></td>
+                      </tr>
+                      <tr>
+                        <td>texto puro</td>
+                        <td>para tipo <i>text</i></td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do hash em base64</td>
+                        <td>para tipo <i>hash</i></td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do conteúdo em base64</td>
+                        <td>para tipo <i>base64</td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do arquivo PDF em base64</td>
+                        <td>para tipo <i>pdf</i></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  textEncoding (opcional)
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>UTF-8</td>
+                        <td>(padrão) somente para tipo <i>text</i></td>
+                      </tr>
+                      <tr>
+                        <td>ISO-8859-1</td>
+                        <td>somente para tipo <i>text</i></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  attached (opcional)
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>true</td>
+                        <td>anexa o contéudo à assinatura, o tamaho da assinatura aumentará de acordo com o tamanho do conteúdo assinado codificado em base64</td>
+                      </tr>
+                      <tr>
+                        <td>false</td>
+                        <td>padrão</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  signaturePolicy (opcional)
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>RT</td>
+                        <td>AD_RT_CADES_2_3</td>
+                      </tr>
+                      <tr>
+                        <td>RV</td>
+                        <td>AD_RV_CADES_2_3, conforme o componente Demoiselle-Signer</td>
+                      </tr>
+                      <tr>
+                        <td>RB</td>
+                        <td>padrão</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+              </ul>
+            </div>
+
+          </div>
+
+          <div class="form-group"><h2>Exemplos:</h2></div>
+
+          <div class="form-group">
+            <label for="assina-um-texto">Assina um Texto</label>
+            <textarea class="form-control" id="assina-um-texto" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(0);$('html,body').scrollTop(0)">Testar</button>
+          <hr>   
+
+          <div class="form-group">
+            <label for="assina-um-texto">Assina um texto com politica de carimbo de tempo (necessário <a href="https://www.loja.serpro.gov.br/carimbodotempo">cadastro</a>)</label>
+            <textarea class="form-control" id="assina-um-texto-tempo" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(1);$('html,body').scrollTop(0)">Testar</button>   
+          <hr>
+
+          <div class="form-group">
+            <label for="assina-um-texto">Assina um texto usando enconding ISO-8859-1</label>
+            <textarea class="form-control" id="assina-um-texto-encoding" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(2);$('html,body').scrollTop(0)">Testar</button>   
+          <hr>
+
+          <div class="form-group">
+            <label for="assina-um-texto">Assina um texto e inclui o contéudo na assinatura</label>
+            <textarea class="form-control" id="assina-um-texto-conteudo" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(3);$('html,body').scrollTop(0)">Testar</button>   
+          <hr>
+
+          <div class="form-group">
+            <label for="assina-um-texto">Assina um hash</label>
+            <textarea class="form-control" id="assina-um-hash" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(4);$('html,body').scrollTop(0)">Testar</button>   
+          <hr>
+
+          <div class="form-group">
+            <label for="assina-um-texto">Assina um contéudo em base 64</label>
+            <textarea class="form-control" id="assina-um-base64" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(5);$('html,body').scrollTop(0)">Testar</button>   
+          <hr>
+          
+          <div class="form-group">
+            <label for="assina-um-pdf">Assina um PDF em base 64</label>
+            <textarea class="form-control" id="assina-um-pdf" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(6);$('html,body').scrollTop(0)">Testar</button>   
+
+        </div>
+      </div>
+    </div>
+
+    <div class="row col-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Comando Verify</h3>
+        </div>
+        <div class="panel-body">
+
+          <div class="form-group" style="border: 2px solid #ccc; border-radius: 5px;">
+            <div style="padding: 20px;">
+              <h3>Parâmetros</h3>
+              <ul class="list-group">
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  command
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>verify</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  type
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>file</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>text</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>hash</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>base64</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>pdf</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  inputData
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>null / branco</td>
+                        <td>para tipo <i>file</i></td>
+                      </tr>
+                      <tr>
+                        <td>texto puro</td>
+                        <td>para tipo <i>text</i></td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do hash em base64</td>
+                        <td>para tipo <i>hash</i></td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do conteúdo em base64</td>
+                        <td>para tipo <i>base64</td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do arquivo PDF em base64</td>
+                        <td>para tipo <i>pdf</i></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  algorithmOIDHash
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>2.16.840.1.101.3.4.2.3</td>
+                        <td>SHA-512</td>
+                      </tr>
+                      <tr>
+                        <td>2.16.840.1.101.3.4.2.1</td>
+                        <td>SHA-256</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  inputSignature
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>array de bytes da assinatura em base64</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="form-group"><h2>Exemplos:</h2></div>
+
+          <div class="form-group">
+            <label for="verify-text">Verifica conteúdo em texto puro</label>
+            <textarea class="form-control" id="verify-text" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(7);$('html,body').scrollTop(0)">Testar</button>
+          <hr>   
+
+          <div class="form-group">
+            <label for="verify-base64">Verifica qualquer contéudo em base64</label>
+            <textarea class="form-control" id="verify-base64" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(8);$('html,body').scrollTop(0)">Testar</button>
+          <hr>   
+
+          <div class="form-group">
+            <label for="verify-content">Verifica assinatura com contéudo anexado</label>
+            <textarea class="form-control" id="verify-content" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(9);$('html,body').scrollTop(0)">Testar</button>
+          <hr>   
+
+          <div class="form-group">
+            <label for="verify-hash">Verifica por hash</label>
+            <textarea class="form-control" id="verify-hash" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(10);$('html,body').scrollTop(0)">Testar</button>
+          <hr>   
+
+          <div class="form-group">
+            <label for="verify-pdf">Verifica PDF assinado</label>
+            <textarea class="form-control" id="verify-pdf" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(11);$('html,body').scrollTop(0)">Testar</button>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="row col-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Comando TimeStamp</h3>
+        </div>
+        <div class="panel-body">
+
+          <div class="form-group" style="border: 2px solid #ccc; border-radius: 5px;">
+            <div style="padding: 20px;">
+              <h3>Parâmetros</h3>
+              <ul class="list-group">
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  command
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>TimeStamp</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  type
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>text</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>hash</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>base64</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>pdf</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  inputData
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>texto puro</td>
+                        <td>para tipo <i>text</i></td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do hash em base64</td>
+                        <td>para tipo <i>hash</i></td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do conteúdo em base64</td>
+                        <td>para tipo <i>base64</td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do arquivo PDF em base64</td>
+                        <td>para tipo <i>pdf</i></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  algorithmOIDHash
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>2.16.840.1.101.3.4.2.3</td>
+                        <td>SHA-512</td>
+                      </tr>
+                      <tr>
+                        <td>2.16.840.1.101.3.4.2.1</td>
+                        <td>SHA-256</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  inputSignature
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>array de bytes da assinatura em base64</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="form-group"><h2>Exemplos:</h2></div>
+
+          <div class="form-group">
+            <label for="timestamp-content">Gera carimbo para contéudo</label>
+            <textarea class="form-control" id="timestamp-content" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(12);$('html,body').scrollTop(0)">Testar</button>
+          <hr>   
+
+          <div class="form-group">
+            <label for="timestamp-sign">Gera carimbo para uma assinatura</label>
+            <textarea class="form-control" id="timestamp-sign" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(13);$('html,body').scrollTop(0)">Testar</button>
+          <hr>   
+
+          <div class="form-group">
+            <label for="timestamp-hash">Gera carimbo para hash de um contéudo</label>
+            <textarea class="form-control" id="timestamp-hash" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(14);$('html,body').scrollTop(0)">Testar</button>  
+
+        </div>
+      </div>
+    </div>
+
+    <div class="row col-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Comando Attached</h3>
+        </div>
+        <div class="panel-body">
+      
+          <div class="form-group" style="border: 2px solid #ccc; border-radius: 5px;">
+            <div style="padding: 20px;">
+              <h3>Parâmetros</h3>
+              <ul class="list-group">
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  command
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>attached</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  inputSignature
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>array de bytes da assinatura em base64</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="form-group"><h2>Exemplos:</h2></div>
+
+          <div class="form-group">
+            <label for="attached-content">Recupera um conteúdo anexaso à assinatura</label>
+            <textarea class="form-control" id="attached-content" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(15);$('html,body').scrollTop(0)">Testar</button>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="row col-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Comando CoSign</h3>
+        </div>
+        <div class="panel-body">
+
+          <div class="form-group" style="border: 2px solid #ccc; border-radius: 5px;">
+            <div style="padding: 20px;">
+              <h3>Parâmetros</h3>
+              <ul class="list-group">
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  command
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>cosign</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  type
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>hash</td>
+                        <td></td>
+                      </tr>
+                      <tr>
+                        <td>base64</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  inputData
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>array de bytes do hash em base64</td>
+                        <td>para tipo <i>hash</i></td>
+                      </tr>
+                      <tr>
+                        <td>array de bytes do conteúdo em base64</td>
+                        <td>para tipo <i>base64</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  signatureToCoSign
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>array de bytes da assinatura anterior em base64</td>
+                        <td>AD_RT_CADES_2_3</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+                <li class="list-group-item" style="font-size: larger; font-weight: bold; background-color: whitesmoke;">
+                  signaturePolicy (opcional)
+                  <table class="table table-bordered" style="background-color:white;">
+                    <thead>
+                      <tr>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>RT</td>
+                        <td>AD_RT_CADES_2_3</td>
+                      </tr>
+                      <tr>
+                        <td>RV</td>
+                        <td>AD_RV_CADES_2_3, conforme o componente Demoiselle-Signer</td>
+                      </tr>
+                      <tr>
+                        <td>RB</td>
+                        <td>padrão</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="form-group"><h2>Exemplos:</h2></div>
+
+          <div class="form-group">
+            <label for="cosign-hash">Co-assinar com hash</label>
+            <textarea class="form-control" id="cosign-hash" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(16);$('html,body').scrollTop(0)">Testar</button>
+          <hr>   
+
+          <div class="form-group">
+            <label for="cosign-base64">Co-assinar com base64</label>
+            <textarea class="form-control" id="cosign-base64" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(17);$('html,body').scrollTop(0)">Testar</button>
+          <hr>   
+
+          <div class="form-group">
+            <label for="cosign-time">Co-assinar com base64 (arquivo todo em base64), com politica de carimbo do tempo</label>
+            <textarea class="form-control" id="cosign-time" rows="5" disabled></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="javascript:prettyCommand(18);$('html,body').scrollTop(0)">Testar</button>  
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/app/serpro-client-connector.js" type="text/javascript"></script>
+  <script>
+    function prettyExample(id, index) {
+      $(id).val(JSON.stringify(commands[index], null, 2));
+    }
+    prettyExample('#assina-um-texto', 0);
+    prettyExample('#assina-um-texto-tempo', 1);
+    prettyExample('#assina-um-texto-encoding', 2);
+    prettyExample('#assina-um-texto-conteudo', 3);
+    prettyExample('#assina-um-hash', 4);
+    prettyExample('#assina-um-base64', 5);
+    prettyExample('#assina-um-pdf', 6);
+    prettyExample('#verify-text', 7);
+    prettyExample('#verify-base64', 8);
+    prettyExample('#verify-content', 9);
+    prettyExample('#verify-hash', 10);
+    prettyExample('#verify-pdf', 11);
+    prettyExample('#timestamp-content', 12);
+    prettyExample('#timestamp-sign', 13);
+    prettyExample('#timestamp-hash', 14);
+    prettyExample('#attached-content', 15);
+    prettyExample('#cosign-hash', 16);
+    prettyExample('#cosign-base64', 17);
+    prettyExample('#cosign-time', 18);
+
+    function prettyCommand(index) {
+      $('#custom-websocket').val(JSON.stringify(commands[index], null, 2));
+    }
+    prettyCommand(0);
+
+    function prettyResult(result) {
+      $('#resultado').val(JSON.stringify(result, null, 2));
+    }
+  </script>  
+
+</body>
+</html>

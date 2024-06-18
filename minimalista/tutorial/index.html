@@ -1,0 +1,263 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<title>Tutorial Assinador SERPRO Frontend</title>
+<link rel="stylesheet" href="styles.css" type="text/css" />
+<link rel="stylesheet" href="./lib/highlightjs/styles/default.css">
+<script src="./lib/highlightjs/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+<!--
+anatine, a free CSS web template by ZyPOP (zypopwebtemplates.com/)
+
+Download: http://zypopwebtemplates.com/
+
+License: Creative Commons Attribution
+//-->
+<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0" />
+</head>
+
+<body>
+
+		<section id="body" class="width">
+			<aside id="sidebar" class="column-left">
+        <header>
+          <h1><a href="#"><p>Assinador SERPRO</p></a></h1>
+          <h2>Exemplo Minimalista</h2>
+        </header>
+
+        <nav id="mainnav">
+          <ul>
+            <li class="selected-item"><a href="index.html">Home</a></li>
+            <li class=""><a href="contato.html">Contato</a></li>
+            <li class=""><a href="../websocket.html">Exemplos Websocket</a></li>
+            <li class=""><a href="../text.html">EXEMPLO - Assinar Texto</a></li>
+            <li class=""><a href="../hash.html">EXEMPLO - Assinar Hash</a></li>
+            <li class=""><a href="../file.html">EXEMPLO - Assinar Arquivo</a></li>
+            <li class=""><a href="../pdf.html">EXEMPLO - Assinar PDF</a></li>
+            <li class=""><a href="../crypto.html">EXEMPLO - Criptografar Texto</a></li>
+          </ul>
+        </nav>
+			</aside>
+		<section id="content" class="column-right">
+        		
+			<h2>Assinador SERPRO Frontend - Tutorial de Adaptação</h2>
+			<div class="article-info">Editado em <time datetime="2019-02-28">28 de fevereiro de 2019</time> por <a href="#" rel="author">Jeferson Jose de Miranda</a></div>
+
+      <p>
+        Este tutorial tem o objetivo de servir de referência para o desenvolvedor que tem a tarefa de adaptar uma aplicação web para assinar documentos utilizando o <a href="http://www.serpro.gov.br/links-fixos-superiores/assinador-digital/assinador-serpro">Assinador SERPRO</a>.
+        Aqui o desenvolvedor precisa ter conhecimentos básicos em HTML, Javascript, JQuery e Bootstrap.
+      </p>
+
+			<h2>Entendendo o Problema</h2>
+
+      <p>
+        Um Frontend em Javascript se comunica com o Assinador SERPRO, a aplicação que foi instalada no seu Desktop, através de comandos websocket.
+        Você pode testar/simular essa comunicação na página <a href="https://www.websocket.org/echo.html" target="_blank">websocket.org</a>. Veja alguns exemplos <a href="./websocket.html">aqui</a>.
+      </p>
+      <p>
+        Em princípio, se você tem familiaridade com comunicação cliente-servidor em websocket, bastaria conhecer a API disponibilizada pelo Assinador SERPRO (a aplicação Desktop) para adaptar o código da sua página.
+        Porém, como não é de conhecimento comum de todos os desenvolvedores, este exemplo disponibiliza a API de acesso e alguns exemplos de uso rotineiro.
+      </p>	
+
+			<h2>Estrutura do Exemplo Minimalista</h2>
+
+      <p>
+        A API oficial de comunicação com o Assinador SERPRO compreende os seguintes arquivos:
+      </p>	
+      <p>
+        <ul>
+          <li>is.min.js</li>
+          <li>serpro-signer-client.js</li>
+          <li>serpro-signer-promise.js</li>
+        </ul>
+      </p>
+      <p>
+        onde, is.min.js identifica o Sistema Operacional, o arquivo serpro-signer-promise.js encapsula <i>helper functions</i> e o arquivo serpro-signer-client.js disponiliza a API.
+        As principais funções da API são:
+      </p>
+      <p>
+        <ul>
+          <li>sign</li>
+          <li>verify</li>
+          <li>attached</li>
+        </ul>
+      </p>
+      <p>
+        <img src="res/estrutura-assinador.png">
+      </p>
+      <p>
+        Os exemplos práticos constituem-se dos arquivos:
+      </p>
+      <p>
+        <ul>
+          <li>crypto.html</li>
+          <li>file.html</li>
+          <li>hash.html</li>
+          <li>pdf.html</li>
+          <li>text.html</li>
+          <li>websocket.html</li>
+        </ul>
+      </p>
+
+      <p>As explicações estarão no início de cada arquivo. Se desejar, você pode fazer o 
+        <a href="../minimalista.zip" download>
+          download
+        </a>
+        do projeto minimalista para modificar os exemplos conforme sua necessidade.
+      </p>
+
+      <p>Se você não tiver um servidor web previamente instalado, uma sugestão é utilizar o <a href="https://mongoose.ws/" target="_blank">Mongoose Web Server</a>. É um executável que serve os arquivos na pasta onde ele é executado. Tem download para Windows, Linux e MacOS.</p>
+
+			<h2>Como adaptar o Assinador SERPRO a sua Aplicação</h2>
+
+      <p>
+        Para adaptar a sua aplicação, considere como API oficial os seguintes arquivos:
+      </p>
+      <p>
+        O arquivo serpro-client-connector.js representa a <b>aplicação</b>. O seu sistema/site/app pode se basear nesse arquivo e adaptá-lo conforme necessidade.
+        Para tanto favor destrinchar a lógica de funcionamento desse arquivo. Observe o diagrama:
+      </p>
+      <p>
+        <img src="res/serpro-client-connector-basic.png">
+      </p>
+      <p>
+        O arquivo serpro.client.connector.js está encapsulado em uma <a href="https://www.w3schools.com/js/tryit.asp?filename=tryjs_function_expression_self" target="_blank">função auto-invocada</a>.
+        Dentro dele, a função <i>checkEnvironment</i> verifica qual é o Sistema Operacional.
+        Existem tokens legados em uso que apresentam problemas na assinatura dos hashes, dependendo do algoritmo e do SO.
+        Para Windows utlizamos o SHA-256 e no Linux utilizamos o SHA-512.
+      </p>
+      <p>
+        A função <i>initApp</i>, utilizando JQuery, faz o binding dos identificadores nos elementos HTML com as funções que devem ser disparadas.
+        Por fim, a função <i>initSerproClient</i> realiza a conexão com o Assinador SERPRO instalado no Desktop.
+        Vejamos essa função em mais detalhes:
+      </p>
+      <p>
+        <img src="res/initSerproSignerClient.png">
+      </p>
+      <p>
+        Pois bem, a função <i>initSerproSignerClient</i> seta a URL de conexão websocket e verifica se o Assinador SERPRO está rodando, para então poder inicializar a conexão websocket.
+        A função <i>verifyDesktopInstallation</i> é um loop que checa se o Assinador está rodando.
+        Caso negativo, o usuário deve ser instruído a instalar o Assinador.
+        Caso positivo, o arquivo serpro.client.connector.js tenta conexão com o websocket.
+        Essa tentativa pode gerar uma exceção.
+        Caso essa excessão seja gerada, o usuário deve ser instruído a autorizar o navegador, isto é, aceitar o certificado.
+        A ação que reseta esse aceite, para fim de testes durande a implementação, é a de limpar o histórico de navegação, conforme figura:
+      </p>
+      <p>
+        <img src="res/limparhistorico.png">
+      </p>
+      <p>
+        Entendendo que essa etapa de notificação ao cliente, de <b>(1) aplicação não instalada</b> e <b>(2) navegador não autorizado</b> é uma etapa extremamente importante da aplicação.
+        Portanto, vamos revê-la em mais detalhes a seguir.
+        É importante salientar que essa solução foi desenvolvida para o Exemplo Minimalista, e a sua aplicação deve se basear nela para solucionar este problema.
+      </p>
+
+      <h2>Notificações de Aplicação Não Instalada e Navegador Não Autorizado</h2>
+
+      <p>
+        Aqui vamos explicar como essas questões foram resolvidas no exemplo minimalista.
+        Você pode e deve modificar o arquivo serpro-client-connector.js adaptando-o da melhor forma para a sua aplicação.
+        Observe o diagrama:
+      </p>
+      <p>
+        <img src="res/status do assinador.png">
+      </p>
+      <p>
+        Começamos verificando se o Assinador SERPRO está rodando:
+      </p>
+      <pre>
+serpro-client-connector.js
+        <code class="javascript">
+function verifyDesktopClientInstallation() {
+  window.SerproSignerClient.verifyIsInstalledAndRunning()
+    .success(function (response) {
+      clearInterval(tryAgainTimeoutVerify);
+      connectToWebSocket();
+    }).error(function (response) {
+      showStatusOff();
+      // Try again in Xms
+      clearInterval(tryAgainTimeoutVerify);
+      tryAgainTimeoutVerify = setTimeout(verifyDesktopClientInstallation, timeoutDefault);
+    });
+}          
+        </code>
+      </pre>
+
+      <p>
+        Caso negativo, notificar o usuário de que o Assinador SERPRO precisa estar rodando.
+        No exemplo, utilizando JQuery, escondemos as <i>div</i> de notificação, On e Off e mostramos apenas a de Off.
+      </p>
+      <pre>
+serpro-client-connector.js
+        <code class="javascript">
+function showStatusOff() {
+  var serverStatus = $('.js-server-status');
+  serverStatus.hide();
+  serverStatus.filter('.js-server-status-off').show();
+}
+        </code>
+      </pre>
+
+      <p>
+        Caso positivo, tentamos a conectar com o websocket.
+      </p>
+      <pre>
+serpro-client-connector.js
+        <code class="javascript">
+function connectToWebSocket() {
+  window.SerproSignerClient.connect(callbackOpenClose, callbackOpenClose, callbackError);
+}
+        </code>
+      </pre>
+
+      <p>
+        Se esse trecho falhar, uma excessão será gerada, e a função callBackError será invocada.
+        Nessa função, o aviso de que o navegador precisa ser autorizado e o respectivo link são exibidos para o usuário.
+      </p>
+      <pre>
+serpro-client-connector.js
+        <code class="javascript">
+function callbackError(event) {
+  var serverAuthorizarion = $('.js-server-authorization');
+  serverAuthorizarion.show();
+
+  ...
+}
+        </code>
+      </pre>
+
+      <p>
+        Por fim, se nada falhar, basta notificar o usuário de que o Assinador está rodando (On).
+        No exemplo, esconde-se todas as notificações, exceto pela de status-on.
+      </p>
+      <pre>
+serpro-client-connector.js
+        <code class="javascript">
+function showStatusOn() {
+  var serverStatus = $('.js-server-status');
+  serverStatus.hide();
+  serverStatus.filter('.js-server-status-on').show();
+  var serverAuthorizarion = $('.js-server-authorization');
+  serverAuthorizarion.hide();
+}
+        </code>
+      </pre>
+      <p>
+        Isso conclui o tutorial de integração para o Exemplo Minimalista.
+        Se ainda restarem dúvidas, encaminhe um email sobre o assunto correspondente, conforme descrito na seção de contatos.
+      </p>
+
+			<footer class="clear">
+				<p>&copy; 2019 SERPRO.</p>
+			</footer>
+
+		</section>
+
+		<div class="clear"></div>
+
+	</section>
+	
+
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<title>Tutorial Assinador SERPRO Frontend</title>
+<link rel="stylesheet" href="styles.css" type="text/css" />
+<link rel="stylesheet" href="./lib/highlightjs/styles/default.css">
+<script src="./lib/highlightjs/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+<!--
+anatine, a free CSS web template by ZyPOP (zypopwebtemplates.com/)
+
+Download: http://zypopwebtemplates.com/
+
+License: Creative Commons Attribution
+//-->
+<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0" />
+</head>
+
+<body>
+
+		<section id="body" class="width">
+			<aside id="sidebar" class="column-left">
+        <header>
+          <h1><a href="#"><p>Assinador SERPRO</p></a></h1>
+          <h2>Exemplo Minimalista</h2>
+        </header>
+
+        <nav id="mainnav">
+          <ul>
+            <li class=""><a href="index.html">Home</a></li>
+            <li class="selected-item"><a href="websocket.html">Exemplos Websocket</a></li>
+            <li class=""><a href="contato.html">Contato</a></li>
+            <li class=""><a href="../text.html">EXEMPLO - Assinar Texto</a></li>
+            <li class=""><a href="../hash.html">EXEMPLO - Assinar Hash</a></li>
+            <li class=""><a href="../file.html">EXEMPLO - Assinar Arquivo</a></li>
+          </ul>
+        </nav>
+			</aside>
+		<section id="content" class="column-right">
+        		
+			<h2>Assinador SERPRO Frontend - Exemplos Websocket</h2>
+			<div class="article-info">Editado em <time datetime="2019-02-28">28 de fevereiro de 2019</time> por <a href="#" rel="author">Jeferson Jose de Miranda</a></div>
+
+      <p style="visibility: hidden;">
+        NÃO REMOVA ESSE TEXTO, INTERFERE NA FORMATAÇÃO!
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+      </p>
+      <p>
+        Para testar os comandos websocket, proceda da seguinte forma:
+      </p>
+      <p>
+        <ol>
+          <li>Acesse <a href="https://www.websocket.org/echo.html">https://www.websocket.org/echo.html</a>.</li>
+          <li>Em <i>Location</i> digite <b>wss://127.0.0.1:65156/signer/</b>.</li>
+          <li>Clique em <i>Connect</i>, em <b>Log</b> vai aparecer <i>Connected</i>.</li>
+          <li>Cole os comandos dos exemplos em <b>Message</b>.</li>
+          <li>Observe os resultados em <b>Log</b>.</li>
+          <li>Para facilitar a visualização, sempre clique em <b>Clear log</b> antes de executar um comando e use a URL <a href="https://jsonlint.com/" target="_blank">JSON Lint</a> para formatar o objeto JSON de retorno.</li>
+        </ol>
+      </p>
+
+			<h2>Assinar Texto</h2>
+
+      <p><b>Assinar um texto qualquer:</b></p>
+      <pre><code class="json">
+{"command": "sign","type": "text", "inputData": "teste"}     
+      </code></pre>
+      <hr><br>
+
+      <p>Assinar um texto com uma política de assinatura específica:</p>
+      <pre><code class="json">
+{"command": "sign","type": "text", "inputData": "teste", "signaturePolicy":"AD_RT_CADES_2_2"}    
+      </code></pre>
+      <hr><br>
+
+      <p>Assinar um texto com codificação encoding UTF-8:</p>
+      <pre><code class="json">
+{"command": "sign","type": "text", "inputData": "teste", "textEncoding": "UTF-8"}     
+      </code></pre>
+      <hr><br>
+
+      <p>Embutir o texto junto à assinatura:</p>
+      <pre><code class="json">
+{"command": "sign","type": "text", "inputData": "teste atachado", "attached": "true"}
+      </code></pre>
+      <hr><br>
+
+      <p>Resgatar o texto que foi embutido com o comando anterior:</p>
+      <pre><code class="json elderscrolls">
+{"command": "attached", "inputSignature": "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"}      </code></pre>
+      </code></pre>
+      <p>
+        O objeto JSON retornado aqui terá um atributo <b>attachedContent</b>.
+        Este conteúdo está em formato Base64.
+      </p>
+      <p>
+        Utilize uma página do tipo <a href="https://www.base64decode.org/" target="_blank">base64decode</a> para decodificar para o conteúdo original.
+      </p>
+      <hr><br>
+
+      <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+
+			<footer class="clear">
+				<p>&copy; 2019 SERPRO.</p>
+			</footer>
+
+		</section>
+
+		<div class="clear"></div>
+
+	</section>
+	
+
+</body>
+</html>

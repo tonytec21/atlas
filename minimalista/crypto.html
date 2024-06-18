@@ -1,0 +1,238 @@
+<html>
+ <head>
+    <title>Assinador SERPRO</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- jquery e bootstrap são usados nesse exemplo -->
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <!-- is.min.js serve para identificar se o usuário está no Windows ou Linux -->
+    <script src="js/lib/serpro/is.min.js" type="text/javascript"></script>
+
+    <!-- os próximos dois arquivos - em Javascript puro - são a API de comunicação com o Assinador SERPRO -->
+    <script src="js/lib/serpro/serpro-signer-promise.js" type="text/javascript"></script>
+    <script src="js/lib/serpro/serpro-signer-client.js" type="text/javascript"></script>
+
+    <!-- este componente jquery serve apenas para automatizar o tamanho de uma text area -->
+    <script src="js/lib/jquery-grab-bag/jquery.autogrow-textarea.js" type="text/javascript"></script>
+ </head>
+<script>
+
+  const commands = [
+    { command: "list" }, 
+    { command: "crypto", action:"decrypt", data: "" },
+    { command: "crypto", action:"encrypt", data: "teste" }
+  ];
+
+  var conn = new WebSocket("wss://127.0.0.1:65156/signer");
+  conn.onmessage = function(e) { 
+    result = JSON.parse(e.data);
+    console.log('#', result);
+    if (result.error) {  
+      $('#result-message').val(result.error);
+    } else {
+      if (result.action == "decrypt") {
+        $('#result-message').val(atob(result.result));
+      } else {
+        $('#text-to-decode').val(result.result);
+      }
+    }
+  }
+
+  function sendData(value){
+    console.log('command', value);
+    conn.send(
+      JSON.stringify(value)
+    );
+  }
+
+  function enc(){
+    cmd = commands[2];
+    cmd.data = btoa(document.getElementById("text-to-encrypt").value);
+    sendData(cmd);
+  }
+
+  function dec(){
+    cmd = commands[1];
+    cmd.data = document.getElementById("text-to-decode").value
+    sendData(cmd)
+  }
+
+  function showDiv(){
+    if(document.getElementById('javaCode').style.visibility=='visible')
+      document.getElementById('javaCode').style.visibility='hidden';
+    else
+      document.getElementById('javaCode').style.visibility='visible';
+  }
+
+</script>
+<body>
+  <div class="container">
+
+    <h1>Assinador SERPRO</h1>
+    <h3>Exemplo Minimalista - Criptografar Texto</h3>
+    <p>Nesse exemplo vamos usar o Assinador SERPRO uma funcionalidade <b>EXTRA</b>. Aqui o aplicativo não vai ser usado para assinar, mas sim para criptografar e decodificar uma mensagem, com um número máximo de 245 caracteres.</p>
+    <p></p>
+    <p><b>ATENÇÃO: NEM TODOS OS TIPOS DE CERTIFICADOS SÃO SUPORTADOS. Não vai funcionar para NeoId.</b></p>
+
+    <div class="">
+      <div class="px-2 font-weight-bold">WebSocket Server está:</div>
+      <div class="label label-success badge-pill js-server-status js-server-status-on">ONLINE</div>
+      <div class="label label-danger badge-pill js-server-status js-server-status-off">OFFLINE</div>
+    </div>
+    <p><a class="js-server-authorization" href="http://127.0.0.1:65056/" target="_blank">Favor autorizar o assinador!</a></p>
+
+    </br></br>
+
+    <div class="row col-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Criptografar</h3>
+        </div>
+        <div class="panel-body">
+          <div>
+            <div class="form-group">
+              <label for="text-to-encrypt">Texto para Criptografar (limite máximo de 245 caracteres):</label>
+              <input id="text-to-encrypt" class="form-control" value="Escreva aqui o seu texto!" maxlength="245"/>
+            </div>
+            <div class="form-group">
+              <label for="crypto-websocket">Comando Websocket</label>
+              <textarea class="form-control" id="crypto-websocket" rows="5" disabled></textarea>
+            </div>
+            <button class="btn btn-primary" id="do-encrypt">Criptografar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row col-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Decodificar</h3>
+        </div>
+        <div class="panel-body">
+          <div>
+            <div class="form-group">
+              <label for="text-to-decode">Base 64 para Decodificar:</label>
+              <input id="text-to-decode" class="form-control" value="aqui ó" disabled/>
+            </div>
+            <div class="form-group">
+              <label for="decode-websocket">Comando Websocket</label>
+              <textarea class="form-control" id="decode-websocket" rows="5" disabled></textarea>
+            </div>
+            <button class="btn btn-primary" id="do-decode">Decodificar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row col-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Resultado</h3>
+        </div>
+        <div class="panel-body">
+          <div>
+            <div class="form-group">
+              <label for="result-message">Texto Decodificado:</label>
+              <input id="result-message" class="form-control" value="" disabled/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+<!--
+    <button class="btn btn-primary" onclick="javascript:showDiv()">Exibir código Java</button>
+
+    <div style="visibility:hidden" id="javaCode">
+      <p style="margin-top:10px">Exemplo de código para gerar chave a ser criptografada</p>
+      <pre>
+      <code>
+import java.security.InvalidKeyException;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+
+import org.bouncycastle.util.encoders.Base64;
+
+public class Teste {
+
+  public static void main(String[] args) throws NoSuchAlgorithmException, InvalidKeySpecException, 
+  InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
+    KeyFactory factory = KeyFactory.getInstance("RSA");
+    //Substituir pela chave publica que será descriptografada
+    String key = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkUWJ1ZYxa/SXG4ux2Q2M"+
+    "mPgtEc8+9O6cHjk7CLI1CNzzPG/1XAxQm2B/cT6l39kdyq0T5ek3PTLKbJI+zUh+"+
+    "QOkKpYDraIqydmulnJsosOpuEOIcTk1Mtd+vw9bOfSyBcaGtp2EvJVaAw989tqzL"+
+    "qjqmMXQDgw2PcE6qCJrn6rcLfxHkpk5pafJzF2nKTXQiBRrkdLHZXHaWmwKzaUjc"+
+    "bcj/NQ0stuQKbZ3tDAPLmwKKQkD0HK39WAUBZMChoH38Te46wllJ4MUZLO+04Pbr"+
+    "KJqZxm1Co/dEY+q1QDwKkjncjs9vNW/u8uh8popg0KjtMEOe99w4DnKMf09H9t+t"+
+    "VwIDAQAB";
+    
+    
+      X509EncodedKeySpec encodedKeySpec = new X509EncodedKeySpec(Base64.decode(key.getBytes()));
+      PublicKey publick  = factory.generatePublic(encodedKeySpec);
+      System.out.println(new Teste().encrypt(args[0], publick));
+  }
+  
+  public String encrypt(String data, PublicKey myPuKey) throws NoSuchAlgorithmException, NoSuchPaddingException, 
+  InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    
+    Cipher rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+    rsa.init(Cipher.ENCRYPT_MODE, myPuKey);
+    byte[] encrypted = rsa.doFinal(data.getBytes());
+    
+    return Base64.toBase64String(encrypted);
+  }
+}
+      </code>
+      </pre>
+    </div>
+-->
+  </div>
+
+  <script src="js/app/serpro-client-connector.js" type="text/javascript"></script>
+  <script>
+    function prettyCommandCrypto() {
+      $('#crypto-websocket').val(JSON.stringify({
+        command: "crypto",
+        action:"encrypt",
+        data: btoa($('#text-to-encrypt').val())
+      }, null, 2));
+    }
+    prettyCommandCrypto();
+
+    function doEncrypt() {
+      prettyCommandCrypto();
+      enc();
+    }
+    $('#do-encrypt').click(doEncrypt);
+    
+    function prettyCommandDecode() {
+      console.log('$$$', $('#text-to-decode').val())
+      $('#decode-websocket').val(JSON.stringify({
+        command: "crypto",
+        action:"decrypt",
+        data: $('#text-to-decode').val()
+      }, null, 2));
+    }
+    prettyCommandDecode();
+
+    function doDecode() {
+      prettyCommandDecode();
+      dec();
+    }
+    $('#do-decode').click(doDecode);
+  </script>  
+
+</body>
+</html>
