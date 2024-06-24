@@ -158,12 +158,14 @@ include(__DIR__ . '/../menu.php');
                 });
             });
 
-            // Inicializar o CKEditor
+            // Inicializar o CKEditor com corretor ortográfico
             CKEDITOR.replace('corpo', {
                 extraPlugins: 'htmlwriter',
                 allowedContent: true,
                 filebrowserUploadUrl: '/uploader/upload.php',
-                filebrowserUploadMethod: 'form'
+                filebrowserUploadMethod: 'form',
+                scayt_autoStartup: true, // Habilitar o corretor ortográfico automaticamente
+                scayt_sLang: 'pt_BR' // Definir o idioma do corretor ortográfico para português brasileiro
             });
         });
     </script>
