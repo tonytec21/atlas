@@ -54,6 +54,16 @@ function formatDateToBrazilian($date)
     return $dateTime->format('d') . ' de ' . $mes[$dateTime->format('F')] . ' de ' . $dateTime->format('Y');
 }
 
+// Carregar assinaturas
+$signatures = json_decode(file_get_contents(__DIR__ . '/assinaturas/data.json'), true);
+$signatureImage = '';
+foreach ($signatures as $signature) {
+    if ($signature['fullName'] == $oficioData['assinante']) {
+        $signatureImage = $signature['assinatura'];
+        break;
+    }
+}
+
 // Configurar a classe PDF
 class PDF extends TCPDF
 {
@@ -136,6 +146,27 @@ $pdf->Ln(1);
 $pdf->SetFont('helvetica', '', 12);
 $pdf->writeHTML('<p style="text-indent: 20mm; text-align: justify;">Atenciosamente,</p>', true, false, true, false, '');
 $pdf->Ln(20);
+
+// Adicionar imagem da assinatura, se disponível
+if ($signatureImage) {
+    $signatureImagePath = __DIR__ . '/assinaturas/' . $signatureImage;
+    if (file_exists($signatureImagePath)) {
+        $signatureWidth = 80; // largura da imagem da assinatura
+        $pageWidth = $pdf->getPageWidth();
+        $marginLeft = $pdf->getMargins()['left'];
+        $marginRight = $pdf->getMargins()['right'];
+        $centerX = ($pageWidth - $marginLeft - $marginRight - $signatureWidth) / 2 + $marginLeft;
+
+        $pdf->Image($signatureImagePath, $centerX, $pdf->GetY() - 10, $signatureWidth, '', '', '', 'T', false, 300, '', false, false, 0, false, false, false);
+        $pdf->Ln(3);
+    } else {
+        // Debug: show the path of the signature image if it doesn't exist
+        $pdf->SetFont('helvetica', 'I', 10);
+        $pdf->Cell(0, $lineHeight, 'Assinatura não encontrada: ' . $signatureImagePath, 0, 1, 'C');
+        $pdf->Ln(5);
+    }
+}
+
 $pdf->Cell(0, $lineHeight, '__________________________________', 0, 1, 'C');
 $pdf->SetFont('helvetica', 'B', 12);
 $pdf->Cell(0, $lineHeight, ($oficioData['assinante']), 0, 1, 'C');
