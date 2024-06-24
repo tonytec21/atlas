@@ -75,13 +75,7 @@ include(__DIR__ . '/../menu.php');
                 <div class="form-row">
                     <div class="form-group col-md-4">
                         <label for="tratamento">Forma de Tratamento:</label>
-                        <select class="form-control" id="tratamento" name="tratamento">
-                            <option value="">Selecione</option>
-                            <option value="Sr.">Sr.</option>
-                            <option value="Sra.">Sra.</option>
-                            <option value="Dr.">Dr.</option>
-                            <option value="Dra.">Dra.</option>
-                        </select>
+                        <input type="text" class="form-control" id="tratamento" name="tratamento">
                     </div>
                     <div class="form-group col-md-4">
                         <label for="destinatario">Destinatário:</label>

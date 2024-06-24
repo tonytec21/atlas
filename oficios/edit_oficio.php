@@ -49,58 +49,58 @@ include(__DIR__ . '/../menu.php');
     <div id="main" class="main-content">
         <div class="container">
             <h3>Editar Ofício</h3>
-            <form id="editOficioForm" method="POST" action="save_oficio.php">
-                <input type="hidden" name="numero" value="<?php echo htmlspecialchars($numero); ?>">
-                <div class="form-row">
-                    <div class="form-group col-md-4">
-                        <label for="tratamento">Forma de Tratamento:</label>
-                        <select class="form-control" id="tratamento" name="tratamento">
-                            <option value="">Selecione</option>
-                            <option value="Sr." <?php if ($oficioData['tratamento'] == "Sr.") echo "selected"; ?>>Sr.</option>
-                            <option value="Sra." <?php if ($oficioData['tratamento'] == "Sra.") echo "selected"; ?>>Sra.</option>
-                            <option value="Dr." <?php if ($oficioData['tratamento'] == "Dr.") echo "selected"; ?>>Dr.</option>
-                            <option value="Dra." <?php if ($oficioData['tratamento'] == "Dra.") echo "selected"; ?>>Dra.</option>
-                        </select>
-                    </div>
-                    <div class="form-group col-md-4">
-                        <label for="destinatario">Destinatário:</label>
-                        <input type="text" class="form-control" id="destinatario" name="destinatario" value="<?php echo htmlspecialchars($oficioData['destinatario']); ?>" required>
-                    </div>
-                    <div class="form-group col-md-4">
-                        <label for="cargo">Cargo:</label>
-                        <input type="text" class="form-control" id="cargo" name="cargo" value="<?php echo htmlspecialchars($oficioData['cargo']); ?>">
-                    </div>
+            <?php if ($oficioData['status'] == 1): ?>
+                <div class="alert alert-danger" role="alert">
+                    Este ofício está bloqueado para edição.
                 </div>
-                <div class="form-group">
-                    <label for="assunto">Assunto:</label>
-                    <input type="text" class="form-control" id="assunto" name="assunto" value="<?php echo htmlspecialchars($oficioData['assunto']); ?>" required>
-                </div>
-                <div class="form-group">
-                    <label for="corpo">Corpo do Ofício:</label>
-                    <textarea class="form-control" id="corpo" name="corpo" rows="10" required><?php echo htmlspecialchars($oficioData['corpo']); ?></textarea>
-                </div>
-                <div class="form-row">
-                    <div class="form-group col-md-4">
-                        <label for="assinante">Assinante:</label>
-                        <select class="form-control" id="assinante" name="assinante" required>
-                            <?php foreach ($employees as $employee): ?>
-                                <option value="<?php echo htmlspecialchars($employee['fullName']); ?>" <?php if ($oficioData['assinante'] == $employee['fullName']) echo "selected"; ?>>
-                                    <?php echo htmlspecialchars($employee['fullName']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+            <?php else: ?>
+                <form id="editOficioForm" method="POST" action="save_oficio.php">
+                    <input type="hidden" name="numero" value="<?php echo htmlspecialchars($numero); ?>">
+                    <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label for="tratamento">Forma de Tratamento:</label>
+                            <input type="text" class="form-control" id="tratamento" name="tratamento" value="<?php echo htmlspecialchars($oficioData['tratamento']); ?>">
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="destinatario">Destinatário:</label>
+                            <input type="text" class="form-control" id="destinatario" name="destinatario" value="<?php echo htmlspecialchars($oficioData['destinatario']); ?>" required>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="cargo">Cargo:</label>
+                            <input type="text" class="form-control" id="cargo" name="cargo" value="<?php echo htmlspecialchars($oficioData['cargo']); ?>">
+                        </div>
                     </div>
-                    <div class="form-group col-md-4">
-                        <label for="cargo_assinante">Cargo do Assinante:</label>
-                        <input type="text" class="form-control" id="cargo_assinante" name="cargo_assinante" value="<?php echo htmlspecialchars($oficioData['cargo_assinante']); ?>">
+                    <div class="form-group">
+                        <label for="assunto">Assunto:</label>
+                        <input type="text" class="form-control" id="assunto" name="assunto" value="<?php echo htmlspecialchars($oficioData['assunto']); ?>" required>
                     </div>
-                    <div class="form-group col-md-4">
-                        <label for="data">Data:</label>
-                        <input type="date" class="form-control" id="data" name="data" value="<?php echo htmlspecialchars($oficioData['data']); ?>" required>
+                    <div class="form-group">
+                        <label for="corpo">Corpo do Ofício:</label>
+                        <textarea class="form-control" id="corpo" name="corpo" rows="10" required><?php echo htmlspecialchars($oficioData['corpo']); ?></textarea>
                     </div>
-                </div>
-                <button type="submit" style="margin-bottom: 31px;margin-top: 0px !important;" class="btn btn-primary w-100">Salvar Ofício</button>
-            </form>
+                    <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label for="assinante">Assinante:</label>
+                            <select class="form-control" id="assinante" name="assinante" required>
+                                <?php foreach ($employees as $employee): ?>
+                                    <option value="<?php echo htmlspecialchars($employee['fullName']); ?>" <?php if ($oficioData['assinante'] == $employee['fullName']) echo "selected"; ?>>
+                                        <?php echo htmlspecialchars($employee['fullName']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="cargo_assinante">Cargo do Assinante:</label>
+                            <input type="text" class="form-control" id="cargo_assinante" name="cargo_assinante" value="<?php echo htmlspecialchars($oficioData['cargo_assinante']); ?>">
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="data">Data:</label>
+                            <input type="date" class="form-control" id="data" name="data" value="<?php echo htmlspecialchars($oficioData['data']); ?>" required>
+                        </div>
+                    </div>
+                    <button type="submit" style="margin-bottom: 31px;margin-top: 0px !important;" class="btn btn-primary w-100">Salvar Ofício</button>
+                </form>
+            <?php endif; ?>
         </div>
     </div>
 

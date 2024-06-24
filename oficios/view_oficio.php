@@ -122,7 +122,7 @@ if (!empty($oficioData['tratamento'])) {
     $pdf->Cell(0, $lineHeight, $oficioData['tratamento'], 0, 1, 'L');
 }
 
-$pdf->SetFont('helvetica', '', 12);
+$pdf->SetFont('helvetica', 'B', 12);
 $pdf->Cell(0, $lineHeight, ($oficioData['destinatario']), 0, 1, 'L');
 
 // Cargo
