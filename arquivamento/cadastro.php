@@ -14,26 +14,9 @@ checkSession();
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
 </head>
 <body class="light-mode">
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
-        <button class="mode-switch">🔄 Modo</button>
-        <a href="../index.php">Página Inicial</a>
-        <a href="index.php">Acervo Cadastrado</a>
-        <a href="cadastro.php">Cadastrar Acervo</a>
-        <a href="categorias.php">Gerenciamento de Categorias</a>
-    </div>
-
-    <div id="main-content-wrapper">
-        <button class="openbtn" onclick="openNav()">&#9776; Menu</button>
-        <div id="system-name">Atlas</div>
-        <div id="welcome-section">
-            <div>
-                <h2>Bem-vindo</h2>
-                <p>Olá, <?php echo htmlspecialchars($_SESSION['username']); ?>. Você está logado.</p>
-            </div>
-            <a href="../logout.php" id="logout-button" class="btn btn-danger">Sair</a>
-        </div>
-    </div>
+<?php
+include(__DIR__ . '/../menu.php');
+?>
 
     <div id="main" class="main-content">
         <div class="container">
@@ -279,5 +262,8 @@ checkSession();
             });
         });
     </script>
+<?php
+include(__DIR__ . '/../rodape.php');
+?>
 </body>
 </html>

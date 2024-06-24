@@ -74,39 +74,22 @@ $atosExcluidos = countFilesInDirectory(__DIR__ . '/arquivamento/lixeira');
     </style>
 </head>
 <body class="light-mode">
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
-        <button class="mode-switch">🔄 Modo</button>
-        <a href="index.php">Página Inicial</a>
-        <a href="arquivamento/index.php">Acervo Cadastrado</a>
-        <a href="arquivamento/cadastro.php">Cadastrar de Acervo</a>
-        <a href="arquivamento/categorias.php">Categorias</a>
-    </div>
-
-    <div id="main-content-wrapper">
-        <button class="openbtn" onclick="openNav()">&#9776; Menu</button>
-        <div id="system-name">Atlas</div>
-        <div id="welcome-section">
-            <div>
-                <h2>Bem-vindo</h2>
-                <p>Olá, <?php echo htmlspecialchars($_SESSION['username']); ?>. Você está logado.</p>
-            </div>
-            <a href="logout.php" id="logout-button" class="btn btn-danger">Sair</a>
-        </div>
-    </div>
+<?php
+include(__DIR__ . '/menu.php');
+?>
 
     <div id="main" class="main-content">
         <div class="container">
             <h3>Dashboard - Visão Geral do Sistema</h3>
             <div class="row mb-4">
                 <div class="col-md-4">
-                    <a href="arquivamento/index.php" class="btn btn-primary w-100">Acervo Cadastrado</a>
+                    <a href="arquivamento/index.php" class="btn btn-primary w-100"><i class="fa fa-folder-open" aria-hidden="true"></i> Acervo Cadastrado</a>
                 </div>
                 <div class="col-md-4">
-                    <a href="arquivamento/cadastro.php" class="btn btn-success w-100">Cadastrar de Acervo</a>
+                    <a href="arquivamento/cadastro.php" class="btn btn-success w-100"><i class="fa fa-plus-circle" aria-hidden="true"></i> Cadastrar de Acervo</a>
                 </div>
                 <div class="col-md-4">
-                    <a href="arquivamento/categorias.php" class="btn btn-info w-100">Categorias</a>
+                    <a href="arquivamento/categorias.php" class="btn btn-info w-100"><i class="fa fa-tags" aria-hidden="true"></i> Categorias</a>
                 </div>
             </div>
             <div class="row mb-4">
@@ -331,5 +314,10 @@ $atosExcluidos = countFilesInDirectory(__DIR__ . '/arquivamento/lixeira');
             });
         });
     </script>
+
+<?php
+include(__DIR__ . '/rodape.php');
+?>
+
 </body>
 </html>

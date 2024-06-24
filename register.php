@@ -55,5 +55,8 @@
             });
         });
     </script>
+<?php
+include(__DIR__ . '/rodape.php');
+?>
 </body>
 </html>

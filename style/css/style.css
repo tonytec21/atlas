@@ -343,3 +343,58 @@ body.dark-mode .anexo-item {
         width: 100%;
     }
 }
+
+
+
+
+.timeline {
+    position: relative;
+    padding: 20px 0;
+    list-style: none;
+}
+
+.timeline-item {
+    padding-left: 40px;
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #007bff;
+    border-radius: 50%;
+    left: 20px;
+    top: 5px;
+}
+
+.timeline-item h6 {
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+
+.timeline-item small {
+    color: #6c757d;
+}
+
+.timeline-item p {
+    margin-bottom: 10px;
+}
+
+.anexo-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.anexo-item span {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.anexo-item button {
+    margin-left: 10px;
+}

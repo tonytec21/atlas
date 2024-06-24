@@ -1,0 +1,22 @@
+{
+    "id": 1718763374,
+    "categoria": "Registro Civil",
+    "livro": "14",
+    "folha": "177",
+    "termo": "145877",
+    "protocolo": "",
+    "matricula": "",
+    "partes_envolvidas": [
+        {
+            "cpf": "061.513.203-01",
+            "nome": "ANTONIO JOS\u00c9 MARTINS GARCIA"
+        }
+    ],
+    "cadastrado_por": "TONY",
+    "data_cadastro": "2024-06-18 23:16:14",
+    "anexos": [
+        "arquivos\/1718763374\/REGISTRO CIVIL.xlsx",
+        "arquivos\/1718763374\/manual-doi.pdf",
+        "arquivos\/1718763374\/anuencia_2151739.pdf"
+    ]
+}

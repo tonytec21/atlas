@@ -19,6 +19,56 @@ checkSession();
     <script src="../script/serpro-signer-promise.js" type="text/javascript"></script>
     <script src="../script/serpro-signer-client.js" type="text/javascript"></script>
     <script src="../script/jquery.autogrow-textarea.js" type="text/javascript"></script>
+    <script>
+        const commands = [
+            {"command": "sign","type": "text", "inputData": "teste"},
+            {"command": "sign","type": "text", "inputData": "teste", "signaturePolicy":"RT"},
+            {"command": "sign","type": "text", "inputData": "teste", "textEncoding": "ISO-8859-1"},
+            {"command": "sign","type": "text", "inputData": "teste","attached": "true"},
+            {"command": "sign","type": "hash", "inputData": " hash em base64 "},
+            {"command": "sign","type": "base64", "inputData": "conteúdo em base64"},
+            {"command": "sign","type": "PDF", "inputData": "arquivo PDF em base64"},
+            {"command": "verify","type": "text", "inputData": "texto assinado", "inputSignature":" Assinatura em base64"},
+            {"command": "verify","type": "base64", "inputData": " Contéudo em base64", "inputSignature":" Assinatura em base64"},
+            {"command": "verify","type": "base64", "inputSignature":" Assinatura em base64"},
+            {"command": "verify","type": "hash", "inputData": "hash em base64", "algorithmOIDHash": " oid do algoritmo"},
+            {"command": "verify","type": "pdf", "inputData": "arquivo PDF em base64"},
+            {"command": "TimeStamp","inputContent":"Contéudo em base64", "type":"raw"},
+            {"command": "TimeStamp","inputContent":"Contéudo em base64", "type":"Signature"},
+            {"command": "TimeStamp","inputContent":"Contéudo em base64", "type":"raw"},
+            {"command": "attached","inputSignature":"Assinatura em base64"},
+            {"command": "cosign", "type": "hash","inputData": "hash em base64", "signatureToCoSign":"Assinatura em base64"},
+            {"command": "cosign", "type": "base64","inputData": "Contéudo em base64", "signatureToCoSign":"Assinatura em base64"},
+            {"command": "cosign", "type": "base64","inputData": "Contéudo em base64", "signatureToCoSign":"Assinatura em base64","signaturePolicy":"RT"}
+        ];
+
+        var conn = new WebSocket("wss://127.0.0.1:65156/signer");
+        conn.onmessage = function(e) { 
+            const result = JSON.parse(e.data);
+            console.log('#', result);
+            if (result.error) {  
+            prettyResult(result.error);
+            } else {
+            prettyResult(result);
+            }
+        }
+
+        function sendData(value){
+            console.log('command', value);
+            conn.send(value);
+        }
+
+        function exec(index){
+            cmd = commands[index];
+            sendData(JSON.stringify(cmd));
+        }
+
+        function customExec(){
+            cmd = $('#custom-websocket').val();
+            sendData(cmd);
+        }
+
+    </script>
 
     <style>
         body.dark-mode {
@@ -35,31 +85,77 @@ checkSession();
         .hidden {
             display: none;
         }
+        .label-default[href]:focus,.label-default[href]:hover{
+            background-color:#5e5e5e;
+        }
+        .label-primary{
+            background-color:#337ab7;
+        }
+        .label-primary[href]:focus,.label-primary[href]:hover{
+            background-color:#286090;
+        }
+        .label-success{
+            background-color:#5cb85c;
+        }
+        .label-success[href]:focus,.label-success[href]:hover{
+            background-color:#449d44;
+        }
+        .label-info{
+            background-color:#5bc0de;
+        }
+        .label-info[href]:focus,.label-info[href]:hover{
+            background-color:#31b0d5;
+        }
+        .label-warning{
+            background-color:#f0ad4e;
+        }
+        .label-warning[href]:focus,.label-warning[href]:hover{
+            background-color:#ec971f;
+        }
+        .label-danger{
+            background-color:#d9534f;
+        }
+        .label-danger[href]:focus,.label-danger[href]:hover{
+            background-color:#c9302c;
+        }
+        .label{
+            display:inline;padding:.2em .6em .3em;
+            font-size:75%;
+            font-weight:700;
+            line-height:1;
+            color:#fff;
+            text-align:center;
+            white-space:nowrap;
+            vertical-align:baseline;
+            border-radius:.25em;
+        }
+        a.label:focus,a.label:hover{
+            color:#fff;
+            text-decoration:none;
+            cursor:pointer;
+        }
+        .label:empty{
+            display:none;
+        }
+        .btn .label{
+            position:relative;
+            top:-1px;
+        }
+        .label-default{
+            background-color:#777;
+        }
     </style>
 </head>
 <body class="light-mode">
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
-        <button class="mode-switch">🔄 Modo</button>
-        <a href="../index.php">Página Inicial</a>
-        <a href="index.php">Acervo Cadastrado</a>
-        <a href="cadastro.php">Cadastrar Acervo</a>
-        <a href="categorias.php">Gerenciamento de Categorias</a>
-    </div>
-
-    <div id="main-content-wrapper">
-        <button class="openbtn" onclick="openNav()">&#9776; Menu</button>
-        <div id="system-name">Atlas</div>
-        <div id="welcome-section">
-            <div>
-                <h2>Bem-vindo</h2>
-                <p>Olá, <?php echo htmlspecialchars($_SESSION['username']); ?>. Você está logado.</p>
-            </div>
-            <a href="../logout.php" id="logout-button" class="btn btn-danger">Sair</a>
-        </div>
-    </div>
+<?php
+include(__DIR__ . '/../menu.php');
+?>
 
     <div class="container">
+    <div class="px-2 font-weight-bold">WebSocket Server está:</div>
+      <div class="label label-success badge-pill js-server-status js-server-status-on">ONLINE</div>
+      <div class="label label-danger badge-pill js-server-status js-server-status-off">OFFLINE</div>
+      <p><a class="js-server-authorization" href="http://127.0.0.1:65056/" target="_blank">Favor autorizar o assinador!</a></p>
         <div class="row col-12">
             <div class="panel panel-default">
                 <div class="panel-heading">
@@ -212,5 +308,10 @@ checkSession();
             document.getElementById("main-content-wrapper").style.marginLeft = "0";
         }
     </script>
+
+<?php
+include(__DIR__ . '/../rodape.php');
+?>
+
 </body>
 </html>
