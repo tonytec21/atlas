@@ -1,3 +1,9 @@
+<style>
+    @import url(https://fonts.googleapis.com/css2?family=Roboto&display=swap);
+    body {
+        font-family: 'Roboto', sans-serif;
+        }
+</style>
 <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
         <button class="mode-switch">🔄 Modo</button>
