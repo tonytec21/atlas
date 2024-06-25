@@ -301,7 +301,7 @@ body.dark-mode .anexo-item {
 #system-name {
     font-size: 24px;
     font-weight: bold;
-    font-family: 'Poppins';
+    font-family: 'Roboto', sans-serif;
 }
 
 #main-content-wrapper button.openbtn {
