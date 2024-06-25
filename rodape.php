@@ -2,7 +2,7 @@
     <div class="footer-content">
         <p>
             &copy; <span id="year"></span> Atlas | By Backup Cloud. Todos os direitos reservados.
-</p>
+        </p>
     </div>
 </footer>
 <script>
@@ -41,5 +41,19 @@
 
     .footer-content a:hover {
         color: #0056b3; /* Cor mais escura ao passar o mouse */
+    }
+
+    body.dark-mode footer {
+        background-color: #343a40; /* Cor de fundo para modo escuro */
+        color: #f8f9fa; /* Cor do texto para modo escuro */
+        border-top: 1px solid #454d55;
+    }
+
+    body.dark-mode .footer-content a {
+        color: #66b2ff; /* Cor suave para o texto no modo escuro */
+    }
+
+    body.dark-mode .footer-content a:hover {
+        color: #3399ff; /* Cor mais escura ao passar o mouse no modo escuro */
     }
 </style>
