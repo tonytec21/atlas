@@ -151,6 +151,9 @@ $pdf->Ln(20);
 if ($signatureImage) {
     $signatureImagePath = __DIR__ . '/assinaturas/' . $signatureImage;
     if (file_exists($signatureImagePath)) {
+        // Obter dimensões da imagem
+        list($imageWidth, $imageHeight) = getimagesize($signatureImagePath);
+
         $signatureWidth = 80; // largura da imagem da assinatura
         $pageWidth = $pdf->getPageWidth();
         $marginLeft = $pdf->getMargins()['left'];
@@ -158,7 +161,13 @@ if ($signatureImage) {
         $centerX = ($pageWidth - $marginLeft - $marginRight - $signatureWidth) / 2 + $marginLeft;
 
         $pdf->Image($signatureImagePath, $centerX, $pdf->GetY() - 10, $signatureWidth, '', '', '', 'T', false, 300, '', false, false, 0, false, false, false);
-        $pdf->Ln(3);
+
+        // Ajustar o espaço vertical com base na largura da imagem
+        if ($imageWidth < 2000) {
+            $pdf->Ln(15);
+        } else {
+            $pdf->Ln(2);
+        }
     } else {
         // Debug: show the path of the signature image if it doesn't exist
         $pdf->SetFont('helvetica', 'I', 10);
