@@ -13,8 +13,15 @@ checkSession();
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <style>
-        .table th:nth-child(9), .table td:nth-child(9) {
-            width: 9%;
+        .table th:nth-child(5), .table td:nth-child(5), /* Data do Ato */
+        .table th:nth-child(12), .table td:nth-child(12) /* Ações */ {
+            width: 8%;
+        }
+        .table th:nth-child(11), .table td:nth-child(11) /* Ações */ {
+            width: 13%;
+        }
+        .table-responsive {
+            zoom: 80%!important;
         }
     </style>
 </head>
@@ -62,7 +69,19 @@ include(__DIR__ . '/../menu.php');
                     <input type="text" id="matricula" class="form-control" placeholder="Matrícula">
                 </div>
                 <div class="col-md-4">
-                    <button id="filter-button" class="btn btn btn-primary w-40">Filtrar</button>
+                    <label for="data-ato">Data do Ato</label>
+                    <input type="date" id="data-ato" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label for="descricao">Descrição e Detalhes</label>
+                    <input type="text" id="descricao" class="form-control" placeholder="Descrição e Detalhes">
+                </div>
+                <div class="col-md-4">
+                    <label for="atribuicao">Atribuição</label>
+                    <input type="text" id="atribuicao" class="form-control" placeholder="Atribuição">
+                </div>
+                <div class="col-md-4">
+                    <button id="filter-button" class="btn btn-primary w-40">Filtrar</button>
                     <button id="add-button" class="btn btn-success w-40" onclick="window.location.href='cadastro.php'">+ Adicionar</button>
                 </div>
             </div>
@@ -70,14 +89,17 @@ include(__DIR__ . '/../menu.php');
                 <table class="table table-striped">
                     <thead>
                         <tr>
+                            <th>Atribuição</th>
                             <th>Categoria</th>
                             <th>CPF/CNPJ</th>
                             <th>Nome</th>
+                            <th>Data do Ato</th>
                             <th>Livro</th>
                             <th>Folha</th>
                             <th>Termo/Ordem</th>
                             <th>Protocolo</th>
                             <th>Matrícula</th>
+                            <th>Descrição e Detalhes</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -268,6 +290,9 @@ include(__DIR__ . '/../menu.php');
                 var searchTermo = $('#termo').val();
                 var searchProtocolo = $('#protocolo').val();
                 var searchMatricula = $('#matricula').val();
+                var searchDataAto = $('#data-ato').val();
+                var searchDescricao = normalizeText($('#descricao').val());
+                var searchAtribuicao = $('#atribuicao').val();
 
                 $.ajax({
                     url: 'load_atos.php',
@@ -279,6 +304,7 @@ include(__DIR__ . '/../menu.php');
 
                         atos.forEach(function(ato) {
                             var normalizedNome = normalizeText(ato.partes_envolvidas.map(p => p.nome).join(', '));
+                            var normalizedDescricao = normalizeText(ato.descricao);
                             var matchesSearch = (!searchTerm || normalizedNome.includes(searchTerm)) &&
                                                 (!searchCategoria || ato.categoria === searchCategoria) &&
                                                 (!searchCpfCnpj || ato.partes_envolvidas.some(p => p.cpf.includes(searchCpfCnpj))) &&
@@ -286,20 +312,26 @@ include(__DIR__ . '/../menu.php');
                                                 (!searchFolha || ato.folha.includes(searchFolha)) &&
                                                 (!searchTermo || ato.termo.includes(searchTermo)) &&
                                                 (!searchProtocolo || ato.protocolo.includes(searchProtocolo)) &&
-                                                (!searchMatricula || ato.matricula.includes(searchMatricula));
+                                                (!searchMatricula || ato.matricula.includes(searchMatricula)) &&
+                                                (!searchDataAto || ato.data_ato === searchDataAto) &&
+                                                (!searchDescricao || normalizedDescricao.includes(searchDescricao)) &&
+                                                (!searchAtribuicao || ato.atribuicao.includes(searchAtribuicao));
 
                             if (matchesSearch) {
                                 var cpfsCnpjs = ato.partes_envolvidas.map(p => p.cpf).join(', ');
                                 var nomes = ato.partes_envolvidas.map(p => p.nome).join(', ');
                                 var row = '<tr>' +
+                                    '<td>' + ato.atribuicao + '</td>' +
                                     '<td>' + ato.categoria + '</td>' +
                                     '<td>' + cpfsCnpjs + '</td>' +
                                     '<td>' + nomes + '</td>' +
+                                    '<td>' + new Date(ato.data_ato).toLocaleDateString('pt-BR') + '</td>' +
                                     '<td>' + ato.livro + '</td>' +
                                     '<td>' + ato.folha + '</td>' +
                                     '<td>' + ato.termo + '</td>' +
                                     '<td>' + ato.protocolo + '</td>' +
                                     '<td>' + ato.matricula + '</td>' +
+                                    '<td>' + ato.descricao + '</td>' +
                                     '<td>' +
                                         '<button class="btn btn-info btn-sm visualizar-anexos" data-id="' + ato.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button> ' +
                                         '<button class="btn btn-edit btn-sm editar-ato" data-id="' + ato.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
@@ -326,7 +358,7 @@ include(__DIR__ . '/../menu.php');
 
                         $('#view-atribuicao').val(ato.atribuicao);
                         $('#view-categoria').val(ato.categoria);
-                        $('#view-data-ato').val(ato.data_ato);
+                        $('#view-data-ato').val(new Date(ato.data_ato).toLocaleDateString('pt-BR'));
                         $('#view-livro').val(ato.livro);
                         $('#view-folha').val(ato.folha);
                         $('#view-termo').val(ato.termo);
