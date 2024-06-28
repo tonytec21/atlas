@@ -10,7 +10,7 @@
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>">Página Inicial</a>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/index.php'?>">Arquivamento</a>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/cadastro.php'?>">Criar arquivamento</a>
-        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/categorias.php'?>">Categorias de arquivamento</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/categorias.php'?>">Categorias de arquivamentos</a>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas/index.php'?>">Tarefas</a>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas/cadastro.php'?>">Criar Tarefa</a>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas/categorias.php'?>">Categorias de tarefas</a>
