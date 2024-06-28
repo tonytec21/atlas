@@ -1,6 +1,7 @@
 <?php
 include(__DIR__ . '/session_check.php');
 checkSession();
+include(__DIR__ . '/db_connection.php');
 
 $metaDataDir = __DIR__ . '/arquivamento/meta-dados';
 $categoriesFile = __DIR__ . '/arquivamento/categorias/categorias.json';
@@ -67,6 +68,41 @@ foreach ($files as $file) {
     }
 }
 
+// Processar dados das tarefas
+$tarefasStatus = [
+    'pendente' => 0,
+    'em andamento' => 0,
+    'concluída' => 0,
+    'cancelada' => 0,
+    'iniciada' => 0, // Add 'iniciada' status
+];
+
+$sqlTarefas = "SELECT status, COUNT(*) as count FROM tarefas GROUP BY status";
+$resultTarefas = $conn->query($sqlTarefas);
+while ($row = $resultTarefas->fetch_assoc()) {
+    $status = strtolower($row['status']);
+    if (isset($tarefasStatus[$status])) {
+        $tarefasStatus[$status] = $row['count'];
+    }
+}
+
+// Buscar tarefas com data limite ultrapassada e prestes a vencer
+$overdueTasks = 0;
+$upcomingTasks = 0;
+$twoDaysLater = (clone $now)->modify('+2 days')->setTime(23, 59, 59);
+
+$sqlOverdueTasks = "SELECT COUNT(*) as count FROM tarefas WHERE data_limite < NOW() AND status != 'Concluída'";
+$resultOverdueTasks = $conn->query($sqlOverdueTasks);
+if ($resultOverdueTasks) {
+    $overdueTasks = $resultOverdueTasks->fetch_assoc()['count'];
+}
+
+$sqlUpcomingTasks = "SELECT COUNT(*) as count FROM tarefas WHERE data_limite BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 2 DAY) AND status != 'Concluída'";
+$resultUpcomingTasks = $conn->query($sqlUpcomingTasks);
+if ($resultUpcomingTasks) {
+    $upcomingTasks = $resultUpcomingTasks->fetch_assoc()['count'];
+}
+
 echo json_encode([
     'totalAtos' => $totalAtos,
     'dailyAtos' => $dailyAtos,
@@ -74,6 +110,9 @@ echo json_encode([
     'monthlyAtos' => $monthlyAtos,
     'atosByCategory' => $atosByCategory,
     'atosByUser' => $atosByUser,
-    'novosCadastros' => $novosCadastros
+    'novosCadastros' => $novosCadastros,
+    'tarefasStatus' => $tarefasStatus,
+    'overdueTasks' => $overdueTasks,
+    'upcomingTasks' => $upcomingTasks
 ]);
 ?>

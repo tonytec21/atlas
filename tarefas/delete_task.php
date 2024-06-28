@@ -1,31 +1,20 @@
 <?php
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $file = $_POST['file'];
+include(__DIR__ . '/session_check.php');
+checkSession();
+include(__DIR__ . '/db_connection.php');
 
-    $metaDir = 'meta-dados/';
-    $uploadDir = 'arquivos/' . pathinfo($file, PATHINFO_FILENAME) . '/';
+$id = $_POST['id'] ?? '';
 
-    $filePath = $metaDir . $file;
+$sql = "DELETE FROM tarefas WHERE id = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $id);
 
-    if (file_exists($filePath)) {
-        unlink($filePath);
-
-        // Remover os arquivos do subdiretório
-        $files = glob($uploadDir . '*');
-        foreach ($files as $file) {
-            if (is_file($file)) {
-                unlink($file);
-            }
-        }
-
-        // Remover o subdiretório
-        rmdir($uploadDir);
-
-        echo json_encode(['status' => 'success']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'File not found']);
-    }
+if ($stmt->execute()) {
+    echo "Tarefa excluída com sucesso!";
 } else {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+    echo "Erro ao excluir a tarefa: " . $conn->error;
 }
+
+$stmt->close();
+$conn->close();
 ?>

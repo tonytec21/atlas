@@ -1,55 +1,51 @@
 <?php
-session_start();
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $title = $_POST['title'];
-    $category = $_POST['category'];
-    $deadline = $_POST['deadline'];
-    $employee = $_POST['employee'];
-    $description = $_POST['description'];
-    $attachments = $_FILES['attachments'];
-    $createdBy = $_SESSION['username'];
-    $createdAt = date('Y-m-d H:i:s'); // Salva a data no formato americano
+include(__DIR__ . '/session_check.php');
+checkSession();
+include(__DIR__ . '/db_connection.php');
 
-    $taskData = [
-        'title' => $title,
-        'category' => $category,
-        'deadline' => $deadline,
-        'employee' => $employee,
-        'description' => $description,
-        'status' => 'Iniciada',
-        'createdBy' => $createdBy,
-        'createdAt' => $createdAt,
-        'attachments' => []
-    ];
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $titulo = $_POST['title'];
+    $categoria = $_POST['category'];
+    $data_limite = $_POST['deadline'];
+    $funcionario_responsavel = $_POST['employee'];
+    $origem = $_POST['origin'];
+    $descricao = $_POST['description'];
+    $criado_por = $_POST['createdBy'];
+    $data_criacao = $_POST['createdAt'];
+    $token = md5(uniqid(rand(), true));
+    $caminho_anexo = '';
 
-    $metaDir = 'meta-dados/';
-    if (!file_exists($metaDir)) {
-        mkdir($metaDir, 0777, true);
-    }
-
-    $taskFileName = uniqid() . '.json';
-    $taskFilePath = $metaDir . $taskFileName;
-
-    // Criar subdiretório para os anexos
-    $uploadDir = 'arquivos/' . pathinfo($taskFileName, PATHINFO_FILENAME) . '/';
-    if (!file_exists($uploadDir)) {
-        mkdir($uploadDir, 0777, true);
-    }
-
-    for ($i = 0; $i < count($attachments['name']); $i++) {
-        $tmpName = $attachments['tmp_name'][$i];
-        $fileName = basename($attachments['name'][$i]);
-        $filePath = $uploadDir . $fileName;
-
-        if (move_uploaded_file($tmpName, $filePath)) {
-            $taskData['attachments'][] = $filePath;
+    // Verifica se há arquivos anexados
+    if (!empty($_FILES['attachments']['name'][0])) {
+        $targetDir = "/arquivos/$token/";
+        $fullTargetDir = __DIR__ . $targetDir;
+        if (!is_dir($fullTargetDir)) {
+            mkdir($fullTargetDir, 0777, true);
         }
+
+        foreach ($_FILES['attachments']['name'] as $key => $name) {
+            $targetFile = $fullTargetDir . basename($name);
+            if (move_uploaded_file($_FILES['attachments']['tmp_name'][$key], $targetFile)) {
+                $caminho_anexo .= "$targetDir" . basename($name) . ";";
+            }
+        }
+        // Remover o ponto e vírgula final
+        $caminho_anexo = rtrim($caminho_anexo, ';');
     }
 
-    file_put_contents($taskFilePath, json_encode($taskData, JSON_PRETTY_PRINT));
+    // Inserir dados da tarefa no banco de dados
+    $sql = "INSERT INTO tarefas (token, titulo, categoria, origem, descricao, data_limite, funcionario_responsavel, criado_por, data_criacao, caminho_anexo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ssssssssss", $token, $titulo, $categoria, $origem, $descricao, $data_limite, $funcionario_responsavel, $criado_por, $data_criacao, $caminho_anexo);
 
-    echo json_encode(['status' => 'success']);
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+    if ($stmt->execute()) {
+        echo "Tarefa salva com sucesso!";
+        header("Location: index.php");
+    } else {
+        echo "Erro ao salvar a tarefa: " . $stmt->error;
+    }
+
+    $stmt->close();
+    $conn->close();
 }
 ?>

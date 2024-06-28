@@ -1,51 +1,48 @@
 <?php
-session_start();
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fileName = $_POST['fileName'];
-    $description = $_POST['commentDescription'];
-    $attachments = $_FILES['commentAttachments'];
+include(__DIR__ . '/session_check.php');
+checkSession();
+include(__DIR__ . '/db_connection.php');
 
-    $metaDir = 'meta-dados/';
-    $taskFilePath = $metaDir . $fileName;
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $hash_tarefa = $_POST['taskToken'];
+    $comentario = $_POST['commentDescription'];
+    $data_comentario = date('Y-m-d H:i:s');
+    $funcionario = $_SESSION['username'];
+    $status = 'Ativo'; // Defina o status inicial do comentário
 
-    if (file_exists($taskFilePath)) {
-        $taskData = json_decode(file_get_contents($taskFilePath), true);
+    $caminho_anexo = '';
 
-        $commentData = [
-            'employee' => $_SESSION['username'],
-            'date' => date('Y-m-d H:i:s'), // Salva a data no formato americano
-            'description' => $description,
-            'attachments' => []
-        ];
-
-        $uploadDir = 'arquivos/' . pathinfo($fileName, PATHINFO_FILENAME) . '/';
-        if (!file_exists($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+    // Verifica se há arquivos anexados
+    if (!empty($_FILES['commentAttachments']['name'][0])) {
+        $targetDir = "/arquivos/$hash_tarefa/";
+        $fullTargetDir = __DIR__ . $targetDir;
+        if (!is_dir($fullTargetDir)) {
+            mkdir($fullTargetDir, 0777, true);
         }
 
-        for ($i = 0; $i < count($attachments['name']); $i++) {
-            $tmpName = $attachments['tmp_name'][$i];
-            $attachmentName = basename($attachments['name'][$i]);
-            $filePath = $uploadDir . $attachmentName;
-
-            if (move_uploaded_file($tmpName, $filePath)) {
-                $commentData['attachments'][] = $filePath;
+        foreach ($_FILES['commentAttachments']['name'] as $key => $name) {
+            $targetFile = $fullTargetDir . basename($name);
+            if (move_uploaded_file($_FILES['commentAttachments']['tmp_name'][$key], $targetFile)) {
+                $caminho_anexo .= "$targetDir" . basename($name) . ";";
             }
         }
-
-        if (!isset($taskData['comments'])) {
-            $taskData['comments'] = [];
-        }
-
-        $taskData['comments'][] = $commentData;
-
-        file_put_contents($taskFilePath, json_encode($taskData, JSON_PRETTY_PRINT));
-
-        echo json_encode(['status' => 'success']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'File not found']);
+        // Remover o ponto e vírgula final
+        $caminho_anexo = rtrim($caminho_anexo, ';');
     }
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+
+    // Inserir comentário no banco de dados
+    $sql = "INSERT INTO comentarios (hash_tarefa, comentario, caminho_anexo, data_comentario, funcionario, status)
+            VALUES (?, ?, ?, ?, ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ssssss", $hash_tarefa, $comentario, $caminho_anexo, $data_comentario, $funcionario, $status);
+
+    if ($stmt->execute()) {
+        echo "Comentário adicionado com sucesso!";
+    } else {
+        echo "Erro ao adicionar comentário: " . $conn->error;
+    }
+
+    $stmt->close();
+    $conn->close();
 }
 ?>

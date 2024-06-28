@@ -35,7 +35,7 @@ include(__DIR__ . '/../menu.php');
 
     <div id="main" class="main-content">
         <div class="container">
-            <h3>Gerenciamento de Categorias</h3>
+            <h3>Gerenciamento de categorias de arquivamento</h3>
             <div class="row mb-3">
                 <div class="col-md-6">
                     <input type="text" id="search-term" class="form-control" placeholder="Pesquisar categoria">

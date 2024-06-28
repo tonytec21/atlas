@@ -398,3 +398,71 @@ body.dark-mode .anexo-item {
 .anexo-item button {
     margin-left: 10px;
 }
+.btn-oficio {
+    color: #fff;
+    background-color: #FFA500; /* Laranja */
+    border-color: #FFA500; /* Laranja */
+}
+
+.btn-oficio:hover {
+    color: #fff;
+    background-color: #FF8C00; /* Laranja mais escuro */
+    border-color: #FF8C00; /* Laranja mais escuro */
+}
+
+.btn-oficio.focus, .btn-oficio:focus {
+    color: #fff;
+    background-color: #FF8C00; /* Laranja mais escuro */
+    border-color: #FF8C00; /* Laranja mais escuro */
+    box-shadow: 0 0 0 .2rem rgba(255,140,0,.5); /* Sombras ajustadas para a cor laranja */
+}
+
+.btn-oficio.disabled, .btn-oficio:disabled {
+    color: #fff;
+    background-color: #FFA500; /* Laranja */
+    border-color: #FFA500; /* Laranja */
+}
+
+.btn-oficio:not(:disabled):not(.disabled).active, .btn-oficio:not(:disabled):not(.disabled):active, .show>.btn-oficio.dropdown-toggle {
+    color: #fff;
+    background-color: #FF7F50; /* Laranja ainda mais escuro */
+    border-color: #FF7F50; /* Laranja ainda mais escuro */
+}
+
+.btn-oficio:not(:disabled):not(.disabled).active:focus, .btn-oficio:not(:disabled):not(.disabled):active:focus, .show>.btn-oficio.dropdown-toggle:focus {
+    box-shadow: 0 0 0 .2rem rgba(255,140,0,.5); /* Sombras ajustadas para a cor laranja */
+}
+.btn-assinador {
+    color: #fff;
+    background-color: #00514c; /* Verde Escuro */
+    border-color: #00514c; /* Verde Escuro */
+}
+
+.btn-assinador:hover {
+    color: #fff;
+    background-color: #003d38; /* Verde mais escuro */
+    border-color: #003d38; /* Verde mais escuro */
+}
+
+.btn-assinador:focus {
+    color: #fff;
+    background-color: #003d38; /* Verde mais escuro */
+    border-color: #003d38; /* Verde mais escuro */
+    box-shadow: 0 0 0 .2rem rgba(0,81,76,.5); /* Sombras ajustadas para a cor verde */
+}
+
+.btn-assinador.disabled, .btn-assinador:disabled {
+    color: #fff;
+    background-color: #00514c; /* Verde Escuro */
+    border-color: #00514c; /* Verde Escuro */
+}
+
+.btn-assinador:not(:disabled):not(.disabled).active, .btn-assinador:not(:disabled):not(.disabled):active, .show>.btn-assinador.dropdown-toggle {
+    color: #fff;
+    background-color: #00423d; /* Verde ainda mais escuro */
+    border-color: #00423d; /* Verde ainda mais escuro */
+}
+
+.btn-assinador:not(:disabled):not(.disabled).active:focus, .btn-assinador:not(:disabled):not(.disabled):active:focus, .show>.btn-assinador.dropdown-toggle:focus {
+    box-shadow: 0 0 0 .2rem rgba(0,81,76,.5); /* Sombras ajustadas para a cor verde */
+}

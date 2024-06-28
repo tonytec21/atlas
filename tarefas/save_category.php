@@ -1,9 +1,22 @@
 <?php
-if (isset($_POST['category'])) {
-    $category = $_POST['category'];
-    $categoriesFile = 'categorias/categorias.json';
-    $categories = file_exists($categoriesFile) ? json_decode(file_get_contents($categoriesFile), true) : [];
-    $categories[] = $category; // Add the new category
-    file_put_contents($categoriesFile, json_encode($categories, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+include(__DIR__ . '/session_check.php');
+checkSession();
+include(__DIR__ . '/db_connection.php');
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['titulo'])) {
+    $titulo = $conn->real_escape_string($_POST['titulo']);
+    $sql = "INSERT INTO categorias (titulo, status) VALUES (?, 'ativo')";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('s', $titulo);
+
+    if ($stmt->execute()) {
+        echo "Categoria salva com sucesso!";
+    } else {
+        echo "Erro ao salvar categoria: " . $stmt->error;
+    }
+
+    $stmt->close();
 }
+
+$conn->close();
 ?>

@@ -1,38 +1,44 @@
 <?php
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $taskFileName = $_POST['taskFile'];
+include(__DIR__ . '/session_check.php');
+checkSession();
+include(__DIR__ . '/db_connection.php');
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $filePath = $_POST['file'];
-    $taskFilePath = __DIR__ . "/meta-dados/$taskFileName";
+    $taskId = $_POST['taskId'];
 
-    if (file_exists($taskFilePath)) {
-        $taskData = json_decode(file_get_contents($taskFilePath), true);
+    // Remove the file path from the database
+    $sql = "SELECT caminho_anexo FROM tarefas WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('i', $taskId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $task = $result->fetch_assoc();
 
-        if ($taskData) {
-            // Remove o anexo da lista de anexos
-            $taskData['attachments'] = array_filter($taskData['attachments'], function ($attachment) use ($filePath) {
-                return $attachment !== $filePath;
-            });
+    if ($task) {
+        $attachments = explode(';', $task['caminho_anexo']);
+        $attachments = array_filter($attachments, function($attachment) use ($filePath) {
+            return $attachment !== $filePath;
+        });
+        $newAttachmentPath = implode(';', $attachments);
 
-            // Remove o anexo da lista de anexos de comentários, se aplicável
-            foreach ($taskData['comments'] as &$comment) {
-                if (isset($comment['attachments'])) {
-                    $comment['attachments'] = array_filter($comment['attachments'], function ($attachment) use ($filePath) {
-                        return $attachment !== $filePath;
-                    });
-                }
+        $sql = "UPDATE tarefas SET caminho_anexo = ? WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param('si', $newAttachmentPath, $taskId);
+        if ($stmt->execute()) {
+            // Delete the file from the server
+            if (file_exists(__DIR__ . '/../' . $filePath)) {
+                unlink(__DIR__ . '/../' . $filePath);
             }
-
-            file_put_contents($taskFilePath, json_encode($taskData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             echo "Anexo excluído com sucesso.";
         } else {
-            http_response_code(500);
-            echo "Erro ao carregar os dados da tarefa.";
+            echo "Erro ao atualizar a tarefa: " . $stmt->error;
         }
     } else {
-        http_response_code(404);
-        echo "Arquivo de tarefa não encontrado.";
+        echo "Tarefa não encontrada.";
     }
-} else {
-    http_response_code(405);
-    echo "Método não permitido.";
+
+    $stmt->close();
+    $conn->close();
 }
+?>

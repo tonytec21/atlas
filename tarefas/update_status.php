@@ -1,23 +1,29 @@
 <?php
-session_start();
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fileName = $_POST['fileName'];
+include(__DIR__ . '/session_check.php');
+checkSession();
+include(__DIR__ . '/db_connection.php');
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $taskToken = $_POST['taskToken'];
     $status = $_POST['status'];
+    $data_conclusao = null;
 
-    $metaDir = 'meta-dados/';
-    $taskFilePath = $metaDir . $fileName;
-
-    if (file_exists($taskFilePath)) {
-        $taskData = json_decode(file_get_contents($taskFilePath), true);
-        $taskData['status'] = $status;
-
-        file_put_contents($taskFilePath, json_encode($taskData, JSON_PRETTY_PRINT));
-
-        echo json_encode(['status' => 'success']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'File not found']);
+    if ($status === 'Concluída') {
+        $data_conclusao = date('Y-m-d H:i:s');
     }
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+
+    // Atualizar o status da tarefa no banco de dados
+    $sql = "UPDATE tarefas SET status = ?, data_conclusao = ? WHERE token = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("sss", $status, $data_conclusao, $taskToken);
+
+    if ($stmt->execute()) {
+        echo "Status atualizado com sucesso!";
+    } else {
+        echo "Erro ao atualizar o status: " . $stmt->error;
+    }
+
+    $stmt->close();
+    $conn->close();
 }
 ?>
