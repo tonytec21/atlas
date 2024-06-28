@@ -7,7 +7,7 @@ checkSession();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Acervo</title>
+    <title>Atlas - Arquivamento</title>
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
@@ -32,7 +32,7 @@ include(__DIR__ . '/../menu.php');
 
     <div id="main" class="main-content">
         <div class="container">
-            <h3>Acervo Cadastrado - Consulta e Gestão</h3>
+            <h3>Arquivos Cadastrados - Consulta e Gestão</h3>
             <div class="row mb-3">
                 <div class="col-md-4">
                     <label for="categoria">Categoria</label>
