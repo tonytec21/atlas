@@ -95,16 +95,26 @@ include(__DIR__ . '/../menu.php');
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="anexosModalLabel">Dados do Ato</h5>
+                    <button type="button" id="generate-pdf-button" style="width: 220px; margin-left: 58%; margin-top: -8px;" class="btn btn-primary"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Capa de arquivamento</button>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
                         <span aria-hidden="true">&times;</span>
                     </button>
+
                 </div>
                 <div class="modal-body">
                     <form>
                         <div class="form-row">
                             <div class="form-group col-md-3">
+                                <label for="view-atribuicao">Atribuição:</label>
+                                <input type="text" class="form-control readonly-field" id="view-atribuicao" readonly>
+                            </div>
+                            <div class="form-group col-md-3">
                                 <label for="view-categoria">Categoria:</label>
                                 <input type="text" class="form-control readonly-field" id="view-categoria" readonly>
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label for="view-data-ato">Data do Ato:</label>
+                                <input type="text" class="form-control readonly-field" id="view-data-ato" readonly>
                             </div>
                             <div class="form-group col-md-3">
                                 <label for="view-livro">Livro:</label>
@@ -118,8 +128,6 @@ include(__DIR__ . '/../menu.php');
                                 <label for="view-termo">Termo/Ordem:</label>
                                 <input type="text" class="form-control readonly-field" id="view-termo" readonly>
                             </div>
-                        </div>
-                        <div class="form-row">
                             <div class="form-group col-md-3">
                                 <label for="view-protocolo">Protocolo:</label>
                                 <input type="text" class="form-control readonly-field" id="view-protocolo" readonly>
@@ -132,6 +140,10 @@ include(__DIR__ . '/../menu.php');
                         <div class="form-group">
                             <label for="view-partes-envolvidas">Partes Envolvidas:</label>
                             <textarea class="form-control readonly-field" id="view-partes-envolvidas" rows="2" readonly></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="view-descricao">Descrição e Detalhes:</label>
+                            <textarea class="form-control readonly-field" id="view-descricao" rows="3" readonly></textarea>
                         </div>
                         <h4>Anexos</h4>
                         <div id="view-anexos-list">
@@ -197,6 +209,12 @@ include(__DIR__ . '/../menu.php');
         function formatDateTime(dateTime) {
             var date = new Date(dateTime);
             return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
+        }
+
+        // Função para converter data no formato d-m-Y H:i:s para o formato Date
+        function parseCustomDate(dateString) {
+            var parts = dateString.split(/[- :]/);
+            return new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]);
         }
 
         $(document).ready(function() {
@@ -298,6 +316,7 @@ include(__DIR__ . '/../menu.php');
             // Visualizar anexos e dados
             $(document).on('click', '.visualizar-anexos', function() {
                 var id = $(this).data('id');
+                $('#generate-pdf-button').data('id', id);
                 $.ajax({
                     url: 'load_ato.php',
                     method: 'GET',
@@ -305,13 +324,16 @@ include(__DIR__ . '/../menu.php');
                     success: function(response) {
                         var ato = JSON.parse(response);
 
+                        $('#view-atribuicao').val(ato.atribuicao);
                         $('#view-categoria').val(ato.categoria);
+                        $('#view-data-ato').val(ato.data_ato);
                         $('#view-livro').val(ato.livro);
                         $('#view-folha').val(ato.folha);
                         $('#view-termo').val(ato.termo);
                         $('#view-protocolo').val(ato.protocolo);
                         $('#view-matricula').val(ato.matricula);
                         $('#view-partes-envolvidas').val(ato.partes_envolvidas.map(p => p.cpf + ' - ' + p.nome).join(', '));
+                        $('#view-descricao').val(ato.descricao);
                         $('#view-cadastrado-por').text(ato.cadastrado_por);
                         $('#view-data-cadastro').text(formatDateTime(ato.data_cadastro));
 
@@ -319,7 +341,8 @@ include(__DIR__ . '/../menu.php');
                         modificacoesList.empty();
                         if (ato.modificacoes && ato.modificacoes.length > 0) {
                             ato.modificacoes.forEach(function(modificacao) {
-                                var modificacaoItem = '<li>' + modificacao.usuario + ' - ' + formatDateTime(modificacao.data_hora) + '</li>';
+                                var modificacaoDate = parseCustomDate(modificacao.data_hora);
+                                var modificacaoItem = '<li>' + modificacao.usuario + ' - ' + formatDateTime(modificacaoDate) + '</li>';
                                 modificacoesList.append(modificacaoItem);
                             });
                         }
@@ -391,6 +414,12 @@ include(__DIR__ . '/../menu.php');
                 if (event.which === 32 && $(this).val().length === 0) {
                     event.preventDefault();
                 }
+            });
+
+            // Gerar capa de arquivamento em PDF
+            $('#generate-pdf-button').on('click', function() {
+                var id = $(this).data('id');
+                window.open('capa-arquivamento.php?id=' + id, '_blank');
             });
         });
     </script>

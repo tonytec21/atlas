@@ -16,12 +16,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     $dados = [
         'id' => $id,
+        'atribuicao' => $_POST['atribuicao'],
         'categoria' => $_POST['categoria'],
+        'data_ato' => $_POST['data_ato'],
         'livro' => isset($_POST['livro']) ? $_POST['livro'] : '',
         'folha' => isset($_POST['folha']) ? $_POST['folha'] : '',
         'termo' => isset($_POST['termo']) ? $_POST['termo'] : '',
         'protocolo' => isset($_POST['protocolo']) ? $_POST['protocolo'] : '',
         'matricula' => isset($_POST['matricula']) ? $_POST['matricula'] : '',
+        'descricao' => isset($_POST['descricao']) ? $_POST['descricao'] : '',
         'partes_envolvidas' => json_decode($_POST['partes_envolvidas'], true),
         'cadastrado_por' => $username,
         'data_cadastro' => $creationTime
@@ -43,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $dados['anexos'] = $anexos;
 
     // Salvar dados em arquivo JSON
-    file_put_contents($filePath, json_encode($dados, JSON_PRETTY_PRINT));
+    file_put_contents($filePath, json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
     echo json_encode(['status' => 'success', 'id' => $id]);
 } else {

@@ -4,12 +4,15 @@ checkSession();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = $_POST['id'];
+    $atribuicao = $_POST['atribuicao'];
     $categoria = $_POST['categoria'];
+    $data_ato = $_POST['data_ato'];
     $livro = $_POST['livro'];
     $folha = $_POST['folha'];
     $termo = $_POST['termo'];
     $protocolo = $_POST['protocolo'];
     $matricula = $_POST['matricula'];
+    $descricao = $_POST['descricao'];
     $partes_envolvidas = json_decode($_POST['partes_envolvidas'], true);
 
     $file_dir = "arquivos/$id/";
@@ -63,12 +66,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $ato = [
         'id' => $id,
+        'atribuicao' => $atribuicao,
         'categoria' => $categoria,
+        'data_ato' => $data_ato,
         'livro' => $livro,
         'folha' => $folha,
         'termo' => $termo,
         'protocolo' => $protocolo,
         'matricula' => $matricula,
+        'descricao' => $descricao,
         'partes_envolvidas' => $partes_envolvidas,
         'anexos' => array_values($anexos),
         'cadastrado_por' => $existing_ato['cadastrado_por'],
@@ -76,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'modificacoes' => $existing_ato['modificacoes']
     ];
 
-    file_put_contents("meta-dados/$id.json", json_encode($ato, JSON_PRETTY_PRINT));
+    file_put_contents("meta-dados/$id.json", json_encode($ato, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
     echo json_encode(['status' => 'success']);
 }

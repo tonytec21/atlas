@@ -25,8 +25,25 @@ include(__DIR__ . '/../menu.php');
                 <input type="hidden" id="ato-id" name="id">
                 <div class="form-row">
                     <div class="form-group col-md-3">
+                        <label for="atribuicao">Atribuição:</label>
+                        <select id="atribuicao" name="atribuicao" class="form-control" required>
+                            <option value="">Selecione</option>
+                            <option value="Registro Civil">Registro Civil</option>
+                            <option value="Registro de Imóveis">Registro de Imóveis</option>
+                            <option value="Registro de Títulos e Documentos">Registro de Títulos e Documentos</option>
+                            <option value="Registro Civil das Pessoas Jurídicas">Registro Civil das Pessoas Jurídicas</option>
+                            <option value="Notas">Notas</option>
+                            <option value="Protesto">Protesto</option>
+                            <option value="Contratos Marítimos">Contratos Marítimos</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-md-3">
                         <label for="categoria">Categoria:</label>
                         <select id="categoria" name="categoria" class="form-control" required></select>
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label for="data_ato">Data do Ato:</label>
+                        <input type="date" class="form-control" id="data_ato" name="data_ato" required>
                     </div>
                     <div class="form-group col-md-3">
                         <label for="livro">Livro:</label>
@@ -70,6 +87,11 @@ include(__DIR__ . '/../menu.php');
                     <tbody id="partes-envolvidas">
                     </tbody>
                 </table>
+                <h4>Descrição e Detalhes</h4>
+                <div class="form-group">
+                    <label for="descricao">Descrição e Detalhes:</label>
+                    <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                </div>
                 <h4>Anexos</h4>
                 <div class="form-group">
                     <label for="file-input">Anexar arquivos:</label>
@@ -183,21 +205,21 @@ include(__DIR__ . '/../menu.php');
             $('#adicionar-parte').click(function() {
                 var cpf = $('#cpf').val();
                 var nome = $('#nome').val();
-                if (!validarCPF_CNPJ(cpf)) {
+                if (cpf && !validarCPF_CNPJ(cpf)) {
                     alert('CPF/CNPJ inválido.');
                     return;
                 }
-                if (cpf && nome) {
+                if (nome || $('#partes-envolvidas tr').length > 0) {
                     var row = '<tr>' +
-                        '<td>' + cpf + '</td>' +
-                        '<td>' + nome + '</td>' +
-                        '<td><button class="btn btn-danger btn-sm remover-parte">Remover</button></td>' +
+                        '<td>' + (cpf || '') + '</td>' +
+                        '<td>' + (nome || '') + '</td>' +
+                        '<td><button class="btn btn-delete btn-sm remover-parte"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
                         '</tr>';
                     $('#partes-envolvidas').append(row);
                     $('#cpf').val('');
                     $('#nome').val('');
                 } else {
-                    alert('Preencha o CPF/CNPJ e o nome.');
+                    alert('Preencha o nome.');
                 }
             });
 
@@ -231,12 +253,15 @@ include(__DIR__ . '/../menu.php');
                     var ato = JSON.parse(response);
                     if (ato) {
                         $('#ato-id').val(ato.id);
+                        $('#atribuicao').val(ato.atribuicao);
                         $('#categoria').val(ato.categoria);
+                        $('#data_ato').val(ato.data_ato);
                         $('#livro').val(ato.livro);
                         $('#folha').val(ato.folha);
                         $('#termo').val(ato.termo);
                         $('#protocolo').val(ato.protocolo);
                         $('#matricula').val(ato.matricula);
+                        $('#descricao').val(ato.descricao);
 
                         ato.partes_envolvidas.forEach(function(parte) {
                             var row = '<tr>' +
