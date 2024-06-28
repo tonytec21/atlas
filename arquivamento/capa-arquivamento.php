@@ -18,7 +18,7 @@ class PDF extends TCPDF
     public function Footer()
     {
         $this->SetY(-15);
-        $this->SetFont('helvetica', 'I', 8);
+        $this->SetFont('arial', 'I', 8);
     }
 }
 
@@ -32,7 +32,7 @@ if (isset($_GET['id'])) {
         $pdf = new PDF();
         $pdf->SetMargins(25, 50, 25); // Definir as margens: esquerda, superior (ajustada), direita
         $pdf->AddPage();
-        $pdf->SetFont('helvetica', '', 12);
+        $pdf->SetFont('arial', '', 10);
 
         $html = '
         <h1 style="text-align: center;">ARQUIVAMENTO</h1>
