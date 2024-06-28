@@ -81,8 +81,8 @@ include(__DIR__ . '/../menu.php');
                     <input type="text" id="atribuicao" class="form-control" placeholder="Atribuição">
                 </div>
                 <div class="col-md-4">
-                    <button id="filter-button" class="btn btn-primary w-40">Filtrar</button>
-                    <button id="add-button" class="btn btn-success w-40" onclick="window.location.href='cadastro.php'">+ Adicionar</button>
+                    <button id="filter-button" class="btn btn-primary w-40"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
+                    <button id="add-button" class="btn btn-success w-40" onclick="window.location.href='cadastro.php'"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar</button>
                 </div>
             </div>
             <div class="table-responsive">
