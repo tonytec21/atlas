@@ -27,6 +27,6 @@
                 <h2>Bem-vindo</h2>
                 <p>Olá, <?php echo htmlspecialchars($_SESSION['username']); ?>. Você está logado.</p>
             </div>
-            <a href="../logout.php" id="logout-button" class="btn btn-danger">Sair</a>
+            <a href="logout.php" id="logout-button" class="btn btn-danger">Sair</a>
         </div>
     </div>

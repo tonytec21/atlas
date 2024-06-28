@@ -160,7 +160,7 @@ include(__DIR__ . '/menu.php');
 
 <div class="notification">
     <span class="close-btn">&times;</span>    
-    <h6>Resumo das tarefas do usuário</h6>
+    <h6>Resumo das tarefas</h6>
     <hr style="border-top: 1px solid rgb(255 255 255 / 31%);">
     <p id="tarefasPendentes">Tarefas pendentes: 0</p>
     <p id="tarefasVencidas">Tarefas com data limite ultrapassada: 0</p>
