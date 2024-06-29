@@ -2,6 +2,18 @@
 include(__DIR__ . '/../session_check.php');
 checkSession();
 
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "oficios_db";
+
+// Conexão com o banco de dados "oficios_db"
+$conn = new mysqli($servername, $username, $password, $dbname);
+if ($conn->connect_error) {
+    die("Falha na conexão: " . $conn->connect_error);
+}
+
+// Função para obter o próximo número de ofício
 function getNextOficioNumber($conn) {
     $currentYear = date('Y');
     $result = $conn->query("SELECT MAX(numero) AS max_numero FROM oficios WHERE YEAR(data) = $currentYear");
@@ -19,16 +31,6 @@ function getNextOficioNumber($conn) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $servername = "localhost";
-    $username = "root";
-    $password = "";
-    $dbname = "oficios_db";
-
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    if ($conn->connect_error) {
-        die("Falha na conexão: " . $conn->connect_error);
-    }
-
     $numero = getNextOficioNumber($conn);
     $destinatario = $conn->real_escape_string($_POST['destinatario']);
     $assunto = $conn->real_escape_string($_POST['assunto']);
@@ -49,7 +51,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     echo "<script>alert('Ofício salvo com sucesso!'); window.location.href = 'index.php';</script>";
 }
 
-$employees = json_decode(file_get_contents(__DIR__ . '/../data.json'), true);
+// Conexão com o banco de dados "atlas"
+$atlasConn = new mysqli($servername, $username, $password, "atlas");
+if ($atlasConn->connect_error) {
+    die("Falha na conexão com o banco atlas: " . $atlasConn->connect_error);
+}
+$atlasConn->set_charset("utf8"); // Definir charset para UTF-8
+
+// Buscar funcionários do banco de dados "atlas"
+$sql = "SELECT id, nome_completo, cargo FROM funcionarios WHERE status = 'ativo'";
+$result = $atlasConn->query($sql);
+$employees = [];
+while ($row = $result->fetch_assoc()) {
+    $employees[] = $row;
+}
+$atlasConn->close();
+
+// Usuário logado
+$loggedUser = $_SESSION['username'];
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -62,6 +82,8 @@ $employees = json_decode(file_get_contents(__DIR__ . '/../data.json'), true);
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <script src="https://cdn.ckeditor.com/4.16.0/full/ckeditor.js"></script>
+    <script src="../script/jquery-3.5.1.min.js"></script>
+    <script src="../script/bootstrap.min.js"></script>
 </head>
 <body class="light-mode">
 <?php
@@ -99,15 +121,15 @@ include(__DIR__ . '/../menu.php');
                         <label for="assinante">Assinante:</label>
                         <select class="form-control" id="assinante" name="assinante" required>
                             <?php foreach ($employees as $employee): ?>
-                                <option value="<?php echo htmlspecialchars($employee['fullName']); ?>">
-                                    <?php echo htmlspecialchars($employee['fullName']); ?>
+                                <option value="<?php echo htmlspecialchars($employee['nome_completo']); ?>" <?php echo $loggedUser == $employee['nome_completo'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($employee['nome_completo']); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group col-md-4">
                         <label for="cargo_assinante">Cargo do Assinante:</label>
-                        <input type="text" class="form-control" id="cargo_assinante" name="cargo_assinante">
+                        <input type="text" class="form-control" id="cargo_assinante" name="cargo_assinante" value="<?php echo $loggedUser == $employee['nome_completo'] ? htmlspecialchars($employee['cargo']) : ''; ?>">
                     </div>
                     <div class="form-group col-md-4">
                         <label for="data">Data:</label>
@@ -119,8 +141,6 @@ include(__DIR__ . '/../menu.php');
         </div>
     </div>
 
-    <script src="../script/jquery-3.5.1.min.js"></script>
-    <script src="../script/bootstrap.min.js"></script>
     <script>
         function openNav() {
             document.getElementById("mySidebar").style.width = "250px";
@@ -167,6 +187,20 @@ include(__DIR__ . '/../menu.php');
                 scayt_autoStartup: true, // Habilitar o corretor ortográfico automaticamente
                 scayt_sLang: 'pt_BR' // Definir o idioma do corretor ortográfico para português brasileiro
             });
+
+            // Preencher automaticamente o campo de cargo ao selecionar um assinante
+            $('#assinante').on('change', function() {
+                var selectedAssinante = $(this).val();
+                var cargoAssinante = '';
+
+                <?php foreach ($employees as $employee): ?>
+                if (selectedAssinante === "<?php echo htmlspecialchars($employee['nome_completo']); ?>") {
+                    cargoAssinante = "<?php echo htmlspecialchars($employee['cargo']); ?>";
+                }
+                <?php endforeach; ?>
+
+                $('#cargo_assinante').val(cargoAssinante);
+            }).trigger('change'); // Trigger change event to set initial value
         });
     </script>
 <?php

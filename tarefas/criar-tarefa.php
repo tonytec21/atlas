@@ -54,12 +54,15 @@ include(__DIR__ . '/../menu.php');
                     <select id="employee" name="employee" class="form-control" required>
                         <option value="">Selecione</option>
                         <?php
-                        $json_data = file_get_contents('../data.json');
-                        $employees = json_decode($json_data, true);
-                        $loggedInUser = $_SESSION["username"];
-                        foreach ($employees as $employee) {
-                            $selected = ($employee['username'] == $loggedInUser) ? 'selected' : '';
-                            echo "<option value='" . htmlspecialchars($employee['fullName'], ENT_QUOTES, 'UTF-8') . "' $selected>" . htmlspecialchars($employee['fullName'], ENT_QUOTES, 'UTF-8') . "</option>";
+                        $sql = "SELECT id, nome_completo FROM funcionarios WHERE status = 'ativo'";
+                        $result = $conn->query($sql);
+                        $loggedInUser = $_SESSION['username'];
+
+                        if ($result->num_rows > 0) {
+                            while($row = $result->fetch_assoc()) {
+                                $selected = ($row['nome_completo'] == $loggedInUser) ? 'selected' : '';
+                                echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "' $selected>" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";
+                            }
                         }
                         ?>
                     </select>
@@ -90,7 +93,7 @@ include(__DIR__ . '/../menu.php');
             </div>
             <input type="hidden" id="createdBy" name="createdBy" value="<?php echo $_SESSION['username']; ?>">
             <input type="hidden" id="createdAt" name="createdAt" value="<?php echo date('Y-m-d H:i:s'); ?>">
-            <button type="submit" style="margin-top: 1px; margin-button: 20px;" class="btn btn-primary w-100">Salvar Tarefa</button>
+            <button type="submit" style="margin-top: 1px; margin-bottom: 20px;" class="btn btn-primary w-100">Salvar Tarefa</button>
         </form>
     </div>
 </div>

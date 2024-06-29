@@ -116,11 +116,20 @@ include(__DIR__ . '/../menu.php');
                     <select id="employee" name="employee" class="form-control">
                         <option value="">Selecione</option>
                         <?php
-                        $json_data = file_get_contents('../data.json');
-                        $employees = json_decode($json_data, true);
-                        foreach ($employees as $employee) {
-                            echo "<option value='" . htmlspecialchars($employee['fullName'], ENT_QUOTES, 'UTF-8') . "'>" . htmlspecialchars($employee['fullName'], ENT_QUOTES, 'UTF-8') . "</option>";
+                        // Buscando os funcionários diretamente do banco de dados "atlas"
+                        $connAtlas = new mysqli("localhost", "root", "", "atlas");
+                        if ($connAtlas->connect_error) {
+                            die("Falha na conexão com o banco atlas: " . $connAtlas->connect_error);
                         }
+
+                        $sql = "SELECT id, nome_completo FROM funcionarios WHERE status = 'ativo'";
+                        $result = $connAtlas->query($sql);
+                        if ($result->num_rows > 0) {
+                            while ($row = $result->fetch_assoc()) {
+                                echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "'>" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";
+                            }
+                        }
+                        $connAtlas->close();
                         ?>
                     </select>
                 </div>
@@ -366,6 +375,31 @@ include(__DIR__ . '/../menu.php');
         });
     });
 
+    // Carregar funcionários do banco de dados
+    $.ajax({
+        url: 'load_employees.php',
+        method: 'GET',
+        success: function(response) {
+            if (response.error) {
+                alert(response.error);
+                return;
+            }
+            
+            var employees = response;
+            var employeeSelect = $('#employee');
+            employeeSelect.empty();
+            employeeSelect.append('<option value="">Selecione</option>');
+            employees.forEach(function(employee) {
+                var option = '<option value="' + employee.nome_completo + '">' + employee.nome_completo + '</option>';
+                employeeSelect.append(option);
+            });
+        },
+        error: function(xhr, status, error) {
+            console.error('Erro ao carregar os funcionários:', status, error);
+            alert('Erro ao carregar os funcionários');
+        }
+    });
+
     // Enviar formulário de pesquisa
     $('#searchForm').on('submit', function(e) {
         e.preventDefault();
@@ -416,7 +450,6 @@ include(__DIR__ . '/../menu.php');
                         }
                     }
 
-
                     var actions = '<button class="btn btn-info btn-sm" onclick="viewTask(\'' + task.token + '\')"><i class="fa fa-eye" aria-hidden="true"></i></button> ';
                     if (task.status.toLowerCase() !== 'concluída') {
                         actions += '<button class="btn btn-edit btn-sm" onclick="editTask(' + task.id + ')"><i class="fa fa-pencil" aria-hidden="true"></i></button> ';
@@ -448,7 +481,7 @@ include(__DIR__ . '/../menu.php');
         e.preventDefault();
 
         var formData = new FormData(this);
-        var taskToken = $('#viewTitle').data('tasktoken'); // Assume that tasktoken is stored as data attribute
+        var taskToken = $('#viewTitle').data('tasktoken'); // Assume que o token da tarefa está armazenado como atributo de dados
 
         formData.append('taskToken', taskToken);
 
@@ -460,9 +493,9 @@ include(__DIR__ . '/../menu.php');
             contentType: false,
             success: function(response) {
                 $('#addCommentModal').modal('hide');
-                $('body').removeClass('modal-open'); // Fix scroll issue
+                $('body').removeClass('modal-open'); // Corrigir problema de rolagem
                 alert('Comentário adicionado com sucesso!');
-                viewTask(taskToken); // Refresh the task view
+                viewTask(taskToken); // Atualizar a visualização da tarefa
             },
             error: function() {
                 alert('Erro ao adicionar comentário');
@@ -486,7 +519,7 @@ include(__DIR__ . '/../menu.php');
             success: function(response) {
                 alert('Status atualizado com sucesso!');
                 $('#viewTaskModal').modal('hide');
-                $('#searchForm').submit(); // Refresh the task list
+                $('#searchForm').submit(); // Atualizar a lista de tarefas
             },
             error: function() {
                 alert('Erro ao atualizar o status');
@@ -494,7 +527,7 @@ include(__DIR__ . '/../menu.php');
         });
     });
 
-    // Handle stacked modals scrolling issue
+    // Resolver problema de rolagem com modais empilhados
     $('#addCommentModal').on('shown.bs.modal', function () {
         $('body').addClass('modal-open');
     }).on('hidden.bs.modal', function () {
@@ -509,15 +542,14 @@ include(__DIR__ . '/../menu.php');
             $('#saveStatusButton').prop('disabled', true);
         }
 
-        // Check if the task has a linked oficio
-        var numeroOficio = $('#viewTitle').data('numeroOficio'); 
+        // Verificar se a tarefa tem um ofício vinculado
+        var numeroOficio = $('#viewTitle').data('numeroOficio');
         if (numeroOficio) {
             $('#vincularOficioButton').html('<i class="fa fa-eye" aria-hidden="true"></i> Visualizar Ofício').attr('onclick', 'viewOficio(\'' + numeroOficio + '\')').removeAttr('data-toggle data-target');
         } else {
             $('#vincularOficioButton').html('<i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício').attr('data-toggle', 'modal').attr('data-target', '#vincularOficioModal').removeAttr('onclick');
         }
     });
-
 });
 
 function viewTask(taskToken) {
@@ -527,7 +559,7 @@ function viewTask(taskToken) {
         data: { token: taskToken },
         success: function(response) {
             var task = JSON.parse(response);
-            $('#viewTitle').val(task.titulo).data('tasktoken', taskToken).data('numeroOficio', task.numero_oficio); 
+            $('#viewTitle').val(task.titulo).data('tasktoken', taskToken).data('numeroOficio', task.numero_oficio);
             $('#viewCategory').val(task.categoria_titulo);
             $('#viewOrigin').val(task.origem_titulo);
             $('#viewDeadline').val(new Date(task.data_limite).toLocaleString("pt-BR"));
@@ -535,8 +567,8 @@ function viewTask(taskToken) {
             $('#viewDescription').val(task.descricao);
             $('#viewStatus').val(task.status).data('data-conclusao', task.data_conclusao);
             $('#createdBy').val(task.criado_por);
-            $('#createdAt').val(task.data_criacao);
-            $('#taskNumber').text(task.id);  // Update the task number here
+            $('#createdAt').val(new Date(task.data_criacao).toLocaleString("pt-BR"));
+            $('#taskNumber').text(task.id); // Atualizar o número da tarefa aqui
             $('#viewConclusionDate').val(task.data_conclusao ? new Date(task.data_conclusao).toLocaleString("pt-BR") : '');
 
             var viewAttachments = $('#viewAttachments');
@@ -544,7 +576,7 @@ function viewTask(taskToken) {
             if (task.caminho_anexo) {
                 task.caminho_anexo.split(';').forEach(function(anexo, index) {
                     var fileName = anexo.split('/').pop();
-                    var filePath = anexo.startsWith('/') ? anexo : '/' + anexo; // Adiciona barra se necessário
+                    var filePath = anexo.startsWith('/') ? anexo : '/' + anexo;
                     var attachmentItem = '<div class="anexo-item">' +
                         '<span>' + (index + 1) + '</span>' +
                         '<span>' + fileName + '</span>' +
@@ -572,7 +604,7 @@ function viewTask(taskToken) {
                     if (comentario.caminho_anexo) {
                         comentario.caminho_anexo.split(';').forEach(function(anexo) {
                             var fileName = anexo.split('/').pop();
-                            var filePath = anexo.startsWith('/') ? anexo : '/' + anexo; // Adiciona barra se necessário
+                            var filePath = anexo.startsWith('/') ? anexo : '/' + anexo;
                             commentItem += '<div class="anexo-item">' +
                                 '<span>' + fileName + '</span>' +
                                 '<button class="btn btn-info btn-sm visualizar-anexo" data-file="' + filePath + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
@@ -625,7 +657,7 @@ function deleteTask(taskId) {
 $('#vincularOficioForm').on('submit', function(e) {
     e.preventDefault();
 
-    var taskId = $('#viewTitle').data('tasktoken'); // Assume task token is stored here
+    var taskId = $('#viewTitle').data('tasktoken'); // Assume que o token da tarefa está armazenado aqui
     var numeroOficio = $('#numeroOficio').val();
 
     $.ajax({
@@ -641,7 +673,7 @@ $('#vincularOficioForm').on('submit', function(e) {
                 alert('Ofício vinculado com sucesso!');
                 $('#vincularOficioModal').modal('hide');
                 $('#vincularOficioButton').html('<i class="fa fa-eye" aria-hidden="true"></i> Visualizar Ofício').attr('onclick', 'viewOficio(\'' + numeroOficio + '\')').removeAttr('data-toggle data-target');
-                $('#viewTitle').data('numeroOficio', numeroOficio); // Update the task data attribute
+                $('#viewTitle').data('numeroOficio', numeroOficio); // Atualizar o atributo de dados da tarefa
                 viewOficio(numeroOficio); // Abrir o ofício em uma nova guia
             } else {
                 alert('Erro ao vincular o ofício');

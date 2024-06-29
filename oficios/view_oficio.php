@@ -28,6 +28,18 @@ if ($result->num_rows === 0) {
 
 $oficioData = $result->fetch_assoc();
 $stmt->close();
+
+// Buscar dados da serventia
+$stmt = $conn->prepare("SELECT cidade FROM cadastro_serventia WHERE id = 1");
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($result->num_rows === 0) {
+    die("Dados da serventia não encontrados.");
+}
+
+$serventiaData = $result->fetch_assoc();
+$stmt->close();
 $conn->close();
 
 // Obter NUMERO_SEQUENCIAL e ANO_VIGENTE
@@ -108,7 +120,7 @@ $lineHeight = 10 * 0.5;
 
 // Cidade e data
 $pdf->SetFont('helvetica', '', 12);
-$pdf->Cell(0, $lineHeight, 'Bequimão-MA, ' . formatDateToBrazilian($oficioData['data']), 0, 1, 'R');
+$pdf->Cell(0, $lineHeight, $serventiaData['cidade'] . ', ' . formatDateToBrazilian($oficioData['data']), 0, 1, 'R');
 $pdf->Ln(3);
 
 // Número do ofício

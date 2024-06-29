@@ -15,7 +15,7 @@ if ($conn->connect_error) {
 }
 
 $stmt = $conn->prepare("SELECT * FROM oficios WHERE numero = ?");
-$stmt->bind_param("s", $numero);  // "s" to accept the format "NUMERO/ANO"
+$stmt->bind_param("s", $numero);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -25,9 +25,33 @@ if ($result->num_rows === 0) {
 
 $oficioData = $result->fetch_assoc();
 $stmt->close();
-$conn->close();
 
-$employees = json_decode(file_get_contents(__DIR__ . '/../data.json'), true);
+// Conexão com o banco de dados "atlas"
+$atlasConn = new mysqli($servername, $username, $password, "atlas");
+if ($atlasConn->connect_error) {
+    die("Falha na conexão com o banco atlas: " . $atlasConn->connect_error);
+}
+$atlasConn->set_charset("utf8");
+
+// Buscar funcionários do banco de dados "atlas"
+$sql = "SELECT id, nome_completo, cargo FROM funcionarios WHERE status = 'ativo'";
+$result = $atlasConn->query($sql);
+$employees = [];
+while ($row = $result->fetch_assoc()) {
+    $employees[] = $row;
+}
+
+// Logar a edição na tabela logs_oficios
+$loggedUser = $_SESSION['username'];
+$sql = "INSERT INTO logs_oficios (numero, destinatario, assunto, corpo, assinante, data, tratamento, cargo, cargo_assinante, atualizado_por) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+$stmt = $atlasConn->prepare($sql);
+$stmt->bind_param("ssssssssss", $oficioData['numero'], $oficioData['destinatario'], $oficioData['assunto'], $oficioData['corpo'], $oficioData['assinante'], $oficioData['data'], $oficioData['tratamento'], $oficioData['cargo'], $oficioData['cargo_assinante'], $loggedUser);
+$stmt->execute();
+$stmt->close();
+
+$atlasConn->close();
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -46,140 +70,154 @@ $employees = json_decode(file_get_contents(__DIR__ . '/../data.json'), true);
 include(__DIR__ . '/../menu.php');
 ?>
 
-    <div id="main" class="main-content">
-        <div class="container">
-            <h3>Editar Ofício</h3>
-            <?php if ($oficioData['status'] == 1): ?>
-                <div class="alert alert-danger" role="alert">
-                    Este ofício está bloqueado para edição.
+<div id="main" class="main-content">
+    <div class="container">
+        <h3>Editar Ofício</h3>
+        <?php if ($oficioData['status'] == 1): ?>
+            <div class="alert alert-danger" role="alert">
+                Este ofício está bloqueado para edição.
+            </div>
+        <?php else: ?>
+            <form id="editOficioForm" method="POST" action="save_oficio.php">
+                <input type="hidden" name="numero" value="<?php echo htmlspecialchars($numero); ?>">
+                <div class="form-row">
+                    <div class="form-group col-md-4">
+                        <label for="tratamento">Forma de Tratamento:</label>
+                        <input type="text" class="form-control" id="tratamento" name="tratamento" value="<?php echo htmlspecialchars($oficioData['tratamento']); ?>">
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label for="destinatario">Destinatário:</label>
+                        <input type="text" class="form-control" id="destinatario" name="destinatario" value="<?php echo htmlspecialchars($oficioData['destinatario']); ?>" required>
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label for="cargo">Cargo:</label>
+                        <input type="text" class="form-control" id="cargo" name="cargo" value="<?php echo htmlspecialchars($oficioData['cargo']); ?>">
+                    </div>
                 </div>
-            <?php else: ?>
-                <form id="editOficioForm" method="POST" action="save_oficio.php">
-                    <input type="hidden" name="numero" value="<?php echo htmlspecialchars($numero); ?>">
-                    <div class="form-row">
-                        <div class="form-group col-md-4">
-                            <label for="tratamento">Forma de Tratamento:</label>
-                            <input type="text" class="form-control" id="tratamento" name="tratamento" value="<?php echo htmlspecialchars($oficioData['tratamento']); ?>">
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="destinatario">Destinatário:</label>
-                            <input type="text" class="form-control" id="destinatario" name="destinatario" value="<?php echo htmlspecialchars($oficioData['destinatario']); ?>" required>
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="cargo">Cargo:</label>
-                            <input type="text" class="form-control" id="cargo" name="cargo" value="<?php echo htmlspecialchars($oficioData['cargo']); ?>">
-                        </div>
+                <div class="form-group">
+                    <label for="assunto">Assunto:</label>
+                    <input type="text" class="form-control" id="assunto" name="assunto" value="<?php echo htmlspecialchars($oficioData['assunto']); ?>" required>
+                </div>
+                <div class="form-group">
+                    <label for="corpo">Corpo do Ofício:</label>
+                    <textarea class="form-control" id="corpo" name="corpo" rows="10" required><?php echo htmlspecialchars($oficioData['corpo']); ?></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-md-4">
+                        <label for="assinante">Assinante:</label>
+                        <select class="form-control" id="assinante" name="assinante" required>
+                            <?php foreach ($employees as $employee): ?>
+                                <option value="<?php echo htmlspecialchars($employee['nome_completo']); ?>" <?php if ($oficioData['assinante'] == $employee['nome_completo']) echo "selected"; ?>>
+                                    <?php echo htmlspecialchars($employee['nome_completo']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
-                    <div class="form-group">
-                        <label for="assunto">Assunto:</label>
-                        <input type="text" class="form-control" id="assunto" name="assunto" value="<?php echo htmlspecialchars($oficioData['assunto']); ?>" required>
+                    <div class="form-group col-md-4">
+                        <label for="cargo_assinante">Cargo do Assinante:</label>
+                        <input type="text" class="form-control" id="cargo_assinante" name="cargo_assinante" value="<?php echo htmlspecialchars($oficioData['cargo_assinante']); ?>">
                     </div>
-                    <div class="form-group">
-                        <label for="corpo">Corpo do Ofício:</label>
-                        <textarea class="form-control" id="corpo" name="corpo" rows="10" required><?php echo htmlspecialchars($oficioData['corpo']); ?></textarea>
+                    <div class="form-group col-md-4">
+                        <label for="data">Data:</label>
+                        <input type="date" class="form-control" id="data" name="data" value="<?php echo htmlspecialchars($oficioData['data']); ?>" required>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-4">
-                            <label for="assinante">Assinante:</label>
-                            <select class="form-control" id="assinante" name="assinante" required>
-                                <?php foreach ($employees as $employee): ?>
-                                    <option value="<?php echo htmlspecialchars($employee['fullName']); ?>" <?php if ($oficioData['assinante'] == $employee['fullName']) echo "selected"; ?>>
-                                        <?php echo htmlspecialchars($employee['fullName']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="cargo_assinante">Cargo do Assinante:</label>
-                            <input type="text" class="form-control" id="cargo_assinante" name="cargo_assinante" value="<?php echo htmlspecialchars($oficioData['cargo_assinante']); ?>">
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="data">Data:</label>
-                            <input type="date" class="form-control" id="data" name="data" value="<?php echo htmlspecialchars($oficioData['data']); ?>" required>
-                        </div>
-                    </div>
-                    <button type="submit" style="margin-bottom: 31px;margin-top: 0px !important;" class="btn btn-primary w-100">Salvar Ofício</button>
-                </form>
-            <?php endif; ?>
-        </div>
+                </div>
+                <button type="submit" style="margin-bottom: 31px;margin-top: 0px !important;" class="btn btn-primary w-100">Salvar Ofício</button>
+            </form>
+        <?php endif; ?>
     </div>
+</div>
 
-    <script src="../script/jquery-3.5.1.min.js"></script>
-    <script src="../script/bootstrap.min.js"></script>
-    <script>
-        function openNav() {
-            document.getElementById("mySidebar").style.width = "250px";
-            document.getElementById("main").style.marginLeft = "250px";
-        }
+<script src="../script/jquery-3.5.1.min.js"></script>
+<script src="../script/bootstrap.min.js"></script>
+<script>
+    function openNav() {
+        document.getElementById("mySidebar").style.width = "250px";
+        document.getElementById("main").style.marginLeft = "250px";
+    }
 
-        function closeNav() {
-            document.getElementById("mySidebar").style.width = "0";
-            document.getElementById("main").style.marginLeft = "0";
-        }
+    function closeNav() {
+        document.getElementById("mySidebar").style.width = "0";
+        document.getElementById("main").style.marginLeft = "0";
+    }
 
-        $(document).ready(function() {
-            // Carregar o modo do usuário
+    $(document).ready(function() {
+        // Carregar o modo do usuário
+        $.ajax({
+            url: '../load_mode.php',
+            method: 'GET',
+            success: function(mode) {
+                $('body').removeClass('light-mode dark-mode').addClass(mode);
+            }
+        });
+
+        // Função para alternar modos claro e escuro
+        $('.mode-switch').on('click', function() {
+            var body = $('body');
+            body.toggleClass('dark-mode light-mode');
+
+            var mode = body.hasClass('dark-mode') ? 'dark-mode' : 'light-mode';
             $.ajax({
-                url: '../load_mode.php',
-                method: 'GET',
-                success: function(mode) {
-                    $('body').removeClass('light-mode dark-mode').addClass(mode);
+                url: '../save_mode.php',
+                method: 'POST',
+                data: { mode: mode },
+                success: function(response) {
+                    console.log(response);
                 }
-            });
-
-            // Função para alternar modos claro e escuro
-            $('.mode-switch').on('click', function() {
-                var body = $('body');
-                body.toggleClass('dark-mode light-mode');
-
-                var mode = body.hasClass('dark-mode') ? 'dark-mode' : 'light-mode';
-                $.ajax({
-                    url: '../save_mode.php',
-                    method: 'POST',
-                    data: { mode: mode },
-                    success: function(response) {
-                        console.log(response);
-                    }
-                });
-            });
-
-            // Inicializar o CKEditor com corretor ortográfico
-            CKEDITOR.replace('corpo', {
-                extraPlugins: 'htmlwriter',
-                allowedContent: true,
-                filebrowserUploadUrl: '/uploader/upload.php',
-                filebrowserUploadMethod: 'form',
-                scayt_autoStartup: true, // Habilitar o corretor ortográfico automaticamente
-                scayt_sLang: 'pt_BR' // Definir o idioma do corretor ortográfico para português brasileiro
-            });
-
-            // Enviar formulário de edição de ofício
-            $('#editOficioForm').on('submit', function(e) {
-                e.preventDefault();
-
-                for (instance in CKEDITOR.instances) {
-                    CKEDITOR.instances[instance].updateElement();
-                }
-
-                var formData = new FormData(this);
-
-                $.ajax({
-                    url: 'save_oficio.php',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        alert('Ofício salvo com sucesso!');
-                        window.location.href = 'index.php';
-                    },
-                    error: function(error) {
-                        alert('Erro ao salvar o ofício.');
-                    }
-                });
             });
         });
-    </script>
+
+        // Inicializar o CKEditor com corretor ortográfico
+        CKEDITOR.replace('corpo', {
+            extraPlugins: 'htmlwriter',
+            allowedContent: true,
+            filebrowserUploadUrl: '/uploader/upload.php',
+            filebrowserUploadMethod: 'form',
+            scayt_autoStartup: true,
+            scayt_sLang: 'pt_BR'
+        });
+
+        // Preencher automaticamente o campo de cargo ao selecionar um assinante
+        $('#assinante').on('change', function() {
+            var selectedAssinante = $(this).val();
+            var cargoAssinante = '';
+
+            <?php foreach ($employees as $employee): ?>
+            if (selectedAssinante === "<?php echo htmlspecialchars($employee['nome_completo']); ?>") {
+                cargoAssinante = "<?php echo htmlspecialchars($employee['cargo']); ?>";
+            }
+            <?php endforeach; ?>
+
+            $('#cargo_assinante').val(cargoAssinante);
+        }).trigger('change'); // Trigger change event to set initial value
+
+        // Enviar formulário de edição de ofício
+        $('#editOficioForm').on('submit', function(e) {
+            e.preventDefault();
+
+            for (instance in CKEDITOR.instances) {
+                CKEDITOR.instances[instance].updateElement();
+            }
+
+            var formData = new FormData(this);
+
+            $.ajax({
+                url: 'save_oficio.php',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    alert('Ofício salvo com sucesso!');
+                    window.location.href = 'index.php';
+                },
+                error: function(error) {
+                    alert('Erro ao salvar o ofício.');
+                }
+            });
+        });
+    });
+</script>
 
 <?php
 include(__DIR__ . '/../rodape.php');

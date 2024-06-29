@@ -23,6 +23,24 @@ if ($result->num_rows === 0) {
 $taskData = $result->fetch_assoc();
 $token = $taskData['token'];
 
+// Registrar log da tarefa
+$logSql = "INSERT INTO logs_tarefas (task_id, titulo, categoria, origem, data_limite, funcionario_responsavel, descricao, caminho_anexo, data_criacao, data_edicao, atualizado_por) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+$logStmt = $conn->prepare($logSql);
+$logTaskId = $taskData['id'];
+$logTitulo = $taskData['titulo'];
+$logCategoria = $taskData['categoria'];
+$logOrigem = $taskData['origem'];
+$logDataLimite = $taskData['data_limite'];
+$logFuncionarioResponsavel = $taskData['funcionario_responsavel'];
+$logDescricao = $taskData['descricao'];
+$logCaminhoAnexo = $taskData['caminho_anexo'];
+$logDataCriacao = $taskData['data_criacao'];
+$logDataEdicao = date('Y-m-d H:i:s');
+$logAtualizadoPor = $_SESSION['username'];
+
+$logStmt->bind_param("issssssssss", $logTaskId, $logTitulo, $logCategoria, $logOrigem, $logDataLimite, $logFuncionarioResponsavel, $logDescricao, $logCaminhoAnexo, $logDataCriacao, $logDataEdicao, $logAtualizadoPor);
+$logStmt->execute();
+
 // Buscar categorias
 $sql = "SELECT * FROM categorias WHERE status = 'ativo'";
 $result = $conn->query($sql);
@@ -39,12 +57,20 @@ while ($row = $result->fetch_assoc()) {
     $origins[] = $row;
 }
 
-// Buscar funcionários
-$employeesFilePath = __DIR__ . "/../data.json";
-if (!file_exists($employeesFilePath)) {
-    die("Arquivo de funcionários não encontrado.");
+// Buscar funcionários do banco de dados "atlas"
+$employeeConn = new mysqli("localhost", "root", "", "atlas");
+if ($employeeConn->connect_error) {
+    die("Falha na conexão com o banco atlas: " . $employeeConn->connect_error);
 }
-$employees = json_decode(file_get_contents($employeesFilePath), true);
+$employeeConn->set_charset("utf8"); // Definir charset para UTF-8
+
+$sql = "SELECT nome_completo FROM funcionarios WHERE status = 'ativo'";
+$result = $employeeConn->query($sql);
+$employees = [];
+while ($row = $result->fetch_assoc()) {
+    $employees[] = $row;
+}
+$employeeConn->close();
 
 // Buscar comentários
 $sql = "SELECT * FROM comentarios WHERE hash_tarefa = ?";
@@ -156,7 +182,7 @@ include(__DIR__ . '/../menu.php');
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-4">
                     <label for="origin">Origem:</label>
                     <select id="origin" name="origin" class="form-control" required>
                         <?php foreach ($origins as $origin) : ?>
@@ -164,17 +190,15 @@ include(__DIR__ . '/../menu.php');
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-4">
                     <label for="deadline">Data Limite para Conclusão:</label>
                     <input type="datetime-local" class="form-control" id="deadline" name="deadline" value="<?php echo htmlspecialchars(str_replace(' ', 'T', $taskData['data_limite'])); ?>" required>
                 </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-4">
                     <label for="employee">Funcionário Responsável:</label>
                     <select id="employee" name="employee" class="form-control" required>
                         <?php foreach ($employees as $employee) : ?>
-                            <option value="<?php echo htmlspecialchars($employee['fullName']); ?>" <?php echo $employee['fullName'] == $taskData['funcionario_responsavel'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($employee['fullName']); ?></option>
+                            <option value="<?php echo htmlspecialchars($employee['nome_completo']); ?>" <?php echo $employee['nome_completo'] == $taskData['funcionario_responsavel'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($employee['nome_completo']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

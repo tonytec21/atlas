@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="style/css/bootstrap.min.css">
     <link rel="stylesheet" href="style/css/custom.css">
     <link rel="icon" href="style/img/favicon.png" type="image/png">
+    <style>
+        @import url(https://fonts.googleapis.com/css2?family=Roboto&display=swap);
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-5">
@@ -15,7 +21,11 @@
         </div>
         <h2>Login</h2>
         <?php if (isset($_GET['error'])): ?>
-            <div class="alert alert-danger">Usuário ou senha incorretos. Tente novamente.</div>
+            <?php if ($_GET['error'] == 1): ?>
+                <div class="alert alert-danger">Usuário ou senha incorretos. Tente novamente.</div>
+            <?php elseif ($_GET['error'] == 2): ?>
+                <div class="alert alert-danger">Usuário inativo. Contate o administrador.</div>
+            <?php endif; ?>
         <?php endif; ?>
         <form action="check_login.php" method="POST">
             <div class="form-group">
