@@ -83,7 +83,7 @@ class PDF extends TCPDF
     public function Header()
     {
         $image_file = '../style/img/logo.png'; // Verifique se o caminho está correto
-        $this->Image($image_file, 25, 10, 150, '', 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);
+        $this->Image($image_file, 30, 10, 150, '', 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);
         $this->SetY(35); // Ajuste para garantir que o conteúdo não sobreponha a imagem
     }
 
