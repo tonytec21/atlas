@@ -98,7 +98,7 @@ include(__DIR__ . '/../menu.php');
                     <input type="file" id="file-input" name="file-input[]" multiple class="form-control">
                 </div>
                 <div id="file-list"></div><br>
-                <button type="submit" class="btn btn-primary">Salvar e Concluir</button>
+                <button type="submit"style="margin-top:0px;margin-bottom: 30px" class="btn btn-primary w-100">Salvar</button>
             </form>
         </div>
     </div>
