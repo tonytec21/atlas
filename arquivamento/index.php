@@ -415,6 +415,7 @@ include(__DIR__ . '/../menu.php');
             });
 
 
+
             // Excluir ato
             var atoIdToDelete;
             $(document).on('click', '.excluir-ato', function() {
