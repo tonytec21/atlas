@@ -98,7 +98,7 @@ include(__DIR__ . '/../menu.php');
                     <label for="file-input">Anexar arquivos:</label>
                     <input type="file" id="file-input" name="file-input[]" multiple class="form-control">
                 </div>
-                <button type="submit" class="btn btn-primary">Salvar e Concluir</button>
+                <button type="submit" class="btn btn-primary w-100" style="margin-top:0px; margin-bottom: 30px;">Salvar e Concluir</button>
             </form>
         </div>
     </div>
