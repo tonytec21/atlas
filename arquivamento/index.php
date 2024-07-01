@@ -126,37 +126,41 @@ include(__DIR__ . '/../menu.php');
                 <div class="modal-body">
                     <form>
                         <div class="form-row">
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-4">
                                 <label for="view-atribuicao">Atribuição:</label>
                                 <input type="text" class="form-control readonly-field" id="view-atribuicao" readonly>
                             </div>
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-4">
                                 <label for="view-categoria">Categoria:</label>
                                 <input type="text" class="form-control readonly-field" id="view-categoria" readonly>
                             </div>
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-2">
                                 <label for="view-data-ato">Data do Ato:</label>
                                 <input type="text" class="form-control readonly-field" id="view-data-ato" readonly>
                             </div>
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-2">
                                 <label for="view-livro">Livro:</label>
                                 <input type="text" class="form-control readonly-field" id="view-livro" readonly>
                             </div>
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-2">
                                 <label for="view-folha">Folha:</label>
                                 <input type="text" class="form-control readonly-field" id="view-folha" readonly>
                             </div>
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-2">
                                 <label for="view-termo">Termo/Ordem:</label>
                                 <input type="text" class="form-control readonly-field" id="view-termo" readonly>
                             </div>
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-2">
                                 <label for="view-protocolo">Protocolo:</label>
                                 <input type="text" class="form-control readonly-field" id="view-protocolo" readonly>
                             </div>
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-2">
                                 <label for="view-matricula">Matrícula:</label>
                                 <input type="text" class="form-control readonly-field" id="view-matricula" readonly>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="view-matricula">Selo de Arquivamento:</label>
+                                <input type="text" class="form-control readonly-field" id="view-selo-arquivamento" readonly>
                             </div>
                         </div>
                         <div class="form-group">
@@ -368,6 +372,20 @@ include(__DIR__ . '/../menu.php');
                         $('#view-descricao').val(ato.descricao);
                         $('#view-cadastrado-por').text(ato.cadastrado_por);
                         $('#view-data-cadastro').text(formatDateTime(ato.data_cadastro));
+                        
+                        // Buscar número do selo e exibir no campo "Selo de Arquivamento"
+                        $.ajax({
+                            url: 'get_selo_modal.php',
+                            method: 'GET',
+                            data: { id: id },
+                            success: function(seloResponse) {
+                                var selo = JSON.parse(seloResponse);
+                                $('#view-selo-arquivamento').val(selo.numero_selo);
+                            },
+                            error: function() {
+                                $('#view-selo-arquivamento').val('Erro ao buscar selo');
+                            }
+                        });
 
                         var modificacoesList = $('#view-modificacoes');
                         modificacoesList.empty();
@@ -395,6 +413,7 @@ include(__DIR__ . '/../menu.php');
                     }
                 });
             });
+
 
             // Excluir ato
             var atoIdToDelete;
