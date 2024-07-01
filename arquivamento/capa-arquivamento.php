@@ -22,12 +22,25 @@ class PDF extends TCPDF
     }
 }
 
+function getSeal($arquivo_id) {
+    include 'db_connection.php';
+    $stmt = $conn->prepare("SELECT selos.* FROM selos_arquivamentos INNER JOIN selos ON selos_arquivamentos.selo_id = selos.id WHERE selos_arquivamentos.arquivo_id = ?");
+    $stmt->bind_param("i", $arquivo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $selo = $result->fetch_assoc();
+    $stmt->close();
+    return $selo;
+}
+
 if (isset($_GET['id'])) {
     $id = $_GET['id'];
     $filePath = "meta-dados/$id.json";
 
     if (file_exists($filePath)) {
         $ato = json_decode(file_get_contents($filePath), true);
+
+        $selo = getSeal($id);
 
         $pdf = new PDF();
         $pdf->SetMargins(25, 50, 25); // Definir as margens: esquerda, superior (ajustada), direita
@@ -36,6 +49,7 @@ if (isset($_GET['id'])) {
 
         $html = '
         <h1 style="text-align: center;">ARQUIVAMENTO</h1>
+        <br>
         <h3>ATRIBUIÇÃO: ' . mb_strtoupper($ato['atribuicao']) . '</h3>
         <table border="1" cellpadding="4">
             <tr>
@@ -76,8 +90,23 @@ if (isset($_GET['id'])) {
             </tr>
         </table>
         <br><br>
-        <h3>SELO DE ARQUIVAMENTO:</h3>
-        <div style="border: 1px solid black; width: 100mm; height: 50mm;"><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p></div>'; // 50mm de altura
+        <h3>SELO DE ARQUIVAMENTO:</h3>';
+
+        if ($selo) {
+            $html .= '<div style="border: 1px solid black; width: 100mm;">
+                        <table>
+                            <tr>
+                                <td style="width: 19%; vertical-align: middle;"><p></p><img style="width: 90px;" src="data:image/png;base64,' . $selo['qr_code'] . '" alt="QR Code"></td>
+                                <td style="width: 77%; padding-left: 10px;">
+                                    <p style="text-align: justify;font-size: 9px;"><strong style="text-align: center!important;font-size: 10px;">Poder Judiciário – TJMA<br>Selo: ' . $selo['numero_selo'] . '</strong>
+                                    <br>' . $selo['texto_selo'] . '</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>';
+        } else {
+            $html .= '<div style="border: 1px solid black; width: 100mm; height: 50mm;"><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p></div>';
+        }
 
         $pdf->writeHTML($html, true, false, true, false, '');
 
