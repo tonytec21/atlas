@@ -187,7 +187,7 @@ include(__DIR__ . '/../menu.php');
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="viewTaskModalLabel">Dados da Tarefa nº <span id="taskNumber"></span></h5>
-                <button id="add-button" type="button" style="width: 130px; margin-left: 40%; margin-top: -8px;" class="btn btn-success" onclick="window.open('../oficios/cadastrar-oficio.php', '_blank')"><i class="fa fa-plus" aria-hidden="true"></i> Criar Ofício</button>
+                <button id="add-button" type="button" style="width: 130px; margin-left: 170px; margin-top: -8px;" class="btn btn-success" onclick="window.open('../oficios/cadastrar-oficio.php', '_blank')"><i class="fa fa-plus" aria-hidden="true"></i> Criar Ofício</button>
                 <button id="vincularOficioButton" type="button" style="width: 170px; margin-left: 2%; margin-top: -8px;" class="btn btn-primary" data-toggle="modal" data-target="#vincularOficioModal"><i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício</button>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
