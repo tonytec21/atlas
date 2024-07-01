@@ -35,6 +35,19 @@ include(__DIR__ . '/../menu.php');
             <h3>Arquivamentos Cadastrados - Consulta e Gestão</h3>
             <div class="row mb-3">
                 <div class="col-md-4">
+                    <label for="atribuicao">Atribuição:</label>
+                    <select id="atribuicao" name="atribuicao" class="form-control" required>
+                        <option value="">Selecione</option>
+                        <option value="Registro Civil">Registro Civil</option>
+                        <option value="Registro de Imóveis">Registro de Imóveis</option>
+                        <option value="Registro de Títulos e Documentos">Registro de Títulos e Documentos</option>
+                        <option value="Registro Civil das Pessoas Jurídicas">Registro Civil das Pessoas Jurídicas</option>
+                        <option value="Notas">Notas</option>
+                        <option value="Protesto">Protesto</option>
+                        <option value="Contratos Marítimos">Contratos Marítimos</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
                     <label for="categoria">Categoria</label>
                     <select id="categoria" class="form-control">
                         <option value="">Selecione</option>
@@ -75,10 +88,6 @@ include(__DIR__ . '/../menu.php');
                 <div class="col-md-4">
                     <label for="descricao">Descrição e Detalhes</label>
                     <input type="text" id="descricao" class="form-control" placeholder="Descrição e Detalhes">
-                </div>
-                <div class="col-md-4">
-                    <label for="atribuicao">Atribuição</label>
-                    <input type="text" id="atribuicao" class="form-control" placeholder="Atribuição">
                 </div>
                 <div class="col-md-4">
                     <button id="filter-button" class="btn btn-primary w-40"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
@@ -159,7 +168,7 @@ include(__DIR__ . '/../menu.php');
                                 <input type="text" class="form-control readonly-field" id="view-matricula" readonly>
                             </div>
                             <div class="form-group col-md-4">
-                                <label for="view-matricula">Selo de Arquivamento:</label>
+                                <label for="view-selo-arquivamento">Selo de Arquivamento:</label>
                                 <input type="text" class="form-control readonly-field" id="view-selo-arquivamento" readonly>
                             </div>
                         </div>
@@ -229,6 +238,9 @@ include(__DIR__ . '/../menu.php');
         }
 
         function normalizeText(text) {
+            if (typeof text !== 'string') {
+                return '';
+            }
             return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         }
 
@@ -372,7 +384,7 @@ include(__DIR__ . '/../menu.php');
                         $('#view-descricao').val(ato.descricao);
                         $('#view-cadastrado-por').text(ato.cadastrado_por);
                         $('#view-data-cadastro').text(formatDateTime(ato.data_cadastro));
-                        
+
                         // Buscar número do selo e exibir no campo "Selo de Arquivamento"
                         $.ajax({
                             url: 'get_selo_modal.php',
@@ -413,8 +425,6 @@ include(__DIR__ . '/../menu.php');
                     }
                 });
             });
-
-
 
             // Excluir ato
             var atoIdToDelete;
