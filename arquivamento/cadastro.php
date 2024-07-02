@@ -69,10 +69,10 @@ include(__DIR__ . '/../menu.php');
                 </div>
                 <h4>Parte Envolvida</h4>
                 <div class="form-row">
-                    <div class="form-group col-md-6">
+                    <div class="form-group col-md-4">
                         <input type="text" class="form-control" id="cpf" placeholder="CPF/CNPJ">
                     </div>
-                    <div class="form-group col-md-6">
+                    <div class="form-group col-md-8">
                         <input type="text" class="form-control" id="nome" placeholder="Nome">
                     </div>
                 </div>
@@ -144,14 +144,20 @@ include(__DIR__ . '/../menu.php');
             });
 
             // Máscara para CPF e CNPJ
-            $('#cpf').on('input', function() {
-                var value = $(this).val().replace(/\D/g, ''); // Remove tudo que não é dígito
-                if (value.length <= 11) {
-                    $(this).mask('000.000.000-00', { reverse: true });
-                } else {
-                    $(this).mask('00.000.000/0000-00', { reverse: true });
-                }
+            $(document).ready(function() {
+                $('#cpf').on('blur', function() {
+                    var value = $(this).val().replace(/\D/g, '');
+                    
+                    if (value.length === 11) {
+                        $(this).mask('000.000.000-00', { reverse: true });
+                    } else if (value.length === 14) {
+                        $(this).mask('00.000.000/0000-00', { reverse: true });
+                    } else {
+                        $(this).unmask();
+                    }
+                });
             });
+
 
             // Validador de CPF e CNPJ
             function validarCPF_CNPJ(value) {

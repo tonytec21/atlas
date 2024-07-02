@@ -286,14 +286,19 @@ $selos_arquivamentos->close();
         });
 
         // Máscara para CPF e CNPJ
-        $('#cpf').on('input', function() {
-            var value = $(this).val().replace(/\D/g, '');
-            if (value.length <= 11) {
-                $(this).mask('000.000.000-00', { reverse: true });
-            } else {
-                $(this).mask('00.000.000/0000-00', { reverse: true });
-            }
-        });
+        $(document).ready(function() {
+                $('#cpf').on('blur', function() {
+                    var value = $(this).val().replace(/\D/g, '');
+                    
+                    if (value.length === 11) {
+                        $(this).mask('000.000.000-00', { reverse: true });
+                    } else if (value.length === 14) {
+                        $(this).mask('00.000.000/0000-00', { reverse: true });
+                    } else {
+                        $(this).unmask();
+                    }
+                });
+            });
 
         // Validador de CPF e CNPJ
         function validarCPF_CNPJ(value) {
