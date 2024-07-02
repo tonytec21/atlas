@@ -279,9 +279,12 @@ include(__DIR__ . '/../menu.php');
                     processData: false,
                     contentType: false,
                     success: function(response) {
-                        alert('Dados salvos com sucesso');
-                        $('#ato-form')[0].reset(); // Limpar o formulário após salvar
-                        $('#partes-envolvidas').empty(); // Limpar as partes envolvidas
+                        var result = JSON.parse(response);
+                        if (result.status === 'success') {
+                            window.location.href = result.redirect;
+                        } else {
+                            alert('Erro ao salvar os dados');
+                        }
                     },
                     error: function() {
                         alert('Erro ao salvar os dados');

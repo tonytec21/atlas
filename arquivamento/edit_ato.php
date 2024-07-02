@@ -51,6 +51,17 @@ checkSession();
             justify-content: center; /* Centraliza os itens no footer */
         }
 
+        /* Alinhamento dos botões ao lado do título */
+        .title-buttons {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .buttons-right {
+            display: flex;
+            gap: 10px;
+        }
     </style>
 </head>
 <body class="light-mode">
@@ -71,7 +82,6 @@ $selo_html = '';
 if ($selo_existe) {
     $selo = $selos_arquivamentos_result->fetch_assoc();
     $selo_html = '<div style="border: 1px solid #ddd; padding: 10px; margin-top: 20px;">';
-    $selo_html .= '<p>Enviado ao portal em ' . date('d/m/Y H:i:s', strtotime($selo['data_geracao'])) . '</p>';
     $selo_html .= '<table>';
     $selo_html .= '<tr><td><img src="data:image/png;base64,' . $selo['qr_code'] . '" alt="QR Code"></td>';
     $selo_html .= '<td>';
@@ -85,7 +95,14 @@ $selos_arquivamentos->close();
 
 <div id="main" class="main-content">
     <div class="container">
-        <h3>Editar Arquivo - Atualização de Registro</h3>
+        <div class="title-buttons">
+            <h3>Editar Arquivo - Atualização de Registro</h3>
+            <div class="buttons-right">
+                <a href="capa-arquivamento.php?id=<?php echo $arquivo_id; ?>" target="_blank" class="btn btn-primary"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Capa de Arquivamento</a>
+                <a href="cadastro.php" class="btn btn-success"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Arquivamento</a>
+            </div>
+        </div>
+        <hr>
         <form id="ato-form">
             <input type="hidden" id="ato-id" name="id">
             <div class="form-row">

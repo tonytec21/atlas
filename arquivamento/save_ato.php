@@ -48,7 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Salvar dados em arquivo JSON
     file_put_contents($filePath, json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-    echo json_encode(['status' => 'success', 'id' => $id]);
+    // Retornar a URL de redirecionamento
+    echo json_encode(['status' => 'success', 'redirect' => "edit_ato.php?id=$id"]);
 } else {
     echo json_encode(['status' => 'error']);
 }
