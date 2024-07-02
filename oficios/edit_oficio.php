@@ -63,7 +63,10 @@ $atlasConn->close();
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <script src="https://cdn.ckeditor.com/4.16.0/full/ckeditor.js"></script>
+    <script src="../ckeditor/ckeditor.js"></script>
+    <style>
+        .cke_notification_warning { display: none !important; }
+    </style>
 </head>
 <body class="light-mode">
 <?php
