@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style/css/bootstrap.min.css">
     <link rel="stylesheet" href="style/css/custom.css">
     <link rel="icon" href="style/img/favicon.png" type="image/png">
+    <link href='https://fonts.googleapis.com/css?family=Poppins' rel='stylesheet'>
     <style>
         @import url(https://fonts.googleapis.com/css2?family=Roboto&display=swap);
         body {
