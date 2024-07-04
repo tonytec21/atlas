@@ -196,7 +196,7 @@ include(__DIR__ . '/../menu.php');
                     <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2" onclick="window.open('protocolo-geral.php?id=' + document.getElementById('taskNumber').innerText, '_blank')">
                         <i class="fa fa-book" aria-hidden="true"></i> Guia de Protocolo Geral
                     </button>
-                    <button style="font-size:12px" id="reciboEntregaButton" type="button" class="btn btn-info2 mr-2" onclick="window.open('recibo-entrega.php?id=' + document.getElementById('taskNumber').innerText, '_blank')">
+                    <button style="font-size:12px" id="reciboEntregaButton" type="button" class="btn btn-info2 mr-2">
                         <i class="fa fa-file-text" aria-hidden="true"></i> Recibo de Entrega
                     </button>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -204,7 +204,6 @@ include(__DIR__ . '/../menu.php');
                     </button>
                 </div>
             </div>
-
 
             <div class="modal-body">
                 <div class="form-row">
@@ -338,6 +337,46 @@ include(__DIR__ . '/../menu.php');
         </div>
     </div>
 </div>
+
+<!-- Modal Recibo de Entrega -->
+<div class="modal fade" id="reciboEntregaModal" tabindex="-1" role="dialog" aria-labelledby="reciboEntregaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reciboEntregaModalLabel">Recibo de Entrega</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="reciboEntregaForm">
+                    <div class="form-group">
+                        <label for="receptor">Nome do Receptor:</label>
+                        <input type="text" class="form-control" id="receptor" name="receptor" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dataEntrega">Data da Entrega:</label>
+                        <input type="datetime-local" class="form-control" id="dataEntrega" name="dataEntrega" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="documentos">Documentos Entregues:</label>
+                        <textarea class="form-control" id="documentos" name="documentos" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="observacoes">Observações:</label>
+                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="entregador">Nome do Entregador:</label>
+                        <input type="text" class="form-control" id="entregador" name="entregador" readonly>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Salvar Recibo</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
@@ -538,6 +577,53 @@ include(__DIR__ . '/../menu.php');
         } else {
             $('#vincularOficioButton').html('<i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício').attr('data-toggle', 'modal').attr('data-target', '#vincularOficioModal').removeAttr('onclick');
         }
+
+        // Verificar se o recibo de entrega já foi gerado
+        if ($('#viewTitle').data('reciboGerado')) {
+            $('#reciboEntregaButton').off('click').on('click', function() {
+                window.open('recibo-entrega.php?id=' + $('#taskNumber').text(), '_blank');
+            });
+        } else {
+            $('#reciboEntregaButton').off('click').on('click', function() {
+                $('#reciboEntregaModal').modal('show');
+                $('#entregador').val($('#viewEmployee').val()); // Preencher o entregador automaticamente
+                $('#receptor').val(''); // Limpar o campo receptor
+                $('#observacoes').val(''); // Limpar o campo observações
+                $('#dataEntrega').val(''); // Limpar o campo data da entrega
+                $('#documentos').val(''); // Limpar o campo documentos entregues
+            });
+        }
+    });
+
+    $('#reciboEntregaForm').on('submit', function(e) {
+        e.preventDefault();
+
+        var formData = $(this).serialize() + '&task_id=' + $('#taskNumber').text();
+
+        $.ajax({
+            url: 'save_recibo_entrega.php',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                try {
+                    var result = JSON.parse(response);
+                    if (result.success) {
+                        $('#reciboEntregaModal').modal('hide');
+                        alert('Recibo de entrega salvo com sucesso!');
+                        window.open('recibo-entrega.php?id=' + $('#taskNumber').text(), '_blank');
+                    } else {
+                        console.error(result.error);
+                        alert('Erro ao salvar o recibo de entrega: ' + result.error);
+                    }
+                } catch (e) {
+                    console.error('Erro ao parsear JSON:', e, response);
+                    alert('Erro ao salvar o recibo de entrega');
+                }
+            },
+            error: function() {
+                alert('Erro ao salvar o recibo de entrega');
+            }
+        });
     });
 });
 
@@ -548,7 +634,7 @@ function viewTask(taskToken) {
         data: { token: taskToken },
         success: function(response) {
             var task = JSON.parse(response);
-            $('#viewTitle').val(task.titulo).data('tasktoken', taskToken).data('numeroOficio', task.numero_oficio);
+            $('#viewTitle').val(task.titulo).data('tasktoken', taskToken).data('numeroOficio', task.numero_oficio).data('reciboGerado', task.recibo_gerado);
             $('#viewCategory').val(task.categoria_titulo);
             $('#viewOrigin').val(task.origem_titulo);
             $('#viewDeadline').val(new Date(task.data_limite).toLocaleString("pt-BR"));
@@ -677,7 +763,6 @@ $('#vincularOficioForm').on('submit', function(e) {
 function viewOficio(numero) {
     window.open('ver_oficio.php?numero=' + numero, '_blank');
 }
-
 </script>
 <?php
 include(__DIR__ . '/../rodape.php');

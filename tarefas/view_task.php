@@ -32,6 +32,14 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
         }
         $task['comentarios'] = $comments;
 
+        // Verificar se o recibo de entrega já foi gerado
+        $reciboStmt = $conn->prepare("SELECT id FROM recibos_de_entrega WHERE task_id = ?");
+        $reciboStmt->bind_param("i", $task['id']);
+        $reciboStmt->execute();
+        $reciboResult = $reciboStmt->get_result();
+        $task['recibo_gerado'] = $reciboResult->num_rows > 0;
+        $reciboStmt->close();
+
         echo json_encode($task);
     } else {
         echo json_encode([]);
