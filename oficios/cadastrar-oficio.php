@@ -1,5 +1,5 @@
 <?php
-include(__DIR__ . '/../session_check.php');
+include(__DIR__ . '/session_check.php');
 checkSession();
 
 $servername = "localhost";
@@ -96,6 +96,7 @@ include(__DIR__ . '/../menu.php');
     <div id="main" class="main-content">
         <div class="container">
             <h3>Criar Ofício</h3>
+            <hr>
             <form method="POST" action="">
                 <div class="form-row">
                     <div class="form-group col-md-4">

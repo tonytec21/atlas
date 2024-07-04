@@ -33,6 +33,7 @@ include(__DIR__ . '/../menu.php');
     <div id="main" class="main-content">
         <div class="container">
             <h3>Arquivamentos Cadastrados - Consulta e Gestão</h3>
+            <hr>
             <div class="row mb-3">
                 <div class="col-md-4">
                     <label for="atribuicao">Atribuição:</label>

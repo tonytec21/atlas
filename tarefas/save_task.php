@@ -39,8 +39,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $stmt->bind_param("ssssssssss", $token, $titulo, $categoria, $origem, $descricao, $data_limite, $funcionario_responsavel, $criado_por, $data_criacao, $caminho_anexo);
 
     if ($stmt->execute()) {
-        echo "Tarefa salva com sucesso!";
-        header("Location: index.php");
+        // Capturar o ID da tarefa recém-inserida
+        $last_id = $stmt->insert_id;
+        header("Location: edit_task.php?id=$last_id");
     } else {
         echo "Erro ao salvar a tarefa: " . $stmt->error;
     }

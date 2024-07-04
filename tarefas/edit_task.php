@@ -154,6 +154,11 @@ while ($row = $result->fetch_assoc()) {
         .dark-mode .timeline-item .timeline-panel::after { border-left-color: #444; }
         .dark-mode .anexo-item { background: #555; color: #fff; border-color: #666; }
         .dark-mode .anexo-item button { color: #fff; }
+        .btn-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body class="light-mode">
@@ -163,7 +168,14 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <h3>Editar Tarefa</h3>
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>Edição de Tarefa - Protocolo Geral nº.: <?php echo $taskId; ?></h3>
+            <div class="btn-container">
+                <a href="protocolo-geral.php?id=<?php echo $taskId; ?>" target="_blank" class="btn btn-primary mr-2"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Guia de Protocolo Geral</a>
+                <a href="criar-tarefa.php" class="btn btn-success"><i class="fa fa-plus-circle" aria-hidden="true"></i> Nova Tarefa</a>
+            </div>
+        </div>
+        <hr>
         <form id="editTaskForm" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="taskId" value="<?php echo htmlspecialchars($taskId); ?>">
             <input type="hidden" name="taskToken" value="<?php echo htmlspecialchars($token); ?>">

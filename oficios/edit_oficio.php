@@ -75,7 +75,8 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <h3>Editar Ofício</h3>
+        <h3>Edição de Ofício Nº.: <?php echo $numero; ?></h3>
+        <hr>
         <?php if ($oficioData['status'] == 1): ?>
             <div class="alert alert-danger" role="alert">
                 Este ofício está bloqueado para edição.

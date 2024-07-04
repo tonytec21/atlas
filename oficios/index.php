@@ -68,6 +68,7 @@ include(__DIR__ . '/../menu.php');
     <div id="main" class="main-content">
         <div class="container">
             <h3>Pesquisa de Ofícios</h3>
+            <hr>
             <form id="searchForm" method="GET">
                 <div class="row mb-3">
                     <div class="col-md-3">

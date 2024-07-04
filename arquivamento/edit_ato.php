@@ -96,7 +96,7 @@ $selos_arquivamentos->close();
 <div id="main" class="main-content">
     <div class="container">
         <div class="title-buttons">
-            <h3>Editar Arquivo - Atualização de Registro</h3>
+            <h3>Edição de Arquivamento</h3>
             <div class="buttons-right">
                 <a href="capa-arquivamento.php?id=<?php echo $arquivo_id; ?>" target="_blank" class="btn btn-primary"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Capa de Arquivamento</a>
                 <a href="cadastro.php" class="btn btn-success"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Arquivamento</a>

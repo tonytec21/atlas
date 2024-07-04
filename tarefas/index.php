@@ -75,13 +75,18 @@ include(__DIR__ . '/../menu.php');
 <div id="main" class="main-content">
     <div class="container">
         <h3>Pesquisa de Tarefas</h3>
+        <hr>
         <form id="searchForm">
             <div class="form-row">
-                <div class="form-group col-md-3">
+                <div class="form-group col-md-2">
+                    <label for="protocol">Protocolo Geral:</label>
+                    <input type="text" class="form-control" id="protocol" name="protocol">
+                </div>
+                <div class="form-group col-md-4">
                     <label for="title">Título da Tarefa:</label>
                     <input type="text" class="form-control" id="title" name="title">
                 </div>
-                <div class="form-group col-md-3">
+                <div class="form-group col-md-2">
                     <label for="category">Categoria:</label>
                     <select id="category" name="category" class="form-control">
                         <option value="">Selecione</option>
@@ -96,7 +101,7 @@ include(__DIR__ . '/../menu.php');
                         ?>
                     </select>
                 </div>
-                <div class="form-group col-md-3">
+                <div class="form-group col-md-2">
                     <label for="origin">Origem:</label>
                     <select id="origin" name="origin" class="form-control">
                         <option value="">Selecione</option>
@@ -111,33 +116,7 @@ include(__DIR__ . '/../menu.php');
                         ?>
                     </select>
                 </div>
-                <div class="form-group col-md-3">
-                    <label for="employee">Funcionário Responsável:</label>
-                    <select id="employee" name="employee" class="form-control">
-                        <option value="">Selecione</option>
-                        <?php
-                        // Buscando os funcionários diretamente do banco de dados "atlas"
-                        $connAtlas = new mysqli("localhost", "root", "", "atlas");
-                        if ($connAtlas->connect_error) {
-                            die("Falha na conexão com o banco atlas: " . $connAtlas->connect_error);
-                        }
-
-                        $sql = "SELECT id, nome_completo FROM funcionarios WHERE status = 'ativo'";
-                        $result = $connAtlas->query($sql);
-                        if ($result->num_rows > 0) {
-                            while ($row = $result->fetch_assoc()) {
-                                echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "'>" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";
-                            }
-                        }
-                        $connAtlas->close();
-                        ?>
-                    </select>
-                </div>
-                <div class="form-group col-md-9">
-                    <label for="description">Descrição:</label>
-                    <input type="text" class="form-control" id="description" name="description">
-                </div>
-                <div class="form-group col-md-3">
+                <div class="form-group col-md-2">
                     <label for="status">Status:</label>
                     <select id="status" name="status" class="form-control">
                         <option value="">Selecione</option>
@@ -147,6 +126,25 @@ include(__DIR__ . '/../menu.php');
                         <option value="Concluída">Concluída</option>
                         <option value="Cancelada">Cancelada</option>
                         <option value="Pendente">Pendente</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-8">
+                    <label for="description">Descrição:</label>
+                    <input type="text" class="form-control" id="description" name="description">
+                </div>
+                <div class="form-group col-md-4">
+                    <label for="employee">Funcionário Responsável:</label>
+                    <select id="employee" name="employee" class="form-control">
+                        <option value="">Selecione</option>
+                        <?php
+                        $sql = "SELECT nome_completo FROM funcionarios WHERE status = 'ativo'";
+                        $result = $conn->query($sql);
+                        if ($result->num_rows > 0) {
+                            while ($row = $result->fetch_assoc()) {
+                                echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "'>" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";
+                            }
+                        }
+                        ?>
                     </select>
                 </div>
             </div>
@@ -160,9 +158,10 @@ include(__DIR__ . '/../menu.php');
             </div>
         </form>
         <div class="mt-3">
-            <table class="table">
+            <table class="table" style="zoom: 85%">
                 <thead>
                     <tr>
+                        <th>Nº Protocolo</th>
                         <th>Título</th>
                         <th>Categoria</th>
                         <th>Origem</th>
@@ -186,13 +185,27 @@ include(__DIR__ . '/../menu.php');
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="viewTaskModalLabel">Dados da Tarefa nº <span id="taskNumber"></span></h5>
-                <button id="add-button" type="button" style="width: 130px; margin-left: 170px; margin-top: -8px;" class="btn btn-success" onclick="window.open('../oficios/cadastrar-oficio.php', '_blank')"><i class="fa fa-plus" aria-hidden="true"></i> Criar Ofício</button>
-                <button id="vincularOficioButton" type="button" style="width: 170px; margin-left: 2%; margin-top: -8px;" class="btn btn-primary" data-toggle="modal" data-target="#vincularOficioModal"><i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício</button>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <h6 class="modal-title" id="viewTaskModalLabel">Dados da Tarefa - Protocolo Geral nº.: <span id="taskNumber"></span></h6>
+                <div class="ml-auto d-flex align-items-center">
+                    <button style="font-size:12px" id="add-button" type="button" class="btn btn-success mr-2" onclick="window.open('../oficios/cadastrar-oficio.php', '_blank')">
+                        <i class="fa fa-plus" aria-hidden="true"></i> Criar Ofício
+                    </button>
+                    <button style="font-size:12px" id="vincularOficioButton" type="button" class="btn btn-primary mr-2" data-toggle="modal" data-target="#vincularOficioModal">
+                        <i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício
+                    </button>
+                    <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2" onclick="window.open('protocolo-geral.php?id=' + document.getElementById('taskNumber').innerText, '_blank')">
+                        <i class="fa fa-book" aria-hidden="true"></i> Guia de Protocolo Geral
+                    </button>
+                    <button style="font-size:12px" id="reciboEntregaButton" type="button" class="btn btn-info2 mr-2" onclick="window.open('recibo-entrega.php?id=' + document.getElementById('taskNumber').innerText, '_blank')">
+                        <i class="fa fa-file-text" aria-hidden="true"></i> Recibo de Entrega
+                    </button>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
             </div>
+
+
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group col-md-6">
@@ -375,31 +388,6 @@ include(__DIR__ . '/../menu.php');
         });
     });
 
-    // Carregar funcionários do banco de dados
-    $.ajax({
-        url: 'load_employees.php',
-        method: 'GET',
-        success: function(response) {
-            if (response.error) {
-                alert(response.error);
-                return;
-            }
-            
-            var employees = response;
-            var employeeSelect = $('#employee');
-            employeeSelect.empty();
-            employeeSelect.append('<option value="">Selecione</option>');
-            employees.forEach(function(employee) {
-                var option = '<option value="' + employee.nome_completo + '">' + employee.nome_completo + '</option>';
-                employeeSelect.append(option);
-            });
-        },
-        error: function(xhr, status, error) {
-            console.error('Erro ao carregar os funcionários:', status, error);
-            alert('Erro ao carregar os funcionários');
-        }
-    });
-
     // Enviar formulário de pesquisa
     $('#searchForm').on('submit', function(e) {
         e.preventDefault();
@@ -459,6 +447,7 @@ include(__DIR__ . '/../menu.php');
                     }
 
                     var row = '<tr class="' + rowClass + '">' +
+                        '<td>' + task.id + '</td>' +
                         '<td>' + task.titulo + '</td>' +
                         '<td>' + task.categoria_titulo + '</td>' +
                         '<td>' + task.origem_titulo + '</td>' +

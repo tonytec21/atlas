@@ -3,6 +3,7 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 
+$protocol = $_GET['protocol'] ?? '';
 $title = $_GET['title'] ?? '';
 $category = $_GET['category'] ?? '';
 $employee = $_GET['employee'] ?? '';
@@ -16,6 +17,9 @@ $sql = "SELECT tarefas.*, categorias.titulo AS categoria_titulo, origem.titulo A
         LEFT JOIN origem ON tarefas.origem = origem.id 
         WHERE 1=1";
 
+if (!empty($protocol)) {
+    $sql .= " AND tarefas.id = '$protocol'";
+}
 if (!empty($title)) {
     $sql .= " AND tarefas.titulo LIKE '%$title%'";
 }
