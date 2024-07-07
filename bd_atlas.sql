@@ -19,6 +19,31 @@
 CREATE DATABASE IF NOT EXISTS `atlas` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
 USE `atlas`;
 
+-- Copiando estrutura para tabela atlas.arquivamentos
+CREATE TABLE IF NOT EXISTS `arquivamentos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `hash_arquivamento` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `atribuicao` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `categoria` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data_ato` date NOT NULL,
+  `livro` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `folha` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `termo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `protocolo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `matricula` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `descricao` text COLLATE utf8mb4_unicode_ci,
+  `cadastrado_por` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data_cadastro` datetime NOT NULL,
+  `modificacoes` json DEFAULT NULL,
+  `partes_envolvidas` json DEFAULT NULL,
+  `anexos` json DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Copiando dados para a tabela atlas.arquivamentos: 0 rows
+/*!40000 ALTER TABLE `arquivamentos` DISABLE KEYS */;
+/*!40000 ALTER TABLE `arquivamentos` ENABLE KEYS */;
+
 -- Copiando estrutura para tabela atlas.cadastro_serventia
 CREATE TABLE IF NOT EXISTS `cadastro_serventia` (
   `id` int(11) NOT NULL,
@@ -83,7 +108,7 @@ CREATE TABLE IF NOT EXISTS `conexao_selador` (
 -- Copiando dados para a tabela atlas.conexao_selador: 1 rows
 /*!40000 ALTER TABLE `conexao_selador` DISABLE KEYS */;
 INSERT IGNORE INTO `conexao_selador` (`id`, `url_base`, `porta`, `usuario`, `senha`) VALUES
-	(1, 'https://selador.ma.portalselo.com.br', '9443', 'homologacao', 'a907438c85f0');
+	(1, 'https://selador.ma.portalselo.com.br', '443', 'cartorio', 'b81fb377ec0c');
 /*!40000 ALTER TABLE `conexao_selador` ENABLE KEYS */;
 
 -- Copiando estrutura para tabela atlas.funcionarios
@@ -96,13 +121,12 @@ CREATE TABLE IF NOT EXISTS `funcionarios` (
   `nivel_de_acesso` varchar(20) CHARACTER SET latin1 DEFAULT 'usuario',
   `status` varchar(20) CHARACTER SET latin1 DEFAULT 'ativo',
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Copiando dados para a tabela atlas.funcionarios: 2 rows
+-- Copiando dados para a tabela atlas.funcionarios: 1 rows
 /*!40000 ALTER TABLE `funcionarios` DISABLE KEYS */;
 INSERT IGNORE INTO `funcionarios` (`id`, `usuario`, `senha`, `nome_completo`, `cargo`, `nivel_de_acesso`, `status`) VALUES
-	(1, 'TONY', 'MTMwNA==', 'Antonio José Martins Garcia', 'Escrevente Substituto', 'administrador', 'ativo'),
-	(2, 'JEFFERSON', 'MTIzNA==', 'Jefferson Pereira de Freitas', 'Tabelião e Registrador', 'usuario', 'ativo');
+	(1, 'ADMIN', 'MTMwNA==', 'ADMIN', 'ADMIN', 'administrador', 'ativo');
 /*!40000 ALTER TABLE `funcionarios` ENABLE KEYS */;
 
 -- Copiando estrutura para tabela atlas.logs_de_acesso
@@ -180,6 +204,23 @@ INSERT IGNORE INTO `origem` (`id`, `titulo`, `status`) VALUES
 	(6, 'CRC', 'ativo'),
 	(7, 'ONR', 'ativo');
 /*!40000 ALTER TABLE `origem` ENABLE KEYS */;
+
+-- Copiando estrutura para tabela atlas.recibos_de_entrega
+CREATE TABLE IF NOT EXISTS `recibos_de_entrega` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `task_id` int(11) NOT NULL,
+  `receptor` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `entregador` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data_entrega` datetime NOT NULL,
+  `documentos` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `observacoes` text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY (`id`),
+  KEY `task_id` (`task_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Copiando dados para a tabela atlas.recibos_de_entrega: 0 rows
+/*!40000 ALTER TABLE `recibos_de_entrega` DISABLE KEYS */;
+/*!40000 ALTER TABLE `recibos_de_entrega` ENABLE KEYS */;
 
 -- Copiando estrutura para tabela atlas.selos
 CREATE TABLE IF NOT EXISTS `selos` (

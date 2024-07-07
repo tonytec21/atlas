@@ -97,14 +97,14 @@ $html = '
 </style>
 <table border="0" cellpadding="5">
     <tr>
-        <td class="header-cell" width="33%">Protocolo Geral:</td>
-        <td class="header-cell" width="33%">Data da Entrega:</td>
-        <td class="header-cell" width="33%">Receptor:</td>
+        <td class="header-cell" width="23%">Protocolo Geral:</td>
+        <td class="header-cell" width="26%">Data da Entrega:</td>
+        <td class="header-cell" width="50%">Receptor:</td>
     </tr>
     <tr>
-        <td class="data-cell" width="33%">' . convertToUtf8($tarefaData['id']) . '</td>
-        <td class="data-cell" width="33%">' . convertToUtf8(formatDateToBrazilian($reciboData['data_entrega'])) . '</td>
-        <td class="data-cell" width="33%">' . convertToUtf8($reciboData['receptor']) . '</td>
+        <td class="data-cell" width="23%">' . convertToUtf8($tarefaData['id']) . '</td>
+        <td class="data-cell" width="26%">' . convertToUtf8(formatDateToBrazilian($reciboData['data_entrega'])) . '</td>
+        <td class="data-cell" width="50%">' . convertToUtf8($reciboData['receptor']) . '</td>
     </tr><br>
     <tr>
         <td class="header-cell" width="49.5%">Entregador:</td>
@@ -128,9 +128,6 @@ $pdf->writeHTML($html, true, false, true, false, '');
 $pdf->Ln(1);
 $pdf->Cell(0, $lineHeight, '______________________________________', 0, 1, 'L');
 $pdf->Cell(0, $lineHeight, 'Assinatura do Receptor', 0, 1, 'L');
-$pdf->Ln(3);
-$pdf->Cell(0, $lineHeight, '______________________________________', 0, 1, 'L');
-$pdf->Cell(0, $lineHeight, 'Assinatura do Entregador', 0, 1, 'L');
 
 // Linha de corte
 $pdf->Ln(15);
@@ -150,14 +147,14 @@ $html = '
 </style>
 <table border="0" cellpadding="5">
     <tr>
-        <td class="header-cell" width="33%">Protocolo Geral:</td>
-        <td class="header-cell" width="33%">Data da Entrega:</td>
-        <td class="header-cell" width="33%">Receptor:</td>
+        <td class="header-cell" width="23%">Protocolo Geral:</td>
+        <td class="header-cell" width="26%">Data da Entrega:</td>
+        <td class="header-cell" width="50%">Receptor:</td>
     </tr>
     <tr>
-        <td class="data-cell" width="33%">' . convertToUtf8($tarefaData['id']) . '</td>
-        <td class="data-cell" width="33%">' . convertToUtf8(formatDateToBrazilian($reciboData['data_entrega'])) . '</td>
-        <td class="data-cell" width="33%">' . convertToUtf8($reciboData['receptor']) . '</td>
+        <td class="data-cell" width="23%">' . convertToUtf8($tarefaData['id']) . '</td>
+        <td class="data-cell" width="26%">' . convertToUtf8(formatDateToBrazilian($reciboData['data_entrega'])) . '</td>
+        <td class="data-cell" width="50%">' . convertToUtf8($reciboData['receptor']) . '</td>
     </tr><br>
     <tr>
         <td class="header-cell" width="49.5%">Entregador:</td>
@@ -179,9 +176,6 @@ $pdf->writeHTML($html, true, false, true, false, '');
 
 // Campos de assinatura no canhoto
 $pdf->Ln(1);
-$pdf->Cell(0, $lineHeight, '______________________________________', 0, 1, 'L');
-$pdf->Cell(0, $lineHeight, 'Assinatura do Receptor', 0, 1, 'L');
-$pdf->Ln(3);
 $pdf->Cell(0, $lineHeight, '______________________________________', 0, 1, 'L');
 $pdf->Cell(0, $lineHeight, 'Assinatura do Entregador', 0, 1, 'L');
 
