@@ -152,12 +152,12 @@ $pdf->Ln(0);
 // Corpo do ofício com recuo na primeira linha de cada parágrafo e texto justificado
 $pdf->SetFont('helvetica', '', 12);
 $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . ($oficioData['corpo']) . '</div>', true, false, true, false, '');
-$pdf->Ln(1);
+$pdf->Ln(0);
 
 // Assinatura
 $pdf->SetFont('helvetica', '', 12);
 $pdf->writeHTML('<p style="text-indent: 20mm; text-align: justify;">Atenciosamente,</p>', true, false, true, false, '');
-$pdf->Ln(20);
+$pdf->Ln(15);
 
 // Adicionar imagem da assinatura, se disponível
 if ($signatureImage) {
