@@ -125,22 +125,25 @@ $pdf->Ln(3);
 
 // Número do ofício
 $pdf->SetFont('helvetica', 'B', 12);
-$pdf->Cell(0, $lineHeight, 'Ofício n° ' . $oficioData['numero'], 0, 1, 'L');
+$pdf->writeHTML('<div style="text-align: justify;">' . ($oficioData['numero']) . '</div>', true, false, true, false, '');
 $pdf->Ln(5);
 
 // Forma de Tratamento e Destinatário
 if (!empty($oficioData['tratamento'])) {
     $pdf->SetFont('helvetica', '0', 12);
-    $pdf->Cell(0, $lineHeight, $oficioData['tratamento'], 0, 1, 'L');
+    $pdf->writeHTML('<div style="text-align: justify;">' . ($oficioData['tratamento']) . '</div>', true, false, true, false, '');
+    $pdf->Ln(0);
 }
 
 $pdf->SetFont('helvetica', 'B', 12);
-$pdf->Cell(0, $lineHeight, ($oficioData['destinatario']), 0, 1, 'L');
+$pdf->writeHTML('<div style="text-align: justify;">' . ($oficioData['destinatario']) . '</div>', true, false, true, false, '');
+$pdf->Ln(0);
 
 // Cargo
 if (!empty($oficioData['cargo'])) {
     $pdf->SetFont('helvetica', '', 12);
-    $pdf->Cell(0, $lineHeight, ($oficioData['cargo']), 0, 1, 'L');
+    $pdf->writeHTML('<div style="text-align: justify;">' . ($oficioData['cargo']) . '</div>', true, false, true, false, '');
+    $pdf->Ln(0);
 }
 $pdf->Ln(5);
 
