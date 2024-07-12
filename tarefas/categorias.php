@@ -205,15 +205,6 @@ include(__DIR__ . '/db_connection.php');
 </script>
 
 <script>
-    function openNav() {
-        document.getElementById("mySidebar").style.width = "250px";
-        document.getElementById("main").style.marginLeft = "250px";
-    }
-
-    function closeNav() {
-        document.getElementById("mySidebar").style.width = "0";
-        document.getElementById("main").style.marginLeft = "0";
-    }
 
     function normalizeText(text) {
         return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();

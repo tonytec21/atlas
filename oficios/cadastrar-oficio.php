@@ -146,16 +146,6 @@ include(__DIR__ . '/../menu.php');
     </div>
 
     <script>
-        function openNav() {
-            document.getElementById("mySidebar").style.width = "250px";
-            document.getElementById("main").style.marginLeft = "250px";
-        }
-
-        function closeNav() {
-            document.getElementById("mySidebar").style.width = "0";
-            document.getElementById("main").style.marginLeft = "0";
-        }
-
         $(document).ready(function() {
             // Carregar o modo do usuário
             $.ajax({

@@ -171,20 +171,6 @@ include(__DIR__ . '/menu.php');
 <script src="script/bootstrap.min.js"></script>
 <script src="script/jquery.mask.min.js"></script>
 <script>
-    function openNav() {
-        document.getElementById("mySidebar").style.width = "250px";
-        document.getElementById("main").style.marginLeft = "250px";
-    }
-
-    function closeNav() {
-        document.getElementById("mySidebar").style.width = "0";
-        document.getElementById("main").style.marginLeft = "0";
-    }
-
-    function getFontColor() {
-        return $('body').hasClass('dark-mode') ? '#ffffff' : '#000000';
-    }
-
     function createChart(ctx, type, data, options) {
         return new Chart(ctx, {
             type: type,
