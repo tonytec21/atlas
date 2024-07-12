@@ -39,7 +39,7 @@ $nivel_de_acesso = $userData['nivel_de_acesso'];
     <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/index.php'?>"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Ofícios</a>
     <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/cadastrar-oficio.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Ofício</a>
     <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/assinar-doc.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Assinador digital</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/gerador_de_registro/index.php'?>"><i class="fa fa-file-text" aria-hidden="true"></i> Gerador de Registros de Cédulas</a>
+    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/gerador_de_registro/index.php'?>"><i class="fa fa-file-text" aria-hidden="true"></i> Gerador de Registro de Garantias</a>
     <?php if ($nivel_de_acesso === 'administrador'): ?>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-serventia.php'?>"><i class="fa fa-cog" aria-hidden="true"></i> Dados da Serventia</a>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-funcionario.php'?>"><i class="fa fa-users" aria-hidden="true"></i> Cadastro de Funcionários</a>
