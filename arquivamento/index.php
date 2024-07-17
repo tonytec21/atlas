@@ -96,7 +96,7 @@ include(__DIR__ . '/../menu.php');
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table table-striped">
+                <table class="table table-striped" style="zoom:94%">
                     <thead>
                         <tr>
                             <th>Atribuição</th>
