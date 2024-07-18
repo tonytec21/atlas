@@ -25,7 +25,11 @@ $nivel_de_acesso = $userData['nivel_de_acesso'];
     body {
         font-family: 'Roboto', sans-serif;
     }
+    #system-name {
+        margin-left: 177px;
+    }
 </style>
+<div id="main-content-wrapper">
 <div id="mySidebar" class="sidebar">
     <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
     <button class="mode-switch">🔄 Modo</button>
@@ -46,7 +50,6 @@ $nivel_de_acesso = $userData['nivel_de_acesso'];
     <?php endif; ?>
 </div>
 
-<div id="main-content-wrapper">
     <button class="openbtn" onclick="openNav()">&#9776; Menu</button>
     <div id="system-name"><a style="color: #fff!important;text-decoration: none!important;" href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>">Atlas</a></div>
     <div id="welcome-section">
