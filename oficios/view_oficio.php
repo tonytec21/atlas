@@ -125,7 +125,7 @@ $pdf->Ln(3);
 
 // Número do ofício
 $pdf->SetFont('helvetica', 'B', 12);
-$pdf->writeHTML('<div style="text-align: justify;">''OFÍCIO Nº ' . ($oficioData['numero']) . '</div>', true, false, true, false, '');
+$pdf->writeHTML('<div style="text-align: justify;">' . 'Ofício nº. ' . ($oficioData['numero']) . '</div>', true, false, true, false, '');
 $pdf->Ln(5);
 
 // Forma de Tratamento e Destinatário
