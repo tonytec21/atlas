@@ -25,9 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $funcionario = $conn->real_escape_string($_POST['funcionario']);
     $avalista = $conn->real_escape_string(trim(preg_replace('/\r\n|\r|\n/', '', $_POST['avalista'])));
     $imovel_localizacao = $conn->real_escape_string(trim(preg_replace('/\r\n|\r|\n/', '', $_POST['imovel_localizacao'])));
+    $tipo = 'penhor';  // Valor fixo para a coluna "tipo"
 
-    $stmt = $conn->prepare("INSERT INTO registros_cedulas (titulo_cedula, n_cedula, emissao_cedula, vencimento_cedula, valor_cedula, credor, emitente, registro_garantia, forma_de_pagamento, vencimento_antecipado, juros, matricula, data, funcionario, avalista, imovel_localizacao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssssssssssssssss", $titulo_cedula, $n_cedula, $emissao_cedula, $vencimento_cedula, $valor_cedula, $credor, $emitente, $registro_garantia, $forma_de_pagamento, $vencimento_antecipado, $juros, $matricula, $data, $funcionario, $avalista, $imovel_localizacao);
+    $stmt = $conn->prepare("INSERT INTO registros_cedulas (titulo_cedula, n_cedula, emissao_cedula, vencimento_cedula, valor_cedula, credor, emitente, registro_garantia, forma_de_pagamento, vencimento_antecipado, juros, matricula, data, funcionario, avalista, imovel_localizacao, tipo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sssssssssssssssss", $titulo_cedula, $n_cedula, $emissao_cedula, $vencimento_cedula, $valor_cedula, $credor, $emitente, $registro_garantia, $forma_de_pagamento, $vencimento_antecipado, $juros, $matricula, $data, $funcionario, $avalista, $imovel_localizacao, $tipo);
     $stmt->execute();
 
     $stmt->close();

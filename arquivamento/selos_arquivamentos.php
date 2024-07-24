@@ -78,7 +78,7 @@ $seloHtml = '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $ato = $_POST["ato"];
-    $escrevente = $_POST["escrevente"];
+    $escrevente = utf8_decode($_POST["escrevente"]);
     $partes = $_POST["partes"];
     $quantidade = $_POST["quantidade"];
     $numeroControle = $_POST["numeroControle"] ?? ''; // Adicionando a variável numeroControle

@@ -48,6 +48,10 @@ include(__DIR__ . '/../menu.php');
         <form id="searchForm">
             <div class="form-row">
                 <div class="form-group col-md-3">
+                    <label for="titulo_cedula">Título da Cédula:</label>
+                    <input type="text" class="form-control" id="titulo_cedula" name="titulo_cedula">
+                </div>
+                <div class="form-group col-md-3">
                     <label for="n_cedula">Número da Cédula:</label>
                     <input type="text" class="form-control" id="n_cedula" name="n_cedula">
                 </div>
@@ -59,15 +63,11 @@ include(__DIR__ . '/../menu.php');
                     <label for="emitente">Emitente:</label>
                     <input type="text" class="form-control" id="emitente" name="emitente">
                 </div>
-                <div class="form-group col-md-3">
-                    <label for="data_emissao">Data de Emissão:</label>
-                    <input type="date" class="form-control" id="data_emissao" name="data_emissao">
-                </div>
             </div>
             <div class="form-row">
                 <div class="form-group col-md-3">
-                    <label for="data_vencimento">Data de Vencimento:</label>
-                    <input type="date" class="form-control" id="data_vencimento" name="data_vencimento">
+                    <label for="data_emissao">Data de Emissão:</label>
+                    <input type="date" class="form-control" id="data_emissao" name="data_emissao">
                 </div>
                 <div class="form-group col-md-3">
                     <label for="valor_cedula">Valor da Cédula:</label>
@@ -99,31 +99,9 @@ include(__DIR__ . '/../menu.php');
                     <input type="text" class="form-control" id="registro_garantia" name="registro_garantia">
                 </div>
                 <div class="form-group col-md-4">
-                    <label for="forma_de_pagamento">Forma de Pagamento:</label>
-                    <input type="text" class="form-control" id="forma_de_pagamento" name="forma_de_pagamento">
+                    <label for="imovel_localizacao">Imóvel de Localização dos Bens:</label>
+                    <input type="text" class="form-control" id="imovel_localizacao" name="imovel_localizacao">
                 </div>
-                <div class="form-group col-md-4">
-                    <label for="vencimento_antecipado">Vencimento Antecipado:</label>
-                    <input type="text" class="form-control" id="vencimento_antecipado" name="vencimento_antecipado">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group col-md-4">
-                    <label for="juros">Juros:</label>
-                    <input type="text" class="form-control" id="juros" name="juros">
-                </div>
-                <div class="form-group col-md-4">
-                    <label for="titulo_cedula">Título da Cédula:</label>
-                    <input type="text" class="form-control" id="titulo_cedula" name="titulo_cedula">
-                </div>
-                <div class="form-group col-md-4">
-                    <label for="avalista">Avalista:</label>
-                    <input type="text" class="form-control" id="avalista" name="avalista">
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="imovel_localizacao">Imóvel de Localização dos Bens:</label>
-                <input type="text" class="form-control" id="imovel_localizacao" name="imovel_localizacao">
             </div>
             <div class="row mb-3">
                 <div class="col-md-6">
@@ -141,7 +119,6 @@ include(__DIR__ . '/../menu.php');
                         <th>ID</th>
                         <th>Número da Cédula</th>
                         <th>Data de Emissão</th>
-                        <th>Data de Vencimento</th>
                         <th>Valor</th>
                         <th>Credor</th>
                         <th>Emitente</th>
@@ -199,11 +176,6 @@ include(__DIR__ . '/../menu.php');
                 </div>
                 <button type="button" class="btn btn-primary" onclick="copyToClipboard()">Copiar</button>
                 <button type="button" class="btn btn-primary" onclick="copyToClipboardHTML()">Copiar código fonte</button>
-                <!-- <h4>Comentários e Anexos</h4>
-                <div id="commentTimeline" class="timeline">
-                    
-                </div>
-                <button type="button" class="btn btn-primary" id="addCommentButton" data-toggle="modal" data-target="#addCommentModal">Adicionar Comentário</button> -->
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
@@ -216,7 +188,6 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
 <script>
-
     $(document).ready(function() {
         // Carregar o modo do usuário
         $.ajax({
@@ -269,7 +240,6 @@ include(__DIR__ . '/../menu.php');
                             '<td>' + cedula.id + '</td>' +
                             '<td>' + cedula.n_cedula + '</td>' +
                             '<td>' + formatDate(cedula.emissao_cedula) + '</td>' +
-                            '<td>' + formatDate(cedula.vencimento_cedula) + '</td>' +
                             '<td>' + parseFloat(cedula.valor_cedula).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + '</td>' +
                             '<td>' + cedula.credor + '</td>' +
                             '<td>' + cedula.emitente + '</td>' +
@@ -297,28 +267,72 @@ include(__DIR__ . '/../menu.php');
             type: 'GET',
             data: { id: cedulaId },
             success: function(response) {
+                console.log('Resposta do servidor:', response); // Adicionando log para verificar a resposta do servidor
+
                 var cedula = JSON.parse(response);
+                console.log('Dados da cédula:', cedula); // Adicionando log para depuração
+
+                // Verificar se o tipo está presente e válido
+                if (!cedula.tipo) {
+                    console.error('Tipo não encontrado na resposta:', cedula);
+                    alert('Erro: Tipo de cédula não encontrado.');
+                    return;
+                }
+
                 $('#view_n_cedula').val(cedula.n_cedula);
                 $('#view_credor').val(cedula.credor);
                 $('#view_emitente').val(cedula.emitente);
                 $('#view_emissao').val(formatDate(cedula.emissao_cedula));
                 $('#view_valor').val(parseFloat(cedula.valor_cedula).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
-                
-                var registroContent = 'Nos termos do art. 178, da Lei n.°6.015/1973, procedo ao registro do Penhor Rural, conforme consta, por extrato, do título de crédito a seguir descriminado: <b>1. Título: ' + cedula.titulo_cedula + 
-                    ' - Nr.: ' + cedula.n_cedula + 
-                    '</b>, emitida em: ' + formatDate(cedula.emissao_cedula) + 
-                    '; <b>2. Emitente:</b> ' + cedula.emitente + 
-                    '; <b>3. Vencimento:</b> Em ' + formatDate(cedula.vencimento_cedula) + 
-                    '; <b>4. Valor:</b> ' + parseFloat(cedula.valor_cedula).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + 
-                    '; <b>5. Forma de Pagamento:</b> ' + cleanText(cedula.forma_de_pagamento) + 
-                    '; <b>6. Credor:</b> ' + cedula.credor + 
-                    '; <b>7. Encargos:</b> ' + cleanText(cedula.juros) + 
-                    '; <b>8. Garantias:</b> ' + cleanText(cedula.registro_garantia) + 
-                    '; <b>9. Vencimento Antecipado:</b> ' + cleanText(cedula.vencimento_antecipado) + 
-                    '; <b>10. Avalista:</b> ' + cleanText(cedula.avalista) + 
-                    '; <b>11. Imóvel de Localização dos Bens:</b> ' + cleanText(cedula.imovel_localizacao) + 
-                    '; <b>12. Demais condições:</b> fazem parte do presente registro todas as cláusulas e demais condições constantes do referido título e aqui não transcritas, vez que via não negociável ficará arquivada nesta serventia. Para fins de cálculos dos Emolumentos foi utilizado o valor nominal da cédula ' + parseFloat(cedula.valor_cedula).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + '. O referido é verdade e dou fé. '  + cedula.funcionario;
-                
+
+                var registroContent = '';
+                if (cedula.tipo === 'hipoteca') {
+                    registroContent = '<b>' + cedula.titulo_cedula +
+                        '</b>. Pela Cédula de Crédito Bancário nº. ' + cedula.n_cedula + 
+                        ', emitida em ' + formatDate(cedula.emissao_cedula) + 
+                        ', o emitente e proprietário ' + cedula.emitente + 
+                        ', deu em ' + cleanText(cedula.registro_garantia) + 
+                        ' ao credor ' + cedula.credor + 
+                        ', para garantir o cumprimento de todas as dívidas decorrentes da cédula representativa de uma operação de crédito no valor de <b>' + parseFloat(cedula.valor_cedula).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + 
+                        '</b>, ' + cleanText(cedula.forma_de_pagamento) + 
+                        '. O referido é verdade e dou fé. '  + cedula.funcionario;
+                } else if (cedula.tipo === 'penhor') {
+                    registroContent = 'Nos termos do art. 178, da Lei n.°6.015/1973, procedo ao registro do Penhor Rural, conforme consta, por extrato, do título de crédito a seguir discriminado: <b>1. Título: ' + cedula.titulo_cedula + 
+                        ' - Nr.: ' + cedula.n_cedula + 
+                        '</b>, emitida em: ' + formatDate(cedula.emissao_cedula) + 
+                        '; <b>2. Emitente:</b> ' + cedula.emitente + 
+                        '; <b>3. Vencimento:</b> Em ' + formatDate(cedula.vencimento_cedula) + 
+                        '; <b>4. Valor:</b> ' + parseFloat(cedula.valor_cedula).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + 
+                        '; <b>5. Forma de Pagamento:</b> ' + cleanText(cedula.forma_de_pagamento) + 
+                        '; <b>6. Credor:</b> ' + cedula.credor + 
+                        '; <b>7. Encargos:</b> ' + cleanText(cedula.juros) + 
+                        '; <b>8. Garantias:</b> ' + cleanText(cedula.registro_garantia) + 
+                        '; <b>9. Vencimento Antecipado:</b> ' + cleanText(cedula.vencimento_antecipado) + 
+                        '; <b>10. Avalista:</b> ' + cleanText(cedula.avalista) + 
+                        '; <b>11. Imóvel de Localização dos Bens:</b> ' + cleanText(cedula.imovel_localizacao) + 
+                        '; <b>12. Demais condições:</b> fazem parte do presente registro todas as cláusulas e demais condições constantes do referido título e aqui não transcritas, vez que via não negociável ficará arquivada nesta serventia. Para fins de cálculos dos Emolumentos foi utilizado o valor nominal da cédula ' + parseFloat(cedula.valor_cedula).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + '. O referido é verdade e dou fé. '  + cedula.funcionario;
+                } else if (cedula.tipo === 'fiduciaria') {
+                    console.log('Entrou no bloco fiduciaria');
+                    registroContent = 'Nos termos do art. 12, da Lei n.°8929/1994, procedo ao registro da Alienação Fiduciária de Produto Agropecuário, conforme consta, por extrato, do título de crédito a seguir discriminado: <b>1. Título: ' + cedula.titulo_cedula + 
+                        ' - Nr.: ' + cedula.n_cedula + 
+                        '</b>, emitida em: ' + formatDate(cedula.emissao_cedula) + 
+                        '; <b>2. Emitente:</b> ' + cedula.emitente + 
+                        '; <b>3. Credor:</b> ' + cedula.credor + 
+                        '; <b>4. Produto:</b> ' + cleanText(cedula.registro_garantia) + 
+                        
+                        '; <b>3. Vencimento:</b> Em ' + formatDate(cedula.vencimento_cedula) + 
+                        '; <b>4. Valor:</b> ' + parseFloat(cedula.valor_cedula).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + 
+                        '; <b>5. Forma de Pagamento:</b> ' + cleanText(cedula.forma_de_pagamento) + 
+
+                        '; <b>7. Encargos:</b> ' + cleanText(cedula.juros) + 
+                        '; <b>9. Vencimento Antecipado:</b> ' + cleanText(cedula.vencimento_antecipado) + 
+                        '; <b>10. Avalista:</b> ' + cleanText(cedula.avalista) + 
+                        '; <b>11. Imóvel de Localização dos Bens:</b> ' + cleanText(cedula.imovel_localizacao) + 
+                        '; <b>12. Demais condições:</b> fazem parte do presente registro todas as cláusulas e demais condições constantes do referido título e aqui não transcritas, vez que via não negociável ficará arquivada nesta serventia. Para fins de cálculos dos Emolumentos foi utilizado o valor nominal da cédula ' + parseFloat(cedula.valor_cedula).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + '. O referido é verdade e dou fé. '  + cedula.funcionario;
+                } else {
+                    console.log('Tipo não identificado:', cedula.tipo); // Adicionando log para tipos não identificados
+                }
+
                 $('#view_registro').html(registroContent);
                 $('#viewModal').modal('show');
             },
@@ -329,6 +343,9 @@ include(__DIR__ . '/../menu.php');
     }
 
     function cleanText(text) {
+        if (text === null || text === undefined) {
+            return '';
+        }
         return text.replace(/(\r\n|\n|\r)/gm, " ").replace(/(<([^>]+)>)/gi, "").replace(/\s+/g, ' ').trim();
     }
 
