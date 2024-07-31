@@ -16,13 +16,12 @@ if ($conn->connect_error) {
 // Função para obter o próximo número de ofício
 function getNextOficioNumber($conn) {
     $currentYear = date('Y');
-    $result = $conn->query("SELECT MAX(numero) AS max_numero FROM oficios WHERE YEAR(data) = $currentYear");
+    $result = $conn->query("SELECT MAX(CAST(SUBSTRING_INDEX(numero, '/', 1) AS UNSIGNED)) AS max_numero FROM oficios WHERE YEAR(data) = $currentYear");
     $row = $result->fetch_assoc();
     $lastNumero = $row['max_numero'];
 
     if ($lastNumero) {
-        $lastNumeroParts = explode('/', $lastNumero);
-        $nextSequence = (int)$lastNumeroParts[0] + 1;
+        $nextSequence = (int)$lastNumero + 1;
     } else {
         $nextSequence = 1;
     }
