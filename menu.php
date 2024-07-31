@@ -53,9 +53,6 @@ $nivel_de_acesso = $userData['nivel_de_acesso'];
         float: right;
         padding-right: 8px;
     }
-    .sidebar .closebtn {
-        right: -80%!important;
-    }
 </style>
 <div id="main-content-wrapper">
 <div id="mySidebar" class="sidebar">
@@ -131,6 +128,10 @@ $nivel_de_acesso = $userData['nivel_de_acesso'];
     function closeNav() {
         document.getElementById("mySidebar").style.width = "0";
         document.getElementById("main").style.marginLeft = "0";
+    }
+
+    function getFontColor() {
+        return $('body').hasClass('dark-mode') ? '#ffffff' : '#000000';
     }
 
     var dropdown = document.getElementsByClassName("dropdown-btn");
