@@ -53,6 +53,9 @@ $nivel_de_acesso = $userData['nivel_de_acesso'];
         float: right;
         padding-right: 8px;
     }
+    .sidebar .closebtn {
+        right: -80%!important;
+    }
 </style>
 <div id="main-content-wrapper">
 <div id="mySidebar" class="sidebar">
