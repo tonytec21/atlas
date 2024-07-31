@@ -59,7 +59,7 @@ include(__DIR__ . '/../menu.php');
         <hr>
         <form id="osForm" method="POST">
             <div class="form-row">
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-5">
                     <label for="cliente">Cliente:</label>
                     <input type="text" class="form-control" id="cliente" name="cliente" required>
                 </div>
@@ -67,8 +67,12 @@ include(__DIR__ . '/../menu.php');
                     <label for="cpf_cliente">CPF/CNPJ do Cliente:</label>
                     <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente">
                 </div>
-                <div class="form-group col-md-3">
-                    <label for="total_os">Total OS:</label>
+                <div class="form-group col-md-2">
+                    <label for="base_calculo">Base de Cálculo:</label>
+                    <input type="text" class="form-control" id="base_calculo" name="base_calculo">
+                </div>
+                <div class="form-group col-md-2">
+                    <label for="total_os">Valor Total da OS:</label>
                     <input type="text" class="form-control" id="total_os" name="total_os" readonly>
                 </div>
             </div>
@@ -92,8 +96,8 @@ include(__DIR__ . '/../menu.php');
                     <input type="number" class="form-control" id="desconto_legal" name="desconto_legal" value="0" required min="0" max="100">
                 </div>
                 <div class="form-group col-md-5" style="display: flex; align-items: center; margin-top: 32px;">
-                    <button type="button" style="width: 45%" class="btn btn-primary" onclick="buscarAto()">Buscar Ato</button>
-                    <button type="button" style="width: 55%" class="btn btn-secondary btn-adicionar-manual" onclick="adicionarAtoManual()">Adicionar Ato Manualmente</button>
+                    <button type="button" style="width: 35%" class="btn btn-primary" onclick="buscarAto()"><i class="fa fa-search" aria-hidden="true"></i> Buscar Ato</button>
+                    <button type="button" style="width: 65%" class="btn btn-secondary btn-adicionar-manual" onclick="adicionarAtoManual()"><i class="fa fa-i-cursor" aria-hidden="true"></i> Adicionar Ato Manualmente</button>
                 </div>
             </div>
             <div class="form-row">
@@ -124,7 +128,7 @@ include(__DIR__ . '/../menu.php');
                     <input type="text" class="form-control" id="total" name="total" readonly>
                 </div>
                 <div class="form-group col-md-2" style="margin-top: 32px;">
-                    <button type="submit" style="width: 100%" class="btn btn-success">Adicionar à OS</button>
+                    <button type="submit" style="width: 100%" class="btn btn-success"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar à OS</button>
                 </div>
             </div>
         </form>
@@ -150,13 +154,13 @@ include(__DIR__ . '/../menu.php');
                 </tbody>
             </table>
         </div>
-        <button type="button" style="width: 100%;" class="btn btn btn-secondary btn-block" onclick="adicionarISS()">Adicionar ISS</button>
+        <button type="button" style="width: 100%;" class="btn btn btn-secondary btn-block" onclick="adicionarISS()"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar ISS</button>
         <hr>
         <div class="form-group">
             <label for="observacoes">Observações:</label>
             <textarea class="form-control" id="observacoes" name="observacoes" rows="4"></textarea>
         </div>
-        <button type="button" class="btn btn-primary btn-block" onclick="salvarOS()">SALVAR OS</button>
+        <button type="button" class="btn btn-primary btn-block" onclick="salvarOS()"><i class="fa fa-floppy-o" aria-hidden="true"></i> SALVAR OS</button>
     </div>
 </div>
 
@@ -197,6 +201,33 @@ function showAlert(message, type) {
 }
 
 $(document).ready(function() {
+    // Carregar o modo do usuário
+    $.ajax({
+        url: '../load_mode.php',
+        method: 'GET',
+        success: function(mode) {
+            $('body').removeClass('light-mode dark-mode').addClass(mode);
+        }
+    });
+
+    // Função para alternar modos claro e escuro
+    $('.mode-switch').on('click', function() {
+        var body = $('body');
+        body.toggleClass('dark-mode light-mode');
+
+        var mode = body.hasClass('dark-mode') ? 'dark-mode' : 'light-mode';
+        $.ajax({
+            url: '../save_mode.php',
+            method: 'POST',
+            data: {
+                mode: mode
+            },
+            success: function(response) {
+                console.log(response);
+            }
+        });
+    });
+
     $('#cpf_cliente').mask('000.000.000-00', {reverse: true}).on('blur', function() {
         var cpfCnpj = $(this).val().replace(/\D/g, '');
         if (cpfCnpj.length === 11) {
@@ -206,7 +237,7 @@ $(document).ready(function() {
         }
     });
 
-    $('#emolumentos, #ferc, #fadep, #femp, #total').mask('#.##0,00', {reverse: true});
+    $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #total').mask('#.##0,00', {reverse: true});
 
     $('#osForm').on('submit', function(e) {
         e.preventDefault();
@@ -280,34 +311,41 @@ function buscarAto() {
     $.ajax({
         url: 'buscar_ato.php',
         type: 'GET',
+        dataType: 'json', // Força a resposta a ser tratada como JSON
         data: { ato: ato },
         success: function(response) {
-            console.log(response); 
+            console.log('Resposta do servidor:', response); // Log da resposta do servidor
+
             if (response.error) {
                 showAlert(response.error, 'error');
             } else {
-                var emolumentos = response.EMOLUMENTOS * quantidade;
-                var ferc = response.FERC * quantidade;
-                var fadep = response.FADEP * quantidade;
-                var femp = response.FEMP * quantidade;
+                try {
+                    var emolumentos = parseFloat(response.EMOLUMENTOS) * quantidade;
+                    var ferc = parseFloat(response.FERC) * quantidade;
+                    var fadep = parseFloat(response.FADEP) * quantidade;
+                    var femp = parseFloat(response.FEMP) * quantidade;
 
-                var desconto = descontoLegal / 100;
-                emolumentos = emolumentos * (1 - desconto);
-                ferc = ferc * (1 - desconto);
-                fadep = fadep * (1 - desconto);
-                femp = femp * (1 - desconto);
+                    var desconto = descontoLegal / 100;
+                    emolumentos = emolumentos * (1 - desconto);
+                    ferc = ferc * (1 - desconto);
+                    fadep = fadep * (1 - desconto);
+                    femp = femp * (1 - desconto);
 
-                $('#descricao').val(response.DESCRICAO);
-                $('#emolumentos').val(emolumentos.toFixed(2).replace('.', ','));
-                $('#ferc').val(ferc.toFixed(2).replace('.', ','));
-                $('#fadep').val(fadep.toFixed(2).replace('.', ','));
-                $('#femp').val(femp.toFixed(2).replace('.', ','));
-                $('#total').val((emolumentos + ferc + fadep + femp).toFixed(2).replace('.', ','));
+                    $('#descricao').val(response.DESCRICAO);
+                    $('#emolumentos').val(emolumentos.toFixed(2).replace('.', ','));
+                    $('#ferc').val(ferc.toFixed(2).replace('.', ','));
+                    $('#fadep').val(fadep.toFixed(2).replace('.', ','));
+                    $('#femp').val(femp.toFixed(2).replace('.', ','));
+                    $('#total').val((emolumentos + ferc + fadep + femp).toFixed(2).replace('.', ','));
+                } catch (e) {
+                    console.log('Erro ao processar os dados do ato:', e);
+                    showAlert('Erro ao processar os dados do ato.', 'error');
+                }
             }
         },
         error: function(xhr, status, error) {
-            console.log('Erro:', error); 
-            console.log('Resposta do servidor:', xhr.responseText); 
+            console.log('Erro:', error);
+            console.log('Resposta do servidor:', xhr.responseText);
             showAlert('Erro ao buscar o ato', 'error');
         }
     });
@@ -369,6 +407,7 @@ function salvarOS() {
     var total_os = $('#total_os').val().replace(/\./g, '').replace(',', '.');
     var descricao_os = $('#descricao_os').val();
     var observacoes = $('#observacoes').val();
+    var base_calculo = $('#base_calculo').val().replace(/\./g, '').replace(',', '.');
     var itens = [];
 
     $('#itensTable tr').each(function() {
@@ -404,6 +443,7 @@ $.ajax({
         total_os: total_os,
         descricao_os: descricao_os,
         observacoes: observacoes,
+        base_calculo: base_calculo,
         itens: itens
     },
     success: function(response) {

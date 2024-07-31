@@ -72,181 +72,118 @@ $valor_pago_liquido = $total_pagamentos - $total_devolucoes;
 // Calcular saldo
 $saldo = $valor_pago_liquido - $ordem_servico['total_os'];
 ?>
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizar Ordem de Serviço</title>
-    <link rel="stylesheet" href="../style/css/bootstrap.min.css">
-    <link rel="stylesheet" href="../style/css/font-awesome.min.css">
-    <link rel="stylesheet" href="../style/css/style.css">
-    <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
-    <style>
-        .btn-print, .btn-payment {
-            margin-left: 10px;
-        }
-        .modal-content {
-            border-radius: 10px;
-        }
-        .modal-dialog {
-            max-width: 400px;
-            margin: 1.75rem auto;
-        }
-        .modal-header {
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-        }
-        .modal-footer {
-            border-top: none;
-        }
-        .modal-header.error {
-            background-color: #dc3545; /* cor de fundo vermelha para erros */
-            color: white;
-        }
-        .modal-header.success {
-            background-color: #28a745; /* cor de fundo verde para sucessos */
-            color: white;
-        }
-        .status-label {
-            padding: 5px 10px;
-            border-radius: 5px;
-            color: white;
-            text-align: center;
-            white-space: nowrap; /* Adicionado para evitar quebra de linha */
-        }
-        .status-pendente {
-            background-color: #dc3545; /* vermelho */
-        }
-        .status-liquidado {
-            background-color: #28a745; /* verde */
-        }
-        .status-parcial {
-            background-color: #ffc107; /* amarelo */
-        }
-    </style>
-</head>
-<body>
-<?php
-include(__DIR__ . '/../menu.php');
-?>
 
-<div id="main" class="main-content">
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center">
-            <h3>Visualizar Ordem de Serviço</h3>
-            <div>
-                <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
-                <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
-                <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
-            </div>
+<div class="d-flex justify-content-between align-items-center">
+    <h3>Visualizar Ordem de Serviço</h3>
+    <div>
+        <button type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Imprimir OS</button>
+        <button type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Efetuar pagamento</button>
+        <button style="width: 100px; height: 38px!important; margin-bottom: 0px!important; margin-left: 10px;" type="button" class="btn btn-edit btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
+    </div>
+</div>
+<hr>
+<form id="osForm" method="POST">
+    <div class="form-row">
+        <div class="form-group col-md-5">
+            <label for="cliente">Cliente:</label>
+            <input type="text" class="form-control" id="cliente" name="cliente" value="<?php echo $ordem_servico['cliente']; ?>" readonly>
         </div>
-        <hr>
-        <form id="osForm" method="POST">
-            <div class="form-row">
-                <div class="form-group col-md-5">
-                    <label for="cliente">Cliente:</label>
-                    <input type="text" class="form-control" id="cliente" name="cliente" value="<?php echo $ordem_servico['cliente']; ?>" readonly>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="cpf_cliente">CPF/CNPJ do Cliente:</label>
-                    <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente" value="<?php echo $ordem_servico['cpf_cliente']; ?>" readonly>
-                </div>
-                <div class="form-group col-md-2">
-                    <label for="total_os">Base de Cálculo:</label>
-                    <input type="text" class="form-control" id="total_os" name="total_os" value="<?php echo 'R$ ' . number_format($ordem_servico['base_de_calculo'], 2, ',', '.'); ?>" readonly>
-                </div>
-                <div class="form-group col-md-2">
-                    <label for="total_os">Valor Total:</label>
-                    <input type="text" class="form-control" id="total_os" name="total_os" value="<?php echo 'R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.'); ?>" readonly>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="deposito_previo">Depósito Prévio:</label>
-                    <input type="text" class="form-control" id="deposito_previo" name="deposito_previo" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="valor_liquidado">Valor Liquidado:</label>
-                    <input type="text" class="form-control" id="valor_liquidado" name="valor_liquidado" value="<?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?>" readonly>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="valor_devolvido">Valor Devolvido:</label>
-                    <input type="text" class="form-control" id="valor_devolvido" name="valor_devolvido" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="saldo">Saldo:</label>
-                    <input type="text" class="form-control" id="saldo" name="saldo" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group col-md-10">
-                    <label for="descricao_os">Título da OS:</label>
-                    <input type="text" class="form-control" id="descricao_os" name="descricao_os" value="<?php echo $ordem_servico['descricao_os']; ?>" readonly>
-                </div>
-                <div class="form-group col-md-2">
-                    <label for="descricao_os">Data da OS:</label>
-                    <input type="text" class="form-control" id="descricao_os" name="descricao_os" value="<?php echo date('d/m/Y', strtotime($ordem_servico['data_criacao'])); ?>" readonly>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group col-md-12">
-                    <label for="observacoes">Observações:</label>
-                    <textarea class="form-control" id="observacoes" name="observacoes" rows="4" readonly><?php echo $ordem_servico['observacoes']; ?></textarea>
-                </div>
-            </div>
-        </form>
-        <div id="osItens" class="mt-4">
-            <h4>Itens da Ordem de Serviço</h4>
-            <table class="table" style="padding: 0.50rem!important; zoom: 90%">
-                <thead>
-                    <tr>
-                        <th>Ato</th>
-                        <th>Qtd</th>
-                        <th>Desconto Legal (%)</th>
-                        <th>Descrição</th>
-                        <th>Emolumentos</th>
-                        <th>FERC</th>
-                        <th>FADEP</th>
-                        <th>FEMP</th>
-                        <th>Total</th>
-                        <th>Qtd Liquidada</th>
-                        <th>Status</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="itensTable">
-                    <?php foreach ($ordem_servico_itens as $item): ?>
-                    <tr>
-                        <td><?php echo $item['ato']; ?></td>
-                        <td><?php echo $item['quantidade']; ?></td>
-                        <td><?php echo $item['desconto_legal']; ?></td>
-                        <td><?php echo $item['descricao']; ?></td>
-                        <td><?php echo number_format($item['emolumentos'], 2, ',', '.'); ?></td>
-                        <td><?php echo number_format($item['ferc'], 2, ',', '.'); ?></td>
-                        <td><?php echo number_format($item['fadep'], 2, ',', '.'); ?></td>
-                        <td><?php echo number_format($item['femp'], 2, ',', '.'); ?></td>
-                        <td><?php echo number_format($item['total'], 2, ',', '.'); ?></td>
-                        <td><?php echo $item['quantidade_liquidada']; ?></td>
-                        <td>
-                            <?php if ($item['status'] == 'liquidado'): ?>
-                                <span class="status-label status-liquidado">Liquidado</span>
-                            <?php elseif ($item['status'] == 'parcialmente liquidado'): ?>
-                                <span class="status-label status-parcial">Liq. Parcialmente</span>
-                            <?php else: ?>
-                                <span class="status-label status-pendente">Pendente</span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if ($item['status'] != 'liquidado'): ?>
-                                <button type="button" class="btn btn-primary btn-sm" onclick="liquidarAto(<?php echo $item['id']; ?>, <?php echo $item['quantidade']; ?>, <?php echo $item['quantidade_liquidada'] !== null ? $item['quantidade_liquidada'] : 0; ?>, '<?php echo $item['status'] !== null ? addslashes($item['status']) : ''; ?>')">Liquidar</button>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+        <div class="form-group col-md-3">
+            <label for="cpf_cliente">CPF/CNPJ do Cliente:</label>
+            <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente" value="<?php echo $ordem_servico['cpf_cliente']; ?>" readonly>
+        </div>
+        <div class="form-group col-md-2">
+            <label for="total_os">Base de Cálculo:</label>
+            <input type="text" class="form-control" id="total_os" name="total_os" value="<?php echo 'R$ ' . number_format($ordem_servico['base_de_calculo'], 2, ',', '.'); ?>" readonly>
+        </div>
+        <div class="form-group col-md-2">
+            <label for="total_os">Valor Total:</label>
+            <input type="text" class="form-control" id="total_os" name="total_os" value="<?php echo 'R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.'); ?>" readonly>
+        </div>
+        <div class="form-group col-md-3">
+            <label for="deposito_previo">Depósito Prévio:</label>
+            <input type="text" class="form-control" id="deposito_previo" name="deposito_previo" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
+        </div>
+        <div class="form-group col-md-3">
+            <label for="valor_liquidado">Valor Liquidado:</label>
+            <input type="text" class="form-control" id="valor_liquidado" name="valor_liquidado" value="<?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?>" readonly>
+        </div>
+        <div class="form-group col-md-3">
+            <label for="valor_devolvido">Valor Devolvido:</label>
+            <input type="text" class="form-control" id="valor_devolvido" name="valor_devolvido" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
+        </div>
+        <div class="form-group col-md-3">
+            <label for="saldo">Saldo:</label>
+            <input type="text" class="form-control" id="saldo" name="saldo" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>
         </div>
     </div>
+    <div class="form-row">
+        <div class="form-group col-md-10">
+            <label for="descricao_os">Título da OS:</label>
+            <input type="text" class="form-control" id="descricao_os" name="descricao_os" value="<?php echo $ordem_servico['descricao_os']; ?>" readonly>
+        </div>
+        <div class="form-group col-md-2">
+            <label for="descricao_os">Data da OS:</label>
+            <input type="text" class="form-control" id="descricao_os" name="descricao_os" value="<?php echo date('d/m/Y', strtotime($ordem_servico['data_criacao'])); ?>" readonly>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group col-md-12">
+            <label for="observacoes">Observações:</label>
+            <textarea class="form-control" id="observacoes" name="observacoes" rows="4" readonly><?php echo $ordem_servico['observacoes']; ?></textarea>
+        </div>
+    </div>
+</form>
+<div id="osItens" class="mt-4">
+    <h4>Itens da Ordem de Serviço</h4>
+    <table class="table" style="padding: 0.50rem!important; zoom: 90%">
+        <thead>
+            <tr>
+                <th>Ato</th>
+                <th>Qtd</th>
+                <th>Desconto Legal (%)</th>
+                <th>Descrição</th>
+                <th>Emolumentos</th>
+                <th>FERC</th>
+                <th>FADEP</th>
+                <th>FEMP</th>
+                <th>Total</th>
+                <th>Qtd Liquidada</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="itensTable">
+            <?php foreach ($ordem_servico_itens as $item): ?>
+            <tr>
+                <td><?php echo $item['ato']; ?></td>
+                <td><?php echo $item['quantidade']; ?></td>
+                <td><?php echo $item['desconto_legal']; ?></td>
+                <td><?php echo $item['descricao']; ?></td>
+                <td><?php echo number_format($item['emolumentos'], 2, ',', '.'); ?></td>
+                <td><?php echo number_format($item['ferc'], 2, ',', '.'); ?></td>
+                <td><?php echo number_format($item['fadep'], 2, ',', '.'); ?></td>
+                <td><?php echo number_format($item['femp'], 2, ',', '.'); ?></td>
+                <td><?php echo number_format($item['total'], 2, ',', '.'); ?></td>
+                <td><?php echo $item['quantidade_liquidada']; ?></td>
+                <td>
+                    <?php if ($item['status'] == 'liquidado'): ?>
+                        <span class="status-label status-liquidado">Liquidado</span>
+                    <?php elseif ($item['status'] == 'parcialmente liquidado'): ?>
+                        <span class="status-label status-parcial">Liq. Parcialmente</span>
+                    <?php else: ?>
+                        <span class="status-label status-pendente">Pendente</span>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <?php if ($item['status'] != 'liquidado'): ?>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="liquidarAto(<?php echo $item['id']; ?>, <?php echo $item['quantidade']; ?>, <?php echo $item['quantidade_liquidada'] !== null ? $item['quantidade_liquidada'] : 0; ?>, '<?php echo $item['status'] !== null ? addslashes($item['status']) : ''; ?>')">Liquidar</button>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
 </div>
 
 <!-- Modal de Pagamento -->
@@ -320,7 +257,7 @@ include(__DIR__ . '/../menu.php');
                     <label for="valor_devolvido_modal">Valor Devolvido</label>
                     <input type="text" class="form-control" id="valor_devolvido_modal" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
                 </div>
-                <?php if ($saldo > 0.01): ?>
+                <?php if ($saldo > 0.1): ?>
                 <button type="button" class="btn btn-warning" onclick="abrirDevolucaoModal()">Devolver valores</button>
                 <?php endif; ?>
             </div>
@@ -374,7 +311,7 @@ include(__DIR__ . '/../menu.php');
                 </div>
                 <div class="form-group">
                     <label for="valor_devolucao">Valor da Devolução</label>
-                    <input type="text" class="form-control" id="valor_devolucao" placeholder="0,00">
+                    <input type="text" class="form-control" id="valor_devolucao">
                 </div>
                 <button type="button" class="btn btn-primary" onclick="salvarDevolucao()">Salvar</button>
             </div>
@@ -405,10 +342,6 @@ include(__DIR__ . '/../menu.php');
     </div>
 </div>
 
-<script src="../script/jquery-3.5.1.min.js"></script>
-<script src="../script/bootstrap.min.js"></script>
-<script src="../script/bootstrap.bundle.min.js"></script>
-<script src="../script/jquery.mask.min.js"></script>
 <script>
     var pagamentos = <?php echo json_encode($pagamentos); ?>;
     var liquidacaoItemId = null;
@@ -416,33 +349,6 @@ include(__DIR__ . '/../menu.php');
     var quantidadeLiquidada = 0;
 
     $(document).ready(function() {
-            // Carregar o modo do usuário
-            $.ajax({
-                url: '../load_mode.php',
-                method: 'GET',
-                success: function(mode) {
-                    $('body').removeClass('light-mode dark-mode').addClass(mode);
-                }
-            });
-
-            // Função para alternar modos claro e escuro
-            $('.mode-switch').on('click', function() {
-                var body = $('body');
-                body.toggleClass('dark-mode light-mode');
-
-                var mode = body.hasClass('dark-mode') ? 'dark-mode' : 'light-mode';
-                $.ajax({
-                    url: '../save_mode.php',
-                    method: 'POST',
-                    data: {
-                        mode: mode
-                    },
-                    success: function(response) {
-                        console.log(response);
-                    }
-                });
-            });
-
         $('#valor_pagamento').mask('#.##0,00', { reverse: true });
         $('#valor_devolucao').mask('#.##0,00', { reverse: true });
 
@@ -598,6 +504,7 @@ include(__DIR__ . '/../menu.php');
         var formaDevolucao = $('#forma_devolucao').val();
         var valorDevolucao = parseFloat($('#valor_devolucao').val().replace('.', '').replace(',', '.'));
         var valorPago = parseFloat('<?php echo $valor_pago_liquido; ?>');
+
         var valorMaximoDevolucao = valorPago - parseFloat('<?php echo $total_liquidado; ?>');
 
         if (formaDevolucao === "") {
@@ -605,7 +512,7 @@ include(__DIR__ . '/../menu.php');
             return;
         }
 
-        if (isNaN(valorDevolucao) || valorDevolucao <= 0 || valorDevolucao > valorMaximoDevolucao + 0.01) {
+        if (isNaN(valorDevolucao) || valorDevolucao <= 0 || valorDevolucao > valorMaximoDevolucao) {
             exibirMensagem('Por favor, insira um valor válido para a devolução que não seja maior que o saldo disponível.', 'error');
             return;
         }
@@ -637,7 +544,6 @@ include(__DIR__ . '/../menu.php');
         });
     }
 
-
     // Função para exibir mensagem
     function exibirMensagem(mensagem, tipo) {
         var modalHeader = $('#mensagemModal .modal-header');
@@ -655,8 +561,3 @@ include(__DIR__ . '/../menu.php');
         $('#mensagemModal').modal('show');
     }
 </script>
-<?php
-include(__DIR__ . '/../rodape.php');
-?>
-</body>
-</html>

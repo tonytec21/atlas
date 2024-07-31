@@ -7,6 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $cliente = $_POST['cliente'];
     $cpf_cliente = $_POST['cpf_cliente'];
     $total_os = str_replace(',', '.', $_POST['total_os']);
+    $base_calculo = isset($_POST['base_calculo']) && $_POST['base_calculo'] !== '' ? str_replace(',', '.', $_POST['base_calculo']) : 0; // Verificação adicionada aqui
     $itens = $_POST['itens'];
     $descricao_os = $_POST['descricao_os'];
     $observacoes = $_POST['observacoes'];
@@ -19,13 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $conn->beginTransaction();
 
         // Insere a OS na tabela `ordens_de_servico`
-        $stmt = $conn->prepare("INSERT INTO ordens_de_servico (cliente, cpf_cliente, total_os, descricao_os, observacoes, criado_por) VALUES (:cliente, :cpf_cliente, :total_os, :descricao_os, :observacoes, :criado_por)");
+        $stmt = $conn->prepare("INSERT INTO ordens_de_servico (cliente, cpf_cliente, total_os, descricao_os, observacoes, criado_por, base_de_calculo) VALUES (:cliente, :cpf_cliente, :total_os, :descricao_os, :observacoes, :criado_por, :base_calculo)");
         $stmt->bindParam(':cliente', $cliente);
         $stmt->bindParam(':cpf_cliente', $cpf_cliente);
         $stmt->bindParam(':total_os', $total_os);
         $stmt->bindParam(':descricao_os', $descricao_os);
         $stmt->bindParam(':observacoes', $observacoes);
         $stmt->bindParam(':criado_por', $criado_por);
+        $stmt->bindParam(':base_calculo', $base_calculo);
         $stmt->execute();
 
         // Obtém o ID da OS inserida

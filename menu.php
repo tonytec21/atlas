@@ -28,25 +28,86 @@ $nivel_de_acesso = $userData['nivel_de_acesso'];
     #system-name {
         margin-left: 177px;
     }
+    .sidebar a, .dropdown-btn {
+        padding: 10px 15px;
+        text-decoration: none;
+        font-size: 18px;
+        color: #818181;
+        display: block;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+        outline: none;
+    }
+    .sidebar a:hover, .dropdown-btn:hover {
+        color: #f1f1f1;
+    }
+    .dropdown-container {
+        display: none;
+        background-color: #262626;
+        padding-left: 8px;
+    }
+    .fa-caret-down {
+        float: right;
+        padding-right: 8px;
+    }
+    .sidebar .closebtn {
+        right: -80%!important;
+    }
 </style>
 <div id="main-content-wrapper">
 <div id="mySidebar" class="sidebar">
     <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
     <button class="mode-switch">🔄 Modo</button>
     <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>"><i class="fa fa-home" aria-hidden="true"></i> Página Inicial</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/index.php'?>"><i class="fa fa-folder-open" aria-hidden="true"></i> Arquivamento</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/cadastro.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar arquivamento</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/categorias.php'?>"><i class="fa fa-tags" aria-hidden="true"></i> Categorias de arquivamentos</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas/index.php'?>"><i class="fa fa-clock-o" aria-hidden="true"></i> Tarefas</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas/criar-tarefa.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Tarefa</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas/categorias.php'?>"><i class="fa fa-tags" aria-hidden="true"></i> Categorias de tarefas</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/index.php'?>"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Ofícios</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/cadastrar-oficio.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Ofício</a>
-    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/assinar-doc.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Assinador digital</a>
+    
+    <button class="dropdown-btn"><i class="fa fa-folder-open" aria-hidden="true"></i> Arquivamento 
+        <i class="fa fa-caret-down"></i>
+    </button>
+    <div class="dropdown-container">
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/index.php'?>"><i class="fa fa-folder-open" aria-hidden="true"></i> Ver Arquivamentos</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/cadastro.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Arquivamento</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/categorias.php'?>"><i class="fa fa-tags" aria-hidden="true"></i> Categorias de Arquivamentos</a>
+    </div>
+
+    <button class="dropdown-btn"><i class="fa fa-money" aria-hidden="true"></i> Ordens de Serviço 
+        <i class="fa fa-caret-down"></i>
+    </button>
+    <div class="dropdown-container">
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/os/index.php'?>"><i class="fa fa-money" aria-hidden="true"></i> Ver Ordens de Serviço</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/os/criar_os.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Ordem de Serviço</a>
+    </div>
+
+    <button class="dropdown-btn"><i class="fa fa-clock-o" aria-hidden="true"></i> Tarefas 
+        <i class="fa fa-caret-down"></i>
+    </button>
+    <div class="dropdown-container">
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas/index.php'?>"><i class="fa fa-clock-o" aria-hidden="true"></i> Ver Tarefas</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas/criar-tarefa.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Tarefa</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas/categorias.php'?>"><i class="fa fa-tags" aria-hidden="true"></i> Categorias de Tarefas</a>
+    </div>
+
+    <button class="dropdown-btn"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Ofícios 
+        <i class="fa fa-caret-down"></i>
+    </button>
+    <div class="dropdown-container">
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/index.php'?>"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Ver Ofícios</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/cadastrar-oficio.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Ofício</a>
+    </div>
+
+    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/assinar-doc.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Assinador Digital</a>
     <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/gerador_de_registro/index.php'?>"><i class="fa fa-file-text" aria-hidden="true"></i> Gerador de Registro de Garantias</a>
+    
     <?php if ($nivel_de_acesso === 'administrador'): ?>
-        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-serventia.php'?>"><i class="fa fa-cog" aria-hidden="true"></i> Dados da Serventia</a>
-        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-funcionario.php'?>"><i class="fa fa-users" aria-hidden="true"></i> Cadastro de Funcionários</a>
+        <button class="dropdown-btn"><i class="fa fa-cog" aria-hidden="true"></i> Administração 
+            <i class="fa fa-caret-down"></i>
+        </button>
+        <div class="dropdown-container">
+            <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-serventia.php'?>"><i class="fa fa-cog" aria-hidden="true"></i> Dados da Serventia</a>
+            <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-funcionario.php'?>"><i class="fa fa-users" aria-hidden="true"></i> Cadastro de Funcionários</a>
+        </div>
     <?php endif; ?>
 </div>
 
@@ -72,7 +133,18 @@ $nivel_de_acesso = $userData['nivel_de_acesso'];
         document.getElementById("main").style.marginLeft = "0";
     }
 
-    function getFontColor() {
-        return $('body').hasClass('dark-mode') ? '#ffffff' : '#000000';
+    var dropdown = document.getElementsByClassName("dropdown-btn");
+    var i;
+
+    for (i = 0; i < dropdown.length; i++) {
+        dropdown[i].addEventListener("click", function() {
+            this.classList.toggle("active");
+            var dropdownContent = this.nextElementSibling;
+            if (dropdownContent.style.display === "block") {
+                dropdownContent.style.display = "none";
+            } else {
+                dropdownContent.style.display = "block";
+            }
+        });
     }
 </script>
