@@ -73,10 +73,10 @@ include(__DIR__ . '/menu.php');
                 <a href="arquivamento/index.php" class="btn btn-primary w-100"><i class="fa fa-folder-open" aria-hidden="true"></i> Arquivamentos</a>
             </div>
             <div class="col-md-4">
-                <a href="os/index.php" class="btn btn-success w-100"><i class="fa fa-money" aria-hidden="true"></i> Ordens de Serviço</a>
+                <a href="os/index.php" class="btn btn-info w-100"><i class="fa fa-money" aria-hidden="true"></i> Ordens de Serviço</a>
             </div>
             <div class="col-md-4">
-                <a href="arquivamento/categorias.php" class="btn btn-info w-100"><i class="fa fa-tags" aria-hidden="true"></i> Categorias</a>
+                <a href="#" class="btn btn-success w-100"><i class="fa fa-university" aria-hidden="true"></i></i> Caixa</a>
             </div>
             <div class="col-md-4">
                 <a href="tarefas/index.php" class="btn btn-secondary w-100"><i class="fa fa-clock-o" aria-hidden="true"></i> Tarefas</a>
