@@ -278,7 +278,6 @@ include(__DIR__ . '/menu.php');
         $('.notification .close-btn').on('click', function() {
             $(this).parent().hide();
         });
-    });
 </script>
 <br><br><br>
 <?php
