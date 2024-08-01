@@ -143,31 +143,6 @@ include(__DIR__ . '/../menu.php');
 
 <script>
     $(document).ready(function() {
-        // Carregar o modo do usuário
-        $.ajax({
-            url: '../load_mode.php',
-            method: 'GET',
-            success: function(mode) {
-                $('body').removeClass('light-mode dark-mode').addClass(mode);
-            }
-        });
-
-        // Função para alternar modos claro e escuro
-        $('.mode-switch').on('click', function() {
-            var body = $('body');
-            body.toggleClass('dark-mode light-mode');
-
-            var mode = body.hasClass('dark-mode') ? 'dark-mode' : 'light-mode';
-            $.ajax({
-                url: '../save_mode.php',
-                method: 'POST',
-                data: { mode: mode },
-                success: function(response) {
-                    console.log(response);
-                }
-            });
-        });
-
         // Inicializar o CKEditor
         CKEDITOR.replace('registro_garantia', {
             extraPlugins: 'htmlwriter',

@@ -82,7 +82,7 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'];
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <style>
         .btn-print, .btn-payment {
             margin-left: 10px;
@@ -135,7 +135,7 @@ include(__DIR__ . '/../menu.php');
 <div id="main" class="main-content">
     <div class="container">
         <div class="d-flex justify-content-between align-items-center">
-            <h3>Visualizar Ordem de Serviço</h3>
+            <h3>Ordem de Serviço nº: <?php echo $ordem_servico['id']; ?></h3>
             <div>
                 <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
                 <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
@@ -298,7 +298,7 @@ include(__DIR__ . '/../menu.php');
                             <tr>
                                 <td><?php echo $pagamento['forma_de_pagamento']; ?></td>
                                 <td><?php echo 'R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.'); ?></td>
-                                <td><button type="button" class="btn btn-danger btn-sm" onclick="removerPagamento(<?php echo $pagamento['id']; ?>)" <?php echo $has_liquidated ? 'disabled' : ''; ?>>Remover</button></td>
+                                <td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(<?php echo $pagamento['id']; ?>)" <?php echo $has_liquidated ? 'disabled' : ''; ?>><i class="fa fa-trash" aria-hidden="true"></i></button></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -325,7 +325,7 @@ include(__DIR__ . '/../menu.php');
                 <?php endif; ?>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
             </div>
         </div>
     </div>
@@ -416,33 +416,6 @@ include(__DIR__ . '/../menu.php');
     var quantidadeLiquidada = 0;
 
     $(document).ready(function() {
-            // Carregar o modo do usuário
-            $.ajax({
-                url: '../load_mode.php',
-                method: 'GET',
-                success: function(mode) {
-                    $('body').removeClass('light-mode dark-mode').addClass(mode);
-                }
-            });
-
-            // Função para alternar modos claro e escuro
-            $('.mode-switch').on('click', function() {
-                var body = $('body');
-                body.toggleClass('dark-mode light-mode');
-
-                var mode = body.hasClass('dark-mode') ? 'dark-mode' : 'light-mode';
-                $.ajax({
-                    url: '../save_mode.php',
-                    method: 'POST',
-                    data: {
-                        mode: mode
-                    },
-                    success: function(response) {
-                        console.log(response);
-                    }
-                });
-            });
-
         $('#valor_pagamento').mask('#.##0,00', { reverse: true });
         $('#valor_devolucao').mask('#.##0,00', { reverse: true });
 
@@ -450,7 +423,7 @@ include(__DIR__ . '/../menu.php');
     });
 
     function imprimirOS() {
-        window.open('gerar_pdf.php?id=<?php echo $os_id; ?>', '_blank');
+        window.open('imprimir-os.php?id=<?php echo $os_id; ?>', '_blank');
     }
 
     function editarOS() {
@@ -514,7 +487,7 @@ include(__DIR__ . '/../menu.php');
                 <tr>
                     <td>${pagamento.forma_de_pagamento}</td>
                     <td>R$ ${parseFloat(pagamento.total_pagamento).toFixed(2).replace('.', ',')}</td>
-                    <td><button type="button" class="btn btn-danger btn-sm" onclick="removerPagamento(${index})" <?php echo $has_liquidated ? 'disabled' : ''; ?>>Remover</button></td>
+                    <td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(${pagamento.id})" <?php echo $has_liquidated ? 'disabled' : ''; ?>><i class="fa fa-trash" aria-hidden="true"></i></button></td>
                 </tr>
             `);
         });
@@ -523,14 +496,34 @@ include(__DIR__ . '/../menu.php');
     }
 
     // Função para remover pagamento
-    function removerPagamento(index) {
+    function confirmarRemocaoPagamento(pagamentoId) {
         if (<?php echo $has_liquidated ? 'true' : 'false'; ?>) {
             exibirMensagem('Não é possível remover pagamentos após a liquidação de atos.', 'error');
             return;
         }
-        
-        pagamentos.splice(index, 1);
-        atualizarTabelaPagamentos();
+
+        if (confirm('Tem certeza de que deseja remover este pagamento?')) {
+            $.ajax({
+                url: 'remover_pagamento.php',
+                type: 'POST',
+                data: {
+                    pagamento_id: pagamentoId
+                },
+                success: function(response) {
+                    response = JSON.parse(response);
+                    if (response.success) {
+                        pagamentos = pagamentos.filter(pagamento => pagamento.id !== pagamentoId);
+                        atualizarTabelaPagamentos();
+                        exibirMensagem('Pagamento removido com sucesso!', 'success');
+                    } else {
+                        exibirMensagem('Erro ao remover pagamento.', 'error');
+                    }
+                },
+                error: function() {
+                    exibirMensagem('Erro ao remover pagamento.', 'error');
+                }
+            });
+        }
     }
 
     // Função para liquidar ato

@@ -84,7 +84,7 @@ try {
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <style>
         .btn-adicionar-manual {
             height: 38px; /* mesma altura do botão Buscar Ato */
@@ -331,33 +331,6 @@ function showAlert(message, type, reload = false) {
 }
 
 $(document).ready(function() {
-    // Carregar o modo do usuário
-    $.ajax({
-        url: '../load_mode.php',
-        method: 'GET',
-        success: function(mode) {
-            $('body').removeClass('light-mode dark-mode').addClass(mode);
-        }
-    });
-
-    // Função para alternar modos claro e escuro
-    $('.mode-switch').on('click', function() {
-        var body = $('body');
-        body.toggleClass('dark-mode light-mode');
-
-        var mode = body.hasClass('dark-mode') ? 'dark-mode' : 'light-mode';
-        $.ajax({
-            url: '../save_mode.php',
-            method: 'POST',
-            data: {
-                mode: mode
-            },
-            success: function(response) {
-                console.log(response);
-            }
-        });
-    });
-
     // Máscaras e configurações iniciais
     $('#cpf_cliente').on('blur', function() {
         var cpfCnpj = $(this).val().replace(/\D/g, '');

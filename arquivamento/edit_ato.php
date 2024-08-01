@@ -268,31 +268,6 @@ $selos_arquivamentos->close();
     $(document).ready(function() {
         var filesToRemove = []; // Array to store files to be removed
 
-        // Carregar o modo do usuário
-        $.ajax({
-            url: '../load_mode.php',
-            method: 'GET',
-            success: function(mode) {
-                $('body').removeClass('light-mode dark-mode').addClass(mode);
-            }
-        });
-
-        // Função para alternar modos claro e escuro
-        $('.mode-switch').on('click', function() {
-            var body = $('body');
-            body.toggleClass('dark-mode light-mode');
-
-            var mode = body.hasClass('dark-mode') ? 'dark-mode' : 'light-mode';
-            $.ajax({
-                url: '../save_mode.php',
-                method: 'POST',
-                data: { mode: mode },
-                success: function(response) {
-                    console.log(response);
-                }
-            });
-        });
-
         // Máscara para CPF e CNPJ
         $(document).ready(function() {
                 $('#cpf').on('blur', function() {

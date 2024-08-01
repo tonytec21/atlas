@@ -14,7 +14,7 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <style>
         .btn-adicionar {
             height: 38px;
@@ -177,10 +177,13 @@ include(__DIR__ . '/db_connection.php');
                     </div>
                 </div>
                 <div class="row mb-3">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <button type="submit" style="width: 100%;" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
                     </div>
-                    <div class="col-md-6 text-right">
+                    <div class="col-md-4">
+                        <button id="add-button" type="button" style="width: 100%; color: #fff!important" class="btn btn-info" onclick="window.open('tabela_de_emolumentos.php')"><i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos</button>
+                    </div>
+                    <div class="col-md-4 text-right">
                         <button id="add-button" type="button" style="width: 100%;" class="btn btn-success" onclick="window.location.href='criar_os.php'"><i class="fa fa-plus" aria-hidden="true"></i> Criar OS</button>
                     </div>
                 </div>
@@ -344,7 +347,7 @@ include(__DIR__ . '/db_connection.php');
                                 <td>
                                     <button class="btn btn-info btn-sm" title="Visualizar OS" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('visualizar_os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <button class="btn btn-success btn-sm" title="Pagamentos e Devoluções" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')"><i class="fa fa-money" aria-hidden="true"></i></button>
-                                    <button type="button" title="Imprimir OS" class="btn btn-primary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('gerar_pdf.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-print" aria-hidden="true"></i></button>
+                                    <button type="button" title="Imprimir OS" class="btn btn-primary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('imprimir-os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-print" aria-hidden="true"></i></button>
                                     <button class="btn btn-secondary btn-sm" title="Anexos" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="abrirAnexoModal(<?php echo $ordem['id']; ?>)"><i class="fa fa-paperclip" aria-hidden="true"></i></button>
                                 </td>
                             </tr>
@@ -538,33 +541,6 @@ include(__DIR__ . '/db_connection.php');
     <script src="../script/jquery.mask.min.js"></script>
     <script>
         $(document).ready(function() {
-            // Carregar o modo do usuário
-            $.ajax({
-                url: '../load_mode.php',
-                method: 'GET',
-                success: function(mode) {
-                    $('body').removeClass('light-mode dark-mode').addClass(mode);
-                }
-            });
-
-            // Função para alternar modos claro e escuro
-            $('.mode-switch').on('click', function() {
-                var body = $('body');
-                body.toggleClass('dark-mode light-mode');
-
-                var mode = body.hasClass('dark-mode') ? 'dark-mode' : 'light-mode';
-                $.ajax({
-                    url: '../save_mode.php',
-                    method: 'POST',
-                    data: {
-                        mode: mode
-                    },
-                    success: function(response) {
-                        console.log(response);
-                    }
-                });
-            });
-
             $('#cpf_cliente').mask('000.000.000-00', { reverse: true }).on('blur', function() {
                 var cpfCnpj = $(this).val().replace(/\D/g, '');
                 if (cpfCnpj.length === 11) {

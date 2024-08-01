@@ -86,6 +86,13 @@ if (isset($_GET['id'])) {
     // Calcular saldo
     $saldo = $total_pagamentos - $ordem_servico['total_os'];
 
+    // Obter soma dos valores devolvidos da tabela devolucao_os
+    $devolucoes_query = $conn->prepare("SELECT SUM(total_devolucao) as total_devolucoes FROM devolucao_os WHERE ordem_de_servico_id = ?");
+    $devolucoes_query->bind_param("i", $os_id);
+    $devolucoes_query->execute();
+    $devolucoes_result = $devolucoes_query->get_result();
+    $total_devolucoes = $devolucoes_result->fetch_assoc()['total_devolucoes'];
+
     // Obter informações das contas bancárias
     $contas_query = $conn->prepare("SELECT banco, agencia, tipo_conta, numero_conta, titular_conta, cpf_cnpj_titular, chave_pix, qr_code_pix FROM configuracao_os WHERE status = 'ativa'");
     $contas_query->execute();
@@ -208,9 +215,21 @@ if (isset($_GET['id'])) {
     $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Dep. Prévio: R$ ' . number_format($total_pagamentos, 2, ',', '.') . '</div>', true, false, true, false, '');
     $pdf->Ln(0);
 
-    // Adicionar o saldo
-    $pdf->SetFont('helvetica', 'B', 9);
-    $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Saldo: R$ ' . number_format($saldo, 2, ',', '.') . '</div>', true, false, true, false, '');
+    // Calcular saldo a restituir subtraindo o valor devolvido
+    $saldo_a_restituir = $saldo - $total_devolucoes;
+
+    // Adicionar o saldo com a condição
+    if ($saldo_a_restituir > 0) {
+        $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Valor a Restituir: R$ ' . number_format($saldo_a_restituir, 2, ',', '.') . '</div>', true, false, true, false, '');
+    } elseif ($saldo < 0) {
+        $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Valor a Pagar: R$ ' . number_format(abs($saldo), 2, ',', '.') . '</div>', true, false, true, false, '');
+    }
+
+    // Adicionar valor devolvido se houver
+    if ($total_devolucoes > 0) {
+        $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Valor Restituído: R$ ' . number_format($total_devolucoes, 2, ',', '.') . '</div>', true, false, true, false, '');
+    }
+
     $pdf->Ln(10);
 
     // Função para adicionar o cabeçalho da tabela de contas bancárias
@@ -273,13 +292,14 @@ if (isset($_GET['id'])) {
     }
 
     // Adicionar a linha de assinatura
-    $pdf->Cell(0, 5, '__________________________________', 0, 1, 'C');
+    $pdf->Ln(5);
+    $pdf->Cell(0, 4, '__________________________________', 0, 1, 'C');
     $pdf->SetFont('helvetica', 'B', 10);
-    $pdf->Cell(0, 5, $logged_in_user_nome, 0, 1, 'C');
+    $pdf->Cell(0, 4, $logged_in_user_nome, 0, 1, 'C');
     $pdf->SetFont('helvetica', '', 10);
-    $pdf->Cell(0, 5, $logged_in_user_cargo, 0, 1, 'C');
+    $pdf->Cell(0, 4, $logged_in_user_cargo, 0, 1, 'C');
 
-    $pdf->Output('ordem_de_servico.pdf', 'I');
+    $pdf->Output('Ordem de serviço nº ' . $os_id . '.pdf', 'I');
 } else {
     echo json_encode(['status' => 'error', 'message' => 'ID não fornecido']);
 }

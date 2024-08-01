@@ -1,5 +1,6 @@
 <?php
 session_start();
+include(__DIR__ . '/db_connection.php');
 
 if (!isset($_SESSION['username'])) {
     exit('Usuário não autenticado.');
@@ -8,16 +9,11 @@ if (!isset($_SESSION['username'])) {
 $username = $_SESSION['username'];
 $mode = $_POST['mode'];
 
-$data = [];
-$jsonFile = 'user_modes.json';
-
-if (file_exists($jsonFile)) {
-    $jsonData = file_get_contents($jsonFile);
-    $data = json_decode($jsonData, true);
-}
-
-$data[$username] = $mode;
-file_put_contents($jsonFile, json_encode($data, JSON_PRETTY_PRINT));
+// Atualizar ou inserir o modo no banco de dados
+$stmt = $conn->prepare("REPLACE INTO modo_usuario (usuario, modo) VALUES (?, ?)");
+$stmt->bind_param("ss", $username, $mode);
+$stmt->execute();
+$stmt->close();
 
 echo 'Modo salvo com sucesso.';
 ?>

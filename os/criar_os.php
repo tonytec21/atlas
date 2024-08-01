@@ -13,7 +13,7 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <style>
         .btn-adicionar-manual {
             height: 38px; /* mesma altura do botão Buscar Ato */
@@ -228,12 +228,24 @@ $(document).ready(function() {
         });
     });
 
-    $('#cpf_cliente').mask('000.000.000-00', {reverse: true}).on('blur', function() {
+    // Máscara do CPF/CNPJ ao perder o foco
+    $('#cpf_cliente').on('blur', function() {
         var cpfCnpj = $(this).val().replace(/\D/g, '');
         if (cpfCnpj.length === 11) {
             $(this).mask('000.000.000-00', {reverse: true});
+            if (!validarCPF($(this).val())) {
+                showAlert('CPF inválido!', 'error');
+                $(this).val('');
+            }
         } else if (cpfCnpj.length === 14) {
             $(this).mask('00.000.000/0000-00', {reverse: true});
+            if (!validarCNPJ($(this).val())) {
+                showAlert('CNPJ inválido!', 'error');
+                $(this).val('');
+            }
+        } else {
+            showAlert('CPF ou CNPJ inválido!', 'error');
+            $(this).val('');
         }
     });
 
@@ -267,7 +279,7 @@ $(document).ready(function() {
             '<td>' + fadep.toFixed(2).replace('.', ',') + '</td>' +
             '<td>' + femp.toFixed(2).replace('.', ',') + '</td>' +
             '<td>' + total.toFixed(2).replace('.', ',') + '</td>' +
-            '<td><button type="button" class="btn btn-danger btn-sm" onclick="removerItem(this)">Remover</button></td>' +
+            '<td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="removerItem(this)"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
             '</tr>';
             
         $('#itensTable').append(item);
@@ -371,7 +383,7 @@ function adicionarISS() {
         '<td>0,00</td>' +
         '<td>0,00</td>' +
         '<td>' + valorISS.toFixed(2).replace('.', ',') + '</td>' +
-        '<td><button type="button" class="btn btn-danger btn-sm" onclick="removerItem(this)">Remover</button></td>' +
+        '<td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="removerItem(this)"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
         '</tr>';
 
     $('#itensTable').append(item);
@@ -411,64 +423,111 @@ function salvarOS() {
     var itens = [];
 
     $('#itensTable tr').each(function() {
-    var ato = $(this).find('td').eq(0).text();
-    var quantidade = $(this).find('td').eq(1).text();
-    var desconto_legal = $(this).find('td').eq(2).text().replace('%', '');
-    var descricao = $(this).find('td').eq(3).text();
-    var emolumentos = $(this).find('td').eq(4).text().replace(/\./g, '').replace(',', '.');
-    var ferc = $(this).find('td').eq(5).text().replace(/\./g, '').replace(',', '.');
-    var fadep = $(this).find('td').eq(6).text().replace(/\./g, '').replace(',', '.');
-    var femp = $(this).find('td').eq(7).text().replace(/\./g, '').replace(',', '.');
-    var total = $(this).find('td').eq(8).text().replace(/\./g, '').replace(',', '.');
-    
-    itens.push({
-        ato: ato,
-        quantidade: quantidade,
-        desconto_legal: desconto_legal,
-        descricao: descricao,
-        emolumentos: emolumentos,
-        ferc: ferc,
-        fadep: fadep,
-        femp: femp,
-        total: total
+        var ato = $(this).find('td').eq(0).text();
+        var quantidade = $(this).find('td').eq(1).text();
+        var desconto_legal = $(this).find('td').eq(2).text().replace('%', '');
+        var descricao = $(this).find('td').eq(3).text();
+        var emolumentos = $(this).find('td').eq(4).text().replace(/\./g, '').replace(',', '.');
+        var ferc = $(this).find('td').eq(5).text().replace(/\./g, '').replace(',', '.');
+        var fadep = $(this).find('td').eq(6).text().replace(/\./g, '').replace(',', '.');
+        var femp = $(this).find('td').eq(7).text().replace(/\./g, '').replace(',', '.');
+        var total = $(this).find('td').eq(8).text().replace(/\./g, '').replace(',', '.');
+        
+        itens.push({
+            ato: ato,
+            quantidade: quantidade,
+            desconto_legal: desconto_legal,
+            descricao: descricao,
+            emolumentos: emolumentos,
+            ferc: ferc,
+            fadep: fadep,
+            femp: femp,
+            total: total
+        });
     });
-});
 
-$.ajax({
-    url: 'salvar_os.php',
-    type: 'POST',
-    data: {
-        cliente: cliente,
-        cpf_cliente: cpf_cliente,
-        total_os: total_os,
-        descricao_os: descricao_os,
-        observacoes: observacoes,
-        base_calculo: base_calculo,
-        itens: itens
-    },
-    success: function(response) {
-        console.log(response); // Adicionando log de depuração para verificar a resposta do servidor
-        try {
-            var res = JSON.parse(response);
-            if (res.error) {
-                showAlert(res.error, 'error');
-            } else {
-                showAlert('Ordem de Serviço salva com sucesso!', 'success');
-                setTimeout(function() {
-                    window.location.href = 'visualizar_os.php?id=' + res.id;
-                }, 2000);
+    $.ajax({
+        url: 'salvar_os.php',
+        type: 'POST',
+        data: {
+            cliente: cliente,
+            cpf_cliente: cpf_cliente,
+            total_os: total_os,
+            descricao_os: descricao_os,
+            observacoes: observacoes,
+            base_calculo: base_calculo,
+            itens: itens
+        },
+        success: function(response) {
+            console.log(response); // Adicionando log de depuração para verificar a resposta do servidor
+            try {
+                var res = JSON.parse(response);
+                if (res.error) {
+                    showAlert(res.error, 'error');
+                } else {
+                    showAlert('Ordem de Serviço salva com sucesso!', 'success');
+                    setTimeout(function() {
+                        window.location.href = 'visualizar_os.php?id=' + res.id;
+                    }, 2000);
+                }
+            } catch (e) {
+                console.log('Erro ao processar a resposta: ', e);
+                showAlert('Erro ao processar a resposta do servidor.', 'error');
             }
-        } catch (e) {
-            console.log('Erro ao processar a resposta: ', e);
-            showAlert('Erro ao processar a resposta do servidor.', 'error');
+        },
+        error: function(xhr, status, error) {
+            console.log('Erro:', error);
+            console.log('Resposta do servidor:', xhr.responseText);
+            showAlert('Erro ao salvar a Ordem de Serviço', 'error');
         }
-    },
-    error: function(xhr, status, error) {
-        console.log('Erro:', error);
-        console.log('Resposta do servidor:', xhr.responseText);
-        showAlert('Erro ao salvar a Ordem de Serviço', 'error');
+    });
+}
+
+// Funções para validar CPF e CNPJ
+function validarCPF(cpf) {
+    cpf = cpf.replace(/[^\d]+/g, '');
+    if (cpf.length !== 11) return false;
+    let soma = 0;
+    let resto;
+    if (cpf === "00000000000") return false;
+    for (let i = 1; i <= 9; i++) soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+    resto = (soma * 10) % 11;
+    if ((resto === 10) || (resto === 11)) resto = 0;
+    if (resto !== parseInt(cpf.substring(9, 10))) return false;
+    soma = 0;
+    for (let i = 1; i <= 10; i++) soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+    resto = (soma * 10) % 11;
+    if ((resto === 10) || (resto === 11)) resto = 0;
+    if (resto !== parseInt(cpf.substring(10, 11))) return false;
+    return true;
+}
+
+function validarCNPJ(cnpj) {
+    cnpj = cnpj.replace(/[^\d]+/g, '');
+    if (cnpj.length !== 14) return false;
+    if (cnpj === "00000000000000") return false;
+    let tamanho = cnpj.length - 2;
+    let numeros = cnpj.substring(0, tamanho);
+    let digitos = cnpj.substring(tamanho);
+    let soma = 0;
+    let pos = tamanho - 7;
+    for (let i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) pos = 9;
     }
-});
+    let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+    if (resultado !== parseInt(digitos.charAt(0))) return false;
+    tamanho = tamanho + 1;
+    numeros = cnpj.substring(0, tamanho);
+    soma = 0;
+    pos = tamanho - 7;
+    for (let i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) pos = 9;
+    }
+    resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+    if (resultado !== parseInt(digitos.charAt(1))) return false;
+    return true;
 }
 
 </script>
