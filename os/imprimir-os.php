@@ -114,7 +114,8 @@ if (isset($_GET['id'])) {
     $pdf->Ln(3);
 
     $pdf->SetFont('helvetica', '', 9);
-    $pdf->writeHTML('<div style="text-align: left;">'.'Cliente: ' . $ordem_servico['cliente'] . ' - CPF/CNPJ: '. $ordem_servico['cpf_cliente'] .'</div>', true, false, true, false, '');
+    $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? ' - CPF/CNPJ: ' . $ordem_servico['cpf_cliente'] : '';
+    $pdf->writeHTML('<div style="text-align: left;">Cliente: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
     $pdf->Ln(1);
 
     $pdf->SetFont('helvetica', '', 9);
@@ -294,9 +295,9 @@ if (isset($_GET['id'])) {
     // Adicionar a linha de assinatura
     $pdf->Ln(5);
     $pdf->Cell(0, 4, '__________________________________', 0, 1, 'C');
-    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->SetFont('helvetica', 'B', 9);
     $pdf->Cell(0, 4, $logged_in_user_nome, 0, 1, 'C');
-    $pdf->SetFont('helvetica', '', 10);
+    $pdf->SetFont('helvetica', '', 9);
     $pdf->Cell(0, 4, $logged_in_user_cargo, 0, 1, 'C');
 
     $pdf->Output('Ordem de serviço nº ' . $os_id . '.pdf', 'I');

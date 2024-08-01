@@ -15,6 +15,7 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
         .btn-adicionar {
             height: 38px;
@@ -190,18 +191,18 @@ include(__DIR__ . '/db_connection.php');
             </form>
             <hr>
             <div id="resultados">
-                <h4>Resultados da Pesquisa</h4>
-                <table class="table" style="zoom: 80%">
+                <h5>Resultados da Pesquisa</h5>
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 80%">
                     <thead>
                         <tr>
-                            <th style="width: 6%;">Nº OS</th>
+                            <th style="width: 7%;">Nº OS</th>
                             <th style="width: 11%;">Cliente</th>
                             <th style="width: 11%;">CPF/CNPJ</th>
                             <th style="width: 13%;">Título da OS</th>
                             <th style="width: 10%;">Valor Total</th>
                             <th style="width: 10%;">Dep. Prévio</th>
                             <th style="width: 10%;">Liquidado</th>
-                            <th style="width: 13%;">Observações</th>
+                            <th style="width: 12%;">Observações</th>
                             <th>Data</th>
                             <th>Status</th>
                             <th style="width: 9%;">Ações</th>
@@ -539,6 +540,8 @@ include(__DIR__ . '/db_connection.php');
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
+    <script src="../script/jquery.dataTables.min.js"></script>
+    <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script>
         $(document).ready(function() {
             $('#cpf_cliente').mask('000.000.000-00', { reverse: true }).on('blur', function() {
@@ -553,6 +556,13 @@ include(__DIR__ . '/db_connection.php');
             $('#total_os').mask('#.##0,00', { reverse: true });
             $('#valor_pagamento').mask('#.##0,00', { reverse: true });
             $('#valor_devolucao').mask('#.##0,00', { reverse: true });
+
+            // Inicializar DataTable
+            $('#tabelaResultados').DataTable({
+                "language": {
+                    "url": "../style/Portuguese-Brasil.json"
+                }
+            });
         });
 
         function abrirPagamentoModal(osId, cliente, totalOs, totalPagamentos, totalLiquidado, totalDevolvido, saldo, statusOS) {

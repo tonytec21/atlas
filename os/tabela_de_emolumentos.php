@@ -14,8 +14,8 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.24/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
         .btn-adicionar {
             height: 38px;
@@ -230,11 +230,17 @@ include(__DIR__ . '/db_connection.php');
     <script>
         $(document).ready(function() {
             // Inicializar DataTable
-            $('#resultadosTabela').DataTable();
+            $('#resultadosTabela').DataTable({
+                "language": {
+                    "url": "../style/Portuguese-Brasil.json"
+                }
+            });
 
             $('#ato').on('input', function() {
                 this.value = this.value.replace(/[^0-9.]/g, '');
             });
+            
+
 
             $('#cpf_cliente').mask('000.000.000-00', { reverse: true }).on('blur', function() {
                 var cpfCnpj = $(this).val().replace(/\D/g, '');

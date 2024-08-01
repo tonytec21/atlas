@@ -1,6 +1,8 @@
 <?php
 include(__DIR__ . '/session_check.php');
 checkSession();
+// Função para definir o fuso horário corretamente como sendo brasileiro
+date_default_timezone_set('America/Sao_Paulo');
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -236,14 +238,29 @@ include(__DIR__ . '/../menu.php');
         }
 
         function formatDateTime(dateTime) {
-            var date = new Date(dateTime);
-            return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
+            var date = new Date(dateTime + 'T00:00:00'); // Adicione um horário fixo para evitar a conversão incorreta de fuso horário
+            return date.toLocaleDateString('pt-BR');
         }
+
+        function formatDateTime2(dateTime) {
+            var date = new Date(dateTime);
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        function formatDate(dateTime) {
+            var parts = dateTime.split(' ');
+            var dateParts = parts[0].split('-');
+
+            var formattedDate = dateParts[0] + '/' + dateParts[1] + '/' + dateParts[2];
+
+            return formattedDate;
+        }
+
 
         // Função para converter data no formato d-m-Y H:i:s para o formato Date
         function parseCustomDate(dateString) {
             var parts = dateString.split(/[- :]/);
-            return new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]);
+            return new Date(parts[0], parts[1] - 1, parts[2], parts[3] || 0, parts[4] || 0, parts[5] || 0);
         }
 
         $(document).ready(function() {
@@ -303,24 +320,24 @@ include(__DIR__ . '/../menu.php');
                                 var cpfsCnpjs = ato.partes_envolvidas.map(p => p.cpf).join(', ');
                                 var nomes = ato.partes_envolvidas.map(p => p.nome).join(', ');
                                 var row = '<tr>' +
-                                    '<td>' + ato.atribuicao + '</td>' +
-                                    '<td>' + ato.categoria + '</td>' +
-                                    '<td>' + cpfsCnpjs + '</td>' +
-                                    '<td>' + nomes + '</td>' +
-                                    '<td>' + new Date(ato.data_ato).toLocaleDateString('pt-BR') + '</td>' +
-                                    '<td>' + ato.livro + '</td>' +
-                                    '<td>' + ato.folha + '</td>' +
-                                    '<td>' + ato.termo + '</td>' +
-                                    '<td>' + ato.protocolo + '</td>' +
-                                    '<td>' + ato.matricula + '</td>' +
-                                    '<td>' + ato.descricao + '</td>' +
-                                    '<td>' +
-                                        '<button class="btn btn-info btn-sm visualizar-anexos" data-id="' + ato.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button> ' +
-                                        '<button class="btn btn-edit btn-sm editar-ato" data-id="' + ato.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
-                                        '<button class="btn btn-delete btn-sm excluir-ato" data-id="' + ato.id + '" data-toggle="modal" data-target="#confirmDeleteModal"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
-                                    '</td>' +
-                                    '</tr>';
-                                tableBody.append(row);
+                                '<td>' + ato.atribuicao + '</td>' +
+                                '<td>' + ato.categoria + '</td>' +
+                                '<td>' + cpfsCnpjs + '</td>' +
+                                '<td>' + nomes + '</td>' +
+                                '<td>' + formatDateTime(ato.data_ato) + '</td>' + // Corrija aqui
+                                '<td>' + ato.livro + '</td>' +
+                                '<td>' + ato.folha + '</td>' +
+                                '<td>' + ato.termo + '</td>' +
+                                '<td>' + ato.protocolo + '</td>' +
+                                '<td>' + ato.matricula + '</td>' +
+                                '<td>' + ato.descricao + '</td>' +
+                                '<td>' +
+                                    '<button class="btn btn-info btn-sm visualizar-anexos" data-id="' + ato.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button> ' +
+                                    '<button class="btn btn-edit btn-sm editar-ato" data-id="' + ato.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
+                                    '<button class="btn btn-delete btn-sm excluir-ato" data-id="' + ato.id + '" data-toggle="modal" data-target="#confirmDeleteModal"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
+                                '</td>' +
+                                '</tr>';
+                            tableBody.append(row);
                             }
                         });
                     }
@@ -340,7 +357,7 @@ include(__DIR__ . '/../menu.php');
 
                         $('#view-atribuicao').val(ato.atribuicao);
                         $('#view-categoria').val(ato.categoria);
-                        $('#view-data-ato').val(new Date(ato.data_ato).toLocaleDateString('pt-BR'));
+                        $('#view-data-ato').val(formatDateTime(ato.data_ato));
                         $('#view-livro').val(ato.livro);
                         $('#view-folha').val(ato.folha);
                         $('#view-termo').val(ato.termo);
@@ -349,7 +366,7 @@ include(__DIR__ . '/../menu.php');
                         $('#view-partes-envolvidas').val(ato.partes_envolvidas.map(p => p.cpf + ' - ' + p.nome).join(', '));
                         $('#view-descricao').val(ato.descricao);
                         $('#view-cadastrado-por').text(ato.cadastrado_por);
-                        $('#view-data-cadastro').text(formatDateTime(ato.data_cadastro));
+                        $('#view-data-cadastro').text(formatDateTime2(ato.data_cadastro));
 
                         // Buscar número do selo e exibir no campo "Selo de Arquivamento"
                         $.ajax({
@@ -366,14 +383,13 @@ include(__DIR__ . '/../menu.php');
                         });
 
                         var modificacoesList = $('#view-modificacoes');
-                        modificacoesList.empty();
-                        if (ato.modificacoes && ato.modificacoes.length > 0) {
-                            ato.modificacoes.forEach(function(modificacao) {
-                                var modificacaoDate = parseCustomDate(modificacao.data_hora);
-                                var modificacaoItem = '<li>' + modificacao.usuario + ' - ' + formatDateTime(modificacaoDate) + '</li>';
-                                modificacoesList.append(modificacaoItem);
-                            });
-                        }
+                            modificacoesList.empty();
+                            if (ato.modificacoes && ato.modificacoes.length > 0) {
+                                ato.modificacoes.forEach(function(modificacao) {
+                                    var modificacaoItem = '<li>' + modificacao.usuario + ' - ' + formatDate(modificacao.data_hora) + '</li>'; // Use formatDate aqui
+                                    modificacoesList.append(modificacaoItem);
+                                });
+                            }
 
                         var anexosList = $('#view-anexos-list');
                         anexosList.empty();
