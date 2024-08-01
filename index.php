@@ -76,7 +76,7 @@ include(__DIR__ . '/menu.php');
                 <a href="os/index.php" class="btn btn-info w-100"><i class="fa fa-money" aria-hidden="true"></i> Ordens de Serviço</a>
             </div>
             <div class="col-md-4">
-                <a href="#" class="btn btn-success w-100"><i class="fa fa-university" aria-hidden="true"></i></i> Caixa</a>
+                <a href="caixa/index.php" class="btn btn-success w-100"><i class="fa fa-university" aria-hidden="true"></i></i> Caixa</a>
             </div>
             <div class="col-md-4">
                 <a href="tarefas/index.php" class="btn btn-secondary w-100"><i class="fa fa-clock-o" aria-hidden="true"></i> Tarefas</a>
