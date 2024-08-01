@@ -133,6 +133,17 @@ include(__DIR__ . '/db_connection.php');
 <body class="light-mode">
     <?php
     include(__DIR__ . '/../menu.php');
+
+    $conn = getDatabaseConnection();
+    $stmt = $conn->prepare('SELECT nivel_de_acesso, status, usuario FROM funcionarios WHERE usuario = :usuario');
+    $stmt->bindParam(':usuario', $_SESSION['username']);
+    $stmt->execute();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user['status'] !== 'ativo') {
+        echo "<script>alert('O usuário não tem acesso à página.'); window.location.href='../index.php';</script>";
+        exit;
+    }
     ?>
 
     <div id="main" class="main-content">
@@ -143,14 +154,20 @@ include(__DIR__ . '/db_connection.php');
                 <div class="form-row">
                     <div class="form-group col-md-4">
                         <label for="funcionario">Funcionário:</label>
-                        <select class="form-control" id="funcionario" name="funcionario">
-                            <option value="todos">Todos</option>
+                        <select class="form-control" id="funcionario" name="funcionario" <?php echo $user['nivel_de_acesso'] === 'usuario' ? 'disabled' : ''; ?>>
+                            <?php if ($user['nivel_de_acesso'] === 'administrador') { ?>
+                                <option value="todos">Todos</option>
+                            <?php } ?>
                             <?php
-                            $conn = getDatabaseConnection();
-                            $stmt = $conn->query("SELECT DISTINCT funcionario FROM atos_liquidados");
+                            $query = $user['nivel_de_acesso'] === 'administrador' ? "SELECT usuario, nome_completo FROM funcionarios WHERE status = 'ativo'" : "SELECT usuario, nome_completo FROM funcionarios WHERE usuario = :usuario";
+                            $stmt = $conn->prepare($query);
+                            if ($user['nivel_de_acesso'] !== 'administrador') {
+                                $stmt->bindParam(':usuario', $user['usuario']);
+                            }
+                            $stmt->execute();
                             $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             foreach ($funcionarios as $funcionario) {
-                                echo '<option value="' . $funcionario['funcionario'] . '">' . $funcionario['funcionario'] . '</option>';
+                                echo '<option value="' . $funcionario['usuario'] . '">' . $funcionario['nome_completo'] . '</option>';
                             }
                             ?>
                         </select>
@@ -190,7 +207,6 @@ include(__DIR__ . '/db_connection.php');
                     </thead>
                     <tbody>
                         <?php
-                        $conn = getDatabaseConnection();
                         $conditions = [];
                         $params = [];
                         $filtered = false;
@@ -198,6 +214,10 @@ include(__DIR__ . '/db_connection.php');
                         if (!empty($_GET['funcionario']) && $_GET['funcionario'] !== 'todos') {
                             $conditions[] = 'funcionario = :funcionario';
                             $params[':funcionario'] = $_GET['funcionario'];
+                            $filtered = true;
+                        } elseif ($user['nivel_de_acesso'] === 'usuario') {
+                            $conditions[] = 'funcionario = :funcionario';
+                            $params[':funcionario'] = $user['usuario'];
                             $filtered = true;
                         }
 
@@ -216,10 +236,31 @@ include(__DIR__ . '/db_connection.php');
                             $filtered = true;
                         }
 
-                        $sql = 'SELECT funcionario, SUM(total) as total_atos, DATE(data) as data FROM atos_liquidados';
+                        $sql = 'SELECT 
+                                    funcionario, 
+                                    DATE(data) as data,
+                                    SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
+                                    SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
+                                    SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
+                                    SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas
+                                FROM (
+                                    SELECT funcionario, data, "ato" as tipo, total 
+                                    FROM atos_liquidados
+                                    UNION ALL
+                                    SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
+                                    FROM pagamento_os
+                                    UNION ALL
+                                    SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
+                                    FROM devolucao_os
+                                    UNION ALL
+                                    SELECT funcionario, data, "saida" as tipo, valor_saida as total
+                                    FROM saidas_despesas
+                                ) as fluxos';
+                        
                         if ($conditions) {
                             $sql .= ' WHERE ' . implode(' AND ', $conditions);
                         }
+
                         $sql .= ' GROUP BY funcionario, DATE(data)';
 
                         $stmt = $conn->prepare($sql);
@@ -227,31 +268,15 @@ include(__DIR__ . '/db_connection.php');
                             $stmt->bindValue($key, $value);
                         }
                         $stmt->execute();
-                        $atos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                        $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                        foreach ($atos as $ato) {
-                            $funcionario = $ato['funcionario'];
-                            $data = $ato['data'];
-                            $total_atos = $ato['total_atos'];
-
-                            $stmt = $conn->prepare('SELECT SUM(total_pagamento) as total_pagamentos FROM pagamento_os WHERE funcionario = :funcionario AND DATE(data_pagamento) = :data');
-                            $stmt->bindParam(':funcionario', $funcionario);
-                            $stmt->bindParam(':data', $data);
-                            $stmt->execute();
-                            $total_pagamentos = $stmt->fetchColumn() ?: 0;
-
-                            $stmt = $conn->prepare('SELECT SUM(total_devolucao) as total_devolucoes FROM devolucao_os WHERE funcionario = :funcionario AND DATE(data_devolucao) = :data');
-                            $stmt->bindParam(':funcionario', $funcionario);
-                            $stmt->bindParam(':data', $data);
-                            $stmt->execute();
-                            $total_devolucoes = $stmt->fetchColumn() ?: 0;
-
-                            // Calcular saídas e despesas
-                            $stmt = $conn->prepare('SELECT SUM(valor_saida) as total_saidas FROM saidas_despesas WHERE funcionario = :funcionario AND DATE(data) = :data');
-                            $stmt->bindParam(':funcionario', $funcionario);
-                            $stmt->bindParam(':data', $data);
-                            $stmt->execute();
-                            $total_saidas = $stmt->fetchColumn() ?: 0;
+                        foreach ($resultados as $resultado) {
+                            $funcionario = $resultado['funcionario'];
+                            $data = $resultado['data'];
+                            $total_atos = $resultado['total_atos'];
+                            $total_pagamentos = $resultado['total_pagamentos'];
+                            $total_devolucoes = $resultado['total_devolucoes'];
+                            $total_saidas = $resultado['total_saidas'];
                             ?>
                             <tr>
                                 <td><?php echo $funcionario; ?></td>
@@ -295,7 +320,7 @@ include(__DIR__ . '/db_connection.php');
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="card text-white bg-success mb-3">
+                            <div class="card text-white bg-warning mb-3">
                                 <div class="card-header">Total Recebido em Conta</div>
                                 <div class="card-body">
                                     <h5 class="card-title" id="cardTotalRecebidoConta">R$ 0,00</h5>
@@ -303,7 +328,7 @@ include(__DIR__ . '/db_connection.php');
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="card text-white bg-warning mb-3">
+                            <div class="card text-white bg-success mb-3">
                                 <div class="card-header">Total Recebido em Espécie</div>
                                 <div class="card-body">
                                     <h5 class="card-title" id="cardTotalRecebidoEspecie">R$ 0,00</h5>
