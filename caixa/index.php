@@ -261,8 +261,8 @@ include(__DIR__ . '/db_connection.php');
                                 <td><?php echo 'R$ ' . number_format($total_saidas, 2, ',', '.'); ?></td>
                                 <td><?php echo date('d/m/Y', strtotime($data)); ?></td>
                                 <td>
-                                    <button class="btn btn-info btn-sm" onclick="verDetalhes('<?php echo $funcionario; ?>', '<?php echo $data; ?>')">Visualizar</button>
-                                    <button class="btn btn-warning btn-sm" onclick="cadastrarSaida('<?php echo $funcionario; ?>', '<?php echo $data; ?>')">Cadastrar Saída</button>
+                                    <button title="Visualizar" class="btn btn-info btn-sm" onclick="verDetalhes('<?php echo $funcionario; ?>', '<?php echo $data; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    <button title="Cadastrar Saída" class="btn btn-edit btn-sm" onclick="cadastrarSaida('<?php echo $funcionario; ?>', '<?php echo $data; ?>')"><i class="fa fa-sign-out" aria-hidden="true"></i></button>
                                 </td>
                             </tr>
                             <?php
