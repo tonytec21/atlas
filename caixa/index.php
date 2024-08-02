@@ -530,7 +530,8 @@ include(__DIR__ . '/db_connection.php');
             $('#tabelaResultados').DataTable({
                 "language": {
                     "url": "../style/Portuguese-Brasil.json"
-                }
+                },
+                "pageLength": 10
             });
 
             // Inicializar máscara de dinheiro
@@ -683,31 +684,36 @@ include(__DIR__ . '/db_connection.php');
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
-                        "destroy": true
+                        "destroy": true,
+                        "pageLength": 10
                     });
                     $('#tabelaPagamentos').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
-                        "destroy": true
+                        "destroy": true,
+                        "pageLength": 10
                     });
                     $('#tabelaTotalPorTipo').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
-                        "destroy": true
+                        "destroy": true,
+                        "pageLength": 10
                     });
                     $('#tabelaDevolucoes').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
-                        "destroy": true
+                        "destroy": true,
+                        "pageLength": 10
                     });
                     $('#tabelaSaidas').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
-                        "destroy": true
+                        "destroy": true,
+                        "pageLength": 10
                     });
                 },
                 error: function() {
@@ -725,6 +731,16 @@ include(__DIR__ . '/db_connection.php');
         function formatCurrency(value) {
             return 'R$ ' + parseFloat(value).toFixed(2).replace('.', ',').replace(/\d(?=(\d{3})+,)/g, '$&.');
         }
+
+        // Adicionar evento para recarregar a página ao fechar os modais
+        $('#detalhesModal').on('hidden.bs.modal', function () {
+            location.reload();
+        });
+
+        $('#cadastroSaidaModal').on('hidden.bs.modal', function () {
+            location.reload();
+        });
+
     </script>
 
 </body>
