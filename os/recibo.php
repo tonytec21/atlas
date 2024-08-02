@@ -19,10 +19,7 @@ class PDF extends TCPDF
     // Cabeçalho do PDF
     public function Header()
     {
-        $this->SetFont('helvetica', 'B', 12);
-        $this->SetY(1);
-        $this->MultiCell(0, 10, $this->serventia, 0, 'C', 0, 1, '', '', true);
-        $this->SetY(20);
+        // Removido o cabeçalho padrão
     }
 
     // Rodapé do PDF
@@ -44,6 +41,19 @@ class PDF extends TCPDF
     public function setServentia($serventia)
     {
         $this->serventia = $serventia;
+    }
+
+    public function addHeaderContent()
+    {
+        $image_file = '../style/img/recibo.png'; // Verifique se o caminho está correto
+        if (file_exists($image_file)) {
+            @$this->Image($image_file, 4, 2, 60, '', 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);
+            $this->Ln(3); // Ajuste o espaçamento após a imagem
+        } else {
+            $this->SetFont('helvetica', 'B', 12);
+            $this->MultiCell(0, 10, $this->serventia, 0, 'C', 0, 1, '', '', true);
+            $this->Ln(3); // Ajuste o espaçamento após o texto
+        }
     }
 }
 
@@ -109,56 +119,58 @@ if (isset($_GET['id'])) {
     $contas_result = $contas_query->get_result();
     $contas = $contas_result->fetch_all(MYSQLI_ASSOC);
 
-    // Obter o nome da serventia
-    $serventia_query = $conn->prepare("SELECT CONVERT(razao_social USING utf8) as razao_social FROM cadastro_serventia WHERE id = 1");
+    // Obter informações da serventia
+    $serventia_query = $conn->prepare("SELECT razao_social FROM cadastro_serventia WHERE id = 1");
     $serventia_query->execute();
     $serventia_result = $serventia_query->get_result();
-    $serventia_data = $serventia_result->fetch_assoc();
-    $serventia = $serventia_data['razao_social'];
+    $serventia = $serventia_result->fetch_assoc()['razao_social'];
 
     $pdf = new PDF('P', 'mm', array(80, 297));
-    $pdf->SetMargins(1, 20, 10);
+    $pdf->SetMargins(1, 1, 10);
     $pdf->setCriadoPor($criado_por_nome); // Define o nome do usuário que criou a OS
     $pdf->setServentia($serventia); // Define o nome da serventia
     $pdf->AddPage();
     $pdf->SetFont('helvetica', '', 9); // Ajuste de fonte e tamanho
 
+    // Adicionar o cabeçalho apenas como início do conteúdo
+    $pdf->addHeaderContent();
+
     $pdf->SetFont('helvetica', 'B', 9);
     $pdf->writeHTML('<div style="text-align: center;">RECIBO DE PAGAMENTO Nº.: ' . $os_id . '</div>', true, false, true, false, '');
-    $pdf->Ln(2);
+    $pdf->Ln(0);
 
-    $pdf->SetFont('helvetica', '', 8);
+    $pdf->SetFont('helvetica', 'B', 8);
     $pdf->writeHTML('<div style="text-align: center;">'. $ordem_servico['descricao_os'] .'</div>', true, false, true, false, '');
-    $pdf->Ln(4);
+    $pdf->Ln(1);
 
-    $pdf->SetFont('helvetica', '', 8);
+    $pdf->SetFont('helvetica', 'B', 8);
     $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? '<br>CPF/CNPJ: ' . $ordem_servico['cpf_cliente'] : '';
     $pdf->writeHTML('<div style="text-align: left;">CLIENTE: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
-    $pdf->Ln(1);
+    $pdf->Ln(0);
 
-    $pdf->SetFont('helvetica', '', 8);
+    $pdf->SetFont('helvetica', 'B', 8);
     $data_pagamento = !empty($ultima_data_pagamento) ? date('d/m/Y - H:i', strtotime($ultima_data_pagamento)) : 'Data não disponível';
     $pdf->writeHTML('<div style="text-align: left;">'.'DATA DO PAGAMENTO: '. $data_pagamento .'</div>', true, false, true, false, '');
-    $pdf->Ln(1);
+    $pdf->Ln(0);
     
-    $pdf->SetFont('helvetica', '', 8);
+    $pdf->SetFont('helvetica', 'B', 8);
     $pdf->writeHTML('<div style="text-align: left;">VALOR PAGO: R$ ' . number_format($total_pagamentos, 2, ',', '.') . '</div>', true, false, true, false, '');
-    $pdf->Ln(1);
+    $pdf->Ln(0);
 
-    $pdf->SetFont('helvetica', '', 8);
+    $pdf->SetFont('helvetica', 'B', 8);
     if ($ordem_servico['base_de_calculo'] >= 0.001) {
         $pdf->writeHTML('<div style="text-align: left;">'.'BASE DE CÁLCULO: R$ '. number_format($ordem_servico['base_de_calculo'], 2, ',', '.') .'</div>', true, false, true, false, '');
-        $pdf->Ln(1);
+        $pdf->Ln(0);
     }
     
-    $pdf->SetFont('helvetica', '', 8);
+    $pdf->SetFont('helvetica', 'B', 8);
     if (!empty($ordem_servico['observacoes'])) {
         $pdf->writeHTML('<div style="text-align: justify;">'.'<b>OBS:</b> '. $ordem_servico['observacoes'] .'</div>', true, false, true, false, '');
         $pdf->Ln(2);
     }
 
     // Adicionar as informações dos itens da OS
-    $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetFont('helvetica', 'B', 9);
     $pdf->writeHTML('<div style="text-align: center; margin-top: 10px;"><b>ITENS</b></div>', true, false, true, false, '');
     $pdf->Ln(1);
 
@@ -202,6 +214,7 @@ if (isset($_GET['id'])) {
             $html .= '</tbody></table>';
             $pdf->writeHTML($html, true, false, true, false, '');
             $pdf->AddPage();
+            $pdf->SetY(10); // Redefine a margem superior para a segunda página e seguintes
             $html = adicionarCabecalhoTabelaItens($pdf) . $rowHtml;
         } else {
             $html .= $rowHtml;
@@ -250,7 +263,7 @@ if (isset($_GET['id'])) {
         $pdf->writeHTML('<div style="text-align: right;">Valor Restituído: R$ ' . number_format($total_devolucoes, 2, ',', '.') . '</div>', true, false, true, false, '');
     }
 
-    $pdf->Ln(10);
+    $pdf->Ln(5);
 
     // Adicionar a linha de assinatura
     $pdf->Cell(0, 4, '__________________________________', 0, 1, 'C');
