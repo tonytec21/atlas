@@ -138,6 +138,7 @@ include(__DIR__ . '/../menu.php');
             <h3>Ordem de Serviço nº: <?php echo $ordem_servico['id']; ?></h3>
             <div>
                 <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
+                <button style="margin-bottom: 5px!important;" type="button" class="btn btn-secondary btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
                 <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
                 <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
             </div>
@@ -424,6 +425,10 @@ include(__DIR__ . '/../menu.php');
 
     function imprimirOS() {
         window.open('imprimir-os.php?id=<?php echo $os_id; ?>', '_blank');
+    }
+
+    function imprimirRecibo() {
+        window.open('recibo.php?id=<?php echo $os_id; ?>', '_blank');
     }
 
     function editarOS() {
