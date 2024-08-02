@@ -231,7 +231,7 @@ if (isset($_GET['id'])) {
         $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Valor Restituído: R$ ' . number_format($total_devolucoes, 2, ',', '.') . '</div>', true, false, true, false, '');
     }
 
-    $pdf->Ln(10);
+    $pdf->Ln(12);
 
     // Função para adicionar o cabeçalho da tabela de contas bancárias
     function adicionarCabecalhoTabelaContas(&$pdf, $numContas) {
