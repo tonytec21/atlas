@@ -212,7 +212,6 @@ include(__DIR__ . '/db_connection.php');
                         $params = [];
                         $filtered = false;
                         $isUnificado = false;
-                        $funcionariosConcatenados = '';
 
                         if (isset($_GET['funcionario']) && $_GET['funcionario'] !== 'todos' && $_GET['funcionario'] !== 'caixa_unificado') {
                             $conditions[] = 'funcionario = :funcionario';
@@ -723,5 +722,6 @@ include(__DIR__ . '/db_connection.php');
             return 'R$ ' + parseFloat(value).toFixed(2).replace('.', ',').replace(/\d(?=(\d{3})+,)/g, '$&.');
         }
     </script>
+
 </body>
 </html>
