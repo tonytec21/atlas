@@ -151,8 +151,8 @@ if (isset($_GET['id'])) {
                 <tr>
                     <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>ATO</b></th>
                     <th style="width: 5%; text-align: center; font-size: 7.5px;"><b>QTD</b></th>
-                    <th style="width: 7%; text-align: center; font-size: 7.5px;"><b>DESC. LEGAL (%)</b></th>
-                    <th style="width: 36%; text-align: center; font-size: 7.5px;"><b>DESCRIÇÃO</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 7px;"><b>DESC. LEGAL %</b></th>
+                    <th style="width: 35%; text-align: center; font-size: 7.5px;"><b>DESCRIÇÃO</b></th>
                     <th style="width: 10%; text-align: center; font-size: 7.5px;"><b>EMOL</b></th>
                     <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>FERC</b></th>
                     <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>FADEP</b></th>
@@ -170,8 +170,8 @@ if (isset($_GET['id'])) {
         $rowHtml = '<tr>
             <td style="width: 8%; font-size: 7.5px;">' . $item['ato'] . '</td>
             <td style="width: 5%; font-size: 7.5px;">' . $item['quantidade'] . '</td>
-            <td style="width: 7%; font-size: 7.5px;">' . $item['desconto_legal'] . '</td>
-            <td style="width: 36%; font-size: 7px;">' . $item['descricao'] . '</td>
+            <td style="width: 8%; font-size: 7.5px;">' . $item['desconto_legal'] . '</td>
+            <td style="width: 35%; font-size: 7px;">' . $item['descricao'] . '</td>
             <td style="width: 10%; font-size: 7.5px;">R$ ' . number_format($item['emolumentos'], 2, ',', '.') . '</td>
             <td style="width: 8%; font-size: 7.5px;">R$ ' . number_format($item['ferc'], 2, ',', '.') . '</td>
             <td style="width: 8%; font-size: 7.5px;">R$ ' . number_format($item['fadep'], 2, ',', '.') . '</td>
