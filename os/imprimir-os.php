@@ -243,11 +243,11 @@ if (isset($_GET['id'])) {
         $html = '<table border="0.1" cellpadding="4">
             <thead>
                 <tr>
-                    <th style="width: 10%; text-align: center; font-size: 7.5px;"><b>Banco</b></th>
+                    <th style="width: 12%; text-align: center; font-size: 7.5px;"><b>Banco</b></th>
                     <th style="width: 7%; text-align: center; font-size: 7.5px;"><b>Agência</b></th>
                     <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>Tipo de Conta</b></th>
                     <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>Nº Conta</b></th>
-                    <th style="width: 21%; text-align: center; font-size: 7.5px;"><b>Titular da Conta</b></th>
+                    <th style="width: 18%; text-align: center; font-size: 7.5px;"><b>Titular da Conta</b></th>
                     <th style="width: 15%; text-align: center; font-size: 7.5px;"><b>CPF/CNPJ do Titular</b></th>
                     <th style="width: 22%; text-align: center; font-size: 7.5px;"><b>Chave PIX</b></th>
                     <th style="width: 9%; text-align: center; font-size: 7.5px;"><b>QR Code PIX</b></th>
@@ -264,11 +264,11 @@ if (isset($_GET['id'])) {
 
         foreach ($contas as $index => $conta) {
             $rowHtml = '<tr>
-                <td style="width: 10%; font-size: 7.5px;">' . $conta['banco'] . '</td>
+                <td style="width: 12%; font-size: 7.5px;">' . $conta['banco'] . '</td>
                 <td style="width: 7%; font-size: 7.5px;">' . $conta['agencia'] . '</td>
                 <td style="width: 8%; font-size: 7.5px;">' . $conta['tipo_conta'] . '</td>
                 <td style="width: 8%; font-size: 7.5px;">' . $conta['numero_conta'] . '</td>
-                <td style="width: 21%; font-size: 7.5px;">' . $conta['titular_conta'] . '</td>
+                <td style="width: 18%; font-size: 7.5px;">' . $conta['titular_conta'] . '</td>
                 <td style="width: 15%; font-size: 7.5px;">' . $conta['cpf_cnpj_titular'] . '</td>
                 <td style="width: 22%; font-size: 7.5px;">' . $conta['chave_pix'] . '</td>
                 <td style="width: 9%; font-size: 7.5px; text-align: center;"><img src="@' . $conta['qr_code_pix'] . '" height="40" /></td>
