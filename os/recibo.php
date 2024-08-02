@@ -19,8 +19,8 @@ class PDF extends TCPDF
     // Cabeçalho do PDF
     public function Header()
     {
-        $this->SetFont('helvetica', 'B', 10);
-        $this->SetY(10);
+        $this->SetFont('helvetica', 'B', 12);
+        $this->SetY(1);
         $this->MultiCell(0, 10, $this->serventia, 0, 'C', 0, 1, '', '', true);
         $this->SetY(20);
     }
@@ -110,11 +110,11 @@ if (isset($_GET['id'])) {
     $contas = $contas_result->fetch_all(MYSQLI_ASSOC);
 
     // Obter o nome da serventia
-    $serventia_query = $conn->prepare("SELECT razao_social FROM cadastro_serventia WHERE id = 1");
+    $serventia_query = $conn->prepare("SELECT CONVERT(razao_social USING utf8) as razao_social FROM cadastro_serventia WHERE id = 1");
     $serventia_query->execute();
     $serventia_result = $serventia_query->get_result();
     $serventia_data = $serventia_result->fetch_assoc();
-    $serventia = mb_convert_encoding($serventia_data['razao_social'], 'UTF-8', 'ISO-8859-1');
+    $serventia = $serventia_data['razao_social'];
 
     $pdf = new PDF('P', 'mm', array(80, 297));
     $pdf->SetMargins(1, 20, 10);
