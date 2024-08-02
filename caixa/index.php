@@ -93,39 +93,39 @@ include(__DIR__ . '/db_connection.php');
             padding: 5px 10px;
             border-radius: 5px;
             color: white;
-            display: inline-block.
+            display: inline-block;
         }
 
         .status-pendente {
             background-color: #dc3545;
             width: 75px;
-            text-align: center.
+            text-align: center;
         }
 
         .status-parcialmente {
             background-color: #ffc107;
             width: 75px;
-            text-align: center.
+            text-align: center;
         }
 
         .status-liquidado {
             background-color: #28a745;
             width: 75px;
-            text-align: center.
+            text-align: center;
         }
 
         .total-label {
             font-weight: bold;
-            text-align: center.
+            text-align: center;
         }
 
         .table-title {
             text-align: center;
-            font-weight: bold.
+            font-weight: bold;
         }
 
         .card-title {
-            font-size: 1.25rem.
+            font-size: 1.25rem;
         }
     </style>
 </head>
@@ -214,7 +214,7 @@ include(__DIR__ . '/db_connection.php');
                         $isUnificado = false;
                         $funcionariosConcatenados = '';
 
-                        if (!empty($_GET['funcionario']) && $_GET['funcionario'] !== 'todos' && $_GET['funcionario'] !== 'caixa_unificado') {
+                        if (isset($_GET['funcionario']) && $_GET['funcionario'] !== 'todos' && $_GET['funcionario'] !== 'caixa_unificado') {
                             $conditions[] = 'funcionario = :funcionario';
                             $params[':funcionario'] = $_GET['funcionario'];
                             $filtered = true;
@@ -222,7 +222,7 @@ include(__DIR__ . '/db_connection.php');
                             $conditions[] = 'funcionario = :funcionario';
                             $params[':funcionario'] = $user['usuario'];
                             $filtered = true;
-                        } elseif ($_GET['funcionario'] === 'caixa_unificado') {
+                        } elseif (isset($_GET['funcionario']) && $_GET['funcionario'] === 'caixa_unificado') {
                             $isUnificado = true;
                         }
 
@@ -250,16 +250,16 @@ include(__DIR__ . '/db_connection.php');
                                         SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
                                         SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas
                                     FROM (
-                                        SELECT funcionario, data as data, "ato" as tipo, total 
+                                        SELECT funcionario, data, "ato" as tipo, total 
                                         FROM atos_liquidados
                                         UNION ALL
-                                        SELECT funcionario, data_pagamento as data_pagamento, "pagamento" as tipo, total_pagamento as total
+                                        SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
                                         FROM pagamento_os
                                         UNION ALL
-                                        SELECT funcionario, data_devolucao as data_devolucao, "devolucao" as tipo, total_devolucao as total
+                                        SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
                                         FROM devolucao_os
                                         UNION ALL
-                                        SELECT funcionario, data as data_saida, "saida" as tipo, valor_saida as total
+                                        SELECT funcionario, data, "saida" as tipo, valor_saida as total
                                         FROM saidas_despesas
                                     ) as fluxos';
                             if ($conditions) {
@@ -275,16 +275,16 @@ include(__DIR__ . '/db_connection.php');
                                         SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
                                         SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas
                                     FROM (
-                                        SELECT funcionario, data as data, "ato" as tipo, total 
+                                        SELECT funcionario, data, "ato" as tipo, total 
                                         FROM atos_liquidados
                                         UNION ALL
-                                        SELECT funcionario, data_pagamento as data_pagamento, "pagamento" as tipo, total_pagamento as total
+                                        SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
                                         FROM pagamento_os
                                         UNION ALL
-                                        SELECT funcionario, data_devolucao as data_devolucao, "devolucao" as tipo, total_devolucao as total
+                                        SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
                                         FROM devolucao_os
                                         UNION ALL
-                                        SELECT funcionario, data as data_saida, "saida" as tipo, valor_saida as total
+                                        SELECT funcionario, data, "saida" as tipo, valor_saida as total
                                         FROM saidas_despesas
                                     ) as fluxos';
                             if ($conditions) {
@@ -645,7 +645,7 @@ include(__DIR__ . '/db_connection.php');
                         }
                         $('#detalhesDevolucoes').append(`
                             <tr>
-                                <td>${devolucao.ordem_de_servico_id}</td>
+                                <td>${devolucao.ordem_servico_id}</td>
                                 <td>${devolucao.cliente}</td>
                                 <td>${devolucao.forma_devolucao}</td>
                                 <td>${formatCurrency(devolucao.total_devolucao)}</td>
@@ -713,19 +713,15 @@ include(__DIR__ . '/db_connection.php');
             });
         }
 
-        function cadastrarSaida(funcionario, data) {
+        function cadastrarSaida(funcionarios, data) {
             $('#data_saida').val(data);
-            $('#funcionario_saida').val(funcionario);
+            $('#funcionario_saida').val(funcionarios);
             $('#cadastroSaidaModal').modal('show');
         }
 
         function formatCurrency(value) {
-            return 'R$ ' + parseFloat(value).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&.');
+            return 'R$ ' + parseFloat(value).toFixed(2).replace('.', ',').replace(/\d(?=(\d{3})+,)/g, '$&.');
         }
     </script>
-    <?php
-    include(__DIR__ . '/../rodape.php');
-    ?>
 </body>
-
 </html>
