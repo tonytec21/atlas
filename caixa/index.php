@@ -127,6 +127,10 @@ include(__DIR__ . '/db_connection.php');
         .card-title {
             font-size: 1.25rem;
         }
+
+        .bg-warning {
+            background-color: #ff8e07 !important;
+        }
     </style>
 </head>
 
@@ -344,7 +348,7 @@ include(__DIR__ . '/db_connection.php');
                     <div class="row">
                         <div class="col-md-2">
                             <div class="card text-white bg-primary mb-3">
-                                <div class="card-header">Total Atos Liquidados</div>
+                                <div style="padding: 0.50rem 1.25rem; font-size: 13px;" class="card-header">Atos Liquidados</div>
                                 <div class="card-body">
                                     <h5 class="card-title" id="cardTotalAtos">R$ 0,00</h5>
                                 </div>
@@ -352,7 +356,7 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                         <div class="col-md-2">
                             <div class="card text-white bg-warning mb-3">
-                                <div class="card-header">Total Recebido em Conta</div>
+                                <div style="padding: 0.50rem 1.25rem; font-size: 13px;" class="card-header">Recebido em Conta</div>
                                 <div class="card-body">
                                     <h5 class="card-title" id="cardTotalRecebidoConta">R$ 0,00</h5>
                                 </div>
@@ -360,23 +364,23 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                         <div class="col-md-2">
                             <div class="card text-white bg-success mb-3">
-                                <div class="card-header">Total Recebido em Espécie</div>
+                                <div style="padding: 0.50rem 1.25rem; font-size: 13px;" class="card-header">Recebido em Espécie</div>
                                 <div class="card-body">
                                     <h5 class="card-title" id="cardTotalRecebidoEspecie">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="card text-white bg-danger mb-3">
-                                <div class="card-header">Total Devoluções</div>
+                            <div class="card text-white bg-secondary mb-3">
+                                <div style="padding: 0.50rem 1.25rem; font-size: 13px;" class="card-header">Devoluções</div>
                                 <div class="card-body">
                                     <h5 class="card-title" id="cardTotalDevolucoes">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="card text-white bg-secondary mb-3">
-                                <div class="card-header">Saídas e Despesas</div>
+                            <div class="card text-white bg-danger mb-3">
+                                <div style="padding: 0.50rem 1.25rem; font-size: 13px;" class="card-header">Saídas e Despesas</div>
                                 <div class="card-body">
                                     <h5 class="card-title" id="cardSaidasDespesas">R$ 0,00</h5>
                                 </div>
@@ -384,7 +388,7 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                         <div class="col-md-2">
                             <div class="card text-white bg-info mb-3">
-                                <div class="card-header">Total em Caixa</div>
+                                <div style="padding: 0.50rem 1.25rem; font-size: 13px;" class="card-header">Total em Caixa</div>
                                 <div class="card-body">
                                     <h5 class="card-title" id="cardTotalEmCaixa">R$ 0,00</h5>
                                 </div>
@@ -396,7 +400,7 @@ include(__DIR__ . '/db_connection.php');
                     <table id="tabelaAtos" class="table table-striped table-bordered" style="zoom: 80%">
                         <thead>
                             <tr>
-                                <th>Ordem de Serviço</th>
+                                <th>Nº OS</th>
                                 <th>Cliente</th>
                                 <th>Ato</th>
                                 <th>Descrição</th>
@@ -414,7 +418,7 @@ include(__DIR__ . '/db_connection.php');
                     <table id="tabelaPagamentos" class="table table-striped table-bordered" style="zoom: 80%">
                         <thead>
                             <tr>
-                                <th>Ordem de Serviço</th>
+                                <th>Nº OS</th>
                                 <th>Cliente</th>
                                 <th>Forma de Pagamento</th>
                                 <th>Total</th>
@@ -443,7 +447,7 @@ include(__DIR__ . '/db_connection.php');
                     <table id="tabelaDevolucoes" class="table table-striped table-bordered" style="zoom: 80%">
                         <thead>
                             <tr>
-                                <th>Ordem de Serviço</th>
+                                <th>Nº OS</th>
                                 <th>Cliente</th>
                                 <th>Forma de Devolução</th>
                                 <th>Total</th>
