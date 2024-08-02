@@ -10,10 +10,19 @@ include(__DIR__ . '/db_connection.php');
 header('Content-Type: application/json');
 
 try {
-    $funcionario = $_GET['funcionario'];
+    $funcionarios = $_GET['funcionarios'];
     $data = $_GET['data'];
+    $tipo = $_GET['tipo'];
 
     $conn = getDatabaseConnection();
+
+    $conditions = 'DATE(data) = :data';
+    $params = [':data' => $data];
+
+    if ($tipo === 'individual') {
+        $conditions .= ' AND funcionario = :funcionario';
+        $params[':funcionario'] = $funcionarios;
+    }
 
     // Atos Liquidados
     $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total
@@ -21,7 +30,7 @@ try {
             JOIN ordens_de_servico os ON al.ordem_servico_id = os.id
             WHERE al.funcionario = :funcionario AND DATE(al.data) = :data';
     $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':funcionario', $funcionario);
+    $stmt->bindParam(':funcionario', $funcionarios);
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $atos = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -32,7 +41,7 @@ try {
             JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
             WHERE po.funcionario = :funcionario AND DATE(po.data_pagamento) = :data';
     $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':funcionario', $funcionario);
+    $stmt->bindParam(':funcionario', $funcionarios);
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $pagamentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -43,7 +52,7 @@ try {
             JOIN ordens_de_servico os ON do.ordem_de_servico_id = os.id
             WHERE do.funcionario = :funcionario AND DATE(do.data_devolucao) = :data';
     $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':funcionario', $funcionario);
+    $stmt->bindParam(':funcionario', $funcionarios);
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $devolucoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -53,7 +62,7 @@ try {
             FROM saidas_despesas sd
             WHERE sd.funcionario = :funcionario AND DATE(sd.data) = :data';
     $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':funcionario', $funcionario);
+    $stmt->bindParam(':funcionario', $funcionarios);
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $saidas = $stmt->fetchAll(PDO::FETCH_ASSOC);

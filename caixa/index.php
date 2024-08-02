@@ -93,39 +93,39 @@ include(__DIR__ . '/db_connection.php');
             padding: 5px 10px;
             border-radius: 5px;
             color: white;
-            display: inline-block;
+            display: inline-block.
         }
 
         .status-pendente {
             background-color: #dc3545;
             width: 75px;
-            text-align: center;
+            text-align: center.
         }
 
         .status-parcialmente {
             background-color: #ffc107;
             width: 75px;
-            text-align: center;
+            text-align: center.
         }
 
         .status-liquidado {
             background-color: #28a745;
             width: 75px;
-            text-align: center;
+            text-align: center.
         }
 
         .total-label {
             font-weight: bold;
-            text-align: center;
+            text-align: center.
         }
 
         .table-title {
             text-align: center;
-            font-weight: bold;
+            font-weight: bold.
         }
 
         .card-title {
-            font-size: 1.25rem;
+            font-size: 1.25rem.
         }
     </style>
 </head>
@@ -157,6 +157,7 @@ include(__DIR__ . '/db_connection.php');
                         <select class="form-control" id="funcionario" name="funcionario" <?php echo $user['nivel_de_acesso'] === 'usuario' ? 'disabled' : ''; ?>>
                             <?php if ($user['nivel_de_acesso'] === 'administrador') { ?>
                                 <option value="todos">Todos</option>
+                                <option value="caixa_unificado">Caixa Unificado</option>
                             <?php } ?>
                             <?php
                             $query = $user['nivel_de_acesso'] === 'administrador' ? "SELECT usuario, nome_completo FROM funcionarios WHERE status = 'ativo'" : "SELECT usuario, nome_completo FROM funcionarios WHERE usuario = :usuario";
@@ -210,8 +211,10 @@ include(__DIR__ . '/db_connection.php');
                         $conditions = [];
                         $params = [];
                         $filtered = false;
+                        $isUnificado = false;
+                        $funcionariosConcatenados = '';
 
-                        if (!empty($_GET['funcionario']) && $_GET['funcionario'] !== 'todos') {
+                        if (!empty($_GET['funcionario']) && $_GET['funcionario'] !== 'todos' && $_GET['funcionario'] !== 'caixa_unificado') {
                             $conditions[] = 'funcionario = :funcionario';
                             $params[':funcionario'] = $_GET['funcionario'];
                             $filtered = true;
@@ -219,6 +222,8 @@ include(__DIR__ . '/db_connection.php');
                             $conditions[] = 'funcionario = :funcionario';
                             $params[':funcionario'] = $user['usuario'];
                             $filtered = true;
+                        } elseif ($_GET['funcionario'] === 'caixa_unificado') {
+                            $isUnificado = true;
                         }
 
                         if (!empty($_GET['data_inicial']) && !empty($_GET['data_final'])) {
@@ -236,32 +241,57 @@ include(__DIR__ . '/db_connection.php');
                             $filtered = true;
                         }
 
-                        $sql = 'SELECT 
-                                    funcionario, 
-                                    DATE(data) as data,
-                                    SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
-                                    SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
-                                    SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
-                                    SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas
-                                FROM (
-                                    SELECT funcionario, data, "ato" as tipo, total 
-                                    FROM atos_liquidados
-                                    UNION ALL
-                                    SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
-                                    FROM pagamento_os
-                                    UNION ALL
-                                    SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
-                                    FROM devolucao_os
-                                    UNION ALL
-                                    SELECT funcionario, data, "saida" as tipo, valor_saida as total
-                                    FROM saidas_despesas
-                                ) as fluxos';
-                        
-                        if ($conditions) {
-                            $sql .= ' WHERE ' . implode(' AND ', $conditions);
+                        if ($isUnificado) {
+                            $sql = 'SELECT 
+                                        GROUP_CONCAT(DISTINCT funcionario SEPARATOR ", ") as funcionarios, 
+                                        DATE(data) as data,
+                                        SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
+                                        SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
+                                        SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
+                                        SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas
+                                    FROM (
+                                        SELECT funcionario, data as data, "ato" as tipo, total 
+                                        FROM atos_liquidados
+                                        UNION ALL
+                                        SELECT funcionario, data_pagamento as data_pagamento, "pagamento" as tipo, total_pagamento as total
+                                        FROM pagamento_os
+                                        UNION ALL
+                                        SELECT funcionario, data_devolucao as data_devolucao, "devolucao" as tipo, total_devolucao as total
+                                        FROM devolucao_os
+                                        UNION ALL
+                                        SELECT funcionario, data as data_saida, "saida" as tipo, valor_saida as total
+                                        FROM saidas_despesas
+                                    ) as fluxos';
+                            if ($conditions) {
+                                $sql .= ' WHERE ' . implode(' AND ', $conditions);
+                            }
+                            $sql .= ' GROUP BY DATE(data)';
+                        } else {
+                            $sql = 'SELECT 
+                                        funcionario, 
+                                        DATE(data) as data,
+                                        SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
+                                        SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
+                                        SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
+                                        SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas
+                                    FROM (
+                                        SELECT funcionario, data as data, "ato" as tipo, total 
+                                        FROM atos_liquidados
+                                        UNION ALL
+                                        SELECT funcionario, data_pagamento as data_pagamento, "pagamento" as tipo, total_pagamento as total
+                                        FROM pagamento_os
+                                        UNION ALL
+                                        SELECT funcionario, data_devolucao as data_devolucao, "devolucao" as tipo, total_devolucao as total
+                                        FROM devolucao_os
+                                        UNION ALL
+                                        SELECT funcionario, data as data_saida, "saida" as tipo, valor_saida as total
+                                        FROM saidas_despesas
+                                    ) as fluxos';
+                            if ($conditions) {
+                                $sql .= ' WHERE ' . implode(' AND ', $conditions);
+                            }
+                            $sql .= ' GROUP BY funcionario, DATE(data)';
                         }
-
-                        $sql .= ' GROUP BY funcionario, DATE(data)';
 
                         $stmt = $conn->prepare($sql);
                         foreach ($params as $key => $value) {
@@ -271,7 +301,7 @@ include(__DIR__ . '/db_connection.php');
                         $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         foreach ($resultados as $resultado) {
-                            $funcionario = $resultado['funcionario'];
+                            $funcionarios = $isUnificado ? $resultado['funcionarios'] : $resultado['funcionario'];
                             $data = $resultado['data'];
                             $total_atos = $resultado['total_atos'];
                             $total_pagamentos = $resultado['total_pagamentos'];
@@ -279,15 +309,17 @@ include(__DIR__ . '/db_connection.php');
                             $total_saidas = $resultado['total_saidas'];
                             ?>
                             <tr>
-                                <td><?php echo $funcionario; ?></td>
+                                <td><?php echo $funcionarios; ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_atos, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_saidas, 2, ',', '.'); ?></td>
                                 <td><?php echo date('d/m/Y', strtotime($data)); ?></td>
                                 <td>
-                                    <button title="Visualizar" class="btn btn-info btn-sm" onclick="verDetalhes('<?php echo $funcionario; ?>', '<?php echo $data; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                    <button title="Cadastrar Saída" class="btn btn-edit btn-sm" onclick="cadastrarSaida('<?php echo $funcionario; ?>', '<?php echo $data; ?>')"><i class="fa fa-sign-out" aria-hidden="true"></i></button>
+                                    <button title="Visualizar" class="btn btn-info btn-sm" onclick="verDetalhes('<?php echo $funcionarios; ?>', '<?php echo $data; ?>', '<?php echo $isUnificado ? 'unificado' : 'individual'; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    <?php if (!$isUnificado) { ?>
+                                    <button title="Cadastrar Saída" class="btn btn-edit btn-sm" onclick="cadastrarSaida('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')"><i class="fa fa-sign-out" aria-hidden="true"></i></button>
+                                    <?php } ?>
                                 </td>
                             </tr>
                             <?php
@@ -518,13 +550,14 @@ include(__DIR__ . '/db_connection.php');
             });
         });
 
-        function verDetalhes(funcionario, data) {
+        function verDetalhes(funcionarios, data, tipo) {
             $.ajax({
                 url: 'detalhes_fluxo_caixa.php',
                 type: 'GET',
                 data: {
-                    funcionario: funcionario,
-                    data: data
+                    funcionarios: funcionarios,
+                    data: data,
+                    tipo: tipo
                 },
                 success: function(response) {
                     if (response.error) {
