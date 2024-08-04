@@ -142,6 +142,11 @@ include(__DIR__ . '/db_connection.php');
             margin: auto;
         }
 
+        .modal-saidas {
+            max-width: 60%;
+            margin: auto;
+        }
+
         .btn-success {
             width: 40px;
             height: 40px;
@@ -560,57 +565,57 @@ include(__DIR__ . '/db_connection.php');
     <!-- Modal de Cadastro de Saídas -->
     <div class="modal fade" id="cadastroSaidaModal" tabindex="-1" role="dialog" aria-labelledby="cadastroSaidaModalLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="cadastroSaidaModalLabel">Cadastrar Saída/Despesa</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <form id="formCadastroSaida" enctype="multipart/form-data">
-                        <div class="form-group">
-                            <label for="titulo">Título</label>
-                            <input type="text" class="form-control" id="titulo" name="titulo" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="valor_saida">Valor da Saída</label>
-                            <input type="text" class="form-control" id="valor_saida" name="valor_saida" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="forma_de_saida">Forma de Saída</label>
-                            <select class="form-control" id="forma_de_saida" name="forma_de_saida" required>
-                                <option value="PIX">PIX</option>
-                                <option value="Transferência Bancária">Transferência Bancária</option>
-                                <option value="Espécie">Espécie</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="anexo">Anexo</label>
-                            <input type="file" class="form-control-file" id="anexo" name="anexo">
-                        </div>
-                        <input type="hidden" id="data_saida" name="data_saida">
-                        <input type="hidden" id="data_caixa_saida" name="data_caixa_saida">
-                        <input type="hidden" id="funcionario_saida" name="funcionario_saida">
-                        <button type="submit" class="btn btn-primary">Adicionar</button>
-                    </form>
-                    <hr>
-                    <h5>Saídas/Despesas Cadastradas</h5>
-                    <table id="tabelaSaidasCadastradas" class="table table-striped table-bordered" style="zoom: 80%">
-                        <thead>
-                            <tr>
-                                <th>Funcionário</th>
-                                <th>Título</th>
-                                <th>Valor</th>
-                                <th>Forma de Saída</th>
-                                <th>Anexo</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="detalhesSaidasCadastradas">
-                            <!-- Detalhes das saídas serão carregados aqui -->
-                        </tbody>
-                    </table>
+            <div class="modal-content modal-saidas">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="cadastroSaidaModalLabel">Cadastrar Saída/Despesa</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formCadastroSaida" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label for="titulo">Título</label>
+                                <input type="text" class="form-control" id="titulo" name="titulo" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="valor_saida">Valor da Saída</label>
+                                <input type="text" class="form-control" id="valor_saida" name="valor_saida" required>
+                            </div>
+                            <div class="form-group" style="display: none;">
+                                <label for="forma_de_saida">Forma de Saída</label>
+                                <select class="form-control" id="forma_de_saida" name="forma_de_saida" required>
+                                    <option value="Espécie">Espécie</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="anexo">Anexo</label>
+                                <input type="file" class="form-control-file" id="anexo" name="anexo">
+                            </div>
+                            <input type="hidden" id="data_saida" name="data_saida">
+                            <input type="hidden" id="data_caixa_saida" name="data_caixa_saida">
+                            <input type="hidden" id="funcionario_saida" name="funcionario_saida">
+                            <button type="submit" style="width: 100%" class="btn btn-primary">Adicionar</button>
+                        </form>
+                        <hr>
+                        <h5>Saídas/Despesas Cadastradas</h5>
+                        <table id="tabelaSaidasCadastradas" class="table table-striped table-bordered" style="zoom: 80%">
+                            <thead>
+                                <tr>
+                                    <th>Funcionário</th>
+                                    <th>Título</th>
+                                    <th>Valor</th>
+                                    <th>Forma de Saída</th>
+                                    <th>Anexo</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detalhesSaidasCadastradas">
+                                <!-- Detalhes das saídas serão carregados aqui -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -945,14 +950,17 @@ include(__DIR__ . '/db_connection.php');
                     detalhes.saidas.forEach(function(saida) {
                         totalSaidas += parseFloat(saida.valor_saida);
 
+                        var dataCaixaFormatada = formatDateForDisplay(saida.data_caixa);
+                        var dataCadastroFormatada = formatDateForDisplay(saida.data);
+
                         $('#detalhesSaidas').append(`
                             <tr>
                                 <td>${saida.funcionario}</td>    
                                 <td>${saida.titulo}</td>
                                 <td>${formatCurrency(saida.valor_saida)}</td>
                                 <td>${saida.forma_de_saida}</td>
-                                <td>${saida.data_caixa}</td>
-                                <td>${saida.data}</td>
+                                <td>${dataCaixaFormatada}</td>
+                                <td>${dataCadastroFormatada}</td>
                                 <td>
                                     <button title="Visualizar" class="btn btn-info btn-sm" onclick="visualizarAnexoSaida('${saida.caminho_anexo}', '${saida.funcionario}', '${saida.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                 </td>
@@ -1204,7 +1212,7 @@ include(__DIR__ . '/db_connection.php');
 
         function removerDeposito(id) {
             if (confirm('Deseja realmente remover este depósito?')) {
-                $.post('update_deposito.php', { id: id }, function(response) {
+                $.post('remover_deposito.php', { id: id }, function(response) {
                     if (response.success) {
                         alert('Depósito removido com sucesso!');
                         location.reload();
@@ -1217,7 +1225,7 @@ include(__DIR__ . '/db_connection.php');
 
         function removerSaida(id) {
             if (confirm('Deseja realmente remover esta saída/despesa?')) {
-                $.post('update_saida.php', { id: id }, function(response) {
+                $.post('update_saida.php', { id: id, status: 'removido' }, function(response) {
                     if (response.success) {
                         alert('Saída/Despesa removida com sucesso!');
                         location.reload();
