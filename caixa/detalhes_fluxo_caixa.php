@@ -19,7 +19,7 @@ try {
     // Ajustar SQL para buscar detalhes do fluxo de caixa
     if ($tipo === 'unificado') {
         // Atos Liquidados
-        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total
+        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total, al.funcionario, al.data
                 FROM atos_liquidados al
                 JOIN ordens_de_servico os ON al.ordem_servico_id = os.id
                 WHERE DATE(al.data) = :data';
@@ -29,7 +29,7 @@ try {
         $atos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Pagamentos
-        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento
+        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento
                 FROM pagamento_os po
                 JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
                 WHERE DATE(po.data_pagamento) = :data';
@@ -39,7 +39,7 @@ try {
         $pagamentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Devoluções
-        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, do.forma_devolucao, do.total_devolucao
+        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, do.forma_devolucao, do.total_devolucao, do.funcionario, do.data_devolucao
                 FROM devolucao_os do
                 JOIN ordens_de_servico os ON do.ordem_de_servico_id = os.id
                 WHERE DATE(do.data_devolucao) = :data';
@@ -49,16 +49,25 @@ try {
         $devolucoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Saídas e Despesas
-        $sql = 'SELECT sd.titulo, sd.valor_saida, sd.forma_de_saida
+        $sql = 'SELECT sd.titulo, sd.valor_saida, sd.forma_de_saida, sd.funcionario, sd.data, sd.data_caixa, sd.caminho_anexo
                 FROM saidas_despesas sd
-                WHERE DATE(sd.data) = :data';
+                WHERE DATE(sd.data) = :data AND sd.status = "ativo"';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
         $stmt->execute();
         $saidas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Depósitos
+        $sql = 'SELECT funcionario, data_caixa, data_cadastro, valor_do_deposito, tipo_deposito, caminho_anexo
+                FROM deposito_caixa
+                WHERE DATE(data_caixa) = :data AND status = "ativo"';
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+        $stmt->execute();
+        $depositos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } else {
         // Atos Liquidados
-        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total
+        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total, al.funcionario, al.data
                 FROM atos_liquidados al
                 JOIN ordens_de_servico os ON al.ordem_servico_id = os.id
                 WHERE al.funcionario = :funcionario AND DATE(al.data) = :data';
@@ -69,7 +78,7 @@ try {
         $atos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Pagamentos
-        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento
+        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento
                 FROM pagamento_os po
                 JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
                 WHERE po.funcionario = :funcionario AND DATE(po.data_pagamento) = :data';
@@ -80,7 +89,7 @@ try {
         $pagamentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Devoluções
-        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, do.forma_devolucao, do.total_devolucao
+        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, do.forma_devolucao, do.total_devolucao, do.funcionario, do.data_devolucao
                 FROM devolucao_os do
                 JOIN ordens_de_servico os ON do.ordem_de_servico_id = os.id
                 WHERE do.funcionario = :funcionario AND DATE(do.data_devolucao) = :data';
@@ -91,14 +100,24 @@ try {
         $devolucoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Saídas e Despesas
-        $sql = 'SELECT sd.titulo, sd.valor_saida, sd.forma_de_saida
+        $sql = 'SELECT sd.titulo, sd.valor_saida, sd.forma_de_saida, sd.funcionario, sd.data, sd.data_caixa, sd.caminho_anexo
                 FROM saidas_despesas sd
-                WHERE sd.funcionario = :funcionario AND DATE(sd.data) = :data';
+                WHERE sd.funcionario = :funcionario AND DATE(sd.data) = :data AND sd.status = "ativo"';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->bindParam(':data', $data);
         $stmt->execute();
         $saidas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Depósitos
+        $sql = 'SELECT funcionario, data_caixa, data_cadastro, valor_do_deposito, tipo_deposito, caminho_anexo
+                FROM deposito_caixa
+                WHERE funcionario = :funcionario AND DATE(data_caixa) = :data AND status = "ativo"';
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':funcionario', $funcionarios);
+        $stmt->bindParam(':data', $data);
+        $stmt->execute();
+        $depositos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     $totalAtos = array_reduce($atos, function($carry, $item) {
@@ -134,19 +153,25 @@ try {
         return $carry + $item['valor_saida'];
     }, 0);
 
-    $totalEmCaixa = $totalRecebidoEspecie - $totalDevolvidoEspecie - $totalSaidasDespesas;
+    $totalDepositoCaixa = array_reduce($depositos, function($carry, $item) {
+        return $carry + $item['valor_do_deposito'];
+    }, 0);
+
+    $totalEmCaixa = $totalRecebidoEspecie - $totalDevolvidoEspecie - $totalSaidasDespesas - $totalDepositoCaixa;
 
     echo json_encode([
         'atos' => $atos,
         'pagamentos' => $pagamentos,
         'devolucoes' => $devolucoes,
         'saidas' => $saidas,
+        'depositos' => $depositos,
         'totalAtos' => $totalAtos,
         'totalRecebidoConta' => $totalRecebidoConta,
         'totalRecebidoEspecie' => $totalRecebidoEspecie,
         'totalDevolucoes' => $totalDevolucoes,
         'totalEmCaixa' => $totalEmCaixa,
-        'totalSaidasDespesas' => $totalSaidasDespesas
+        'totalSaidasDespesas' => $totalSaidasDespesas,
+        'totalDepositoCaixa' => $totalDepositoCaixa
     ]);
 } catch (Exception $e) {
     echo json_encode(['error' => $e->getMessage()]);
