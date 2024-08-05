@@ -292,7 +292,7 @@ include(__DIR__ . '/db_connection.php');
                                         FROM devolucao_os
                                         UNION ALL
                                         SELECT funcionario, data, "saida" as tipo, valor_saida as total
-                                        FROM saidas_despesas WHERE status = "ativo"
+                                        FROM saidas_despesas
                                     ) as fluxos';
                             if ($conditions) {
                                 $sql .= ' WHERE ' . implode(' AND ', $conditions);
@@ -317,7 +317,7 @@ include(__DIR__ . '/db_connection.php');
                                         FROM devolucao_os
                                         UNION ALL
                                         SELECT funcionario, data, "saida" as tipo, valor_saida as total
-                                        FROM saidas_despesas WHERE status = "ativo"
+                                        FROM saidas_despesas
                                     ) as fluxos';
                             if ($conditions) {
                                 $sql .= ' WHERE ' . implode(' AND ', $conditions);
@@ -1125,8 +1125,6 @@ include(__DIR__ . '/db_connection.php');
                 },
                 dataType: 'json',
                 success: function(response) {
-                    console.log(response); // Adicione esta linha para inspecionar a resposta
-
                     if (response.error) {
                         alert('Erro: ' + response.error);
                         return;
@@ -1181,8 +1179,6 @@ include(__DIR__ . '/db_connection.php');
                 },
                 dataType: 'json',
                 success: function(response) {
-                    console.log(response); // Adicione esta linha para inspecionar a resposta
-
                     if (response.error) {
                         alert('Erro: ' + response.error);
                         return;
@@ -1322,4 +1318,3 @@ include(__DIR__ . '/db_connection.php');
 
 </body>
 </html>
-
