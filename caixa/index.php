@@ -647,7 +647,7 @@ include(__DIR__ . '/db_connection.php');
                             </div>
                             <div class="form-group">
                                 <label for="anexo">Anexo</label>
-                                <input type="file" class="form-control-file" id="anexo" name="anexo">
+                                <input type="file" class="form-control-file" id="anexo" name="anexo" required>
                             </div>
                             <input type="hidden" id="data_saida" name="data_saida">
                             <input type="hidden" id="data_caixa_saida" name="data_caixa_saida">
