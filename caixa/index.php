@@ -156,6 +156,20 @@ include(__DIR__ . '/db_connection.php');
         .btn-success:hover {
             color: #212529;
         } 
+        
+        /* Estilo para o modo dark */
+        body.dark-mode .card.bg-dark {
+            background-color: #f8f9fa !important; /* bg-light */
+            color: #777 !important;
+        }
+
+        /* Para garantir que o texto dos elementos internos também fique na cor #777 */
+        body.dark-mode .card.bg-dark .card-header,
+        body.dark-mode .card.bg-dark .card-body,
+        body.dark-mode .card.bg-dark .card-title {
+            color: #777 !important;
+        }
+
 
     </style>
 </head>
