@@ -86,6 +86,9 @@ $mode_query->close();
             background-color: #ffffff;
             color: #000000;
         }
+        body.dark-mode .card {
+            background-color: #6c757d;
+        }
     </style>
 </head>
 <body class="<?php echo $mode; ?>">
