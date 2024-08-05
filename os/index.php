@@ -114,6 +114,22 @@ include(__DIR__ . '/db_connection.php');
             text-align: center;
         }
 
+        .btn-info:hover {
+            color: #212529;
+        }
+
+        .btn-success:hover {
+            color: #212529!important;
+        }
+
+        .btn-secondary:hover {
+            color: #212529!important;
+        }
+
+        .btn-primary:hover {
+            color: #212529!important;
+        }
+
     </style>
 </head>
 
@@ -178,14 +194,17 @@ include(__DIR__ . '/db_connection.php');
                     </div>
                 </div>
                 <div class="row mb-3">
-                    <div class="col-md-4">
-                        <button type="submit" style="width: 100%;" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
+                    <div class="col-md-3">
+                        <button type="submit" style="width: 100%; color: #fff!important" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
                     </div>
-                    <div class="col-md-4">
-                        <button id="add-button" type="button" style="width: 100%; color: #fff!important" class="btn btn-info" onclick="window.open('tabela_de_emolumentos.php')"><i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos</button>
+                    <div class="col-md-3">
+                        <button id="add-button" type="button" style="width: 100%; color: #fff!important" class="btn btn-secondary" onclick="window.open('tabela_de_emolumentos.php')"><i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos</button>
                     </div>
-                    <div class="col-md-4 text-right">
-                        <button id="add-button" type="button" style="width: 100%;" class="btn btn-success" onclick="window.location.href='criar_os.php'"><i class="fa fa-plus" aria-hidden="true"></i> Criar OS</button>
+                    <div class="col-md-3">
+                        <button id="add-button" type="button" style="width: 100%; color: #fff!important" class="btn btn-info" onclick="window.location.href='criar_os.php'"><i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço</button>
+                    </div>
+                    <div class="col-md-3">
+                        <button id="add-button" type="button" style="width: 100%; color: #fff!important" class="btn btn-success" onclick="window.open('../caixa/index.php')"><i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa</button>
                     </div>
                 </div>
             </form>

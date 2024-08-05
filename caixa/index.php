@@ -86,7 +86,7 @@ include(__DIR__ . '/db_connection.php');
         }
 
         .btn-delete {
-            margin-bottom: 0px!important;
+            margin-bottom: 5px!important;
         }
 
         .status-label {
@@ -228,11 +228,14 @@ include(__DIR__ . '/db_connection.php');
                     <thead>
                         <tr>
                             <th>Funcionário</th>
-                            <th>Total Atos Liquidados</th>
-                            <th>Total Pagamentos</th>
-                            <th>Total Devoluções</th>
-                            <th>Saídas</th>
                             <th>Data</th>
+                            <th>Atos Liquidados</th>
+                            <th>Recebido em Conta</th>
+                            <th>Recebido em Espécie</th>
+                            <th>Devoluções</th>
+                            <th>Saídas e Despesas</th>
+                            <th>Depósito do Caixa</th>
+                            <th>Total em Caixa</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -336,18 +339,71 @@ include(__DIR__ . '/db_connection.php');
                             $total_pagamentos = $resultado['total_pagamentos'];
                             $total_devolucoes = $resultado['total_devolucoes'];
                             $total_saidas = $resultado['total_saidas'];
+
+                            // Calculando valores
+                            $totalRecebidoConta = 0;
+                            $totalRecebidoEspecie = 0;
+                            $totalDevolvidoEspecie = 0;
+
+                            // Recebido em Conta e Espécie
+                            $stmt = $conn->prepare('SELECT forma_de_pagamento, total_pagamento FROM pagamento_os WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_pagamento) = :data');
+                            if (!$isUnificado) {
+                                $stmt->bindParam(':funcionario', $funcionarios);
+                            }
+                            $stmt->bindParam(':data', $data);
+                            $stmt->execute();
+                            $pagamentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            foreach ($pagamentos as $pagamento) {
+                                if (in_array($pagamento['forma_de_pagamento'], ['PIX', 'Transferência Bancária', 'Crédito', 'Débito'])) {
+                                    $totalRecebidoConta += $pagamento['total_pagamento'];
+                                } else if ($pagamento['forma_de_pagamento'] === 'Espécie') {
+                                    $totalRecebidoEspecie += $pagamento['total_pagamento'];
+                                }
+                            }
+
+                            // Devolvido em Espécie
+                            $stmt = $conn->prepare('SELECT forma_devolucao, total_devolucao FROM devolucao_os WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_devolucao) = :data');
+                            if (!$isUnificado) {
+                                $stmt->bindParam(':funcionario', $funcionarios);
+                            }
+                            $stmt->bindParam(':data', $data);
+                            $stmt->execute();
+                            $devolucoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            foreach ($devolucoes as $devolucao) {
+                                if ($devolucao['forma_devolucao'] === 'Espécie') {
+                                    $totalDevolvidoEspecie += $devolucao['total_devolucao'];
+                                }
+                            }
+
+                            // Depósitos do Caixa
+                            $stmt = $conn->prepare('SELECT valor_do_deposito FROM deposito_caixa WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_caixa) = :data AND status = "ativo"');
+                            if (!$isUnificado) {
+                                $stmt->bindParam(':funcionario', $funcionarios);
+                            }
+                            $stmt->bindParam(':data', $data);
+                            $stmt->execute();
+                            $depositos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            $totalDepositoCaixa = array_reduce($depositos, function($carry, $item) {
+                                return $carry + $item['valor_do_deposito'];
+                            }, 0);
+
+                            // Total em Caixa
+                            $totalEmCaixa = $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa;
                             ?>
                             <tr>
                                 <td><?php echo $funcionarios; ?></td>
+                                <td><?php echo date('d/m/Y', strtotime($data)); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_atos, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?></td>
+                                <td><?php echo 'R$ ' . number_format($totalRecebidoConta, 2, ',', '.'); ?></td>
+                                <td><?php echo 'R$ ' . number_format($totalRecebidoEspecie, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_saidas, 2, ',', '.'); ?></td>
-                                <td><?php echo date('d/m/Y', strtotime($data)); ?></td>
+                                <td><?php echo 'R$ ' . number_format($totalDepositoCaixa, 2, ',', '.'); ?></td>
+                                <td><?php echo 'R$ ' . number_format($totalEmCaixa, 2, ',', '.'); ?></td>
                                 <td>
                                     <button title="Visualizar" class="btn btn-info btn-sm" onclick="verDetalhes('<?php echo $funcionarios; ?>', '<?php echo $data; ?>', '<?php echo $isUnificado ? 'unificado' : 'individual'; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <?php if (!$isUnificado) { ?>
-                                    <button title="Saídas e Despesas" class="btn btn-edit btn-sm" onclick="cadastrarSaida('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')"><i class="fa fa-sign-out" aria-hidden="true"></i></button>
+                                    <button title="Saídas e Despesas" class="btn btn-delete btn-sm" onclick="cadastrarSaida('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')"><i class="fa fa-sign-out" aria-hidden="true"></i></button>
                                     <button title="Depósito do Caixa" class="btn btn-success btn-sm" onclick="cadastrarDeposito('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')"><i class="fa fa-university" aria-hidden="true"></i></button>
                                     <?php } else { ?>
                                     <button title="Ver Depósitos do Caixa" class="btn btn-success btn-sm" onclick="verDepositosCaixa('<?php echo $data; ?>')"><i class="fa fa-list" aria-hidden="true"></i></button>
