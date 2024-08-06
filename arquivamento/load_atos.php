@@ -23,26 +23,29 @@ $results = [];
 foreach ($files as $file) {
     $data = json_decode(file_get_contents($file), true);
 
-    $dataCategoria = normalizeText($data['categoria']);
-    $dataCpf = normalizeText(implode(', ', array_column($data['partes_envolvidas'], 'cpf')));
-    $dataNome = normalizeText(implode(', ', array_column($data['partes_envolvidas'], 'nome')));
-    $dataLivro = normalizeText($data['livro']);
-    $dataFolha = normalizeText($data['folha']);
-    $dataTermo = normalizeText($data['termo']);
-    $dataProtocolo = normalizeText($data['protocolo']);
-    $dataMatricula = normalizeText($data['matricula']);
+    // Verifique se partes_envolvidas não é nulo
+    if ($data['partes_envolvidas'] !== null) {
+        $dataCategoria = normalizeText($data['categoria']);
+        $dataCpf = normalizeText(implode(', ', array_column($data['partes_envolvidas'], 'cpf')));
+        $dataNome = normalizeText(implode(', ', array_column($data['partes_envolvidas'], 'nome')));
+        $dataLivro = normalizeText($data['livro']);
+        $dataFolha = normalizeText($data['folha']);
+        $dataTermo = normalizeText($data['termo']);
+        $dataProtocolo = normalizeText($data['protocolo']);
+        $dataMatricula = normalizeText($data['matricula']);
 
-    if (
-        ($categoria === '' || strpos($dataCategoria, $categoria) !== false) &&
-        ($cpf === '' || strpos($dataCpf, $cpf) !== false) &&
-        ($nome === '' || strpos($dataNome, $nome) !== false) &&
-        ($livro === '' || strpos($dataLivro, $livro) !== false) &&
-        ($folha === '' || strpos($dataFolha, $folha) !== false) &&
-        ($termo === '' || strpos($dataTermo, $termo) !== false) &&
-        ($protocolo === '' || strpos($dataProtocolo, $protocolo) !== false) &&
-        ($matricula === '' || strpos($dataMatricula, $matricula) !== false)
-    ) {
-        $results[] = $data;
+        if (
+            ($categoria === '' || strpos($dataCategoria, $categoria) !== false) &&
+            ($cpf === '' || strpos($dataCpf, $cpf) !== false) &&
+            ($nome === '' || strpos($dataNome, $nome) !== false) &&
+            ($livro === '' || strpos($dataLivro, $livro) !== false) &&
+            ($folha === '' || strpos($dataFolha, $folha) !== false) &&
+            ($termo === '' || strpos($dataTermo, $termo) !== false) &&
+            ($protocolo === '' || strpos($dataProtocolo, $protocolo) !== false) &&
+            ($matricula === '' || strpos($dataMatricula, $matricula) !== false)
+        ) {
+            $results[] = $data;
+        }
     }
 }
 

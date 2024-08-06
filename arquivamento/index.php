@@ -297,51 +297,57 @@ include(__DIR__ . '/../menu.php');
                     url: 'load_atos.php',
                     method: 'GET',
                     success: function(response) {
-                        var atos = JSON.parse(response);
-                        var tableBody = $('#atos-table-body');
-                        tableBody.empty(); // Limpar a tabela
+                        try {
+                            var atos = JSON.parse(response);
+                            var tableBody = $('#atos-table-body');
+                            tableBody.empty(); // Limpar a tabela
 
-                        atos.forEach(function(ato) {
-                            var normalizedNome = normalizeText(ato.partes_envolvidas.map(p => p.nome).join(', '));
-                            var normalizedDescricao = normalizeText(ato.descricao);
-                            var matchesSearch = (!searchTerm || normalizedNome.includes(searchTerm)) &&
-                                                (!searchCategoria || ato.categoria === searchCategoria) &&
-                                                (!searchCpfCnpj || ato.partes_envolvidas.some(p => p.cpf.includes(searchCpfCnpj))) &&
-                                                (!searchLivro || ato.livro.includes(searchLivro)) &&
-                                                (!searchFolha || ato.folha.includes(searchFolha)) &&
-                                                (!searchTermo || ato.termo.includes(searchTermo)) &&
-                                                (!searchProtocolo || ato.protocolo.includes(searchProtocolo)) &&
-                                                (!searchMatricula || ato.matricula.includes(searchMatricula)) &&
-                                                (!searchDataAto || ato.data_ato === searchDataAto) &&
-                                                (!searchDescricao || normalizedDescricao.includes(searchDescricao)) &&
-                                                (!searchAtribuicao || ato.atribuicao.includes(searchAtribuicao));
+                            atos.forEach(function(ato) {
+                                var normalizedNome = normalizeText(ato.partes_envolvidas.map(p => p.nome).join(', '));
+                                var normalizedDescricao = normalizeText(ato.descricao);
+                                var matchesSearch = (!searchTerm || normalizedNome.includes(searchTerm)) &&
+                                                    (!searchCategoria || ato.categoria === searchCategoria) &&
+                                                    (!searchCpfCnpj || ato.partes_envolvidas.some(p => p.cpf.includes(searchCpfCnpj))) &&
+                                                    (!searchLivro || ato.livro.includes(searchLivro)) &&
+                                                    (!searchFolha || ato.folha.includes(searchFolha)) &&
+                                                    (!searchTermo || ato.termo.includes(searchTermo)) &&
+                                                    (!searchProtocolo || ato.protocolo.includes(searchProtocolo)) &&
+                                                    (!searchMatricula || ato.matricula.includes(searchMatricula)) &&
+                                                    (!searchDataAto || ato.data_ato === searchDataAto) &&
+                                                    (!searchDescricao || normalizedDescricao.includes(searchDescricao)) &&
+                                                    (!searchAtribuicao || ato.atribuicao.includes(searchAtribuicao));
 
-                            if (matchesSearch) {
-                                var cpfsCnpjs = ato.partes_envolvidas.map(p => p.cpf).join(', ');
-                                var nomes = ato.partes_envolvidas.map(p => p.nome).join(', ');
-                                var row = '<tr>' +
-                                '<td>' + ato.atribuicao + '</td>' +
-                                '<td>' + ato.categoria + '</td>' +
-                                '<td>' + cpfsCnpjs + '</td>' +
-                                '<td>' + nomes + '</td>' +
-                                '<td>' + formatDateTime(ato.data_ato) + '</td>' + // Corrija aqui
-                                '<td>' + ato.livro + '</td>' +
-                                '<td>' + ato.folha + '</td>' +
-                                '<td>' + ato.termo + '</td>' +
-                                '<td>' + ato.protocolo + '</td>' +
-                                '<td>' + ato.matricula + '</td>' +
-                                '<td>' + ato.descricao + '</td>' +
-                                '<td>' +
-                                    '<button class="btn btn-info btn-sm visualizar-anexos" data-id="' + ato.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button> ' +
-                                    '<button class="btn btn-edit btn-sm editar-ato" data-id="' + ato.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
-                                    '<button class="btn btn-delete btn-sm excluir-ato" data-id="' + ato.id + '" data-toggle="modal" data-target="#confirmDeleteModal"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
-                                '</td>' +
-                                '</tr>';
-                            tableBody.append(row);
-                            }
-                        });
+                                if (matchesSearch) {
+                                    var cpfsCnpjs = ato.partes_envolvidas.map(p => p.cpf).join(', ');
+                                    var nomes = ato.partes_envolvidas.map(p => p.nome).join(', ');
+                                    var row = '<tr>' +
+                                    '<td>' + ato.atribuicao + '</td>' +
+                                    '<td>' + ato.categoria + '</td>' +
+                                    '<td>' + cpfsCnpjs + '</td>' +
+                                    '<td>' + nomes + '</td>' +
+                                    '<td>' + formatDateTime(ato.data_ato) + '</td>' + // Corrija aqui
+                                    '<td>' + ato.livro + '</td>' +
+                                    '<td>' + ato.folha + '</td>' +
+                                    '<td>' + ato.termo + '</td>' +
+                                    '<td>' + ato.protocolo + '</td>' +
+                                    '<td>' + ato.matricula + '</td>' +
+                                    '<td>' + ato.descricao + '</td>' +
+                                    '<td>' +
+                                        '<button class="btn btn-info btn-sm visualizar-anexos" data-id="' + ato.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button> ' +
+                                        '<button class="btn btn-edit btn-sm editar-ato" data-id="' + ato.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
+                                        '<button class="btn btn-delete btn-sm excluir-ato" data-id="' + ato.id + '" data-toggle="modal" data-target="#confirmDeleteModal"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
+                                    '</td>' +
+                                    '</tr>';
+                                    tableBody.append(row);
+                                }
+                            });
+                        } catch (e) {
+                            console.error("Erro ao analisar resposta JSON: ", e);
+                            console.error("Resposta recebida: ", response);
+                        }
                     }
                 });
+
             });
 
             // Visualizar anexos e dados
