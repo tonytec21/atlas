@@ -190,7 +190,7 @@ include(__DIR__ . '/db_connection.php');
 
     <div id="main" class="main-content">
         <div class="container">
-            <h3>Pesquisar Fluxo de Caixa</h3>
+            <h3>Pesquisar Controle de Caixa</h3>
             <hr>
             <form id="pesquisarForm" method="GET">
                 <div class="form-row">
