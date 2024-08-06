@@ -114,7 +114,7 @@ $mode_query->close();
             <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/os/index.php'?>"><i class="fa fa-eye" aria-hidden="true"></i> Ver Ordens de Serviço</a>
             <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/os/criar_os.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Ordem de Serviço</a>
             <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/os/tabela_de_emolumentos.php'?>"><i class="fa fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos</a>
-            <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/caixa/index.php'?>"><i class="fa fa-university" aria-hidden="true"></i> Caixa</a>
+            <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/caixa/index.php'?>"><i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa</a>
         </div>
 
         <button class="dropdown-btn"><i class="fa fa-clock-o" aria-hidden="true"></i> Tarefas 
