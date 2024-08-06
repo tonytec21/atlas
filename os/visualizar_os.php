@@ -47,10 +47,13 @@ $total_liquidado = $atos_liquidados['total_liquidado'] ?? 0.0; // Valor padrão 
 
 // Verificar se há itens liquidados
 $has_liquidated = false;
+$has_ato_17 = false;
 foreach ($ordem_servico_itens as $item) {
     if ($item['status'] == 'liquidado') {
         $has_liquidated = true;
-        break;
+    }
+    if (strpos($item['ato'], '17.') === 0) {
+        $has_ato_17 = true;
     }
 }
 
@@ -66,11 +69,21 @@ foreach ($devolucoes as $devolucao) {
     $total_devolucoes += $devolucao['total_devolucao'];
 }
 
+// Calcular total dos repasses
+$total_repasses = 0;
+$repasse_query = $conn->prepare("SELECT total_repasse FROM repasse_credor WHERE ordem_de_servico_id = ?");
+$repasse_query->bind_param("i", $os_id);
+$repasse_query->execute();
+$repasse_result = $repasse_query->get_result();
+while ($repasse = $repasse_result->fetch_assoc()) {
+    $total_repasses += $repasse['total_repasse'];
+}
+
 // Calcular valor líquido pago
 $valor_pago_liquido = $total_pagamentos - $total_devolucoes;
 
 // Calcular saldo
-$saldo = $valor_pago_liquido - $ordem_servico['total_os'];
+$saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -84,7 +97,7 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'];
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <style>
-        .btn-print, .btn-payment {
+        .btn-print, .btn-payment, .btn-repasse {
             margin-left: 10px;
         }
         .modal-content {
@@ -167,18 +180,30 @@ include(__DIR__ . '/../menu.php');
                     <label for="deposito_previo">Depósito Prévio:</label>
                     <input type="text" class="form-control" id="deposito_previo" name="deposito_previo" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
                 </div>
+                <?php if ($total_liquidado > 0): ?>
                 <div class="form-group col-md-3">
                     <label for="valor_liquidado">Valor Liquidado:</label>
                     <input type="text" class="form-control" id="valor_liquidado" name="valor_liquidado" value="<?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?>" readonly>
                 </div>
+                <?php endif; ?>
+                <?php if ($total_devolucoes > 0): ?>
                 <div class="form-group col-md-3">
                     <label for="valor_devolvido">Valor Devolvido:</label>
                     <input type="text" class="form-control" id="valor_devolvido" name="valor_devolvido" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
                 </div>
+                <?php endif; ?>
+                <?php if ($total_repasses > 0): ?>
+                <div class="form-group col-md-3">
+                    <label for="total_repasses">Repasse Credor:</label>
+                    <input type="text" class="form-control" id="total_repasses" name="total_repasses" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>
+                </div>
+                <?php endif; ?>
+                <?php if ($saldo > 0): ?>
                 <div class="form-group col-md-3">
                     <label for="saldo">Saldo:</label>
                     <input type="text" class="form-control" id="saldo" name="saldo" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>
                 </div>
+                <?php endif; ?>
             </div>
             <div class="form-row">
                 <div class="form-group col-md-10">
@@ -282,7 +307,7 @@ include(__DIR__ . '/../menu.php');
                     <label for="valor_pagamento">Valor do Pagamento</label>
                     <input type="text" class="form-control" id="valor_pagamento">
                 </div>
-                <button type="button" class="btn btn-primary" onclick="adicionarPagamento()">Adicionar</button>
+                <button type="button" style="width: 100%" class="btn btn-primary" onclick="adicionarPagamento()">Adicionar</button>
                 <hr>
                 <div id="pagamentosAdicionados">
                     <h5>Pagamentos Adicionados</h5>
@@ -306,28 +331,78 @@ include(__DIR__ . '/../menu.php');
                         </tbody>
                     </table>
                 </div>
+                <?php if ($total_pagamentos > 0): ?>
                 <div class="form-group">
                     <label for="total_pagamento">Valor Pago</label>
-                    <input type="text" class="form-control" id="valor_liquidado_modal" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
+                    <input type="text" class="form-control" id="total_pagamento_modal" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
                 </div>
+                <?php endif; ?>
+                <?php if ($total_liquidado > 0): ?>
                 <div class="form-group">
                     <label for="valor_liquidado_modal">Valor Liquidado</label>
                     <input type="text" class="form-control" id="valor_liquidado_modal" value="<?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?>" readonly>
                 </div>
+                <?php endif; ?>
+                <?php if ($saldo > 0): ?>
                 <div class="form-group">
                     <label for="saldo_modal">Saldo</label>
                     <input type="text" class="form-control" id="saldo_modal" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>
                 </div>
+                <?php endif; ?>
+                <?php if ($total_devolucoes > 0): ?>
                 <div class="form-group">
                     <label for="valor_devolvido_modal">Valor Devolvido</label>
                     <input type="text" class="form-control" id="valor_devolvido_modal" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
                 </div>
+                <?php endif; ?>
+                <?php if ($total_repasses > 0): ?>
+                <div class="form-group">
+                    <label for="total_repasses_modal">Repasse Credor</label>
+                    <input type="text" class="form-control" id="total_repasses_modal" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>
+                </div>
+                <?php endif; ?>
+                <?php if ($saldo > 0.01 && $has_ato_17): ?>
+                <button type="button" class="btn btn-warning btn-repasse" onclick="abrirRepasseModal()">Repasse Credor</button>
+                <?php endif; ?>
                 <?php if ($saldo > 0.01): ?>
                 <button type="button" class="btn btn-warning" onclick="abrirDevolucaoModal()">Devolver valores</button>
                 <?php endif; ?>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Repasse -->
+<div class="modal fade" id="repasseModal" tabindex="-1" role="dialog" aria-labelledby="repasseModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="repasseModalLabel">Repasse Credor</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="forma_repasse">Forma de Repasse</label>
+                    <select class="form-control" id="forma_repasse">
+                        <option value="">Selecione</option>
+                        <option value="Espécie">Espécie</option>
+                        <option value="PIX">PIX</option>
+                        <option value="Transferência Bancária">Transferência Bancária</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="valor_repasse">Valor do Repasse</label>
+                    <input type="text" class="form-control" id="valor_repasse" placeholder="0,00">
+                </div>
+                <button type="button" class="btn btn-primary" onclick="salvarRepasse()">Salvar</button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
             </div>
         </div>
     </div>
@@ -420,6 +495,7 @@ include(__DIR__ . '/../menu.php');
     $(document).ready(function() {
         $('#valor_pagamento').mask('#.##0,00', { reverse: true });
         $('#valor_devolucao').mask('#.##0,00', { reverse: true });
+        $('#valor_repasse').mask('#.##0,00', { reverse: true });
 
         atualizarTabelaPagamentos(); // Chamada para exibir os pagamentos existentes ao carregar a página
     });
@@ -636,6 +712,80 @@ include(__DIR__ . '/../menu.php');
         });
     }
 
+    // Função para abrir modal de repasse
+    function abrirRepasseModal() {
+        $('#repasseModal').modal('show');
+    }
+
+    // Função para salvar repasse
+    function salvarRepasse() {
+        var formaRepasse = $('#forma_repasse').val();
+        var valorRepasse = parseFloat($('#valor_repasse').val().replace('.', '').replace(',', '.'));
+        var saldoAtual = parseFloat('<?php echo $saldo; ?>');
+
+        if (formaRepasse === "") {
+            exibirMensagem('Por favor, selecione uma forma de repasse.', 'error');
+            return;
+        }
+
+        if (isNaN(valorRepasse) || valorRepasse <= 0 || valorRepasse > saldoAtual + 0.01) {
+            exibirMensagem('Por favor, insira um valor válido para o repasse que não seja maior que o saldo disponível.', 'error');
+            return;
+        }
+
+        var osId = <?php echo $os_id; ?>;
+        var cliente = '<?php echo $ordem_servico['cliente']; ?>';
+        var totalOs = '<?php echo $ordem_servico['total_os']; ?>';
+        var dataOs = '<?php echo $ordem_servico['data_criacao']; ?>';
+        var funcionario = '<?php echo $_SESSION['username']; ?>';
+
+        $.ajax({
+            url: 'salvar_repasse.php',
+            type: 'POST',
+            data: {
+                os_id: osId,
+                cliente: cliente,
+                total_os: totalOs,
+                total_repasse: valorRepasse,
+                forma_repasse: formaRepasse,
+                data_os: dataOs,
+                funcionario: funcionario
+            },
+            success: function(response) {
+                console.log("Server response:", response); // Adicione esta linha para verificar a resposta do servidor
+                try {
+                    // Verifique se a resposta já é um objeto, se for, não tente analisá-la
+                    if (typeof response === 'object') {
+                        processarResposta(response, saldoAtual, valorRepasse);
+                    } else {
+                        response = JSON.parse(response);
+                        processarResposta(response, saldoAtual, valorRepasse);
+                    }
+                } catch (e) {
+                    console.error('Erro ao analisar resposta JSON:', e);
+                    exibirMensagem('Erro ao processar a resposta do servidor: ' + e.message, 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Erro na requisição AJAX:', error); // Adicione esta linha para logar erros de AJAX
+                exibirMensagem('Erro ao salvar repasse: ' + error, 'error');
+            }
+        });
+    }
+
+    function processarResposta(response, saldoAtual, valorRepasse) {
+        if (response.success) {
+            alert('Repasse salvo com sucesso!');
+            $('#repasseModal').modal('hide');
+            // Recalcular o saldo após o repasse
+            var novoSaldo = saldoAtual - valorRepasse;
+            $('#saldo').val('R$ ' + novoSaldo.toFixed(2).replace('.', ','));
+            window.location.reload();
+        } else {
+            exibirMensagem('Erro ao salvar repasse: ' + response.error, 'error');
+        }
+    }
+
 
     // Função para exibir mensagem
     function exibirMensagem(mensagem, tipo) {
@@ -654,10 +804,10 @@ include(__DIR__ . '/../menu.php');
         $('#mensagemModal').modal('show');
     }
 
-            // Adicionar evento para recarregar a página ao fechar os modais
-            $('#pagamentoModal').on('hidden.bs.modal', function () {
-            location.reload();
-        });
+    // Adicionar evento para recarregar a página ao fechar os modais
+    $('#pagamentoModal').on('hidden.bs.modal', function () {
+        location.reload();
+    });
 </script>
 <?php
 include(__DIR__ . '/../rodape.php');

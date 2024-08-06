@@ -113,6 +113,13 @@ if (isset($_GET['id'])) {
     $devolucoes_result = $devolucoes_query->get_result();
     $total_devolucoes = $devolucoes_result->fetch_assoc()['total_devolucoes'];
 
+    // Obter soma dos valores de repasse credor da tabela repasse_credor
+    $repasses_query = $conn->prepare("SELECT SUM(total_repasse) as total_repasses FROM repasse_credor WHERE ordem_de_servico_id = ?");
+    $repasses_query->bind_param("i", $os_id);
+    $repasses_query->execute();
+    $repasses_result = $repasses_query->get_result();
+    $total_repasses = $repasses_result->fetch_assoc()['total_repasses'];
+
     // Obter informações das contas bancárias
     $contas_query = $conn->prepare("SELECT banco, agencia, tipo_conta, numero_conta, titular_conta, cpf_cnpj_titular, chave_pix, qr_code_pix FROM configuracao_os WHERE status = 'ativa'");
     $contas_query->execute();
@@ -248,8 +255,14 @@ if (isset($_GET['id'])) {
     $pdf->writeHTML('<div style="text-align: right;">Dep. Prévio: R$ ' . number_format($total_pagamentos, 2, ',', '.') . '</div>', true, false, true, false, '');
     $pdf->Ln(1);
 
-    // Calcular saldo a restituir subtraindo o valor devolvido
-    $saldo_a_restituir = $saldo - $total_devolucoes;
+    // Adicionar valor de repasse credor se houver
+    if ($total_repasses > 0) {
+        $pdf->writeHTML('<div style="text-align: right;">Repasse Credor: R$ ' . number_format($total_repasses, 2, ',', '.') . '</div>', true, false, true, false, '');
+        $pdf->Ln(1);
+    }
+
+    // Calcular saldo a restituir subtraindo o valor devolvido e o repasse credor
+    $saldo_a_restituir = $saldo - $total_devolucoes - $total_repasses;
 
     // Adicionar o saldo com a condição
     if ($saldo_a_restituir > 0) {
