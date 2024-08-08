@@ -983,24 +983,24 @@ include(__DIR__ . '/db_connection.php');
             // Carregar modal de abertura de caixa ao carregar a página
             abrirCaixaModal();
 
-                function abrirCaixaModal() {
-                    $.ajax({
-                        url: 'verificar_caixa_aberto.php',
-                        type: 'GET',
-                        dataType: 'json',
-                        success: function(response) {
-                            if (response.aberto) {
-                                return;
-                            } else {
-                                $('#abrirCaixaModal').modal('show');
-                                $('#saldo_inicial').val(response.saldo_transportado ? response.saldo_transportado.toFixed(2).replace('.', ',') : '');
-                            }
-                        },
-                        error: function() {
-                            alert('Erro ao verificar caixa.');
+            function abrirCaixaModal() {
+                $.ajax({
+                    url: 'verificar_caixa_aberto.php',
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.aberto) {
+                            return;
+                        } else {
+                            $('#abrirCaixaModal').modal('show');
+                            $('#saldo_inicial').val(response.saldo_transportado ? response.saldo_transportado.toFixed(2).replace('.', ',') : '');
                         }
-                    });
-                }
+                    },
+                    error: function() {
+                        alert('Erro ao verificar caixa.');
+                    }
+                });
+            }
 
             // Evento de submissão do formulário de abertura de caixa
             $('#formAbrirCaixa').on('submit', function(e) {
@@ -1140,7 +1140,7 @@ include(__DIR__ . '/db_connection.php');
                         if (['PIX', 'Transferência Bancária', 'Crédito', 'Débito'].includes(tipo)) {
                             totalRecebidoConta += totalPorTipo[tipo];
                         } else if (tipo === 'Espécie') {
-                            totalRecebidoEspecie += totalPorTipo[tipo]);
+                            totalRecebidoEspecie += totalPorTipo[tipo];
                         }
                     }
                     $('#cardTotalRecebidoConta').text(formatCurrency(totalRecebidoConta));
@@ -1287,7 +1287,6 @@ include(__DIR__ . '/db_connection.php');
                 }
             });
         }
-
 
         function cadastrarSaida(funcionarios, data) {
             $('#data_saida').val(data);
@@ -1544,6 +1543,7 @@ include(__DIR__ . '/db_connection.php');
             location.reload();
         });
     </script>
+
 
 </body>
 </html>
