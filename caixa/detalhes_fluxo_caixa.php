@@ -130,9 +130,10 @@ try {
         // Saldo Transportado
         $sql = 'SELECT data_caixa, data_transporte, valor_transportado, funcionario, status
                 FROM transporte_saldo_caixa
-                WHERE DATE(data_caixa) = :data';
+                WHERE DATE(data_caixa) = :data AND funcionario = :funcionario';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
+        $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->execute();
         $saldoTransportado = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -178,8 +179,9 @@ try {
         return $carry + floatval($item['valor_transportado']);
     }, 0.0);
 
-    $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data');
+    $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
     $stmt->bindParam(':data', $data);
+    $stmt->bindParam(':funcionario', $funcionarios);
     $stmt->execute();
     $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
     $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
@@ -214,3 +216,4 @@ try {
 } catch (Exception $e) {
     echo json_encode(['error' => $e->getMessage()]);
 }
+?>

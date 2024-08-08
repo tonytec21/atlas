@@ -12,9 +12,10 @@ try {
 
     $conn = getDatabaseConnection();
 
-    // Verifica todos os saldos transportados em aberto e soma seus valores
-    $sql = 'SELECT SUM(valor_transportado) as saldo_transportado_total FROM transporte_saldo_caixa WHERE status = "em aberto"';
+    // Verifica todos os saldos transportados em aberto e soma seus valores por funcionário
+    $sql = 'SELECT SUM(valor_transportado) as saldo_transportado_total FROM transporte_saldo_caixa WHERE status = "em aberto" AND funcionario = :funcionario';
     $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':funcionario', $funcionario);
     $stmt->execute();
     $transporteSaldo = $stmt->fetch(PDO::FETCH_ASSOC);
     $saldoTransportadoTotal = $transporteSaldo ? floatval($transporteSaldo['saldo_transportado_total']) : 0.0;
@@ -24,14 +25,15 @@ try {
 
     // Verifica se o saldo inicial é maior ou igual ao valor transportado total
     if ($saldoTransportadoTotal > 0) {
-        // Atualiza o status do transporte de saldo para usado e define a data de uso para todos os registros
-        $sql = 'UPDATE transporte_saldo_caixa SET status = "usado", data_caixa_uso = :data_caixa WHERE status = "em aberto"';
+        // Atualiza o status do transporte de saldo para usado e define a data de uso para todos os registros do funcionário
+        $sql = 'UPDATE transporte_saldo_caixa SET status = "usado", data_caixa_uso = :data_caixa WHERE status = "em aberto" AND funcionario = :funcionario';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data_caixa', $dataCaixa);
+        $stmt->bindParam(':funcionario', $funcionario);
         $stmt->execute();
     }
 
-    // Insere o caixa do dia com o saldo inicial apropriado
+    // Insere o caixa do dia com o saldo inicial apropriado para o funcionário
     $sql = 'INSERT INTO caixa (saldo_inicial, funcionario, data_caixa, status) VALUES (:saldo_inicial, :funcionario, :data_caixa, "aberto")';
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':saldo_inicial', $saldoInicial);
