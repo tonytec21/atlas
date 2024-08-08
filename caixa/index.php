@@ -396,7 +396,7 @@ include(__DIR__ . '/db_connection.php');
                             $stmt->execute();
                             $depositos = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             $totalDepositoCaixa = array_reduce($depositos, function($carry, $item) {
-                                return $carry + $item['valor_do_deposito'];
+                                return $carry + floatval($item['valor_do_deposito']);
                             }, 0);
 
                             // Saldo Transportado
@@ -408,16 +408,15 @@ include(__DIR__ . '/db_connection.php');
                                 return $carry + floatval($item['valor_transportado']);
                             }, 0);
 
-                            // Total em Caixa
-                            $totalEmCaixa = $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa - $totalSaldoTransportado;
-
                             // Saldo Inicial
                             $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data');
                             $stmt->bindParam(':data', $data);
                             $stmt->execute();
                             $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
-                            $saldoInicial = $caixa ? $caixa['saldo_inicial'] : 0;
-                            $totalEmCaixaComSaldo = $saldoInicial + $totalEmCaixa;
+                            $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0;
+
+                            // Total em Caixa
+                            $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa - $totalSaldoTransportado;
                             ?>
                             <tr>
                                 <td><?php echo $funcionarios; ?></td>
@@ -428,7 +427,7 @@ include(__DIR__ . '/db_connection.php');
                                 <td><?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_saidas, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($totalDepositoCaixa, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($totalEmCaixaComSaldo, 2, ',', '.'); ?></td>
+                                <td><?php echo 'R$ ' . number_format($totalEmCaixa, 2, ',', '.'); ?></td>
                                 <td>
                                     <button title="Visualizar" class="btn btn-info btn-sm" onclick="verDetalhes('<?php echo $funcionarios; ?>', '<?php echo $data; ?>', '<?php echo $isUnificado ? 'unificado' : 'individual'; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <?php if (!$isUnificado) { ?>
@@ -1285,7 +1284,6 @@ include(__DIR__ . '/db_connection.php');
             });
         }
 
-
         function cadastrarSaida(funcionarios, data) {
             $('#data_saida').val(data);
             $('#data_caixa_saida').val(data);
@@ -1541,6 +1539,6 @@ include(__DIR__ . '/db_connection.php');
             location.reload();
         });
     </script>
-
+    
 </body>
 </html>
