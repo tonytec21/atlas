@@ -1347,15 +1347,16 @@ include(__DIR__ . '/db_connection.php');
                     var totalDevolvidoEspecie = parseFloat(response.totalDevolvidoEspecie);
                     var totalSaidasDespesas = parseFloat(response.totalSaidasDespesas);
                     var totalDepositoCaixa = parseFloat(response.totalDepositoCaixa);
+                    var totalSaldoTransportado = parseFloat(response.totalSaldoTransportado);
 
-                    // Verifica se a data do saldo transportado é a mesma da data_caixa
-                    var totalSaldoTransportado = 0;
-                    if (data === response.data_caixa_transportado) {
-                        totalSaldoTransportado = parseFloat(response.totalSaldoTransportado);
+                    // Calcula o total em caixa levando em consideração o saldo transportado para a data e funcionário específicos
+                    var totalEmCaixa = saldoInicial + totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidasDespesas - totalDepositoCaixa;
+
+                    // Subtrai o saldo transportado apenas se ele for para o mesmo funcionário e a mesma data do caixa
+                    if (response.data_caixa === data && response.funcionario === funcionarios) {
+                        totalEmCaixa -= totalSaldoTransportado;
                     }
 
-                    var totalEmCaixa = saldoInicial + totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidasDespesas - totalDepositoCaixa - totalSaldoTransportado;
-                    
                     $('#total_em_caixa').text(formatCurrency(totalEmCaixa));
 
                     // Inicializar DataTable
@@ -1372,7 +1373,6 @@ include(__DIR__ . '/db_connection.php');
                 }
             });
         }
-
 
         function carregarDepositosCaixaUnificado(data) {
             $.ajax({
