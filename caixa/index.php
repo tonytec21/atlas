@@ -399,8 +399,25 @@ include(__DIR__ . '/db_connection.php');
                                 return $carry + $item['valor_do_deposito'];
                             }, 0);
 
+                            // Saldo Transportado
+                            $stmt = $conn->prepare('SELECT valor_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data');
+                            $stmt->bindParam(':data', $data);
+                            $stmt->execute();
+                            $transportes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            $totalSaldoTransportado = array_reduce($transportes, function($carry, $item) {
+                                return $carry + floatval($item['valor_transportado']);
+                            }, 0);
+
                             // Total em Caixa
-                            $totalEmCaixa = $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa;
+                            $totalEmCaixa = $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa - $totalSaldoTransportado;
+
+                            // Saldo Inicial
+                            $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data');
+                            $stmt->bindParam(':data', $data);
+                            $stmt->execute();
+                            $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
+                            $saldoInicial = $caixa ? $caixa['saldo_inicial'] : 0;
+                            $totalEmCaixaComSaldo = $saldoInicial + $totalEmCaixa;
                             ?>
                             <tr>
                                 <td><?php echo $funcionarios; ?></td>
@@ -411,7 +428,7 @@ include(__DIR__ . '/db_connection.php');
                                 <td><?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_saidas, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($totalDepositoCaixa, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($totalEmCaixa, 2, ',', '.'); ?></td>
+                                <td><?php echo 'R$ ' . number_format($totalEmCaixaComSaldo, 2, ',', '.'); ?></td>
                                 <td>
                                     <button title="Visualizar" class="btn btn-info btn-sm" onclick="verDetalhes('<?php echo $funcionarios; ?>', '<?php echo $data; ?>', '<?php echo $isUnificado ? 'unificado' : 'individual'; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <?php if (!$isUnificado) { ?>
@@ -443,6 +460,14 @@ include(__DIR__ . '/db_connection.php');
                 </div>
                 <div class="modal-body">
                     <div class="row">
+                        <div class="col-md-3">
+                            <div class="card text-white bg-primary mb-3" style="background-color: #005d15 !important">
+                                <div class="card-header">Saldo Inicial</div>
+                                <div class="card-body">
+                                    <h5 class="card-title" id="cardSaldoInicial">R$ 0,00</h5>
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-md-3">
                             <div class="card text-white bg-primary mb-3">
                                 <div class="card-header">Atos Liquidados</div>
@@ -622,6 +647,27 @@ include(__DIR__ . '/db_connection.php');
                             </table>
                         </div>
                     </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header table-title">SALDO TRANSPORTADO</div>
+                        <div class="card-body">
+                            <table id="tabelaSaldoTransportado" class="table table-striped table-bordered" style="zoom: 80%">
+                                <thead>
+                                    <tr>
+                                        <th>Data Caixa</th>
+                                        <th>Data Transporte</th>
+                                        <th>Valor Transportado</th>
+                                        <th>Funcionário</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detalhesSaldoTransportado">
+                                    <!-- Detalhes do saldo transportado serão carregados aqui -->
+                                </tbody>
+                            </table>
+                            <h6 class="total-label">Total Saldo Transportado: <span id="totalSaldoTransportado"></span></h6>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
@@ -700,6 +746,10 @@ include(__DIR__ . '/db_connection.php');
                     </button>
                 </div>
                 <div class="modal-body">
+                    <div class="form-group">
+                        <label for="total_em_caixa">Total em Caixa:</label>
+                        <div id="total_em_caixa">R$ 0,00</div>
+                    </div>
                     <form id="formCadastroDeposito" enctype="multipart/form-data">
                         <div class="form-group">
                             <label for="valor_deposito">Valor do Depósito</label>
@@ -708,7 +758,7 @@ include(__DIR__ . '/db_connection.php');
                         <div class="form-group">
                             <label for="tipo_deposito">Tipo de Depósito</label>
                             <select class="form-control" id="tipo_deposito" name="tipo_deposito" required>
-                                <option value="Depósito Bancário">Depósito Bancário</option>    
+                                <option value="Depósito Bancário">Depósito Bancário</option>
                                 <option value="Espécie">Espécie</option>
                                 <option value="Transferência">Transferência</option>
                             </select>
@@ -721,8 +771,11 @@ include(__DIR__ . '/db_connection.php');
                         <input type="hidden" id="funcionario_deposito" name="funcionario_deposito">
                         <button type="submit" style="width: 100%" class="btn btn-primary">Adicionar</button>
                     </form>
-                </div>
-                <div class="modal-body">
+                    <hr>
+                    <div class="form-group">
+                        <button type="button" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()">Transportar Saldo e Fechar Caixa</button>
+                    </div>
+                    <hr>
                     <h5>Depósitos Registrados</h5>
                     <table id="tabelaDepositosRegistrados" class="table table-striped table-bordered" style="zoom: 80%">
                         <thead>
@@ -777,6 +830,26 @@ include(__DIR__ . '/db_connection.php');
         </div>
     </div>
 
+    <!-- Modal de Abertura de Caixa -->
+    <div class="modal fade" id="abrirCaixaModal" tabindex="-1" role="dialog" aria-labelledby="abrirCaixaModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="abrirCaixaModalLabel">Abrir Caixa do Dia</h5>
+                </div>
+                <div class="modal-body">
+                    <form id="formAbrirCaixa">
+                        <div class="form-group">
+                            <label for="saldo_inicial">Saldo Inicial</label>
+                            <input type="text" class="form-control" id="saldo_inicial" name="saldo_inicial" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Abrir Caixa</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
@@ -796,6 +869,7 @@ include(__DIR__ . '/db_connection.php');
             // Inicializar máscara de dinheiro
             $('#valor_saida').mask('#.##0,00', {reverse: true});
             $('#valor_deposito').mask('#.##0,00', {reverse: true});
+            $('#saldo_inicial').mask('#.##0,00', {reverse: true});
 
             // Evento de submissão do formulário de saída
             $('#formCadastroSaida').on('submit', function(e) {
@@ -902,7 +976,76 @@ include(__DIR__ . '/db_connection.php');
                     }
                 });
             });
+
+            // Carregar modal de abertura de caixa ao carregar a página
+            abrirCaixaModal();
+
+                function abrirCaixaModal() {
+                    $.ajax({
+                        url: 'verificar_caixa_aberto.php',
+                        type: 'GET',
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.aberto) {
+                                return;
+                            } else {
+                                $('#abrirCaixaModal').modal('show');
+                                $('#saldo_inicial').val(response.saldo_transportado ? response.saldo_transportado.toFixed(2).replace('.', ',') : '');
+                            }
+                        },
+                        error: function() {
+                            alert('Erro ao verificar caixa.');
+                        }
+                    });
+                }
+
+            // Evento de submissão do formulário de abertura de caixa
+            $('#formAbrirCaixa').on('submit', function(e) {
+                e.preventDefault();
+
+                var saldoInicial = $('#saldo_inicial').val().replace('.', '').replace(',', '.');
+
+                $.ajax({
+                    url: 'abrir_caixa.php',
+                    type: 'POST',
+                    data: {
+                        saldo_inicial: saldoInicial
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            alert('Caixa aberto com sucesso!');
+                            $('#abrirCaixaModal').modal('hide');
+                            location.reload();
+                        } else {
+                            alert('Erro ao abrir caixa: ' + response.error);
+                        }
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        alert('Erro ao abrir caixa: ' + textStatus + ' - ' + errorThrown);
+                    }
+                });
+            });
         });
+
+        function abrirCaixaModal() {
+            $.ajax({
+                url: 'verificar_caixa_aberto.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    if (response.aberto) {
+                        return;
+                    } else {
+                        $('#abrirCaixaModal').modal('show');
+                        $('#saldo_inicial').val(response.saldo_transportado.replace('.', ','));
+                    }
+                },
+                error: function() {
+                    alert('Erro ao verificar caixa.');
+                }
+            });
+        }
 
         function verDetalhes(funcionarios, data, tipo) {
             $.ajax({
@@ -929,6 +1072,15 @@ include(__DIR__ . '/db_connection.php');
                     $('#cardTotalEmCaixa').text(formatCurrency(detalhes.totalEmCaixa));
                     $('#cardSaidasDespesas').text(formatCurrency(detalhes.totalSaidasDespesas));
                     $('#cardDepositoCaixa').text(formatCurrency(detalhes.totalDepositoCaixa));
+                    $('#cardSaldoInicial').text(formatCurrency(detalhes.saldoInicial));
+
+                    // Debugging logs
+                    console.log("Saldo Inicial: " + detalhes.saldoInicial);
+                    console.log("Total Recebido em Espécie: " + detalhes.totalRecebidoEspecie);
+                    console.log("Total Devolvido em Espécie: " + detalhes.totalDevolvidoEspecie);
+                    console.log("Total Saídas e Despesas: " + detalhes.totalSaidasDespesas);
+                    console.log("Total Depósito do Caixa: " + detalhes.totalDepositoCaixa);
+                    console.log("Total Saldo Transportado: " + detalhes.totalSaldoTransportado);
 
                     // Atos Liquidados
                     var totalAtos = 0;
@@ -1057,9 +1209,22 @@ include(__DIR__ . '/db_connection.php');
                     });
                     $('#totalDepositos').text(formatCurrency(totalDepositos));
 
-                    // Total em Caixa
-                    var totalEmCaixa = totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidas - totalDepositos;
-                    $('#cardTotalEmCaixa').text(formatCurrency(totalEmCaixa));
+                    // Saldo Transportado
+                    var totalSaldoTransportado = 0;
+                    $('#detalhesSaldoTransportado').empty();
+                    detalhes.saldoTransportado.forEach(function(transporte) {
+                        totalSaldoTransportado += parseFloat(transporte.valor_transportado);
+                        $('#detalhesSaldoTransportado').append(`
+                            <tr>
+                                <td>${formatDateForDisplay(transporte.data_caixa)}</td>
+                                <td>${formatDateForDisplay(transporte.data_transporte)}</td>
+                                <td>${formatCurrency(transporte.valor_transportado)}</td>
+                                <td>${transporte.funcionario}</td>
+                                <td>${transporte.status}</td>
+                            </tr>
+                        `);
+                    });
+                    $('#totalSaldoTransportado').text(formatCurrency(totalSaldoTransportado));
 
                     $('#detalhesModal').modal('show');
 
@@ -1106,12 +1271,20 @@ include(__DIR__ . '/db_connection.php');
                         "destroy": true,
                         "pageLength": 10
                     });
+                    $('#tabelaSaldoTransportado').DataTable({
+                        "language": {
+                            "url": "../style/Portuguese-Brasil.json"
+                        },
+                        "destroy": true,
+                        "pageLength": 10
+                    });
                 },
                 error: function() {
                     alert('Erro ao obter detalhes.');
                 }
             });
         }
+
 
         function cadastrarSaida(funcionarios, data) {
             $('#data_saida').val(data);
@@ -1137,8 +1310,6 @@ include(__DIR__ . '/db_connection.php');
                 },
                 dataType: 'json',
                 success: function(response) {
-                    console.log(response); // Adicione esta linha para inspecionar a resposta
-
                     if (response.error) {
                         alert('Erro: ' + response.error);
                         return;
@@ -1169,6 +1340,17 @@ include(__DIR__ . '/db_connection.php');
                         `);
                     });
 
+                    var saldoInicial = parseFloat(response.saldoInicial);
+                    var totalRecebidoEspecie = parseFloat(response.totalRecebidoEspecie);
+                    var totalDevolvidoEspecie = parseFloat(response.totalDevolvidoEspecie);
+                    var totalSaidasDespesas = parseFloat(response.totalSaidasDespesas);
+                    var totalDepositoCaixa = parseFloat(response.totalDepositoCaixa);
+                    var totalSaldoTransportado = parseFloat(response.totalSaldoTransportado);
+
+                    var totalEmCaixa = saldoInicial + totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidasDespesas - totalDepositoCaixa - totalSaldoTransportado;
+                    
+                    $('#total_em_caixa').text(formatCurrency(totalEmCaixa));
+
                     // Inicializar DataTable
                     $('#tabelaDepositosRegistrados').DataTable({
                         "language": {
@@ -1193,8 +1375,6 @@ include(__DIR__ . '/db_connection.php');
                 },
                 dataType: 'json',
                 success: function(response) {
-                    console.log(response); // Adicione esta linha para inspecionar a resposta
-
                     if (response.error) {
                         alert('Erro: ' + response.error);
                         return;
@@ -1219,6 +1399,7 @@ include(__DIR__ . '/db_connection.php');
                                 <td>${deposito.tipo_deposito}</td>
                                 <td>
                                     <button title="Visualizar" class="btn btn-info btn-sm" onclick="visualizarComprovanteCaixaUnificado('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    <button title="Remover" style="margin-bottom: 5px !important;" class="btn btn-delete btn-sm" onclick="removerDeposito(${deposito.id})"><i class="fa fa-trash" aria-hidden="true"></i></button>
                                 </td>
                             </tr>
                         `);
@@ -1310,7 +1491,37 @@ include(__DIR__ . '/db_connection.php');
         }
 
         function formatCurrency(value) {
+            if (isNaN(value)) return 'R$ 0,00';
             return 'R$ ' + parseFloat(value).toFixed(2).replace('.', ',').replace(/\d(?=(\d{3})+,)/g, '$&.');
+        }
+
+        function transportarSaldoFecharCaixa() {
+            var totalEmCaixa = $('#total_em_caixa').text().replace('.', '').replace(',', '.');
+            var dataCaixa = $('#data_caixa_deposito').val();
+            var funcionario = $('#funcionario_deposito').val();
+
+            $.ajax({
+                url: 'transportar_saldo_fechar_caixa.php',
+                type: 'POST',
+                data: {
+                    total_em_caixa: totalEmCaixa,
+                    data_caixa: dataCaixa,
+                    funcionario: funcionario
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        alert('Saldo transportado e caixa fechado com sucesso!');
+                        $('#cadastroDepositoModal').modal('hide');
+                        location.reload();
+                    } else {
+                        alert('Erro ao transportar saldo e fechar caixa: ' + response.error);
+                    }
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    alert('Erro ao transportar saldo e fechar caixa: ' + textStatus + ' - ' + errorThrown);
+                }
+            });
         }
 
         // Adicionar evento para recarregar a página ao fechar os modais
@@ -1329,9 +1540,7 @@ include(__DIR__ . '/db_connection.php');
         $('#verDepositosCaixaModal').on('hidden.bs.modal', function () {
             location.reload();
         });
-
     </script>
 
 </body>
 </html>
-
