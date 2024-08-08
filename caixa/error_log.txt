@@ -1,1 +1,0 @@
-SQLSTATE[HY000]: General error: 1366 Incorrect decimal value: 'R$ 200.00' for column 'valor_transportado' at row 1
