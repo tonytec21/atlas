@@ -396,7 +396,7 @@ include(__DIR__ . '/db_connection.php');
                             $stmt->execute();
                             $depositos = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             $totalDepositoCaixa = array_reduce($depositos, function($carry, $item) {
-                                return $carry + floatval($item['valor_do_deposito']);
+                                return $carry + $item['valor_do_deposito'];
                             }, 0);
 
                             // Saldo Transportado
@@ -408,15 +408,19 @@ include(__DIR__ . '/db_connection.php');
                                 return $carry + floatval($item['valor_transportado']);
                             }, 0);
 
-                            // Saldo Inicial
-                            $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data');
+                            // Saldo Inicial individualizado por funcionário
+                            $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data' . ($isUnificado ? '' : ' AND funcionario = :funcionario'));
+                            if (!$isUnificado) {
+                                $stmt->bindParam(':funcionario', $funcionarios);
+                            }
                             $stmt->bindParam(':data', $data);
                             $stmt->execute();
                             $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
-                            $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0;
+                            $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
 
                             // Total em Caixa
                             $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa - $totalSaldoTransportado;
+
                             ?>
                             <tr>
                                 <td><?php echo $funcionarios; ?></td>
@@ -1136,7 +1140,7 @@ include(__DIR__ . '/db_connection.php');
                         if (['PIX', 'Transferência Bancária', 'Crédito', 'Débito'].includes(tipo)) {
                             totalRecebidoConta += totalPorTipo[tipo];
                         } else if (tipo === 'Espécie') {
-                            totalRecebidoEspecie += totalPorTipo[tipo];
+                            totalRecebidoEspecie += totalPorTipo[tipo]);
                         }
                     }
                     $('#cardTotalRecebidoConta').text(formatCurrency(totalRecebidoConta));
@@ -1283,6 +1287,7 @@ include(__DIR__ . '/db_connection.php');
                 }
             });
         }
+
 
         function cadastrarSaida(funcionarios, data) {
             $('#data_saida').val(data);
@@ -1539,6 +1544,6 @@ include(__DIR__ . '/db_connection.php');
             location.reload();
         });
     </script>
-    
+
 </body>
 </html>
