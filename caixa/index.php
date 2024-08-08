@@ -1295,7 +1295,7 @@ include(__DIR__ . '/db_connection.php');
             $('#cadastroSaidaModal').modal('show');
         }
 
-        function cadastrarDeposito(funcionarios, data) {
+        function cadastrarDeposito(funcioanrios, data) {
             $('#data_caixa_deposito').val(data);
             $('#funcionario_deposito').val(funcionarios);
             carregarDepositos(funcionarios, data);
@@ -1349,14 +1349,8 @@ include(__DIR__ . '/db_connection.php');
                     var totalDepositoCaixa = parseFloat(response.totalDepositoCaixa);
                     var totalSaldoTransportado = parseFloat(response.totalSaldoTransportado);
 
-                    // Calcula o total em caixa levando em consideração o saldo transportado para a data e funcionário específicos
-                    var totalEmCaixa = saldoInicial + totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidasDespesas - totalDepositoCaixa;
-
-                    // Subtrai o saldo transportado apenas se ele for para o mesmo funcionário e a mesma data do caixa
-                    if (response.data_caixa === data && response.funcionario === funcionarios) {
-                        totalEmCaixa -= totalSaldoTransportado;
-                    }
-
+                    var totalEmCaixa = saldoInicial + totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidasDespesas - totalDepositoCaixa - totalSaldoTransportado;
+                    
                     $('#total_em_caixa').text(formatCurrency(totalEmCaixa));
 
                     // Inicializar DataTable
@@ -1549,7 +1543,6 @@ include(__DIR__ . '/db_connection.php');
             location.reload();
         });
     </script>
-
 
 </body>
 </html>
