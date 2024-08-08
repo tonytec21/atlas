@@ -8,18 +8,15 @@ header('Content-Type: application/json');
 try {
     $funcionarios = $_GET['funcionarios'];
     $data = $_GET['data'];
-    $tipo = isset($_GET['tipo']) ? $_GET['tipo'] : 'individual';
 
     $conn = getDatabaseConnection();
 
     // Seleciona os depósitos
     $sql = 'SELECT funcionario, data_caixa, data_cadastro, valor_do_deposito, tipo_deposito, caminho_anexo
             FROM deposito_caixa
-            WHERE ' . ($tipo === 'unificado' ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_caixa) = :data AND status = "ativo"';
+            WHERE funcionario = :funcionario AND DATE(data_caixa) = :data AND status = "ativo"';
     $stmt = $conn->prepare($sql);
-    if ($tipo !== 'unificado') {
-        $stmt->bindParam(':funcionario', $funcionarios);
-    }
+    $stmt->bindParam(':funcionario', $funcionarios);
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $depositos = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -29,10 +26,7 @@ try {
     }, 0.0);
 
     // Seleciona o saldo inicial
-    $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
-    if ($tipo !== 'unificado') {
-        $stmt->bindParam(':funcionario', $funcionarios);
-    }
+    $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data');
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -41,10 +35,7 @@ try {
     // Seleciona o total recebido em espécie
     $stmt = $conn->prepare('SELECT SUM(total_pagamento) as total_recebido_especie
                             FROM pagamento_os
-                            WHERE forma_de_pagamento = "Espécie" AND DATE(data_pagamento) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
-    if ($tipo !== 'unificado') {
-        $stmt->bindParam(':funcionario', $funcionarios);
-    }
+                            WHERE forma_de_pagamento = "Espécie" AND DATE(data_pagamento) = :data');
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $totalRecebidoEspecie = $stmt->fetchColumn();
@@ -53,10 +44,7 @@ try {
     // Seleciona o total devolvido em espécie
     $stmt = $conn->prepare('SELECT SUM(total_devolucao) as total_devolvido_especie
                             FROM devolucao_os
-                            WHERE forma_devolucao = "Espécie" AND DATE(data_devolucao) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
-    if ($tipo !== 'unificado') {
-        $stmt->bindParam(':funcionario', $funcionarios);
-    }
+                            WHERE forma_devolucao = "Espécie" AND DATE(data_devolucao) = :data');
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $totalDevolvidoEspecie = $stmt->fetchColumn();
@@ -65,10 +53,7 @@ try {
     // Seleciona o total de saídas e despesas
     $stmt = $conn->prepare('SELECT SUM(valor_saida) as total_saidas_despesas
                             FROM saidas_despesas
-                            WHERE DATE(data) = :data AND status = "ativo"' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
-    if ($tipo !== 'unificado') {
-        $stmt->bindParam(':funcionario', $funcionarios);
-    }
+                            WHERE DATE(data) = :data AND status = "ativo"');
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $totalSaidasDespesas = $stmt->fetchColumn();
@@ -77,10 +62,7 @@ try {
     // Seleciona o total de saldo transportado
     $stmt = $conn->prepare('SELECT SUM(valor_transportado) as total_saldo_transportado
                             FROM transporte_saldo_caixa
-                            WHERE DATE(data_caixa) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
-    if ($tipo !== 'unificado') {
-        $stmt->bindParam(':funcionario', $funcionarios);
-    }
+                            WHERE DATE(data_caixa) = :data');
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $totalSaldoTransportado = $stmt->fetchColumn();
@@ -102,3 +84,4 @@ try {
     echo json_encode(['error' => $e->getMessage()]);
 }
 ?>
+
