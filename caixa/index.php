@@ -1347,7 +1347,12 @@ include(__DIR__ . '/db_connection.php');
                     var totalDevolvidoEspecie = parseFloat(response.totalDevolvidoEspecie);
                     var totalSaidasDespesas = parseFloat(response.totalSaidasDespesas);
                     var totalDepositoCaixa = parseFloat(response.totalDepositoCaixa);
-                    var totalSaldoTransportado = parseFloat(response.totalSaldoTransportado);
+
+                    // Verifica se a data do saldo transportado é a mesma da data_caixa
+                    var totalSaldoTransportado = 0;
+                    if (data === response.data_caixa_transportado) {
+                        totalSaldoTransportado = parseFloat(response.totalSaldoTransportado);
+                    }
 
                     var totalEmCaixa = saldoInicial + totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidasDespesas - totalDepositoCaixa - totalSaldoTransportado;
                     
@@ -1367,6 +1372,7 @@ include(__DIR__ . '/db_connection.php');
                 }
             });
         }
+
 
         function carregarDepositosCaixaUnificado(data) {
             $.ajax({
