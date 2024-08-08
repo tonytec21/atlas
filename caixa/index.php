@@ -404,9 +404,10 @@ include(__DIR__ . '/db_connection.php');
                                 return $carry + $item['valor_do_deposito'];
                             }, 0);
 
-                            // Saldo Transportado
-                            $stmt = $conn->prepare('SELECT valor_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data');
+                            // Saldo Transportado individualizado por funcionário
+                            $stmt = $conn->prepare('SELECT valor_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
                             $stmt->bindParam(':data', $data);
+                            $stmt->bindParam(':funcionario', $funcionarios);
                             $stmt->execute();
                             $transportes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             $totalSaldoTransportado = array_reduce($transportes, function($carry, $item) {
@@ -455,6 +456,7 @@ include(__DIR__ . '/db_connection.php');
             </div>
         </div>
     </div>
+
 
     <!-- Modal de Detalhes -->
     <div class="modal fade" id="detalhesModal" tabindex="-1" role="dialog" aria-labelledby="detalhesModalLabel" aria-hidden="true">
