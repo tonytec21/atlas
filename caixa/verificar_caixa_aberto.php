@@ -3,6 +3,8 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 
+date_default_timezone_set('America/Sao_Paulo');
+
 header('Content-Type: application/json');
 
 try {
