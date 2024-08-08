@@ -141,6 +141,11 @@ include(__DIR__ . '/db_connection.php');
             max-width: 60%;
             margin: auto;
         }
+        
+        .modal-abrir-caixa {
+            max-width: 25%;
+            margin: auto;
+        }
 
         .modal-saidas {
             max-width: 60%;
@@ -836,18 +841,20 @@ include(__DIR__ . '/db_connection.php');
     <!-- Modal de Abertura de Caixa -->
     <div class="modal fade" id="abrirCaixaModal" tabindex="-1" role="dialog" aria-labelledby="abrirCaixaModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
         <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="abrirCaixaModalLabel">Abrir Caixa do Dia</h5>
-                </div>
-                <div class="modal-body">
-                    <form id="formAbrirCaixa">
-                        <div class="form-group">
-                            <label for="saldo_inicial">Saldo Inicial</label>
-                            <input type="text" class="form-control" id="saldo_inicial" name="saldo_inicial" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Abrir Caixa</button>
-                    </form>
+            <div class="modal-content modal-abrir-caixa">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="abrirCaixaModalLabel">Abrir Caixa do Dia</h5>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formAbrirCaixa">
+                            <div class="form-group">
+                                <label for="saldo_inicial">Saldo Inicial</label>
+                                <input type="text" class="form-control" id="saldo_inicial" name="saldo_inicial" required>
+                            </div>
+                            <button type="submit" style="width: 100%" class="btn btn-primary">Abrir Caixa</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
