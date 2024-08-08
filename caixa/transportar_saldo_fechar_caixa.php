@@ -42,10 +42,11 @@ try {
     // Pega o id do transporte inserido
     $idTransporte = $conn->lastInsertId();
 
-    // Update na tabela caixa
-    $sql = 'UPDATE caixa SET status = "fechado" WHERE DATE(data_caixa) = :data_caixa';
+    // Update na tabela caixa apenas para o caixa do funcionário logado
+    $sql = 'UPDATE caixa SET status = "fechado" WHERE DATE(data_caixa) = :data_caixa AND funcionario = :funcionario';
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':data_caixa', $dataCaixa);
+    $stmt->bindParam(':funcionario', $funcionario);
     $stmt->execute();
 
     echo json_encode(['success' => true]);
