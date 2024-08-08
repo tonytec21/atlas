@@ -77,8 +77,10 @@ try {
     // Seleciona o total de saldo transportado
     $stmt = $conn->prepare('SELECT SUM(valor_transportado) as total_saldo_transportado
                             FROM transporte_saldo_caixa
-                            WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
-    $stmt->bindParam(':funcionario', $funcionarios);
+                            WHERE DATE(data_caixa) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
+    if ($tipo !== 'unificado') {
+        $stmt->bindParam(':funcionario', $funcionarios);
+    }
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $totalSaldoTransportado = $stmt->fetchColumn();
