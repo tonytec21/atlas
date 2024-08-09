@@ -96,10 +96,18 @@ $selos_arquivamentos->close();
 <div id="main" class="main-content">
     <div class="container">
         <div class="title-buttons">
-            <h3>Edição de Arquivamento</h3>
+            <h4>Edição de Arquivamento</h4>
             <div class="buttons-right">
-                <a href="capa-arquivamento.php?id=<?php echo $arquivo_id; ?>" target="_blank" class="btn btn-primary"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Capa de Arquivamento</a>
-                <a href="cadastro.php" class="btn btn-success"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Arquivamento</a>
+                <button style="width: 190px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-primary" onclick="window.open('capa-arquivamento.php?id=<?php echo $arquivo_id; ?>', '_blank')">
+                    <i class="fa fa-print" aria-hidden="true"></i> Capa de Arquivamento
+                </button>
+
+                <button style="width: 190px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-success" onclick="window.location.href='cadastro.php'">
+                    <i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Arquivamento
+                </button>
+                <button style="width: 200px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'">
+                    <i class="fa fa-search" aria-hidden="true"></i> Pesquisar Arquivamentos
+                </button>
             </div>
         </div>
         <hr>
