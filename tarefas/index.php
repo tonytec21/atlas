@@ -319,7 +319,7 @@ include(__DIR__ . '/db_connection.php');
                             <i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício
                         </button>
                         <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2" onclick="window.open('protocolo-geral.php?id=' + document.getElementById('taskNumber').innerText, '_blank')">
-                            <i class="fa fa-book" aria-hidden="true"></i> Guia de Protocolo Geral
+                            <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo Geral
                         </button>
                         <button style="font-size:12px" id="reciboEntregaButton" type="button" class="btn btn-info2 mr-2">
                             <i class="fa fa-file-text" aria-hidden="true"></i> Recibo de Entrega

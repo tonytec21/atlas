@@ -169,10 +169,17 @@ include(__DIR__ . '/../menu.php');
 <div id="main" class="main-content">
     <div class="container">
         <div class="d-flex justify-content-between align-items-center">
-            <h3>Edição de Tarefa - Protocolo Geral nº.: <?php echo $taskId; ?></h3>
+            <h4>Edição de Tarefa - Protocolo Geral nº.: <?php echo $taskId; ?></h4>
             <div class="btn-container">
-                <a href="protocolo-geral.php?id=<?php echo $taskId; ?>" target="_blank" class="btn btn-primary mr-2"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Guia de Protocolo Geral</a>
-                <a href="criar-tarefa.php" class="btn btn-success"><i class="fa fa-plus-circle" aria-hidden="true"></i> Nova Tarefa</a>
+                <button style="width: 172px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" onclick="window.open('protocolo-geral.php?id=<?php echo $taskId; ?>', '_blank')" class="btn btn-primary mr-2">
+                    <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo
+                </button>
+                <button style="width: 150px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important;" onclick="window.location.href='criar-tarefa.php'" class="btn btn-success">
+                    <i class="fa fa-plus" aria-hidden="true"></i> Nova Tarefa
+                </button>
+                <button style="width: 150px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'">
+                    <i class="fa fa-search" aria-hidden="true"></i> Pesquisar Tarefas
+                </button>
             </div>
         </div>
         <hr>
