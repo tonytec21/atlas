@@ -294,6 +294,14 @@ include(__DIR__ . '/db_connection.php');
                             $filtered = true;
                         }
 
+                        // Condição adicional para incluir caixas abertos
+                        $sqlCaixaAberto = "SELECT funcionario, DATE(data_caixa) as data, saldo_inicial 
+                                           FROM caixa 
+                                           WHERE status = 'aberto'";
+                        if ($conditions) {
+                            $sqlCaixaAberto .= ' AND ' . implode(' AND ', $conditions);
+                        }
+
                         if ($isUnificado) {
                             $sql = 'SELECT 
                                         GROUP_CONCAT(DISTINCT funcionario SEPARATOR ", ") as funcionarios, 
@@ -301,7 +309,8 @@ include(__DIR__ . '/db_connection.php');
                                         SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
                                         SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
                                         SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
-                                        SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas
+                                        SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
+                                        SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos
                                     FROM (
                                         SELECT funcionario, data, "ato" as tipo, total 
                                         FROM atos_liquidados
@@ -314,6 +323,12 @@ include(__DIR__ . '/db_connection.php');
                                         UNION ALL
                                         SELECT funcionario, data, "saida" as tipo, valor_saida as total
                                         FROM saidas_despesas WHERE status = "ativo"
+                                        UNION ALL
+                                        SELECT funcionario, data_caixa as data, "deposito" as tipo, valor_do_deposito as total
+                                        FROM deposito_caixa WHERE status = "ativo"
+                                        UNION ALL
+                                        SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
+                                        FROM caixa WHERE status = "aberto"
                                     ) as fluxos';
                             if ($conditions) {
                                 $sql .= ' WHERE ' . implode(' AND ', $conditions);
@@ -326,7 +341,9 @@ include(__DIR__ . '/db_connection.php');
                                         SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
                                         SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
                                         SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
-                                        SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas
+                                        SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
+                                        SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos,
+                                        SUM(CASE WHEN tipo = "caixa" THEN total ELSE 0 END) as saldo_inicial
                                     FROM (
                                         SELECT funcionario, data, "ato" as tipo, total 
                                         FROM atos_liquidados
@@ -339,6 +356,12 @@ include(__DIR__ . '/db_connection.php');
                                         UNION ALL
                                         SELECT funcionario, data, "saida" as tipo, valor_saida as total
                                         FROM saidas_despesas WHERE status = "ativo"
+                                        UNION ALL
+                                        SELECT funcionario, data_caixa as data, "deposito" as tipo, valor_do_deposito as total
+                                        FROM deposito_caixa WHERE status = "ativo"
+                                        UNION ALL
+                                        SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
+                                        FROM caixa WHERE status = "aberto"
                                     ) as fluxos';
                             if ($conditions) {
                                 $sql .= ' WHERE ' . implode(' AND ', $conditions);
@@ -360,6 +383,8 @@ include(__DIR__ . '/db_connection.php');
                             $total_pagamentos = $resultado['total_pagamentos'];
                             $total_devolucoes = $resultado['total_devolucoes'];
                             $total_saidas = $resultado['total_saidas'];
+                            $total_depositos = $resultado['total_depositos'];
+                            $saldo_inicial = $resultado['saldo_inicial'];
 
                             // Calculando valores
                             $totalRecebidoConta = 0;
