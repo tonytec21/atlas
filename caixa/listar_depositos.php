@@ -29,7 +29,7 @@ try {
     }, 0.0);
 
     // Seleciona o saldo inicial
-    $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
+    $stmt = $conn->prepare('SELECT saldo_inicial, status FROM caixa WHERE DATE(data_caixa) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
     if ($tipo !== 'unificado') {
         $stmt->bindParam(':funcionario', $funcionarios);
     }
@@ -37,6 +37,7 @@ try {
     $stmt->execute();
     $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
     $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
+    $caixaFechado = $caixa && $caixa['status'] === 'fechado';
 
     // Seleciona o total recebido em espécie
     $stmt = $conn->prepare('SELECT SUM(total_pagamento) as total_recebido_especie
@@ -86,7 +87,12 @@ try {
     $totalSaldoTransportado = $stmt->fetchColumn();
     $totalSaldoTransportado = $totalSaldoTransportado ? floatval($totalSaldoTransportado) : 0.0;
 
-    $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $totalSaidasDespesas - $totalDepositoCaixa - $totalSaldoTransportado;
+    // Se o caixa estiver fechado, o total em caixa é zero
+    if ($caixaFechado) {
+        $totalEmCaixa = 0.0;
+    } else {
+        $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $totalSaidasDespesas - $totalDepositoCaixa - $totalSaldoTransportado;
+    }
 
     echo json_encode([
         'depositos' => $depositos,
