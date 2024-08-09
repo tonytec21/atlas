@@ -128,6 +128,10 @@ include(__DIR__ . '/db_connection.php');
             font-size: 1.25rem;
         }
 
+        .card-title2 {
+            font-size: 1.1rem;
+        }
+
         .bg-warning {
             background-color: #ff8e07 !important;
         }
@@ -756,22 +760,50 @@ include(__DIR__ . '/db_connection.php');
                     </button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="total_em_caixa">Total em Caixa:</label>
-                        <div id="total_em_caixa">R$ 0,00</div>
-                    </div>
-                    <form id="formCadastroDeposito" enctype="multipart/form-data">
-                        <div class="form-group">
-                            <label for="valor_deposito">Valor do Depósito</label>
-                            <input type="text" class="form-control" id="valor_deposito" name="valor_deposito" required>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title2">Total em Caixa:</h5>
+                                    <p class="card-text" id="total_em_caixa" style="font-size: 1.5em;">R$ 0,00</p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="tipo_deposito">Tipo de Depósito</label>
-                            <select class="form-control" id="tipo_deposito" name="tipo_deposito" required>
-                                <option value="Depósito Bancário">Depósito Bancário</option>
-                                <option value="Espécie">Espécie</option>
-                                <option value="Transferência">Transferência</option>
-                            </select>
+                        <div class="col-md-4">
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title2">Depósitos:</h5>
+                                    <p class="card-text" id="total_depositos" style="font-size: 1.5em;">R$ 0,00</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title2">Saldo Transportado:</h5>
+                                    <p class="card-text" id="saldo_transportado" style="font-size: 1.5em;">R$ 0,00</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <button type="button" id="btnTransportarSaldo" style="width: 100%" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()"><i class="fa fa-lock" aria-hidden="true"></i> Fechar Caixa e Transportar Saldo <i class="fa fa-share" aria-hidden="true"></i></button>
+                    </div>
+                    <hr>
+                    <form id="formCadastroDeposito" enctype="multipart/form-data">
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="valor_deposito">Valor do Depósito</label>
+                                <input type="text" class="form-control" id="valor_deposito" name="valor_deposito" required>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="tipo_deposito">Tipo de Depósito</label>
+                                <select class="form-control" id="tipo_deposito" name="tipo_deposito" required>
+                                    <option value="Depósito Bancário">Depósito Bancário</option>
+                                    <option value="Espécie">Espécie</option>
+                                    <option value="Transferência">Transferência</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="comprovante_deposito">Comprovante de Depósito</label>
@@ -779,12 +811,8 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                         <input type="hidden" id="data_caixa_deposito" name="data_caixa_deposito">
                         <input type="hidden" id="funcionario_deposito" name="funcionario_deposito">
-                        <button type="submit" id="btnAdicionarDeposito" style="width: 100%" class="btn btn-primary">Adicionar</button>
+                        <button type="submit" id="btnAdicionarDeposito" style="width: 100%" class="btn btn-primary"><i class="fa fa-plus-circle" aria-hidden="true"></i> Adicionar</button>
                     </form>
-                    <hr>
-                    <div class="form-group">
-                        <button type="button" id="btnTransportarSaldo" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()">Transportar Saldo e Fechar Caixa</button>
-                    </div>
                     <hr>
                     <h5>Depósitos Registrados</h5>
                     <table id="tabelaDepositosRegistrados" class="table table-striped table-bordered" style="zoom: 80%">
@@ -806,6 +834,7 @@ include(__DIR__ . '/db_connection.php');
             </div>
         </div>
     </div>
+
 
     <!-- Modal de Listagem de Depósitos do Caixa Unificado -->
     <div class="modal fade" id="verDepositosCaixaModal" tabindex="-1" role="dialog" aria-labelledby="verDepositosCaixaModalLabel" aria-hidden="true">
@@ -1366,7 +1395,10 @@ include(__DIR__ . '/db_connection.php');
                         totalEmCaixa -= totalSaldoTransportado;
                     }
 
+                    // Atualiza os valores dos cards
                     $('#total_em_caixa').text(formatCurrency(totalEmCaixa));
+                    $('#total_depositos').text(formatCurrency(totalDepositoCaixa));
+                    $('#saldo_transportado').text(formatCurrency(totalSaldoTransportado));
 
                     // Desabilitar botões se o total em caixa for zero
                     if (totalEmCaixa === 0) {
