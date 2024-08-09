@@ -208,7 +208,7 @@ include(__DIR__ . '/db_connection.php');
                         <select class="form-control" id="funcionario" name="funcionario" <?php echo $user['nivel_de_acesso'] === 'usuario' ? 'disabled' : ''; ?>>
                             <?php if ($user['nivel_de_acesso'] === 'administrador') { ?>
                                 <option value="todos">Todos</option>
-                                <option value="caixa_unificado">Caixa Unificado</option>
+                                <!-- <option value="caixa_unificado">Caixa Unificado</option> -->
                             <?php } ?>
                             <?php
                             $query = $user['nivel_de_acesso'] === 'administrador' ? "SELECT usuario, nome_completo FROM funcionarios WHERE status = 'ativo'" : "SELECT usuario, nome_completo FROM funcionarios WHERE usuario = :usuario";
@@ -834,7 +834,6 @@ include(__DIR__ . '/db_connection.php');
             </div>
         </div>
     </div>
-
 
     <!-- Modal de Listagem de Depósitos do Caixa Unificado -->
     <div class="modal fade" id="verDepositosCaixaModal" tabindex="-1" role="dialog" aria-labelledby="verDepositosCaixaModalLabel" aria-hidden="true">
