@@ -102,7 +102,9 @@ try {
         'totalSaidasDespesas' => $totalSaidasDespesas,
         'totalDepositoCaixa' => $totalDepositoCaixa,
         'totalSaldoTransportado' => $totalSaldoTransportado,
-        'totalEmCaixa' => $totalEmCaixa
+        'totalEmCaixa' => $totalEmCaixa,
+        'data_caixa' => $data, // Adicionei o campo 'data_caixa'
+        'funcionario' => $funcionarios // Adicionei o campo 'funcionario'
     ]);
 } catch (Exception $e) {
     echo json_encode(['error' => $e->getMessage()]);

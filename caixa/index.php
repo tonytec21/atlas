@@ -779,11 +779,11 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                         <input type="hidden" id="data_caixa_deposito" name="data_caixa_deposito">
                         <input type="hidden" id="funcionario_deposito" name="funcionario_deposito">
-                        <button type="submit" style="width: 100%" class="btn btn-primary">Adicionar</button>
+                        <button type="submit" id="btnAdicionarDeposito" style="width: 100%" class="btn btn-primary">Adicionar</button>
                     </form>
                     <hr>
                     <div class="form-group">
-                        <button type="button" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()">Transportar Saldo e Fechar Caixa</button>
+                        <button type="button" id="btnTransportarSaldo" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()">Transportar Saldo e Fechar Caixa</button>
                     </div>
                     <hr>
                     <h5>Depósitos Registrados</h5>
@@ -1149,8 +1149,8 @@ include(__DIR__ . '/db_connection.php');
                         if (['PIX', 'Transferência Bancária', 'Crédito', 'Débito'].includes(tipo)) {
                             totalRecebidoConta += totalPorTipo[tipo];
                         } else if (tipo === 'Espécie') {
-                            totalRecebidoEspecie += totalPorTipo[tipo];
-                        }
+                        totalRecebidoEspecie += totalPorTipo[tipo];
+                    }
                     }
                     $('#cardTotalRecebidoConta').text(formatCurrency(totalRecebidoConta));
                     $('#cardTotalRecebidoEspecie').text(formatCurrency(totalRecebidoEspecie));
@@ -1367,6 +1367,12 @@ include(__DIR__ . '/db_connection.php');
                     }
 
                     $('#total_em_caixa').text(formatCurrency(totalEmCaixa));
+
+                    // Desabilitar botões se o total em caixa for zero
+                    if (totalEmCaixa === 0) {
+                        $('#btnTransportarSaldo').prop('disabled', true);
+                        $('#btnAdicionarDeposito').prop('disabled', true);
+                    }
 
                     // Inicializar DataTable
                     $('#tabelaDepositosRegistrados').DataTable({
