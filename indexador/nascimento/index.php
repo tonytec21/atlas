@@ -179,23 +179,23 @@ include(__DIR__ . '/../../menu.php');
                     <div class="modal-body">
                         <form id="registry-form">
                             <div class="form-row">
-                                <div class="form-group col-md-2">
+                                <div class="form-group col-12 col-md-2">
                                     <label for="term">Termo</label>
                                     <input type="number" class="form-control" id="term" name="termo" required min="0">
                                 </div>
-                                <div class="form-group col-md-2">
+                                <div class="form-group col-12 col-md-2">
                                     <label for="book">Livro</label>
                                     <input type="number" class="form-control" id="book" name="livro" required min="0">
                                 </div>
-                                <div class="form-group col-md-2">
+                                <div class="form-group col-12 col-md-2">
                                     <label for="page">Folha</label>
                                     <input type="number" class="form-control" id="page" name="folha" required min="0">
                                 </div>
-                                <div class="form-group col-md-3">
+                                <div class="form-group col-12 col-md-3">
                                     <label for="registry-date">Data de Registro</label>
                                     <input type="date" class="form-control" id="registry-date" name="data_registro" required>
                                 </div>
-                                <div class="form-group col-md-3">
+                                <div class="form-group col-12 col-md-3">
                                     <label for="birthdate">Data de Nascimento</label>
                                     <input type="date" class="form-control" id="birthdate" name="data_nascimento" required>
                                 </div>
@@ -254,23 +254,23 @@ include(__DIR__ . '/../../menu.php');
                         <form id="edit-registry-form">
                             <input type="hidden" id="edit-id" name="id">
                             <div class="form-row">
-                                <div class="form-group col-md-2">
+                                <div class="form-group col-12 col-md-2">
                                     <label for="edit-term">Termo</label>
                                     <input type="number" class="form-control" id="edit-term" name="termo" required min="0">
                                 </div>
-                                <div class="form-group col-md-2">
+                                <div class="form-group col-12 col-md-2">
                                     <label for="edit-book">Livro</label>
                                     <input type="number" class="form-control" id="edit-book" name="livro" required min="0">
                                 </div>
-                                <div class="form-group col-md-2">
+                                <div class="form-group col-12 col-md-2">
                                     <label for="edit-page">Folha</label>
                                     <input type="number" class="form-control" id="edit-page" name="folha" required min="0">
                                 </div>
-                                <div class="form-group col-md-3">
+                                <div class="form-group col-12 col-md-3">
                                     <label for="edit-registry-date">Data de Registro</label>
                                     <input type="date" class="form-control" id="edit-registry-date" name="data_registro" required>
                                 </div>
-                                <div class="form-group col-md-3">
+                                <div class="form-group col-12 col-md-3">
                                     <label for="edit-birthdate">Data de Nascimento</label>
                                     <input type="date" class="form-control" id="edit-birthdate" name="data_nascimento" required>
                                 </div>
@@ -331,23 +331,23 @@ include(__DIR__ . '/../../menu.php');
                     <div class="modal-body">
                         <form>
                             <div class="form-row">
-                                <div class="form-group col-md-2">
+                                <div class="form-group col-12 col-md-2">
                                     <label for="view-term">Termo</label>
                                     <input type="text" class="form-control" id="view-term" readonly>
                                 </div>
-                                <div class="form-group col-md-2">
+                                <div class="form-group col-12 col-md-2">
                                     <label for="view-book">Livro</label>
                                     <input type="text" class="form-control" id="view-book" readonly>
                                 </div>
-                                <div class="form-group col-md-2">
+                                <div class="form-group col-12 col-md-2">
                                     <label for="view-page">Folha</label>
                                     <input type="text" class="form-control" id="view-page" readonly>
                                 </div>
-                                <div class="form-group col-md-3">
+                                <div class="form-group col-12 col-md-3">
                                     <label for="view-registry-date">Data de Registro</label>
                                     <input type="text" class="form-control" id="view-registry-date" readonly>
                                 </div>
-                                <div class="form-group col-md-3">
+                                <div class="form-group col-12 col-md-3">
                                     <label for="view-birthdate">Data de Nascimento</label>
                                     <input type="text" class="form-control" id="view-birthdate" readonly>
                                 </div>
@@ -538,9 +538,9 @@ include(__DIR__ . '/../../menu.php');
             e.preventDefault();
             var formData = new FormData(this);
 
-            // Adicionar anexos ao FormData
-            addAttachments.forEach(function(file, index) {
-                formData.append('arquivo_pdf_' + index, file);
+            // Adicionar caminhos dos anexos temporários ao FormData
+            addAttachments.forEach(function(filePath, index) {
+                formData.append('arquivo_pdf_paths[]', filePath);
             });
 
             $.ajax({
@@ -563,17 +563,34 @@ include(__DIR__ . '/../../menu.php');
             var fileInput = $('#add-pdf-file')[0];
             if (fileInput.files.length > 0) {
                 var file = fileInput.files[0];
-                var fileName = file.name;
-                addAttachments.push(file);
+                var formData = new FormData();
+                formData.append('arquivo_pdf', file);
 
-                var row = '<tr>' +
-                    '<td>' + fileName + '</td>' +
-                    '<td><button class="btn btn-danger btn-remove-add-attachment"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
-                    '</tr>';
-                $('#add-attachments-table-body').append(row);
+                $.ajax({
+                    type: 'POST',
+                    url: 'upload_temp_anexo.php',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        var data = JSON.parse(response);
+                        if (data.success) {
+                            var filePath = data.file_path;
+                            addAttachments.push(filePath);
 
-                // Limpar o input de arquivo
-                fileInput.value = '';
+                            var row = '<tr>' +
+                                '<td>' + file.name + '</td>' +
+                                '<td><button class="btn btn-danger btn-remove-add-attachment"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
+                                '</tr>';
+                            $('#add-attachments-table-body').append(row);
+
+                            // Limpar o input de arquivo
+                            fileInput.value = '';
+                        } else {
+                            alert(data.error);
+                        }
+                    }
+                });
             }
         });
 
@@ -811,18 +828,18 @@ include(__DIR__ . '/../../menu.php');
             }, 3000);
         }
 
-                // Adicionar evento para recarregar a página ao fechar os modais
-                $('#editRegistryModal').on('hidden.bs.modal', function () {
-                    location.reload();
-                });
+        // Adicionar evento para recarregar a página ao fechar os modais
+        $('#editRegistryModal').on('hidden.bs.modal', function () {
+            location.reload();
+        });
 
-                $('#viewRegistryModal').on('hidden.bs.modal', function () {
-                    location.reload();
-                });
+        $('#viewRegistryModal').on('hidden.bs.modal', function () {
+            location.reload();
+        });
 
-                $('#addRegistryModal').on('hidden.bs.modal', function () {
-                    location.reload();
-                });
+        $('#addRegistryModal').on('hidden.bs.modal', function () {
+            location.reload();
+        });
     });
 </script>
 

@@ -23,20 +23,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     if ($stmt->execute()) {
         $last_id = $stmt->insert_id;
-        $arquivo_pdf = '';
 
-        if (isset($_FILES['arquivo_pdf']) && $_FILES['arquivo_pdf']['error'] == 0) {
-            $dir = 'anexos/' . $last_id . '/';
-            if (!file_exists($dir)) {
-                mkdir($dir, 0777, true);
+        // Mover anexos temporários para o diretório final e salvar no banco de dados
+        if (!empty($_POST['arquivo_pdf_paths'])) {
+            foreach ($_POST['arquivo_pdf_paths'] as $temp_file_path) {
+                $dir = 'anexos/' . $last_id . '/';
+                if (!file_exists($dir)) {
+                    mkdir($dir, 0777, true);
+                }
+                $file_name = basename($temp_file_path);
+                $final_file_path = $dir . $file_name;
+                if (rename($temp_file_path, $final_file_path)) {
+                    $stmt_anexo = $conn->prepare("INSERT INTO indexador_nascimento_anexos (id_nascimento, caminho_anexo, funcionario, status) VALUES (?, ?, ?, ?)");
+                    $stmt_anexo->bind_param("isss", $last_id, $final_file_path, $funcionario, $status);
+                    $stmt_anexo->execute();
+                }
             }
-            $arquivo_pdf = $dir . basename($_FILES['arquivo_pdf']['name']);
-            move_uploaded_file($_FILES['arquivo_pdf']['tmp_name'], $arquivo_pdf);
-
-            // Inserir anexo no banco de dados
-            $stmt_anexo = $conn->prepare("INSERT INTO indexador_nascimento_anexos (id_nascimento, caminho_anexo, funcionario, status) VALUES (?, ?, ?, ?)");
-            $stmt_anexo->bind_param("isss", $last_id, $arquivo_pdf, $funcionario, $status);
-            $stmt_anexo->execute();
         }
 
         echo 'Registro salvo com sucesso!';
