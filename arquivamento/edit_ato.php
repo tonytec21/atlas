@@ -270,7 +270,10 @@ $selos_arquivamentos->close();
 
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
+<script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+<script src="../script/jquery.dataTables.min.js"></script>
+<script src="../script/dataTables.bootstrap4.min.js"></script>
 <script>
 
     $(document).ready(function() {

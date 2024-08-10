@@ -9,22 +9,9 @@
     <link rel="stylesheet" href="../style/css/style.css">
 </head>
 <body class="light-mode">
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
-        <button class="mode-switch">🔄 Modo</button>
-        <a href="../index.php">Página Inicial</a>
-        <a href="../nascimento/index.php">Nascimento</a>
-        <a href="../casamento/index.php">Casamento</a>
-        <a href="../obito/index.php">Óbito</a>
-        <a href="../procuracao/index.php">Procuração</a>
-        <a href="../escritura/index.php">Escritura</a>
-        <a href="../protesto/index.php">Protesto</a>
-        <a href="../ri/index.php">Registro de Imóveis</a>
-        <a href="../rcpj/index.php">Pessoas Jurídicas</a>
-        <a href="../rtd/nascimento/index.php">Títulos e Documentos</a>
-    </div>
-
-    <button class="openbtn" onclick="openNav()">&#9776; Menu</button>
+<?php
+include(__DIR__ . '/../menu.php');
+?>
 
     <div id="main" class="main-content">
         <div class="container">
