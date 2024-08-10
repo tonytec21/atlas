@@ -408,12 +408,12 @@ include(__DIR__ . '/../../menu.php');
             </div>
         </div>
 
-<script src="../script/jquery-3.5.1.min.js"></script>
-<script src="../script/bootstrap.min.js"></script>
-<script src="../script/bootstrap.bundle.min.js"></script>
-<script src="../script/jquery.mask.min.js"></script>
-<script src="../script/jquery.dataTables.min.js"></script>
-<script src="../script/dataTables.bootstrap4.min.js"></script>
+<script src="../../script/jquery-3.5.1.min.js"></script>
+<script src="../../script/bootstrap.min.js"></script>
+<script src="../../script/bootstrap.bundle.min.js"></script>
+<script src="../../script/jquery.mask.min.js"></script>
+<script src="../../script/jquery.dataTables.min.js"></script>
+<script src="../../script/dataTables.bootstrap4.min.js"></script>
 <script>
     $(document).ready(function() {
         var addAttachments = []; // Para armazenar anexos adicionados no modal "Adicionar Registro"
@@ -422,7 +422,7 @@ include(__DIR__ . '/../../menu.php');
         // Inicializar DataTable
         $('#tabelaResultados').DataTable({
             "language": {
-                "url": "../style/Portuguese-Brasil.json"
+                "url": "../../style/Portuguese-Brasil.json"
             },
             "pageLength": 10
         });
