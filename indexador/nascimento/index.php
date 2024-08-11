@@ -125,7 +125,7 @@ include(__DIR__ . '/../../menu.php');
         <hr>
         <div class="table-responsive">
             <h5>Resultados da Pesquisa</h5>
-            <table id="tabelaResultados" class="table table-striped table-bordered">
+            <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
                 <thead>
                     <tr>
                         <th>Termo</th>
@@ -419,15 +419,6 @@ include(__DIR__ . '/../../menu.php');
         var addAttachments = []; // Para armazenar anexos adicionados no modal "Adicionar Registro"
         var attachmentIdToRemove = null; // Variável para armazenar o ID do anexo a ser removido
         
-        // Inicializar DataTable
-        $('#tabelaResultados').DataTable({
-            "language": {
-                "url": "../../style/Portuguese-Brasil.json"
-            },
-            "pageLength": 10,
-            "order": [], // Sem ordenação inicial
-        });
-
         // Função para formatar data para pt-br
         function formatDate(date) {
             if (!date) return '';
@@ -459,6 +450,16 @@ include(__DIR__ . '/../../menu.php');
                     '</tr>';
                 tableBody.append(row);
             });
+
+                // Inicializar o DataTable após os dados serem carregados
+                $('#tabelaResultados').DataTable({
+                    "language": {
+                        "url": "../../style/Portuguese-Brasil.json"
+                    },
+                    "pageLength": 10,
+                    "order": [[0, 'desc']],
+                    "destroy": true
+                });
         }
 
         // Função para filtrar registros
