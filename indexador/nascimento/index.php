@@ -152,8 +152,8 @@ include(__DIR__ . '/../../menu.php');
                         echo '<td>' . $row['folha'] . '</td>';
                         echo '<td>' . $row['nome_registrado'] . '</td>';
                         echo '<td>' . ($row['nome_pai'] ? $row['nome_pai'] . ' e ' . $row['nome_mae'] : $row['nome_mae']) . '</td>';
-                        echo '<td>' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
-                        echo '<td>' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';
+                        echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
+                        echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';                        
                         echo '<td>' .
                                 '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
                                 '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
