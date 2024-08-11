@@ -96,6 +96,7 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
         .btn-print, .btn-payment, .btn-repasse {
             margin-left: 10px;
@@ -148,7 +149,7 @@ include(__DIR__ . '/../menu.php');
 <div id="main" class="main-content">
     <div class="container">
         <div class="d-flex justify-content-between align-items-center">
-            <h3>Ordem de Serviço nº: <?php echo $ordem_servico['id']; ?></h3>
+            <h4>Ordem de Serviço nº: <?php echo $ordem_servico['id']; ?></h4>
             <div>
                 <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
                 <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-info btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
@@ -224,7 +225,7 @@ include(__DIR__ . '/../menu.php');
         </form>
         <div id="osItens" class="mt-4">
             <h4>Itens da Ordem de Serviço</h4>
-            <table class="table" style="padding: 0.50rem!important; zoom: 90%">
+            <table id="tabelaItensOS" class="table table-striped table-bordered" style="zoom: 80%">
                 <thead>
                     <tr>
                         <th>Ato</th>
@@ -311,7 +312,7 @@ include(__DIR__ . '/../menu.php');
                 <hr>
                 <div id="pagamentosAdicionados">
                     <h5>Pagamentos Adicionados</h5>
-                    <table class="table">
+                    <table id="tabelaIPagamentoOS" class="table table-striped table-bordered" style="zoom: 80%">
                         <thead>
                             <tr>
                                 <th style="width: 20%;">Forma de Pagamento</th>
@@ -486,6 +487,8 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+<script src="../script/jquery.dataTables.min.js"></script>
+<script src="../script/dataTables.bootstrap4.min.js"></script>
 <script>
     var pagamentos = <?php echo json_encode($pagamentos); ?>;
     var liquidacaoItemId = null;
@@ -498,6 +501,23 @@ include(__DIR__ . '/../menu.php');
         $('#valor_repasse').mask('#.##0,00', { reverse: true });
 
         atualizarTabelaPagamentos(); // Chamada para exibir os pagamentos existentes ao carregar a página
+    });
+
+    // Inicializar DataTable
+    $('#tabelaItensOS').DataTable({
+        "language": {
+            "url": "../style/Portuguese-Brasil.json"
+        },
+        "pageLength": 10,
+        "order": [], // Sem ordenação inicial
+    });
+
+    $('#tabelaPagamentoOS').DataTable({
+        "language": {
+            "url": "../style/Portuguese-Brasil.json"
+        },
+        "pageLength": 10,
+        "order": [], // Sem ordenação inicial
     });
 
     function imprimirOS() {

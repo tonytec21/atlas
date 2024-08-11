@@ -116,10 +116,10 @@ include(__DIR__ . '/../../menu.php');
                 <input type="date" id="search-registry-date" class="form-control">
             </div>
             <div class="col-md-6 col-lg-3 mb-2">
-                <button id="filter-button" class="btn btn-primary w-100">Filtrar</button>
+                <button id="filter-button" class="btn btn-primary w-100"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
             </div>
             <div class="col-md-6 col-lg-3 mb-2">
-                <button class="btn btn-add w-100" data-toggle="modal" data-target="#addRegistryModal">+ Adicionar</button>
+                <button class="btn btn-add w-100" data-toggle="modal" data-target="#addRegistryModal"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar</button>
             </div>
         </div>
         <hr>
@@ -424,7 +424,8 @@ include(__DIR__ . '/../../menu.php');
             "language": {
                 "url": "../../style/Portuguese-Brasil.json"
             },
-            "pageLength": 10
+            "pageLength": 10,
+            "order": [], // Sem ordenação inicial
         });
 
         // Função para formatar data para pt-br

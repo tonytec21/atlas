@@ -85,6 +85,7 @@ try {
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
         .btn-adicionar-manual {
             height: 38px; /* mesma altura do botão Buscar Ato */
@@ -206,7 +207,7 @@ include(__DIR__ . '/../menu.php');
         </form>
         <div id="osItens" class="mt-4">
             <h4>Itens da Ordem de Serviço</h4>
-            <table class="table">
+            <table id="tabelaItensOS" class="table table-striped table-bordered" style="zoom: 80%">
                 <thead>
                     <tr>
                         <th>Ato</th>
@@ -312,6 +313,8 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+<script src="../script/jquery.dataTables.min.js"></script>
+<script src="../script/dataTables.bootstrap4.min.js"></script>
 <script>
 // Função para exibir modal de alerta
 function showAlert(message, type, reload = false) {
@@ -329,6 +332,16 @@ function showAlert(message, type, reload = false) {
         });
     }
 }
+
+    // Inicializar DataTable
+    $('#tabelaItensOS').DataTable({
+        "language": {
+            "url": "../style/Portuguese-Brasil.json"
+        },
+        "pageLength": 10,
+        "order": [], // Sem ordenação inicial
+    });
+
 
 $(document).ready(function() {
     // Máscaras e configurações iniciais

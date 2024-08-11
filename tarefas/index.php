@@ -14,7 +14,8 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
         .status-label {
             display: inline-block;
@@ -282,8 +283,10 @@ include(__DIR__ . '/db_connection.php');
                     </div>
                 </div>
             </form>
+            <hr>
             <div class="mt-3">
-                <table class="table" style="zoom: 85%">
+                <h5>Resultados da Pesquisa</h5>
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 80%">
                     <thead>
                         <tr>
                             <th>Nº Protocolo</th>
@@ -502,10 +505,12 @@ include(__DIR__ . '/db_connection.php');
         </div>
     </div>
 
-
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
+    <script src="../script/bootstrap.bundle.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
+    <script src="../script/jquery.dataTables.min.js"></script>
+    <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script>
 
         function normalizeText(text) {
@@ -594,6 +599,15 @@ include(__DIR__ . '/db_connection.php');
                         alert('Erro ao buscar as tarefas');
                     }
                 });
+            });
+
+            // Inicializar DataTable
+            $('#tabelaResultados').DataTable({
+                "language": {
+                    "url": "../style/Portuguese-Brasil.json"
+                },
+                "pageLength": 10,
+                "order": [[0, 'desc']] // Ordena a primeira coluna (índice 0) em ordem decrescente
             });
 
             $('#commentForm').on('submit', function(e) {

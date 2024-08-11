@@ -233,7 +233,8 @@ include(__DIR__ . '/db_connection.php');
             $('#resultadosTabela').DataTable({
                 "language": {
                     "url": "../style/Portuguese-Brasil.json"
-                }
+                },
+                "order": [],
             });
 
             $('#ato').on('input', function() {

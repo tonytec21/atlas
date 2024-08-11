@@ -459,7 +459,9 @@ include(__DIR__ . '/db_connection.php');
                             ?>
                             <tr>
                                 <td><?php echo $funcionarios; ?></td>
-                                <td><?php echo date('d/m/Y', strtotime($data)); ?></td>
+                                <td data-order="<?php echo date('Y-m-d', strtotime($data)); ?>">
+                                    <?php echo date('d/m/Y', strtotime($data)); ?>
+                                </td>
                                 <td><?php echo 'R$ ' . number_format($total_atos, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($totalRecebidoConta, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($totalRecebidoEspecie, 2, ',', '.'); ?></td>
@@ -928,7 +930,8 @@ include(__DIR__ . '/db_connection.php');
                 "language": {
                     "url": "../style/Portuguese-Brasil.json"
                 },
-                "pageLength": 10
+                "pageLength": 10,
+                "order": [[1, 'desc']] // Ordena a primeira coluna (índice 0) em ordem decrescente
             });
 
             // Inicializar máscara de dinheiro
@@ -1033,7 +1036,8 @@ include(__DIR__ . '/db_connection.php');
                                 "url": "../style/Portuguese-Brasil.json"
                             },
                             "destroy": true,
-                            "pageLength": 10
+                            "pageLength": 10,
+                            "order": [],
                         });
                     },
                     error: function() {
@@ -1299,49 +1303,56 @@ include(__DIR__ . '/db_connection.php');
                             "url": "../style/Portuguese-Brasil.json"
                         },
                         "destroy": true,
-                        "pageLength": 10
+                        "pageLength": 10,
+                        "order": [],
                     });
                     $('#tabelaPagamentos').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
                         "destroy": true,
-                        "pageLength": 10
+                        "pageLength": 10,
+                        "order": [],
                     });
                     $('#tabelaTotalPorTipo').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
                         "destroy": true,
-                        "pageLength": 10
+                        "pageLength": 10,
+                        "order": [],
                     });
                     $('#tabelaDevolucoes').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
                         "destroy": true,
-                        "pageLength": 10
+                        "pageLength": 10,
+                        "order": [],
                     });
                     $('#tabelaSaidas').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
                         "destroy": true,
-                        "pageLength": 10
+                        "pageLength": 10,
+                        "order": [],
                     });
                     $('#tabelaDepositos').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
                         "destroy": true,
-                        "pageLength": 10
+                        "pageLength": 10,
+                        "order": [],
                     });
                     $('#tabelaSaldoTransportado').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },
                         "destroy": true,
-                        "pageLength": 10
+                        "pageLength": 10,
+                        "order": [],
                     });
                 },
                 error: function() {
@@ -1490,7 +1501,8 @@ include(__DIR__ . '/db_connection.php');
                             "url": "../style/Portuguese-Brasil.json"
                         },
                         "destroy": true,
-                        "pageLength": 10
+                        "pageLength": 10,
+                        "order": [],
                     });
                 },
                 error: function() {

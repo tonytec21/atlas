@@ -580,8 +580,10 @@ include(__DIR__ . '/db_connection.php');
             $('#tabelaResultados').DataTable({
                 "language": {
                     "url": "../style/Portuguese-Brasil.json"
-                }
+                },
+                "order": [[0, 'desc']]
             });
+
         });
 
         function abrirPagamentoModal(osId, cliente, totalOs, totalPagamentos, totalLiquidado, totalDevolvido, saldo, statusOS) {
