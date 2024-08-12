@@ -58,7 +58,8 @@ $conn->close();
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
 </head>
 <body class="light-mode">
 <?php
@@ -98,7 +99,7 @@ include(__DIR__ . '/../menu.php');
                 </div>
             </form>
             <div class="mt-3">
-                <table class="table">
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 85%">
                     <thead>
                         <tr>
                             <th>Número</th>
@@ -113,7 +114,7 @@ include(__DIR__ . '/../menu.php');
                         <?php foreach ($oficios as $oficio) : ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($oficio['numero']); ?></td>
-                                <td><?php echo date('d/m/Y', strtotime($oficio['data'])); ?></td>
+                                <td data-order="<?php echo date('Y-m-d', strtotime($oficio['data'])); ?>"><?php echo date('d/m/Y', strtotime($oficio['data'])); ?></td>
                                 <td><?php echo htmlspecialchars($oficio['assunto']); ?></td>
                                 <td><?php echo htmlspecialchars($oficio['destinatario']); ?></td>
                                 <td><?php echo htmlspecialchars($oficio['cargo']); ?></td>
@@ -219,6 +220,10 @@ include(__DIR__ . '/../menu.php');
 
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
+    <script src="../script/bootstrap.bundle.min.js"></script>
+    <script src="../script/jquery.mask.min.js"></script>
+    <script src="../script/jquery.dataTables.min.js"></script>
+    <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script>
         $(document).ready(function() {
             
@@ -272,6 +277,14 @@ include(__DIR__ . '/../menu.php');
                 }
             });
         }
+
+         // Inicializar DataTable
+         $('#tabelaResultados').DataTable({
+                "language": {
+                    "url": "../style/Portuguese-Brasil.json"
+                },
+                "order": [[0, 'desc']]
+            });
 
         function formatDateToBrazilian(date) {
             var dateParts = date.split('-');

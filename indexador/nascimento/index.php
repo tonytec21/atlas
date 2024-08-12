@@ -440,8 +440,8 @@ include(__DIR__ . '/../../menu.php');
                     '<td>' + registry.folha + '</td>' +
                     '<td>' + registry.nome_registrado + '</td>' +
                     '<td>' + filiacao + '</td>' +
-                    '<td>' + formatDate(registry.data_nascimento) + '</td>' +
-                    '<td>' + formatDate(registry.data_registro) + '</td>' +
+                    '<td data-order="' + registry.data_nascimento + '">' + formatDate(registry.data_nascimento) + '</td>' +
+                    '<td data-order="' + registry.data_registro + '">' + formatDate(registry.data_registro) + '</td>' +
                     '<td>' +
                         '<button title="Visualizar Registro" class="btn btn-info btn-view" data-id="' + registry.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
                         '<button title="Editar Registro" class="btn btn-edit" data-id="' + registry.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +

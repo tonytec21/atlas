@@ -362,7 +362,7 @@ include(__DIR__ . '/db_connection.php');
                                 <td><?php echo 'R$ ' . number_format($deposito_previo, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?></td>
                                 <td><?php echo strlen($ordem['observacoes']) > 100 ? substr($ordem['observacoes'], 0, 100) . '...' : $ordem['observacoes']; ?></td>
-                                <td><?php echo date('d/m/Y', strtotime($ordem['data_criacao'])); ?></td>
+                                <td data-order="<?php echo date('Y-m-d', strtotime($ordem['data_criacao'])); ?>"><?php echo date('d/m/Y', strtotime($ordem['data_criacao'])); ?></td>
                                 <td><span style="font-size: 13px" class="status-label <?php echo $statusClasses[$statusOS]; ?>"><?php echo $statusOS; ?></span></td>
                                 <td>
                                     <button class="btn btn-info btn-sm" title="Visualizar OS" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('visualizar_os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-eye" aria-hidden="true"></i></button>
