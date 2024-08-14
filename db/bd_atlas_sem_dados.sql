@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS `anexos_os` (
   `funcionario` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` enum('ativo','removido') COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -69,7 +69,32 @@ CREATE TABLE IF NOT EXISTS `atos_liquidados` (
   `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `data` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=65 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Exportação de dados foi desmarcado.
+
+-- Copiando estrutura para tabela atlas.cadastro_serventia
+CREATE TABLE IF NOT EXISTS `cadastro_serventia` (
+  `id` int(11) NOT NULL,
+  `razao_social` mediumtext CHARACTER SET utf8 COLLATE utf8_unicode_ci,
+  `cidade` text,
+  `status` int(11) DEFAULT NULL,
+  `cns` tinytext
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+-- Exportação de dados foi desmarcado.
+
+-- Copiando estrutura para tabela atlas.caixa
+CREATE TABLE IF NOT EXISTS `caixa` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id_transporte_caixa` int(11) DEFAULT NULL,
+  `saldo_inicial` decimal(10,2) NOT NULL,
+  `funcionario` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data_caixa` date NOT NULL,
+  `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `id_transporte_caixa` (`id_transporte_caixa`)
+) ENGINE=MyISAM AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -94,7 +119,19 @@ CREATE TABLE IF NOT EXISTS `comentarios` (
   `status` varchar(50) NOT NULL,
   `data_atualizacao` datetime DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=latin1;
+
+-- Exportação de dados foi desmarcado.
+
+-- Copiando estrutura para tabela atlas.conexao_selador
+CREATE TABLE IF NOT EXISTS `conexao_selador` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `url_base` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `porta` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `usuario` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `senha` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -111,7 +148,7 @@ CREATE TABLE IF NOT EXISTS `configuracao_os` (
   `qr_code_pix` longblob,
   `status` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'ativa',
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -148,7 +185,7 @@ CREATE TABLE IF NOT EXISTS `deposito_caixa` (
   `caminho_anexo` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` enum('ativo','removido') COLLATE utf8mb4_unicode_ci DEFAULT 'ativo',
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -164,7 +201,54 @@ CREATE TABLE IF NOT EXISTS `devolucao_os` (
   `funcionario` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Exportação de dados foi desmarcado.
+
+-- Copiando estrutura para tabela atlas.funcionarios
+CREATE TABLE IF NOT EXISTS `funcionarios` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `usuario` varchar(50) CHARACTER SET latin1 NOT NULL,
+  `senha` varchar(255) CHARACTER SET latin1 NOT NULL,
+  `nome_completo` varchar(100) CHARACTER SET latin1 NOT NULL,
+  `cargo` varchar(50) CHARACTER SET latin1 NOT NULL,
+  `nivel_de_acesso` varchar(20) CHARACTER SET latin1 DEFAULT 'usuario',
+  `status` varchar(20) CHARACTER SET latin1 DEFAULT 'ativo',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Exportação de dados foi desmarcado.
+
+-- Copiando estrutura para tabela atlas.indexador_nascimento
+CREATE TABLE IF NOT EXISTS `indexador_nascimento` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `termo` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `livro` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `folha` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data_registro` date NOT NULL,
+  `data_nascimento` date NOT NULL,
+  `nome_registrado` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `nome_pai` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `nome_mae` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `data_cadastro` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `funcionario` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('ativo','removido') COLLATE utf8mb4_unicode_ci DEFAULT 'ativo',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Exportação de dados foi desmarcado.
+
+-- Copiando estrutura para tabela atlas.indexador_nascimento_anexos
+CREATE TABLE IF NOT EXISTS `indexador_nascimento_anexos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id_nascimento` int(11) NOT NULL,
+  `caminho_anexo` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `funcionario` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('ativo','removido') COLLATE utf8mb4_unicode_ci DEFAULT 'ativo',
+  PRIMARY KEY (`id`),
+  KEY `id_nascimento` (`id_nascimento`)
+) ENGINE=MyISAM AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -176,7 +260,7 @@ CREATE TABLE IF NOT EXISTS `logs_de_acesso` (
   `ip` varchar(45) NOT NULL,
   `data_hora` datetime NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=10 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=14 DEFAULT CHARSET=latin1;
 
 -- Exportação de dados foi desmarcado.
 
@@ -195,7 +279,7 @@ CREATE TABLE IF NOT EXISTS `logs_oficios` (
   `data_edicao` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `atualizado_por` varchar(255) CHARACTER SET latin1 DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -214,7 +298,7 @@ CREATE TABLE IF NOT EXISTS `logs_ordens_de_servico` (
   `data_edicao` datetime DEFAULT NULL,
   `base_de_calculo` decimal(10,2) DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE=MyISAM AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
+) ENGINE=MyISAM AUTO_INCREMENT=48 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
 -- Exportação de dados foi desmarcado.
 
@@ -234,7 +318,7 @@ CREATE TABLE IF NOT EXISTS `logs_ordens_de_servico_itens` (
   `quantidade_liquidada` int(11) DEFAULT NULL,
   `status` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=69 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
+) ENGINE=MyISAM AUTO_INCREMENT=414 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
 -- Exportação de dados foi desmarcado.
 
@@ -253,7 +337,7 @@ CREATE TABLE IF NOT EXISTS `logs_tarefas` (
   `data_edicao` datetime NOT NULL,
   `atualizado_por` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=54 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -264,7 +348,7 @@ CREATE TABLE IF NOT EXISTS `modo_usuario` (
   `modo` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `usuario` (`usuario`)
-) ENGINE=MyISAM AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -282,7 +366,7 @@ CREATE TABLE IF NOT EXISTS `ordens_de_servico` (
   `data_edicao` datetime DEFAULT NULL,
   `base_de_calculo` decimal(10,2) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -303,7 +387,7 @@ CREATE TABLE IF NOT EXISTS `ordens_de_servico_itens` (
   `status` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `ordem_servico_id` (`ordem_servico_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=99 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -330,7 +414,7 @@ CREATE TABLE IF NOT EXISTS `pagamento_os` (
   `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   KEY `ordem_de_servico_id` (`ordem_de_servico_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -345,7 +429,7 @@ CREATE TABLE IF NOT EXISTS `recibos_de_entrega` (
   `observacoes` text COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`id`),
   KEY `task_id` (`task_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -371,6 +455,23 @@ CREATE TABLE IF NOT EXISTS `registros_cedulas` (
   `tipo` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Exportação de dados foi desmarcado.
+
+-- Copiando estrutura para tabela atlas.repasse_credor
+CREATE TABLE IF NOT EXISTS `repasse_credor` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ordem_de_servico_id` int(11) NOT NULL,
+  `cliente` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `total_os` decimal(10,2) NOT NULL,
+  `total_repasse` decimal(10,2) NOT NULL,
+  `forma_repasse` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data_repasse` datetime NOT NULL,
+  `data_os` date NOT NULL,
+  `funcionario` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ativo',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
@@ -488,7 +589,21 @@ CREATE TABLE IF NOT EXISTS `tarefas` (
   `numero_oficio` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `token` (`token`)
-) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+
+-- Exportação de dados foi desmarcado.
+
+-- Copiando estrutura para tabela atlas.transporte_saldo_caixa
+CREATE TABLE IF NOT EXISTS `transporte_saldo_caixa` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `data_caixa` date NOT NULL,
+  `data_transporte` date NOT NULL,
+  `valor_transportado` decimal(10,2) NOT NULL,
+  `funcionario` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data_caixa_uso` date DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Exportação de dados foi desmarcado.
 
