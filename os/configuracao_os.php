@@ -26,7 +26,8 @@ try {
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
         .btn-adicionar {
             height: 38px;
@@ -108,44 +109,45 @@ include(__DIR__ . '/../menu.php');
                     </div>
                 </div>
             </div>
-            <button type="button" class="btn btn-secondary btn-adicionar" onclick="adicionarConta()"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar Conta</button>
+            <button type="button" id="submit-button" class="btn btn-secondary btn-adicionar" onclick="adicionarConta()"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar Conta</button>
         </form>
         <hr>
-        <h4>Contas Adicionadas</h4>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Banco</th>
-                    <th>Agência</th>
-                    <th>Tipo de Conta</th>
-                    <th>Número da Conta</th>
-                    <th>Titular</th>
-                    <th>CPF/CNPJ</th>
-                    <th>Chave PIX</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody id="contasAdicionadas">
-                <?php foreach ($contasCadastradas as $conta): ?>
-                <tr data-id="<?= $conta['id'] ?>" data-qrcode="<?= $conta['qr_code_pix'] ?>">
-                    <td><?= $conta['banco'] ?></td>
-                    <td><?= $conta['agencia'] ?></td>
-                    <td><?= $conta['tipo_conta'] ?></td>
-                    <td><?= $conta['numero_conta'] ?></td>
-                    <td><?= $conta['titular_conta'] ?></td>
-                    <td><?= $conta['cpf_cnpj_titular'] ?></td>
-                    <td><?= $conta['chave_pix'] ?></td>
-                    <td>
-                        <button type="button" title="Visualizar QR Code PIX" class="btn btn-info btn-sm" onclick="visualizarQRCode(this)"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                        <button type="button" title="Editar" class="btn btn-edit btn-sm" onclick="editarConta(this)"><i class="fa fa-pencil" aria-hidden="true"></i></button>
-                        <button type="button" title="Excluir" class="btn btn-delete btn-sm" onclick="removerConta(this)"><i class="fa fa-trash" aria-hidden="true"></i></button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+        <div class="table-responsive">
+            <h5>Contas Cadastradas</h5>
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 100%">
+                    <thead>
+                        <tr>
+                            <th>Banco</th>
+                            <th>Agência</th>
+                            <th>Tipo de Conta</th>
+                            <th>Número da Conta</th>
+                            <th>Titular</th>
+                            <th>CPF/CNPJ</th>
+                            <th>Chave PIX</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contasAdicionadas">
+                        <?php foreach ($contasCadastradas as $conta): ?>
+                        <tr data-id="<?= $conta['id'] ?>" data-qrcode="<?= $conta['qr_code_pix'] ?>">
+                            <td><?= $conta['banco'] ?></td>
+                            <td><?= $conta['agencia'] ?></td>
+                            <td><?= $conta['tipo_conta'] ?></td>
+                            <td><?= $conta['numero_conta'] ?></td>
+                            <td><?= $conta['titular_conta'] ?></td>
+                            <td><?= $conta['cpf_cnpj_titular'] ?></td>
+                            <td><?= $conta['chave_pix'] ?></td>
+                            <td>
+                                <button type="button" title="Visualizar QR Code PIX" class="btn btn-info btn-sm" onclick="visualizarQRCode(this)"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                <button type="button" title="Editar" class="btn btn-edit btn-sm" onclick="editarConta(this)"><i class="fa fa-pencil" aria-hidden="true"></i></button>
+                                <button type="button" title="Excluir" class="btn btn-delete btn-sm" onclick="removerConta(this)"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
 <!-- Modal para QR Code -->
 <div class="modal fade" id="qrCodeModal" tabindex="-1" role="dialog" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
@@ -188,6 +190,8 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+<script src="../script/jquery.dataTables.min.js"></script>
+<script src="../script/dataTables.bootstrap4.min.js"></script>
 <script>
 function showAlert(message, type) {
     $('#alertModalBody').text(message);
@@ -394,6 +398,7 @@ function salvarConta(id, banco, agencia, tipoConta, numeroConta, titularConta, c
                     }
                     $('#configForm')[0].reset();
                     $('#conta_id').val('');
+                    $('#submit-button').html('<i class="fa fa-plus" aria-hidden="true"></i> Adicionar Conta');
                 }
             } catch (e) {
                 console.log('Erro ao processar a resposta: ', e);
@@ -427,6 +432,14 @@ function generateContaHTML(id, banco, agencia, tipoConta, numeroConta, titularCo
     `;
 }
 
+        // Inicializar o DataTable após os dados serem carregados
+        $('#tabelaResultados').DataTable({
+            "language": {
+                "url": "../../style/Portuguese-Brasil.json"
+            },
+            "order": [],
+        });
+
 function editarConta(button) {
     var row = $(button).closest('tr');
     $('#conta_id').val(row.data('id'));
@@ -437,6 +450,7 @@ function editarConta(button) {
     $('#titular_conta').val(row.find('td').eq(4).text());
     $('#cpf_cnpj_titular').val(row.find('td').eq(5).text());
     $('#chave_pix').val(row.find('td').eq(6).text());
+    $('#submit-button').html('<i class="fa fa-floppy-o" aria-hidden="true"></i> Salvar Alterações');
 }
 
 function removerConta(button) {
