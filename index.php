@@ -85,7 +85,7 @@ include(__DIR__ . '/menu.php');
                 <a href="oficios/index.php" class="btn btn-oficio w-100"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Ofícios</a>
             </div>
             <div class="col-md-4">
-                <a href="arquivamento/assinar-doc.php" class="btn btn-assinador w-100"><i class="fa fa-check-square-o" aria-hidden="true"></i> Assinador digital</a>
+                <a href="provimentos/index.php" class="btn btn-assinador w-100"><i class="fa fa-balance-scale" aria-hidden="true"></i> Provimentos e Resoluções</a>
             </div>
         </div>
         <div class="row mb-4">
