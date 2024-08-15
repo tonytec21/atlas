@@ -46,21 +46,25 @@ date_default_timezone_set('America/Sao_Paulo');
             background-color: #f0ad4e;
         }
 
-        /* Estilo do modal de confirmação */
-        #confirmRemoveAttachmentModal .modal-dialog {
-            max-width: 400px;
+        .modal-dialog {
+            max-width: 80%;
             margin: 1.75rem auto;
         }
 
-            /* Estilo do modal de confirmação */
-            .modal-dialogo {
+         /* Ajuste do tamanho do modal de visualização */
+        .modal-edicao {
             width: 80%;
             margin: 1.75rem auto;
         }
 
-        #confirmRemoveAttachmentModal .modal-content {
-            padding: 20px;
-            border-radius: 10px;
+        .modal-cadastro {
+            width: 80%;
+            margin: 1.75rem auto;
+        }
+
+        .modal-visualizacao {
+            width: 100%;
+            margin: 1.75rem auto;
         }
 
         #confirmRemoveAttachmentModal .modal-header {
@@ -175,7 +179,7 @@ include(__DIR__ . '/../../menu.php');
         <!-- Modal de Adição de Registro -->
         <div class="modal fade" id="addRegistryModal" tabindex="-1" role="dialog" aria-labelledby="addRegistryModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-custom" role="document">
-                <div class="modal-content">
+                <div class="modal-content modal-cadastro">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addRegistryModalLabel">Adicionar Registro</h5>
                         <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
@@ -249,7 +253,7 @@ include(__DIR__ . '/../../menu.php');
         <!-- Modal de Edição de Registro -->
         <div class="modal fade" id="editRegistryModal" tabindex="-1" role="dialog" aria-labelledby="editRegistryModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-custom" role="document">
-                <div class="modal-content">
+                <div class="modal-content modal-edicao">
                     <div class="modal-header">
                         <h5 class="modal-title" id="editRegistryModalLabel">Editar Registro</h5>
                         <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
@@ -326,8 +330,8 @@ include(__DIR__ . '/../../menu.php');
 
         <!-- Modal de Visualização de Registro -->
         <div class="modal fade" id="viewRegistryModal" tabindex="-1" role="dialog" aria-labelledby="viewRegistryModalLabel" aria-hidden="true">
-            <div class="modal-dialogo modal-custom" role="document">
-                <div class="modal-content">
+             <div class="modal-dialog modal-lg" role="document">
+                 <div class="modal-content modal-visualizacao">
                     <div class="modal-header">
                         <h5 class="modal-title" id="viewRegistryModalLabel">Visualizar Registro</h5>
                         <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
