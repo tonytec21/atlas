@@ -52,6 +52,12 @@ date_default_timezone_set('America/Sao_Paulo');
             margin: 1.75rem auto;
         }
 
+            /* Estilo do modal de confirmação */
+            .modal-dialogo {
+            width: 80%;
+            margin: 1.75rem auto;
+        }
+
         #confirmRemoveAttachmentModal .modal-content {
             padding: 20px;
             border-radius: 10px;
@@ -320,7 +326,7 @@ include(__DIR__ . '/../../menu.php');
 
         <!-- Modal de Visualização de Registro -->
         <div class="modal fade" id="viewRegistryModal" tabindex="-1" role="dialog" aria-labelledby="viewRegistryModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-custom" role="document">
+            <div class="modal-dialogo modal-custom" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="viewRegistryModalLabel">Visualizar Registro</h5>
@@ -365,21 +371,12 @@ include(__DIR__ . '/../../menu.php');
                                 <input type="text" class="form-control" id="view-mother-name" readonly>
                             </div>
 
-                            <!-- Tabela de Anexos -->
+                            <!-- Área de Visualização de Anexos -->
                             <div class="mt-4">
                                 <h5>Anexos</h5>
-                                <table class="table table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Nome do Arquivo</th>
-                                            <th>Data do Anexo</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="view-attachments-table-body">
-                                        <!-- Linhas serão adicionadas dinamicamente -->
-                                    </tbody>
-                                </table>
+                                <div id="view-attachments-container">
+                                    <!-- O PDF será exibido aqui -->
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -451,15 +448,15 @@ include(__DIR__ . '/../../menu.php');
                 tableBody.append(row);
             });
 
-                // Inicializar o DataTable após os dados serem carregados
-                $('#tabelaResultados').DataTable({
-                    "language": {
-                        "url": "../../style/Portuguese-Brasil.json"
-                    },
-                    "pageLength": 10,
-                    "order": [[0, 'desc']],
-                    "destroy": true
-                });
+            // Inicializar o DataTable após os dados serem carregados
+            $('#tabelaResultados').DataTable({
+                "language": {
+                    "url": "../../style/Portuguese-Brasil.json"
+                },
+                "pageLength": 10,
+                "order": [[0, 'desc']],
+                "destroy": true
+            });
         }
 
         // Função para filtrar registros
@@ -608,25 +605,35 @@ include(__DIR__ . '/../../menu.php');
             $.ajax({
                 type: 'GET',
                 url: 'get_anexos.php',
-                data: {id_nascimento: registryId},
+                data: { id_nascimento: registryId },
                 success: function(response) {
                     var attachments = JSON.parse(response);
-                    var tableBody = isViewMode ? $('#view-attachments-table-body') : $('#edit-attachments-table-body');
-                    tableBody.empty(); // Limpar linhas existentes
+                    var container = isViewMode ? $('#view-attachments-container') : $('#edit-attachments-table-body');
+                    container.empty(); // Limpar o conteúdo existente
 
-                    $.each(attachments, function(index, attachment) {
-                        var formattedDate = formatDate(attachment.data.split(' ')[0]); // Formatar data sem hora
+                    if (isViewMode) {
+                        $.each(attachments, function(index, attachment) {
+                            // Exibir o PDF em um iframe
+                            var iframe = '<iframe src="' + attachment.caminho_anexo + '" width="100%" height="600px" style="border: none;"></iframe>';
+                            container.append(iframe);
+                        });
+                    } else {
+                        // Código para editar e remover anexos, conforme sua implementação atual
+                        // Este bloco permanece inalterado
+                        $.each(attachments, function(index, attachment) {
+                            var formattedDate = formatDate(attachment.data.split(' ')[0]); // Formatar data sem hora
 
-                        var row = '<tr>' +
-                            '<td>' + attachment.caminho_anexo.split('/').pop() + '</td>' +
-                            '<td>' + formattedDate + '</td>' +
-                            '<td>' +
-                                '<a href="' + attachment.caminho_anexo + '" target="_blank" title="Visualizar Anexo" style="width: 40px; height: 40px;margin-top: 5px; margin-right: 5px;" class="btn btn-info"><i class="fa fa-eye" aria-hidden="true"></i></a>' +
-                                (!isViewMode ? '<button type="button" style="width: 40px; height: 40px" title="Remover Anexo" class="btn btn-danger btn-delete-attachment" data-id="' + attachment.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') +
-                            '</td>' +
-                            '</tr>';
-                        tableBody.append(row);
-                    });
+                            var row = '<tr>' +
+                                '<td>' + attachment.caminho_anexo.split('/').pop() + '</td>' +
+                                '<td>' + formattedDate + '</td>' +
+                                '<td>' +
+                                    '<a href="' + attachment.caminho_anexo + '" target="_blank" title="Visualizar Anexo" style="width: 40px; height: 40px;margin-top: 5px; margin-right: 5px;" class="btn btn-info"><i class="fa fa-eye" aria-hidden="true"></i></a>' +
+                                    (!isViewMode ? '<button type="button" style="width: 40px; height: 40px" title="Remover Anexo" class="btn btn-danger btn-delete-attachment" data-id="' + attachment.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') +
+                                '</td>' +
+                                '</tr>';
+                            container.append(row);
+                        });
+                    }
                 }
             });
         }
