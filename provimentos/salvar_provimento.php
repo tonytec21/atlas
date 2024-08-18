@@ -8,11 +8,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $origem = $_POST['origem'];
     $data_provimento = $_POST['data_provimento'];
     $descricao = $_POST['descricao'];
-    $tipo = $_POST['tipo']; // Novo campo para o tipo (Provimento ou Resolução)
+    $tipo = $_POST['tipo'];
     $ano = date('Y', strtotime($data_provimento));
     $funcionario = $_SESSION['username'];
     $data_cadastro = date('Y-m-d H:i:s');
     $status = 'Ativo';
+
+    // Novo campo opcional para conteúdo do anexo
+    $conteudo_anexo = !empty($_POST['conteudo_anexo']) ? $_POST['conteudo_anexo'] : null;
 
     // Verificação de duplicidade
     $conn = getDatabaseConnection();
@@ -42,7 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (move_uploaded_file($anexo['tmp_name'], __DIR__ . '/' . $caminho_anexo)) {
         try {
-            $stmt = $conn->prepare('INSERT INTO provimentos (numero_provimento, origem, descricao, data_provimento, caminho_anexo, tipo, funcionario, data_cadastro, status) VALUES (:numero_provimento, :origem, :descricao, :data_provimento, :caminho_anexo, :tipo, :funcionario, :data_cadastro, :status)');
+            // Insira o conteúdo do anexo no banco de dados
+            $stmt = $conn->prepare('INSERT INTO provimentos (numero_provimento, origem, descricao, data_provimento, caminho_anexo, tipo, funcionario, data_cadastro, status, conteudo_anexo) VALUES (:numero_provimento, :origem, :descricao, :data_provimento, :caminho_anexo, :tipo, :funcionario, :data_cadastro, :status, :conteudo_anexo)');
             $stmt->bindParam(':numero_provimento', $numero_provimento);
             $stmt->bindParam(':origem', $origem);
             $stmt->bindParam(':descricao', $descricao);
@@ -52,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bindParam(':funcionario', $funcionario);
             $stmt->bindParam(':data_cadastro', $data_cadastro);
             $stmt->bindParam(':status', $status);
+            $stmt->bindParam(':conteudo_anexo', $conteudo_anexo); // Adiciona o novo campo
             $stmt->execute();
 
             echo json_encode(['success' => true, 'message' => 'Provimento cadastrado com sucesso!']);

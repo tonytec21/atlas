@@ -84,18 +84,22 @@ date_default_timezone_set('America/Sao_Paulo');
             <form id="pesquisarForm" method="GET">
                 <div class="form-row">
                     <div class="form-group col-md-2">
+                            <label for="tipo">Tipo:</label>
+                            <select class="form-control" id="tipo" name="tipo">
+                                <option value="">Todos</option>
+                                <option value="Provimento">Provimento</option>
+                                <option value="Resolução">Resolução</option>
+                            </select>
+                        </div>    
+                    <div class="form-group col-md-2">
                         <label for="numero_provimento">Nº Prov./Resol.:</label>
                         <input type="text" class="form-control" id="numero_provimento" name="numero_provimento">
                     </div>
                     <div class="form-group col-md-2">
-                        <label for="tipo">Tipo:</label>
-                        <select class="form-control" id="tipo" name="tipo">
-                            <option value="">Todos</option>
-                            <option value="Provimento">Provimento</option>
-                            <option value="Resolução">Resolução</option>
-                        </select>
+                        <label for="ano">Ano:</label>
+                        <input type="text" class="form-control" id="ano" name="ano" pattern="\d{4}" title="Digite um ano válido (ex: 2023)" maxlength="4" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4)">
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-3">
                         <label for="origem">Origem:</label>
                         <select class="form-control" id="origem" name="origem">
                             <option value="">Selecione</option>
@@ -103,21 +107,29 @@ date_default_timezone_set('America/Sao_Paulo');
                             <option value="CNJ">CNJ</option>
                         </select>
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-3">
                         <label for="data_provimento">Data:</label>
                         <input type="date" class="form-control" id="data_provimento" name="data_provimento">
                     </div>
-                    <div class="form-group col-md-4">
+                    <div class="form-group col-md-6">
                         <label for="descricao">Descrição:</label>
-                        <input type="text" class="form-control" id="descricao" name="descricao">
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="conteudo_anexo">Conteúdo:</label>
+                        <textarea class="form-control" id="conteudo_anexo" name="conteudo_anexo" rows="3"></textarea>
                     </div>
                 </div>
                 <div class="row mb-12">
                     <div class="col-md-6">
-                        <button type="submit" style="width: 100%; color: #fff!important" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
+                        <button type="submit" style="width: 100%; color: #fff!important" class="btn btn-primary">
+                            <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
+                        </button>
                     </div>
                     <div class="col-md-6">
-                        <button type="button" style="width: 100%; color: #fff!important" class="btn btn-secondary" onclick="window.open('cadastrar_provimento.php')"><i class="fa fa-plus" aria-hidden="true"></i> Cadastrar Prov./Resol.</button>
+                        <button type="button" style="width: 100%; color: #fff!important" class="btn btn-secondary" onclick="window.open('cadastrar_provimento.php')">
+                            <i class="fa fa-plus" aria-hidden="true"></i> Cadastrar Prov./Resol.
+                        </button>
                     </div>
                 </div>
             </form>
@@ -164,6 +176,11 @@ date_default_timezone_set('America/Sao_Paulo');
                             $params[':tipo'] = $_GET['tipo'];
                             $filtered = true;
                         }
+                        if (!empty($_GET['ano'])) {
+                            $conditions[] = 'YEAR(data_provimento) = :ano';
+                            $params[':ano'] = $_GET['ano'];
+                            $filtered = true;
+                        }                        
                         if (!empty($_GET['data_provimento'])) {
                             $conditions[] = 'data_provimento = :data_provimento';
                             $params[':data_provimento'] = $_GET['data_provimento'];
@@ -174,12 +191,16 @@ date_default_timezone_set('America/Sao_Paulo');
                             $params[':descricao'] = '%' . $_GET['descricao'] . '%';
                             $filtered = true;
                         }
-
+                        if (!empty($_GET['conteudo_anexo'])) {
+                            $conditions[] = 'conteudo_anexo LIKE :conteudo_anexo';
+                            $params[':conteudo_anexo'] = '%' . $_GET['conteudo_anexo'] . '%';
+                            $filtered = true;
+                        }
+                        
                         $sql = 'SELECT * FROM provimentos';
                         if ($conditions) {
                             $sql .= ' WHERE ' . implode(' AND ', $conditions);
                         }
-
                         if (!$filtered) {
                             $sql .= ' ORDER BY data_provimento DESC';
                         }
