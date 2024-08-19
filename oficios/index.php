@@ -283,7 +283,7 @@ include(__DIR__ . '/../menu.php');
                 "language": {
                     "url": "../style/Portuguese-Brasil.json"
                 },
-                "order": [[0, 'desc']]
+                "order": [[1, 'desc']]
             });
 
         function formatDateToBrazilian(date) {
