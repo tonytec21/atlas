@@ -508,7 +508,7 @@ include(__DIR__ . '/../menu.php');
         "language": {
             "url": "../style/Portuguese-Brasil.json"
         },
-        "pageLength": 10,
+        "pageLength": 100,
         "order": [], // Sem ordenação inicial
     });
 
