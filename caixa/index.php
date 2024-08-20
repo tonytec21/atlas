@@ -400,7 +400,7 @@ include(__DIR__ . '/db_connection.php');
                             $stmt->execute();
                             $pagamentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             foreach ($pagamentos as $pagamento) {
-                                if (in_array($pagamento['forma_de_pagamento'], ['PIX', 'Transferência Bancária', 'Crédito', 'Débito'])) {
+                                if (in_array($pagamento['forma_de_pagamento'], ['PIX', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'])) {
                                     $totalRecebidoConta += $pagamento['total_pagamento'];
                                 } else if ($pagamento['forma_de_pagamento'] === 'Espécie') {
                                     $totalRecebidoEspecie += $pagamento['total_pagamento'];
@@ -1203,7 +1203,7 @@ include(__DIR__ . '/db_connection.php');
                                 <td>${formatCurrency(totalPorTipo[tipo])}</td>
                             </tr>
                         `);
-                        if (['PIX', 'Transferência Bancária', 'Crédito', 'Débito'].includes(tipo)) {
+                        if (['PIX', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'].includes(tipo)) {
                             totalRecebidoConta += totalPorTipo[tipo];
                         } else if (tipo === 'Espécie') {
                         totalRecebidoEspecie += totalPorTipo[tipo];

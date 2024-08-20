@@ -404,6 +404,7 @@ include(__DIR__ . '/db_connection.php');
                             <option value="Débito">Débito</option>
                             <option value="PIX">PIX</option>
                             <option value="Transferência Bancária">Transferência Bancária</option>
+                            <option value="Boleto">Boleto</option>
                             <option value="Cheque">Cheque</option>
                         </select>
                     </div>
