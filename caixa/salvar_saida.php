@@ -11,7 +11,7 @@ try {
     $forma_de_saida = $_POST['forma_de_saida'];
     $data = $_POST['data_saida'];
     $data_caixa = $_POST['data_caixa_saida'];
-    $funcionario = $_POST['funcionario_saida'];
+    $funcionario = trim(str_replace(' ', '', $_POST['funcionario_saida']));
     $status = 'ativo';
 
     // Upload de arquivo
