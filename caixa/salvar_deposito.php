@@ -3,13 +3,16 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 
+header('Content-Type: application/json');
+ob_start();
+
 $response = ['success' => false, 'error' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     try {
         $conn = getDatabaseConnection();
 
-        $funcionario = $_POST['funcionario_deposito'];
+        $funcionario = trim(str_replace(' ', '', $_POST['funcionario_deposito']));
         $data_caixa = $_POST['data_caixa_deposito'];
         $valor_do_deposito = str_replace(['.', ','], ['', '.'], $_POST['valor_deposito']);
         $tipo_deposito = $_POST['tipo_deposito'];
@@ -50,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-header('Content-Type: application/json');
+ob_end_clean();
 echo json_encode($response);
+exit;
 ?>
