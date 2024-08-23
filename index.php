@@ -2,6 +2,17 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+// Executa o comando git pull no mesmo diretório onde o arquivo está localizado
+$output = shell_exec('git pull 2>&1');
+
+// Verifica o resultado da execução
+if (strpos($output, 'Already up to date.') !== false) {
+    $mensagem = "Sistema atualizado. Nenhuma atualização pendente.";
+} elseif (strpos($output, 'Updating') !== false) {
+    $mensagem = "Atualização do código aplicada com sucesso.";
+} else {
+    $mensagem = "Erro ao executar a atualização via git: " . $output;
+}
 ?>
 <?php
 include_once 'update_atlas/atualizacao.php';
