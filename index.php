@@ -2,7 +2,10 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
-// Executa o comando git pull no mesmo diretório onde o arquivo está localizado
+// Configura o diretório como seguro para o Git
+shell_exec('git config --global --add safe.directory C:/xampp/htdocs/atlas');
+
+// Executa o comando git pull
 $output = shell_exec('git pull 2>&1');
 
 // Verifica o resultado da execução
