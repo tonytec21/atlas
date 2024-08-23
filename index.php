@@ -3,6 +3,9 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 ?>
+<?php
+include_once 'update_atlas/atualizacao.php';
+?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>

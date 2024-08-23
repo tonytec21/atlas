@@ -1,2 +1,0 @@
-UPDATE provimentos
-SET conteudo_anexo = TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(conteudo_anexo, '\r', ' '), '\n', ' '), '\t', ' '), '  ', ' '), '  ', ' '));
