@@ -121,16 +121,16 @@ date_default_timezone_set('America/Sao_Paulo');
                     </div>
                 </div>
                 <div class="row mb-12">
-                    <div class="col-md-6">
+                    <div class="col-md-12">
                         <button type="submit" style="width: 100%; color: #fff!important" class="btn btn-primary">
                             <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
                         </button>
                     </div>
-                    <div class="col-md-6">
+                    <!-- <div class="col-md-6">
                         <button type="button" style="width: 100%; color: #fff!important" class="btn btn-secondary" onclick="window.open('cadastrar_provimento.php')">
                             <i class="fa fa-plus" aria-hidden="true"></i> Cadastrar Prov./Resol.
                         </button>
-                    </div>
+                    </div> -->
                 </div>
             </form>
             <hr>
