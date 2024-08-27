@@ -48,8 +48,12 @@ date_default_timezone_set('America/Sao_Paulo');
         }
 
         .modal-header.success {
-            background-color: #6c757d;
+            background-color: #138496;
             color: white;
+        }
+
+        .close, .close:hover {
+            color: #fff;
         }
 
         .custom-file-input ~ .custom-file-label::after {
@@ -239,7 +243,7 @@ date_default_timezone_set('America/Sao_Paulo');
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header success">
-                    <h5 class="modal-title" id="visualizarModalLabel">Visualizar Provimento</h5>
+                    <h5 class="modal-title" id="visualizarModalLabel"><?php echo $provimento['tipo']; ?> nº: <?php echo $numero_provimento_ano; ?> - <?php echo $provimento['origem']; ?></h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -247,16 +251,20 @@ date_default_timezone_set('America/Sao_Paulo');
                 <div class="modal-body">
                     <form>
                         <div class="form-row">
-                            <div class="form-group col-md-4">
-                                <label for="numero_provimento_modal">Número do Provimento:</label>
+                            <div class="form-group col-md-3">
+                                <label for="numero_provimento_modal">Tipo:</label>
+                                <input type="text" class="form-control" id="tipo_provimento_modal" readonly>
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label for="numero_provimento_modal">Número:</label>
                                 <input type="text" class="form-control" id="numero_provimento_modal" readonly>
                             </div>
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-3">
                                 <label for="origem_modal">Origem:</label>
                                 <input type="text" class="form-control" id="origem_modal" readonly>
                             </div>
-                            <div class="form-group col-md-4">
-                                <label for="data_provimento_modal">Data do Provimento:</label>
+                            <div class="form-group col-md-3">
+                                <label for="data_provimento_modal">Data:</label>
                                 <input type="text" class="form-control" id="data_provimento_modal" readonly>
                             </div>
                         </div>
@@ -265,7 +273,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             <textarea class="form-control" id="descricao_modal" rows="3" readonly></textarea>
                         </div>
                         <div class="form-group">
-                            <label for="anexo_visualizacao">Provimento:</label>
+                            <label for="anexo_visualizacao">Conteúdo:</label>
                             <iframe id="anexo_visualizacao" style="width: 100%; height: 800px;" frameborder="0"></iframe>
                         </div>
                     </form>
@@ -303,12 +311,17 @@ date_default_timezone_set('America/Sao_Paulo');
                         var provimento = JSON.parse(response);
 
                         var numero_provimento_ano = provimento.numero_provimento + '/' + provimento.ano_provimento;
+                        $('#tipo_provimento_modal').val(provimento.tipo);
                         $('#numero_provimento_modal').val(numero_provimento_ano);
                         $('#origem_modal').val(provimento.origem);
                         let dataProvimento = new Date(provimento.data_provimento + 'T00:00:00');
                         $('#data_provimento_modal').val(dataProvimento.toLocaleDateString('pt-BR'));
                         $('#descricao_modal').val(provimento.descricao);
                         $('#anexo_visualizacao').attr('src', provimento.caminho_anexo);
+
+                        // Configura o título do modal dinamicamente
+                        var modalTitle = provimento.tipo + ' nº: ' + numero_provimento_ano + ' - ' + provimento.origem;
+                        $('#visualizarModalLabel').text(modalTitle);
 
                         $('#visualizarModal').modal('show');
                     } catch (e) {
