@@ -79,11 +79,11 @@ $mode_query->close();
             right: -80%!important;
         }
         body.dark-mode {
-            background-color: #121212;
+            background-color: #242424;
             color: #ffffff;
         }
         body.light-mode {
-            background-color: #ffffff;
+            background-color: #e3f6ff;
             color: #000000;
         }
         body.dark-mode .card {
