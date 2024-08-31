@@ -84,8 +84,8 @@ include(__DIR__ . '/db_connection.php');
                     <div class="form-group col-md-3">
                         <label for="tipo">Tipo:</label>
                         <select class="form-control" id="tipo" name="tipo" required>
-                            <option value="Provimento">Provimento</option>    
                             <option value="Resolução">Resolução</option>        
+                            <option value="Provimento">Provimento</option>    
                         </select>
                     </div>
                     <div class="form-group col-md-3">
@@ -95,8 +95,8 @@ include(__DIR__ . '/db_connection.php');
                     <div class="form-group col-md-3">
                         <label for="origem">Origem:</label>
                         <select class="form-control" id="origem" name="origem" required>
-                            <option value="CNJ">CNJ</option>    
                             <option value="CGJ/MA">CGJ/MA</option>        
+                            <option value="CNJ">CNJ</option>    
                         </select>
                     </div>
                     <div class="form-group col-md-3">

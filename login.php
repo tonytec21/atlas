@@ -33,7 +33,7 @@ if (strpos($output, 'Already up to date.') !== false) {
 <body>
     <div class="container mt-5">
         <div class="brand">
-            <h1>Atlas</h1>
+            <img src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/atlas.png'?>" alt="Atlas" style="vertical-align: middle;width: 150px;">
         </div>
         <h2>Login</h2>
         <?php if (isset($_GET['error'])): ?>

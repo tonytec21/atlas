@@ -150,7 +150,12 @@ $mode_query->close();
     </div>
 
     <button class="openbtn" onclick="openNav()">&#9776; Menu</button>
-    <div id="system-name"><a style="color: #fff!important;text-decoration: none!important;" href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>">Atlas</a></div>
+    <div id="system-name">
+        <a style="color: #fff!important;text-decoration: none!important;" href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>">
+            <img src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/atlas.png'?>" alt="Atlas" style="vertical-align: middle;width: 88px;">
+        </a>
+    </div>
+
     <div id="welcome-section">
         <div>
             <h2>Bem-vindo</h2>
