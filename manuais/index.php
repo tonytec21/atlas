@@ -54,7 +54,6 @@ include(__DIR__ . '/db_connection.php');
 
         .video-description {
             font-size: 14px;
-            color: #666;
             margin-top: 10px;
         }
 

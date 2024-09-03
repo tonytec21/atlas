@@ -82,9 +82,15 @@ $mode_query->close();
             background-color: #242424;
             color: #ffffff;
         }
+        body.dark-mod .video-description {
+            color: #fff;
+        }
         body.light-mode {
             background-color: #e3f6ff;
             color: #000000;
+        }
+        body.light-mod .video-description {
+            color: #666;
         }
         body.dark-mode .card {
             background-color: #6c757d;
