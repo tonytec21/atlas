@@ -135,7 +135,7 @@ $mode_query->close();
         </div>
 
         <!-- <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/assinar-doc.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Assinador Digital</a> -->
-        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/manuais/index.php'?>"><i class="fa fa-file-text" aria-hidden="true"></i> Manuais Atlas</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/manuais/index.php'?>"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
 
         <?php if ($nivel_de_acesso === 'administrador'): ?>
             <button class="dropdown-btn"><i class="fa fa-cog" aria-hidden="true"></i> Administração 
