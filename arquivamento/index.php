@@ -60,41 +60,41 @@ include(__DIR__ . '/../menu.php');
                     <label for="cpf-cnpj">CPF/CNPJ</label>
                     <input type="text" id="cpf-cnpj" class="form-control" placeholder="CPF/CNPJ">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label for="nome">Nome</label>
                     <input type="text" id="nome" class="form-control" placeholder="Nome">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <label for="livro">Livro</label>
                     <input type="text" id="livro" class="form-control" placeholder="Livro">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <label for="folha">Folha</label>
                     <input type="text" id="folha" class="form-control" placeholder="Folha">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <label for="termo">Termo/Ordem</label>
                     <input type="text" id="termo" class="form-control" placeholder="Termo/Ordem">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <label for="protocolo">Protocolo</label>
                     <input type="text" id="protocolo" class="form-control" placeholder="Protocolo">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <label for="matricula">Matrícula</label>
                     <input type="text" id="matricula" class="form-control" placeholder="Matrícula">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <label for="data-ato">Data do Ato</label>
                     <input type="date" id="data-ato" class="form-control">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label for="descricao">Descrição e Detalhes</label>
                     <input type="text" id="descricao" class="form-control" placeholder="Descrição e Detalhes">
                 </div>
-                <div class="col-md-4">
-                    <button id="filter-button" class="btn btn-primary w-40"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
-                    <button id="add-button" class="btn btn-success w-40" onclick="window.location.href='cadastro.php'"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar</button>
+                <div class="col-md-12">
+                    <button style="width: 49.8%; margin-top: 10px;" id="filter-button" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
+                    <button style="width: 49.8%; margin-top: 10px;" id="add-button" class="btn btn-success" onclick="window.location.href='cadastro.php'"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar</button>
                 </div>
             </div>
             <div class="table-responsive">

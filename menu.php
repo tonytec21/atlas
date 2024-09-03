@@ -134,8 +134,8 @@ $mode_query->close();
             <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/cadastrar-oficio.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Ofício</a>
         </div>
 
-        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/assinar-doc.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Assinador Digital</a>
-        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/gerador_de_registro/index.php'?>"><i class="fa fa-file-text" aria-hidden="true"></i> Gerador de Registro de Garantias</a>
+        <!-- <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/arquivamento/assinar-doc.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Assinador Digital</a> -->
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/manuais/index.php'?>"><i class="fa fa-file-text" aria-hidden="true"></i> Manuais Atlas</a>
 
         <?php if ($nivel_de_acesso === 'administrador'): ?>
             <button class="dropdown-btn"><i class="fa fa-cog" aria-hidden="true"></i> Administração 
