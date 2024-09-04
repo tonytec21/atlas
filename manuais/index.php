@@ -25,12 +25,28 @@ include(__DIR__ . '/db_connection.php');
         .video-card {
             margin-bottom: 20px;
             position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-card-title {
+            background-color: #313131;
+            color: white;
+            text-align: center;
+            height: 55px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            border-radius: 5px 5px 0 0;
+            padding: 10px;
         }
 
         .video-card iframe {
             width: 100%;
             height: 250px;
-            border-radius: 10px;
+            border-radius: 0 0 5px 5px;
             display: none;
         }
 
@@ -38,9 +54,9 @@ include(__DIR__ . '/db_connection.php');
             width: 100%;
             height: 250px;
             background: #000;
-            border-radius: 10px;
             position: relative;
             cursor: pointer;
+            border-radius: 0 0 5px 5px;
         }
 
         .video-placeholder i {
@@ -54,7 +70,10 @@ include(__DIR__ . '/db_connection.php');
 
         .video-description {
             font-size: 14px;
-            margin-top: 10px;
+            line-height: 1.2;
+            text-align: justify;
+            padding: 10px;
+            min-height: 60px;
         }
 
         .search-bar {
@@ -63,6 +82,11 @@ include(__DIR__ . '/db_connection.php');
 
         .category-section {
             margin-bottom: 20px;
+        }
+
+        .card-body {
+            padding: 0;
+            border-radius: 5px;
         }
     </style>
 </head>
@@ -79,6 +103,7 @@ include(__DIR__ . '/db_connection.php');
             <div class="search-bar">
                 <input type="text" id="searchInput" class="form-control" placeholder="Pesquisar vídeos...">
             </div>
+            <hr>
             <?php
             $conn = getDatabaseConnection();
             $stmt = $conn->query("SELECT DISTINCT categoria FROM manuais WHERE status = 'ativo' ORDER BY categoria ASC");
@@ -86,7 +111,7 @@ include(__DIR__ . '/db_connection.php');
 
             foreach ($categorias as $categoria) {
                 echo '<div class="category-section">';
-                echo '<h4 class="category-title" data-toggle="collapse" data-target="#category-' . md5($categoria['categoria']) . '">' . htmlspecialchars($categoria['categoria']) . ' <i class="fa fa-chevron-down"></i></h4>';
+                echo '<h5 class="category-title" data-toggle="collapse" data-target="#category-' . md5($categoria['categoria']) . '">' . htmlspecialchars($categoria['categoria']) . ' <i class="fa fa-chevron-down"></i></h5>';
                 
                 $stmtVideos = $conn->prepare("SELECT * FROM manuais WHERE categoria = :categoria AND status = 'ativo' ORDER BY ordem ASC");
                 $stmtVideos->bindParam(':categoria', $categoria['categoria']);
@@ -96,10 +121,10 @@ include(__DIR__ . '/db_connection.php');
                 echo '<div id="category-' . md5($categoria['categoria']) . '" class="collapse show">';
                 echo '<div class="row">';
                 foreach ($videos as $video) {
-                    echo '<div class="col-md-4 video-card">';
+                    echo '<div class="col-md-6 video-card">';
                     echo '<div class="card">';
                     echo '<div class="card-body">';
-                    echo '<h5 class="card-title">' . htmlspecialchars($video['titulo']) . '</h5>';
+                    echo '<div class="video-card-title">' . htmlspecialchars($video['titulo']) . '</div>';
                     echo '<div class="video-placeholder" data-src="' . htmlspecialchars($video['caminho_video']) . '">';
                     echo '<i class="fa fa-play-circle"></i>';
                     echo '</div>';
@@ -128,7 +153,7 @@ include(__DIR__ . '/db_connection.php');
                     var section = $(this);
                     var found = false;
                     section.find('.video-card').each(function() {
-                        var videoTitle = $(this).find('.card-title').text().toLowerCase();
+                        var videoTitle = $(this).find('.video-card-title').text().toLowerCase();
                         var videoDescription = $(this).find('.video-description').text().toLowerCase();
                         if (videoTitle.includes(value) || videoDescription.includes(value)) {
                             $(this).show();
