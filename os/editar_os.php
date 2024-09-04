@@ -338,7 +338,7 @@ function showAlert(message, type, reload = false) {
         "language": {
             "url": "../style/Portuguese-Brasil.json"
         },
-        "pageLength": 500,
+        "pageLength": 100,
         "order": [], // Sem ordenação inicial
     });
 
