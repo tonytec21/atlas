@@ -171,7 +171,7 @@ include(__DIR__ . '/../menu.php');
         <div class="d-flex justify-content-between align-items-center">
             <h4>Edição de Tarefa - Protocolo Geral nº.: <?php echo $taskId; ?></h4>
             <div class="btn-container">
-                <button style="width: 172px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" onclick="window.open('protocolo-geral.php?id=<?php echo $taskId; ?>', '_blank')" class="btn btn-primary mr-2">
+                <button style="width: 172px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" class="btn btn-primary mr-2" id="protocoloButton">
                     <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo
                 </button>
                 <button style="width: 150px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important;" onclick="window.location.href='criar-tarefa.php'" class="btn btn-success">
@@ -315,6 +315,7 @@ include(__DIR__ . '/../menu.php');
 </div>
 
 <script src="../script/jquery-3.5.1.min.js"></script>
+<script src="../script/jquery-3.6.0.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
 <script>
@@ -344,6 +345,37 @@ include(__DIR__ . '/../menu.php');
                 }
             });
         });
+
+
+    $(document).ready(function() {
+        // Adiciona o evento de clique ao botão quando a página for carregada
+        $('#protocoloButton').on('click', function() {
+            // Faz a requisição para o JSON
+            $.ajax({
+                url: '../style/configuracao.json',
+                dataType: 'json',
+                cache: false, // Desabilita o cache
+                success: function(data) {
+                    const taskId = '<?php echo $taskId; ?>'; // Pega o taskId via PHP
+                    let url = '';
+
+                    // Verifica o valor do "timbrado" e ajusta a URL
+                    if (data.timbrado === 'S') {
+                        url = 'protocolo_geral.php?id=' + taskId;
+                    } else if (data.timbrado === 'N') {
+                        url = 'protocolo-geral.php?id=' + taskId;
+                    }
+
+                    // Abre a URL correspondente em uma nova aba
+                    window.open(url, '_blank');
+                },
+                error: function() {
+                    alert('Erro ao carregar o arquivo de configuração.');
+                }
+            });
+        });
+    });
+
 
         $(document).on('click', '.visualizar-anexo', function() {
             var filePath = $(this).data('file');

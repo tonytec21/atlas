@@ -321,7 +321,7 @@ include(__DIR__ . '/db_connection.php');
                         <button style="font-size:12px" id="vincularOficioButton" type="button" class="btn btn-primary mr-2" data-toggle="modal" data-target="#vincularOficioModal">
                             <i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício
                         </button>
-                        <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2" onclick="window.open('protocolo-geral.php?id=' + document.getElementById('taskNumber').innerText, '_blank')">
+                        <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2">
                             <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo Geral
                         </button>
                         <button style="font-size:12px" id="reciboEntregaButton" type="button" class="btn btn-info2 mr-2">
@@ -601,6 +601,36 @@ include(__DIR__ . '/db_connection.php');
                 });
             });
 
+
+    $(document).ready(function() {
+        // Adiciona o evento de clique ao botão quando a página for carregada
+        $('#guiaProtocoloButton').on('click', function() {
+            // Faz a requisição para o JSON
+            $.ajax({
+                url: '../style/configuracao.json',
+                dataType: 'json',
+                cache: false, // Desabilita o cache
+                success: function(data) {
+                    const taskId = document.getElementById('taskNumber').innerText; // Pega o taskId via o elemento HTML
+                    let url = '';
+
+                    // Verifica o valor do "timbrado" e ajusta a URL
+                    if (data.timbrado === 'S') {
+                        url = 'protocolo_geral.php?id=' + taskId;
+                    } else if (data.timbrado === 'N') {
+                        url = 'protocolo-geral.php?id=' + taskId;
+                    }
+
+                    // Abre a URL correspondente em uma nova aba
+                    window.open(url, '_blank');
+                },
+                error: function() {
+                    alert('Erro ao carregar o arquivo de configuração.');
+                }
+            });
+        });
+    });
+
             // Inicializar DataTable
             $('#tabelaResultados').DataTable({
                 "language": {
@@ -683,11 +713,34 @@ include(__DIR__ . '/db_connection.php');
                     $('#vincularOficioButton').html('<i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício').attr('data-toggle', 'modal').attr('data-target', '#vincularOficioModal').removeAttr('onclick');
                 }
 
-                // Verificar se o recibo de entrega já foi gerado
+               // Verificar se o recibo de entrega já foi gerado
                 if ($('#viewTitle').data('reciboGerado')) {
                     $('#reciboEntregaButton').off('click').on('click', function() {
-                        window.open('recibo-entrega.php?id=' + $('#taskNumber').text(), '_blank');
+                        // Faz a requisição para o JSON
+                        $.ajax({
+                            url: '../style/configuracao.json',
+                            dataType: 'json',
+                            cache: false, // Desabilita o cache
+                            success: function(data) {
+                                const taskId = $('#taskNumber').text(); // Pega o taskNumber via jQuery
+                                let url = '';
+
+                                // Verifica o valor do "timbrado" e ajusta a URL
+                                if (data.timbrado === 'S') {
+                                    url = 'recibo_entrega.php?id=' + taskId;
+                                } else if (data.timbrado === 'N') {
+                                    url = 'recibo-entrega.php?id=' + taskId;
+                                }
+
+                                // Abre a URL correspondente em uma nova aba
+                                window.open(url, '_blank');
+                            },
+                            error: function() {
+                                alert('Erro ao carregar o arquivo de configuração.');
+                            }
+                        });
                     });
+
                 } else {
                     $('#reciboEntregaButton').off('click').on('click', function() {
                         $('#reciboEntregaModal').modal('show');
