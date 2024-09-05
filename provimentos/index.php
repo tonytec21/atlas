@@ -107,7 +107,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         <label for="origem">Origem:</label>
                         <select class="form-control" id="origem" name="origem">
                             <option value="">Selecione</option>
-                            <option value="CGJ_MA">CGJ/MA</option>
+                            <option value="CGJ/MA">CGJ/MA</option>
                             <option value="CNJ">CNJ</option>
                         </select>
                     </div>

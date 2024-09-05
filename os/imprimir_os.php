@@ -15,28 +15,58 @@ class PDF extends TCPDF
 {
     private $criado_por;
 
-    // Cabeçalho do PDF
-    public function Header()
-    {
-        $image_file = '../style/img/logo.png'; // Verifique se o caminho está correto
-        @$this->Image($image_file, 20, 8, 170, '', 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);
-        $this->SetY(25);
-    }
+       // Cabeçalho do PDF
+       public function Header()
+       {
+           $image_file = '../style/img/timbrado.png'; // Verifique se o caminho está correto
+           
+           // Salva as margens atuais
+           $currentMargins = $this->getMargins();
+           
+           // Desativa temporariamente as margens e AutoPageBreak
+           $this->SetAutoPageBreak(false, 0); // Desativa o AutoPageBreak para permitir a imagem cobrir toda a página
+           $this->SetMargins(0, 0, 0);
+   
+           // Inserir a imagem ocupando toda a página
+           @$this->Image($image_file, 0, 0, 210, 297, 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);
+           
+           // Restaura o AutoPageBreak e as margens para o conteúdo subsequente
+           $this->SetAutoPageBreak(true, 25); // Ativa novamente o AutoPageBreak com a margem inferior padrão
+           $this->SetMargins($currentMargins['left'], $currentMargins['top'], $currentMargins['right']);
+           $this->SetY(25); // Define o ponto Y após a imagem para o conteúdo
+       }
 
     // Rodapé do PDF
     public function Footer()
     {
-        $this->SetY(-15);
+        // Número da página no canto inferior direito, na cor branca
+        $this->SetY(-14.5);
         $this->SetFont('arial', 'I', 8);
-        // Adiciona o nome do usuário que criou a OS
-        $this->Cell(0, 10, 'Página ' . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 0, false, 'L', 0, '', 0, false, 'T', 'M');
-        $this->Cell(0, 10, 'Criado por: ' . $this->criado_por, 0, false, 'R', 0, '', 0, false, 'T', 'M');
+        $this->SetTextColor(255, 255, 255); // Definir cor branca
+
+        // Ajustar a posição horizontal com SetX para aproximar mais do canto
+        $this->SetX(-23); // Ajusta o valor de -15 conforme necessário para alinhar melhor no canto
+
+        $this->Cell(0, 11, 'Página ' . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 0, false, 'L', 0, '', 0, false, 'T', 'M');
+
+        
+        // Definir cor preta para o texto "Criado por"
+        $this->SetTextColor(0, 0, 0); // Definir cor preta
+        
+        // Posicionar o texto na lateral direita, com rotação para orientação vertical
+        $this->SetXY(-10, ($this->getPageHeight() / 2)); // Posição X na margem direita, Y centralizada verticalmente
+        $this->StartTransform(); // Iniciar transformação
+        $this->Rotate(90); // Rotacionar 90 graus
+        $this->Cell(0, 10, 'Criado por: ' . $this->criado_por, 0, false, 'C', 0, '', 0, false, 'T', 'M'); // Texto centralizado verticalmente
+        $this->StopTransform(); // Parar transformação
     }
 
+    // Método para definir o nome do criador
     public function setCriadoPor($criado_por)
     {
-        $this->criado_por = $criado_por;
+        $this->criado_por = $criado_por; // Atribui o valor à propriedade privado
     }
+
 
     // Função para adicionar a chancela da assinatura
     public function addSignature($assinatura_path)
@@ -121,7 +151,7 @@ if (isset($_GET['id'])) {
     $contas = $contas_result->fetch_all(MYSQLI_ASSOC);
 
     $pdf = new PDF();
-    $pdf->SetMargins(10, 45, 10);
+    $pdf->SetMargins(12, 40, 10);
     $pdf->setCriadoPor($criado_por_nome); // Define o nome do usuário que criou a OS
     $pdf->AddPage();
     $pdf->SetFont('arial', '', 10);
@@ -148,6 +178,7 @@ if (isset($_GET['id'])) {
     $pdf->Ln(3);
 
     $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetMargins(10, 40, 10);
     $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? ' - CPF/CNPJ: ' . $ordem_servico['cpf_cliente'] : '';
     $pdf->writeHTML('<div style="text-align: left;">Cliente: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
     $pdf->Ln(1);

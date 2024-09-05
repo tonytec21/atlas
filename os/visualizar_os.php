@@ -518,12 +518,30 @@ include(__DIR__ . '/../menu.php');
         "language": {
             "url": "../style/Portuguese-Brasil.json"
         },
-        "pageLength": 10,
+        "pageLength": 100,
         "order": [], // Sem ordenação inicial
     });
 
     function imprimirOS() {
-        window.open('imprimir-os.php?id=<?php echo $os_id; ?>', '_blank');
+        // Fazer a requisição para o arquivo JSON
+        fetch('../style/configuracao.json')
+            .then(response => response.json())
+            .then(data => {
+                const osId = '<?php echo $os_id; ?>'; // Usando PHP para pegar o ID
+                let url = '';
+                
+                if (data.timbrado === 'S') {
+                    url = `imprimir_os.php?id=${osId}`;
+                } else {
+                    url = `imprimir-os.php?id=${osId}`;
+                }
+                
+                // Abrir o link correspondente em uma nova aba
+                window.open(url, '_blank');
+            })
+            .catch(error => {
+                console.error('Erro ao carregar o arquivo JSON:', error);
+            });
     }
 
     function imprimirRecibo() {

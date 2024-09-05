@@ -367,7 +367,7 @@ include(__DIR__ . '/db_connection.php');
                                 <td>
                                     <button class="btn btn-info btn-sm" title="Visualizar OS" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('visualizar_os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <button class="btn btn-success btn-sm" title="Pagamentos e Devoluções" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')"><i class="fa fa-money" aria-hidden="true"></i></button>
-                                    <button type="button" title="Imprimir OS" class="btn btn-primary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('imprimir-os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-print" aria-hidden="true"></i></button>
+                                    <button type="button" title="Imprimir OS" class="btn btn-primary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="verificarTimbrado(<?php echo $ordem['id']; ?>)"><i class="fa fa-print" aria-hidden="true"></i></button>
                                     <button class="btn btn-secondary btn-sm" title="Anexos" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="abrirAnexoModal(<?php echo $ordem['id']; ?>)"><i class="fa fa-paperclip" aria-hidden="true"></i></button>
                                 </td>
                             </tr>
@@ -557,6 +557,7 @@ include(__DIR__ . '/db_connection.php');
 
 
     <script src="../script/jquery-3.5.1.min.js"></script>
+    <script src="../script/jquery-3.6.0.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
@@ -586,6 +587,26 @@ include(__DIR__ . '/db_connection.php');
             });
 
         });
+
+        function verificarTimbrado(id) {
+            $.ajax({
+                url: '../style/configuracao.json',
+                dataType: 'json',
+                cache: false, // Desabilita o cache
+                success: function(data) {
+                    var url = '';
+                    if (data.timbrado === 'S') {
+                        url = 'imprimir_os.php?id=' + id;
+                    } else if (data.timbrado === 'N') {
+                        url = 'imprimir-os.php?id=' + id;
+                    }
+                    window.open(url, '_blank');
+                },
+                error: function() {
+                    alert('Erro ao carregar o arquivo de configuração.');
+                }
+            });
+        }
 
         function abrirPagamentoModal(osId, cliente, totalOs, totalPagamentos, totalLiquidado, totalDevolvido, saldo, statusOS) {
             $('#total_os_modal').val('R$ ' + totalOs.toFixed(2).replace('.', ','));

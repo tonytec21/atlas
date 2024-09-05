@@ -230,27 +230,51 @@ include(__DIR__ . '/../menu.php');
         });
 
         function viewOficio(numero) {
-            var url = 'view_oficio.php?numero=' + numero;
-            $('#oficioPDF').attr('src', url);
-            $('#viewOficioModal').modal('show');
+            // Primeiro, verificamos o JSON de configuração
             $.ajax({
-                url: 'get_status.php',
-                type: 'GET',
-                data: { numero: numero },
-                success: function(response) {
-                    var status = JSON.parse(response).status;
-                    if (status == 1) {
-                        $('#lockButton').hide();
-                    } else {
-                        $('#lockButton').show();
+                url: '../style/configuracao.json',
+                dataType: 'json',
+                cache: false, // Desabilita o cache para garantir que o JSON mais recente seja carregado
+                success: function(data) {
+                    // Verifica o valor do "timbrado" no JSON
+                    var url = '';
+                    if (data.timbrado === 'S') {
+                        url = 'view_oficio.php?numero=' + numero;
+                    } else if (data.timbrado === 'N') {
+                        url = 'view-oficio.php?numero=' + numero;
                     }
+
+                    // Define a URL no iframe e abre o modal
+                    $('#oficioPDF').attr('src', url);
+                    $('#viewOficioModal').modal('show');
+                    
+                    // Verifica o status do ofício
+                    $.ajax({
+                        url: 'get_status.php',
+                        type: 'GET',
+                        data: { numero: numero },
+                        success: function(response) {
+                            var status = JSON.parse(response).status;
+                            if (status == 1) {
+                                $('#lockButton').hide();
+                            } else {
+                                $('#lockButton').show();
+                            }
+                        },
+                        error: function() {
+                            alert('Erro ao verificar status do ofício.');
+                        }
+                    });
+
+                    // Define a ação para o botão de bloqueio
+                    $('#lockButton').off('click').on('click', function() {
+                        lockOficio(numero);
+                    });
+
                 },
                 error: function() {
-                    alert('Erro ao verificar status do ofício.');
+                    alert('Erro ao carregar a configuração de timbrado.');
                 }
-            });
-            $('#lockButton').off('click').on('click', function() {
-                lockOficio(numero);
             });
         }
 
