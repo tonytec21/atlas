@@ -523,8 +523,11 @@ include(__DIR__ . '/../menu.php');
     });
 
     function imprimirOS() {
-        // Fazer a requisição para o arquivo JSON
-        fetch('../style/configuracao.json')
+        // Gerar um timestamp para evitar cache
+        const timestamp = new Date().getTime();
+        
+        // Fazer a requisição para o arquivo JSON com o timestamp
+        fetch(`../style/configuracao.json?nocache=${timestamp}`)
             .then(response => response.json())
             .then(data => {
                 const osId = '<?php echo $os_id; ?>'; // Usando PHP para pegar o ID
@@ -543,6 +546,7 @@ include(__DIR__ . '/../menu.php');
                 console.error('Erro ao carregar o arquivo JSON:', error);
             });
     }
+
 
     function imprimirRecibo() {
         window.open('recibo.php?id=<?php echo $os_id; ?>', '_blank');
