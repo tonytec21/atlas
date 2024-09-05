@@ -308,6 +308,10 @@ include(__DIR__ . '/menu.php');
             $(this).parent().hide();
         });
     });
+
+    window.onload = function() {
+    clearCache();
+};
 </script>
 <br><br><br>
 <?php
