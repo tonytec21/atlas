@@ -2,6 +2,8 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+// Função para definir o fuso horário corretamente como sendo brasileiro
+date_default_timezone_set('America/Sao_Paulo');
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -923,8 +925,30 @@ include(__DIR__ . '/db_connection.php');
         });
 
         function viewOficio(numero) {
-            window.open('ver_oficio.php?numero=' + numero, '_blank');
+            // Faz a requisição para o arquivo JSON
+            $.ajax({
+                url: '../style/configuracao.json',
+                dataType: 'json',
+                cache: false, // Desabilita o cache
+                success: function(data) {
+                    let url = '';
+
+                    // Verifica o valor do "timbrado" e ajusta a URL
+                    if (data.timbrado === 'S') {
+                        url = 'ver_oficio.php?numero=' + numero;
+                    } else if (data.timbrado === 'N') {
+                        url = 'ver-oficio.php?numero=' + numero;
+                    }
+
+                    // Abre a URL correspondente em uma nova aba
+                    window.open(url, '_blank');
+                },
+                error: function() {
+                    alert('Erro ao carregar o arquivo de configuração.');
+                }
+            });
         }
+
     </script>
     <?php
     include(__DIR__ . '/../rodape.php');

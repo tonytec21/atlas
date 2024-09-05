@@ -215,6 +215,7 @@ include(__DIR__ . '/db_connection.php');
                     <thead>
                         <tr>
                             <th style="width: 7%;">Nº OS</th>
+                            <th>Funcionário</th>
                             <th style="width: 11%;">Cliente</th>
                             <th style="width: 11%;">CPF/CNPJ</th>
                             <th style="width: 13%;">Título da OS</th>
@@ -290,7 +291,7 @@ include(__DIR__ . '/db_connection.php');
                         }
 
                         if (!$filtered) {
-                            $sql .= ' ORDER BY data_criacao DESC LIMIT 10';
+                            $sql .= ' ORDER BY data_criacao DESC LIMIT 100';
                         }
 
                         $stmt = $conn->prepare($sql);
@@ -355,6 +356,7 @@ include(__DIR__ . '/db_connection.php');
                             ?>
                             <tr>
                                 <td><?php echo $ordem['id']; ?></td>
+                                <td><?php echo $ordem['criado_por']; ?></td>
                                 <td><?php echo $ordem['cliente']; ?></td>
                                 <td><?php echo $ordem['cpf_cliente']; ?></td>
                                 <td><?php echo $ordem['descricao_os']; ?></td>
@@ -578,12 +580,13 @@ include(__DIR__ . '/db_connection.php');
             $('#valor_pagamento').mask('#.##0,00', { reverse: true });
             $('#valor_devolucao').mask('#.##0,00', { reverse: true });
 
-            // Inicializar DataTable
+        // Inicializar DataTable
             $('#tabelaResultados').DataTable({
                 "language": {
                     "url": "../style/Portuguese-Brasil.json"
                 },
-                "order": [[0, 'desc']]
+                "order": [[0, 'desc']],
+                "pageLength": 10 // Define o número de registros por página
             });
 
         });

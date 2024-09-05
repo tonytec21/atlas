@@ -8,6 +8,54 @@ if (!isset($conn)) {
     die("Erro ao conectar ao banco de dados");
 }
 
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $titulo = $_POST['title'];
+    $categoria = $_POST['category'];
+    $data_limite = $_POST['deadline'];
+    $funcionario_responsavel = $_POST['employee'];
+    $origem = $_POST['origin'];
+    $descricao = $_POST['description'];
+    $criado_por = $_POST['createdBy'];
+    $data_criacao = $_POST['createdAt'];
+    $token = md5(uniqid(rand(), true));
+    $caminho_anexo = '';
+
+    // Verifica se há arquivos anexados
+    if (!empty($_FILES['attachments']['name'][0])) {
+        $targetDir = "../tarefas/arquivos/$token/";
+        $fullTargetDir = __DIR__ . $targetDir;
+        if (!is_dir($fullTargetDir)) {
+            mkdir($fullTargetDir, 0777, true);
+        }
+
+        foreach ($_FILES['attachments']['name'] as $key => $name) {
+            $targetFile = $fullTargetDir . basename($name);
+            if (move_uploaded_file($_FILES['attachments']['tmp_name'][$key], $targetFile)) {
+                $caminho_anexo .= "$targetDir" . basename($name) . ";";
+            }
+        }
+        // Remover o ponto e vírgula final
+        $caminho_anexo = rtrim($caminho_anexo, ';');
+    }
+
+    // Inserir dados da tarefa no banco de dados
+    $sql = "INSERT INTO tarefas (token, titulo, categoria, origem, descricao, data_limite, funcionario_responsavel, criado_por, data_criacao, caminho_anexo) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ssssssssss", $token, $titulo, $categoria, $origem, $descricao, $data_limite, $funcionario_responsavel, $criado_por, $data_criacao, $caminho_anexo);
+
+    if ($stmt->execute()) {
+        // Capturar o ID da tarefa recém-inserida
+        $last_id = $stmt->insert_id;
+        header("Location: edit_task.php?id=$last_id");
+    } else {
+        echo "Erro ao salvar a tarefa: " . $stmt->error;
+    }
+
+    $stmt->close();
+    $conn->close();
+}
+
 // Buscar dados da OS
 $os_id = $_GET['id'];
 $os_query = $conn->prepare("SELECT * FROM ordens_de_servico WHERE id = ?");
@@ -139,6 +187,15 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
         .status-parcial {
             background-color: #ffc107; /* amarelo */
         }
+        /* CSS personalizado para aumentar o tamanho do modal de criação de tarefas */
+        #tarefaModal .modal-dialog {
+            max-width: 60%; /* Define a largura do modal para 60% da página */
+        }
+
+        /* Ajuste a altura automática se necessário */
+        #tarefaModal .modal-content {
+            height: auto;
+        }
     </style>
 </head>
 <body>
@@ -156,6 +213,7 @@ include(__DIR__ . '/../menu.php');
                 <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
                 <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
                 <button style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
+                <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#tarefaModal">Criar Tarefa</button>
             </div>
         </div>
         <hr>
@@ -484,6 +542,100 @@ include(__DIR__ . '/../menu.php');
         </div>
     </div>
 </div>
+
+<!-- Modal para criação de Tarefa -->
+<div class="modal fade" id="tarefaModal" tabindex="-1" role="dialog" aria-labelledby="tarefaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document"> <!-- Modal ajustado para ser grande -->
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tarefaModalLabel">Criar Tarefa</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="taskForm" method="POST" action="save_task.php" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="title">Título da Tarefa</label>
+                        <input type="text" class="form-control" id="title" name="title" value="<?php echo $ordem_servico['descricao_os'] . ' - ' . $ordem_servico['cliente']; ?>" required>
+                    </div>
+
+                    <!-- Alinhando os campos na mesma linha -->
+                    <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label for="category">Categoria</label>
+                            <select class="form-control" id="category" name="category" required>
+                                <option value="">Selecione</option>
+                                <?php
+                                $sql = "SELECT id, titulo FROM categorias WHERE status = 'ativo'";
+                                $result = $conn->query($sql);
+                                if ($result->num_rows > 0) {
+                                    while($row = $result->fetch_assoc()) {
+                                        echo "<option value='" . $row['id'] . "'>" . htmlspecialchars($row['titulo'], ENT_QUOTES, 'UTF-8') . "</option>";
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </div>
+
+                        <div class="form-group col-md-4">
+                            <label for="deadline">Data Limite para Conclusão</label>
+                            <input type="datetime-local" class="form-control" id="deadline" name="deadline" required>
+                        </div>
+
+                        <div class="form-group col-md-4">
+                            <label for="employee">Funcionário Responsável</label>
+                            <select class="form-control" id="employee" name="employee" required>
+                                <option value="">Selecione</option>
+                                <?php
+                                $sql = "SELECT id, nome_completo FROM funcionarios WHERE status = 'ativo'";
+                                $result = $conn->query($sql);
+                                $loggedInUser = $_SESSION['username'];
+
+                                if ($result->num_rows > 0) {
+                                    while($row = $result->fetch_assoc()) {
+                                        $selected = ($row['nome_completo'] == $loggedInUser) ? 'selected' : '';
+                                        echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "' $selected>" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </div>
+
+                        <div class="form-group col-md-4">
+                            <label for="origin">Origem</label>
+                            <select class="form-control" id="origin" name="origin" required>
+                                <option value="">Selecione</option>
+                                <?php
+                                $sql = "SELECT id, titulo FROM origem WHERE status = 'ativo'";
+                                $result = $conn->query($sql);
+                                if ($result->num_rows > 0) {
+                                    while($row = $result->fetch_assoc()) {
+                                        echo "<option value='" . $row['id'] . "'>" . htmlspecialchars($row['titulo'], ENT_QUOTES, 'UTF-8') . "</option>";
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Descrição</label>
+                        <textarea class="form-control" id="description" name="description" rows="4"><?php echo $ordem_servico['observacoes']; ?></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="attachments">Anexos</label>
+                        <input type="file" class="form-control-file" id="attachments" name="attachments[]" multiple>
+                    </div>
+                    <input type="hidden" id="createdBy" name="createdBy" value="<?php echo $_SESSION['username']; ?>">
+                    <input type="hidden" id="createdAt" name="createdAt" value="<?php echo date('Y-m-d H:i:s'); ?>">
+                    <button type="submit" class="btn btn-primary w-100">Criar Tarefa</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
