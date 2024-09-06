@@ -196,6 +196,30 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
         #tarefaModal .modal-content {
             height: auto;
         }
+        .btn-4 {
+            background: #34495e;
+            color: #fff;
+        }
+        .btn-4:hover {
+            background: #2c3e50;
+            color: #fff;
+        }
+        .btn-edit2 {
+            background: #ffa907;
+            color: #fff;
+        }
+        .btn-edit2:hover {
+            background: #ff9707;
+            color: #fff;
+        }
+        .btn-info2 {
+            background: #17a2b8;
+            color: #fff;
+        }
+        .btn-info2:hover {
+            background: #138496;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -209,11 +233,11 @@ include(__DIR__ . '/../menu.php');
             <h4>Ordem de Serviço nº: <?php echo $ordem_servico['id']; ?></h4>
             <div>
                 <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
-                <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-info btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
+                <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" type="button" class="btn btn-info2 btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
                 <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
-                <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
+                <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
                 <button style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
-                <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#tarefaModal">Criar Tarefa</button>
+                <button type="button" class="btn btn-4 btn-sm" style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" data-toggle="modal" data-target="#tarefaModal"><i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa</button>
             </div>
         </div>
         <hr>

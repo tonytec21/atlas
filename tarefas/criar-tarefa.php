@@ -101,6 +101,7 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+<script src="../script/toastr.min.js"></script>
 <script>
     $(document).ready(function() {
 

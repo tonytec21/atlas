@@ -93,7 +93,8 @@ while ($row = $result->fetch_assoc()) {
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/toastr.min.css">
     <style>
         .comment-bubble {
             position: relative;
@@ -318,6 +319,7 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/jquery-3.6.0.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+<script src="../script/toastr.min.js"></script>
 <script>
 
     $(document).ready(function() {
