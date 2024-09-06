@@ -181,7 +181,7 @@ if ($signatureImage) {
         if ($imageWidth < 2000) {
             $pdf->Ln(15);
         } else {
-            $pdf->Ln(2);
+            $pdf->Ln(4);
         }
     } else {
         // Debug: show the path of the signature image if it doesn't exist
