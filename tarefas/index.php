@@ -2,7 +2,6 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
-// Função para definir o fuso horário corretamente como sendo brasileiro
 date_default_timezone_set('America/Sao_Paulo');
 ?>
 <!DOCTYPE html>
