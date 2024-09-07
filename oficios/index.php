@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['numero']) || isset($_G
     }
 }
 
-$sql = "SELECT * FROM oficios $filterQuery ORDER BY id DESC LIMIT 10";
+$sql = "SELECT * FROM oficios $filterQuery ORDER BY id DESC";
 $result = $conn->query($sql);
 
 $oficios = [];
