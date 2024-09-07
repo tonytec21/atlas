@@ -22,6 +22,7 @@ include_once 'update_atlas/atualizacao.php';
         }
         .chart-container.full-height {
             height: 360px;
+            margin-top: 30px;
         }
         .btn-info:hover {
             color: #fff;
@@ -309,9 +310,9 @@ include(__DIR__ . '/menu.php');
         });
     });
 
-    window.onload = function() {
-    clearCache();
-};
+    // window.onload = function() {
+    //     clearCache();
+    // };
 </script>
 <br><br><br>
 <?php

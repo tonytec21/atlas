@@ -55,5 +55,10 @@ if (strpos($output, 'Already up to date.') !== false) {
             <button type="submit" class="btn btn-primary">Entrar</button>
         </form>
     </div>
+    <script>
+        window.onload = function() {
+            clearCache();
+        };
+    </script>
 </body>
 </html>
