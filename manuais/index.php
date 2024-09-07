@@ -121,7 +121,7 @@ include(__DIR__ . '/db_connection.php');
                 echo '<div id="category-' . md5($categoria['categoria']) . '" class="collapse show">';
                 echo '<div class="row">';
                 foreach ($videos as $video) {
-                    echo '<div class="col-md-6 video-card">';
+                    echo '<div class="col-md-4 video-card">';
                     echo '<div class="card">';
                     echo '<div class="card-body">';
                     echo '<div class="video-card-title">' . htmlspecialchars($video['titulo']) . '</div>';
