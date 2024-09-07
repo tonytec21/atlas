@@ -9,6 +9,8 @@ checkSession();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Atlas - Editar Arquivos</title>
+    <script src="../script/jquery-3.5.1.min.js"></script>
+    <script src="../script/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
@@ -98,10 +100,9 @@ $selos_arquivamentos->close();
         <div class="title-buttons">
             <h4>Edição de Arquivamento</h4>
             <div class="buttons-right">
-                <button style="width: 190px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-primary" onclick="window.open('capa-arquivamento.php?id=<?php echo $arquivo_id; ?>', '_blank')">
+                <button style="width: 190px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-primary" id="capaArquivamentoButton">
                     <i class="fa fa-print" aria-hidden="true"></i> Capa de Arquivamento
                 </button>
-
                 <button style="width: 190px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-success" onclick="window.location.href='cadastro.php'">
                     <i class="fa fa-plus" aria-hidden="true"></i> Criar Arquivamento
                 </button>
@@ -268,13 +269,41 @@ $selos_arquivamentos->close();
     </div>
 </div>
 
-<script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
 <script src="../script/jquery.dataTables.min.js"></script>
 <script src="../script/dataTables.bootstrap4.min.js"></script>
 <script>
+
+            $(document).ready(function() {
+            // Adiciona o evento de clique ao botão
+            $('#capaArquivamentoButton').on('click', function() {
+                // Faz a requisição para o JSON
+                $.ajax({
+                    url: '../style/configuracao.json',
+                    dataType: 'json',
+                    cache: false, // Desabilita o cache
+                    success: function(data) {
+                        const arquivoId = '<?php echo $arquivo_id; ?>'; // Pega o arquivo_id via PHP
+                        let url = '';
+
+                        // Verifica o valor do "timbrado" e ajusta a URL
+                        if (data.timbrado === 'S') {
+                            url = 'capa_arquivamento.php?id=' + arquivoId;
+                        } else if (data.timbrado === 'N') {
+                            url = 'capa-arquivamento.php?id=' + arquivoId;
+                        }
+
+                        // Abre a URL correspondente em uma nova aba
+                        window.open(url, '_blank');
+                    },
+                    error: function() {
+                        alert('Erro ao carregar o arquivo de configuração.');
+                    }
+                });
+            });
+        });
 
     $(document).ready(function() {
         var filesToRemove = []; // Array to store files to be removed

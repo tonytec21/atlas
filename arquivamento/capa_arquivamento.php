@@ -9,16 +9,42 @@ class PDF extends TCPDF
     // Cabeçalho do PDF
     public function Header()
     {
-        $image_file = '../style/img/logo.png'; // Verifique se o caminho está correto
-        $this->Image($image_file, 30, 10, 150, '', 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);
-        $this->SetY(25); // Ajuste para garantir que o conteúdo comece 2 cm abaixo do cabeçalho
+        $image_file = '../style/img/timbrado.png'; // Verifique se o caminho está correto
+        
+        // Definir largura e altura que você deseja forçar
+        $imageWidth = 210;  // Largura total da página A4 (em mm)
+        $imageHeight = 297; // Altura total da página A4 (em mm)
+
+        // Desativar as margens e o AutoPageBreak temporariamente
+        $this->SetAutoPageBreak(false, 0); // Desativar temporariamente a quebra automática de página
+        $this->SetMargins(0, 0, 0); // Remover margens para a imagem
+        
+        // Redimensionar a imagem para ocupar toda a página, ignorando proporções
+        $this->Image($image_file, 0, 0, $imageWidth, $imageHeight, 'PNG', '', '', false, 300, '', false, false, 0, false, false, false);
+
+        // Restaurar as margens e o AutoPageBreak para o conteúdo subsequente
+        $this->SetAutoPageBreak(true, 25); // Restaurar o AutoPageBreak com a margem inferior de 2.5cm
+        $this->SetMargins(25, 45, 25);  // Restaurar as margens para o conteúdo
+        $this->SetY(35); // Ajuste para garantir que o conteúdo não sobreponha a imagem
     }
 
     // Rodapé do PDF
     public function Footer()
     {
         $this->SetY(-15);
-        $this->SetFont('arial', 'I', 8);
+        $this->SetFont('helvetica', 'I', 8);
+    }
+
+    // Adicionar parágrafo com recuo na primeira linha
+    public function AddParagraph($text, $lineHeight)
+    {
+        $this->SetX(25); // Recuo da margem esquerda
+        $paragraphs = explode("\n", $text);
+        foreach ($paragraphs as $paragraph) {
+            $this->SetX(25);
+            $paragraph = ltrim($paragraph, "\t"); // Remove o tab no início do parágrafo
+            $this->WriteHTML('<p style="text-align:justify; text-indent:2cm;">' . htmlspecialchars_decode($paragraph) . '</p>');
+        }
     }
 }
 

@@ -229,6 +229,7 @@ include(__DIR__ . '/../menu.php');
     </div>
 
     <script src="../script/jquery-3.5.1.min.js"></script>
+    <script src="../script/jquery-3.6.0.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
     <script>
@@ -471,7 +472,29 @@ include(__DIR__ . '/../menu.php');
             // Gerar capa de arquivamento em PDF
             $('#generate-pdf-button').on('click', function() {
                 var id = $(this).data('id');
-                window.open('capa-arquivamento.php?id=' + id, '_blank');
+
+                // Faz a requisição para o arquivo JSON
+                $.ajax({
+                    url: '../style/configuracao.json',
+                    dataType: 'json',
+                    cache: false, // Desabilita o cache
+                    success: function(data) {
+                        let url = '';
+
+                        // Verifica o valor do "timbrado" e ajusta a URL
+                        if (data.timbrado === 'S') {
+                            url = 'capa_arquivamento.php?id=' + id;
+                        } else if (data.timbrado === 'N') {
+                            url = 'capa-arquivamento.php?id=' + id;
+                        }
+
+                        // Abre a URL correspondente em uma nova aba
+                        window.open(url, '_blank');
+                    },
+                    error: function() {
+                        alert('Erro ao carregar o arquivo de configuração.');
+                    }
+                });
             });
         });
     </script>
