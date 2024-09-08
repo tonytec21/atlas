@@ -396,19 +396,19 @@ date_default_timezone_set('America/Sao_Paulo');
             <hr>
             <div class="mt-3">
                 <h5>Resultados da Pesquisa</h5>
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 80%">
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
                     <thead>
                         <tr>
                             <th>Nº Protocolo</th>
-                            <th>Título</th>
-                            <th>Categoria</th>
-                            <th>Origem</th>
-                            <th>Descrição</th>
-                            <th>Data Limite</th>
-                            <th>Funcionário</th>
+                            <th style="width: 15%">Título</th>
+                            <th style="width: 10%">Categoria</th>
+                            <th style="width: 9%">Origem</th>
+                            <th style="width: 20%">Descrição</th>
+                            <th style="width: 9%">Data Limite</th>
+                            <th style="width: 12%">Funcionário</th>
                             <th>Prioridade</th>
                             <th>Status</th>
-                            <th>Ações</th>
+                            <th style="width: 8%">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="taskTable">
