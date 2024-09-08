@@ -1,6 +1,7 @@
 <?php
 session_start();
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 function checkSession() {
     if (!isset($_SESSION['username'])) {

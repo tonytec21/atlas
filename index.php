@@ -3,6 +3,7 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 include_once 'update_atlas/atualizacao.php';
+date_default_timezone_set('America/Sao_Paulo');
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
