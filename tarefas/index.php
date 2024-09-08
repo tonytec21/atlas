@@ -922,18 +922,21 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
                         }
 
                         // Adicionar a linha na tabela DataTables com a classe de coloração correta
+                        var descricaoLimitada = task.descricao.length > 80 ? task.descricao.substring(0, 80) + '...' : task.descricao;
+
                         var row = dataTable.row.add([
                             task.id,
                             task.titulo,
                             task.categoria_titulo,
                             task.origem_titulo,
-                            task.descricao,
+                            descricaoLimitada, // Limita a descrição a 80 caracteres
                             new Date(task.data_limite).toLocaleString("pt-BR"),
                             task.funcionario_responsavel,
                             task.nivel_de_prioridade,
                             '<span class="status-label ' + statusClass + '">' + capitalize(task.status) + '</span>',
                             actions
                         ]).draw().node(); // Aqui adicionamos a linha e retornamos o nó DOM
+
 
                         // Aplicar a classe de coloração na linha
                         $(row).addClass(rowClass);

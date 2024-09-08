@@ -290,9 +290,8 @@ include(__DIR__ . '/menu.php');
     </div>
 </div>
 
-
 <div class="modal fade" id="tarefasModal" tabindex="-1" aria-labelledby="tarefasModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg" style="max-width: 70%;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 style="text-align: center;width: 100%;" class="modal-title" id="tarefasModalLabel">RESUMO DAS TAREFAS</h5>
@@ -303,18 +302,18 @@ include(__DIR__ . '/menu.php');
             <div class="modal-body">
                 <!-- Seção para novas tarefas -->
                 <div id="novas-tarefas-section" style="display: none;">
-                    <h5 class="text-success">NOVAS TAREFAS:</h5> <!-- Título estilizado como h4 -->
-                    <ul id="novas-tarefas-list">
-                        <!-- Novas tarefas serão carregadas aqui via AJAX -->
-                    </ul>
+                    <h5 class="text-success">NOVAS TAREFAS:</h5>
+                    <div id="novas-tarefas-list">
+                        <!-- As novas tarefas serão carregadas aqui via AJAX e exibidas em tabelas -->
+                    </div>
                     <hr>
                 </div>
 
                 <!-- Seção para tarefas pendentes -->
-                <h5 class="text-danger">TAREFAS PENDENTES:</h5> <!-- Título estilizado como h4 -->
-                <ul id="tarefas-list">
-                    <!-- Tarefas pendentes serão carregadas aqui via AJAX -->
-                </ul>
+                <h5 class="text-danger">TAREFAS PENDENTES:</h5>
+                <div id="tarefas-list">
+                    <!-- As tarefas pendentes serão carregadas aqui via AJAX e exibidas em tabelas -->
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
@@ -337,13 +336,84 @@ $(document).ready(function() {
             return 'Data inválida';
         }
         const dia = String(data.getDate()).padStart(2, '0');
-        const mes = String(data.getMonth() + 1).padStart(2, '0'); // Mês começa do 0
+        const mes = String(data.getMonth() + 1).padStart(2, '0');
         const ano = data.getFullYear();
         const horas = String(data.getHours()).padStart(2, '0');
         const minutos = String(data.getMinutes()).padStart(2, '0');
         const segundos = String(data.getSeconds()).padStart(2, '0');
-
         return `${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}`;
+    }
+
+    // Função para adicionar classes de prioridade
+    function getPriorityClass(priority) {
+        if (priority === 'Média') {
+            return 'priority-medium';
+        } else if (priority === 'Alta') {
+            return 'priority-high';
+        } else if (priority === 'Crítica') {
+            return 'priority-critical';
+        }
+        return '';
+    }
+
+    // Função para adicionar classes de status baseado no estado
+    function getStatusClass(status_data) {
+        if (status_data === 'Prestes a vencer') {
+            return 'row-quase-vencida';
+        } else if (status_data === 'Vencida') {
+            return 'row-vencida';
+        }
+        return '';
+    }
+
+    // Função para limitar o texto a 60 caracteres
+    function limitarTexto(texto, limite) {
+        if (texto.length > limite) {
+            return texto.substring(0, limite) + '...';
+        }
+        return texto;
+    }
+
+    // Função para criar uma tabela HTML com as tarefas
+    function criarTabelaPorPrioridade(prioridade, tarefas) {
+        let tabela = `
+            <h5 class="text-${prioridade === 'Baixa' ? 'primary' : prioridade === 'Média' ? 'warning' : 'danger'}">
+                Tarefas - Prioridade ${prioridade}
+            </h5>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Nº Prot.</th>
+                        <th>Título</th>
+                        <th>Descrição</th>
+                        <th>Data Criação</th>
+                        <th>Data Limite</th>
+                        <th>Situação</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        // Adiciona as tarefas à tabela
+        tarefas.forEach(tarefa => {
+            tabela += `
+                <tr class="${getPriorityClass(tarefa.nivel_de_prioridade)} ${getStatusClass(tarefa.status_data)}">
+                    <td>${tarefa.id}</td>
+                    <td>${limitarTexto(tarefa.titulo, 80)}</td>
+                    <td>${limitarTexto(tarefa.descricao, 80)}</td>
+                    <td>${formatarDataBrasileira(tarefa.data_criacao)}</td>
+                    <td>${formatarDataBrasileira(tarefa.data_limite)}</td>
+                    <td>${tarefa.status_data ? `<span class="text-danger">${tarefa.status_data}</span>` : ''}</td>
+                </tr>
+            `;
+        });
+
+        tabela += `
+                </tbody>
+            </table>
+        `;
+
+        return tabela;
     }
 
     // Carregar as tarefas pendentes ao carregar a página
@@ -359,64 +429,39 @@ $(document).ready(function() {
 
             var totalTarefas = 0; // Contador para tarefas diferentes de "Concluída" ou "Cancelada"
 
-            // Função para adicionar classes de prioridade
-            function getPriorityClass(priority) {
-                if (priority === 'Média') {
-                    return 'priority-medium';
-                } else if (priority === 'Alta') {
-                    return 'priority-high';
-                } else if (priority === 'Crítica') {
-                    return 'priority-critical';
-                }
-                return '';
-            }
-
-            // Função para adicionar classes de status baseado no estado
-            function getStatusClass(status_data) {
-                if (status_data === 'Prestes a vencer') {
-                    return 'row-quase-vencida';
-                } else if (status_data === 'Vencida') {
-                    return 'row-vencida';
-                }
-                return '';
-            }
-
             // Exibir as novas tarefas agrupadas por funcionário
             $.each(response.novas_tarefas, function(funcionario, tarefas) {
                 $('#novas-tarefas-section').show();
                 novasTarefasList.append(`<h5>Tarefas de ${funcionario}:</h5>`);
-                $.each(tarefas, function(index, tarefa) {
-                    novasTarefasList.append(`
-                        <li class="${getPriorityClass(tarefa.nivel_de_prioridade)}">
-                            <strong>Nº Protocolo: ${tarefa.id}</strong><br>
-                            <strong>${tarefa.titulo}</strong><br>
-                            ${tarefa.descricao}<br>
-                            Criada em: ${formatarDataBrasileira(tarefa.data_criacao)}<br>
-                            Data Limite: ${formatarDataBrasileira(tarefa.data_limite)}<br>
-                            Prioridade: ${tarefa.nivel_de_prioridade}
-                        </li><hr>
-                    `);
-                });
+                novasTarefasList.append(criarTabelaPorPrioridade('Baixa', tarefas));
                 totalTarefas += tarefas.length; // Contabilizar tarefas novas
             });
 
-            // Exibir as tarefas pendentes agrupadas por funcionário
-            $.each(response.tarefas, function(funcionario, tarefas) {
+            // Exibir as tarefas pendentes agrupadas por funcionário e prioridade
+            $.each(response.tarefas, function(funcionario, tarefasFuncionario) {
+                // Exibir o título com o nome do funcionário
                 tarefasList.append(`<h5>Tarefas de ${funcionario}:</h5>`);
-                $.each(tarefas, function(index, tarefa) {
-                    var status_data = tarefa.status_data ? `<span class="text-danger">${tarefa.status_data}</span>` : '';
-                    tarefasList.append(`
-                        <li class="${getPriorityClass(tarefa.nivel_de_prioridade)} ${getStatusClass(tarefa.status_data)}">
-                            <strong>Nº Protocolo: ${tarefa.id}</strong><br>
-                            <strong>${tarefa.titulo}</strong><br>
-                            ${tarefa.descricao}<br>
-                            Criada em: ${formatarDataBrasileira(tarefa.data_criacao)}<br>
-                            Data Limite: ${formatarDataBrasileira(tarefa.data_limite)} ${status_data}<br>
-                            Prioridade: ${tarefa.nivel_de_prioridade}
-                        </li><hr>
-                    `);
-                });
-                totalTarefas += tarefas.length; // Contabilizar tarefas pendentes
+                
+                const tarefasBaixa = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Baixa');
+                const tarefasMedia = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Média');
+                const tarefasAlta = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Alta');
+                const tarefasCritica = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Crítica');
+
+                // Adicionar as tabelas por prioridade se houver tarefas
+                if (tarefasBaixa.length > 0) {
+                    tarefasList.append(criarTabelaPorPrioridade('Baixa', tarefasBaixa));
+                }
+                if (tarefasMedia.length > 0) {
+                    tarefasList.append(criarTabelaPorPrioridade('Média', tarefasMedia));
+                }
+                if (tarefasAlta.length > 0) {
+                    tarefasList.append(criarTabelaPorPrioridade('Alta', tarefasAlta));
+                }
+                if (tarefasCritica.length > 0) {
+                    tarefasList.append(criarTabelaPorPrioridade('Crítica', tarefasCritica));
+                }
+
+                totalTarefas += tarefasFuncionario.length; // Contabilizar tarefas pendentes
             });
 
             // Verificar se existem tarefas. Se houver, abrir o modal.
@@ -432,6 +477,8 @@ $(document).ready(function() {
         }
     });
 });
+
+
 </script>
 
 
