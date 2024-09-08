@@ -202,7 +202,7 @@ include(__DIR__ . '/../menu.php');
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group col-md-4">
+                <div class="form-group col-md-3">
                     <label for="origin">Origem:</label>
                     <select id="origin" name="origin" class="form-control" required>
                         <?php foreach ($origins as $origin) : ?>
@@ -210,11 +210,20 @@ include(__DIR__ . '/../menu.php');
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group col-md-4">
+                <div class="form-group col-md-3">
                     <label for="deadline">Data Limite para Conclusão:</label>
                     <input type="datetime-local" class="form-control" id="deadline" name="deadline" value="<?php echo htmlspecialchars(str_replace(' ', 'T', $taskData['data_limite'])); ?>" required>
                 </div>
-                <div class="form-group col-md-4">
+                <div class="form-group col-md-3">
+                    <label for="priority">Nível de Prioridade:</label>
+                    <select id="priority" name="priority" class="form-control" required>
+                        <option value="Baixa" <?php echo $taskData['nivel_de_prioridade'] == 'Baixa' ? 'selected' : ''; ?>>Baixa</option>
+                        <option value="Média" <?php echo $taskData['nivel_de_prioridade'] == 'Média' ? 'selected' : ''; ?>>Média</option>
+                        <option value="Alta" <?php echo $taskData['nivel_de_prioridade'] == 'Alta' ? 'selected' : ''; ?>>Alta</option>
+                        <option value="Crítica" <?php echo $taskData['nivel_de_prioridade'] == 'Crítica' ? 'selected' : ''; ?>>Crítica</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
                     <label for="employee">Funcionário Responsável:</label>
                     <select id="employee" name="employee" class="form-control" required>
                         <?php foreach ($employees as $employee) : ?>

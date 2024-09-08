@@ -45,11 +45,21 @@ include(__DIR__ . '/../menu.php');
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group col-md-4">
+                <div class="form-group col-md-3">
                     <label for="deadline">Data Limite para Conclusão:</label>
                     <input type="datetime-local" class="form-control" id="deadline" name="deadline" required>
                 </div>
-                <div class="form-group col-md-4">
+                <div class="form-group col-md-3">
+                    <label for="priority">Nível de Prioridade:</label>
+                    <select id="priority" name="priority" class="form-control" required>
+                        <option value="">Selecione</option>
+                        <option value="Baixa">Baixa</option>
+                        <option value="Média">Média</option>
+                        <option value="Alta">Alta</option>
+                        <option value="Crítica">Crítica</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
                     <label for="employee">Funcionário Responsável:</label>
                     <select id="employee" name="employee" class="form-control" required>
                         <option value="">Selecione</option>
@@ -67,7 +77,7 @@ include(__DIR__ . '/../menu.php');
                         ?>
                     </select>
                 </div>
-                <div class="form-group col-md-4">
+                <div class="form-group col-md-3">
                     <label for="origin">Origem:</label>
                     <select id="origin" name="origin" class="form-control" required>
                         <option value="">Selecione</option>

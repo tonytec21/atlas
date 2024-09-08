@@ -12,7 +12,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $employee = $_POST['employee'];
     $description = $_POST['description'];
     $updatedBy = $_POST['updatedBy'];
-    $updatedAt = date('Y-m-d H:i:s'); // Current timestamp
+    $updatedAt = date('Y-m-d H:i:s'); 
+    $nivel_de_prioridade = $_POST['priority'];
 
     // Convert deadline to the correct format
     $deadline = DateTime::createFromFormat('Y-m-d\TH:i', $deadline);
@@ -23,9 +24,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     // Update task data
-    $sql = "UPDATE tarefas SET titulo = ?, categoria = ?, origem = ?, data_limite = ?, funcionario_responsavel = ?, descricao = ?, data_atualizacao = ?, atualizado_por = ? WHERE id = ?";
+    $sql = "UPDATE tarefas SET titulo = ?, categoria = ?, origem = ?, data_limite = ?, funcionario_responsavel = ?, descricao = ?, data_atualizacao = ?, atualizado_por = ?, nivel_de_prioridade = ? WHERE id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param('ssssssssi', $title, $category, $origin, $deadline, $employee, $description, $updatedAt, $updatedBy, $taskId);
+    $stmt->bind_param('sssssssssi', $title, $category, $origin, $deadline, $employee, $description, $updatedAt, $updatedBy, $nivel_de_prioridade, $taskId);
 
     if ($stmt->execute()) {
         echo "Tarefa atualizada com sucesso.";

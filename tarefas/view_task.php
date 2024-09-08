@@ -19,17 +19,26 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
 
     if ($result->num_rows > 0) {
         $task = $result->fetch_assoc();
+        $taskId = $task['id'];  // ID da tarefa principal
 
-        // Fetch comments for the task
-        $sql_comments = "SELECT * FROM comentarios WHERE hash_tarefa = ?";
+        // Buscar comentários da tarefa principal e das subtarefas
+        $sql_comments = "SELECT * FROM comentarios 
+                         WHERE hash_tarefa = ? OR id_tarefa_principal = ?";
         $stmt_comments = $conn->prepare($sql_comments);
-        $stmt_comments->bind_param("s", $token);
+        $stmt_comments->bind_param("si", $token, $taskId);
         $stmt_comments->execute();
         $comments_result = $stmt_comments->get_result();
         $comments = [];
         while ($comment_row = $comments_result->fetch_assoc()) {
+            // Verificar se o comentário é de uma subtarefa
+            if ($comment_row['id_tarefa_principal'] == $taskId) {
+                $comment_row['is_subtask'] = true;  // Indicar que é um comentário de subtarefa
+            } else {
+                $comment_row['is_subtask'] = false;  // Indicar que é um comentário da tarefa principal
+            }
             $comments[] = $comment_row;
         }
+
         $task['comentarios'] = $comments;
 
         // Verificar se o recibo de entrega já foi gerado
@@ -48,4 +57,3 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
     $stmt->close();
     $conn->close();
 }
-?>
