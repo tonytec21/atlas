@@ -430,17 +430,35 @@ $(document).ready(function() {
 
             var totalTarefas = 0; // Contador para tarefas diferentes de "Concluída" ou "Cancelada"
 
-            // Exibir as novas tarefas agrupadas por funcionário
-            $.each(response.novas_tarefas, function(funcionario, tarefas) {
+            // Exibir as novas tarefas agrupadas por funcionário e prioridade
+            $.each(response.novas_tarefas, function(funcionario, tarefasFuncionario) {
                 $('#novas-tarefas-section').show();
                 novasTarefasList.append(`<h5>Tarefas de ${funcionario}:</h5>`);
-                novasTarefasList.append(criarTabelaPorPrioridade('Baixa', tarefas));
-                totalTarefas += tarefas.length; // Contabilizar tarefas novas
+                
+                const novasTarefasCritica = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Crítica');
+                const novasTarefasAlta = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Alta');
+                const novasTarefasMedia = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Média');
+                const novasTarefasBaixa = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Baixa');
+
+                // Adicionar as tabelas por prioridade nas novas tarefas
+                if (novasTarefasCritica.length > 0) {
+                    novasTarefasList.append(criarTabelaPorPrioridade('Crítica', novasTarefasCritica));
+                }
+                if (novasTarefasAlta.length > 0) {
+                    novasTarefasList.append(criarTabelaPorPrioridade('Alta', novasTarefasAlta));
+                }
+                if (novasTarefasMedia.length > 0) {
+                    novasTarefasList.append(criarTabelaPorPrioridade('Média', novasTarefasMedia));
+                }
+                if (novasTarefasBaixa.length > 0) {
+                    novasTarefasList.append(criarTabelaPorPrioridade('Baixa', novasTarefasBaixa));
+                }
+
+                totalTarefas += tarefasFuncionario.length; // Contabilizar novas tarefas
             });
 
             // Exibir as tarefas pendentes agrupadas por funcionário e prioridade
             $.each(response.tarefas, function(funcionario, tarefasFuncionario) {
-                // Exibir o título com o nome do funcionário
                 tarefasList.append(`<h5>Tarefas de ${funcionario}:</h5>`);
                 
                 const tarefasCritica = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Crítica');
@@ -448,7 +466,7 @@ $(document).ready(function() {
                 const tarefasMedia = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Média');
                 const tarefasBaixa = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Baixa');
 
-                // Adicionar as tabelas por prioridade, começando com as tarefas críticas
+                // Adicionar as tabelas por prioridade nas tarefas pendentes
                 if (tarefasCritica.length > 0) {
                     tarefasList.append(criarTabelaPorPrioridade('Crítica', tarefasCritica));
                 }
