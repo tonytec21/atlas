@@ -364,9 +364,19 @@ date_default_timezone_set('America/Sao_Paulo');
                             <option value="Pendente">Pendente</option>
                         </select>
                     </div>
-                    <div class="form-group col-md-8">
+                    <div class="form-group col-md-6">
                         <label for="description">Descrição:</label>
                         <input type="text" class="form-control" id="description" name="description">
+                    </div>
+                    <div class="form-group col-md-2">
+                        <label for="priority">Prioridade:</label>
+                        <select id="priority" name="priority" class="form-control">
+                            <option value="">Selecione</option>
+                            <option value="Baixa">Baixa</option>
+                            <option value="Média">Média</option>
+                            <option value="Alta">Alta</option>
+                            <option value="Crítica">Crítica</option>
+                        </select>
                     </div>
                     <div class="form-group col-md-4">
                         <label for="employee">Funcionário Responsável:</label>
@@ -897,50 +907,55 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
                     // Limpar os dados da tabela DataTables sem destruir a instância
                     dataTable.clear();
 
-                    // Popular a tabela com os novos dados
-                    tasks.forEach(function(task) {
-                        // Definir classe de status
-                        var statusClass = getStatusClass(task.status.toLowerCase());
+                    // Verificar se há tarefas
+                    if (tasks.length > 0) {
+                        // Popular a tabela com os novos dados
+                        tasks.forEach(function(task) {
+                            // Definir classe de status
+                            var statusClass = getStatusClass(task.status.toLowerCase());
 
-                        var rowClass = '';
+                            var rowClass = '';
 
-                        // Aplicar regras de coloração apenas se o status não for "Concluída" ou "Cancelada"
-                        if (task.status.toLowerCase() !== 'concluída' && task.status.toLowerCase() !== 'cancelada') {
-                            // Verificar vencimento e definir classe de linha
-                            rowClass = getRowClass(task.status.toLowerCase(), task.data_limite);
+                            // Aplicar regras de coloração apenas se o status não for "Concluída" ou "Cancelada"
+                            if (task.status.toLowerCase() !== 'concluída' && task.status.toLowerCase() !== 'cancelada') {
+                                // Verificar vencimento e definir classe de linha
+                                rowClass = getRowClass(task.status.toLowerCase(), task.data_limite);
 
-                            // Se a tarefa não estiver vencida, aplicar a classe de prioridade
-                            if (!rowClass) {
-                                rowClass = getPriorityClass(task.nivel_de_prioridade);
+                                // Se a tarefa não estiver vencida, aplicar a classe de prioridade
+                                if (!rowClass) {
+                                    rowClass = getPriorityClass(task.nivel_de_prioridade);
+                                }
                             }
-                        }
 
-                        // Definir os botões de ação
-                        var actions = '<button class="btn btn-info btn-sm" onclick="viewTask(\'' + task.token + '\')"><i class="fa fa-eye" aria-hidden="true"></i></button>';
-                        if (task.status.toLowerCase() !== 'concluída') {
-                            actions += '<button class="btn btn-edit btn-sm" onclick="editTask(' + task.id + ')"><i class="fa fa-pencil" aria-hidden="true"></i></button>';
-                        }
+                            // Definir os botões de ação
+                            var actions = '<button class="btn btn-info btn-sm" onclick="viewTask(\'' + task.token + '\')"><i class="fa fa-eye" aria-hidden="true"></i></button>';
+                            if (task.status.toLowerCase() !== 'concluída') {
+                                actions += '<button class="btn btn-edit btn-sm" onclick="editTask(' + task.id + ')"><i class="fa fa-pencil" aria-hidden="true"></i></button>';
+                            }
 
-                        // Adicionar a linha na tabela DataTables com a classe de coloração correta
-                        var descricaoLimitada = task.descricao.length > 80 ? task.descricao.substring(0, 80) + '...' : task.descricao;
+                            // Adicionar a linha na tabela DataTables com a classe de coloração correta
+                            var descricaoLimitada = task.descricao.length > 80 ? task.descricao.substring(0, 80) + '...' : task.descricao;
 
-                        var row = dataTable.row.add([
-                            task.id,
-                            task.titulo,
-                            task.categoria_titulo,
-                            task.origem_titulo,
-                            descricaoLimitada, // Limita a descrição a 80 caracteres
-                            new Date(task.data_limite).toLocaleString("pt-BR"),
-                            task.funcionario_responsavel,
-                            task.nivel_de_prioridade,
-                            '<span class="status-label ' + statusClass + '">' + capitalize(task.status) + '</span>',
-                            actions
-                        ]).draw().node(); // Aqui adicionamos a linha e retornamos o nó DOM
+                            var row = dataTable.row.add([
+                                task.id,
+                                task.titulo,
+                                task.categoria_titulo,
+                                task.origem_titulo,
+                                descricaoLimitada, // Limita a descrição a 80 caracteres
+                                new Date(task.data_limite).toLocaleString("pt-BR"),
+                                task.funcionario_responsavel,
+                                task.nivel_de_prioridade,
+                                '<span class="status-label ' + statusClass + '">' + capitalize(task.status) + '</span>',
+                                actions
+                            ]).draw().node(); // Aqui adicionamos a linha e retornamos o nó DOM
 
-
-                        // Aplicar a classe de coloração na linha
-                        $(row).addClass(rowClass);
-                    });
+                            // Aplicar a classe de coloração na linha
+                            $(row).addClass(rowClass);
+                        });
+                    } else {
+                        // Exibir mensagem de "Nenhum resultado encontrado" se não houver tarefas
+                        $('#taskTable').html('<tr><td colspan="10" class="text-center">Nenhum resultado encontrado</td></tr>');
+                    }
                 },
                 error: function() {
                     alert('Erro ao buscar as tarefas');

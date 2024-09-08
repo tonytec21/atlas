@@ -29,6 +29,7 @@ $category = isset($_GET['category']) ? trim($_GET['category']) : '';
 $employee = isset($_GET['employee']) ? trim($_GET['employee']) : '';
 $status = isset($_GET['status']) ? trim($_GET['status']) : '';
 $description = isset($_GET['description']) ? trim($_GET['description']) : '';
+$priority = isset($_GET['priority']) ? trim($_GET['priority']) : '';
 $origin = isset($_GET['origin']) ? trim($_GET['origin']) : '';
 
 // Montagem da consulta SQL
@@ -64,6 +65,9 @@ if (!empty($status)) {
 }
 if (!empty($description)) {
     $sql .= " AND tarefas.descricao LIKE '%" . $conn->real_escape_string($description) . "%'";
+}
+if (!empty($priority)) {
+    $sql .= " AND tarefas.nivel_de_prioridade = '" . $conn->real_escape_string($priority) . "'";
 }
 if (!empty($origin)) {
     $sql .= " AND tarefas.origem = '" . $conn->real_escape_string($origin) . "'";
