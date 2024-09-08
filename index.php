@@ -323,8 +323,6 @@ include(__DIR__ . '/menu.php');
     </div>
 </div>
 
-
-
 <script src="script/jquery-3.5.1.min.js"></script>
 <script src="script/bootstrap.min.js"></script>
 <script src="script/jquery.mask.min.js"></script>
