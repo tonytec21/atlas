@@ -144,6 +144,7 @@ $mode_query->close();
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/manuais/index.php'?>"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
 
         <?php if ($nivel_de_acesso === 'administrador'): ?>
+            <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/contas_a_pagar/index.php'?>"><i class="fa fa-usd" aria-hidden="true"></i> Controle de Contas a Pagar</a>
             <button class="dropdown-btn"><i class="fa fa-cog" aria-hidden="true"></i> Administração 
                 <i class="fa fa-caret-down"></i>
             </button>
