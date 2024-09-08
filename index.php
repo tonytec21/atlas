@@ -399,8 +399,8 @@ $(document).ready(function() {
             tabela += `
                 <tr class="${getPriorityClass(tarefa.nivel_de_prioridade)} ${getStatusClass(tarefa.status_data)}">
                     <td>${tarefa.id}</td>
-                    <td>${limitarTexto(tarefa.titulo, 80)}</td>
-                    <td>${limitarTexto(tarefa.descricao, 80)}</td>
+                    <td>${limitarTexto(tarefa.titulo, 60)}</td>
+                    <td>${limitarTexto(tarefa.descricao, 60)}</td>
                     <td>${formatarDataBrasileira(tarefa.data_criacao)}</td>
                     <td>${formatarDataBrasileira(tarefa.data_limite)}</td>
                     <td>${tarefa.status_data ? `<span class="text-danger">${tarefa.status_data}</span>` : ''}</td>
@@ -442,23 +442,23 @@ $(document).ready(function() {
                 // Exibir o título com o nome do funcionário
                 tarefasList.append(`<h5>Tarefas de ${funcionario}:</h5>`);
                 
-                const tarefasBaixa = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Baixa');
-                const tarefasMedia = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Média');
-                const tarefasAlta = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Alta');
                 const tarefasCritica = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Crítica');
+                const tarefasAlta = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Alta');
+                const tarefasMedia = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Média');
+                const tarefasBaixa = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Baixa');
 
-                // Adicionar as tabelas por prioridade se houver tarefas
-                if (tarefasBaixa.length > 0) {
-                    tarefasList.append(criarTabelaPorPrioridade('Baixa', tarefasBaixa));
-                }
-                if (tarefasMedia.length > 0) {
-                    tarefasList.append(criarTabelaPorPrioridade('Média', tarefasMedia));
+                // Adicionar as tabelas por prioridade, começando com as tarefas críticas
+                if (tarefasCritica.length > 0) {
+                    tarefasList.append(criarTabelaPorPrioridade('Crítica', tarefasCritica));
                 }
                 if (tarefasAlta.length > 0) {
                     tarefasList.append(criarTabelaPorPrioridade('Alta', tarefasAlta));
                 }
-                if (tarefasCritica.length > 0) {
-                    tarefasList.append(criarTabelaPorPrioridade('Crítica', tarefasCritica));
+                if (tarefasMedia.length > 0) {
+                    tarefasList.append(criarTabelaPorPrioridade('Média', tarefasMedia));
+                }
+                if (tarefasBaixa.length > 0) {
+                    tarefasList.append(criarTabelaPorPrioridade('Baixa', tarefasBaixa));
                 }
 
                 totalTarefas += tarefasFuncionario.length; // Contabilizar tarefas pendentes
@@ -477,8 +477,6 @@ $(document).ready(function() {
         }
     });
 });
-
-
 </script>
 
 
