@@ -16,6 +16,136 @@ include_once 'update_atlas/atualizacao.php';
     <link rel="icon" href="style/img/favicon.png" type="image/png">
     <script src="script/chart.js"></script>
     <style>
+        /* Remover a borda de foco no botão de fechar */
+        .btn-close {
+            outline: none; /* Remove a borda ao clicar */
+            border: none; /* Remove qualquer borda padrão */
+            background: none; /* Remove o fundo padrão */
+            padding: 0; /* Remove o espaçamento extra */
+            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
+            cursor: pointer; /* Mostra o ponteiro de clique */
+            transition: transform 0.2s ease; /* Suaviza a transição do hover */
+        }
+
+        /* Aumentar o tamanho do botão em 5% no hover */
+        .btn-close:hover {
+            transform: scale(2.10); /* Aumenta 5% */
+        }
+
+        /* Opcional: Adicionar foco suave sem borda visível */
+        .btn-close:focus {
+            outline: none; /* Remove a borda ao foco */
+        }
+
+         /* Remover marcadores de lista */
+    .modal-body ul {
+        list-style-type: none; /* Remove os marcadores de lista */
+        padding-left: 0; /* Remove o padding padrão */
+    }
+
+    /* Recuo personalizado para os itens da lista */
+    .modal-body li {
+        padding-left: 20px!important; /* Recuo da lista */
+        padding: 10px 0; /* Adiciona espaço vertical */
+        border-bottom: 1px solid #ddd; /* Linha separadora */
+    }
+
+    /* Estilo dos títulos de funcionários */
+    .modal-body h5 {
+        margin-top: 20px;
+        margin-bottom: 10px;
+        font-weight: bold;
+    }
+
+    /* Exemplo de ajuste no modal para torná-lo mais largo */
+    .modal-dialog {
+        max-width: 700px; /* Aumenta a largura do modal */
+    }
+
+    /* Prioridades */
+    .priority-medium {
+        background-color: #fff9c4 !important; /* Amarelo claro */
+        padding: 10px;
+    }
+
+    .priority-high {
+        background-color: #ffe082 !important; /* Laranja claro */
+        padding: 10px;
+    }
+
+    .priority-critical {
+        background-color: #ff8a80 !important; /* Vermelho claro */
+        padding: 10px;
+    }
+
+    /* Tarefas quase vencidas e vencidas */
+    .row-quase-vencida {
+        background-color: #ffebcc!important; /* Amarelo claro */
+        padding: 10px;
+    }
+
+    .row-vencida {
+        background-color: #ffcccc!important; /* Vermelho claro */
+        padding: 10px;
+    }
+
+    /* Modo escuro - Prioridades */
+    body.dark-mode .priority-medium {
+        background-color: #fff9c4 !important; /* Amarelo claro */
+        color: #000!important;
+    }
+
+    body.dark-mode .priority-high {
+        background-color: #ffe082 !important; /* Laranja claro */
+        color: #000!important;
+    }
+
+    body.dark-mode .priority-critical {
+        background-color: #ff8a80 !important; /* Vermelho claro */
+    }
+
+    /* Modo escuro - Quase vencida e vencida */
+    body.dark-mode .row-quase-vencida {
+        background-color: #ffebcc!important; /* Amarelo claro */
+        color: #000!important;
+    }
+
+    body.dark-mode .row-vencida {
+        background-color: #ffcccc!important; /* Vermelho claro */
+        color: #000!important;
+    }
+
+    /* Status das tarefas */
+    .status-iniciada {
+        background-color: #007bff; /* Azul */
+        color: #fff;
+    }
+
+    .status-em-espera {
+        background-color: #ffa500; /* Laranja */
+        color: #fff;
+    }
+
+    .status-em-andamento {
+        background-color: #0056b3; /* Azul escuro */
+        color: #fff;
+    }
+
+    .status-concluida {
+        background-color: #28a745; /* Verde */
+        color: #fff;
+    }
+
+    .status-cancelada {
+        background-color: #dc3545; /* Vermelho */
+        color: #fff;
+    }
+
+    .status-pendente {
+        background-color: gray;
+        color: #fff;
+    }
+
         .chart-container {
             position: relative;
             height: 240px;
@@ -160,18 +290,151 @@ include(__DIR__ . '/menu.php');
     </div>
 </div>
 
-<div class="notification">
-    <span class="close-btn">&times;</span>    
-    <h6>Resumo das tarefas</h6>
-    <hr style="border-top: 1px solid rgb(255 255 255 / 31%);">
-    <p id="tarefasPendentes">Tarefas pendentes: 0</p>
-    <p id="tarefasVencidas">Tarefas com data limite ultrapassada: 0</p>
-    <p id="tarefasPrestesVencer">Tarefas prestes a vencer: 0</p>
+
+<div class="modal fade" id="tarefasModal" tabindex="-1" aria-labelledby="tarefasModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="tarefasModalLabel">Suas tarefas</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                    &times;
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Seção para novas tarefas -->
+                <div id="novas-tarefas-section" style="display: none;">
+                    <h5 class="text-success">NOVAS TAREFAS:</h5> <!-- Título estilizado como h4 -->
+                    <ul id="novas-tarefas-list">
+                        <!-- Novas tarefas serão carregadas aqui via AJAX -->
+                    </ul>
+                    <hr>
+                </div>
+
+                <!-- Seção para tarefas pendentes -->
+                <h5 class="text-danger">TAREFAS PENDENTES:</h5> <!-- Título estilizado como h4 -->
+                <ul id="tarefas-list">
+                    <!-- Tarefas pendentes serão carregadas aqui via AJAX -->
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
 </div>
+
+
 
 <script src="script/jquery-3.5.1.min.js"></script>
 <script src="script/bootstrap.min.js"></script>
 <script src="script/jquery.mask.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Função para formatar a data no padrão brasileiro
+    function formatarDataBrasileira(dataISO) {
+        const data = new Date(dataISO);
+        if (isNaN(data.getTime())) {
+            return 'Data inválida';
+        }
+        const dia = String(data.getDate()).padStart(2, '0');
+        const mes = String(data.getMonth() + 1).padStart(2, '0'); // Mês começa do 0
+        const ano = data.getFullYear();
+        const horas = String(data.getHours()).padStart(2, '0');
+        const minutos = String(data.getMinutes()).padStart(2, '0');
+        const segundos = String(data.getSeconds()).padStart(2, '0');
+
+        return `${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}`;
+    }
+
+    // Carregar as tarefas pendentes ao carregar a página
+    $.ajax({
+        url: 'verificar_tarefas.php',
+        method: 'GET',
+        dataType: 'json',
+        success: function(response) {
+            var tarefasList = $('#tarefas-list');
+            var novasTarefasList = $('#novas-tarefas-list');
+            tarefasList.empty();
+            novasTarefasList.empty();
+
+            var totalTarefas = 0; // Contador para tarefas diferentes de "Concluída" ou "Cancelada"
+
+            // Função para adicionar classes de prioridade
+            function getPriorityClass(priority) {
+                if (priority === 'Média') {
+                    return 'priority-medium';
+                } else if (priority === 'Alta') {
+                    return 'priority-high';
+                } else if (priority === 'Crítica') {
+                    return 'priority-critical';
+                }
+                return '';
+            }
+
+            // Função para adicionar classes de status baseado no estado
+            function getStatusClass(status_data) {
+                if (status_data === 'Prestes a vencer') {
+                    return 'row-quase-vencida';
+                } else if (status_data === 'Vencida') {
+                    return 'row-vencida';
+                }
+                return '';
+            }
+
+            // Exibir as novas tarefas agrupadas por funcionário
+            $.each(response.novas_tarefas, function(funcionario, tarefas) {
+                $('#novas-tarefas-section').show();
+                novasTarefasList.append(`<h5>Tarefas de ${funcionario}:</h5>`);
+                $.each(tarefas, function(index, tarefa) {
+                    novasTarefasList.append(`
+                        <li class="${getPriorityClass(tarefa.nivel_de_prioridade)}">
+                            <strong>Nº Protocolo: ${tarefa.id}</strong><br>
+                            <strong>${tarefa.titulo}</strong><br>
+                            ${tarefa.descricao}<br>
+                            Criada em: ${formatarDataBrasileira(tarefa.data_criacao)}<br>
+                            Data Limite: ${formatarDataBrasileira(tarefa.data_limite)}<br>
+                            Prioridade: ${tarefa.nivel_de_prioridade}
+                        </li><hr>
+                    `);
+                });
+                totalTarefas += tarefas.length; // Contabilizar tarefas novas
+            });
+
+            // Exibir as tarefas pendentes agrupadas por funcionário
+            $.each(response.tarefas, function(funcionario, tarefas) {
+                tarefasList.append(`<h5>Tarefas de ${funcionario}:</h5>`);
+                $.each(tarefas, function(index, tarefa) {
+                    var status_data = tarefa.status_data ? `<span class="text-danger">${tarefa.status_data}</span>` : '';
+                    tarefasList.append(`
+                        <li class="${getPriorityClass(tarefa.nivel_de_prioridade)} ${getStatusClass(tarefa.status_data)}">
+                            <strong>Nº Protocolo: ${tarefa.id}</strong><br>
+                            <strong>${tarefa.titulo}</strong><br>
+                            ${tarefa.descricao}<br>
+                            Criada em: ${formatarDataBrasileira(tarefa.data_criacao)}<br>
+                            Data Limite: ${formatarDataBrasileira(tarefa.data_limite)} ${status_data}<br>
+                            Prioridade: ${tarefa.nivel_de_prioridade}
+                        </li><hr>
+                    `);
+                });
+                totalTarefas += tarefas.length; // Contabilizar tarefas pendentes
+            });
+
+            // Verificar se existem tarefas. Se houver, abrir o modal.
+            if (totalTarefas > 0) {
+                $('#tarefasModal').modal('show');
+            } else {
+                console.log('Nenhuma tarefa pendente ou nova para exibir.');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Erro ao carregar as tarefas:', error);
+            console.log(xhr.responseText);
+        }
+    });
+});
+</script>
+
+
 <script>
     function createChart(ctx, type, data, options) {
         return new Chart(ctx, {
@@ -223,10 +486,6 @@ include(__DIR__ . '/menu.php');
                 $('#totalAcervos').text(data.totalAtos);
                 $('#novosCadastros').text(data.novosCadastros);
                 $('#atosExcluidos').text(data.atosExcluidos);
-
-                $('#tarefasPendentes').text('Tarefas pendentes: ' + data.tarefasStatus.pendente);
-                $('#tarefasVencidas').text('Tarefas com data limite ultrapassada: ' + data.overdueTasks);
-                $('#tarefasPrestesVencer').text('Tarefas prestes a vencer: ' + data.upcomingTasks);
 
                 const dailyAtosCtx = document.getElementById('dailyAtosChart').getContext('2d');
                 const weeklyAtosCtx = document.getElementById('weeklyAtosChart').getContext('2d');
@@ -318,6 +577,10 @@ include(__DIR__ . '/menu.php');
 <?php
 include(__DIR__ . '/rodape.php');
 ?>
+
+<script src="script/popper.min.js"></script>
+<script src="script/bootstrap2.min.js"></script>
+
 
 </body>
 </html>
