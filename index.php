@@ -295,7 +295,7 @@ include(__DIR__ . '/menu.php');
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h4 class="modal-title" id="tarefasModalLabel">NOTIFICAÇÃO DE TAREFAS</h4>
+                <h5 style="text-align: center;width: 100%;" class="modal-title" id="tarefasModalLabel">RESUMO DAS TAREFAS</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
                     &times;
                 </button>
