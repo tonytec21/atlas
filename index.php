@@ -53,8 +53,8 @@ date_default_timezone_set('America/Sao_Paulo');
 
     /* Estilo dos títulos de funcionários */
     .modal-body h5 {
-        margin-top: 20px;
-        margin-bottom: 10px;
+        /* margin-top: 20px;
+        margin-bottom: 10px; */
         font-weight: bold;
     }
 
@@ -376,10 +376,10 @@ $(document).ready(function() {
     // Função para criar uma tabela HTML com as tarefas
     function criarTabelaPorPrioridade(prioridade, tarefas) {
         let tabela = `
-            <h5 class="text-${prioridade === 'Baixa' ? 'primary' : prioridade === 'Média' ? 'warning' : 'danger'}">
-                Tarefas - Prioridade ${prioridade}
-            </h5>
-            <table class="table table-striped">
+            <h6 class="text-${prioridade === 'Baixa' ? 'primary' : prioridade === 'Média' ? 'warning' : 'danger'}">
+                <b>Tarefas - Prioridade ${prioridade}</b>
+            </h6>
+            <table class="table table-striped" style="zoom: 90%">
                 <thead>
                     <tr>
                         <th>Nº Prot.</th>
@@ -431,7 +431,7 @@ $(document).ready(function() {
             // Exibir as novas tarefas agrupadas por funcionário e prioridade
             $.each(response.novas_tarefas, function(funcionario, tarefasFuncionario) {
                 $('#novas-tarefas-section').show();
-                novasTarefasList.append(`<h5>Tarefas de ${funcionario}:</h5>`);
+                novasTarefasList.append(`<h6><b>Tarefas de ${funcionario}:</b></h6>`);
                 
                 const novasTarefasCritica = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Crítica');
                 const novasTarefasAlta = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Alta');
@@ -457,7 +457,7 @@ $(document).ready(function() {
 
             // Exibir as tarefas pendentes agrupadas por funcionário e prioridade
             $.each(response.tarefas, function(funcionario, tarefasFuncionario) {
-                tarefasList.append(`<h5>Tarefas de ${funcionario}:</h5>`);
+                tarefasList.append(`<h6><b>Tarefas de ${funcionario}:</b></h6>`);
                 
                 const tarefasCritica = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Crítica');
                 const tarefasAlta = tarefasFuncionario.filter(tarefa => tarefa.nivel_de_prioridade === 'Alta');
