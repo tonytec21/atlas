@@ -47,6 +47,7 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <link rel="icon" href="../style/img/favicon.png" type="image/png">
 
     <style>
         .vencida {
@@ -127,7 +128,7 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
             <hr>
             <div id="resultados">
                 <h5>Resultados da Pesquisa</h5>
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 100%">
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 80%">
                     <thead>
                         <tr>
                        
@@ -137,8 +138,8 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                             <th style="width: 15%;">Data de Vencimento</th>
                             <th style="width: 25%;">Descrição</th>
                             <th style="width: 10%;">Recorrência</th>
-                            <th style="width: 10%;">Status</th>
-                            <th style="width: 10%;">Ações</th>
+                            <th style="width: 8%;">Status</th>
+                            <th style="width: 12%;">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
