@@ -379,7 +379,7 @@ $(document).ready(function() {
             <h6 class="text-${prioridade === 'Baixa' ? 'primary' : prioridade === 'Média' ? 'warning' : 'danger'}">
                 <b style="margin-left: 2%">Tarefas - Prioridade ${prioridade}</b>
             </h6>
-            <table class="table table-striped" style="zoom: 90%; margin-left: 2%; max-width: 98%;">
+            <table class="table table-striped" style="zoom: 90%; margin-left: 2%; max-width: 96%;">
                 <thead>
                     <tr>
                         <th>Nº Prot.</th>
