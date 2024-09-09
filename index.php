@@ -377,9 +377,9 @@ $(document).ready(function() {
     function criarTabelaPorPrioridade(prioridade, tarefas) {
         let tabela = `
             <h6 class="text-${prioridade === 'Baixa' ? 'primary' : prioridade === 'Média' ? 'warning' : 'danger'}">
-                <b>Tarefas - Prioridade ${prioridade}</b>
+                <b style="margin-left: 2%">Tarefas - Prioridade ${prioridade}</b>
             </h6>
-            <table class="table table-striped" style="zoom: 90%">
+            <table class="table table-striped" style="zoom: 90%; margin-left: 2%; max-width: 98%;">
                 <thead>
                     <tr>
                         <th>Nº Prot.</th>
