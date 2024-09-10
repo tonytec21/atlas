@@ -813,10 +813,7 @@ include(__DIR__ . '/db_connection.php');
                             </div>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <button type="button" id="btnTransportarSaldo" style="width: 100%" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()"><i class="fa fa-lock" aria-hidden="true"></i> Fechar Caixa e Transportar Saldo <i class="fa fa-share" aria-hidden="true"></i></button>
-                    </div>
-                    <hr>
+<hr>
                     <form id="formCadastroDeposito" enctype="multipart/form-data">
                         <div class="form-row">
                             <div class="form-group col-md-6">
@@ -857,6 +854,11 @@ include(__DIR__ . '/db_connection.php');
                             <!-- Detalhes dos depósitos serão carregados aqui -->
                         </tbody>
                     </table>
+                    <hr>
+                    <div class="form-group">
+                        <button type="button" id="btnTransportarSaldo" style="width: 100%" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()"><i class="fa fa-lock" aria-hidden="true"></i> Fechar Caixa e Transportar Saldo <i class="fa fa-share" aria-hidden="true"></i></button>
+                    </div>
+                    
                 </div>
             </div>
         </div>
