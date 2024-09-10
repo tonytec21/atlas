@@ -137,6 +137,7 @@ include(__DIR__ . '/../menu.php');
             <table class="table">
                 <thead>
                     <tr>
+                        <th>#</th>
                         <th>Ato</th>
                         <th>Quantidade</th>
                         <th>Desconto Legal (%)</th>
@@ -188,7 +189,49 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 <script>
+    $(document).ready(function() {
+    // Inicializa a funcionalidade de arrastar e soltar na tabela de itens
+    $("#itensTable").sortable({
+        placeholder: "ui-state-highlight",
+        update: function(event, ui) {
+            atualizarOrdemExibicao(); // Função para atualizar a ordem
+        }
+    });
+
+    $("#itensTable").disableSelection(); // Impede que o texto dentro da tabela seja selecionado durante o arraste
+
+    // Função para atualizar a ordem de exibição
+    function atualizarOrdemExibicao() {
+        // Atualiza a ordem de exibição na tabela
+        $('#itensTable tr').each(function(index) {
+            // Atualiza a coluna de ordem de exibição
+            $(this).find('td:first').text(index + 1); // Primeira coluna é o número da ordem
+        });
+
+
+        // Aqui você pode enviar via AJAX a nova ordem para o servidor, se necessário
+        var ordem = [];
+        $('#itensTable tr').each(function(index) {
+            var itemId = $(this).data('item-id'); // Supondo que cada item tem um ID único
+            ordem.push({ id: itemId, ordem: index + 1 });
+        });
+
+        $.ajax({
+            url: 'atualizar_ordem_itens.php', // URL para atualizar a ordem no servidor
+            type: 'POST',
+            data: { ordem: ordem },
+            success: function(response) {
+                console.log('Ordem de exibição atualizada com sucesso!');
+            },
+            error: function(xhr, status, error) {
+                console.log('Erro ao atualizar a ordem de exibição: ' + error);
+            }
+        });
+    }
+});
+
 // Função para exibir modal de alerta
 function showAlert(message, type) {
     $('#alertModalBody').text(message);
@@ -255,14 +298,23 @@ $(document).ready(function() {
         e.preventDefault();
         
         var ato = $('#ato').val();
-        var quantidade = $('#quantidade').val();
+        var quantidade = parseInt($('#quantidade').val(), 10);
         var descontoLegal = $('#desconto_legal').val();
         var descricao = $('#descricao').val();
-        var emolumentos = parseFloat($('#emolumentos').val().replace(/\./g, '').replace(',', '.')) || 0;
+        var emolumentos = parseFloat($('#emolumentos').val().replace(/\./g, '').replace(',', '.')); // Corrigir o valor para formato numérico
         var ferc = parseFloat($('#ferc').val().replace(/\./g, '').replace(',', '.')) || 0;
         var fadep = parseFloat($('#fadep').val().replace(/\./g, '').replace(',', '.')) || 0;
         var femp = parseFloat($('#femp').val().replace(/\./g, '').replace(',', '.')) || 0;
         var total = parseFloat($('#total').val().replace(/\./g, '').replace(',', '.')) || 0;
+
+        // Validação de emolumentos para garantir que é um número válido
+        if (isNaN(emolumentos)) {
+            showAlert('O valor dos emolumentos deve ser um número válido.', 'error');
+            return;
+        }
+
+        // Contar quantos itens existem na tabela e usar esse valor como ordem
+        var ordemExibicao = $('#itensTable tr').length + 1;
 
         if (isNaN(total) || total <= 0) {
             showAlert("Por favor, clique em 'Buscar Ato' antes de adicionar à OS.", 'error');
@@ -270,6 +322,7 @@ $(document).ready(function() {
         }
         
         var item = '<tr>' +
+            '<td>' + ordemExibicao + '</td>' + // Adiciona a ordem de exibição
             '<td>' + ato + '</td>' +
             '<td>' + quantidade + '</td>' +
             '<td>' + descontoLegal + '%</td>' +
@@ -305,6 +358,8 @@ $(document).ready(function() {
         $('#femp').prop('readonly', true);
         $('#total').prop('readonly', true);
     });
+
+
 
     $('#ato').on('input', function() {
         this.value = this.value.replace(/[^0-9.]/g, '');
@@ -411,6 +466,9 @@ function removerItem(button) {
     $('#total_os').val(totalOS.toFixed(2).replace('.', ','));
 
     row.remove();
+
+    // Atualiza a ordem de exibição após a remoção de um item
+    atualizarOrdemExibicao();
 }
 
 function salvarOS() {
@@ -422,17 +480,18 @@ function salvarOS() {
     var base_calculo = $('#base_calculo').val().replace(/\./g, '').replace(',', '.');
     var itens = [];
 
-    $('#itensTable tr').each(function() {
-        var ato = $(this).find('td').eq(0).text();
-        var quantidade = $(this).find('td').eq(1).text();
-        var desconto_legal = $(this).find('td').eq(2).text().replace('%', '');
-        var descricao = $(this).find('td').eq(3).text();
-        var emolumentos = $(this).find('td').eq(4).text().replace(/\./g, '').replace(',', '.');
-        var ferc = $(this).find('td').eq(5).text().replace(/\./g, '').replace(',', '.');
-        var fadep = $(this).find('td').eq(6).text().replace(/\./g, '').replace(',', '.');
-        var femp = $(this).find('td').eq(7).text().replace(/\./g, '').replace(',', '.');
-        var total = $(this).find('td').eq(8).text().replace(/\./g, '').replace(',', '.');
-        
+    $('#itensTable tr').each(function(index) {
+        var ato = $(this).find('td').eq(1).text();
+        var quantidade = $(this).find('td').eq(2).text();
+        var desconto_legal = $(this).find('td').eq(3).text().replace('%', '');
+        var descricao = $(this).find('td').eq(4).text();
+        var emolumentos = $(this).find('td').eq(5).text().replace(/\./g, '').replace(',', '.');
+        var ferc = $(this).find('td').eq(6).text().replace(/\./g, '').replace(',', '.');
+        var fadep = $(this).find('td').eq(7).text().replace(/\./g, '').replace(',', '.');
+        var femp = $(this).find('td').eq(8).text().replace(/\./g, '').replace(',', '.');
+        var total = $(this).find('td').eq(9).text().replace(/\./g, '').replace(',', '.');
+        var ordem_exibicao = index + 1; // Define a ordem correta na tabela
+
         itens.push({
             ato: ato,
             quantidade: quantidade,
@@ -442,7 +501,8 @@ function salvarOS() {
             ferc: ferc,
             fadep: fadep,
             femp: femp,
-            total: total
+            total: total,
+            ordem_exibicao: ordem_exibicao // Adiciona a ordem de exibição ao objeto
         });
     });
 
@@ -482,6 +542,7 @@ function salvarOS() {
         }
     });
 }
+
 
 // Funções para validar CPF e CNPJ
 function validarCPF(cpf) {

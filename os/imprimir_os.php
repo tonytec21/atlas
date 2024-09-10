@@ -93,8 +93,8 @@ if (isset($_GET['id'])) {
     $os_result = $os_query->get_result();
     $ordem_servico = $os_result->fetch_assoc();
 
-    // Obter dados de itens da SO
-    $os_items_query = $conn->prepare("SELECT * FROM ordens_de_servico_itens WHERE ordem_servico_id = ?");
+    // Obter dados de itens da OS ordenados pela coluna ordem_exibicao
+    $os_items_query = $conn->prepare("SELECT * FROM ordens_de_servico_itens WHERE ordem_servico_id = ? ORDER BY ordem_exibicao ASC");
     $os_items_query->bind_param("i", $os_id);
     $os_items_query->execute();
     $os_items_result = $os_items_query->get_result();

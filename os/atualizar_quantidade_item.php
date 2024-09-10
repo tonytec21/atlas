@@ -15,7 +15,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     try {
         $conn = getDatabaseConnection();
 
-        $stmt = $conn->prepare("UPDATE ordens_de_servico_itens SET quantidade = :quantidade, emolumentos = :emolumentos, ferc = :ferc, fadep = :fadep, femp = :femp, total = :total WHERE id = :id");
+        // Verifica a quantidade já liquidada
+        $stmt = $conn->prepare("SELECT quantidade_liquidada, status FROM ordens_de_servico_itens WHERE id = :id");
+        $stmt->bindParam(':id', $item_id);
+        $stmt->execute();
+        $item = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$item) {
+            echo json_encode(['error' => 'Item não encontrado.']);
+            exit;
+        }
+
+        $quantidadeLiquidada = (int) $item['quantidade_liquidada'];
+        $statusAtual = $item['status'];
+
+        // Verifica se a nova quantidade é menor que a quantidade liquidada
+        if ($quantidade < $quantidadeLiquidada) {
+            echo json_encode(['error' => 'A nova quantidade não pode ser menor do que a quantidade já liquidada (' . $quantidadeLiquidada . ').']);
+            exit;
+        }
+
+        // Atualiza os valores do item
+        $stmt = $conn->prepare("
+            UPDATE ordens_de_servico_itens 
+            SET quantidade = :quantidade, emolumentos = :emolumentos, ferc = :ferc, fadep = :fadep, femp = :femp, total = :total 
+            WHERE id = :id
+        ");
         $stmt->bindParam(':quantidade', $quantidade);
         $stmt->bindParam(':emolumentos', $emolumentos);
         $stmt->bindParam(':ferc', $ferc);
@@ -24,6 +49,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bindParam(':total', $total);
         $stmt->bindParam(':id', $item_id);
         $stmt->execute();
+
+        // Verifica se a quantidade atual é igual à quantidade liquidada para alterar o status
+        if ($quantidade == $quantidadeLiquidada && $statusAtual !== 'liquidado') {
+            $stmt = $conn->prepare("UPDATE ordens_de_servico_itens SET status = 'liquidado' WHERE id = :id");
+            $stmt->bindParam(':id', $item_id);
+            $stmt->execute();
+        }
 
         echo json_encode(['success' => true]);
     } catch (PDOException $e) {

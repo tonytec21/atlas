@@ -48,7 +48,7 @@ try {
     $itens = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Inserir itens da OS na tabela de logs
-    $stmt = $conn->prepare("INSERT INTO logs_ordens_de_servico_itens (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, quantidade_liquidada, status) VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :total, :quantidade_liquidada, :status)");
+    $stmt = $conn->prepare("INSERT INTO logs_ordens_de_servico_itens (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, quantidade_liquidada, status, ordem_exibicao) VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :total, :quantidade_liquidada, :status, :ordem_exibicao)");
     
     foreach ($itens as $item) {
         $stmt->bindParam(':ordem_servico_id', $log_os_id);
@@ -63,6 +63,7 @@ try {
         $stmt->bindParam(':total', $item['total']);
         $stmt->bindParam(':quantidade_liquidada', $item['quantidade_liquidada']);
         $stmt->bindParam(':status', $item['status']);
+        $stmt->bindParam(':ordem_exibicao', $item['ordem_exibicao']);
         $stmt->execute();
     }
 
@@ -127,7 +128,7 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <h3>Editar Ordem de Serviço</h3>
+        <h3>Editar Ordem de Serviço nº: <?php echo $id; ?></h3>
         <hr>
         <form id="osForm" method="POST">
             <input type="hidden" id="os_id" name="os_id" value="<?php echo $id; ?>">
@@ -210,6 +211,7 @@ include(__DIR__ . '/../menu.php');
             <table id="tabelaItensOS" class="table table-striped table-bordered" style="zoom: 80%">
                 <thead>
                     <tr>
+                        <th>#</th>
                         <th>Ato</th>
                         <th>Quantidade</th>
                         <th>Desconto Legal (%)</th>
@@ -226,7 +228,8 @@ include(__DIR__ . '/../menu.php');
                 <tbody id="itensTable">
                     <!-- Itens existentes -->
                     <?php foreach ($itens as $item): ?>
-                        <tr data-item-id="<?php echo $item['id']; ?>" data-quantidade-liquidada="<?php echo $item['quantidade_liquidada']; ?>" data-status="<?php echo $item['status']; ?>">
+                        <tr data-item-id="<?php echo $item['id']; ?>" data-ordem-exibicao="<?php echo $item['ordem_exibicao']; ?>">
+                            <td class="ordem"><?php echo $item['ordem_exibicao']; ?></td>
                             <td><?php echo $item['ato']; ?></td>
                             <td><?php echo $item['quantidade']; ?></td>
                             <td><?php echo $item['desconto_legal']; ?>%</td>
@@ -315,7 +318,45 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/jquery.mask.min.js"></script>
 <script src="../script/jquery.dataTables.min.js"></script>
 <script src="../script/dataTables.bootstrap4.min.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 <script>
+    $(function() {
+    // Tornar as linhas da tabela arrastáveis
+    $("#itensTable").sortable({
+        placeholder: "ui-state-highlight",
+        update: function(event, ui) {
+            salvarOrdemExibicao(); // Função que será chamada após reordenar
+        }
+    });
+
+    $("#itensTable").disableSelection();
+});
+
+function salvarOrdemExibicao() {
+    var ordem = [];
+    $('#itensTable tr').each(function(index) {
+        var itemId = $(this).data('item-id');
+        ordem.push({
+            id: itemId,
+            ordem_exibicao: index + 1 // Nova ordem de exibição
+        });
+        $(this).find('.ordem').text(index + 1); // Atualizar a exibição da ordem
+    });
+
+    $.ajax({
+        url: 'salvar_ordem_exibicao.php',
+        type: 'POST',
+        data: { ordem: ordem },
+        success: function(response) {
+            console.log('Ordem de exibição salva com sucesso');
+            calcularTotalOS(); // Recalcular o total após salvar a nova ordem
+        },
+        error: function(xhr, status, error) {
+            console.log('Erro ao salvar a ordem de exibição: ' + error);
+        }
+    });
+}
+
 // Função para exibir modal de alerta
 function showAlert(message, type, reload = false) {
     $('#alertModalBody').text(message);
@@ -339,7 +380,7 @@ function showAlert(message, type, reload = false) {
             "url": "../style/Portuguese-Brasil.json"
         },
         "pageLength": 100,
-        "order": [], // Sem ordenação inicial
+        "order": [[0, 'asc']], // Ordena pela segunda coluna de forma ascendente
     });
 
 
@@ -555,7 +596,8 @@ function alterarQuantidade(button) {
     var quantidadeLiquidada = parseInt(row.data('quantidade-liquidada'));
     var status = row.data('status');
 
-    $('#novaQuantidade').val(row.find('td').eq(1).text());
+    // Ajuste para pegar a nova quantidade (coluna 3) e demais informações da tabela
+    $('#novaQuantidade').val(row.find('td').eq(2).text());
     $('#quantidadeLiquidada').val(quantidadeLiquidada);
     $('#statusItem').val(status);
     $('#alterarQuantidadeModal').modal('show');
@@ -567,20 +609,15 @@ function salvarNovaQuantidade() {
     var quantidadeLiquidada = parseInt($('#quantidadeLiquidada').val());
     var statusItem = $('#statusItem').val();
 
-    if (statusItem === 'liquidado') {
-        showAlert('Não é permitido alterar a quantidade de um ato liquidado.', 'error');
-        return;
-    }
-
     if (novaQuantidade < quantidadeLiquidada) {
-        showAlert('A nova quantidade não pode ser menor que a quantidade liquidada.', 'error');
+        showAlert('A nova quantidade não pode ser menor que a quantidade já liquidada (' + quantidadeLiquidada + ').', 'error');
         return;
     }
 
     var row = $('#alterarQuantidadeForm').data('row');
     var item_id = row.data('item-id');
-    var ato = row.find('td').eq(0).text();
-    var descontoLegal = parseFloat(row.find('td').eq(2).text().replace('%', ''));
+    var ato = row.find('td').eq(1).text();
+    var descontoLegal = parseFloat(row.find('td').eq(3).text().replace('%', ''));
 
     buscarAtoPorQuantidade(ato, novaQuantidade, descontoLegal, function(values) {
         $.ajax({
@@ -601,15 +638,15 @@ function salvarNovaQuantidade() {
                     if (res.error) {
                         showAlert(res.error, 'error');
                     } else {
-                        row.find('td').eq(1).text(novaQuantidade);
-                        row.find('td').eq(3).text(values.descricao);
-                        row.find('td').eq(4).text(values.emolumentos);
-                        row.find('td').eq(5).text(values.ferc);
-                        row.find('td').eq(6).text(values.fadep);
-                        row.find('td').eq(7).text(values.femp);
-                        row.find('td').eq(8).text(values.total);
+                        row.find('td').eq(2).text(novaQuantidade);
+                        row.find('td').eq(4).text(values.descricao);
+                        row.find('td').eq(5).text(values.emolumentos);
+                        row.find('td').eq(6).text(values.ferc);
+                        row.find('td').eq(7).text(values.fadep);
+                        row.find('td').eq(8).text(values.femp);
+                        row.find('td').eq(9).text(values.total);
 
-                        if (novaQuantidade === quantidadeLiquidada && statusItem === 'liquidado parcialmente') {
+                        if (novaQuantidade === quantidadeLiquidada) {
                             row.data('status', 'liquidado');
                             row.find('td').eq(10).text('liquidado');
                             $.ajax({
@@ -626,35 +663,33 @@ function salvarNovaQuantidade() {
                                             showAlert(res.error, 'error');
                                         }
                                     } catch (e) {
-                                        console.log('Erro ao processar a resposta: ', e);
                                         showAlert('Erro ao processar a resposta do servidor.', 'error');
                                     }
                                 },
                                 error: function(xhr, status, error) {
-                                    console.log('Erro:', error);
-                                    console.log('Resposta do servidor:', xhr.responseText);
                                     showAlert('Erro ao atualizar o status do item', 'error');
                                 }
                             });
                         }
 
+                        // Recalcular o total da OS
                         calcularTotalOS();
+
                         $('#alterarQuantidadeModal').modal('hide');
                         showAlert('Quantidade atualizada com sucesso!', 'success');
                     }
                 } catch (e) {
-                    console.log('Erro ao processar a resposta: ', e);
                     showAlert('Erro ao processar a resposta do servidor.', 'error');
                 }
             },
             error: function(xhr, status, error) {
-                console.log('Erro:', error);
-                console.log('Resposta do servidor:', xhr.responseText);
                 showAlert('Erro ao atualizar a quantidade do item', 'error');
             }
         });
     });
 }
+
+
 
 function removerItem(button) {
     var row = $(button).closest('tr');
@@ -680,8 +715,8 @@ function removerItem(button) {
                         showAlert(res.error, 'error');
                     } else {
                         showAlert('Item removido com sucesso!', 'success');
-                        row.remove();
-                        calcularTotalOS();
+                        row.remove(); // Remove a linha da tabela
+                        calcularTotalOS(); // Recalcula o total da OS após remoção
                     }
                 } catch (e) {
                     console.log('Erro ao processar a resposta: ', e);
@@ -699,33 +734,61 @@ function removerItem(button) {
 
 function calcularTotalOS() {
     var totalOS = 0;
+
     $('#itensTable tr').each(function() {
-        var total = parseFloat($(this).find('td').eq(8).text().replace(/\./g, '').replace(',', '.')) || 0;
+        var total = parseFloat($(this).find('td').eq(9).text().replace(/\./g, '').replace(',', '.')) || 0;
         totalOS += total;
     });
+
     $('#total_os').val(totalOS.toFixed(2).replace('.', ','));
+
+    // Atualizar o total da OS no banco de dados
+    var os_id = $('#os_id').val();
+    $.ajax({
+        url: 'atualizar_total_os.php',
+        type: 'POST',
+        data: {
+            os_id: os_id,
+            total_os: totalOS.toFixed(2).replace('.', ',')
+        },
+        success: function(response) {
+            try {
+                var res = JSON.parse(response);
+                if (res.error) {
+                    showAlert(res.error, 'error');
+                }
+            } catch (e) {
+                showAlert('Erro ao processar a resposta do servidor.', 'error');
+            }
+        },
+        error: function(xhr, status, error) {
+            showAlert('Erro ao atualizar o total da OS', 'error');
+        }
+    });
 }
+
 
 function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos, ferc, fadep, femp, total) {
     var item = '<tr>' +
-        '<td>' + ato + '</td>' +
-        '<td>' + quantidade + '</td>' +
-        '<td>' + descontoLegal + '%</td>' +
-        '<td>' + descricao + '</td>' +
-        '<td>' + emolumentos + '</td>' +
-        '<td>' + ferc + '</td>' +
-        '<td>' + fadep + '</td>' +
-        '<td>' + femp + '</td>' +
-        '<td>' + total + '</td>' +
-        '<td>0</td>' + // Quantidade liquidada é 0 para novos itens
+        '<td>#</td>' + // Nova coluna para o índice #
+        '<td>' + ato + '</td>' + // Coluna "Ato"
+        '<td>' + quantidade + '</td>' + // Coluna "Quantidade"
+        '<td>' + descontoLegal + '%</td>' + // Coluna "Desconto Legal"
+        '<td>' + descricao + '</td>' + // Coluna "Descrição"
+        '<td>' + emolumentos + '</td>' + // Coluna "Emolumentos"
+        '<td>' + ferc + '</td>' + // Coluna "FERC"
+        '<td>' + fadep + '</td>' + // Coluna "FADEP"
+        '<td>' + femp + '</td>' + // Coluna "FEMP"
+        '<td>' + total + '</td>' + // Coluna "Total"
+        '<td>0</td>' + // Coluna "Qtd Liquidada" (0 para novos itens)
         '<td>' +
             '<button type="button" class="btn btn-edit btn-sm" onclick="alterarQuantidade(this)"><i class="fa fa-pencil" aria-hidden="true"></i></button>' +
             '<button type="button" class="btn btn-danger btn-sm" onclick="removerItem(this)">Remover</button>' +
         '</td>' +
         '</tr>';
-    
+
     $('#itensTable').append(item);
-    calcularTotalOS(); // Recalcula o total da OS após adição
+    calcularTotalOS(); // Recalcula o total após a adição
 }
 
 function atualizarTotalOS(os_id) {
@@ -799,111 +862,112 @@ function salvarOS() {
 }
 </script>
 <script>
-    function alterarQuantidade(button) {
-        var row = $(button).closest('tr');
-        var quantidadeLiquidada = parseInt(row.data('quantidade-liquidada'));
-        var status = row.data('status');
+function alterarQuantidade(button) {
+    var row = $(button).closest('tr');
+    var quantidadeLiquidada = parseInt(row.data('quantidade-liquidada'));
+    var status = row.data('status');
 
-        $('#novaQuantidade').val(row.find('td').eq(1).text());
-        $('#quantidadeLiquidada').val(quantidadeLiquidada);
-        $('#statusItem').val(status);
-        $('#alterarQuantidadeModal').modal('show');
-        $('#alterarQuantidadeForm').data('row', row);
+    // Ajuste para pegar a nova quantidade (coluna 3) e demais informações da tabela
+    $('#novaQuantidade').val(row.find('td').eq(2).text());
+    $('#quantidadeLiquidada').val(quantidadeLiquidada);
+    $('#statusItem').val(status);
+    $('#alterarQuantidadeModal').modal('show');
+    $('#alterarQuantidadeForm').data('row', row);
+}
+
+function salvarNovaQuantidade() {
+    var novaQuantidade = parseInt($('#novaQuantidade').val());
+    var quantidadeLiquidada = parseInt($('#quantidadeLiquidada').val());
+    var statusItem = $('#statusItem').val();
+
+    if (novaQuantidade < quantidadeLiquidada) {
+        showAlert('A nova quantidade não pode ser menor que a quantidade já liquidada (' + quantidadeLiquidada + ').', 'error');
+        return;
     }
 
-    function salvarNovaQuantidade() {
-        var novaQuantidade = parseInt($('#novaQuantidade').val());
-        var quantidadeLiquidada = parseInt($('#quantidadeLiquidada').val());
-        var statusItem = $('#statusItem').val();
+    var row = $('#alterarQuantidadeForm').data('row');
+    var item_id = row.data('item-id');
+    var ato = row.find('td').eq(1).text();
+    var descontoLegal = parseFloat(row.find('td').eq(3).text().replace('%', ''));
 
-        if (statusItem === 'liquidado') {
-            showAlert('Não é permitido alterar a quantidade de um ato liquidado.', 'error');
-            return;
-        }
+    buscarAtoPorQuantidade(ato, novaQuantidade, descontoLegal, function(values) {
+        $.ajax({
+            url: 'atualizar_quantidade_item.php',
+            type: 'POST',
+            data: {
+                item_id: item_id,
+                quantidade: novaQuantidade,
+                emolumentos: parseFloat(values.emolumentos.replace(',', '.')),
+                ferc: parseFloat(values.ferc.replace(',', '.')),
+                fadep: parseFloat(values.fadep.replace(',', '.')),
+                femp: parseFloat(values.femp.replace(',', '.')),
+                total: parseFloat(values.total.replace(',', '.'))
+            },
+            success: function(response) {
+                try {
+                    var res = JSON.parse(response);
+                    if (res.error) {
+                        showAlert(res.error, 'error');
+                    } else {
+                        row.find('td').eq(2).text(novaQuantidade);
+                        row.find('td').eq(4).text(values.descricao);
+                        row.find('td').eq(5).text(values.emolumentos);
+                        row.find('td').eq(6).text(values.ferc);
+                        row.find('td').eq(7).text(values.fadep);
+                        row.find('td').eq(8).text(values.femp);
+                        row.find('td').eq(9).text(values.total);
 
-        if (novaQuantidade < quantidadeLiquidada) {
-            showAlert('A nova quantidade não pode ser menor que a quantidade liquidada.', 'error');
-            return;
-        }
-
-        var row = $('#alterarQuantidadeForm').data('row');
-        var item_id = row.data('item-id');
-        var ato = row.find('td').eq(0).text();
-        var descontoLegal = parseFloat(row.find('td').eq(2).text().replace('%', ''));
-
-        buscarAtoPorQuantidade(ato, novaQuantidade, descontoLegal, function(values) {
-            $.ajax({
-                url: 'atualizar_quantidade_item.php',
-                type: 'POST',
-                data: {
-                    item_id: item_id,
-                    quantidade: novaQuantidade,
-                    emolumentos: parseFloat(values.emolumentos.replace(',', '.')),
-                    ferc: parseFloat(values.ferc.replace(',', '.')),
-                    fadep: parseFloat(values.fadep.replace(',', '.')),
-                    femp: parseFloat(values.femp.replace(',', '.')),
-                    total: parseFloat(values.total.replace(',', '.'))
-                },
-                success: function(response) {
-                    try {
-                        var res = JSON.parse(response);
-                        if (res.error) {
-                            showAlert(res.error, 'error');
-                        } else {
-                            row.find('td').eq(1).text(novaQuantidade);
-                            row.find('td').eq(3).text(values.descricao);
-                            row.find('td').eq(4).text(values.emolumentos);
-                            row.find('td').eq(5).text(values.ferc);
-                            row.find('td').eq(6).text(values.fadep);
-                            row.find('td').eq(7).text(values.femp);
-                            row.find('td').eq(8).text(values.total);
-
-                            if (novaQuantidade === quantidadeLiquidada) {
-                                row.data('status', 'liquidado');
-                                row.find('td').eq(10).text('liquidado');
-                                $.ajax({
-                                    url: 'atualizar_status_item.php',
-                                    type: 'POST',
-                                    data: {
-                                        item_id: item_id,
-                                        quantidade: novaQuantidade
-                                    },
-                                    success: function(response) {
-                                        try {
-                                            var res = JSON.parse(response);
-                                            if (res.error) {
-                                                showAlert(res.error, 'error');
-                                            }
-                                        } catch (e) {
-                                            console.log('Erro ao processar a resposta: ', e);
-                                            showAlert('Erro ao processar a resposta do servidor.', 'error');
+                        if (novaQuantidade === quantidadeLiquidada) {
+                            row.data('status', 'liquidado');
+                            row.find('td').eq(10).text('liquidado');
+                            $.ajax({
+                                url: 'atualizar_status_item.php',
+                                type: 'POST',
+                                data: {
+                                    item_id: row.data('item-id'),
+                                    status: 'liquidado'
+                                },
+                                success: function(response) {
+                                    try {
+                                        var res = JSON.parse(response);
+                                        if (res.error) {
+                                            showAlert(res.error, 'error');
                                         }
-                                    },
-                                    error: function(xhr, status, error) {
-                                        console.log('Erro:', error);
-                                        console.log('Resposta do servidor:', xhr.responseText);
-                                        showAlert('Erro ao atualizar o status do item', 'error');
+                                    } catch (e) {
+                                        showAlert('Erro ao processar a resposta do servidor.', 'error');
                                     }
-                                });
-                            }
-
-                            calcularTotalOS();
-                            $('#alterarQuantidadeModal').modal('hide');
-                            showAlert('Quantidade atualizada com sucesso!', 'success');
+                                },
+                                error: function(xhr, status, error) {
+                                    showAlert('Erro ao atualizar o status do item', 'error');
+                                }
+                            });
                         }
-                    } catch (e) {
-                        console.log('Erro ao processar a resposta: ', e);
-                        showAlert('Erro ao processar a resposta do servidor.', 'error');
+
+                        // Recalcular o total da OS
+                        calcularTotalOS();
+
+                        $('#alterarQuantidadeModal').modal('hide');
+                        showAlert('Quantidade atualizada com sucesso!', 'success');
                     }
-                },
-                error: function(xhr, status, error) {
-                    console.log('Erro:', error);
-                    console.log('Resposta do servidor:', xhr.responseText);
-                    showAlert('Erro ao atualizar a quantidade do item', 'error');
+                } catch (e) {
+                    showAlert('Erro ao processar a resposta do servidor.', 'error');
                 }
-            });
+            },
+            error: function(xhr, status, error) {
+                showAlert('Erro ao atualizar a quantidade do item', 'error');
+            }
         });
-    }
+    });
+}
+
+// Detecta o fechamento do modal de alteração de quantidade
+$('#alterarQuantidadeModal').on('hidden.bs.modal', function () {
+    // Define um atraso de 1 segundo antes de recarregar a página
+    setTimeout(function() {
+        location.reload();
+    }, 900); // 1000 milissegundos = 1 segundo
+});
+
 </script>
 
 <?php

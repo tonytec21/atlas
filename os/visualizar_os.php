@@ -310,6 +310,7 @@ include(__DIR__ . '/../menu.php');
             <table id="tabelaItensOS" class="table table-striped table-bordered" style="zoom: 80%">
                 <thead>
                     <tr>
+                        <th>#</th>
                         <th>Ato</th>
                         <th>Qtd</th>
                         <th>Desconto Legal (%)</th>
@@ -327,6 +328,7 @@ include(__DIR__ . '/../menu.php');
                 <tbody id="itensTable">
                     <?php foreach ($ordem_servico_itens as $item): ?>
                     <tr>
+                        <td><?php echo $item['ordem_exibicao']; ?></td>
                         <td><?php echo $item['ato']; ?></td>
                         <td><?php echo $item['quantidade']; ?></td>
                         <td><?php echo $item['desconto_legal']; ?></td>
@@ -687,7 +689,7 @@ include(__DIR__ . '/../menu.php');
             "url": "../style/Portuguese-Brasil.json"
         },
         "pageLength": 100,
-        "order": [], // Sem ordenação inicial
+        "order": [[0, 'asc']], // Ordena pela segunda coluna de forma ascendente
     });
 
     $('#tabelaPagamentoOS').DataTable({

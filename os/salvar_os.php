@@ -33,9 +33,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Obtém o ID da OS inserida
         $os_id = $conn->lastInsertId();
 
-        // Insere os itens na tabela `ordens_de_servico_itens`
-        $stmt = $conn->prepare("INSERT INTO ordens_de_servico_itens (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total) VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :total)");
-
+        $stmt = $conn->prepare("INSERT INTO ordens_de_servico_itens 
+            (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, ordem_exibicao) 
+            VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :total, :ordem_exibicao)");
+        
         foreach ($itens as $item) {
             $ordem_servico_id = $os_id;
             $ato = $item['ato'];
@@ -47,7 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $fadep = str_replace(',', '.', $item['fadep']);
             $femp = str_replace(',', '.', $item['femp']);
             $total = str_replace(',', '.', $item['total']);
-
+            $ordem_exibicao = $item['ordem_exibicao']; // Novo campo
+        
             $stmt->bindParam(':ordem_servico_id', $ordem_servico_id);
             $stmt->bindParam(':ato', $ato);
             $stmt->bindParam(':quantidade', $quantidade);
@@ -58,9 +60,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bindParam(':fadep', $fadep);
             $stmt->bindParam(':femp', $femp);
             $stmt->bindParam(':total', $total);
+            $stmt->bindParam(':ordem_exibicao', $ordem_exibicao); // Novo campo vinculado
             $stmt->execute();
         }
-
         // Confirma a transação
         $conn->commit();
 
