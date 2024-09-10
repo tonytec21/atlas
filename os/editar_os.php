@@ -454,7 +454,7 @@ function buscarAto() {
 function adicionarISS() {
     var totalEmolumentos = 0;
     $('#itensTable tr').each(function() {
-        var emolumentos = parseFloat($(this).find('td').eq(4).text().replace(/\./g, '').replace(',', '.')) || 0;
+        var emolumentos = parseFloat($(this).find('td').eq(5).text().replace(/\./g, '').replace(',', '.')) || 0;
         totalEmolumentos += emolumentos;
     });
 
