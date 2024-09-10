@@ -73,6 +73,7 @@ if (!empty($tarefas)) {
                 'descricao' => $tarefa['descricao'],
                 'data_criacao' => $data_criacao->format('Y-m-d H:i:s'),
                 'data_limite' => $data_limite->format('Y-m-d H:i:s'),
+                'status' => $tarefa['status'], 
                 'nivel_de_prioridade' => $tarefa['nivel_de_prioridade']
             ];
         }
@@ -91,8 +92,9 @@ if (!empty($tarefas)) {
             'data_criacao' => $data_criacao->format('Y-m-d H:i:s'),
             'data_limite' => $data_limite->format('Y-m-d H:i:s'),
             'nivel_de_prioridade' => $tarefa['nivel_de_prioridade'],
+            'status' => $tarefa['status'], 
             'status_data' => $status_data
-        ];
+        ];        
     }
 }
 

@@ -17,6 +17,53 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="icon" href="style/img/favicon.png" type="image/png">
     <script src="script/chart.js"></script>
     <style>
+
+.status-label {
+    display: inline-block;
+    padding: 0.2em 0.6em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 2;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25em;
+    width: 100px;
+}
+
+.status-iniciada {
+    background-color: #007bff;
+}
+
+.status-em-espera {
+    background-color: #ffa500;
+}
+
+.status-em-andamento {
+    background-color: #0056b3;
+}
+
+.status-concluida {
+    background-color: #28a745;
+}
+
+.status-cancelada {
+    background-color: #dc3545;
+}
+
+.status-pendente {
+    background-color: gray;
+}
+
+.status-prestes-vencer {
+    background-color: #ffc107; /* Cor amarelada para "Prestes a vencer" */
+}
+
+.status-vencida {
+    background-color: #dc3545; /* Cor avermelhada para "Vencida" */
+}
+
         /* Remover a borda de foco no botão de fechar */
         .btn-close {
             outline: none; /* Remove a borda ao clicar */
@@ -39,113 +86,113 @@ date_default_timezone_set('America/Sao_Paulo');
         }
 
          /* Remover marcadores de lista */
-    .modal-body ul {
-        list-style-type: none; /* Remove os marcadores de lista */
-        padding-left: 0; /* Remove o padding padrão */
-    }
+        .modal-body ul {
+            list-style-type: none; /* Remove os marcadores de lista */
+            padding-left: 0; /* Remove o padding padrão */
+        }
 
-    /* Recuo personalizado para os itens da lista */
-    .modal-body li {
-        padding-left: 20px!important; /* Recuo da lista */
-        padding: 10px 0; /* Adiciona espaço vertical */
-        border-bottom: 1px solid #ddd; /* Linha separadora */
-    }
+        /* Recuo personalizado para os itens da lista */
+        .modal-body li {
+            padding-left: 20px!important; /* Recuo da lista */
+            padding: 10px 0; /* Adiciona espaço vertical */
+            border-bottom: 1px solid #ddd; /* Linha separadora */
+        }
 
-    /* Estilo dos títulos de funcionários */
-    .modal-body h5 {
-        /* margin-top: 20px;
-        margin-bottom: 10px; */
-        font-weight: bold;
-    }
+        /* Estilo dos títulos de funcionários */
+        .modal-body h5 {
+            /* margin-top: 20px;
+            margin-bottom: 10px; */
+            font-weight: bold;
+        }
 
-    /* Exemplo de ajuste no modal para torná-lo mais largo */
-    .modal-dialog {
-        max-width: 700px; /* Aumenta a largura do modal */
-    }
+        /* Exemplo de ajuste no modal para torná-lo mais largo */
+        .modal-dialog {
+            max-width: 700px; /* Aumenta a largura do modal */
+        }
 
-    /* Prioridades */
-    .priority-medium {
-        background-color: #fff9c4 !important; /* Amarelo claro */
-        padding: 10px;
-    }
+        /* Prioridades */
+        .priority-medium {
+            background-color: #fff9c4 !important; /* Amarelo claro */
+            padding: 10px;
+        }
 
-    .priority-high {
-        background-color: #ffe082 !important; /* Laranja claro */
-        padding: 10px;
-    }
+        .priority-high {
+            background-color: #ffe082 !important; /* Laranja claro */
+            padding: 10px;
+        }
 
-    .priority-critical {
-        background-color: #ff8a80 !important; /* Vermelho claro */
-        padding: 10px;
-    }
+        .priority-critical {
+            background-color: #ff8a80 !important; /* Vermelho claro */
+            padding: 10px;
+        }
 
-    /* Tarefas quase vencidas e vencidas */
-    .row-quase-vencida {
-        background-color: #ffebcc!important; /* Amarelo claro */
-        padding: 10px;
-    }
+        /* Tarefas quase vencidas e vencidas */
+        .row-quase-vencida {
+            background-color: #ffebcc!important; /* Amarelo claro */
+            padding: 10px;
+        }
 
-    .row-vencida {
-        background-color: #ffcccc!important; /* Vermelho claro */
-        padding: 10px;
-    }
+        .row-vencida {
+            background-color: #ffcccc!important; /* Vermelho claro */
+            padding: 10px;
+        }
 
-    /* Modo escuro - Prioridades */
-    body.dark-mode .priority-medium {
-        background-color: #fff9c4 !important; /* Amarelo claro */
-        color: #000!important;
-    }
+        /* Modo escuro - Prioridades */
+        body.dark-mode .priority-medium {
+            background-color: #fff9c4 !important; /* Amarelo claro */
+            color: #000!important;
+        }
 
-    body.dark-mode .priority-high {
-        background-color: #ffe082 !important; /* Laranja claro */
-        color: #000!important;
-    }
+        body.dark-mode .priority-high {
+            background-color: #ffe082 !important; /* Laranja claro */
+            color: #000!important;
+        }
 
-    body.dark-mode .priority-critical {
-        background-color: #ff8a80 !important; /* Vermelho claro */
-    }
+        body.dark-mode .priority-critical {
+            background-color: #ff8a80 !important; /* Vermelho claro */
+        }
 
-    /* Modo escuro - Quase vencida e vencida */
-    body.dark-mode .row-quase-vencida {
-        background-color: #ffebcc!important; /* Amarelo claro */
-        color: #000!important;
-    }
+        /* Modo escuro - Quase vencida e vencida */
+        body.dark-mode .row-quase-vencida {
+            background-color: #ffebcc!important; /* Amarelo claro */
+            color: #000!important;
+        }
 
-    body.dark-mode .row-vencida {
-        background-color: #ffcccc!important; /* Vermelho claro */
-        color: #000!important;
-    }
+        body.dark-mode .row-vencida {
+            background-color: #ffcccc!important; /* Vermelho claro */
+            color: #000!important;
+        }
 
-    /* Status das tarefas */
-    .status-iniciada {
-        background-color: #007bff; /* Azul */
-        color: #fff;
-    }
+        /* Status das tarefas */
+        .status-iniciada {
+            background-color: #007bff; /* Azul */
+            color: #fff;
+        }
 
-    .status-em-espera {
-        background-color: #ffa500; /* Laranja */
-        color: #fff;
-    }
+        .status-em-espera {
+            background-color: #ffa500; /* Laranja */
+            color: #fff;
+        }
 
-    .status-em-andamento {
-        background-color: #0056b3; /* Azul escuro */
-        color: #fff;
-    }
+        .status-em-andamento {
+            background-color: #0056b3; /* Azul escuro */
+            color: #fff;
+        }
 
-    .status-concluida {
-        background-color: #28a745; /* Verde */
-        color: #fff;
-    }
+        .status-concluida {
+            background-color: #28a745; /* Verde */
+            color: #fff;
+        }
 
-    .status-cancelada {
-        background-color: #dc3545; /* Vermelho */
-        color: #fff;
-    }
+        .status-cancelada {
+            background-color: #dc3545; /* Vermelho */
+            color: #fff;
+        }
 
-    .status-pendente {
-        background-color: gray;
-        color: #fff;
-    }
+        .status-pendente {
+            background-color: gray;
+            color: #fff;
+        }
 
         .chart-container {
             position: relative;
@@ -373,47 +420,94 @@ $(document).ready(function() {
         return texto;
     }
 
-    // Função para criar uma tabela HTML com as tarefas
-    function criarTabelaPorPrioridade(prioridade, tarefas) {
-        let tabela = `
-            <h6 class="text-${prioridade === 'Baixa' ? 'primary' : prioridade === 'Média' ? 'warning' : 'danger'}">
-                <b style="margin-left: 2%">Tarefas - Prioridade ${prioridade}</b>
-            </h6>
-            <table class="table table-striped" style="zoom: 90%; margin-left: 2%; max-width: 96%;">
-                <thead>
-                    <tr>
-                        <th>Nº Prot.</th>
-                        <th>Título</th>
-                        <th>Descrição</th>
-                        <th>Data Criação</th>
-                        <th>Data Limite</th>
-                        <th>Situação</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        
-        // Adiciona as tarefas à tabela
-        tarefas.forEach(tarefa => {
-            tabela += `
-                <tr class="${getPriorityClass(tarefa.nivel_de_prioridade)} ${getStatusClass(tarefa.status_data)}">
-                    <td>${tarefa.id}</td>
-                    <td>${limitarTexto(tarefa.titulo, 60)}</td>
-                    <td>${limitarTexto(tarefa.descricao, 60)}</td>
-                    <td>${formatarDataBrasileira(tarefa.data_criacao)}</td>
-                    <td>${formatarDataBrasileira(tarefa.data_limite)}</td>
-                    <td>${tarefa.status_data ? `<span class="text-danger">${tarefa.status_data}</span>` : ''}</td>
-                </tr>
-            `;
-        });
+// Função para capitalizar o texto
+function capitalize(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
-        tabela += `
-                </tbody>
-            </table>
-        `;
-
-        return tabela;
+// Função para retornar a classe de status
+function getStatusClassLabel(status) {
+    switch (status.toLowerCase()) {
+        case 'iniciada':
+            return 'status-iniciada';
+        case 'em espera':
+            return 'status-em-espera';
+        case 'em andamento':
+            return 'status-em-andamento';
+        case 'concluída':
+            return 'status-concluida';
+        case 'cancelada':
+            return 'status-cancelada';
+        case 'pendente':
+            return 'status-pendente';
+        default:
+            return '';
     }
+}
+
+// Função para adicionar classes de status baseado no estado para o fundo e texto
+function getStatusClassBackground(status_data) {
+    switch (status_data) {
+        case 'Prestes a vencer':
+            return 'status-prestes-vencer';  // Classe para fundo e texto de "Prestes a vencer"
+        case 'Vencida':
+            return 'status-vencida';  // Classe para fundo e texto de "Vencida"
+        default:
+            return '';
+    }
+}
+
+// Função para criar uma tabela HTML com as tarefas
+function criarTabelaPorPrioridade(prioridade, tarefas) {
+    let tabela = `
+        <h6 class="text-${prioridade === 'Baixa' ? 'primary' : prioridade === 'Média' ? 'warning' : 'danger'}">
+            <b style="margin-left: 2%">Tarefas - Prioridade ${prioridade}</b>
+        </h6>
+        <table class="table table-striped" style="zoom: 90%; margin-left: 2%; max-width: 96%;">
+            <thead>
+                <tr>
+                    <th>Nº Prot.</th>
+                    <th>Título</th>
+                    <th>Descrição</th>
+                    <th>Data Criação</th>
+                    <th>Data Limite</th>
+                    <th>Status</th>
+                    <th>Situação</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    // Adiciona as tarefas à tabela
+    tarefas.forEach(tarefa => {
+        const statusClassLabel = getStatusClassLabel(tarefa.status); // Obter a classe correta para o status
+        const statusClassBackground = getStatusClassBackground(tarefa.status_data); // Classe para fundo e texto de situação
+        
+        tabela += `
+            <tr class="${getPriorityClass(tarefa.nivel_de_prioridade)}">
+                <td>${tarefa.id}</td>
+                <td>${limitarTexto(tarefa.titulo, 60)}</td>
+                <td>${limitarTexto(tarefa.descricao, 60)}</td>
+                <td>${formatarDataBrasileira(tarefa.data_criacao)}</td>
+                <td>${formatarDataBrasileira(tarefa.data_limite)}</td>
+                <td>
+                    <span class="status-label ${statusClassLabel}">${capitalize(tarefa.status)}</span>
+                </td>
+                <td>
+                    ${tarefa.status_data ? `<span class="status-label ${statusClassBackground}">${tarefa.status_data}</span>` : ''}
+                </td>
+            </tr>
+        `;
+    });
+
+    tabela += `
+            </tbody>
+        </table>
+    `;
+
+    return tabela;
+}
+
 
     // Carregar as tarefas pendentes ao carregar a página
     $.ajax({
