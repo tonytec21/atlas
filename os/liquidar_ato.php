@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             if ($emolumentos_result->num_rows > 0) {
                 $emolumentos = $emolumentos_result->fetch_assoc();
-
+            
                 $emolumentos_valor = isset($emolumentos['EMOLUMENTOS']) ? floatval($emolumentos['EMOLUMENTOS']) * $quantidade_liquidar : 0;
                 $ferc_valor = isset($emolumentos['FERC']) ? floatval($emolumentos['FERC']) * $quantidade_liquidar : 0;
                 $fadep_valor = isset($emolumentos['FADEP']) ? floatval($emolumentos['FADEP']) * $quantidade_liquidar : 0;
@@ -60,7 +60,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $femp_valor = floatval($item['femp']) * $quantidade_liquidar;
                 $total_valor = floatval($item['total']) * $quantidade_liquidar;
             }
-
+            
+            // Aplicar desconto legal, se houver
+            $desconto_legal = isset($item['desconto_legal']) ? floatval($item['desconto_legal']) : 0;
+            
+            if ($desconto_legal > 0) {
+                $emolumentos_valor *= (1 - $desconto_legal / 100);
+                $ferc_valor *= (1 - $desconto_legal / 100);
+                $fadep_valor *= (1 - $desconto_legal / 100);
+                $femp_valor *= (1 - $desconto_legal / 100);
+                $total_valor *= (1 - $desconto_legal / 100);
+            }
+            
             // Verificar valores antes de inserir
             if ($emolumentos_valor > 0 || $ferc_valor > 0 || $fadep_valor > 0 || $femp_valor > 0 || $total_valor > 0) {
                 // Adicionar item liquidado na tabela atos_liquidados
@@ -80,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $status
                 );
                 $stmt->execute();
-            }
+            }            
         }
 
         // Atualizar item
