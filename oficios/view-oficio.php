@@ -221,18 +221,24 @@ foreach ($partes as $parte) {
         // Ajustar o espaçamento após o blockquote
         $pdf->Ln(5);  // Ajustar o espaçamento após o blockquote
     } else {
-        // Processar os parágrafos individualmente dentro da parte não pertencente ao blockquote
-        $paragrafos = preg_split('/(<p>.*?<\/p>)/is', $parte, -1, PREG_SPLIT_DELIM_CAPTURE);
-        foreach ($paragrafos as $paragrafo) {
-            if (preg_match('/<p>(.*?)<\/p>/is', $paragrafo, $matchParagrafo)) {
+        // Processar normalmente, mesmo se não houver <blockquote>
+        $pdf->SetFont('helvetica', '', 12);
+
+        // Verificar se existem parágrafos fora do blockquote
+        if (preg_match_all('/<p>(.*?)<\/p>/is', $parte, $matchesParagrafo)) {
+            foreach ($matchesParagrafo[1] as $paragrafoTexto) {
                 // Renderizar cada parágrafo individualmente
-                $pdf->SetFont('helvetica', '', 12);
-                $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . strip_tags($matchParagrafo[1]) . '</div>', true, false, true, false);
+                $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . strip_tags($paragrafoTexto) . '</div>', true, false, true, false);
                 $pdf->Ln(5); // Espaçamento entre parágrafos
             }
+        } else {
+            // Caso não tenha parágrafos formatados corretamente, exibir o texto
+            $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . strip_tags($parte) . '</div>', true, false, true, false);
+            $pdf->Ln(5); // Espaçamento entre textos
         }
     }
 }
+
 
 // Assinatura
 $pdf->SetFont('helvetica', '', 12);
