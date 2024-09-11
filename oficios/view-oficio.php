@@ -209,7 +209,7 @@ foreach ($partes as $parte) {
         $pdf->SetX(60);
 
         // Calcular a largura do bloco de texto para caber nas margens definidas
-        $blockquoteWidth = $pdf->getPageWidth() - 60 - $rightMarginOriginal;
+        $blockquoteWidth = $pdf->getPageWidth() - 60 - $rightMarginOriginal - 1;  // Redução de 1 mm
 
         // Aplicar estilo para o blockquote e ajustar o conteúdo para caber nas margens
         $pdf->SetFont('helvetica', 'I', 10); // Itálico apenas para o blockquote
