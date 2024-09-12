@@ -34,7 +34,7 @@ $now = new DateTime();
 // Se o usuário for administrador, buscar as tarefas de todos os funcionários
 if ($nivel_de_acesso === 'administrador') {
     $sql_tarefas = "
-        SELECT id, titulo, descricao, data_limite, data_criacao, nivel_de_prioridade, status, funcionario_responsavel
+        SELECT id, titulo, descricao, data_limite, data_criacao, nivel_de_prioridade, status, funcionario_responsavel, token
         FROM tarefas 
         WHERE status NOT IN ('Concluída', 'Cancelada')
         ORDER BY funcionario_responsavel
@@ -43,7 +43,7 @@ if ($nivel_de_acesso === 'administrador') {
 } else {
     // Caso contrário, buscar as tarefas apenas do usuário logado
     $sql_tarefas = "
-        SELECT id, titulo, descricao, data_limite, data_criacao, nivel_de_prioridade, status, funcionario_responsavel
+        SELECT id, titulo, descricao, data_limite, data_criacao, nivel_de_prioridade, status, funcionario_responsavel, token
         FROM tarefas 
         WHERE funcionario_responsavel = ? 
         AND status NOT IN ('Concluída', 'Cancelada')
@@ -74,7 +74,8 @@ if (!empty($tarefas)) {
                 'data_criacao' => $data_criacao->format('Y-m-d H:i:s'),
                 'data_limite' => $data_limite->format('Y-m-d H:i:s'),
                 'status' => $tarefa['status'], 
-                'nivel_de_prioridade' => $tarefa['nivel_de_prioridade']
+                'nivel_de_prioridade' => $tarefa['nivel_de_prioridade'],
+                'token' => $tarefa['token']
             ];
         }
 
@@ -93,7 +94,8 @@ if (!empty($tarefas)) {
             'data_limite' => $data_limite->format('Y-m-d H:i:s'),
             'nivel_de_prioridade' => $tarefa['nivel_de_prioridade'],
             'status' => $tarefa['status'], 
-            'status_data' => $status_data
+            'status_data' => $status_data,
+            'token' => $tarefa['token']
         ];        
     }
 }
