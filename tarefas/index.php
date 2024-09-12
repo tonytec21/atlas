@@ -522,22 +522,43 @@ date_default_timezone_set('America/Sao_Paulo');
                     <button style="margin-bottom:20px; width: 100%; " id="createSubTaskButton" type="button" class="btn btn-primary" data-toggle="modal" data-target="#createSubTaskModal">
                         <i class="fa fa-plus" aria-hidden="true"></i> Criar subtarefa
                     </button>
-                    <h4>Subtarefas</h4>
-                        <table style="zoom: 85%" id="subTasksTable" class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Protocolo</th>
-                                    <th>Título da Subtarefa</th>
-                                    <th>Funcionário Responsável</th>
-                                    <th>Data de Criação</th>
-                                    <th>Data Limite</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="subTasksTableBody">
-                                <!-- Linhas de subtarefas serão inseridas aqui via JavaScript -->
-                            </tbody>
-                        </table>
+                    <!-- Tabela da Tarefa Principal -->
+                    <h4 id="mainTaskHeader" style="display: none;">Tarefa Principal</h4>
+                    <table style="zoom: 85%; display: none;" id="mainTaskTable" class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Protocolo</th>
+                                <th>Título da Tarefa Principal</th>
+                                <th>Funcionário Responsável</th>
+                                <th>Data de Criação</th>
+                                <th>Data Limite</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mainTaskTableBody">
+                            <!-- Linha da tarefa principal será inserida aqui via JavaScript -->
+                        </tbody>
+                    </table>
+
+                    <hr>
+
+                    <!-- Tabela de Subtarefas -->
+                    <h4 id="subTasksHeader" style="display: none;">Subtarefas</h4>
+                    <table style="zoom: 85%; display: none;" id="subTasksTable" class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Protocolo</th>
+                                <th>Título da Subtarefa</th>
+                                <th>Funcionário Responsável</th>
+                                <th>Data de Criação</th>
+                                <th>Data Limite</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subTasksTableBody">
+                            <!-- Linhas de subtarefas serão inseridas aqui via JavaScript -->
+                        </tbody>
+                    </table>
                     <hr>
                     <h4>Timeline</h4>
                     <div id="commentTimeline" class="timeline">
@@ -772,47 +793,96 @@ date_default_timezone_set('America/Sao_Paulo');
             });
         });
 
-        function loadSubTasks(taskId) {
-    $.ajax({
-        url: 'get_sub_tasks.php', // Arquivo PHP que busca as subtarefas no banco de dados
-        type: 'GET',
-        data: { id_tarefa_principal: taskId }, // Envia o ID da tarefa principal
-        success: function(response) {
-            var subTasks = JSON.parse(response);
-            var subTasksTableBody = $('#subTasksTableBody');
-            subTasksTableBody.empty(); // Limpa as linhas antigas da tabela
+        function loadMainTask(subTaskId) {
+            $.ajax({
+                url: 'get_tarefa_principal.php', // Arquivo PHP que busca a tarefa principal
+                type: 'GET',
+                data: { id_tarefa_sub: subTaskId }, // Envia o ID da subtarefa
+                success: function(response) {
+                    var mainTask = JSON.parse(response);
+                    var mainTaskTableBody = $('#mainTaskTableBody');
+                    var mainTaskTable = $('#mainTaskTable');
+                    var mainTaskHeader = $('#mainTaskHeader');
 
-            if (subTasks.length > 0) {
-                subTasks.forEach(function(subTask) {
-                    // Adiciona a classe de status, prioridade e vencimento
-                    var statusClass = getStatusClass(subTask.status);
-                    var rowClass = getRowClass(subTask.status, subTask.data_limite);
-                    var priorityClass = getPriorityClass(subTask.nivel_de_prioridade);
-
-                    // Verifica se todas as classes estão válidas
-                    var row = '<tr class="' + rowClass + '">' +
-                        '<td>' + subTask.id + '</td>' +
-                        '<td>' + subTask.titulo + '</td>' +
-                        '<td>' + subTask.funcionario_responsavel + '</td>' +
-                        '<td>' + new Date(subTask.data_criacao).toLocaleString("pt-BR") + '</td>' +
-                        '<td>' + new Date(subTask.data_limite).toLocaleString("pt-BR") + '</td>' +
-                        '<td><span class="' + statusClass + '">' + capitalize(subTask.status) + '</span></td>' +
-                        '</tr>';
-                    subTasksTableBody.append(row);
-                });
-            } else {
-                subTasksTableBody.append('<tr><td colspan="6">Nenhuma subtarefa encontrada</td></tr>');
-            }
-        },
-        error: function() {
-            alert('Erro ao buscar as subtarefas');
+                    mainTaskTableBody.empty(); // Limpa as linhas antigas da tabela
+                    
+                    // Verifica se a tarefa que está sendo visualizada é a mesma que a principal
+                    if (mainTask.error || !mainTask.id || mainTask.id == subTaskId) {
+                        mainTaskTable.hide(); // Oculta a tabela e o cabeçalho se não houver tarefa principal ou se for a própria tarefa
+                        mainTaskHeader.hide();
+                    } else {
+                        mainTaskTable.show(); // Mostra a tabela de tarefa principal
+                        mainTaskHeader.show();
+                        var row = '<tr>' +
+                            '<td>' + mainTask.id + '</td>' +
+                            '<td>' + mainTask.titulo + '</td>' +
+                            '<td>' + mainTask.funcionario_responsavel + '</td>' +
+                            '<td>' + new Date(mainTask.data_criacao).toLocaleString("pt-BR") + '</td>' +
+                            '<td>' + new Date(mainTask.data_limite).toLocaleString("pt-BR") + '</td>' +
+                            '<td><span class="' + getStatusClass(mainTask.status) + '">' + capitalize(mainTask.status) + '</span></td>' +
+                            '</tr>';
+                        mainTaskTableBody.append(row);
+                    }
+                },
+                error: function() {
+                    alert('Erro ao buscar a tarefa principal');
+                }
+            });
         }
-    });
-}
 
-function capitalize(text) {
-    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-}
+
+        $('#viewTaskModal').on('shown.bs.modal', function() {
+            var taskId = $('#taskNumber').text(); // ID da tarefa (pode ser principal ou subtarefa)
+            
+            loadSubTasks(taskId); // Carregar subtarefas da tarefa principal (caso seja uma tarefa principal)
+            loadMainTask(taskId); // Carregar a tarefa principal (caso seja uma subtarefa)
+        });
+
+
+        function loadSubTasks(taskId) {
+            $.ajax({
+                url: 'get_sub_tasks.php', // Certifique-se que a URL está correta
+                type: 'GET',
+                data: { id_tarefa_principal: taskId }, // Envia o ID da tarefa principal
+                success: function(response) {
+                    var subTasks = JSON.parse(response);
+                    var subTasksTableBody = $('#subTasksTableBody');
+                    var subTasksTable = $('#subTasksTable');
+                    var subTasksHeader = $('#subTasksHeader');
+
+                    subTasksTableBody.empty(); // Limpa as linhas antigas da tabela
+
+                    if (subTasks.length > 0) {
+                        subTasksTable.show(); // Mostra a tabela de subtarefas caso existam
+                        subTasksHeader.show();
+                        subTasks.forEach(function(subTask) {
+                            var statusClass = getStatusClass(subTask.status);
+                            var rowClass = getRowClass(subTask.status, subTask.data_limite);
+
+                            var row = '<tr class="' + rowClass + '">' +
+                                '<td>' + subTask.id + '</td>' +
+                                '<td>' + subTask.titulo + '</td>' +
+                                '<td>' + subTask.funcionario_responsavel + '</td>' +
+                                '<td>' + new Date(subTask.data_criacao).toLocaleString("pt-BR") + '</td>' +
+                                '<td>' + new Date(subTask.data_limite).toLocaleString("pt-BR") + '</td>' +
+                                '<td><span class="' + statusClass + '">' + capitalize(subTask.status) + '</span></td>' +
+                                '</tr>';
+                            subTasksTableBody.append(row);
+                        });
+                    } else {
+                        subTasksTable.hide(); // Oculta a tabela se não houver subtarefas
+                        subTasksHeader.hide();
+                    }
+                },
+                error: function() {
+                    alert('Erro ao buscar as subtarefas');
+                }
+            });
+        }
+
+        function capitalize(text) {
+            return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+        }
 
 // Função para retornar a classe de status
 function getStatusClass(status) {
