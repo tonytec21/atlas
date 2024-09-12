@@ -473,6 +473,7 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
                     <th>Data Limite</th>
                     <th>Status</th>
                     <th>Situação</th>
+                    <th style="text-align: center;">Visualizar</th>
                 </tr>
             </thead>
             <tbody>
@@ -495,6 +496,11 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
                 </td>
                 <td>
                     ${tarefa.status_data ? `<span class="status-label ${statusClassBackground}">${tarefa.status_data}</span>` : ''}
+                </td>
+                <td style="text-align: center;">
+                    <button class="btn btn-info btn-sm" style="margin-bottom: 0px; width: 40px; height: 30px;" onclick="window.location.href='tarefas/index.php?token=${tarefa.token}'">
+                        <i class="fa fa-eye" aria-hidden="true"></i>
+                    </button>
                 </td>
             </tr>
         `;
