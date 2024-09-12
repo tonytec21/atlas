@@ -228,13 +228,11 @@ foreach ($partes as $parte) {
 
         // Aplicar estilo para o blockquote e ajustar o conteúdo para caber nas margens
         $pdf->SetFont('helvetica', 'I', 10); // Itálico apenas para o blockquote
-        $pdf->MultiCell($blockquoteWidth, 5, strip_tags($matches[1]), 0, 'J', false, 1); // Remove as tags HTML com strip_tags
+        $pdf->MultiCell($blockquoteWidth, 5, strip_tags($matches[1]), 0, 'J', false, 1);
 
-        // Restaurar as margens originais após o blockquote
-        $pdf->SetMargins($leftMarginOriginal, $topMargin, $rightMarginOriginal);
-
-        // Ajustar o espaçamento após o blockquote
-        $pdf->Ln(5);  // Ajustar o espaçamento após o blockquote
+        // Reduzir o espaçamento após o blockquote ajustando a posição Y diretamente
+        $yPosAfterBlockquote = $pdf->GetY() - 7;  // Reduzindo o espaçamento
+        $pdf->SetY($yPosAfterBlockquote);
     } else {
         // Processar normalmente os conteúdos fora do blockquote
         $pdf->SetFont('helvetica', '', 12);
@@ -253,8 +251,6 @@ foreach ($partes as $parte) {
         }
     }
 }
-
-
 
 // Assinatura
 $pdf->SetFont('helvetica', '', 12);
