@@ -236,23 +236,24 @@ foreach ($partes as $parte) {
         // Ajustar o espaçamento após o blockquote
         $pdf->Ln(5);  // Ajustar o espaçamento após o blockquote
     } else {
-        // Processar normalmente, mesmo se não houver <blockquote>
+        // Processar normalmente os conteúdos fora do blockquote
         $pdf->SetFont('helvetica', '', 12);
 
         // Verificar se existem parágrafos fora do blockquote
         if (preg_match_all('/<p>(.*?)<\/p>/is', $parte, $matchesParagrafo)) {
             foreach ($matchesParagrafo[1] as $paragrafoTexto) {
-                // Renderizar cada parágrafo individualmente
-                $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . strip_tags($paragrafoTexto) . '</div>', true, false, true, false);
+                // Renderizar cada parágrafo com as formatações HTML preservadas
+                $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $paragrafoTexto . '</div>', true, false, true, false);
                 $pdf->Ln(5); // Espaçamento entre parágrafos
             }
         } else {
-            // Caso não tenha parágrafos formatados corretamente, exibir o texto
-            $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . strip_tags($parte) . '</div>', true, false, true, false);
+            // Caso não tenha parágrafos formatados corretamente, exibir o texto diretamente com formatações HTML
+            $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $parte . '</div>', true, false, true, false);
             $pdf->Ln(5); // Espaçamento entre textos
         }
     }
 }
+
 
 
 // Assinatura
