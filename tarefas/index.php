@@ -435,6 +435,9 @@ date_default_timezone_set('America/Sao_Paulo');
             <div class="modal-content">
                 <div class="modal-header d-block text-center">
                     <h5 class="modal-title" id="viewTaskModalLabel">Dados da Tarefa - Protocolo Geral nº.: <span id="taskNumber"></span></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="position: absolute; top: 10px; right: 10px;">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
 
                 <div class="modal-body text-center">
@@ -455,12 +458,6 @@ date_default_timezone_set('America/Sao_Paulo');
                             <i class="fa fa-file-text" aria-hidden="true"></i> Recibo de Entrega
                         </button>
                     </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
                 </div>
 
                 <div class="modal-body">
