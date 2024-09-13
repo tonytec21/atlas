@@ -460,7 +460,7 @@ function adicionarAtoManual() {
 
 function removerItem(button) {
     var row = $(button).closest('tr');
-    var totalItem = parseFloat(row.find('td').eq(8).text().replace(/\./g, '').replace(',', '.')) || 0;
+    var totalItem = parseFloat(row.find('td').eq(9).text().replace(/\./g, '').replace(',', '.')) || 0;
 
     var totalOS = parseFloat($('#total_os').val().replace(/\./g, '').replace(',', '.')) || 0;
     totalOS -= totalItem;
