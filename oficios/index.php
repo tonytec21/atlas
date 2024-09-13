@@ -121,7 +121,7 @@ include(__DIR__ . '/../menu.php');
                                 <td>
                                     <button class="btn btn-info btn-sm" onclick="viewOficio('<?php echo $oficio['numero']; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <button class="btn btn-edit btn-sm" onclick="editOficio('<?php echo $oficio['numero']; ?>')" <?php if ($oficio['status'] == 1) echo 'disabled'; ?>><i class="fa fa-pencil" aria-hidden="true"></i></button>
-                                    <button class="btn btn-sm btn-primary" style="width: 40px; height: 40px;" onclick="viewAttachments('<?php echo $oficio['numero']; ?>')"><i class="fa fa-paperclip" aria-hidden="true"></i></button>
+                                    <button class="btn btn-sm btn-primary" style="width: 40px; height: 40px; margin-bottom: 5px;" onclick="viewAttachments('<?php echo $oficio['numero']; ?>')"><i class="fa fa-paperclip" aria-hidden="true"></i></button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
