@@ -1625,7 +1625,15 @@ function viewTask(taskToken) {
                 // Se houver um token, chama a função para visualizar a tarefa e abrir o modal
                 viewTask(taskToken);
             }
+
+            // Adiciona um evento para redirecionar a página quando o modal for fechado e se houver um token
+            $('#viewTaskModal').on('hidden.bs.modal', function () {
+                if (taskToken) { // Verifica se o token está presente
+                    window.location.href = '../index.php'; // Redireciona para index.php quando o modal é fechado
+                }
+            });
         });
+
 
 
     </script>

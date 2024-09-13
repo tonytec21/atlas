@@ -216,7 +216,7 @@ foreach ($partes as $parte) {
         $pdf->MultiCell($blockquoteWidth, 5, strip_tags($matches[1]), 0, 'J', false, 1);
 
         // Reduzir o espaçamento após o blockquote ajustando a posição Y diretamente
-        $yPosAfterBlockquote = $pdf->GetY() - 7;  // Reduzindo o espaçamento
+        $yPosAfterBlockquote = $pdf->GetY() + 3;  // Reduzindo o espaçamento
         $pdf->SetY($yPosAfterBlockquote);
     } else {
         // Processar normalmente os conteúdos fora do blockquote
