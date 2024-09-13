@@ -440,7 +440,7 @@ date_default_timezone_set('America/Sao_Paulo');
                     </button>
                 </div>
 
-                <div class="modal-body text-center">
+                <div class="modal-header d-block text-center">
                     <div class="btn-group" role="group" aria-label="Ações da Tarefa">
                         <button style="font-size:12px" id="guiaRecebimentoButton" type="button" class="btn btn-info2 mr-2">
                             <i class="fa fa-file-text" aria-hidden="true"></i> Guia de Recebimento
@@ -459,7 +459,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         </button>
                     </div>
                 </div>
-<hr>
+
                 <div class="modal-body">
                     <div class="form-row">
                         <div class="form-group col-md-6">
