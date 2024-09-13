@@ -433,9 +433,15 @@ date_default_timezone_set('America/Sao_Paulo');
     <div class="modal fade" id="viewTaskModal" tabindex="-1" role="dialog" aria-labelledby="viewTaskModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h6 class="modal-title" id="viewTaskModalLabel">Dados da Tarefa - Protocolo Geral nº.: <span id="taskNumber"></span></h6>
-                    <div class="ml-auto d-flex align-items-center">
+                <div class="modal-header d-block text-center">
+                    <h5 class="modal-title" id="viewTaskModalLabel">Dados da Tarefa - Protocolo Geral nº.: <span id="taskNumber"></span></h5>
+                </div>
+
+                <div class="modal-body text-center">
+                    <div class="btn-group" role="group" aria-label="Ações da Tarefa">
+                        <button style="font-size:12px" id="guiaRecebimentoButton" type="button" class="btn btn-info2 mr-2">
+                            <i class="fa fa-file-text" aria-hidden="true"></i> Guia de Recebimento
+                        </button>
                         <button style="font-size:12px" id="add-button" type="button" class="btn btn-success mr-2" onclick="window.open('../oficios/cadastrar-oficio.php', '_blank')">
                             <i class="fa fa-plus" aria-hidden="true"></i> Criar Ofício
                         </button>
@@ -448,10 +454,13 @@ date_default_timezone_set('America/Sao_Paulo');
                         <button style="font-size:12px" id="reciboEntregaButton" type="button" class="btn btn-info2 mr-2">
                             <i class="fa fa-file-text" aria-hidden="true"></i> Recibo de Entrega
                         </button>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
                     </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
 
                 <div class="modal-body">
@@ -667,6 +676,46 @@ date_default_timezone_set('America/Sao_Paulo');
             </div>
         </div>
     </div>
+
+    <!-- Modal Guia de Recebimento -->
+<div class="modal fade" id="guiaRecebimentoModal" tabindex="-1" role="dialog" aria-labelledby="guiaRecebimentoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="guiaRecebimentoModalLabel">Guia de Recebimento</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="guiaRecebimentoForm">
+                    <div class="form-group">
+                        <label for="cliente">Nome do Cliente:</label>
+                        <input type="text" class="form-control" id="cliente" name="cliente" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dataRecebimento">Data de Recebimento:</label>
+                        <input type="datetime-local" class="form-control" id="dataRecebimento" name="dataRecebimento" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="documentosRecebidos">Documentos Recebidos:</label>
+                        <textarea class="form-control" id="documentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="observacoes">Observações:</label>
+                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="funcionario">Funcionário:</label>
+                        <input type="text" class="form-control" id="funcionario" name="funcionario" readonly>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Salvar Guia</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 
     <!-- Modal Criar Subtarefa -->
 <div class="modal fade" id="createSubTaskModal" tabindex="-1" role="dialog" aria-labelledby="createSubTaskModalLabel" aria-hidden="true">
@@ -1290,88 +1339,189 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
             });
         
 
-        function viewTask(taskToken) {
-            $.ajax({
-                url: 'view_task.php',
-                type: 'GET',
-                data: {
-                    token: taskToken
-                },
-                success: function(response) {
-                    var task = JSON.parse(response);
-                    $('#viewTitle').val(task.titulo).data('tasktoken', taskToken).data('numeroOficio', task.numero_oficio).data('reciboGerado', task.recibo_gerado);
-                    $('#viewCategory').val(task.categoria_titulo);
-                    $('#viewOrigin').val(task.origem_titulo);
-                    $('#viewDeadline').val(new Date(task.data_limite).toLocaleString("pt-BR"));
-                    $('#viewEmployee').val(task.funcionario_responsavel);
-                    $('#viewDescription').val(task.descricao);
-                    $('#viewStatus').val(task.status).data('data-conclusao', task.data_conclusao);
-                    $('#createdBy').val(task.criado_por);
-                    $('#createdAt').val(new Date(task.data_criacao).toLocaleString("pt-BR"));
-                    $('#taskNumber').text(task.id); // Atualizar o número da tarefa aqui
-                    $('#viewConclusionDate').val(task.data_conclusao ? new Date(task.data_conclusao).toLocaleString("pt-BR") : '');
+// Função para verificar se a guia de recebimento já foi gerada
+function verificarOuAbrirGuia(taskId) {
+    $.ajax({
+        url: 'verificar_guia.php', // O arquivo PHP que criamos para verificar a guia
+        type: 'GET',
+        data: {
+            task_id: taskId
+        },
+        success: function(response) {
+            var result = JSON.parse(response);
 
-                    var viewAttachments = $('#viewAttachments');
-                    viewAttachments.empty();
-                    if (task.caminho_anexo) {
-                        task.caminho_anexo.split(';').forEach(function(anexo, index) {
+            if (result.guia_existe) {
+                // Se a guia já existe, abrir a guia diretamente com o task_id
+                $.ajax({
+                    url: '../style/configuracao.json',
+                    dataType: 'json',
+                    cache: false,
+                    success: function(data) {
+                        let url = '';
+
+                        if (data.timbrado === 'S') {
+                            url = 'guia_recebimento.php?id=' + taskId; // Usar task_id na URL
+                        } else {
+                            url = 'guia-recebimento.php?id=' + taskId; // Usar task_id na URL
+                        }
+
+                        // Abre a URL correspondente em uma nova aba
+                        window.open(url, '_blank');
+                    },
+                    error: function() {
+                        alert('Erro ao carregar o arquivo de configuração.');
+                    }
+                });
+
+            } else {
+                // Se a guia não existe, abrir o modal para criar a guia
+                $('#guiaRecebimentoModal').modal('show');
+                $('#funcionario').val($('#viewEmployee').val()); // Preencher o funcionário automaticamente
+                $('#cliente').val(''); // Limpar o campo cliente
+                $('#observacoes').val(''); // Limpar o campo observações
+                $('#dataRecebimento').val(''); // Limpar o campo data de recebimento
+                $('#documentosRecebidos').val(''); // Limpar o campo documentos recebidos
+            }
+        },
+        error: function() {
+            alert('Erro ao verificar a guia de recebimento.');
+        }
+    });
+}
+
+// Associa a verificação à ação do botão de guia de recebimento
+$('#guiaRecebimentoButton').off('click').on('click', function() {
+    const taskId = $('#taskNumber').text(); // Pega o taskNumber via jQuery
+    verificarOuAbrirGuia(taskId);
+});
+
+
+// Submissão do formulário de criação de guia
+$('#guiaRecebimentoForm').on('submit', function(e) {
+    e.preventDefault();
+
+    var formData = $(this).serialize() + '&task_id=' + $('#taskNumber').text();
+
+    $.ajax({
+        url: 'save_guia_recebimento.php',
+        type: 'POST',
+        data: formData,
+        success: function(response) {
+            try {
+                var result = JSON.parse(response);
+                if (result.success) {
+                    $('#guiaRecebimentoModal').modal('hide');
+                    alert('Guia de recebimento salva com sucesso!');
+                    window.open('guia-recebimento.php?id=' + $('#taskNumber').text(), '_blank');
+                } else {
+                    console.error(result.error);
+                    alert('Erro ao salvar a guia de recebimento: ' + result.error);
+                }
+            } catch (e) {
+                console.error('Erro ao parsear JSON:', e, response);
+                alert('Erro ao salvar a guia de recebimento');
+            }
+        },
+        error: function() {
+            alert('Erro ao salvar a guia de recebimento');
+        }
+    });
+});
+
+
+
+function viewTask(taskToken) {
+    $.ajax({
+        url: 'view_task.php',
+        type: 'GET',
+        data: {
+            token: taskToken
+        },
+        success: function(response) {
+            var task = JSON.parse(response);
+
+            // Carregar os dados da tarefa
+            $('#viewTitle').val(task.titulo)
+                .data('tasktoken', taskToken)
+                .data('numeroOficio', task.numero_oficio)
+                .data('reciboGerado', task.recibo_gerado) // Recibo de Entrega gerado
+                .data('guiaGerado', task.guia_gerada); // Guia de Recebimento gerado
+
+            $('#viewCategory').val(task.categoria_titulo);
+            $('#viewOrigin').val(task.origem_titulo);
+            $('#viewDeadline').val(new Date(task.data_limite).toLocaleString("pt-BR"));
+            $('#viewEmployee').val(task.funcionario_responsavel);
+            $('#viewDescription').val(task.descricao);
+            $('#viewStatus').val(task.status).data('data-conclusao', task.data_conclusao);
+            $('#createdBy').val(task.criado_por);
+            $('#createdAt').val(new Date(task.data_criacao).toLocaleString("pt-BR"));
+            $('#taskNumber').text(task.id); // Atualizar o número da tarefa aqui
+            $('#viewConclusionDate').val(task.data_conclusao ? new Date(task.data_conclusao).toLocaleString("pt-BR") : '');
+
+            // Gerenciamento de anexos
+            var viewAttachments = $('#viewAttachments');
+            viewAttachments.empty();
+            if (task.caminho_anexo) {
+                task.caminho_anexo.split(';').forEach(function(anexo, index) {
+                    var fileName = anexo.split('/').pop();
+                    var filePath = anexo.startsWith('/') ? anexo : '/' + anexo;
+                    var attachmentItem = '<div class="anexo-item">' +
+                        '<span>' + (index + 1) + '</span>' +
+                        '<span>' + fileName + '</span>' +
+                        '<button class="btn btn-info btn-sm visualizar-anexo" data-file="' + filePath + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
+                        '</div>';
+                    viewAttachments.append(attachmentItem);
+                });
+            }
+
+            // Gerenciamento da linha do tempo de comentários
+            var commentTimeline = $('#commentTimeline');
+            commentTimeline.empty();
+            if (task.comentarios) {
+                task.comentarios.forEach(function(comentario) {
+                    var commentDate = new Date(comentario.data_comentario);
+                    var commentDateFormatted = commentDate.toLocaleString("pt-BR");
+
+                    var commentItem = '<div class="timeline-item">';
+                    if (comentario.is_subtask) {
+                        // Destaque para comentários de subtarefas
+                        commentItem += '<div class="timeline-badge subtask"><i class="fa fa-comments-o" aria-hidden="true"></i></div>'; // Ícone especial para subtarefas
+                        commentItem += '<div class="timeline-panel subtask-panel">'; // Estilo especial para subtarefas
+                        commentItem += '<div class="timeline-heading"><h6 class="timeline-title">' + (comentario.funcionario || 'Desconhecido') + ' <small>' + commentDateFormatted + '</small></h6>';
+                        commentItem += '<div class="subtask-title">Comentário de Subtarefa</div>'; // Título de "Comentário de Subtarefa"
+                    } else {
+                        commentItem += '<div class="timeline-badge primary"><i class="fa fa-commenting-o" aria-hidden="true"></i></div>';
+                        commentItem += '<div class="timeline-panel">';
+                        commentItem += '<div class="timeline-heading"><h6 class="timeline-title">' + (comentario.funcionario || 'Desconhecido') + ' <small>' + commentDateFormatted + '</small></h6>';
+                    }
+
+                    commentItem += '</div><div class="timeline-body"><p>' + comentario.comentario + '</p>';
+                    
+                    if (comentario.caminho_anexo) {
+                        comentario.caminho_anexo.split(';').forEach(function(anexo) {
                             var fileName = anexo.split('/').pop();
                             var filePath = anexo.startsWith('/') ? anexo : '/' + anexo;
-                            var attachmentItem = '<div class="anexo-item">' +
-                                '<span>' + (index + 1) + '</span>' +
+                            commentItem += '<div class="anexo-item">' +
                                 '<span>' + fileName + '</span>' +
                                 '<button class="btn btn-info btn-sm visualizar-anexo" data-file="' + filePath + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
                                 '</div>';
-                            viewAttachments.append(attachmentItem);
                         });
                     }
 
-                    var commentTimeline = $('#commentTimeline');
-                        commentTimeline.empty();
-                        if (task.comentarios) {
-                            task.comentarios.forEach(function(comentario) {
-                                var commentDate = new Date(comentario.data_comentario);
-                                var commentDateFormatted = commentDate.toLocaleString("pt-BR");
+                    commentItem += '</div></div></div>';
+                    commentTimeline.append(commentItem);
+                });
+            }
 
-                                var commentItem = '<div class="timeline-item">';
-                                if (comentario.is_subtask) {
-                                    // Destaque para comentários de subtarefas
-                                    commentItem += '<div class="timeline-badge subtask"><i class="fa fa-comments-o" aria-hidden="true"></i></div>'; // Ícone especial para subtarefas
-                                    commentItem += '<div class="timeline-panel subtask-panel">'; // Estilo especial para subtarefas
-                                    commentItem += '<div class="timeline-heading"><h6 class="timeline-title">' + (comentario.funcionario || 'Desconhecido') + ' <small>' + commentDateFormatted + '</small></h6>';
-                                    commentItem += '<div class="subtask-title">Comentário de Subtarefa</div>'; // Título de "Comentário de Subtarefa"
-                                } else {
-                                    commentItem += '<div class="timeline-badge primary"><i class="fa fa-commenting-o" aria-hidden="true"></i></div>';
-                                    commentItem += '<div class="timeline-panel">';
-                                    commentItem += '<div class="timeline-heading"><h6 class="timeline-title">' + (comentario.funcionario || 'Desconhecido') + ' <small>' + commentDateFormatted + '</small></h6>';
-                                }
-
-                                commentItem += '</div><div class="timeline-body"><p>' + comentario.comentario + '</p>';
-                                
-                                if (comentario.caminho_anexo) {
-                                    comentario.caminho_anexo.split(';').forEach(function(anexo) {
-                                        var fileName = anexo.split('/').pop();
-                                        var filePath = anexo.startsWith('/') ? anexo : '/' + anexo;
-                                        commentItem += '<div class="anexo-item">' +
-                                            '<span>' + fileName + '</span>' +
-                                            '<button class="btn btn-info btn-sm visualizar-anexo" data-file="' + filePath + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
-                                            '</div>';
-                                    });
-                                }
-
-                                commentItem += '</div></div></div>';
-                                commentTimeline.append(commentItem);
-                            });
-                        }
-
-
-                    $('#viewTaskModal').modal('show');
-                },
-                error: function() {
-                    alert('Erro ao buscar a tarefa');
-                }
-            });
+            // Exibir o modal da tarefa
+            $('#viewTaskModal').modal('show');
+        },
+        error: function() {
+            alert('Erro ao buscar a tarefa');
         }
+    });
+}
+
 
         $(document).on('click', '.visualizar-anexo', function() {
             var filePath = $(this).data('file');

@@ -43,11 +43,19 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
 
         // Verificar se o recibo de entrega já foi gerado
         $reciboStmt = $conn->prepare("SELECT id FROM recibos_de_entrega WHERE task_id = ?");
-        $reciboStmt->bind_param("i", $task['id']);
+        $reciboStmt->bind_param("i", $taskId);
         $reciboStmt->execute();
         $reciboResult = $reciboStmt->get_result();
         $task['recibo_gerado'] = $reciboResult->num_rows > 0;
         $reciboStmt->close();
+
+        // Verificar se a guia de recebimento já foi gerada
+        $guiaStmt = $conn->prepare("SELECT id FROM guia_de_recebimento WHERE task_id = ?");
+        $guiaStmt->bind_param("i", $taskId);
+        $guiaStmt->execute();
+        $guiaResult = $guiaStmt->get_result();
+        $task['guia_gerada'] = $guiaResult->num_rows > 0;
+        $guiaStmt->close();
 
         echo json_encode($task);
     } else {
@@ -57,3 +65,4 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
     $stmt->close();
     $conn->close();
 }
+?>
