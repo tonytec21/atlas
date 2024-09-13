@@ -459,7 +459,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         </button>
                     </div>
                 </div>
-
+<hr>
                 <div class="modal-body">
                     <div class="form-row">
                         <div class="form-group col-md-6">
