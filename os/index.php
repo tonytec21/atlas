@@ -17,6 +17,26 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
+        /* Remover a borda de foco no botão de fechar */
+        .btn-close {
+            outline: none; /* Remove a borda ao clicar */
+            border: none; /* Remove qualquer borda padrão */
+            background: none; /* Remove o fundo padrão */
+            padding: 0; /* Remove o espaçamento extra */
+            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
+            cursor: pointer; /* Mostra o ponteiro de clique */
+            transition: transform 0.2s ease; /* Suaviza a transição do hover */
+        }
+
+        /* Aumentar o tamanho do botão em 5% no hover */
+        .btn-close:hover {
+            transform: scale(2.10); /* Aumenta 5% */
+        }
+
+        /* Opcional: Adicionar foco suave sem borda visível */
+        .btn-close:focus {
+            outline: none; /* Remove a borda ao foco */
+        }
         .btn-adicionar {
             height: 38px;
             line-height: 24px;
@@ -388,8 +408,8 @@ include(__DIR__ . '/db_connection.php');
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="pagamentoModalLabel">Efetuar Pagamento</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
@@ -464,8 +484,8 @@ include(__DIR__ . '/db_connection.php');
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="devolucaoModalLabel">Devolver Valores</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
@@ -497,8 +517,8 @@ include(__DIR__ . '/db_connection.php');
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="anexoModalLabel">Anexos</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
@@ -539,8 +559,8 @@ include(__DIR__ . '/db_connection.php');
             <div class="modal-content">
                 <div class="modal-header error">
                     <h5 class="modal-title" id="mensagemModalLabel">Erro</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">

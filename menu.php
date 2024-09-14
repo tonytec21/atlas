@@ -93,7 +93,10 @@ $mode_query->close();
             color: #666;
         }
         body.dark-mode .card {
-            background-color: #6c757d;
+            background-color: #4a4a4a;
+        }
+        body.dark-mode .card-header {
+            background-color: rgb(255 0 0 / 3%)
         }
     </style>
 </head>

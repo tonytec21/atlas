@@ -19,10 +19,26 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
 
     <style>
-        /* .priority-low {
-            background-color: #e0f7fa !important; 
-        } */
-         /* Estilo para destacar comentários de subtarefas */
+        /* Remover a borda de foco no botão de fechar */
+        .btn-close {
+            outline: none; /* Remove a borda ao clicar */
+            border: none; /* Remove qualquer borda padrão */
+            background: none; /* Remove o fundo padrão */
+            padding: 0; /* Remove o espaçamento extra */
+            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
+            cursor: pointer; /* Mostra o ponteiro de clique */
+            transition: transform 0.2s ease; /* Suaviza a transição do hover */
+        }
+
+        /* Aumentar o tamanho do botão em 5% no hover */
+        .btn-close:hover {
+            transform: scale(2.10); /* Aumenta 5% */
+        }
+
+        /* Opcional: Adicionar foco suave sem borda visível */
+        .btn-close:focus {
+            outline: none; /* Remove a borda ao foco */
+        }
 .timeline-badge.subtask {
     background-color: #ffc107;
 }
@@ -435,8 +451,8 @@ date_default_timezone_set('America/Sao_Paulo');
             <div class="modal-content">
                 <div class="modal-header d-block text-center">
                     <h5 class="modal-title" id="viewTaskModalLabel">Dados da Tarefa - Protocolo Geral nº.: <span id="taskNumber"></span></h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="position: absolute; top: 10px; right: 10px;">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" style="position: absolute; top: 5px; right: 15px;">
+                        &times;
                     </button>
                 </div>
 
@@ -585,8 +601,8 @@ date_default_timezone_set('America/Sao_Paulo');
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addCommentModalLabel">Adicionar Comentário</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
@@ -615,9 +631,10 @@ date_default_timezone_set('America/Sao_Paulo');
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="vincularOficioModalLabel">Vincular Ofício</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
+
                 </div>
                 <div class="modal-body">
                     <form id="vincularOficioForm">
@@ -641,8 +658,8 @@ date_default_timezone_set('America/Sao_Paulo');
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="reciboEntregaModalLabel">Recibo de Entrega</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
@@ -680,8 +697,8 @@ date_default_timezone_set('America/Sao_Paulo');
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="guiaRecebimentoModalLabel">Guia de Recebimento</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
@@ -720,8 +737,8 @@ date_default_timezone_set('America/Sao_Paulo');
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createSubTaskModalLabel">Criar Subtarefa</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">

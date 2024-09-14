@@ -17,6 +17,30 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
+        .btn-4 {
+            background: #34495e;
+            color: #fff;
+        }
+        /* Remover a borda de foco no botão de fechar */
+        .btn-close {
+            outline: none; /* Remove a borda ao clicar */
+            border: none; /* Remove qualquer borda padrão */
+            background: none; /* Remove o fundo padrão */
+            padding: 0; /* Remove o espaçamento extra */
+            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
+            cursor: pointer; /* Mostra o ponteiro de clique */
+            transition: transform 0.2s ease; /* Suaviza a transição do hover */
+        }
+
+        /* Aumentar o tamanho do botão em 5% no hover */
+        .btn-close:hover {
+            transform: scale(2.10); /* Aumenta 5% */
+        }
+
+        /* Opcional: Adicionar foco suave sem borda visível */
+        .btn-close:focus {
+            outline: none; /* Remove a borda ao foco */
+        }
         .btn-adicionar {
             height: 38px;
             line-height: 24px;
@@ -25,6 +49,9 @@ include(__DIR__ . '/db_connection.php');
 
         .modal-content {
             border-radius: 10px;
+        }
+        body.light-mode .modal-content {
+            background-color: #e3f6ff!important;
         }
 
         .modal-dialog {
@@ -493,74 +520,80 @@ include(__DIR__ . '/db_connection.php');
     <div class="modal fade" id="detalhesModal" tabindex="-1" role="dialog" aria-labelledby="detalhesModalLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="detalhesModalLabel">Detalhes do Fluxo de Caixa</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                <div class="modal-header" style="display: flex; justify-content: center; align-items: center; position: relative;">
+                    <h5 class="modal-title" id="detalhesModalLabel" style="flex-grow: 1; text-align: center;"></h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px; top: 10px;">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card text-white bg-primary mb-3" style="background-color: #005d15 !important">
-                                <div class="card-header">Saldo Inicial</div>
-                                <div class="card-body">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">SALDO INICIAL</div>
+                                <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardSaldoInicial">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card text-white bg-primary mb-3">
-                                <div class="card-header">Atos Liquidados</div>
-                                <div class="card-body">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL EM ATOS LIQUIDADOS</div>
+                                <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalAtos">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card text-white bg-warning mb-3">
-                                <div class="card-header">Recebido em Conta</div>
-                                <div class="card-body">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL RECEBIDO EM CONTA</div>
+                                <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalRecebidoConta">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card text-white bg-success mb-3">
-                                <div class="card-header">Recebido em Espécie</div>
-                                <div class="card-body">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL RECEBIDO EM ESPÉCIE</div>
+                                <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalRecebidoEspecie">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card text-white bg-secondary mb-3">
-                                <div class="card-header">Devoluções</div>
-                                <div class="card-body">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL EM DEVOLUÇÕES</div>
+                                <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalDevolucoes">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card text-white bg-danger mb-3">
-                                <div class="card-header">Saídas e Despesas</div>
-                                <div class="card-body">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL EM SAÍDAS E DESPESAS</div>
+                                <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardSaidasDespesas">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card text-white bg-info mb-3">
-                                <div class="card-header">Depósito do Caixa</div>
-                                <div class="card-body">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">DEPÓSITO DO CAIXA</div>
+                                <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardDepositoCaixa">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
+                            <div class="card text-white btn-4 mb-3">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">SALDO TRANSPORTADO</div>
+                                <div class="card-body" style="padding: 0.90rem;">
+                                    <h5 class="card-title" id="cardSaldoTransportado">R$ 0,00</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
                             <div class="card text-white bg-dark mb-3">
-                                <div class="card-header">Total em Caixa</div>
-                                <div class="card-body">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL EM CAIXA</div>
+                                <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalEmCaixa">R$ 0,00</h5>
                                 </div>
                             </div>
@@ -568,7 +601,7 @@ include(__DIR__ . '/db_connection.php');
                     </div>
                     <hr>
                     <div class="card mb-3">
-                        <div class="card-header table-title">ATOS LIQUIDADOS</div>
+                        <div class="card-header table-title text-center"><b>ATOS LIQUIDADOS</b></div>
                         <div class="card-body">
                             <table id="tabelaAtos" class="table table-striped table-bordered" style="zoom: 80%">
                                 <thead>
@@ -590,7 +623,7 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                     </div>
                     <div class="card mb-3">
-                        <div class="card-header table-title">PAGAMENTOS</div>
+                        <div class="card-header table-title text-center"><b>PAGAMENTOS</b></div>
                         <div class="card-body">
                             <table id="tabelaPagamentos" class="table table-striped table-bordered" style="zoom: 80%">
                                 <thead>
@@ -610,7 +643,7 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                     </div>
                     <div class="card mb-3">
-                        <div class="card-header table-title">TOTAL POR TIPO DE PAGAMENTO</div>
+                        <div class="card-header table-title text-center"><b>TOTAL POR TIPO DE PAGAMENTO</b></div>
                         <div class="card-body">
                             <table id="tabelaTotalPorTipo" class="table table-striped table-bordered" style="zoom: 80%">
                                 <thead>
@@ -626,7 +659,7 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                     </div>
                     <div class="card mb-3">
-                        <div class="card-header table-title">DEVOLUÇÕES</div>
+                        <div class="card-header table-title text-center"><b>DEVOLUÇÕES</b></div>
                         <div class="card-body">
                             <table id="tabelaDevolucoes" class="table table-striped table-bordered" style="zoom: 80%">
                                 <thead>
@@ -646,7 +679,7 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                     </div>
                     <div class="card mb-3">
-                        <div class="card-header table-title">SAÍDAS E DESPESAS</div>
+                        <div class="card-header table-title text-center"><b>SAÍDAS E DESPESAS</b></div>
                         <div class="card-body">
                             <table id="tabelaSaidas" class="table table-striped table-bordered" style="zoom: 80%">
                                 <thead>
@@ -669,7 +702,7 @@ include(__DIR__ . '/db_connection.php');
                     </div>
 
                     <div class="card mb-3">
-                        <div class="card-header table-title">DEPÓSITOS</div>
+                        <div class="card-header table-title text-center"><b>DEPÓSITOS</b></div>
                         <div class="card-body">
                             <table id="tabelaDepositos" class="table table-striped table-bordered" style="zoom: 80%">
                                 <thead>
@@ -690,7 +723,7 @@ include(__DIR__ . '/db_connection.php');
                     </div>
 
                     <div class="card mb-3">
-                        <div class="card-header table-title">SALDO TRANSPORTADO</div>
+                        <div class="card-header table-title text-center"><b>SALDO TRANSPORTADO</b></div>
                         <div class="card-body">
                             <table id="tabelaSaldoTransportado" class="table table-striped table-bordered" style="zoom: 80%">
                                 <thead>
@@ -724,8 +757,8 @@ include(__DIR__ . '/db_connection.php');
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="cadastroSaidaModalLabel">Cadastrar Saída/Despesa</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
+                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                            &times;
                         </button>
                     </div>
                     <div class="modal-body">
@@ -782,8 +815,8 @@ include(__DIR__ . '/db_connection.php');
             <div class="modal-content modal-deposito-caixa">
                 <div class="modal-header">
                     <h5 class="modal-title" id="cadastroDepositoModalLabel">Cadastrar Depósito do Caixa</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
@@ -871,8 +904,8 @@ include(__DIR__ . '/db_connection.php');
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="verDepositosCaixaModalLabel">Depósitos do Caixa Unificado</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
+                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                            &times;
                         </button>
                     </div>
                     <div class="modal-body">
@@ -1136,6 +1169,8 @@ include(__DIR__ . '/db_connection.php');
                     var detalhes = response;
 
                     // Atualiza os cards no topo do modal
+                    var dataFormatada = formatDateForDisplay(data); // Usando função já existente para formatar a data
+                    $('#detalhesModalLabel').html(`CAIXA DO DIA ${dataFormatada} - FUNCIONÁRIO: ${funcionarios}`);
                     $('#cardTotalAtos').text(formatCurrency(detalhes.totalAtos));
                     $('#cardTotalRecebidoConta').text(formatCurrency(detalhes.totalRecebidoConta));
                     $('#cardTotalRecebidoEspecie').text(formatCurrency(detalhes.totalRecebidoEspecie));
@@ -1143,6 +1178,7 @@ include(__DIR__ . '/db_connection.php');
                     $('#cardTotalEmCaixa').text(formatCurrency(detalhes.totalEmCaixa));
                     $('#cardSaidasDespesas').text(formatCurrency(detalhes.totalSaidasDespesas));
                     $('#cardDepositoCaixa').text(formatCurrency(detalhes.totalDepositoCaixa));
+                    $('#cardSaldoTransportado').text(formatCurrency(detalhes.totalSaldoTransportado));
                     $('#cardSaldoInicial').text(formatCurrency(detalhes.saldoInicial));
 
                     // Debugging logs

@@ -146,6 +146,26 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
+        /* Remover a borda de foco no botão de fechar */
+        .btn-close {
+            outline: none; /* Remove a borda ao clicar */
+            border: none; /* Remove qualquer borda padrão */
+            background: none; /* Remove o fundo padrão */
+            padding: 0; /* Remove o espaçamento extra */
+            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
+            cursor: pointer; /* Mostra o ponteiro de clique */
+            transition: transform 0.2s ease; /* Suaviza a transição do hover */
+        }
+
+        /* Aumentar o tamanho do botão em 5% no hover */
+        .btn-close:hover {
+            transform: scale(2.10); /* Aumenta 5% */
+        }
+
+        /* Opcional: Adicionar foco suave sem borda visível */
+        .btn-close:focus {
+            outline: none; /* Remove a borda ao foco */
+        }
         .btn-print, .btn-payment, .btn-repasse {
             margin-left: 10px;
         }
@@ -229,16 +249,17 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center">
-            <h4>Ordem de Serviço nº: <?php echo $ordem_servico['id']; ?></h4>
-            <div>
-                <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
-                <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" type="button" class="btn btn-info2 btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
-                <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
-                <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
-                <button style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
-                <button type="button" class="btn btn-4 btn-sm" style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" data-toggle="modal" data-target="#tarefaModal"><i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa</button>
-            </div>
+        <div class="d-flex justify-content-center align-items-center">
+            <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
+            <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" type="button" class="btn btn-info2 btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
+            <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
+            <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
+            <button style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
+            <button type="button" class="btn btn-4 btn-sm" style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" data-toggle="modal" data-target="#tarefaModal"><i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa</button>
+        </div>
+        <hr>
+        <div class="text-center">
+            <h4>ORDEM DE SERVIÇO Nº: <?php echo $ordem_servico['id']; ?></h4>
         </div>
         <hr>
         <form id="osForm" method="POST">
@@ -367,8 +388,8 @@ include(__DIR__ . '/../menu.php');
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="pagamentoModalLabel">Efetuar Pagamento</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
@@ -467,8 +488,8 @@ include(__DIR__ . '/../menu.php');
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="repasseModalLabel">Repasse Credor</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
@@ -501,8 +522,8 @@ include(__DIR__ . '/../menu.php');
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="liquidacaoModalLabel">Liquidar Ato</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
@@ -522,8 +543,8 @@ include(__DIR__ . '/../menu.php');
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="devolucaoModalLabel">Devolver Valores</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
@@ -555,8 +576,8 @@ include(__DIR__ . '/../menu.php');
         <div class="modal-content">
             <div class="modal-header error">
                 <h5 class="modal-title" id="mensagemModalLabel">Erro</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
@@ -575,19 +596,19 @@ include(__DIR__ . '/../menu.php');
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="tarefaModalLabel">Criar Tarefa</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
                 <form id="taskForm" method="POST" action="save_task.php" enctype="multipart/form-data">
-                    <div class="form-group">
-                        <label for="title">Título da Tarefa</label>
-                        <input type="text" class="form-control" id="title" name="title" value="<?php echo $ordem_servico['descricao_os'] . ' - ' . $ordem_servico['cliente']; ?>" required>
-                    </div>
+                    <div class="form-row">    
+                        <div class="form-group col-md-8">
+                            <label for="title">Título da Tarefa</label>
+                            <input type="text" class="form-control" id="title" name="title" value="<?php echo $ordem_servico['descricao_os'] . ' - ' . $ordem_servico['cliente']; ?>" required>
+                        </div>
 
                     <!-- Alinhando os campos na mesma linha -->
-                    <div class="form-row">
                         <div class="form-group col-md-4">
                             <label for="category">Categoria</label>
                             <select class="form-control" id="category" name="category" required>
