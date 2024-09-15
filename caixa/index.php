@@ -526,73 +526,81 @@ include(__DIR__ . '/db_connection.php');
                 </div>
                 <div class="modal-body">
                     <div class="row">
-                        <div class="col-md-4">
+                        <div class="col-md-2">
                             <div class="card text-white bg-primary mb-3" style="background-color: #005d15 !important">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">SALDO INICIAL</div>
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Saldo Inicial</div>
                                 <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardSaldoInicial">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-2">
                             <div class="card text-white bg-primary mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL EM ATOS LIQUIDADOS</div>
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Atos Liquidados</div>
                                 <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalAtos">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-2">
+                            <div class="card text-white" style="background-color: #6f42c1;">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Atos Manuais</div>
+                                <div class="card-body" style="padding: 0.90rem;">
+                                    <h5 class="card-title" id="cardTotalAtosManuais">R$ 0,00</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
                             <div class="card text-white bg-warning mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL RECEBIDO EM CONTA</div>
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Recebido em Conta</div>
                                 <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalRecebidoConta">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-2">
                             <div class="card text-white bg-success mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL RECEBIDO EM ESPÉCIE</div>
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Recebido em Espécie</div>
                                 <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalRecebidoEspecie">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-2">
                             <div class="card text-white bg-secondary mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL EM DEVOLUÇÕES</div>
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Devoluções</div>
                                 <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalDevolucoes">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-2">
                             <div class="card text-white bg-danger mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL EM SAÍDAS E DESPESAS</div>
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Saídas e Despesas</div>
                                 <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardSaidasDespesas">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-2">
                             <div class="card text-white bg-info mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">DEPÓSITO DO CAIXA</div>
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Depósito do Caixa</div>
                                 <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardDepositoCaixa">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-2">
                             <div class="card text-white btn-4 mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">SALDO TRANSPORTADO</div>
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Saldo Transportado</div>
                                 <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardSaldoTransportado">R$ 0,00</h5>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-2">
                             <div class="card text-white bg-dark mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">TOTAL EM CAIXA</div>
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Total em Caixa</div>
                                 <div class="card-body" style="padding: 0.90rem;">
                                     <h5 class="card-title" id="cardTotalEmCaixa">R$ 0,00</h5>
                                 </div>
@@ -620,6 +628,29 @@ include(__DIR__ . '/db_connection.php');
                                 </tbody>
                             </table>
                             <h6 class="total-label">Total Atos Liquidados: <span id="totalAtos"></span></h6>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header table-title text-center"><b>ATOS MANUAIS</b></div>
+                        <div class="card-body">
+                            <table id="tabelaAtosManuais" class="table table-striped table-bordered" style="zoom: 80%">
+                                <thead>
+                                    <tr>
+                                        <th>Funcionário</th>
+                                        <th>Nº OS</th>
+                                        <th>Cliente</th>
+                                        <th>Ato</th>
+                                        <th>Descrição</th>
+                                        <th>Quantidade</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detalhesAtosManuais">
+                                    <!-- Detalhes dos atos serão carregados aqui -->
+                                </tbody>
+                            </table>
+                            <h6 class="total-label">Total Atos Manuais: <span id="totalAtosManuais"></span></h6>
                         </div>
                     </div>
                     <div class="card mb-3">
@@ -1172,6 +1203,7 @@ include(__DIR__ . '/db_connection.php');
                     var dataFormatada = formatDateForDisplay(data); // Usando função já existente para formatar a data
                     $('#detalhesModalLabel').html(`CAIXA DO DIA ${dataFormatada} - FUNCIONÁRIO: ${funcionarios}`);
                     $('#cardTotalAtos').text(formatCurrency(detalhes.totalAtos));
+                    $('#cardTotalAtosManuais').text(formatCurrency(detalhes.totalAtosManuais));
                     $('#cardTotalRecebidoConta').text(formatCurrency(detalhes.totalRecebidoConta));
                     $('#cardTotalRecebidoEspecie').text(formatCurrency(detalhes.totalRecebidoEspecie));
                     $('#cardTotalDevolucoes').text(formatCurrency(detalhes.totalDevolucoes));
@@ -1207,6 +1239,25 @@ include(__DIR__ . '/db_connection.php');
                         `);
                     });
                     $('#totalAtos').text(formatCurrency(totalAtos));
+
+                    // Atos Manuais Liquidados
+                    var totalAtosManuais = 0;
+                    $('#detalhesAtosManuais').empty();
+                    detalhes.atosManuais.forEach(function(atoManual) {
+                        totalAtosManuais += parseFloat(atoManual.total);
+                        $('#detalhesAtosManuais').append(`
+                            <tr>
+                                <td>${atoManual.funcionario}</td>    
+                                <td>${atoManual.ordem_servico_id}</td>
+                                <td>${atoManual.cliente}</td>
+                                <td>${atoManual.ato}</td>
+                                <td>${atoManual.descricao}</td>
+                                <td>${atoManual.quantidade_liquidada}</td>
+                                <td>${formatCurrency(atoManual.total)}</td>
+                            </tr>
+                        `);
+                    });
+                    $('#totalAtosManuais').text(formatCurrency(totalAtosManuais));
 
                     // Pagamentos
                     var totalPagamentos = 0;
@@ -1337,6 +1388,14 @@ include(__DIR__ . '/db_connection.php');
 
                     // Inicializar DataTables
                     $('#tabelaAtos').DataTable({
+                        "language": {
+                            "url": "../style/Portuguese-Brasil.json"
+                        },
+                        "destroy": true,
+                        "pageLength": 10,
+                        "order": [],
+                    });
+                    $('#tabelaAtosManuais').DataTable({
                         "language": {
                             "url": "../style/Portuguese-Brasil.json"
                         },

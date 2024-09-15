@@ -51,7 +51,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($stmt->execute()) {
         // Capturar o ID da tarefa recém-inserida
         $last_id = $stmt->insert_id;
-        header("Location: ../tarefas/edit_task.php?id=$last_id");
+    
+        // Preparar a consulta para pegar o token baseado no ID
+        $query_token = "SELECT token FROM tarefas WHERE id = ?";
+        $stmt_token = $conn->prepare($query_token);
+        $stmt_token->bind_param("i", $last_id);
+        $stmt_token->execute();
+        $stmt_token->bind_result($token);
+        $stmt_token->fetch();
+        $stmt_token->close();
+    
+        // Redirecionar para a página usando o token
+        header("Location: ../tarefas/index_tarefa.php?token=" . $token);
+        exit();
     } else {
         echo "Erro ao salvar a tarefa: " . $stmt->error;
     }

@@ -27,6 +27,16 @@ try {
         $stmt->execute();
         $atos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Atos Manuais Liquidados
+        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total, aml.funcionario, aml.data
+                FROM atos_manuais_liquidados aml
+                JOIN ordens_de_servico os ON aml.ordem_servico_id = os.id
+                WHERE DATE(aml.data) = :data';
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+        $stmt->execute();
+        $atos_manuais = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         // Pagamentos
         $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento
                 FROM pagamento_os po
@@ -85,6 +95,17 @@ try {
         $stmt->execute();
         $atos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Atos Manuais Liquidados
+        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total, aml.funcionario, aml.data
+                FROM atos_manuais_liquidados aml
+                JOIN ordens_de_servico os ON aml.ordem_servico_id = os.id
+                WHERE aml.funcionario = :funcionario AND DATE(aml.data) = :data';
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':funcionario', $funcionarios);
+        $stmt->bindParam(':data', $data);
+        $stmt->execute();
+        $atos_manuais = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         // Pagamentos
         $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento
                 FROM pagamento_os po
@@ -139,6 +160,11 @@ try {
     }
 
     $totalAtos = array_reduce($atos, function($carry, $item) {
+        return $carry + floatval($item['total']);
+    }, 0.0);
+
+    // Total de Atos Manuais Liquidados
+    $totalAtosManuais = array_reduce($atos_manuais, function($carry, $item) {
         return $carry + floatval($item['total']);
     }, 0.0);
 
@@ -198,12 +224,14 @@ try {
 
     echo json_encode([
         'atos' => $atos,
+        'atosManuais' => $atos_manuais,
         'pagamentos' => $pagamentos,
         'devolucoes' => $devolucoes,
         'saidas' => $saidas,
         'depositos' => $depositos,
         'saldoTransportado' => $saldoTransportado,
         'totalAtos' => $totalAtos,
+        'totalAtosManuais' => $totalAtosManuais,
         'totalRecebidoConta' => $totalRecebidoConta,
         'totalRecebidoEspecie' => $totalRecebidoEspecie,
         'totalDevolucoes' => $totalDevolucoes,

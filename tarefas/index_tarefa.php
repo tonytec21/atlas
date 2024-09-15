@@ -1643,14 +1643,13 @@ function viewTask(taskToken) {
                 viewTask(taskToken);
             }
 
-            // Adiciona um evento para redirecionar a página quando o modal for fechado e se houver um token
+            // Adiciona um evento para voltar à página anterior quando o modal for fechado e se houver um token
             $('#viewTaskModal').on('hidden.bs.modal', function () {
                 if (taskToken) { // Verifica se o token está presente
-                    window.location.href = 'index.php'; // Redireciona para index.php quando o modal é fechado
+                    window.history.back(); // Volta para a página anterior no histórico do navegador
                 }
             });
         });
-
 
 
     </script>
