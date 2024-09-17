@@ -180,7 +180,7 @@ if (isset($_GET['id'])) {
     $pdf->SetFont('helvetica', '', 9);
     $pdf->SetMargins(10, 40, 10);
     $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? ' - CPF/CNPJ: ' . $ordem_servico['cpf_cliente'] : '';
-    $pdf->writeHTML('<div style="text-align: left;">Cliente: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
+    $pdf->writeHTML('<div style="text-align: left;">Apresentante: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
     $pdf->Ln(1);
 
     $pdf->SetFont('helvetica', '', 9);

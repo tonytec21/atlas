@@ -616,7 +616,7 @@ include(__DIR__ . '/db_connection.php');
                                     <tr>
                                         <th>Funcionário</th>
                                         <th>Nº OS</th>
-                                        <th>Cliente</th>
+                                        <th>Apresentante</th>
                                         <th>Ato</th>
                                         <th>Descrição</th>
                                         <th>Quantidade</th>
@@ -639,7 +639,7 @@ include(__DIR__ . '/db_connection.php');
                                     <tr>
                                         <th>Funcionário</th>
                                         <th>Nº OS</th>
-                                        <th>Cliente</th>
+                                        <th>Apresentante</th>
                                         <th>Ato</th>
                                         <th>Descrição</th>
                                         <th>Quantidade</th>
@@ -661,7 +661,7 @@ include(__DIR__ . '/db_connection.php');
                                     <tr>
                                         <th>Funcionário</th>    
                                         <th>Nº OS</th>
-                                        <th>Cliente</th>
+                                        <th>Apresentante</th>
                                         <th>Forma de Pagamento</th>
                                         <th>Total</th>
                                     </tr>
@@ -697,7 +697,7 @@ include(__DIR__ . '/db_connection.php');
                                     <tr>
                                         <th>Funcionário</th>
                                         <th>Nº OS</th>
-                                        <th>Cliente</th>
+                                        <th>Apresentante</th>
                                         <th>Forma de Devolução</th>
                                         <th>Total</th>
                                     </tr>

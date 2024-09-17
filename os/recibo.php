@@ -152,7 +152,7 @@ if (isset($_GET['id'])) {
 
     $pdf->SetFont('helvetica', 'B', 8);
     $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? '<br>CPF/CNPJ: ' . $ordem_servico['cpf_cliente'] : '';
-    $pdf->writeHTML('<div style="text-align: left;">CLIENTE: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
+    $pdf->writeHTML('<div style="text-align: left;">APRESENTANTE: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
     $pdf->Ln(0);
 
     $pdf->SetFont('helvetica', 'B', 8);

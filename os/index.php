@@ -169,7 +169,7 @@ include(__DIR__ . '/db_connection.php');
                         <input type="number" class="form-control" id="os_id" name="os_id" min="1">
                     </div>
                     <div class="form-group col-md-3">
-                        <label for="cliente">Cliente:</label>
+                        <label for="cliente">Apresentante:</label>
                         <input type="text" class="form-control" id="cliente" name="cliente">
                     </div>
                     <div class="form-group col-md-2">
@@ -236,7 +236,7 @@ include(__DIR__ . '/db_connection.php');
                         <tr>
                             <th style="width: 7%;">Nº OS</th>
                             <th>Funcionário</th>
-                            <th style="width: 11%;">Cliente</th>
+                            <th style="width: 11%;">Apresentante</th>
                             <th style="width: 11%;">CPF/CNPJ</th>
                             <th style="width: 13%;">Título da OS</th>
                             <th style="width: 10%;">Valor Total</th>

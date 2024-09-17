@@ -265,11 +265,11 @@ include(__DIR__ . '/../menu.php');
         <form id="osForm" method="POST">
             <div class="form-row">
                 <div class="form-group col-md-5">
-                    <label for="cliente">Cliente:</label>
+                    <label for="cliente">Apresentante:</label>
                     <input type="text" class="form-control" id="cliente" name="cliente" value="<?php echo $ordem_servico['cliente']; ?>" readonly>
                 </div>
                 <div class="form-group col-md-3">
-                    <label for="cpf_cliente">CPF/CNPJ do Cliente:</label>
+                    <label for="cpf_cliente">CPF/CNPJ do Apresentante:</label>
                     <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente" value="<?php echo $ordem_servico['cpf_cliente']; ?>" readonly>
                 </div>
                 <div class="form-group col-md-2">
