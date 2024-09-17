@@ -50,9 +50,14 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
 
     <style>
+        .pago {
+            background-color: #d4edda !important; /* Verde clara */
+        }
+
         .vencida {
             background-color: #f8d7da !important; /* Vermelha clara */
         }
+
         .prestes-vencer {
             background-color: #fff3cd !important; /* Amarela clara */
         }
@@ -64,6 +69,7 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
             border-radius: 5px;
             border: none;
         }
+
     </style>
 
 </head>
@@ -77,7 +83,7 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
             <hr>
             <form id="pesquisarForm" method="GET">
                 <div class="form-row">
-                    <div class="form-group col-md-3">
+                    <div class="form-group col-md-6">
                         <label for="titulo">Título:</label>
                         <input type="text" class="form-control" id="titulo" name="titulo">
                     </div>
@@ -99,16 +105,21 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                             <option value="Anual">Anual</option>
                         </select>
                     </div>
-                    <div class="form-group col-md-3">
+                    <div class="form-group col-md-2">
+                        <label for="mes_referencia">Mês de Referência:</label>
+                        <input type="month" class="form-control" id="mes_referencia" name="mes_referencia">
+                    </div>
+                    <div class="form-group col-md-2">
                         <label for="status">Status:</label>
                         <select class="form-control" id="status" name="status">
-                            <option value="">Pendente</option>
+                            <option value="">Todos</option>
+                            <option value="Pendente">Pendente</option>
                             <option value="Pago">Pago</option>
                         </select>
                     </div>
-                    <div class="form-group col-md-12">
+                    <div class="form-group col-md-8">
                         <label for="descricao">Descrição:</label>
-                        <textarea class="form-control" id="descricao" name="descricao" rows="2"></textarea>
+                        <input class="form-control" id="descricao" name="descricao" rows="2"></input>
                     </div>
                 </div>
                 <div class="row mb-12">
@@ -131,8 +142,6 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                 <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 80%">
                     <thead>
                         <tr>
-                       
-
                             <th style="width: 20%;">Título</th>
                             <th style="width: 10%;">Valor</th>
                             <th style="width: 15%;">Data de Vencimento</th>
@@ -168,11 +177,16 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                             $params[] = $_GET['recorrencia'];
                             $filtered = true;
                         }
-                        if (!empty($_GET['status']) && $_GET['status'] == 'Pago') {
-                            $sql = "SELECT * FROM contas_pagas WHERE 1=1";
+                        if (!empty($_GET['mes_referencia'])) {
+                            $conditions[] = "DATE_FORMAT(data_vencimento, '%Y-%m') = ?";
+                            $params[] = $_GET['mes_referencia'];
+                            $filtered = true;
+                        }
+                        if (!empty($_GET['status']) && $_GET['status'] != '') {
+                            $conditions[] = "status = ?";
+                            $params[] = $_GET['status'];
                         } else {
-                            $conditions[] = "status != 'Pago' AND status != 'Cancelado'";
-                            $sql = "SELECT * FROM contas_a_pagar WHERE 1=1";
+                            $conditions[] = "status != 'Cancelado'";
                         }
 
                         if (!empty($_GET['descricao'])) {
@@ -181,9 +195,13 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                             $filtered = true;
                         }
 
+                        // Construção da SQL
                         if ($conditions) {
-                            $sql .= ' AND ' . implode(' AND ', $conditions);
+                            $sql = "SELECT * FROM contas_a_pagar WHERE " . implode(' AND ', $conditions);
+                        } else {
+                            $sql = "SELECT * FROM contas_a_pagar WHERE status = 'Pendente'";
                         }
+
                         $sql .= ' ORDER BY data_vencimento ASC';
 
                         $stmt = $conn->prepare($sql);
@@ -195,7 +213,7 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
 
                         while ($conta = $result->fetch_assoc()) {
                             ?>
-                            <tr class="<?php echo (strtotime($conta['data_vencimento']) < strtotime('today')) ? 'vencida' : (strtotime($conta['data_vencimento']) == strtotime('+1 day') ? 'prestes-vencer' : ''); ?>">
+                            <tr class="<?php echo ($conta['status'] == 'Pago') ? 'pago' : ((strtotime($conta['data_vencimento']) < strtotime('today')) ? 'vencida' : ((strtotime($conta['data_vencimento']) == strtotime('+1 day')) ? 'prestes-vencer' : '')); ?>">
                                 <td><?php echo $conta['titulo']; ?></td>
                                 <td><?php echo 'R$ ' . number_format($conta['valor'], 2, ',', '.'); ?></td>
                                 <td><?php echo date('d/m/Y', strtotime($conta['data_vencimento'])); ?></td>
@@ -207,6 +225,23 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                                     <button class="btn btn-edit btn-sm" title="Editar Conta" onclick="editarConta('<?php echo $conta['id']; ?>')" style="margin-bottom: 5px;"><i class="fa fa-pencil" aria-hidden="true"></i></button>
                                     <button class="btn btn-delete btn-sm" title="Cancelar Conta" onclick="excluirConta('<?php echo $conta['id']; ?>')" style="margin-bottom: 5px;"><i class="fa fa-trash" aria-hidden="true"></i></button>
                                     <button class="btn btn-success2 btn-sm" title="Definir como Pago" onclick="definirComoPago('<?php echo $conta['id']; ?>')" style="margin-bottom: 5px;"><i class="fa fa-check" aria-hidden="true"></i></button>
+                                    <?php
+                                        // Verifique se existe um comprovante para a conta atual no banco de dados
+                                        $comprovante_sql = "SELECT caminho_comprovante FROM contas_pagas_comprovante WHERE id_conta = ?";
+                                        $stmt_comprovante = $conn->prepare($comprovante_sql);
+                                        $stmt_comprovante->bind_param('i', $conta['id']);
+                                        $stmt_comprovante->execute();
+                                        $result_comprovante = $stmt_comprovante->get_result();
+                                        
+                                        if ($result_comprovante->num_rows > 0) {
+                                            $comprovante = $result_comprovante->fetch_assoc();
+                                            // Se já existir um comprovante, mostrar o botão de visualização
+                                            echo '<button class="btn btn-info btn-sm" title="Visualizar Comprovante" onclick="visualizarComprovante(\'' . $comprovante['caminho_comprovante'] . '\')" style="margin-bottom: 5px;"><i class="fa fa-paperclip" aria-hidden="true"></i></button>';
+                                        } else {
+                                            // Se não existir um comprovante, mostrar o botão de anexo
+                                            echo '<button class="btn btn-secondary btn-sm" style="margin-bottom: 5px;width: 40px;height: 40px;" title="Anexar Comprovante" onclick="abrirModalAnexo(' . $conta['id'] . ')" style="margin-bottom: 5px;"><i class="fa fa-paperclip" aria-hidden="true"></i></button>';
+                                        }
+                                        ?>
                                 </td>
                             </tr>
                             <?php
@@ -311,6 +346,50 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
         </div>
     </div>
 
+    <!-- Modal para Anexar Comprovante -->
+    <div class="modal fade" id="modalAnexo" tabindex="-1" role="dialog" aria-labelledby="modalAnexoLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalAnexoLabel">Anexar Comprovante de Pagamento</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="formAnexo" enctype="multipart/form-data">
+                        <input type="hidden" name="id_conta" id="id_conta_anexo">
+                        <div class="form-group">
+                            <label for="comprovante">Selecione o comprovante:</label>
+                            <input type="file" class="form-control" id="comprovante" name="comprovante" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Enviar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Visualizar Comprovante -->
+    <div class="modal fade" id="modalVisualizarComprovante" tabindex="-1" role="dialog" aria-labelledby="modalVisualizarComprovanteLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalVisualizarComprovanteLabel">Visualizar Comprovante</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <iframe id="comprovante_visualizacao" style="width: 100%; height: 600px;" frameborder="0"></iframe>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
@@ -392,6 +471,55 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                 });
             }
         }
+    
+        function visualizarComprovante(caminho_comprovante) {
+            // Se o comprovante existe, mostrar no modal
+            if (caminho_comprovante) {
+                $('#comprovante_visualizacao').attr('src', caminho_comprovante);
+                $('#modalVisualizarComprovante').modal('show');
+            } else {
+                alert('Nenhum comprovante disponível para esta conta.');
+            }
+        }
+
+        // Função para abrir modal do comprovante
+        $('#formAnexo').on('submit', function(e) {
+            e.preventDefault();
+
+            var formData = new FormData(this);
+            
+            $.ajax({
+                url: 'upload_comprovante.php',  // Arquivo PHP que vai lidar com o upload
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function(response) {
+                    console.log(response); // Exibe a resposta no console
+                    var res;
+                    try {
+                        res = JSON.parse(response);  // Valida a resposta JSON
+                    } catch (error) {
+                        console.error('Erro ao processar JSON: ', error, response);
+                        alert('Erro ao processar a resposta do servidor.');
+                        return;
+                    }
+
+                    if (res.success) {
+                        alert('Comprovante enviado com sucesso.');
+                        $('#modalAnexo').modal('hide');
+                        window.location.reload();  // Atualiza a página para refletir a mudança
+                    } else {
+                        alert('Erro ao enviar o comprovante: ' + res.message);
+                    }
+                },
+                error: function() {
+                    alert('Erro ao enviar o comprovante.');
+                }
+            });
+        });
+
+
 
         $(document).ready(function() {
             // Abre o modal automaticamente ao carregar a página, se houver contas vencidas ou prestes a vencer
@@ -400,6 +528,10 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
             <?php } ?>
         });
 
+        function abrirModalAnexo(id_conta) {
+            $('#id_conta_anexo').val(id_conta);  // Insere o ID da conta no campo oculto
+            $('#modalAnexo').modal('show');  // Abre o modal de upload
+        }
 
     </script>
 
