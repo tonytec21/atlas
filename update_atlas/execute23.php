@@ -15,15 +15,16 @@ function criarTabelaSeNecessario($conn, $queryCriarTabela) {
 }
 
 $tabelas = [
-    "CREATE TABLE contas_pagas_comprovante (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        id_conta INT NOT NULL,
-        caminho_comprovante VARCHAR(255) NOT NULL,
-        funcionario VARCHAR(255) NOT NULL,
-        data DATETIME DEFAULT CURRENT_TIMESTAMP,
-        status VARCHAR(50) NOT NULL,
-        FOREIGN KEY (id_conta) REFERENCES contas_a_pagar(id)
-    );"    
+    "CREATE TABLE IF NOT EXISTS `contas_pagas_comprovante` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id_conta` int(11) NOT NULL,
+  `caminho_comprovante` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `funcionario` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data` datetime DEFAULT CURRENT_TIMESTAMP,
+  `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `id_conta` (`id_conta`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
 ];
 
 // Executa a criação de todas as tabelas
