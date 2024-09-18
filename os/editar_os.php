@@ -128,7 +128,12 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <h3>Editar Ordem de Serviço nº: <?php echo $id; ?></h3>
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>Editar Ordem de Serviço nº: <?php echo $id; ?></h3>
+            <button id="add-button" type="button" style="color: #fff!important" class="btn btn-secondary" onclick="window.open('tabela_de_emolumentos.php')">
+                <i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos
+            </button>
+        </div>
         <hr>
         <form id="osForm" method="POST">
             <input type="hidden" id="os_id" name="os_id" value="<?php echo $id; ?>">
