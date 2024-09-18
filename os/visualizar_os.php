@@ -264,8 +264,8 @@ include(__DIR__ . '/../menu.php');
             <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" type="button" class="btn btn-info2 btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
             <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
             <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
-            <button style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
             <button type="button" class="btn btn-4 btn-sm" style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" data-toggle="modal" data-target="#tarefaModal"><i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa</button>
+            <button style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
             <button type="button" class="btn btn-info3 btn-sm" style="width: 190px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" onclick="window.location.href='criar_os.php'"><i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço</button>
         </div>
         <hr>
