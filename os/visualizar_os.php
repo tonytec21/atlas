@@ -233,10 +233,20 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
             color: #fff;
         }
         .btn-info2 {
+            background: #085f6d;
+            color: #fff;
+            border-color: #085f6d;
+        }
+        .btn-info2:hover {
+            background: #085460;
+            color: #fff;
+            border-color: #085f6d;
+        }
+        .btn-info3 {
             background: #17a2b8;
             color: #fff;
         }
-        .btn-info2:hover {
+        .btn-info3:hover {
             background: #138496;
             color: #fff;
         }
@@ -256,6 +266,7 @@ include(__DIR__ . '/../menu.php');
             <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
             <button style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
             <button type="button" class="btn btn-4 btn-sm" style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" data-toggle="modal" data-target="#tarefaModal"><i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa</button>
+            <button type="button" class="btn btn-info3 btn-sm" style="width: 190px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" onclick="window.location.href='criar_os.php'"><i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço</button>
         </div>
         <hr>
         <div class="text-center">
