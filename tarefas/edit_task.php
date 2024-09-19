@@ -234,7 +234,7 @@ include(__DIR__ . '/../menu.php');
             </div>
             <div class="form-group">
                 <label for="description">Descrição:</label>
-                <textarea class="form-control" id="description" name="description" rows="5" required><?php echo htmlspecialchars($taskData['descricao']); ?></textarea>
+                <textarea class="form-control" id="description" name="description" rows="5"><?php echo htmlspecialchars($taskData['descricao']); ?></textarea>
             </div>
         <h4>Anexos</h4>
         <div id="viewAttachments" class="list-group">
@@ -330,6 +330,25 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/jquery.mask.min.js"></script>
 <script src="../script/toastr.min.js"></script>
 <script>
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var deadlineInput = document.getElementById('deadline');
+        var now = new Date();
+        var year = now.getFullYear();
+        var month = ('0' + (now.getMonth() + 1)).slice(-2); // Meses são 0-indexados
+        var day = ('0' + now.getDate()).slice(-2);
+        var hours = ('0' + now.getHours()).slice(-2);
+        var minutes = ('0' + now.getMinutes()).slice(-2);
+
+        // Formato YYYY-MM-DDTHH:MM
+        var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+        deadlineInput.min = minDateTime;
+
+        // Caso o valor atual seja anterior ao mínimo, corrige automaticamente
+        if (deadlineInput.value && deadlineInput.value < minDateTime) {
+            deadlineInput.value = minDateTime;
+        }
+    });
 
     $(document).ready(function() {
         // Enviar formulário de edição de tarefa

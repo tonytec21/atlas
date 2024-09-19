@@ -113,6 +113,21 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/jquery.mask.min.js"></script>
 <script src="../script/toastr.min.js"></script>
 <script>
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var deadlineInput = document.getElementById('deadline');
+        var now = new Date();
+        var year = now.getFullYear();
+        var month = ('0' + (now.getMonth() + 1)).slice(-2); // Meses são 0-indexados
+        var day = ('0' + now.getDate()).slice(-2);
+        var hours = ('0' + now.getHours()).slice(-2);
+        var minutes = ('0' + now.getMinutes()).slice(-2);
+        
+        // Formato YYYY-MM-DDTHH:MM
+        var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+        deadlineInput.min = minDateTime;
+    });
+
     $(document).ready(function() {
 
     });

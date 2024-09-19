@@ -458,6 +458,9 @@ date_default_timezone_set('America/Sao_Paulo');
 
                 <div class="modal-header d-block text-center">
                     <div class="btn-group" role="group" aria-label="Ações da Tarefa">
+                        <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2">
+                            <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo Geral
+                        </button>
                         <button style="font-size:12px" id="guiaRecebimentoButton" type="button" class="btn btn-info2 mr-2">
                             <i class="fa fa-file-text" aria-hidden="true"></i> Guia de Recebimento
                         </button>
@@ -466,9 +469,6 @@ date_default_timezone_set('America/Sao_Paulo');
                         </button>
                         <button style="font-size:12px" id="vincularOficioButton" type="button" class="btn btn-primary mr-2" data-toggle="modal" data-target="#vincularOficioModal">
                             <i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício
-                        </button>
-                        <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2">
-                            <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo Geral
                         </button>
                         <button style="font-size:12px" id="reciboEntregaButton" type="button" class="btn btn-info2 mr-2">
                             <i class="fa fa-file-text" aria-hidden="true"></i> Recibo de Entrega
@@ -831,7 +831,6 @@ date_default_timezone_set('America/Sao_Paulo');
     </div>
 </div>
 
-
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
@@ -839,6 +838,48 @@ date_default_timezone_set('America/Sao_Paulo');
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script>
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var subTaskDeadlineInput = document.getElementById('subTaskDeadline');
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = ('0' + (now.getMonth() + 1)).slice(-2); // Meses são 0-indexados
+            var day = ('0' + now.getDate()).slice(-2);
+            var hours = ('0' + now.getHours()).slice(-2);
+            var minutes = ('0' + now.getMinutes()).slice(-2);
+
+            // Formato YYYY-MM-DDTHH:MM
+            var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+            subTaskDeadlineInput.min = minDateTime;
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var dataRecebimentoInput = document.getElementById('dataRecebimento');
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = ('0' + (now.getMonth() + 1)).slice(-2); // Meses são 0-indexados
+            var day = ('0' + now.getDate()).slice(-2);
+            var hours = ('0' + now.getHours()).slice(-2);
+            var minutes = ('0' + now.getMinutes()).slice(-2);
+
+            // Formato YYYY-MM-DDTHH:MM
+            var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+            dataRecebimentoInput.min = minDateTime;
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var dataEntregaInput = document.getElementById('dataEntrega');
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = ('0' + (now.getMonth() + 1)).slice(-2); // Meses são 0-indexados
+            var day = ('0' + now.getDate()).slice(-2);
+            var hours = ('0' + now.getHours()).slice(-2);
+            var minutes = ('0' + now.getMinutes()).slice(-2);
+
+            // Formato YYYY-MM-DDTHH:MM
+            var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+            dataEntregaInput.min = minDateTime;
+        });
 
         function normalizeText(text) {
             return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
