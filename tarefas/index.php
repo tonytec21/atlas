@@ -19,6 +19,14 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
 
     <style>
+
+.status-prestes-vencer {
+    background-color: #ffc107; /* Cor amarelada para "Prestes a vencer" */
+}
+
+.status-vencida {
+    background-color: #dc3545; /* Cor avermelhada para "Vencida" */
+}
         /* Remover a borda de foco no botão de fechar */
         .btn-close {
             outline: none; /* Remove a borda ao clicar */
@@ -62,6 +70,10 @@ date_default_timezone_set('America/Sao_Paulo');
 }
 
         .btn-edit {
+            margin-left: 5px;
+        }
+
+        .btn-info {
             margin-left: 5px;
         }
 
@@ -434,6 +446,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             <th style="width: 12%">Funcionário</th>
                             <th>Prioridade</th>
                             <th>Status</th>
+                            <th>Situação</th>
                             <th style="width: 8%">Ações</th>
                         </tr>
                     </thead>
@@ -1107,24 +1120,49 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
                                 actions += '<button class="btn btn-edit btn-sm" onclick="editTask(' + task.id + ')"><i class="fa fa-pencil" aria-hidden="true"></i></button>';
                             }
 
-                            // Adicionar a linha na tabela DataTables com a classe de coloração correta
-                            var descricaoLimitada = task.descricao.length > 80 ? task.descricao.substring(0, 80) + '...' : task.descricao;
+                                // Função para adicionar classes de status baseado no estado para o fundo e texto
+                                function getStatusClassBackground(situacao) {
+                                    switch (situacao) {
+                                        case 'Prestes a vencer':
+                                            return 'status-prestes-vencer';  // Classe para fundo e texto de "Prestes a vencer"
+                                        case 'Vencida':
+                                            return 'status-vencida';  // Classe para fundo e texto de "Vencida"
+                                        default:
+                                            return '';
+                                    }
+                                }
 
-                            var row = dataTable.row.add([
-                                task.id,
-                                task.titulo,
-                                task.categoria_titulo,
-                                task.origem_titulo,
-                                descricaoLimitada, // Limita a descrição a 80 caracteres
-                                new Date(task.data_limite).toLocaleString("pt-BR"),
-                                task.funcionario_responsavel,
-                                task.nivel_de_prioridade,
-                                '<span class="status-label ' + statusClass + '">' + capitalize(task.status) + '</span>',
-                                actions
-                            ]).draw().node(); // Aqui adicionamos a linha e retornamos o nó DOM
+                                var descricaoLimitada = task.descricao.length > 80 ? task.descricao.substring(0, 80) + '...' : task.descricao;
 
-                            // Aplicar a classe de coloração na linha
-                            $(row).addClass(rowClass);
+                                var situacao = '';
+                                if (rowClass === 'row-vencida') {
+                                    situacao = 'Vencida';
+                                } else if (rowClass === 'row-quase-vencida') {
+                                    situacao = 'Prestes a vencer';
+                                } else {
+                                    situacao = '-';
+                                }
+
+                                // Adicionar a classe de fundo e texto para a situação
+                                var statusClassBackground = getStatusClassBackground(situacao);
+
+                                var row = dataTable.row.add([
+                                    task.id,
+                                    task.titulo,
+                                    task.categoria_titulo,
+                                    task.origem_titulo,
+                                    descricaoLimitada, // Limita a descrição a 80 caracteres
+                                    new Date(task.data_limite).toLocaleString("pt-BR"),
+                                    task.funcionario_responsavel,
+                                    task.nivel_de_prioridade,
+                                    '<span class="status-label ' + statusClass + '">' + capitalize(task.status) + '</span>',
+                                    '<span class="status-label ' + statusClassBackground + '">' + situacao + '</span>', // Coluna "Situação" com classe dinâmica
+                                    actions
+                                ]).draw().node();
+
+                                // Aplicar a classe de coloração na linha
+                                $(row).addClass(rowClass);
+
                         });
                     } else {
                         // Exibir mensagem de "Nenhum resultado encontrado" se não houver tarefas
