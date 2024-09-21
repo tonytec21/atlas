@@ -2,8 +2,8 @@
 include(__DIR__ . '/db_connection.php');
 require('../oficios/tcpdf/tcpdf.php');
 
-// Carregar o número do protocolo
-$task_id = isset($_GET['id']) ? $_GET['id'] : 0;
+// Carregar o número do ID da guia de recebimento
+$guia_id = isset($_GET['id']) ? $_GET['id'] : 0;
 
 // Conexão com o banco de dados
 $conn = new mysqli($servername, $username, $password, $dbname);
@@ -14,8 +14,8 @@ if ($conn->connect_error) {
 }
 
 // Buscar dados da guia de recebimento
-$stmt = $conn->prepare("SELECT * FROM guia_de_recebimento WHERE task_id = ?");
-$stmt->bind_param("i", $task_id);
+$stmt = $conn->prepare("SELECT * FROM guia_de_recebimento WHERE id = ?");
+$stmt->bind_param("i", $guia_id);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -24,19 +24,6 @@ if ($result->num_rows === 0) {
 }
 
 $guiaData = $result->fetch_assoc();
-$stmt->close();
-
-// Buscar dados da tarefa
-$stmt = $conn->prepare("SELECT * FROM tarefas WHERE id = ?");
-$stmt->bind_param("i", $task_id);
-$stmt->execute();
-$result = $stmt->get_result();
-
-if ($result->num_rows === 0) {
-    die("Tarefa não encontrada.");
-}
-
-$tarefaData = $result->fetch_assoc();
 $stmt->close();
 $conn->close();
 
@@ -75,7 +62,7 @@ class PDF extends TCPDF
 // Criar o documento PDF
 $pdf = new PDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
 $pdf->SetCreator(PDF_CREATOR);
-$pdf->SetTitle('Guia de Recebimento - Protocolo Geral nº ' . $tarefaData['id']);
+$pdf->SetTitle('Guia de Recebimento');
 $pdf->SetMargins(25, 45, 25); // Definir as margens (em mm): esquerda, superior, direita
 $pdf->SetAutoPageBreak(true, 10); // Definir a margem inferior
 $pdf->AddPage();
@@ -97,28 +84,30 @@ $html = '
 </style>
 <table border="0" cellpadding="5">
     <tr>
-        <td class="header-cell" width="23%">Protocolo Geral:</td>
-        <td class="header-cell" width="26%">Data de Recebimento:</td>
-        <td class="header-cell" width="50%">Apresentante:</td>
+        <td class="header-cell" width="13%">Nº Guia:</td> <!-- Alterado para Nº Guia -->
+        <td class="header-cell" width="25%">Data de Recebimento:</td>
+        <td class="header-cell" width="37%">Apresentante:</td>
+        <td class="header-cell" width="25%">CPF/CNPJ:</td>
     </tr>
     <tr>
-        <td class="data-cell" width="23%">' . convertToUtf8($tarefaData['id']) . '</td>
-        <td class="data-cell" width="26%">' . convertToUtf8(formatDateToBrazilian($guiaData['data_recebimento'])) . '</td>
-        <td class="data-cell" width="50%">' . convertToUtf8($guiaData['cliente']) . '</td>
+        <td class="data-cell" width="13%">' . convertToUtf8($guiaData['id']) . '</td> <!-- Exibindo o id da guia -->
+        <td class="data-cell" width="25%">' . convertToUtf8(formatDateToBrazilian($guiaData['data_recebimento'])) . '</td>
+        <td class="data-cell" width="37%">' . convertToUtf8($guiaData['cliente']) . '</td>
+        <td class="data-cell" width="25%">' . (!empty($guiaData['documento_apresentante']) ? convertToUtf8($guiaData['documento_apresentante']) : 'Não informado') . '</td>
     </tr><br>
     <tr>
-        <td class="header-cell" width="49.5%">Funcionário:</td>
-        <td class="header-cell" width="49.5%">Observações:</td>
+        <td class="header-cell" width="48%">Funcionário:</td>
+        <td class="header-cell" width="52%">Observações:</td>
     </tr>
     <tr>
-        <td class="data-cell" width="49.5%">' . convertToUtf8($guiaData['funcionario']) . '</td>
-        <td class="data-cell" width="49.5%" style="text-align:justify;">' . (!empty($guiaData['observacoes']) ? convertToUtf8($guiaData['observacoes']) : 'Não informado') . '</td>
+        <td class="data-cell" width="48%">' . convertToUtf8($guiaData['funcionario']) . '</td>
+        <td class="data-cell" width="52%" style="text-align:justify;">' . (!empty($guiaData['observacoes']) ? convertToUtf8($guiaData['observacoes']) : 'Não informado') . '</td>
     </tr><br>
     <tr>
-        <td class="header-cell" width="99%">Documento(s) Recebido(s):</td>
+        <td class="header-cell" width="100%">Documento(s) Recebido(s):</td>
     </tr>
     <tr>
-        <td class="data-cell" width="99%" style="text-align:justify;">' . convertToUtf8($guiaData['documentos_recebidos']) . '</td>
+        <td class="data-cell" width="100%" style="text-align:justify;">' . convertToUtf8($guiaData['documentos_recebidos']) . '</td>
     </tr>
 </table>';
 
@@ -127,7 +116,7 @@ $pdf->writeHTML($html, true, false, true, false, '');
 // Campos de assinatura
 $pdf->Ln(1);
 $pdf->Cell(0, $lineHeight, '______________________________________', 0, 1, 'L');
-$pdf->Cell(0, $lineHeight, 'Assinatura do Cliente', 0, 1, 'L');
+$pdf->Cell(0, $lineHeight, 'Assinatura do Apresentante', 0, 1, 'L');
 
 // Linha de corte
 $pdf->Ln(15);
@@ -147,28 +136,30 @@ $html = '
 </style>
 <table border="0" cellpadding="5">
     <tr>
-        <td class="header-cell" width="23%">Protocolo Geral:</td>
-        <td class="header-cell" width="26%">Data de Recebimento:</td>
-        <td class="header-cell" width="50%">Apresentante:</td>
+        <td class="header-cell" width="13%">Nº Guia:</td> <!-- Alterado para Nº Guia -->
+        <td class="header-cell" width="25%">Data de Recebimento:</td>
+        <td class="header-cell" width="37%">Apresentante:</td>
+        <td class="header-cell" width="25%">CPF/CNPJ:</td>
     </tr>
     <tr>
-        <td class="data-cell" width="23%">' . convertToUtf8($tarefaData['id']) . '</td>
-        <td class="data-cell" width="26%">' . convertToUtf8(formatDateToBrazilian($guiaData['data_recebimento'])) . '</td>
-        <td class="data-cell" width="50%">' . convertToUtf8($guiaData['cliente']) . '</td>
+        <td class="data-cell" width="13%">' . convertToUtf8($guiaData['id']) . '</td> <!-- Exibindo o id da guia -->
+        <td class="data-cell" width="25%">' . convertToUtf8(formatDateToBrazilian($guiaData['data_recebimento'])) . '</td>
+        <td class="data-cell" width="37%">' . convertToUtf8($guiaData['cliente']) . '</td>
+        <td class="data-cell" width="25%">' . (!empty($guiaData['documento_apresentante']) ? convertToUtf8($guiaData['documento_apresentante']) : 'Não informado') . '</td>
     </tr><br>
     <tr>
-        <td class="header-cell" width="49.5%">Funcionário:</td>
-        <td class="header-cell" width="49.5%">Observações:</td>
+        <td class="header-cell" width="48%">Funcionário:</td>
+        <td class="header-cell" width="52%">Observações:</td>
     </tr>
     <tr>
-        <td class="data-cell" width="49.5%">' . convertToUtf8($guiaData['funcionario']) . '</td>
-        <td class="data-cell" width="49.5%" style="text-align:justify;">' . (!empty($guiaData['observacoes']) ? convertToUtf8($guiaData['observacoes']) : 'Não informado') . '</td>
+        <td class="data-cell" width="48%">' . convertToUtf8($guiaData['funcionario']) . '</td>
+        <td class="data-cell" width="52%" style="text-align:justify;">' . (!empty($guiaData['observacoes']) ? convertToUtf8($guiaData['observacoes']) : 'Não informado') . '</td>
     </tr><br>
     <tr>
-        <td class="header-cell" width="99%">Documento(s) Recebido(s):</td>
+        <td class="header-cell" width="100%">Documento(s) Recebido(s):</td>
     </tr>
     <tr>
-        <td class="data-cell" width="99%" style="text-align:justify;">' . convertToUtf8($guiaData['documentos_recebidos']) . '</td>
+        <td class="data-cell" width="100%" style="text-align:justify;">' . convertToUtf8($guiaData['documentos_recebidos']) . '</td>
     </tr>
 </table>';
 
@@ -181,5 +172,5 @@ $pdf->Cell(0, $lineHeight, 'Assinatura do Funcionário', 0, 1, 'L');
 
 // Gerar o PDF
 ob_clean(); // Limpar buffer de saída para evitar erros de envio de PDF
-$pdf->Output('Guia_Recebimento_Protocolo_Geral_' . $tarefaData['id'] . '.pdf', 'I');
+$pdf->Output('Guia_Recebimento_' . $guiaData['id'] . '.pdf', 'I');
 ?>

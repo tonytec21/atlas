@@ -458,6 +458,9 @@ date_default_timezone_set('America/Sao_Paulo');
 
                 <div class="modal-header d-block text-center">
                     <div class="btn-group" role="group" aria-label="Ações da Tarefa">
+                        <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2">
+                            <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo Geral
+                        </button>
                         <button style="font-size:12px" id="guiaRecebimentoButton" type="button" class="btn btn-info2 mr-2">
                             <i class="fa fa-file-text" aria-hidden="true"></i> Guia de Recebimento
                         </button>
@@ -466,9 +469,6 @@ date_default_timezone_set('America/Sao_Paulo');
                         </button>
                         <button style="font-size:12px" id="vincularOficioButton" type="button" class="btn btn-primary mr-2" data-toggle="modal" data-target="#vincularOficioModal">
                             <i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício
-                        </button>
-                        <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2">
-                            <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo Geral
                         </button>
                         <button style="font-size:12px" id="reciboEntregaButton" type="button" class="btn btn-info2 mr-2">
                             <i class="fa fa-file-text" aria-hidden="true"></i> Recibo de Entrega
@@ -704,7 +704,7 @@ date_default_timezone_set('America/Sao_Paulo');
             <div class="modal-body">
                 <form id="guiaRecebimentoForm">
                     <div class="form-group">
-                        <label for="cliente">Nome do Cliente:</label>
+                        <label for="cliente">Apresentante:</label>
                         <input type="text" class="form-control" id="cliente" name="cliente" required>
                     </div>
                     <div class="form-group">

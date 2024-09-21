@@ -1,6 +1,7 @@
 <?php
 include(__DIR__ . '/session_check.php');
 checkSession();
+include '../checar_acesso_de_administrador.php';
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">

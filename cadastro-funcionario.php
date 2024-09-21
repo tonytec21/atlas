@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+include '/checar_acesso_de_administrador.php';
 
 $notificationMessage = null;
 $notificationType = null;

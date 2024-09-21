@@ -705,43 +705,43 @@ date_default_timezone_set('America/Sao_Paulo');
     </div>
 
     <!-- Modal Guia de Recebimento -->
-<div class="modal fade" id="guiaRecebimentoModal" tabindex="-1" role="dialog" aria-labelledby="guiaRecebimentoModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="guiaRecebimentoModalLabel">Guia de Recebimento</h5>
-                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                    &times;
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="guiaRecebimentoForm">
-                    <div class="form-group">
-                        <label for="cliente">Nome do Cliente:</label>
-                        <input type="text" class="form-control" id="cliente" name="cliente" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="dataRecebimento">Data de Recebimento:</label>
-                        <input type="datetime-local" class="form-control" id="dataRecebimento" name="dataRecebimento" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="documentosRecebidos">Documentos Recebidos:</label>
-                        <textarea class="form-control" id="documentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="observacoes">Observações:</label>
-                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="funcionario">Funcionário:</label>
-                        <input type="text" class="form-control" id="funcionario" name="funcionario" readonly>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Salvar Guia</button>
-                </form>
+    <div class="modal fade" id="guiaRecebimentoModal" tabindex="-1" role="dialog" aria-labelledby="guiaRecebimentoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="guiaRecebimentoModalLabel">Guia de Recebimento</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="guiaRecebimentoForm">
+                        <div class="form-group">
+                            <label for="cliente">Apresentante:</label>
+                            <input type="text" class="form-control" id="cliente" name="cliente" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dataRecebimento">Data de Recebimento:</label>
+                            <input type="datetime-local" class="form-control" id="dataRecebimento" name="dataRecebimento" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="documentosRecebidos">Documentos Recebidos:</label>
+                            <textarea class="form-control" id="documentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="observacoes">Observações:</label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="funcionario">Funcionário:</label>
+                            <input type="text" class="form-control" id="funcionario" name="funcionario" readonly>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Salvar Guia</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
 
     <!-- Modal Criar Subtarefa -->
