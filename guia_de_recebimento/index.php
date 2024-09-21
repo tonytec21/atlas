@@ -431,7 +431,7 @@ date_default_timezone_set('America/Sao_Paulo');
 
                             });
                         } else {
-                            alert('Nenhum registro encontrado.');
+                            // alert('Nenhum registro encontrado.');
                         }
                     },
                     error: function() {
