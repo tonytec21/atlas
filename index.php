@@ -4,6 +4,20 @@ checkSession();
 include(__DIR__ . '/db_connection.php');
 include_once 'update_atlas/atualizacao.php';
 date_default_timezone_set('America/Sao_Paulo');
+
+// Verificar o nível de acesso do usuário logado
+$username = $_SESSION['username'];
+$connAtlas = new mysqli("localhost", "root", "", "atlas");
+
+// Consulta para verificar o nível de acesso do usuário
+$sql = "SELECT nivel_de_acesso FROM funcionarios WHERE usuario = ?";
+$stmt = $connAtlas->prepare($sql);
+$stmt->bind_param("s", $username);
+$stmt->execute();
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
+$nivel_de_acesso = $user['nivel_de_acesso'];
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -18,51 +32,120 @@ date_default_timezone_set('America/Sao_Paulo');
     <script src="script/chart.js"></script>
     <style>
 
-.status-label {
-    display: inline-block;
-    padding: 0.2em 0.6em;
-    font-size: 75%;
-    font-weight: 700;
-    line-height: 2;
-    color: #fff;
-    text-align: center;
-    white-space: nowrap;
-    vertical-align: baseline;
-    border-radius: 0.25em;
-    width: 100px;
-}
+        .btn-4 {
+            background: #34495e;
+            color: #fff;
+        }
+        .btn-4:hover {
+            background: #2c3e50;
+            color: #fff;
+        }
 
-.status-iniciada {
-    background-color: #007bff;
-}
+        .btn-5 {
+            background: #ff8a80;
+            color: #fff;
+        }
+        .btn-5:hover {
+            background: #e3786f;
+            color: #fff;
+        }
+        .btn-6 {
+            background: #427b8e;
+            color: #fff;
+        }
+        .btn-6:hover {
+            background: #366879;
+            color: #fff;
+        }
 
-.status-em-espera {
-    background-color: #ffa500;
-}
 
-.status-em-andamento {
-    background-color: #0056b3;
-}
+        /* Estilos exclusivos para o modal com a classe modal-alerta */
+        .modal-alerta .modal-content {
+            border: 2px solid #dc3545; /* Borda vermelha */
+            background-color: #f8d7da; /* Fundo rosa claro */
+            color: #721c24; /* Texto vermelho escuro */
+        }
 
-.status-concluida {
-    background-color: #28a745;
-}
+        .modal-alerta .modal-header {
+            background-color: #dc3545; /* Cabeçalho vermelho */
+            color: white; /* Texto branco no cabeçalho */
+        }
 
-.status-cancelada {
-    background-color: #dc3545;
-}
+        .modal-alerta .modal-body {
+            font-weight: bold; /* Texto da mensagem em negrito */
+        }
 
-.status-pendente {
-    background-color: gray;
-}
+        .modal-alerta .modal-footer {
+            background-color: #f5c6cb; /* Fundo do rodapé em tom claro */
+        }
 
-.status-prestes-vencer {
-    background-color: #ffc107; /* Cor amarelada para "Prestes a vencer" */
-}
+        /* Estilo do botão de fechar */
+        .modal-alerta .btn-close {
+            background-color: white;
+            border: 1px solid #dc3545; /* Borda vermelha */
+        }
 
-.status-vencida {
-    background-color: #dc3545; /* Cor avermelhada para "Vencida" */
-}
+        .modal-alerta .btn-close:hover {
+            background-color: #dc3545; /* Cor ao passar o mouse */
+            color: white;
+        }
+
+        /* Estilo do botão "Fechar" */
+        .modal-alerta .modal-footer .btn-secondary {
+            background-color: #dc3545; /* Botão vermelho */
+            border: none;
+        }
+
+        .modal-alerta .modal-footer .btn-secondary:hover {
+            background-color: #c82333; /* Tom mais escuro ao passar o mouse */
+        }
+
+
+        .status-label {
+            display: inline-block;
+            padding: 0.2em 0.6em;
+            font-size: 75%;
+            font-weight: 700;
+            line-height: 2;
+            color: #fff;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: baseline;
+            border-radius: 0.25em;
+            width: 100px;
+        }
+
+        .status-iniciada {
+            background-color: #007bff;
+        }
+
+        .status-em-espera {
+            background-color: #ffa500;
+        }
+
+        .status-em-andamento {
+            background-color: #0056b3;
+        }
+
+        .status-concluida {
+            background-color: #28a745;
+        }
+
+        .status-cancelada {
+            background-color: #dc3545;
+        }
+
+        .status-pendente {
+            background-color: gray;
+        }
+
+        .status-prestes-vencer {
+            background-color: #ffc107; /* Cor amarelada para "Prestes a vencer" */
+        }
+
+        .status-vencida {
+            background-color: #dc3545; /* Cor avermelhada para "Vencida" */
+        }
 
         /* Remover a borda de foco no botão de fechar */
         .btn-close {
@@ -202,7 +285,16 @@ date_default_timezone_set('America/Sao_Paulo');
             height: 360px;
             margin-top: 30px;
         }
-        .btn-info:hover {
+        .btn-info2{
+            background-color: #17a2b8;
+            color: white;
+            margin-bottom: 5px;
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            border: none;
+     }
+        .btn-info2:hover {
             color: #fff;
         }
         @media (max-width: 768px) {
@@ -253,7 +345,7 @@ include(__DIR__ . '/menu.php');
                 <a href="arquivamento/index.php" class="btn btn-primary w-100"><i class="fa fa-folder-open" aria-hidden="true"></i> Arquivamentos</a>
             </div>
             <div class="col-md-4">
-                <a href="os/index.php" class="btn btn-info w-100"><i class="fa fa-money" aria-hidden="true"></i> Ordens de Serviço</a>
+                <a href="os/index.php" class="btn btn-info2 w-100"><i class="fa fa-money" aria-hidden="true"></i> Ordens de Serviço</a>
             </div>
             <div class="col-md-4">
                 <a href="caixa/index.php" class="btn btn-success w-100"><i class="fa fa-university" aria-hidden="true"></i></i> Controle de Caixa</a>
@@ -266,6 +358,22 @@ include(__DIR__ . '/menu.php');
             </div>
             <div class="col-md-4">
                 <a href="provimentos/index.php" class="btn btn-assinador w-100"><i class="fa fa-balance-scale" aria-hidden="true"></i> Provimentos e Resoluções</a>
+            </div>
+            <div class="col-md-4">
+                <a href="guia_de_recebimento/index.php" class="btn btn-4 w-100"><i class="fa fa-file-text" aria-hidden="true"></i> Guia de Recebimento</a>
+            </div>
+            <!-- Botão e Pop-up -->
+            <div class="col-md-4">
+                <?php if ($nivel_de_acesso === 'administrador') : ?>
+                    <!-- Se for administrador, o botão é clicável -->
+                    <a href="contas_a_pagar/index.php" class="btn btn-5 w-100"><i class="fa fa-usd" aria-hidden="true"></i> Controle de Contas a Pagar</a>
+                <?php else : ?>
+                    <!-- Se não for administrador, exibe um botão que chama o modal -->
+                    <button class="btn btn-5 w-100" data-bs-toggle="modal" data-bs-target="#accessDeniedModal"><i class="fa fa-usd" aria-hidden="true"></i> Controle de Contas a Pagar</button>
+                <?php endif; ?>
+            </div>
+            <div class="col-md-4">
+                <a href="manuais/index.php" class="btn btn-6 w-100"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
             </div>
         </div>
         <div class="row mb-4">
@@ -369,6 +477,24 @@ include(__DIR__ . '/menu.php');
         </div>
     </div>
 </div>
+
+<div class="modal fade modal-alerta" id="accessDeniedModal" tabindex="-1" aria-labelledby="accessDeniedLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 20%!important;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="accessDeniedLabel">Acesso Negado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Você não tem permissão para acessar esta página.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script src="script/jquery-3.5.1.min.js"></script>
 <script src="script/bootstrap.min.js"></script>
