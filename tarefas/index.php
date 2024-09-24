@@ -599,7 +599,7 @@ date_default_timezone_set('America/Sao_Paulo');
                     <div id="commentTimeline" class="timeline">
                         <!-- Comentários serão inseridos aqui -->
                     </div>
-                    <button type="button" class="btn btn-primary" id="addCommentButton" data-toggle="modal" data-target="#addCommentModal">Adicionar Comentário</button>
+                    <button type="button" class="btn btn-primary" id="addCommentButton" data-toggle="modal" data-target="#addCommentModal"><i class="fa fa-plus-circle" aria-hidden="true"></i> Comentário e Anexos</button>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
@@ -613,7 +613,7 @@ date_default_timezone_set('America/Sao_Paulo');
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="addCommentModalLabel">Adicionar Comentário</h5>
+                    <h5 class="modal-title" id="addCommentModalLabel">Adicionar Comentário e Anexos</h5>
                     <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
                         &times;
                     </button>
