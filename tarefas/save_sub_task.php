@@ -12,7 +12,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $origem = $_POST['origin'];
     $descricao = $_POST['description'];
     $criado_por = $_POST['createdBy'];
-    $data_criacao = $_POST['createdAt'];
+    $data_criacao = date('Y-m-d H:i:s');
     $token = md5(uniqid(rand(), true));
     $caminho_anexo = '';
     $nivel_de_prioridade = $_POST['priority'];

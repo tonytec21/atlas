@@ -19,7 +19,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $origem = $_POST['origin'];
     $descricao = $_POST['description'];
     $criado_por = $_POST['createdBy'];
-    $data_criacao = $_POST['createdAt'];
+    $data_criacao = date('Y-m-d H:i:s');
     $guiaId = $_POST['guiaId'];  // Receber o ID da guia de recebimento
     $token = md5(uniqid(rand(), true));
     $caminho_anexo = '';
