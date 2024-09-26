@@ -13,4 +13,7 @@ if ($conn->connect_error) {
 
 // Define a codificação para UTF-8
 $conn->set_charset("utf8");
+
+// Definir o timezone usando UTC-3
+$conn->query("SET time_zone = '-03:00'");
 ?>
