@@ -456,11 +456,14 @@ date_default_timezone_set('America/Sao_Paulo');
         });
 
         function abrirModalTarefa(guiaId, cliente, documentosRecebidos) {
+            // Use JSON.stringify para garantir que os dados sejam tratados corretamente no JavaScript
+            var documentosFormatados = JSON.stringify(documentosRecebidos).slice(1, -1); // Remove as aspas duplas adicionadas nas extremidades
+
             // Preencher o título da tarefa com o nome do cliente
             $('#title').val(' - ' + cliente);
             
-            // Preencher a descrição da tarefa com os documentos recebidos
-            $('#description').val('Documentos Recebidos: ' + documentosRecebidos);
+            // Preencher a descrição da tarefa com os documentos recebidos, já formatados
+            $('#description').val('Documentos Recebidos: ' + documentosFormatados);
 
             // Definir o ID da guia no modal para uso posterior
             $('#guiaId').val(guiaId);
@@ -468,6 +471,7 @@ date_default_timezone_set('America/Sao_Paulo');
             // Abrir o modal
             $('#tarefaModal').modal('show');
         }
+
 
         // Função para abrir o modal de vincular tarefa
         function abrirModalVincularTarefa(guiaId) {
