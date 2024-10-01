@@ -57,13 +57,25 @@ $guias = [];
 if ($result->num_rows > 0) {
     // Converter os resultados em um array associativo
     while ($row = $result->fetch_assoc()) {
+        // Remover quebras de linha e caracteres especiais dos dados
+        $row = array_map(function($value) {
+            return preg_replace('/\r|\n/', ' ', $value); // Substituir quebras de linha por espaço
+        }, $row);
+
         $guias[] = $row;
     }
 }
 
-// Verifique se o JSON foi gerado corretamente
+// Definir cabeçalho JSON
 header('Content-Type: application/json');
-echo json_encode($guias, JSON_UNESCAPED_UNICODE);
+
+// Verificar se a codificação JSON foi bem-sucedida
+$jsonOutput = json_encode($guias, JSON_UNESCAPED_UNICODE);
+if ($jsonOutput === false) {
+    echo json_encode(['error' => 'Erro ao codificar os dados para JSON: ' . json_last_error_msg()]);
+} else {
+    echo $jsonOutput;
+}
 
 ob_end_flush(); // Libera qualquer conteúdo do buffer de saída
 ?>
