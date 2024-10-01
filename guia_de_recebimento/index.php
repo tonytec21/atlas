@@ -412,9 +412,10 @@ date_default_timezone_set('America/Sao_Paulo');
                                 if (!guia.task_id || guia.task_id == 0) {
                                     acoes = `
                                         <button class="btn btn-primary btn-sm btn-print" data-task-id="${guia.task_id}" data-guia-id="${guia.id}" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Imprimir Guia de Recebimento"><i class="fa fa-print" aria-hidden="true"></i></button>
-                                        <button class="btn btn-success btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Criar Tarefa" onclick="abrirModalTarefa(${guia.id}, '${guia.cliente}', '${guia.documentos_recebidos}')"><i class="fa fa-clock-o" aria-hidden="true"></i></button>
+                                        <button class="btn btn-success btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Criar Tarefa" onclick="abrirModalTarefa(${guia.id}, ${JSON.stringify(guia.cliente)}, ${JSON.stringify(guia.documentos_recebidos)})"><i class="fa fa-clock-o" aria-hidden="true"></i></button>
                                         <button class="btn btn-secondary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Vincular Tarefa" onclick="abrirModalVincularTarefa(${guia.id})"><i class="fa fa-link" aria-hidden="true"></i></button>
                                     `;
+
                                 } else {
                                     // Caso já exista um task_id, exibe o botão "Visualizar Tarefa" com o link para a página da tarefa
                                     acoes = `
