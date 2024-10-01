@@ -54,18 +54,12 @@ $result = $conn->query($sql);
 
 $guias = [];
 
-// Converter os resultados em um array associativo
 if ($result->num_rows > 0) {
+    // Converter os resultados em um array associativo
     while ($row = $result->fetch_assoc()) {
-        // Remover quebras de linha e caracteres especiais dos dados
-        $row = array_map(function($value) {
-            return preg_replace('/\r|\n/', ' ', $value); // Substituir quebras de linha por espaço
-        }, $row);
-
         $guias[] = $row;
     }
 }
-
 
 // Verifique se o JSON foi gerado corretamente
 header('Content-Type: application/json');
