@@ -63,7 +63,7 @@ if ($result->num_rows > 0) {
 
 // Verifique se o JSON foi gerado corretamente
 header('Content-Type: application/json');
-echo json_encode($guias, JSON_UNESCAPED_UNICODE);
+echo json_encode($guias, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 ob_end_flush(); // Libera qualquer conteúdo do buffer de saída
 ?>
