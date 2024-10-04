@@ -286,8 +286,48 @@ date_default_timezone_set('America/Sao_Paulo');
         </div>
     </div>
 
+    <!-- Modal para Editar Guia -->
+    <div class="modal fade" id="modalEditarGuia" tabindex="-1" role="dialog" aria-labelledby="modalEditarGuiaLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalEditarGuiaLabel">Editar Guia de Recebimento</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="formEditarGuia">
+                        <input type="hidden" id="editarGuiaId" name="guiaId">
+                        <div class="form-row">
+                            <div class="form-group col-md-8">
+                                <label for="editarCliente">Apresentante:</label>
+                                <input type="text" class="form-control" id="editarCliente" name="cliente" required>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="editarDocumentoApresentante">CPF/CNPJ:</label>
+                                <input type="text" class="form-control" id="editarDocumentoApresentante" name="documentoApresentante">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="editarDocumentosRecebidos">Documentos Recebidos:</label>
+                            <textarea class="form-control" id="editarDocumentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="editarObservacoes">Observações:</label>
+                            <textarea class="form-control" id="editarObservacoes" name="observacoes" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="salvarEdicaoGuiaBtn">Salvar Alterações</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <script src="../script/jquery-3.5.1.min.js"></script>
+    <script src="../script/jquery-3.6.0.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
@@ -414,6 +454,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                         <button class="btn btn-primary btn-sm btn-print" data-task-id="${guia.task_id}" data-guia-id="${guia.id}" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Imprimir Guia de Recebimento"><i class="fa fa-print" aria-hidden="true"></i></button>
                                         <button class="btn btn-success btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Criar Tarefa" onclick='abrirModalTarefa(${guia.id}, ${JSON.stringify(guia.cliente)}, ${JSON.stringify(guia.documentos_recebidos)})'><i class="fa fa-clock-o" aria-hidden="true"></i></button>
                                         <button class="btn btn-secondary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Vincular Tarefa" onclick="abrirModalVincularTarefa(${guia.id})"><i class="fa fa-link" aria-hidden="true"></i></button>
+                                        <button class="btn btn-warning btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Editar Guia" onclick="abrirModalEditarGuia(${guia.id})"><i class="fa fa-edit" aria-hidden="true"></i></button>
                                     `;
 
                                 } else {
@@ -527,38 +568,100 @@ date_default_timezone_set('America/Sao_Paulo');
         });
 
         $(document).ready(function() {
-            $('#documentoApresentante').on('input', function() {
-                // Permitir apenas números no campo enquanto o usuário digita
-                this.value = this.value.replace(/[^0-9]/g, '');
-            });
-
-            $('#documentoApresentante').on('blur', function() {
-                var valor = $(this).val();
-
-                // Remover qualquer máscara (pontos, traços, barras) antes de contar os dígitos
-                var valorSemMascara = valor.replace(/\D/g, '');
-
-                // Se o valor sem máscara tiver 11 dígitos, aplicar máscara de CPF
-                if (valorSemMascara.length === 11) {
-                    $(this).mask('000.000.000-00');
-                }
-                // Se o valor sem máscara tiver 14 dígitos, aplicar máscara de CNPJ
-                else if (valorSemMascara.length === 14) {
-                    $(this).mask('00.000.000/0000-00');
-                }
-                // Exibir um alerta se o valor estiver incorreto
-                else if (valor.length > 0 && valorSemMascara.length !== 11 && valorSemMascara.length !== 14) {
-                    alert('Por favor, preencha 11 dígitos para CPF ou 14 dígitos para CNPJ.');
-                }
-            });
-        });
-
-        $(document).ready(function() {
             $('#modalCriarGuia').on('hidden.bs.modal', function () {
                 // Recarregar a página ao fechar o modal
                 location.reload();
             });
         });
+
+        function abrirModalEditarGuia(guiaId) {
+            // Obter os dados da guia via AJAX
+            $.ajax({
+                url: 'get_edit.php',
+                type: 'GET',
+                dataType: 'json',
+                data: { id: guiaId },
+                success: function(response) {
+                    if (response.success) {
+                        // Preencher os campos do modal com os dados da guia
+                        $('#editarGuiaId').val(response.data.id);
+                        $('#editarCliente').val(response.data.cliente);
+                        $('#editarDocumentoApresentante').val(response.data.documento_apresentante);
+                        $('#editarDocumentosRecebidos').val(response.data.documentos_recebidos);
+                        $('#editarObservacoes').val(response.data.observacoes);
+
+                        // Abrir o modal
+                        $('#modalEditarGuia').modal('show');
+                    } else {
+                        alert('Erro ao buscar os dados da guia: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('Erro ao buscar os dados da guia.');
+                }
+            });
+        }
+
+    // Salvar as alterações do guia
+    $(document).ready(function() {
+        $('#salvarEdicaoGuiaBtn').click(function() {
+            var formData = $('#formEditarGuia').serialize(); // Pega os dados do formulário
+
+            $.ajax({
+                url: 'salvar_edicao_guia.php',
+                type: 'POST',
+                dataType: 'json',
+                data: formData,
+                success: function(response) {
+                    if (response.success) {
+                        // Fechar o modal
+                        $('#modalEditarGuia').modal('hide');
+                        
+                        // Recarregar os dados
+                        location.reload();
+                    } else {
+                        alert('Erro: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('Erro ao salvar as alterações da guia.');
+                }
+            });
+        });
+    });
+
+    $(document).ready(function() {
+        // Função para aplicar a máscara de CPF/CNPJ
+        function aplicarMascaraCPF_CNPJ(element) {
+            $(document).on('input', element, function() {
+                var valor = $(this).val().replace(/\D/g, ''); // Remove todos os caracteres não numéricos
+                $(this).val(valor);
+            });
+
+            // Aplicar a máscara ao perder o foco
+            $(document).on('blur', element, function() {
+                var valor = $(this).val().replace(/\D/g, ''); // Remove todos os caracteres não numéricos
+
+                if (valor.length === 11) {
+                    // Aplica a máscara de CPF se o valor tiver 11 dígitos
+                    $(this).val(valor).mask('000.000.000-00');
+                } else if (valor.length === 14) {
+                    // Aplica a máscara de CNPJ se o valor tiver 14 dígitos
+                    $(this).val(valor).mask('00.000.000/0000-00');
+                } else {
+                    // Se o valor não tiver 11 ou 14 dígitos, limpa o campo ou mostra uma mensagem
+                    alert('Por favor, insira um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.');
+                    $(this).val('');
+                }
+            });
+        }
+
+        // Aplicar a máscara ao campo CPF/CNPJ no modal "Criar Guia"
+        aplicarMascaraCPF_CNPJ('#documentoApresentante');
+
+        // Aplicar a máscara ao campo CPF/CNPJ no modal "Editar Guia"
+        aplicarMascaraCPF_CNPJ('#editarDocumentoApresentante');
+    });
 
     </script>
 
