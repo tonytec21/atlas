@@ -30,7 +30,15 @@ $nivel_de_acesso = $user['nivel_de_acesso'];
     <link rel="stylesheet" href="style/css/style.css">
     <link rel="icon" href="style/img/favicon.png" type="image/png">
     <script src="script/chart.js"></script>
+    <script src="script/jquery-3.6.0.min.js"></script>
+    <script src="script/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="style/css/jquery-ui.css">
     <style>
+
+/* Cursor para indicar que os elementos são arrastáveis */
+#sortable-buttons .col-md-4 {
+            cursor: move;
+        }
 
         .btn-4 {
             background: #34495e;
@@ -340,42 +348,42 @@ include(__DIR__ . '/menu.php');
 <div id="main" class="main-content">
     <div class="container">
         <h3>Dashboard - Visão Geral do Sistema</h3>
-        <div class="row mb-4">
-            <div class="col-md-4">
+        <!-- Estrutura de Botões -->
+        <div id="sortable-buttons" class="row mb-4">
+            <!-- Cada botão precisa de um ID único -->
+            <div class="col-md-4 ui-sortable-handle" id="btn-arquivamento">
                 <a href="arquivamento/index.php" class="btn btn-primary w-100"><i class="fa fa-folder-open" aria-hidden="true"></i> Arquivamentos</a>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4 ui-sortable-handle" id="btn-os">
                 <a href="os/index.php" class="btn btn-info2 w-100"><i class="fa fa-money" aria-hidden="true"></i> Ordens de Serviço</a>
             </div>
-            <div class="col-md-4">
-                <a href="caixa/index.php" class="btn btn-success w-100"><i class="fa fa-university" aria-hidden="true"></i></i> Controle de Caixa</a>
+            <div class="col-md-4 ui-sortable-handle" id="btn-caixa">
+                <a href="caixa/index.php" class="btn btn-success w-100"><i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa</a>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4 ui-sortable-handle" id="btn-tarefas">
                 <a href="tarefas/index.php" class="btn btn-secondary w-100"><i class="fa fa-clock-o" aria-hidden="true"></i> Tarefas</a>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4 ui-sortable-handle" id="btn-oficios">
                 <a href="oficios/index.php" class="btn btn-oficio w-100"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Ofícios</a>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4 ui-sortable-handle" id="btn-provimento">
                 <a href="provimentos/index.php" class="btn btn-assinador w-100"><i class="fa fa-balance-scale" aria-hidden="true"></i> Provimentos e Resoluções</a>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4 ui-sortable-handle" id="btn-guia">
                 <a href="guia_de_recebimento/index.php" class="btn btn-4 w-100"><i class="fa fa-file-text" aria-hidden="true"></i> Guia de Recebimento</a>
             </div>
-            <!-- Botão e Pop-up -->
-            <div class="col-md-4">
+            <div class="col-md-4 ui-sortable-handle" id="btn-contas">
                 <?php if ($nivel_de_acesso === 'administrador') : ?>
-                    <!-- Se for administrador, o botão é clicável -->
                     <a href="contas_a_pagar/index.php" class="btn btn-5 w-100"><i class="fa fa-usd" aria-hidden="true"></i> Controle de Contas a Pagar</a>
                 <?php else : ?>
-                    <!-- Se não for administrador, exibe um botão que chama o modal -->
                     <button class="btn btn-5 w-100" data-bs-toggle="modal" data-bs-target="#accessDeniedModal"><i class="fa fa-usd" aria-hidden="true"></i> Controle de Contas a Pagar</button>
                 <?php endif; ?>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4 ui-sortable-handle" id="btn-manuais">
                 <a href="manuais/index.php" class="btn btn-6 w-100"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
             </div>
         </div>
+
         <div class="row mb-4">
             <div class="col-md-4">
                 <div class="card text-white bg-primary">
@@ -495,8 +503,6 @@ include(__DIR__ . '/menu.php');
     </div>
 </div>
 
-
-<script src="script/jquery-3.5.1.min.js"></script>
 <script src="script/bootstrap.min.js"></script>
 <script src="script/jquery.mask.min.js"></script>
 <script>
@@ -861,6 +867,66 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
     //     clearCache();
     // };
 </script>
+
+<!-- Script de Drag-and-Drop e Salvamento -->
+<script>
+    $(document).ready(function () {
+        // Inicializa o sortable
+        $("#sortable-buttons").sortable({
+            placeholder: "ui-state-highlight", // Realça o espaço ao arrastar
+            helper: 'clone', // Ajuda a tornar o elemento mais claro enquanto arrasta
+            containment: 'parent', // Restringe o movimento dentro do container pai
+            update: function (event, ui) {
+                // Quando a ordem for alterada, salva a nova ordem
+                saveButtonOrder();
+            }
+        });
+
+
+        // Função para salvar a ordem dos botões no arquivo JSON
+        function saveButtonOrder() {
+            let order = [];
+            // Percorre cada botão e salva seu ID na ordem atual
+            $("#sortable-buttons .col-md-4").each(function () {
+                order.push($(this).attr('id'));
+            });
+
+            // Faz uma requisição AJAX para salvar a ordem no arquivo JSON
+            $.ajax({
+                url: 'save_order.php',
+                type: 'POST',
+                data: { order: order },
+                success: function (response) {
+                    console.log('Ordem salva com sucesso!');
+                },
+                error: function (xhr, status, error) {
+                    console.error('Erro ao salvar a ordem:', error);
+                }
+            });
+        }
+
+        // Carrega a ordem dos botões do arquivo JSON
+        function loadButtonOrder() {
+            $.ajax({
+                url: 'load_order.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function (data) {
+                    // Ordena os botões com base na ordem do arquivo JSON
+                    $.each(data.order, function (index, btnId) {
+                        $("#" + btnId).appendTo("#sortable-buttons");
+                    });
+                },
+                error: function (xhr, status, error) {
+                    console.error('Erro ao carregar a ordem:', error);
+                }
+            });
+        }
+
+        // Carrega a ordem ao carregar a página
+        loadButtonOrder();
+    });
+</script>
 <br><br><br>
 <?php
 include(__DIR__ . '/rodape.php');
@@ -868,7 +934,6 @@ include(__DIR__ . '/rodape.php');
 
 <script src="script/popper.min.js"></script>
 <script src="script/bootstrap2.min.js"></script>
-
 
 </body>
 </html>
