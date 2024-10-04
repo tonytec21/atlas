@@ -248,7 +248,10 @@ $orderData['groups'] = $groupedFiles;
 
                     // Verifica se o grupo está vazio para exibir o ícone apropriado
                     if (empty($group)) {
-                        echo '<i class="fa fa-times" aria-hidden="true" onclick="deleteGroup(\'' . $groupName . '\')"></i>';
+                        $cleanGroupName = str_replace(["\n", "\r"], ' ', $groupName);
+                        echo '<i class="fa fa-times" aria-hidden="true" data-group-name="' . htmlspecialchars($cleanGroupName, ENT_QUOTES, 'UTF-8') . '" onclick="deleteGroup(this)"></i>';
+                        
+
                     } else {
                         echo '<i class="fa fa-chevron-down toggle-icon" onclick="toggleGroup(this)"></i>';
                     }
@@ -398,23 +401,25 @@ $orderData['groups'] = $groupedFiles;
             });
         });
         
-        // Função para mover o arquivo para a lixeira
+        // Função para mover o arquivo para a lixeira com confirmação
         function moveToTrash(filename) {
-            $.ajax({
-                url: 'move_to_trash.php',
-                method: 'POST',
-                data: { filename: filename },
-                success: function(response) {
-                    if (response === 'success') {
-                        document.querySelector(`.card[data-filename='${filename}']`).remove();
-                    } else {
+            if (confirm('Tem certeza que deseja excluir esta nota?')) {
+                $.ajax({
+                    url: 'move_to_trash.php',
+                    method: 'POST',
+                    data: { filename: filename },
+                    success: function(response) {
+                        if (response === 'success') {
+                            document.querySelector(`.card[data-filename='${filename}']`).remove();
+                        } else {
+                            alert('Erro ao mover para a lixeira.');
+                        }
+                    },
+                    error: function() {
                         alert('Erro ao mover para a lixeira.');
                     }
-                },
-                error: function() {
-                    alert('Erro ao mover para a lixeira.');
-                }
-            });
+                });
+            }
         }
 
         // Função para alternar a exibição dos grupos
@@ -691,14 +696,28 @@ $orderData['groups'] = $groupedFiles;
             });
         }
 
-        // Função para deletar um grupo vazio
-        function deleteGroup(groupName) {
-            // Remove o grupo do DOM
-            document.querySelector(`[data-group="${groupName}"]`).parentElement.remove();
+        // Função para excluir grupos vazios
+        function deleteGroup(element) {
+            if (confirm('Tem certeza que deseja excluir este grupo?')) {
+                // Obtém o nome do grupo a partir do atributo data-group-name e remove espaços extras
+                const groupName = element.getAttribute('data-group-name').trim();
 
-            // Atualiza o arquivo JSON
-            updateOrder();
+                // Escapa o nome do grupo para uso no seletor CSS
+                const escapedGroupName = CSS.escape(groupName);
+
+                // Remove o grupo do DOM
+                const groupElement = document.querySelector(`[data-group="${escapedGroupName}"]`);
+                if (groupElement) {
+                    groupElement.parentElement.remove();
+                } else {
+                    console.error(`Grupo não encontrado: ${groupName}`);
+                }
+
+                // Atualiza o arquivo JSON
+                updateOrder();
+            }
         }
+
 
         // Função para criar um novo grupo de cards
         function createGroup() {
