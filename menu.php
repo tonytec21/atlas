@@ -79,7 +79,7 @@ $mode_query->close();
             right: -80%!important;
         }
         body.dark-mode {
-            background-color: #242424;
+            background-color: #222e35;
             color: #ffffff;
         }
         body.dark-mod .video-description {
@@ -90,7 +90,7 @@ $mode_query->close();
             color: #000000;
         }
         body.light-mod .video-description {
-            color: #666;
+            color: #6c6b6b;
         }
         body.dark-mode .card {
             background-color: #4a4a4a;

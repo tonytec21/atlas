@@ -90,7 +90,7 @@ $orderData['groups'] = $groupedFiles;
         }
 
         .create-group-expansion a {
-            color: #444;
+            color: #6c6b6b;
             text-decoration: none;
             font-size: 1em;
             cursor: pointer;
