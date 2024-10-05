@@ -39,9 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tratamento = $conn->real_escape_string($_POST['tratamento']);
     $cargo = $conn->real_escape_string($_POST['cargo']);
     $cargo_assinante = $conn->real_escape_string($_POST['cargo_assinante']);
+    $dados_complementares = $conn->real_escape_string($_POST['dados_complementares']);
 
-    $stmt = $conn->prepare("INSERT INTO oficios (destinatario, assunto, corpo, assinante, data, numero, tratamento, cargo, cargo_assinante) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sssssssss", $destinatario, $assunto, $corpo, $assinante, $data, $numero, $tratamento, $cargo, $cargo_assinante);
+    $stmt = $conn->prepare("INSERT INTO oficios (destinatario, assunto, corpo, assinante, data, numero, tratamento, cargo, cargo_assinante, dados_complementares) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssssssssss", $destinatario, $assunto, $corpo, $assinante, $data, $numero, $tratamento, $cargo, $cargo_assinante, $dados_complementares);
     $stmt->execute();
 
     $stmt->close();
@@ -138,6 +139,10 @@ include(__DIR__ . '/../menu.php');
                         <label for="data">Data:</label>
                         <input type="date" class="form-control" id="data" name="data" required>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label for="dados_complementares">Dados Complementares:</label>
+                    <textarea class="form-control" id="dados_complementares" name="dados_complementares" rows="5"></textarea>
                 </div>
                 <button type="submit" style="margin-bottom: 31px;margin-top: 0px !important;" class="btn btn-primary w-100">Salvar Ofício</button>
             </form>

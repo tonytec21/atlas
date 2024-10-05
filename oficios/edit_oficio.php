@@ -126,6 +126,10 @@ include(__DIR__ . '/../menu.php');
                         <input type="date" class="form-control" id="data" name="data" value="<?php echo htmlspecialchars($oficioData['data']); ?>" required>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label for="dados_complementares">Dados Complementares:</label>
+                    <textarea class="form-control" id="dados_complementares" name="dados_complementares" rows="5"><?php echo htmlspecialchars($oficioData['dados_complementares']); ?></textarea>
+                </div>
                 <button type="submit" style="margin-bottom: 31px;margin-top: 0px !important;" class="btn btn-primary w-100">Salvar Ofício</button>
             </form>
         <?php endif; ?>

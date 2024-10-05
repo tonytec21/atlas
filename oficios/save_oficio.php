@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $assinante = $_POST['assinante'];
     $cargo_assinante = $_POST['cargo_assinante'];
     $data = $_POST['data'];
+    $dados_complementares = $_POST['dados_complementares'];
 
     $servername = "localhost";
     $username = "root";
@@ -23,8 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Falha na conexão: " . $conn->connect_error);
     }
 
-    $stmt = $conn->prepare("UPDATE oficios SET tratamento = ?, destinatario = ?, cargo = ?, assunto = ?, corpo = ?, assinante = ?, cargo_assinante = ?, data = ? WHERE numero = ?");
-    $stmt->bind_param("sssssssss", $tratamento, $destinatario, $cargo, $assunto, $corpo, $assinante, $cargo_assinante, $data, $numero);
+    $stmt = $conn->prepare("UPDATE oficios SET tratamento = ?, destinatario = ?, cargo = ?, assunto = ?, corpo = ?, assinante = ?, cargo_assinante = ?, data = ?, dados_complementares = ? WHERE numero = ?");
+    $stmt->bind_param("ssssssssss", $tratamento, $destinatario, $cargo, $assunto, $corpo, $assinante, $cargo_assinante, $data, $dados_complementares, $numero);  
 
     if ($stmt->execute()) {
         echo "<script>alert('Ofício atualizado com sucesso!'); window.location.href = 'index.php';</script>";

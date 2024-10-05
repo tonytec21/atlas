@@ -30,6 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['numero']) || isset($_G
     if (!empty($_GET['destinatario'])) {
         $filters[] = "destinatario LIKE '%" . $conn->real_escape_string($_GET['destinatario']) . "%'";
     }
+    if (!empty($_GET['dados_complementares'])) {
+        $filters[] = "dados_complementares LIKE '%" . $conn->real_escape_string($_GET['dados_complementares']) . "%'";
+    }   
 
     if (count($filters) > 0) {
         $filterQuery = "WHERE " . implode(" AND ", $filters);
@@ -94,11 +97,11 @@ include(__DIR__ . '/../menu.php');
             <hr>
             <form id="searchForm" method="GET">
                 <div class="row mb-3">
-                    <div class="col-md-3">
+                    <div class="col-md-1">
                         <label for="numero">Número:</label>
                         <input type="text" class="form-control" id="numero" name="numero">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label for="data">Data:</label>
                         <input type="date" class="form-control" id="data" name="data">
                     </div>
@@ -110,6 +113,11 @@ include(__DIR__ . '/../menu.php');
                         <label for="destinatario">Destinatário:</label>
                         <input type="text" class="form-control" id="destinatario" name="destinatario">
                     </div>
+                    <div class="col-md-3">
+                        <label for="dados_complementares">Dados Complementares:</label>
+                        <input type="text" class="form-control" id="dados_complementares" name="dados_complementares">
+                    </div>
+
                 </div>
                 <div class="row mb-3">
                     <div class="col-md-6">
@@ -129,6 +137,7 @@ include(__DIR__ . '/../menu.php');
                             <th>Assunto</th>
                             <th>Destinatário</th>
                             <th>Cargo</th>
+                            <th>Dados Complementares</th>
                             <th style="width: 10%;">Ações</th>
                         </tr>
                     </thead>
@@ -140,6 +149,7 @@ include(__DIR__ . '/../menu.php');
                                 <td><?php echo htmlspecialchars($oficio['assunto']); ?></td>
                                 <td><?php echo htmlspecialchars($oficio['destinatario']); ?></td>
                                 <td><?php echo htmlspecialchars($oficio['cargo']); ?></td>
+                                <td><?php echo htmlspecialchars($oficio['dados_complementares']); ?></td>
                                 <td>
                                     <button class="btn btn-info btn-sm" onclick="viewOficio('<?php echo $oficio['numero']; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <button class="btn btn-edit btn-sm" onclick="editOficio('<?php echo $oficio['numero']; ?>')" <?php if ($oficio['status'] == 1) echo 'disabled'; ?>><i class="fa fa-pencil" aria-hidden="true"></i></button>
@@ -188,14 +198,25 @@ include(__DIR__ . '/../menu.php');
                     <div id="oficioDetails">
                         <div class="form-row">
                             <div class="form-group col-md-2">
-                                <label for="detNumero">Número:</label>
+                                <label for="detNumero">Nº do Ofício:</label>
                                 <input type="text" class="form-control" id="detNumero" disabled>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label for="detTarefaId">Nº da Tarefa:</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="detTarefaId" disabled>
+                                    <div class="input-group-append">
+                                        <button id="viewTaskButton" class="btn btn-info btn-sm" style="height: 38px; display: none;">
+                                            <i class="fa fa-eye" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-group col-md-2">
                                 <label for="detData">Data:</label>
                                 <input type="text" class="form-control" id="detData" disabled>
                             </div>
-                            <div class="form-group col-md-8">
+                            <div class="form-group col-md-6">
                                 <label for="detAssunto">Assunto:</label>
                                 <input type="text" class="form-control" id="detAssunto" disabled>
                             </div>
@@ -209,6 +230,10 @@ include(__DIR__ . '/../menu.php');
                                 <label for="detCargo">Cargo:</label>
                                 <input type="text" class="form-control" id="detCargo" disabled>
                             </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="detDadosComplementares">Dados Complementares:</label>
+                            <textarea class="form-control" id="detDadosComplementares" rows="5" disabled></textarea>
                         </div>
                         <div class="form-row">
                             <div class="form-group col-md-6">
@@ -314,8 +339,52 @@ include(__DIR__ . '/../menu.php');
                     $('#detCargo').val(data.cargo);
                     $('#detAssinante').val(data.assinante);
                     $('#detCargoAssinante').val(data.cargo_assinante);
+                    $('#detDadosComplementares').val(data.dados_complementares);
                     $('#numeroOficio').val(data.numero);
                     loadAttachments(data.numero);
+
+                    // Verificar se o número do ofício existe na tabela tarefas
+                    $.ajax({
+                        url: 'verificar_tarefa.php',
+                        type: 'GET',
+                        data: { numero_oficio: numero },
+                        success: function(response) {
+                            var result = JSON.parse(response);
+                            if (result.status === 'success') {
+                                // Preencher o campo com o ID da tarefa
+                                $('#detTarefaId').val(result.id);
+
+                                // Obter o token da tarefa e atualizar o botão
+                                $.ajax({
+                                    url: 'get_tarefa_token.php',
+                                    type: 'GET',
+                                    data: { id: result.id },
+                                    success: function(response) {
+                                        var tarefa = JSON.parse(response);
+                                        if (tarefa.status === 'success') {
+                                            $('#viewTaskButton').attr('onclick', `window.location.href='../tarefas/index_tarefa.php?token=${tarefa.token}'`);
+                                            $('#viewTaskButton').show(); // Exibir o botão
+                                        } else {
+                                            $('#viewTaskButton').hide(); // Ocultar o botão se o token não for encontrado
+                                        }
+                                    },
+                                    error: function() {
+                                        alert('Erro ao obter o token da tarefa.');
+                                        $('#viewTaskButton').hide(); // Ocultar o botão em caso de erro
+                                    }
+                                });
+                            } else {
+                                $('#detTarefaId').val('Não encontrado');
+                                $('#viewTaskButton').hide(); // Ocultar o botão se a tarefa não for encontrada
+                                console.log(result.message);
+                            }
+                        },
+                        error: function() {
+                            alert('Erro ao verificar a tarefa.');
+                            $('#viewTaskButton').hide(); // Ocultar o botão em caso de erro
+                        }
+                    });
+
                     $('#viewAttachmentsModal').modal('show');
                 },
                 error: function() {
@@ -324,6 +393,7 @@ include(__DIR__ . '/../menu.php');
             });
         }
 
+        
          // Inicializar DataTable
          $('#tabelaResultados').DataTable({
                 "language": {
@@ -391,10 +461,6 @@ include(__DIR__ . '/../menu.php');
             }
         }
 
-        $(document).on('click', '.visualizar-anexo', function() {
-            var fileUrl = $(this).data('file');
-            window.open(fileUrl, '_blank');
-        });
     </script>
 
 <?php
