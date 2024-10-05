@@ -462,6 +462,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                     acoes = `
                                         <button class="btn btn-primary btn-sm btn-print" data-task-id="${guia.task_id}" data-guia-id="${guia.id}" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Imprimir Guia de Recebimento"><i class="fa fa-print" aria-hidden="true"></i></button>
                                         <button class="btn btn-info btn-sm" title="Visualizar Tarefa" onclick="window.location.href='../tarefas/index_tarefa.php?token=${guia.task_token}'"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                        <button class="btn btn-warning btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Editar Guia" onclick="abrirModalEditarGuia(${guia.id})"><i class="fa fa-edit" aria-hidden="true"></i></button>
                                     `;
                                 }
 
