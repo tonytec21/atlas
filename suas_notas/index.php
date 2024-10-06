@@ -303,7 +303,7 @@ $orderData['groups'] = $groupedFiles;
 
     <!-- Modal para visualização e edição do lembrete -->
     <div class="modal fade" id="noteModal" tabindex="-1" role="dialog" aria-labelledby="noteModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document" style="width: 40%">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 40%">
             <div class="modal-content">
                 <form id="editNoteForm" method="post" class="mt-4">
                     <div class="modal-header">
@@ -333,7 +333,7 @@ $orderData['groups'] = $groupedFiles;
 
     <!-- Modal para criar nova nota -->
     <div class="modal fade" id="novaNotaModal" tabindex="-1" role="dialog" aria-labelledby="novaNotaModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document" style="width: 40%">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 40%">
             <div class="modal-content">
                 <form id="novaNotaForm" method="post">
                     <div class="modal-header">
