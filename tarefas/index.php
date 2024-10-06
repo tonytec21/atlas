@@ -433,7 +433,7 @@ date_default_timezone_set('America/Sao_Paulo');
                 </div>
             </form>
             <hr>
-            <div class="mt-3">
+            <div class="table-responsive">
                 <h5>Resultados da Pesquisa</h5>
                 <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
                     <thead>

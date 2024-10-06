@@ -15,16 +15,44 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/sweetalert2.min.css">
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+
     <style>
-        .table th:nth-child(5), .table td:nth-child(5), /* Data do Ato */
-        .table th:nth-child(12), .table td:nth-child(12) /* Ações */ {
+        .table th:nth-child(1), .table td:nth-child(1) { /* Atribuição */
+        width: 8%;
+        }
+        .table th:nth-child(2), .table td:nth-child(2) { /* Categoria */
             width: 8%;
         }
-        .table th:nth-child(11), .table td:nth-child(11) /* Ações */ {
-            width: 13%;
+        .table th:nth-child(3), .table td:nth-child(3) { /* CPF/CNPJ */
+            width: 10%;
         }
-        .table-responsive {
-            zoom: 80%!important;
+        .table th:nth-child(4), .table td:nth-child(4) { /* Nome */
+            width: 15%;
+        }
+        .table th:nth-child(5), .table td:nth-child(5) { /* Data do Ato */
+            width: 8%;
+        }
+        .table th:nth-child(6), .table td:nth-child(6) { /* Livro */
+            width: 5%;
+        }
+        .table th:nth-child(7), .table td:nth-child(7) { /* Folha */
+            width: 5%;
+        }
+        .table th:nth-child(8), .table td:nth-child(8) { /* Termo/Ordem */
+            width: 7%;
+        }
+        .table th:nth-child(9), .table td:nth-child(9) { /* Protocolo */
+            width: 7%;
+        }
+        .table th:nth-child(10), .table td:nth-child(10) { /* Matrícula */
+            width: 6%;
+        }
+        .table th:nth-child(11), .table td:nth-child(11) { /* Descrição e Detalhes */
+            width: 14%;
+        }
+        .table th:nth-child(12), .table td:nth-child(12) { /* Ações */
+            width: 8%;
         }
     </style>
 </head>
@@ -98,8 +126,10 @@ include(__DIR__ . '/../menu.php');
                     <button style="width: 49.8%; margin-top: 10px;" id="add-button" class="btn btn-success" onclick="window.location.href='cadastro.php'"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar</button>
                 </div>
             </div>
+            <hr>
             <div class="table-responsive">
-                <table class="table table-striped" style="zoom:94%">
+                <h5>Resultados da Pesquisa</h5>
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
                     <thead>
                         <tr>
                             <th>Atribuição</th>
@@ -208,32 +238,12 @@ include(__DIR__ . '/../menu.php');
         </div>
     </div>
 
-    <!-- Modal de confirmação de exclusão
-    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Exclusão</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    Tem certeza de que deseja excluir este ato?
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="button" id="confirm-delete-button" class="btn btn-danger">Excluir</button>
-                </div>
-            </div>
-        </div>
-    </div> -->
-
-    <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/jquery-3.6.0.min.js"></script>
+    <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
     <script src="../script/sweetalert2.js"></script>
+    <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script>
         function normalizeText(text) {
             if (typeof text !== 'string') {
@@ -284,76 +294,133 @@ include(__DIR__ . '/../menu.php');
                 }
             });
 
-            // Carregar dados dos atos
-            $('#filter-button').on('click', function() {
-                var searchTerm = normalizeText($('#nome').val());
-                var searchCategoria = $('#categoria').val();
-                var searchCpfCnpj = $('#cpf-cnpj').val();
-                var searchLivro = $('#livro').val();
-                var searchFolha = $('#folha').val();
-                var searchTermo = $('#termo').val();
-                var searchProtocolo = $('#protocolo').val();
-                var searchMatricula = $('#matricula').val();
-                var searchDataAto = $('#data-ato').val();
-                var searchDescricao = normalizeText($('#descricao').val());
-                var searchAtribuicao = $('#atribuicao').val();
+            
+            $(document).ready(function () {
+                // Inicializar DataTables com Bootstrap 4
+                var table = $('.table').DataTable({
+                    "order": [], // Remove a ordenação inicial
+                    "pageLength": 10, // Define o número padrão de registros por página
+                    "language": {
+                        "url": "../style/Portuguese-Brasil.json"
+                    },
+                    "responsive": true,
+                });
 
+                // Carregar os últimos 100 documentos ao entrar na página
                 $.ajax({
                     url: 'load_atos.php',
                     method: 'GET',
-                    success: function(response) {
+                    data: { limit: 100 }, // Passa o limite de 100 registros
+                    success: function (response) {
                         try {
                             var atos = JSON.parse(response);
-                            var tableBody = $('#atos-table-body');
-                            tableBody.empty(); // Limpar a tabela
-
-                            atos.forEach(function(ato) {
-                                var normalizedNome = normalizeText(ato.partes_envolvidas.map(p => p.nome).join(', '));
-                                var normalizedDescricao = normalizeText(ato.descricao);
-                                var matchesSearch = (!searchTerm || normalizedNome.includes(searchTerm)) &&
-                                                    (!searchCategoria || ato.categoria === searchCategoria) &&
-                                                    (!searchCpfCnpj || ato.partes_envolvidas.some(p => p.cpf.includes(searchCpfCnpj))) &&
-                                                    (!searchLivro || ato.livro.includes(searchLivro)) &&
-                                                    (!searchFolha || ato.folha.includes(searchFolha)) &&
-                                                    (!searchTermo || ato.termo.includes(searchTermo)) &&
-                                                    (!searchProtocolo || ato.protocolo.includes(searchProtocolo)) &&
-                                                    (!searchMatricula || ato.matricula.includes(searchMatricula)) &&
-                                                    (!searchDataAto || ato.data_ato === searchDataAto) &&
-                                                    (!searchDescricao || normalizedDescricao.includes(searchDescricao)) &&
-                                                    (!searchAtribuicao || ato.atribuicao.includes(searchAtribuicao));
-
-                                if (matchesSearch) {
-                                    var cpfsCnpjs = ato.partes_envolvidas.map(p => p.cpf).join(', ');
-                                    var nomes = ato.partes_envolvidas.map(p => p.nome).join(', ');
-                                    var row = '<tr>' +
-                                    '<td>' + ato.atribuicao + '</td>' +
-                                    '<td>' + ato.categoria + '</td>' +
-                                    '<td>' + cpfsCnpjs + '</td>' +
-                                    '<td>' + nomes + '</td>' +
-                                    '<td>' + formatDateTime(ato.data_ato) + '</td>' + // Corrija aqui
-                                    '<td>' + ato.livro + '</td>' +
-                                    '<td>' + ato.folha + '</td>' +
-                                    '<td>' + ato.termo + '</td>' +
-                                    '<td>' + ato.protocolo + '</td>' +
-                                    '<td>' + ato.matricula + '</td>' +
-                                    '<td>' + ato.descricao + '</td>' +
-                                    '<td>' +
-                                        '<button class="btn btn-info btn-sm visualizar-anexos" data-id="' + ato.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button> ' +
-                                        '<button class="btn btn-edit btn-sm editar-ato" data-id="' + ato.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
-                                        '<button class="btn btn-delete btn-sm excluir-ato" data-id="' + ato.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
-                                    '</td>' +
-                                    '</tr>';
-                                    tableBody.append(row);
-                                }
+                            // Limpar e preencher a tabela com os dados
+                            table.clear();
+                            atos.forEach(function (ato) {
+                                var cpfsCnpjs = ato.partes_envolvidas.map(p => p.cpf).join(', ');
+                                var nomes = ato.partes_envolvidas.map(p => p.nome).join(', ');
+                                table.row.add([
+                                    ato.atribuicao,
+                                    ato.categoria,
+                                    cpfsCnpjs,
+                                    nomes,
+                                    formatDateTime(ato.data_ato),
+                                    ato.livro,
+                                    ato.folha,
+                                    ato.termo,
+                                    ato.protocolo,
+                                    ato.matricula,
+                                    ato.descricao,
+                                    '<button class="btn btn-info btn-sm visualizar-anexos" data-id="' + ato.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button> ' +
+                                    '<button class="btn btn-edit btn-sm editar-ato" data-id="' + ato.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
+                                    '<button class="btn btn-delete btn-sm excluir-ato" data-id="' + ato.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>'
+                                ]);
                             });
+                            table.draw(); // Atualizar a tabela com os novos dados
                         } catch (e) {
                             console.error("Erro ao analisar resposta JSON: ", e);
                             console.error("Resposta recebida: ", response);
                         }
+                    },
+                    error: function () {
+                        console.error("Erro ao carregar os dados.");
                     }
                 });
 
+                // Aplicar o filtro personalizado
+                $('#filter-button').on('click', function () {
+                    var searchTerm = normalizeText($('#nome').val());
+                    var searchCategoria = $('#categoria').val();
+                    var searchCpfCnpj = $('#cpf-cnpj').val();
+                    var searchLivro = $('#livro').val();
+                    var searchFolha = $('#folha').val();
+                    var searchTermo = $('#termo').val();
+                    var searchProtocolo = $('#protocolo').val();
+                    var searchMatricula = $('#matricula').val();
+                    var searchDataAto = $('#data-ato').val();
+                    var searchDescricao = normalizeText($('#descricao').val());
+                    var searchAtribuicao = $('#atribuicao').val();
+
+                    $.ajax({
+                        url: 'load_atos.php',
+                        method: 'GET',
+                        success: function (response) {
+                            try {
+                                var atos = JSON.parse(response);
+                                // Filtrar os dados
+                                var filteredAtos = atos.filter(function (ato) {
+                                    var normalizedNome = normalizeText(ato.partes_envolvidas.map(p => p.nome).join(', '));
+                                    var normalizedDescricao = normalizeText(ato.descricao);
+
+                                    return (!searchTerm || normalizedNome.includes(searchTerm)) &&
+                                        (!searchCategoria || ato.categoria === searchCategoria) &&
+                                        (!searchCpfCnpj || ato.partes_envolvidas.some(p => p.cpf.includes(searchCpfCnpj))) &&
+                                        (!searchLivro || ato.livro.includes(searchLivro)) &&
+                                        (!searchFolha || ato.folha.includes(searchFolha)) &&
+                                        (!searchTermo || ato.termo.includes(searchTermo)) &&
+                                        (!searchProtocolo || ato.protocolo.includes(searchProtocolo)) &&
+                                        (!searchMatricula || ato.matricula.includes(searchMatricula)) &&
+                                        (!searchDataAto || ato.data_ato === searchDataAto) &&
+                                        (!searchDescricao || normalizedDescricao.includes(searchDescricao)) &&
+                                        (!searchAtribuicao || ato.atribuicao.includes(searchAtribuicao));
+                                });
+
+                                // Limpar e adicionar os dados filtrados à tabela
+                                table.clear();
+                                filteredAtos.forEach(function (ato) {
+                                    var cpfsCnpjs = ato.partes_envolvidas.map(p => p.cpf).join(', ');
+                                    var nomes = ato.partes_envolvidas.map(p => p.nome).join(', ');
+                                    table.row.add([
+                                        ato.atribuicao,
+                                        ato.categoria,
+                                        cpfsCnpjs,
+                                        nomes,
+                                        formatDateTime(ato.data_ato),
+                                        ato.livro,
+                                        ato.folha,
+                                        ato.termo,
+                                        ato.protocolo,
+                                        ato.matricula,
+                                        ato.descricao,
+                                        '<button class="btn btn-info btn-sm visualizar-anexos" data-id="' + ato.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button> ' +
+                                        '<button class="btn btn-edit btn-sm editar-ato" data-id="' + ato.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
+                                        '<button class="btn btn-delete btn-sm excluir-ato" data-id="' + ato.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>'
+                                    ]);
+                                });
+                                table.draw(); // Atualizar a tabela com os novos dados filtrados
+                            } catch (e) {
+                                console.error("Erro ao analisar resposta JSON: ", e);
+                                console.error("Resposta recebida: ", response);
+                            }
+                        },
+                        error: function () {
+                            console.error("Erro ao carregar os dados.");
+                        }
+                    });
+                });
             });
+
+
 
             // Visualizar anexos e dados
             $(document).on('click', '.visualizar-anexos', function() {
@@ -519,6 +586,7 @@ include(__DIR__ . '/../menu.php');
                 });
             });
         });
+        
     </script>
 <?php
 include(__DIR__ . '/../rodape.php');

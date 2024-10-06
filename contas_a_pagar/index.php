@@ -138,9 +138,9 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
 
             </form>
             <hr>
-            <div id="resultados">
+            <div class="table-responsive">
                 <h5>Resultados da Pesquisa</h5>
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 80%">
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
                     <thead>
                         <tr>
                             <th style="width: 20%;">Título</th>

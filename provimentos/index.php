@@ -73,6 +73,25 @@ date_default_timezone_set('America/Sao_Paulo');
             outline-offset: -2px;
         }
 
+        .table th:nth-child(1), .table td:nth-child(1) { /* Tipo */
+            width: 7%;
+        }
+        .table th:nth-child(2), .table td:nth-child(2) { /* Nº */
+            width: 7%;
+        }
+        .table th:nth-child(3), .table td:nth-child(3) { /* Origem */
+            width: 5%;
+        }
+        .table th:nth-child(4), .table td:nth-child(4) { /* Data */
+            width: 8%;
+        }
+        .table th:nth-child(5), .table td:nth-child(5) { /* Descrição */
+            width: 68%;
+        }
+        .table th:nth-child(6), .table td:nth-child(6) { /* Ações */
+            width: 5%;
+        }
+
     </style>
 </head>
 
@@ -138,7 +157,7 @@ date_default_timezone_set('America/Sao_Paulo');
                 </div>
             </form>
             <hr>
-            <div id="resultados">
+            <div class="table-responsive">
                 <h5>Resultados da Pesquisa</h5>
                 <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
                     <thead>

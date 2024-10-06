@@ -109,9 +109,9 @@ date_default_timezone_set('America/Sao_Paulo');
 
 
             <hr>
-            <div class="mt-3">
+            <div class="table-responsive">
                 <h5>Resultados da Pesquisa</h5>
-                <table id="resultadosTabela" class="table table-striped table-bordered" style="zoom: 82%">
+                <table id="resultadosTabela" class="table table-striped table-bordered" style="zoom: 90%">
                     <thead>
                         <tr>
                             <th style="width: 6%">Nº Guia</th>

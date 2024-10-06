@@ -128,8 +128,10 @@ include(__DIR__ . '/../menu.php');
                     </div>
                 </div>
             </form>
-            <div class="mt-3">
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 85%">
+            <hr>
+            <div class="table-responsive">
+                <h5>Resultados da Pesquisa</h5>
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
                     <thead>
                         <tr>
                             <th>Número</th>
@@ -137,7 +139,7 @@ include(__DIR__ . '/../menu.php');
                             <th>Assunto</th>
                             <th>Destinatário</th>
                             <th>Cargo</th>
-                            <th>Dados Complementares</th>
+                            <th style="width: 15%;">Dados Complementares</th>
                             <th style="width: 10%;">Ações</th>
                         </tr>
                     </thead>

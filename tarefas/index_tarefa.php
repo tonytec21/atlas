@@ -17,8 +17,17 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
 
     <style>
+
+.status-prestes-vencer {
+    background-color: #ffc107; /* Cor amarelada para "Prestes a vencer" */
+}
+
+.status-vencida {
+    background-color: #dc3545; /* Cor avermelhada para "Vencida" */
+}
         /* Remover a borda de foco no botão de fechar */
         .btn-close {
             outline: none; /* Remove a borda ao clicar */
@@ -62,6 +71,10 @@ date_default_timezone_set('America/Sao_Paulo');
 }
 
         .btn-edit {
+            margin-left: 5px;
+        }
+
+        .btn-info {
             margin-left: 5px;
         }
 
@@ -420,7 +433,7 @@ date_default_timezone_set('America/Sao_Paulo');
                 </div>
             </form>
             <hr>
-            <div class="mt-3">
+            <div class="table-responsive">
                 <h5>Resultados da Pesquisa</h5>
                 <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
                     <thead>
@@ -434,6 +447,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             <th style="width: 12%">Funcionário</th>
                             <th>Prioridade</th>
                             <th>Status</th>
+                            <th>Situação</th>
                             <th style="width: 8%">Ações</th>
                         </tr>
                     </thead>
@@ -597,7 +611,7 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <!-- Modal Adicionar Comentário -->
     <div class="modal fade" id="addCommentModal" tabindex="-1" role="dialog" aria-labelledby="addCommentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-dialog modal-lg" role="document" style="max-width: 60%;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addCommentModalLabel">Adicionar Comentário e Anexos</h5>
@@ -692,48 +706,48 @@ date_default_timezone_set('America/Sao_Paulo');
     </div>
 
     <!-- Modal Guia de Recebimento -->
-<div class="modal fade" id="guiaRecebimentoModal" tabindex="-1" role="dialog" aria-labelledby="guiaRecebimentoModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="guiaRecebimentoModalLabel">Guia de Recebimento</h5>
-                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                    &times;
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="guiaRecebimentoForm">
-                    <div class="form-group">
-                        <label for="cliente">Apresentante:</label>
-                        <input type="text" class="form-control" id="cliente" name="cliente" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="dataRecebimento">Data de Recebimento:</label>
-                        <input type="datetime-local" class="form-control" id="dataRecebimento" name="dataRecebimento" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="documentosRecebidos">Documentos Recebidos:</label>
-                        <textarea class="form-control" id="documentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="observacoes">Observações:</label>
-                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="funcionario">Funcionário:</label>
-                        <input type="text" class="form-control" id="funcionario" name="funcionario" readonly>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Salvar Guia</button>
-                </form>
+    <div class="modal fade" id="guiaRecebimentoModal" tabindex="-1" role="dialog" aria-labelledby="guiaRecebimentoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="guiaRecebimentoModalLabel">Guia de Recebimento</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="guiaRecebimentoForm">
+                        <div class="form-group">
+                            <label for="cliente">Apresentante:</label>
+                            <input type="text" class="form-control" id="cliente" name="cliente" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dataRecebimento">Data de Recebimento:</label>
+                            <input type="datetime-local" class="form-control" id="dataRecebimento" name="dataRecebimento" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="documentosRecebidos">Documentos Recebidos:</label>
+                            <textarea class="form-control" id="documentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="observacoes">Observações:</label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="funcionario">Funcionário:</label>
+                            <input type="text" class="form-control" id="funcionario" name="funcionario" readonly>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Salvar Guia</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
 
     <!-- Modal Criar Subtarefa -->
 <div class="modal fade" id="createSubTaskModal" tabindex="-1" role="dialog" aria-labelledby="createSubTaskModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog modal-lg" role="document" style="max-width: 60%;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createSubTaskModalLabel">Criar Subtarefa</h5>
@@ -831,14 +845,56 @@ date_default_timezone_set('America/Sao_Paulo');
     </div>
 </div>
 
-
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var subTaskDeadlineInput = document.getElementById('subTaskDeadline');
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = ('0' + (now.getMonth() + 1)).slice(-2); // Meses são 0-indexados
+            var day = ('0' + now.getDate()).slice(-2);
+            var hours = ('0' + now.getHours()).slice(-2);
+            var minutes = ('0' + now.getMinutes()).slice(-2);
+
+            // Formato YYYY-MM-DDTHH:MM
+            var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+            subTaskDeadlineInput.min = minDateTime;
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var dataRecebimentoInput = document.getElementById('dataRecebimento');
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = ('0' + (now.getMonth() + 1)).slice(-2); // Meses são 0-indexados
+            var day = ('0' + now.getDate()).slice(-2);
+            var hours = ('0' + now.getHours()).slice(-2);
+            var minutes = ('0' + now.getMinutes()).slice(-2);
+
+            // Formato YYYY-MM-DDTHH:MM
+            var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+            dataRecebimentoInput.min = minDateTime;
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var dataEntregaInput = document.getElementById('dataEntrega');
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = ('0' + (now.getMonth() + 1)).slice(-2); // Meses são 0-indexados
+            var day = ('0' + now.getDate()).slice(-2);
+            var hours = ('0' + now.getHours()).slice(-2);
+            var minutes = ('0' + now.getMinutes()).slice(-2);
+
+            // Formato YYYY-MM-DDTHH:MM
+            var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+            dataEntregaInput.min = minDateTime;
+        });
 
         function normalizeText(text) {
             return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -1066,24 +1122,49 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
                                 actions += '<button class="btn btn-edit btn-sm" onclick="editTask(' + task.id + ')"><i class="fa fa-pencil" aria-hidden="true"></i></button>';
                             }
 
-                            // Adicionar a linha na tabela DataTables com a classe de coloração correta
-                            var descricaoLimitada = task.descricao.length > 80 ? task.descricao.substring(0, 80) + '...' : task.descricao;
+                                // Função para adicionar classes de status baseado no estado para o fundo e texto
+                                function getStatusClassBackground(situacao) {
+                                    switch (situacao) {
+                                        case 'Prestes a vencer':
+                                            return 'status-prestes-vencer';  // Classe para fundo e texto de "Prestes a vencer"
+                                        case 'Vencida':
+                                            return 'status-vencida';  // Classe para fundo e texto de "Vencida"
+                                        default:
+                                            return '';
+                                    }
+                                }
 
-                            var row = dataTable.row.add([
-                                task.id,
-                                task.titulo,
-                                task.categoria_titulo,
-                                task.origem_titulo,
-                                descricaoLimitada, // Limita a descrição a 80 caracteres
-                                new Date(task.data_limite).toLocaleString("pt-BR"),
-                                task.funcionario_responsavel,
-                                task.nivel_de_prioridade,
-                                '<span class="status-label ' + statusClass + '">' + capitalize(task.status) + '</span>',
-                                actions
-                            ]).draw().node(); // Aqui adicionamos a linha e retornamos o nó DOM
+                                var descricaoLimitada = task.descricao.length > 80 ? task.descricao.substring(0, 80) + '...' : task.descricao;
 
-                            // Aplicar a classe de coloração na linha
-                            $(row).addClass(rowClass);
+                                var situacao = '';
+                                if (rowClass === 'row-vencida') {
+                                    situacao = 'Vencida';
+                                } else if (rowClass === 'row-quase-vencida') {
+                                    situacao = 'Prestes a vencer';
+                                } else {
+                                    situacao = '-';
+                                }
+
+                                // Adicionar a classe de fundo e texto para a situação
+                                var statusClassBackground = getStatusClassBackground(situacao);
+
+                                var row = dataTable.row.add([
+                                    task.id,
+                                    task.titulo,
+                                    task.categoria_titulo,
+                                    task.origem_titulo,
+                                    descricaoLimitada, // Limita a descrição a 80 caracteres
+                                    new Date(task.data_limite).toLocaleString("pt-BR"),
+                                    task.funcionario_responsavel,
+                                    task.nivel_de_prioridade,
+                                    '<span class="status-label ' + statusClass + '">' + capitalize(task.status) + '</span>',
+                                    '<span class="status-label ' + statusClassBackground + '">' + situacao + '</span>', // Coluna "Situação" com classe dinâmica
+                                    actions
+                                ]).draw().node();
+
+                                // Aplicar a classe de coloração na linha
+                                $(row).addClass(rowClass);
+
                         });
                     } else {
                         // Exibir mensagem de "Nenhum resultado encontrado" se não houver tarefas
@@ -1183,31 +1264,42 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
         });
     });
 
-            $('#commentForm').on('submit', function(e) {
-                e.preventDefault();
+        $('#commentForm').on('submit', function(e) {
+            e.preventDefault();
 
-                var formData = new FormData(this);
-                var taskToken = $('#viewTitle').data('tasktoken'); // Assume que o token da tarefa está armazenado como atributo de dados
+            var formData = new FormData(this);
+            var taskToken = $('#viewTitle').data('tasktoken'); // Assume que o token da tarefa está armazenado como atributo de dados
 
-                formData.append('taskToken', taskToken);
+            formData.append('taskToken', taskToken);
 
-                $.ajax({
-                    url: 'add_comment.php',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        $('#addCommentModal').modal('hide');
-                        $('body').removeClass('modal-open'); // Corrigir problema de rolagem
-                        alert('Comentário adicionado com sucesso!');
+            $.ajax({
+                url: 'add_comment.php',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    $('#addCommentModal').modal('hide');
+                    $('body').removeClass('modal-open'); // Corrigir problema de rolagem
+
+                    Swal.fire({
+                        title: 'Sucesso!',
+                        text: 'Comentário adicionado com sucesso!',
+                        icon: 'success'
+                    }).then(() => {
                         viewTask(taskToken); // Atualizar a visualização da tarefa
-                    },
-                    error: function() {
-                        alert('Erro ao adicionar comentário');
-                    }
-                });
+                    });
+                },
+                error: function() {
+                    Swal.fire({
+                        title: 'Erro!',
+                        text: 'Erro ao adicionar comentário',
+                        icon: 'error'
+                    });
+                }
             });
+        });
+
 
             $('#saveStatusButton').on('click', function() {
                 var taskToken = $('#viewTitle').data('tasktoken');
@@ -1643,6 +1735,122 @@ function viewTask(taskToken) {
                 viewTask(taskToken);
             }
 
+            // Adiciona um evento para redirecionar a página quando o modal for fechado e se houver um token
+            $('#viewTaskModal').on('hidden.bs.modal', function () {
+                if (taskToken) { // Verifica se o token está presente
+                    window.location.href = 'index.php'; // Redireciona para index.php quando o modal é fechado
+                }
+            });
+        });
+
+
+        // Ação para abrir o formulário usando SweetAlert2
+        function showAddCommentForm() {
+            Swal.fire({
+                title: 'Adicionar Comentário e Anexos',
+                html: `
+                    <form id="swalCommentForm" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="swalCommentDescription">Comentário:</label>
+                            <textarea class="form-control" id="swalCommentDescription" name="commentDescription" rows="5"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="swalCommentAttachments">Anexar arquivos:</label>
+                            <input type="file" id="swalCommentAttachments" name="commentAttachments[]" multiple class="form-control-file">
+                        </div>
+                    </form>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Salvar Comentário',
+                cancelButtonText: 'Fechar',
+                preConfirm: () => {
+                    // Coletar dados do formulário antes de confirmar
+                    const commentDescription = document.getElementById('swalCommentDescription').value;
+                    const attachments = document.getElementById('swalCommentAttachments').files;
+
+                    if (!commentDescription) {
+                        Swal.showValidationMessage('O campo de comentário é obrigatório.');
+                        return false;
+                    }
+
+                    return {
+                        commentDescription: commentDescription,
+                        attachments: attachments
+                    };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Criar um FormData para enviar os dados via AJAX
+                    const formData = new FormData();
+                    formData.append('commentDescription', result.value.commentDescription);
+
+                    for (let i = 0; i < result.value.attachments.length; i++) {
+                        formData.append('commentAttachments[]', result.value.attachments[i]);
+                    }
+
+                    // Fazer a requisição AJAX para salvar o comentário
+                    $.ajax({
+                        url: 'add_comment.php',
+                        type: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function(response) {
+                            Swal.fire({
+                                title: 'Sucesso!',
+                                text: 'Comentário adicionado com sucesso!',
+                                icon: 'success'
+                            }).then(() => {
+                                // Atualizar a visualização da tarefa
+                                location.reload();
+                            });
+                        },
+                        error: function() {
+                            Swal.fire({
+                                title: 'Erro!',
+                                text: 'Erro ao adicionar comentário.',
+                                icon: 'error'
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        $(document).on('show.bs.modal', function () {
+            // Desativa a rolagem do fundo
+            $('body').css('overflow', 'hidden');
+        });
+
+        $(document).on('hidden.bs.modal', function () {
+            // Restaura a rolagem do fundo apenas se não houver mais modais abertos
+            if ($('.modal.show').length === 0) {
+                $('body').css('overflow', 'auto');
+            }
+        });
+
+        // Adicionar rolagem ao modal principal após fechar o secundário
+        $('#addCommentModal').on('hidden.bs.modal', function () {
+            $('#viewTaskModal').css('overflow-y', 'auto');
+        });
+
+        $(document).ready(function() {
+            // Função para obter o valor do parâmetro da URL
+            function getUrlParameter(name) {
+                name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+                var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+                var results = regex.exec(location.search);
+                return results === null ? null : decodeURIComponent(results[1].replace(/\+/g, ' '));
+            }
+
+            // Verifica se existe um token na URL
+            var taskToken = getUrlParameter('token');
+
+            if (taskToken) {
+                // Se houver um token, chama a função para visualizar a tarefa e abrir o modal
+                viewTask(taskToken);
+            }
+
             // Adiciona um evento para voltar à página anterior quando o modal for fechado e se houver um token
             $('#viewTaskModal').on('hidden.bs.modal', function () {
                 if (taskToken) { // Verifica se o token está presente
@@ -1650,7 +1858,6 @@ function viewTask(taskToken) {
                 }
             });
         });
-
 
     </script>
     <?php
