@@ -15,6 +15,7 @@ checkSession();
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         /* CSS para estilizar o modal */
         .modal-dialog {
@@ -183,14 +184,15 @@ $selos_arquivamentos->close();
                 <label for="descricao">Descrição e Detalhes:</label>
                 <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
             </div>
-            <h4>Anexos</h4>
             <div class="form-group">
                 <label for="file-input">Anexar arquivos:</label>
                 <input type="file" id="file-input" name="file-input[]" multiple class="form-control">
             </div>
-            <div id="file-list"></div><br>
             <button type="submit" style="margin-top:0px;margin-bottom: 30px" class="btn btn-primary w-100">Salvar</button>
         </form>
+        <hr>
+        <h4>Anexos</h4>
+        <div id="file-list"></div><br>
 
 <!-- Formulário de Solicitação de Selo -->
 <?php if (!$selo_existe): ?>
@@ -274,6 +276,7 @@ $selos_arquivamentos->close();
 <script src="../script/jquery.mask.min.js"></script>
 <script src="../script/jquery.dataTables.min.js"></script>
 <script src="../script/dataTables.bootstrap4.min.js"></script>
+<script src="../script/sweetalert2.js"></script>
 <script>
 
             $(document).ready(function() {
@@ -373,27 +376,61 @@ $selos_arquivamentos->close();
         $('#adicionar-parte').click(function() {
             var cpf = $('#cpf').val();
             var nome = $('#nome').val();
+
             if (cpf && !validarCPF_CNPJ(cpf)) {
-                alert('CPF/CNPJ inválido.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: 'CPF/CNPJ inválido.',
+                    confirmButtonText: 'OK'
+                });
                 return;
             }
+
             if (nome || $('#partes-envolvidas tr').length > 0) {
                 var row = '<tr>' +
                     '<td>' + (cpf || '') + '</td>' +
                     '<td>' + (nome || '') + '</td>' +
-                    '<td><button class="btn btn-delete btn-sm remover-parte"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
+                    '<td><button type="button" class="btn btn-delete btn-sm remover-parte"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
                     '</tr>';
                 $('#partes-envolvidas').append(row);
                 $('#cpf').val('');
                 $('#nome').val('');
             } else {
-                alert('Preencha o nome.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: 'Preencha o nome.',
+                    confirmButtonText: 'OK'
+                });
             }
         });
 
-        // Remover parte envolvida
-        $(document).on('click', '.remover-parte', function() {
-            $(this).closest('tr').remove();
+        // Remover parte envolvida com confirmação
+        $(document).on('click', '.remover-parte', function(e) {
+            e.preventDefault(); // Previne a ação padrão do botão
+            var row = $(this).closest('tr'); // Captura a linha da tabela que contém o botão
+
+            Swal.fire({
+                title: 'Você tem certeza?',
+                text: 'Deseja realmente remover esta parte envolvida?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, remover',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    row.remove(); // Executa a remoção somente após a confirmação
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Removido!',
+                        text: 'A parte envolvida foi removida com sucesso.',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            });
         });
 
         // Carregar categorias do JSON
@@ -492,12 +529,38 @@ $selos_arquivamentos->close();
             }
         });
 
-        // Remover anexo
+        // Remover anexo com confirmação
         $(document).on('click', '.remover-anexo', function() {
-            var anexo = $(this).data('file');
-            $(this).closest('.attachment-item').remove();
-            filesToRemove.push(anexo); // Add the file to the remove list
+            var button = $(this); // Referência ao botão que foi clicado
+            var anexo = button.data('file'); // Obtém o nome do arquivo a ser removido
+
+            // Exibir confirmação com SweetAlert2
+            Swal.fire({
+                title: 'Você tem certeza?',
+                text: 'Deseja realmente remover este anexo?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, remover',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Remover o anexo somente após a confirmação
+                    button.closest('.attachment-item').remove();
+                    filesToRemove.push(anexo); // Adicionar o anexo à lista de remoção
+
+                    // Exibir mensagem de sucesso
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Removido!',
+                        text: 'O anexo foi removido com sucesso.',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            });
         });
+
 
         // Visualizar anexo
         $(document).on('click', '.visualizar-anexo', function(e) {
@@ -514,7 +577,12 @@ $selos_arquivamentos->close();
 
             // Verificar se há pelo menos uma parte envolvida
             if ($('#partes-envolvidas tr').length === 0) {
-                alert('Adicione pelo menos uma parte envolvida.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: 'Adicione pelo menos uma parte envolvida.',
+                    confirmButtonText: 'OK'
+                });
                 return;
             }
 
@@ -538,14 +606,26 @@ $selos_arquivamentos->close();
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    alert('Dados salvos com sucesso');
-                    window.location.href = '';
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Dados salvos com sucesso.',
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        window.location.href = '';
+                    });
                 },
                 error: function() {
-                    alert('Erro ao salvar os dados');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao salvar os dados.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             });
         });
+
 
         // Submeter formulário de solicitação de selo
         $('#selo-form').on('submit', function(e) {
@@ -565,64 +645,102 @@ $selos_arquivamentos->close();
                         $('#selo-form').hide();
                         $('#selo-form').after(data.html);
 
-                        // Exibir modal com mensagem de sucesso
-                        $('#messageModalLabel').text('Sucesso');
-                        $('#messageModalBody').text(data.success);
-                        $('#messageModal').modal('show');
-
-                        // Atualizar a página ao fechar o modal
-                        $('#messageModal').on('hidden.bs.modal', function () {
+                        // Exibir mensagem de sucesso com SweetAlert2
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso',
+                            text: data.success,
+                            confirmButtonText: 'OK'
+                        }).then(() => {
                             location.reload();
                         });
-                    } else if (data.error) {
-                        // Exibir modal com mensagem de erro
-                        $('#messageModalLabel').text('Erro');
-                        $('#messageModalBody').html(data.error + '<br><button id="verificarIpBtn" class="btn btn-primary">Verificar IP do Selador</button>');
-                        $('#messageModal').modal('show');
 
-                        $('#verificarIpBtn').click(function() {
-                            $.ajax({
-                                url: 'verificar_ip.php',
-                                type: 'GET',
-                                success: function(response) {
-                                    var ipData = JSON.parse(response);
-                                    if (ipData.sucesso) {
-                                        $('#messageModalBody').html(ipData.sucesso + '<br><button id="salvarIpBtn" class="btn btn-primary">Salvar</button>');
-                                        $('#salvarIpBtn').click(function() {
-                                            $.ajax({
-                                                url: 'atualizar_ip.php',
-                                                type: 'POST',
-                                                data: { ip: ipData.ip },
-                                                success: function(updateResponse) {
-                                                    $('#messageModalBody').html(updateResponse);
-                                                },
-                                                error: function() {
-                                                    $('#messageModalBody').text('Erro ao atualizar o IP.');
-                                                }
+                    } else if (data.error) {
+                        // Exibir mensagem de erro com SweetAlert2
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            html: data.error + '<br><button id="verificarIpBtn" class="btn btn-primary mt-2">Verificar IP do Selador</button>',
+                            didOpen: () => {
+                                $('#verificarIpBtn').click(function() {
+                                    // Desabilitar o botão e mostrar mensagem
+                                    $(this).prop('disabled', true).text('Verificando... aguarde');
+
+                                    $.ajax({
+                                        url: 'verificar_ip.php',
+                                        type: 'GET',
+                                        success: function(response) {
+                                            var ipData = JSON.parse(response);
+                                            if (ipData.sucesso) {
+                                                Swal.fire({
+                                                    icon: 'success',
+                                                    title: 'IP Verificado',
+                                                    html: ipData.sucesso + '<br><button id="salvarIpBtn" class="btn btn-primary mt-2">Salvar</button>',
+                                                    didOpen: () => {
+                                                        $('#salvarIpBtn').click(function() {
+                                                            $.ajax({
+                                                                url: 'atualizar_ip.php',
+                                                                type: 'POST',
+                                                                data: { ip: ipData.ip },
+                                                                success: function(updateResponse) {
+                                                                    Swal.fire({
+                                                                        icon: 'success',
+                                                                        title: 'IP Atualizado',
+                                                                        text: updateResponse,
+                                                                        confirmButtonText: 'OK'
+                                                                    });
+                                                                },
+                                                                error: function() {
+                                                                    Swal.fire({
+                                                                        icon: 'error',
+                                                                        title: 'Erro',
+                                                                        text: 'Erro ao atualizar o IP.',
+                                                                        confirmButtonText: 'OK'
+                                                                    });
+                                                                }
+                                                            });
+                                                        });
+                                                    }
+                                                });
+                                            } else {
+                                                Swal.fire({
+                                                    icon: 'error',
+                                                    title: 'Erro',
+                                                    text: ipData.erro,
+                                                    confirmButtonText: 'OK'
+                                                });
+                                            }
+                                        },
+                                        error: function() {
+                                            Swal.fire({
+                                                icon: 'error',
+                                                title: 'Erro',
+                                                text: 'Erro ao verificar o IP.',
+                                                confirmButtonText: 'OK'
                                             });
-                                        });
-                                    } else {
-                                        $('#messageModalBody').text(ipData.erro);
-                                    }
-                                },
-                                error: function() {
-                                    $('#messageModalBody').text('Erro ao verificar o IP.');
-                                }
-                            });
+                                        }
+                                    });
+                                });
+                            }
                         });
                     }
                 },
                 error: function() {
-                    // Exibir modal com mensagem de erro
-                    $('#messageModalLabel').text('Erro');
-                    $('#messageModalBody').text('Erro ao solicitar o selo.');
-                    $('#messageModal').modal('show');
+                    // Exibir mensagem de erro com SweetAlert2
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: 'Erro ao solicitar o selo.',
+                        confirmButtonText: 'OK'
+                    });
 
                     // Reativar o botão "Solicitar Selo"
                     $('#solicitar-selo-btn').prop('disabled', false);
                 }
             });
         });
+
+
 
         // Esconder o formulário de solicitação de selo se o selo já foi gerado
         if (typeof seloGerado !== 'undefined' && seloGerado) {

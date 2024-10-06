@@ -12,6 +12,7 @@ checkSession();
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
 </head>
 <body class="light-mode">
 <?php
@@ -106,6 +107,7 @@ include(__DIR__ . '/../menu.php');
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
 
         $(document).ready(function() {
@@ -177,10 +179,17 @@ include(__DIR__ . '/../menu.php');
             $('#adicionar-parte').click(function() {
                 var cpf = $('#cpf').val();
                 var nome = $('#nome').val();
+                
                 if (cpf && !validarCPF_CNPJ(cpf)) {
-                    alert('CPF/CNPJ inválido.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'CPF/CNPJ inválido.',
+                        confirmButtonText: 'OK'
+                    });
                     return;
                 }
+                
                 if (nome || $('#partes-envolvidas tr').length > 0) {
                     var row = '<tr>' +
                         '<td>' + (cpf || '') + '</td>' +
@@ -191,9 +200,15 @@ include(__DIR__ . '/../menu.php');
                     $('#cpf').val('');
                     $('#nome').val('');
                 } else {
-                    alert('Preencha o nome.');
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Atenção!',
+                        text: 'Preencha o nome.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             });
+
 
             // Remover parte envolvida
             $(document).on('click', '.remover-parte', function() {
@@ -224,7 +239,12 @@ include(__DIR__ . '/../menu.php');
 
                 // Verificar se há pelo menos uma parte envolvida
                 if ($('#partes-envolvidas tr').length === 0) {
-                    alert('Adicione pelo menos uma parte envolvida.');
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Atenção!',
+                        text: 'Adicione pelo menos uma parte envolvida.',
+                        confirmButtonText: 'OK'
+                    });
                     return;
                 }
 
@@ -247,16 +267,34 @@ include(__DIR__ . '/../menu.php');
                     success: function(response) {
                         var result = JSON.parse(response);
                         if (result.status === 'success') {
-                            window.location.href = result.redirect;
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Dados salvos com sucesso!',
+                                confirmButtonText: 'OK'
+                            }).then(() => {
+                                window.location.href = result.redirect;
+                            });
                         } else {
-                            alert('Erro ao salvar os dados');
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: 'Erro ao salvar os dados.',
+                                confirmButtonText: 'OK'
+                            });
                         }
                     },
                     error: function() {
-                        alert('Erro ao salvar os dados');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao salvar os dados.',
+                            confirmButtonText: 'OK'
+                        });
                     }
                 });
             });
+
         });
     </script>
 <?php
