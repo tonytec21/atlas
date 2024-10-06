@@ -145,6 +145,7 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         /* Remover a borda de foco no botão de fechar */
         .btn-close {
@@ -262,8 +263,9 @@ include(__DIR__ . '/../menu.php');
         <div class="d-flex justify-content-center align-items-center">
             <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
             <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" type="button" class="btn btn-info2 btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
-            <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal"><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
-            <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()"><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
+            <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal" <?php echo ($ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
+            <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()" <?php echo ($ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
+            <button style="height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-danger btn-cancel btn-sm" onclick="cancelarOS()" <?php echo ($has_liquidated || $ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>><i class="fa fa-ban" aria-hidden="true"></i> Cancelar OS</button>
             <button type="button" class="btn btn-4 btn-sm" style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" data-toggle="modal" data-target="#tarefaModal"><i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa</button>
             <button style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
             <button type="button" class="btn btn-info3 btn-sm" style="width: 190px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" onclick="window.location.href='criar_os.php'"><i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço</button>
@@ -374,6 +376,8 @@ include(__DIR__ . '/../menu.php');
                         <td>
                             <?php if ($item['status'] == 'liquidado'): ?>
                                 <span class="status-label status-liquidado">Liquidado</span>
+                            <?php elseif ($item['status'] == 'Cancelado'): ?>
+                                <span class="status-label status-pendente">Cancelado</span>
                             <?php elseif ($item['status'] == 'parcialmente liquidado'): ?>
                                 <span class="status-label status-parcial">Liq. Parcialmente</span>
                             <?php else: ?>
@@ -381,7 +385,7 @@ include(__DIR__ . '/../menu.php');
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?php if ($item['status'] != 'liquidado'): ?>
+                            <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado'): ?>
                                 <button type="button" class="btn btn-primary btn-sm" onclick="liquidarAto(<?php echo $item['id']; ?>, <?php echo $item['quantidade']; ?>, <?php echo $item['quantidade_liquidada'] !== null ? $item['quantidade_liquidada'] : 0; ?>, '<?php echo $item['status'] !== null ? addslashes($item['status']) : ''; ?>')">Liquidar</button>
                             <?php endif; ?>
                         </td>
@@ -529,7 +533,7 @@ include(__DIR__ . '/../menu.php');
 
 <!-- Modal de Liquidação -->
 <div class="modal fade" id="liquidacaoModal" tabindex="-1" role="dialog" aria-labelledby="liquidacaoModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="liquidacaoModalLabel">Liquidar Ato</h5>
@@ -547,6 +551,7 @@ include(__DIR__ . '/../menu.php');
         </div>
     </div>
 </div>
+
 
 <!-- Modal de Devolução -->
 <div class="modal fade" id="devolucaoModal" tabindex="-1" role="dialog" aria-labelledby="devolucaoModalLabel" aria-hidden="true">
@@ -694,13 +699,13 @@ include(__DIR__ . '/../menu.php');
     </div>
 </div>
 
-
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
 <script src="../script/jquery.dataTables.min.js"></script>
 <script src="../script/dataTables.bootstrap4.min.js"></script>
+<script src="../script/sweetalert2.js"></script>
 <script>
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -787,12 +792,22 @@ include(__DIR__ . '/../menu.php');
         var valorPagamento = parseFloat($('#valor_pagamento').val().replace('.', '').replace(',', '.'));
 
         if (formaPagamento === "") {
-            exibirMensagem('Por favor, selecione uma forma de pagamento.', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: 'Por favor, selecione uma forma de pagamento.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
         if (isNaN(valorPagamento) || valorPagamento <= 0) {
-            exibirMensagem('Por favor, insira um valor válido para o pagamento.', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: 'Por favor, insira um valor válido para o pagamento.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
@@ -813,16 +828,32 @@ include(__DIR__ . '/../menu.php');
                     pagamentos.push({ forma_de_pagamento: formaPagamento, total_pagamento: valorPagamento });
                     atualizarTabelaPagamentos();
                     $('#valor_pagamento').val('');
-                    exibirMensagem('Pagamento adicionado com sucesso!', 'success');
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Pagamento adicionado com sucesso!',
+                        confirmButtonText: 'OK'
+                    });
                 } else {
-                    exibirMensagem('Erro ao adicionar pagamento.', 'error');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao adicionar pagamento.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             },
             error: function() {
-                exibirMensagem('Erro ao adicionar pagamento.', 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: 'Erro ao adicionar pagamento.',
+                    confirmButtonText: 'OK'
+                });
             }
         });
     }
+
 
     // Função para atualizar a tabela de pagamentos
     function atualizarTabelaPagamentos() {
@@ -849,32 +880,63 @@ include(__DIR__ . '/../menu.php');
     // Função para remover pagamento
     function confirmarRemocaoPagamento(pagamentoId) {
         if (<?php echo $has_liquidated ? 'true' : 'false'; ?>) {
-            exibirMensagem('Não é possível remover pagamentos após a liquidação de atos.', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: 'Não é possível remover pagamentos após a liquidação de atos.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
-        if (confirm('Tem certeza de que deseja remover este pagamento?')) {
-            $.ajax({
-                url: 'remover_pagamento.php',
-                type: 'POST',
-                data: {
-                    pagamento_id: pagamentoId
-                },
-                success: function(response) {
-                    response = JSON.parse(response);
-                    if (response.success) {
-                        pagamentos = pagamentos.filter(pagamento => pagamento.id !== pagamentoId);
-                        atualizarTabelaPagamentos();
-                        exibirMensagem('Pagamento removido com sucesso!', 'success');
-                    } else {
-                        exibirMensagem('Erro ao remover pagamento.', 'error');
+        Swal.fire({
+            title: 'Tem certeza?',
+            text: 'Deseja realmente remover este pagamento?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sim, remover!',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: 'remover_pagamento.php',
+                    type: 'POST',
+                    data: {
+                        pagamento_id: pagamentoId
+                    },
+                    success: function(response) {
+                        response = JSON.parse(response);
+                        if (response.success) {
+                            pagamentos = pagamentos.filter(pagamento => pagamento.id !== pagamentoId);
+                            atualizarTabelaPagamentos();
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Pagamento removido com sucesso!',
+                                confirmButtonText: 'OK'
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: 'Erro ao remover pagamento.',
+                                confirmButtonText: 'OK'
+                            });
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao remover pagamento.',
+                            confirmButtonText: 'OK'
+                        });
                     }
-                },
-                error: function() {
-                    exibirMensagem('Erro ao remover pagamento.', 'error');
-                }
-            });
-        }
+                });
+            }
+        });
     }
 
     // Função para liquidar ato
@@ -900,7 +962,12 @@ include(__DIR__ . '/../menu.php');
         var quantidadeALiquidar = parseInt($('#quantidade_liquidar').val());
 
         if (quantidadeALiquidar <= 0 || (quantidadeLiquidada + quantidadeALiquidar) > quantidadeTotal) {
-            exibirMensagem('Quantidade inválida para liquidação.', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: 'Quantidade inválida para liquidação.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
@@ -916,21 +983,44 @@ include(__DIR__ . '/../menu.php');
                 try {
                     response = JSON.parse(response);
                     if (response.success) {
-                        $('#liquidacaoModal').modal('hide');
-                        window.location.reload();
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Ato liquidado com sucesso!',
+                            confirmButtonText: 'OK'
+                        }).then(() => {
+                            $('#liquidacaoModal').modal('hide');
+                            window.location.reload();
+                        });
                     } else {
-                        exibirMensagem(response.error || 'Erro ao liquidar ato.', 'error');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: response.error || 'Erro ao liquidar ato.',
+                            confirmButtonText: 'OK'
+                        });
                     }
                 } catch (e) {
                     console.error('Erro ao analisar resposta JSON:', e);
-                    exibirMensagem('Erro ao analisar resposta do servidor.', 'error');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao analisar resposta do servidor.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             },
             error: function(xhr, status, error) {
-                exibirMensagem('Erro ao liquidar ato: ' + error, 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: 'Erro ao liquidar ato: ' + error,
+                    confirmButtonText: 'OK'
+                });
             }
         });
     }
+
 
     // Função para abrir modal de devolução
     function abrirDevolucaoModal() {
@@ -945,12 +1035,22 @@ include(__DIR__ . '/../menu.php');
         var valorMaximoDevolucao = valorPago - parseFloat('<?php echo $total_liquidado; ?>');
 
         if (formaDevolucao === "") {
-            exibirMensagem('Por favor, selecione uma forma de devolução.', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: 'Por favor, selecione uma forma de devolução.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
         if (isNaN(valorDevolucao) || valorDevolucao <= 0 || valorDevolucao > valorMaximoDevolucao + 0.01) {
-            exibirMensagem('Por favor, insira um valor válido para a devolução que não seja maior que o saldo disponível.', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: 'Por favor, insira um valor válido para a devolução que não seja maior que o saldo disponível.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
@@ -971,15 +1071,27 @@ include(__DIR__ . '/../menu.php');
                 funcionario: funcionario
             },
             success: function(response) {
-                alert('Devolução salva com sucesso!');
-                $('#devolucaoModal').modal('hide');
-                window.location.reload();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso!',
+                    text: 'Devolução salva com sucesso!',
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    $('#devolucaoModal').modal('hide');
+                    window.location.reload();
+                });
             },
             error: function(xhr, status, error) {
-                exibirMensagem('Erro ao salvar devolução: ' + error, 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: 'Erro ao salvar devolução: ' + error,
+                    confirmButtonText: 'OK'
+                });
             }
         });
     }
+
 
     // Função para abrir modal de repasse
     function abrirRepasseModal() {
@@ -1044,17 +1156,28 @@ include(__DIR__ . '/../menu.php');
 
     function processarResposta(response, saldoAtual, valorRepasse) {
         if (response.success) {
-            alert('Repasse salvo com sucesso!');
-            $('#repasseModal').modal('hide');
-            // Recalcular o saldo após o repasse
-            var novoSaldo = saldoAtual - valorRepasse;
-            $('#saldo').val('R$ ' + novoSaldo.toFixed(2).replace('.', ','));
-            window.location.reload();
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: 'Repasse salvo com sucesso!',
+                confirmButtonText: 'OK'
+            }).then(() => {
+                // Fechar o modal e recarregar a página
+                $('#repasseModal').modal('hide');
+                // Recalcular o saldo após o repasse
+                var novoSaldo = saldoAtual - valorRepasse;
+                $('#saldo').val('R$ ' + novoSaldo.toFixed(2).replace('.', ','));
+                window.location.reload();
+            });
         } else {
-            exibirMensagem('Erro ao salvar repasse: ' + response.error, 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: 'Erro ao salvar repasse: ' + response.error,
+                confirmButtonText: 'OK'
+            });
         }
     }
-
 
     // Função para exibir mensagem
     function exibirMensagem(mensagem, tipo) {
@@ -1077,6 +1200,58 @@ include(__DIR__ . '/../menu.php');
     $('#pagamentoModal').on('hidden.bs.modal', function () {
         location.reload();
     });
+
+    function cancelarOS() {
+        var totalPagamentos = parseFloat('<?php echo $total_pagamentos; ?>');
+        var totalDevolucoes = parseFloat('<?php echo $total_devolucoes; ?>');
+
+        // Se o total de pagamentos for maior que o total de devoluções, alertar e abrir o modal de devolução
+        if (totalPagamentos > totalDevolucoes) {
+            exibirMensagem('Há pagamentos nesta OS que ainda não foram totalmente devolvidos. Você precisa devolver o saldo antes de cancelar a OS.', 'error');
+            abrirDevolucaoModal(); // Abrir o modal de devolução
+            return;
+        }
+
+        // Exibir confirmação com SweetAlert2
+        Swal.fire({
+            title: 'Tem certeza?',
+            text: "Tem certeza de que deseja cancelar esta Ordem de Serviço? Esta ação não pode ser desfeita.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sim, cancelar',
+            cancelButtonText: 'Não, manter'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Realizar o cancelamento da OS
+                $.ajax({
+                    url: 'cancelar_os.php',
+                    type: 'POST',
+                    data: {
+                        os_id: <?php echo $os_id; ?>
+                    },
+                    success: function(response) {
+                        try {
+                            response = JSON.parse(response);
+                            if (response.success) {
+                                exibirMensagem('Ordem de Serviço cancelada com sucesso!', 'success');
+                                window.location.reload();
+                            } else {
+                                exibirMensagem('Erro ao cancelar a Ordem de Serviço.', 'error');
+                            }
+                        } catch (e) {
+                            exibirMensagem('Erro ao processar resposta do servidor.', 'error');
+                        }
+                    },
+                    error: function() {
+                        exibirMensagem('Erro ao cancelar a Ordem de Serviço.', 'error');
+                    }
+                });
+            }
+        });
+    }
+
 </script>
 <?php
 include(__DIR__ . '/../rodape.php');

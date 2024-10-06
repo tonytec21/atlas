@@ -14,6 +14,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         .table th:nth-child(5), .table td:nth-child(5), /* Data do Ato */
         .table th:nth-child(12), .table td:nth-child(12) /* Ações */ {
@@ -207,7 +208,7 @@ include(__DIR__ . '/../menu.php');
         </div>
     </div>
 
-    <!-- Modal de confirmação de exclusão -->
+    <!-- Modal de confirmação de exclusão
     <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -226,12 +227,13 @@ include(__DIR__ . '/../menu.php');
                 </div>
             </div>
         </div>
-    </div>
+    </div> -->
 
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/jquery-3.6.0.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
         function normalizeText(text) {
             if (typeof text !== 'string') {
@@ -338,7 +340,7 @@ include(__DIR__ . '/../menu.php');
                                     '<td>' +
                                         '<button class="btn btn-info btn-sm visualizar-anexos" data-id="' + ato.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button> ' +
                                         '<button class="btn btn-edit btn-sm editar-ato" data-id="' + ato.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
-                                        '<button class="btn btn-delete btn-sm excluir-ato" data-id="' + ato.id + '" data-toggle="modal" data-target="#confirmDeleteModal"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
+                                        '<button class="btn btn-delete btn-sm excluir-ato" data-id="' + ato.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
                                     '</td>' +
                                     '</tr>';
                                     tableBody.append(row);
@@ -417,26 +419,46 @@ include(__DIR__ . '/../menu.php');
                 });
             });
 
-            // Excluir ato
-            var atoIdToDelete;
+            // Excluir ato com SweetAlert2
             $(document).on('click', '.excluir-ato', function() {
-                atoIdToDelete = $(this).data('id');
+                var atoIdToDelete = $(this).data('id');
+
+                Swal.fire({
+                    title: 'Tem certeza?',
+                    text: "Você realmente deseja excluir este ato?",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Sim, excluir',
+                    cancelButtonText: 'Não, cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Se o usuário confirmar, prossegue com a exclusão
+                        $.ajax({
+                            url: 'delete_ato.php',
+                            method: 'POST',
+                            data: { id: atoIdToDelete },
+                            success: function(response) {
+                                Swal.fire(
+                                    'Excluído!',
+                                    'Ato movido para a lixeira com sucesso.',
+                                    'success'
+                                );
+                                location.reload();
+                            },
+                            error: function() {
+                                Swal.fire(
+                                    'Erro!',
+                                    'Houve um problema ao tentar mover o ato para a lixeira.',
+                                    'error'
+                                );
+                            }
+                        });
+                    }
+                });
             });
 
-            $('#confirm-delete-button').on('click', function() {
-                if (atoIdToDelete) {
-                    $.ajax({
-                        url: 'delete_ato.php',
-                        method: 'POST',
-                        data: { id: atoIdToDelete },
-                        success: function(response) {
-                            $('#confirmDeleteModal').modal('hide');
-                            alert('Ato movido para a lixeira com sucesso');
-                            location.reload();
-                        }
-                    });
-                }
-            });
 
             // Editar ato
             $(document).on('click', '.editar-ato', function() {

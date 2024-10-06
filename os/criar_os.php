@@ -14,6 +14,7 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         .btn-adicionar-manual {
             height: 38px; /* mesma altura do botão Buscar Ato */
@@ -194,7 +195,8 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
-<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+<script src="../script/jquery-ui.min.js"></script>
+<script src="../script/sweetalert2.js"></script>
 <script>
     $(document).ready(function() {
     // Inicializa a funcionalidade de arrastar e soltar na tabela de itens
@@ -239,14 +241,16 @@ include(__DIR__ . '/../menu.php');
 
 // Função para exibir modal de alerta
 function showAlert(message, type) {
-    $('#alertModalBody').text(message);
-    if (type === 'error') {
-        $('#alertModalHeader').removeClass('success').addClass('error');
-    } else if (type === 'success') {
-        $('#alertModalHeader').removeClass('error').addClass('success');
-    }
-    $('#alertModal').modal('show');
+    let iconType = type === 'error' ? 'error' : 'success';
+
+    Swal.fire({
+        icon: iconType,
+        title: type === 'error' ? 'Erro!' : 'Sucesso!',
+        text: message,
+        confirmButtonText: 'OK'
+    });
 }
+
 
 $(document).ready(function() {
     // Carregar o modo do usuário

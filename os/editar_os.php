@@ -87,6 +87,7 @@ try {
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         .btn-adicionar-manual {
             height: 38px; /* mesma altura do botão Buscar Ato */
@@ -323,7 +324,8 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/jquery.mask.min.js"></script>
 <script src="../script/jquery.dataTables.min.js"></script>
 <script src="../script/dataTables.bootstrap4.min.js"></script>
-<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+<script src="../script/jquery-ui.min.js"></script>
+<script src="../script/sweetalert2.js"></script>
 <script>
     $(function() {
     // Tornar as linhas da tabela arrastáveis
@@ -364,20 +366,20 @@ function salvarOrdemExibicao() {
 
 // Função para exibir modal de alerta
 function showAlert(message, type, reload = false) {
-    $('#alertModalBody').text(message);
-    if (type === 'error') {
-        $('#alertModalHeader').removeClass('success').addClass('error');
-    } else if (type === 'success') {
-        $('#alertModalHeader').removeClass('error').addClass('success');
-    }
-    $('#alertModal').modal('show');
+    let iconType = type === 'error' ? 'error' : 'success';
 
-    if (reload) {
-        $('#alertModal').on('hidden.bs.modal', function () {
+    Swal.fire({
+        icon: iconType,
+        title: type === 'error' ? 'Erro!' : 'Sucesso!',
+        text: message,
+        confirmButtonText: 'OK'
+    }).then(() => {
+        if (reload) {
             location.reload();
-        });
-    }
+        }
+    });
 }
+
 
     // Inicializar DataTable
     $('#tabelaItensOS').DataTable({
@@ -702,40 +704,77 @@ function removerItem(button) {
     var status = row.data('status');
 
     if (status === 'liquidado parcialmente') {
-        showAlert('Não é permitido remover um item parcialmente liquidado.', 'error');
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro!',
+            text: 'Não é permitido remover um item parcialmente liquidado.',
+            confirmButtonText: 'OK'
+        });
         return;
     }
 
-    if (confirm('Você tem certeza que deseja remover este item?')) {
-        $.ajax({
-            url: 'remover_item.php',
-            type: 'POST',
-            data: {
-                item_id: itemId
-            },
-            success: function(response) {
-                try {
-                    var res = JSON.parse(response);
-                    if (res.error) {
-                        showAlert(res.error, 'error');
-                    } else {
-                        showAlert('Item removido com sucesso!', 'success');
-                        row.remove(); // Remove a linha da tabela
-                        calcularTotalOS(); // Recalcula o total da OS após remoção
+    Swal.fire({
+        title: 'Você tem certeza?',
+        text: 'Deseja realmente remover este item?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sim, remover!',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: 'remover_item.php',
+                type: 'POST',
+                data: {
+                    item_id: itemId
+                },
+                success: function(response) {
+                    try {
+                        var res = JSON.parse(response);
+                        if (res.error) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: res.error,
+                                confirmButtonText: 'OK'
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Item removido com sucesso!',
+                                confirmButtonText: 'OK'
+                            });
+                            row.remove(); // Remove a linha da tabela
+                            calcularTotalOS(); // Recalcula o total da OS após remoção
+                        }
+                    } catch (e) {
+                        console.log('Erro ao processar a resposta: ', e);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao processar a resposta do servidor.',
+                            confirmButtonText: 'OK'
+                        });
                     }
-                } catch (e) {
-                    console.log('Erro ao processar a resposta: ', e);
-                    showAlert('Erro ao processar a resposta do servidor.', 'error');
+                },
+                error: function(xhr, status, error) {
+                    console.log('Erro:', error);
+                    console.log('Resposta do servidor:', xhr.responseText);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao remover o item',
+                        confirmButtonText: 'OK'
+                    });
                 }
-            },
-            error: function(xhr, status, error) {
-                console.log('Erro:', error);
-                console.log('Resposta do servidor:', xhr.responseText);
-                showAlert('Erro ao remover o item', 'error');
-            }
-        });
-    }
+            });
+        }
+    });
 }
+
 
 function calcularTotalOS() {
     var totalOS = 0;
@@ -760,14 +799,29 @@ function calcularTotalOS() {
             try {
                 var res = JSON.parse(response);
                 if (res.error) {
-                    showAlert(res.error, 'error');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: res.error,
+                        confirmButtonText: 'OK'
+                    });
                 }
             } catch (e) {
-                showAlert('Erro ao processar a resposta do servidor.', 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: 'Erro ao processar a resposta do servidor.',
+                    confirmButtonText: 'OK'
+                });
             }
         },
         error: function(xhr, status, error) {
-            showAlert('Erro ao atualizar o total da OS', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: 'Erro ao atualizar o total da OS',
+                confirmButtonText: 'OK'
+            });
         }
     });
 }

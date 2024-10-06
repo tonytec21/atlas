@@ -2,15 +2,21 @@
 include(__DIR__ . '/db_connection.php');
 
 // Obter os dados do formulário
-$guiaId = isset($_POST['guiaId']) ? $_POST['guiaId'] : '';
-$cliente = isset($_POST['cliente']) ? $_POST['cliente'] : '';
-$documentoApresentante = isset($_POST['documentoApresentante']) ? $_POST['documentoApresentante'] : '';
-$documentosRecebidos = isset($_POST['documentosRecebidos']) ? $_POST['documentosRecebidos'] : '';
-$observacoes = isset($_POST['observacoes']) ? $_POST['observacoes'] : '';
+$guiaId = isset($_POST['guiaId']) ? trim($_POST['guiaId']) : '';
+$cliente = isset($_POST['cliente']) ? trim($_POST['cliente']) : '';
+$documentoApresentante = isset($_POST['documentoApresentante']) ? trim($_POST['documentoApresentante']) : '';
+$documentosRecebidos = isset($_POST['documentosRecebidos']) ? trim($_POST['documentosRecebidos']) : '';
+$observacoes = isset($_POST['observacoes']) ? trim($_POST['observacoes']) : '';
 
 // Verificar se o ID da guia foi fornecido
 if (empty($guiaId)) {
     echo json_encode(['success' => false, 'message' => 'ID da guia não fornecido.']);
+    exit;
+}
+
+// Verificar se os campos obrigatórios foram preenchidos
+if (empty($cliente) || empty($documentosRecebidos)) {
+    echo json_encode(['success' => false, 'message' => 'Campos obrigatórios não preenchidos.']);
     exit;
 }
 

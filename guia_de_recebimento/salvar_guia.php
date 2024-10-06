@@ -28,10 +28,16 @@ if ($result->num_rows > 0) {
 // Verificar se os dados foram enviados via POST
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Capturar os dados do formulário
-    $cliente = $_POST['cliente'];
-    $documentoApresentante = $_POST['documentoApresentante']; // Novo campo
-    $documentosRecebidos = $_POST['documentosRecebidos'];
-    $observacoes = isset($_POST['observacoes']) ? $_POST['observacoes'] : '';
+    $cliente = trim($_POST['cliente']);
+    $documentoApresentante = trim($_POST['documentoApresentante']); // Novo campo
+    $documentosRecebidos = trim($_POST['documentosRecebidos']);
+    $observacoes = isset($_POST['observacoes']) ? trim($_POST['observacoes']) : '';
+
+    // Verificar se os campos obrigatórios foram preenchidos
+    if (empty($cliente) || empty($documentosRecebidos)) {
+        echo json_encode(['success' => false, 'message' => 'Campos obrigatórios não preenchidos.']);
+        exit;
+    }
 
     // Capturar a data e hora atual para "data_recebimento" e "data_cadastro"
     $dataAtual = date('Y-m-d H:i:s');

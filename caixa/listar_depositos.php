@@ -13,9 +13,10 @@ try {
     $conn = getDatabaseConnection();
 
     // Seleciona os depósitos
-    $sql = 'SELECT funcionario, data_caixa, data_cadastro, valor_do_deposito, tipo_deposito, caminho_anexo
-            FROM deposito_caixa
-            WHERE ' . ($tipo === 'unificado' ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_caixa) = :data AND status = "ativo"';
+    $sql = 'SELECT id, funcionario, data_caixa, data_cadastro, valor_do_deposito, tipo_deposito, caminho_anexo
+        FROM deposito_caixa
+        WHERE ' . ($tipo === 'unificado' ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_caixa) = :data AND status = "ativo"';
+
     $stmt = $conn->prepare($sql);
     if ($tipo !== 'unificado') {
         $stmt->bindParam(':funcionario', $funcionarios);

@@ -16,6 +16,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         /* Remover a borda de foco no botão de fechar */
         .btn-close {
@@ -49,11 +50,22 @@ date_default_timezone_set('America/Sao_Paulo');
             <hr>
             <form id="searchForm">
     <div class="form-row">
-        <div class="form-group col-md-4">
+        <!-- Campo para Número da Guia -->
+        <div class="form-group col-md-1">
+            <label for="numeroGuia">Nº Guia:</label>
+            <input type="text" class="form-control" id="numeroGuia" name="numeroGuia" placeholder="Digite o Nº da Guia">
+        </div>
+
+        <!-- Campo para Número da Tarefa -->
+        <div class="form-group col-md-1">
+            <label for="numeroTarefa">Nº Tarefa:</label>
+            <input type="text" class="form-control" id="numeroTarefa" name="numeroTarefa" placeholder="Digite o Nº da Tarefa">
+        </div>
+        <div class="form-group col-md-3">
             <label for="cliente">Apresentante:</label>
             <input type="text" class="form-control" id="cliente" name="cliente" placeholder="Nome do Cliente">
         </div>
-        <div class="form-group col-md-3">
+        <div class="form-group col-md-2">
             <label for="documentoApresentante">CPF/CNPJ:</label>
             <input type="text" class="form-control" id="documentoApresentante" name="documentoApresentante" placeholder="Digite o CPF ou CNPJ">
         </div>
@@ -332,6 +344,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var deadlineInput = document.getElementById('deadline');
@@ -365,7 +378,7 @@ date_default_timezone_set('America/Sao_Paulo');
 
                 console.log(formData); // Verifique no console se o CPF/CNPJ está sendo enviado corretamente
 
-                var hasFilters = $('#cliente').val() || $('#funcionario').val() || $('#dataRecebimento').val() || $('#documentoApresentante').val();
+                var hasFilters = $('#cliente').val() || $('#funcionario').val() || $('#dataRecebimento').val() || $('#documentoApresentante').val()|| $('#numeroGuia').val() || $('#numeroTarefa').val();
 
                 if (!hasFilters) {
                     loadGuias('all');  // Se nenhum filtro foi aplicado, carregar todos os dados
@@ -532,14 +545,27 @@ date_default_timezone_set('America/Sao_Paulo');
                 },
                 success: function(response) {
                     $('#vincularTarefaModal').modal('hide'); // Fecha o modal após a operação
-                    alert(response); // Exibe a resposta da operação
-                    location.reload(); // Recarrega a página para refletir as alterações
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: response,
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        location.reload(); // Recarrega a página para refletir as alterações
+                    });
                 },
-                error: function(error) {
-                    alert('Erro ao vincular tarefa.');
+                error: function() {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao vincular tarefa.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             });
         }
+
 
         $(document).ready(function() {
             $('#salvarGuiaBtn').click(function() {
@@ -557,16 +583,35 @@ date_default_timezone_set('America/Sao_Paulo');
                             
                             // Abrir a guia de impressão em uma nova aba
                             window.open(response.url, '_blank');
+                            
+                            // Exibir mensagem de sucesso
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Guia de recebimento salva com sucesso!',
+                                confirmButtonText: 'OK'
+                            });
                         } else {
-                            alert('Erro: ' + response.message);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: 'Erro: ' + response.message,
+                                confirmButtonText: 'OK'
+                            });
                         }
                     },
                     error: function() {
-                        alert('Erro ao salvar a guia de recebimento.');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao salvar a guia de recebimento.',
+                            confirmButtonText: 'OK'
+                        });
                     }
                 });
             });
         });
+
 
         $(document).ready(function() {
             $('#modalCriarGuia').on('hidden.bs.modal', function () {
@@ -594,14 +639,25 @@ date_default_timezone_set('America/Sao_Paulo');
                         // Abrir o modal
                         $('#modalEditarGuia').modal('show');
                     } else {
-                        alert('Erro ao buscar os dados da guia: ' + response.message);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao buscar os dados da guia: ' + response.message,
+                            confirmButtonText: 'OK'
+                        });
                     }
                 },
                 error: function() {
-                    alert('Erro ao buscar os dados da guia.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao buscar os dados da guia.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             });
         }
+
 
     // Salvar as alterações do guia
     $(document).ready(function() {
@@ -618,18 +674,37 @@ date_default_timezone_set('America/Sao_Paulo');
                         // Fechar o modal
                         $('#modalEditarGuia').modal('hide');
                         
-                        // Recarregar os dados
-                        location.reload();
+                        // Exibir mensagem de sucesso
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Alterações salvas com sucesso!',
+                            confirmButtonText: 'OK'
+                        }).then(() => {
+                            // Recarregar os dados
+                            location.reload();
+                        });
                     } else {
-                        alert('Erro: ' + response.message);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro: ' + response.message,
+                            confirmButtonText: 'OK'
+                        });
                     }
                 },
                 error: function() {
-                    alert('Erro ao salvar as alterações da guia.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao salvar as alterações da guia.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             });
         });
     });
+
 
     $(document).ready(function() {
         // Função para aplicar a máscara de CPF/CNPJ
@@ -651,11 +726,17 @@ date_default_timezone_set('America/Sao_Paulo');
                     $(this).val(valor).mask('00.000.000/0000-00');
                 } else {
                     // Se o valor não tiver 11 ou 14 dígitos, limpa o campo ou mostra uma mensagem
-                    alert('Por favor, insira um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Por favor, insira um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.',
+                        confirmButtonText: 'OK'
+                    });
                     $(this).val('');
                 }
             });
         }
+
 
         // Aplicar a máscara ao campo CPF/CNPJ no modal "Criar Guia"
         aplicarMascaraCPF_CNPJ('#documentoApresentante');
@@ -663,6 +744,29 @@ date_default_timezone_set('America/Sao_Paulo');
         // Aplicar a máscara ao campo CPF/CNPJ no modal "Editar Guia"
         aplicarMascaraCPF_CNPJ('#editarDocumentoApresentante');
     });
+
+    // Botão Salvar Guia
+    document.getElementById('salvarGuiaBtn').addEventListener('click', function() {
+        let form = document.getElementById('formCriarGuia');
+        if (form.checkValidity()) {
+            // Salvar os dados
+            form.submit();
+        } else {
+            form.reportValidity(); // Exibe os avisos de campos obrigatórios
+        }
+    });
+
+    // Botão Salvar Alterações
+    document.getElementById('salvarEdicaoGuiaBtn').addEventListener('click', function() {
+        let form = document.getElementById('formEditarGuia');
+        if (form.checkValidity()) {
+            // Salvar as alterações
+            form.submit();
+        } else {
+            form.reportValidity(); // Exibe os avisos de campos obrigatórios
+        }
+    });
+
 
     </script>
 

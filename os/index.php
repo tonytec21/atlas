@@ -17,6 +17,28 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
+        .situacao-ativo {
+            background-color: #28a745; /* Verde */
+            color: white;
+            width: 80px;
+            text-align: center;
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-block;
+            font-size: 13px;
+        }
+
+        .situacao-cancelado {
+            background-color: #dc3545; /* Vermelho */
+            color: white;
+            width: 80px;
+            text-align: center;
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-block;
+            font-size: 13px;
+        }
+
         /* Remover a borda de foco no botão de fechar */
         .btn-close {
             outline: none; /* Remove a borda ao clicar */
@@ -168,7 +190,7 @@ include(__DIR__ . '/db_connection.php');
                         <label for="os_id">Nº OS:</label>
                         <input type="number" class="form-control" id="os_id" name="os_id" min="1">
                     </div>
-                    <div class="form-group col-md-3">
+                    <div class="form-group col-md-2">
                         <label for="cliente">Apresentante:</label>
                         <input type="text" class="form-control" id="cliente" name="cliente">
                     </div>
@@ -180,7 +202,7 @@ include(__DIR__ . '/db_connection.php');
                         <label for="total_os">Valor Total:</label>
                         <input type="text" class="form-control" id="total_os" name="total_os">
                     </div>
-                    <div class="form-group col-md-3">
+                    <div class="form-group col-md-2">
                         <label for="funcionario">Funcionário:</label>
                         <select class="form-control" id="funcionario" name="funcionario">
                             <option value="">Selecione o Funcionário</option>
@@ -192,6 +214,14 @@ include(__DIR__ . '/db_connection.php');
                                 echo '<option value="' . $funcionario['criado_por'] . '">' . $funcionario['criado_por'] . '</option>';
                             }
                             ?>
+                        </select>
+                    </div>
+                    <div class="form-group col-md-2">
+                        <label for="situacao">Situação:</label>
+                        <select class="form-control" id="situacao" name="situacao">
+                            <option value="">Selecione a Situação</option>
+                            <option value="Ativo">Ativo</option>
+                            <option value="Cancelado">Cancelado</option>
                         </select>
                     </div>
                 </div>
@@ -245,6 +275,7 @@ include(__DIR__ . '/db_connection.php');
                             <th style="width: 12%;">Observações</th>
                             <th>Data</th>
                             <th>Status</th>
+                            <th style="width: 5%;">Situação</th>
                             <th style="width: 9%;">Ações</th>
                         </tr>
                     </thead>
@@ -294,6 +325,11 @@ include(__DIR__ . '/db_connection.php');
                             $params[':funcionario'] = $_GET['funcionario'];
                             $filtered = true;
                         }
+                        if (!empty($_GET['situacao'])) {
+                            $conditions[] = 'status = :situacao';
+                            $params[':situacao'] = $_GET['situacao'];
+                            $filtered = true;
+                        }                        
                         if (!empty($_GET['descricao_os'])) {
                             $conditions[] = 'descricao_os LIKE :descricao_os';
                             $params[':descricao_os'] = '%' . $_GET['descricao_os'] . '%';
@@ -386,6 +422,11 @@ include(__DIR__ . '/db_connection.php');
                                 <td><?php echo strlen($ordem['observacoes']) > 100 ? substr($ordem['observacoes'], 0, 100) . '...' : $ordem['observacoes']; ?></td>
                                 <td data-order="<?php echo date('Y-m-d', strtotime($ordem['data_criacao'])); ?>"><?php echo date('d/m/Y', strtotime($ordem['data_criacao'])); ?></td>
                                 <td><span style="font-size: 13px" class="status-label <?php echo $statusClasses[$statusOS]; ?>"><?php echo $statusOS; ?></span></td>
+                                <td>
+                                    <span class="<?php echo $ordem['status'] === 'Ativo' ? 'situacao-ativo' : 'situacao-cancelado'; ?>">
+                                        <?php echo $ordem['status']; ?>
+                                    </span>
+                                </td>
                                 <td>
                                     <button class="btn btn-info btn-sm" title="Visualizar OS" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('visualizar_os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <button class="btn btn-success btn-sm" title="Pagamentos e Devoluções" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')"><i class="fa fa-money" aria-hidden="true"></i></button>

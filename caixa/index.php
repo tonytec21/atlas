@@ -16,6 +16,7 @@ include(__DIR__ . '/db_connection.php');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         .btn-4 {
             background: #34495e;
@@ -783,7 +784,7 @@ include(__DIR__ . '/db_connection.php');
 
     <!-- Modal de Cadastro de Saídas -->
     <div class="modal fade" id="cadastroSaidaModal" tabindex="-1" role="dialog" aria-labelledby="cadastroSaidaModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 60%">
             <div class="modal-content modal-saidas">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -794,13 +795,15 @@ include(__DIR__ . '/db_connection.php');
                     </div>
                     <div class="modal-body">
                         <form id="formCadastroSaida" enctype="multipart/form-data">
-                            <div class="form-group">
-                                <label for="titulo">Título</label>
-                                <input type="text" class="form-control" id="titulo" name="titulo" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="valor_saida">Valor da Saída</label>
-                                <input type="text" class="form-control" id="valor_saida" name="valor_saida" required>
+                            <div class="form-row">
+                                <div class="form-group col-md-8">
+                                    <label for="titulo">Título</label>
+                                    <input type="text" class="form-control" id="titulo" name="titulo" required>
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label for="valor_saida">Valor da Saída</label>
+                                    <input type="text" class="form-control" id="valor_saida" name="valor_saida" required>
+                                </div>
                             </div>
                             <div class="form-group" style="display: none;">
                                 <label for="forma_de_saida">Forma de Saída</label>
@@ -842,7 +845,7 @@ include(__DIR__ . '/db_connection.php');
 
     <!-- Modal de Cadastro de Depósito -->
     <div class="modal fade" id="cadastroDepositoModal" tabindex="-1" role="dialog" aria-labelledby="cadastroDepositoModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content modal-deposito-caixa">
                 <div class="modal-header">
                     <h5 class="modal-title" id="cadastroDepositoModalLabel">Cadastrar Depósito do Caixa</h5>
@@ -887,6 +890,7 @@ include(__DIR__ . '/db_connection.php');
                             <div class="form-group col-md-6">
                                 <label for="tipo_deposito">Tipo de Depósito</label>
                                 <select class="form-control" id="tipo_deposito" name="tipo_deposito" required>
+                                    <option value="" disabled selected>Selecione</option>
                                     <option value="Depósito Bancário">Depósito Bancário</option>
                                     <option value="Espécie">Espécie</option>
                                     <option value="Transferência">Transferência</option>
@@ -989,6 +993,7 @@ include(__DIR__ . '/db_connection.php');
     <script src="../script/jquery.mask.min.js"></script>
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
         $(document).ready(function() {
             // Inicializar DataTable
@@ -1019,45 +1024,93 @@ include(__DIR__ . '/db_connection.php');
                     dataType: 'json',
                     success: function(response) {
                         if (response.success) {
-                            alert('Saída cadastrada com sucesso!');
-                            $('#cadastroSaidaModal').modal('hide');
-                            location.reload();
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Saída cadastrada com sucesso!',
+                                confirmButtonText: 'OK'
+                            }).then(() => {
+                                $('#cadastroSaidaModal').modal('hide');
+                                location.reload();
+                            });
                         } else {
-                            alert('Erro ao cadastrar saída: ' + response.error);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: 'Erro ao cadastrar saída: ' + response.error,
+                                confirmButtonText: 'OK'
+                            });
                         }
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
-                        alert('Erro ao cadastrar saída: ' + textStatus + ' - ' + errorThrown);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao cadastrar saída: ' + textStatus + ' - ' + errorThrown,
+                            confirmButtonText: 'OK'
+                        });
                     }
                 });
             });
+
 
             // Evento de submissão do formulário de depósito
             $('#formCadastroDeposito').on('submit', function(e) {
                 e.preventDefault();
 
-                var formData = new FormData(this);
-                $.ajax({
-                    url: 'salvar_deposito.php',
-                    type: 'POST',
-                    data: formData,
-                    contentType: false,
-                    processData: false,
-                    dataType: 'json',
-                    success: function(response) {
-                        if (response.success) {
-                            alert('Depósito cadastrado com sucesso!');
-                            $('#cadastroDepositoModal').modal('hide');
-                            location.reload();
-                        } else {
-                            alert('Erro ao cadastrar depósito: ' + response.error);
-                        }
-                    },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        alert('Erro ao cadastrar depósito: ' + textStatus + ' - ' + errorThrown);
+                // Solicitar confirmação do usuário
+                Swal.fire({
+                    title: 'Você tem certeza?',
+                    text: 'Deseja realmente inserir este Depósito/Repasse?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Sim, inserir',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        var formData = new FormData(this);
+                        $.ajax({
+                            url: 'salvar_deposito.php',
+                            type: 'POST',
+                            data: formData,
+                            contentType: false,
+                            processData: false,
+                            dataType: 'json',
+                            success: function(response) {
+                                if (response.success) {
+                                    Swal.fire({
+                                        icon: 'success',
+                                        title: 'Sucesso!',
+                                        text: 'Depósito cadastrado com sucesso!',
+                                        confirmButtonText: 'OK'
+                                    }).then(() => {
+                                        $('#cadastroDepositoModal').modal('hide');
+                                        location.reload();
+                                    });
+                                } else {
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Erro!',
+                                        text: 'Erro ao cadastrar depósito: ' + response.error,
+                                        confirmButtonText: 'OK'
+                                    });
+                                }
+                            },
+                            error: function(jqXHR, textStatus, errorThrown) {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro!',
+                                    text: 'Erro ao cadastrar depósito: ' + textStatus + ' - ' + errorThrown,
+                                    confirmButtonText: 'OK'
+                                });
+                            }
+                        });
                     }
                 });
             });
+
 
             // Carregar Saídas/Despesas no Modal
             $('#cadastroSaidaModal').on('shown.bs.modal', function () {
@@ -1483,12 +1536,22 @@ include(__DIR__ . '/db_connection.php');
                 dataType: 'json',
                 success: function(response) {
                     if (response.error) {
-                        alert('Erro: ' + response.error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: response.error,
+                            confirmButtonText: 'OK'
+                        });
                         return;
                     }
 
                     if (!Array.isArray(response.depositos)) {
-                        alert('Erro: Dados de depósitos inválidos');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Dados de depósitos inválidos',
+                            confirmButtonText: 'OK'
+                        });
                         return;
                     }
 
@@ -1506,10 +1569,15 @@ include(__DIR__ . '/db_connection.php');
                                 <td>${deposito.tipo_deposito}</td>
                                 <td>
                                     <button title="Visualizar" class="btn btn-info btn-sm" onclick="visualizarComprovante('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                    <button title="Remover" style="margin-bottom: 5px !important;" class="btn btn-delete btn-sm" onclick="removerDeposito(${deposito.id})"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                                    <button title="Remover" style="margin-bottom: 5px !important;" class="btn btn-delete btn-sm" data-id="${deposito.id ? deposito.id : 'undefined'}" onclick="removerDeposito(this)"><i class="fa fa-trash" aria-hidden="true"></i></button>
                                 </td>
                             </tr>
                         `);
+
+                        console.log('ID do depósito ao criar botão:', deposito.id);
+
+
+
                     });
 
                     var saldoInicial = parseFloat(response.saldoInicial);
@@ -1548,10 +1616,16 @@ include(__DIR__ . '/db_connection.php');
                     });
                 },
                 error: function() {
-                    alert('Erro ao obter depósitos.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao obter depósitos.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             });
         }
+
 
         function carregarDepositosCaixaUnificado(data) {
             $.ajax({
@@ -1647,31 +1721,85 @@ include(__DIR__ . '/db_connection.php');
             return `${day}-${month}-${year}`;
         }
 
-        function removerDeposito(id) {
-            if (confirm('Deseja realmente remover este depósito?')) {
-                $.post('remover_deposito.php', { id: id }, function(response) {
-                    if (response.success) {
-                        alert('Depósito removido com sucesso!');
-                        location.reload();
-                    } else {
-                        alert('Erro ao remover depósito.');
-                    }
-                }, 'json');
+        function removerDeposito(button) {
+            var id = $(button).attr('data-id'); // Alterar para 'attr' em vez de 'data' para garantir a leitura
+            console.log('ID do depósito a ser removido:', id); // Log do ID
+
+            if (!id || id === 'undefined') {
+                console.error('ID do depósito a ser removido é indefinido.');
+                return;
             }
+
+            Swal.fire({
+                title: 'Deseja realmente remover este depósito?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, remover!',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    console.log('ID do depósito enviado para remoção:', id); // Log do ID
+                    $.post('remover_deposito.php', { id: id }, function(response) {
+                        console.log('Resposta do servidor:', response); // Log da resposta do servidor
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Depósito removido com sucesso!',
+                                confirmButtonText: 'OK'
+                            }).then(() => {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: response.error || 'Erro ao remover depósito.',
+                                confirmButtonText: 'OK'
+                            });
+                        }
+                    }, 'json');
+                }
+            });
         }
 
+
         function removerSaida(id) {
-            if (confirm('Deseja realmente remover esta saída/despesa?')) {
-                $.post('update_saida.php', { id: id, status: 'removido' }, function(response) {
-                    if (response.success) {
-                        alert('Saída/Despesa removida com sucesso!');
-                        location.reload();
-                    } else {
-                        alert('Erro ao remover saída/despesa.');
-                    }
-                }, 'json');
-            }
+            Swal.fire({
+                title: 'Deseja realmente remover esta saída/despesa?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, remover!',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.post('update_saida.php', { id: id, status: 'removido' }, function(response) {
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Saída/Despesa removida com sucesso!',
+                                confirmButtonText: 'OK'
+                            }).then(() => {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: 'Erro ao remover saída/despesa.',
+                                confirmButtonText: 'OK'
+                            });
+                        }
+                    }, 'json');
+                }
+            });
         }
+
 
         function verDepositosCaixa(data) {
             carregarDepositosCaixaUnificado(data);
@@ -1684,33 +1812,61 @@ include(__DIR__ . '/db_connection.php');
         }
 
         function transportarSaldoFecharCaixa() {
-            var totalEmCaixa = $('#total_em_caixa').text().replace('.', '').replace(',', '.');
-            var dataCaixa = $('#data_caixa_deposito').val();
-            var funcionario = $('#funcionario_deposito').val();
+            // Exibe o alerta de confirmação com SweetAlert2
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: "Você realmente deseja fechar o caixa e transportar o saldo para o caixa seguinte?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, fechar caixa',
+                cancelButtonText: 'Não, cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Se o usuário confirmar, prossegue com o fechamento do caixa
+                    var totalEmCaixa = $('#total_em_caixa').text().replace('.', '').replace(',', '.');
+                    var dataCaixa = $('#data_caixa_deposito').val();
+                    var funcionario = $('#funcionario_deposito').val();
 
-            $.ajax({
-                url: 'transportar_saldo_fechar_caixa.php',
-                type: 'POST',
-                data: {
-                    total_em_caixa: totalEmCaixa,
-                    data_caixa: dataCaixa,
-                    funcionario: funcionario
-                },
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        alert('Saldo transportado e caixa fechado com sucesso!');
-                        $('#cadastroDepositoModal').modal('hide');
-                        location.reload();
-                    } else {
-                        alert('Erro ao transportar saldo e fechar caixa: ' + response.error);
-                    }
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    alert('Erro ao transportar saldo e fechar caixa: ' + textStatus + ' - ' + errorThrown);
+                    $.ajax({
+                        url: 'transportar_saldo_fechar_caixa.php',
+                        type: 'POST',
+                        data: {
+                            total_em_caixa: totalEmCaixa,
+                            data_caixa: dataCaixa,
+                            funcionario: funcionario
+                        },
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                Swal.fire(
+                                    'Sucesso!',
+                                    'Saldo transportado e caixa fechado com sucesso!',
+                                    'success'
+                                );
+                                $('#cadastroDepositoModal').modal('hide');
+                                location.reload();
+                            } else {
+                                Swal.fire(
+                                    'Erro!',
+                                    'Erro ao transportar saldo e fechar caixa: ' + response.error,
+                                    'error'
+                                );
+                            }
+                        },
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            Swal.fire(
+                                'Erro!',
+                                'Erro ao transportar saldo e fechar caixa: ' + textStatus + ' - ' + errorThrown,
+                                'error'
+                            );
+                        }
+                    });
                 }
             });
         }
+
 
         // Adicionar evento para recarregar a página ao fechar os modais
         $('#detalhesModal').on('hidden.bs.modal', function () {

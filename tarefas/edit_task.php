@@ -96,6 +96,7 @@ while ($row = $result->fetch_assoc()) {
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/toastr.min.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         .comment-bubble {
             position: relative;
@@ -237,6 +238,12 @@ include(__DIR__ . '/../menu.php');
                 <label for="description">Descrição:</label>
                 <textarea class="form-control" id="description" name="description" rows="5"><?php echo htmlspecialchars($taskData['descricao']); ?></textarea>
             </div>
+            <div class="form-group">
+                <input type="file" id="attachments" name="attachments[]" multiple class="form-control-file">
+            </div>
+            <button type="submit" style="margin-top: 1px!important;margin-bottom: 30px!important;" class="btn btn-primary w-100">Salvar Tarefa</button>
+        </form>
+        <hr>
         <h4>Anexos</h4>
         <div id="viewAttachments" class="list-group">
             <?php
@@ -252,18 +259,12 @@ include(__DIR__ . '/../menu.php');
             <?php endforeach; endif; ?>
         </div>
         <hr>
-            <div class="form-group">
-                <input type="file" id="attachments" name="attachments[]" multiple class="form-control-file">
-            </div>
-            <button type="submit" style="margin-top: 1px!important;margin-bottom: 30px!important;" class="btn btn-primary w-100">Salvar Tarefa</button>
-        </form>
-        <hr>
         <h4>Timeline</h4>
         <div id="commentTimeline" class="timeline">
             <?php if (!empty($comments)) : ?>
                 <?php foreach ($comments as $comment) : ?>
                     <div class="timeline-item">
-                        <div class="timeline-badge primary"><i class="mdi mdi-comment"></i></div>
+                        <div class="timeline-badge primary"><i class="fa fa-commenting-o" aria-hidden="true"></i></div>
                         <div class="timeline-panel">
                             <div class="timeline-heading">
                                 <h6 class="timeline-title"><?php echo htmlspecialchars($comment['funcionario'] ?? 'Desconhecido'); ?> <small><?php $date = new DateTime($comment['data_comentario']); echo $date->format('d/m/Y H:i:s'); ?></small></h6>
@@ -330,6 +331,7 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
 <script src="../script/toastr.min.js"></script>
+<script src="../script/sweetalert2.js"></script>
 <script>
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -367,15 +369,34 @@ include(__DIR__ . '/../menu.php');
                 data: formData,
                 processData: false,
                 contentType: false,
+                dataType: 'json', // Espera um JSON como resposta
                 success: function(response) {
-                    alert(response);
-                    location.reload();
+                    if (response.status === 'success') {
+                        Swal.fire({
+                            title: 'Sucesso!',
+                            text: response.message,
+                            icon: 'success'
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            title: 'Erro!',
+                            text: response.message,
+                            icon: 'error'
+                        });
+                    }
                 },
-                error: function(error) {
-                    alert('Erro ao salvar a tarefa.');
+                error: function() {
+                    Swal.fire({
+                        title: 'Erro!',
+                        text: 'Erro ao salvar a tarefa. Tente novamente.',
+                        icon: 'error'
+                    });
                 }
             });
         });
+
 
 
     $(document).ready(function() {
@@ -414,44 +435,82 @@ include(__DIR__ . '/../menu.php');
         });
 
         $(document).on('click', '.excluir-anexo', function() {
-            if (confirm('Tem certeza que deseja excluir este anexo?')) {
-                var filePath = $(this).data('file');
-                var taskId = '<?php echo $taskId; ?>';
+            Swal.fire({
+                title: 'Tem certeza que deseja excluir este anexo?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, excluir',
+                cancelButtonText: 'Cancelar',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    var filePath = $(this).data('file');
+                    var taskId = '<?php echo $taskId; ?>';
 
-                $.ajax({
-                    url: 'delete_attachment.php',
-                    type: 'POST',
-                    data: { file: filePath, taskId: taskId },
-                    success: function(response) {
-                        alert('Anexo excluído com sucesso');
-                        location.reload();
-                    },
-                    error: function() {
-                        alert('Erro ao excluir o anexo');
-                    }
-                });
-            }
+                    $.ajax({
+                        url: 'delete_attachment.php',
+                        type: 'POST',
+                        data: { file: filePath, taskId: taskId, action: 'delete_attachment' }, // Inclui o campo 'action'
+                        success: function(response) {
+                            Swal.fire(
+                                'Excluído!',
+                                response,
+                                'success'
+                            ).then(() => {
+                                location.reload();
+                            });
+                        },
+                        error: function() {
+                            Swal.fire(
+                                'Erro!',
+                                'Erro ao excluir o anexo.',
+                                'error'
+                            );
+                        }
+                    });
+                }
+            });
         });
+
 
         $(document).on('click', '.excluir-anexo-comentario', function() {
-            if (confirm('Tem certeza que deseja excluir este anexo?')) {
-                var filePath = $(this).data('file');
-                var commentId = $(this).data('comment');
+            Swal.fire({
+                title: 'Tem certeza que deseja excluir este anexo?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, excluir',
+                cancelButtonText: 'Cancelar',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    var filePath = $(this).data('file');
+                    var commentId = $(this).data('comment');
 
-                $.ajax({
-                    url: 'delete_comment_attachment.php',
-                    type: 'POST',
-                    data: { file: filePath, commentId: commentId },
-                    success: function(response) {
-                        alert('Anexo excluído com sucesso');
-                        location.reload();
-                    },
-                    error: function() {
-                        alert('Erro ao excluir o anexo');
-                    }
-                });
-            }
+                    $.ajax({
+                        url: 'delete_comment_attachment.php',
+                        type: 'POST',
+                        data: { file: filePath, commentId: commentId },
+                        success: function(response) {
+                            Swal.fire(
+                                'Excluído!',
+                                'Anexo excluído com sucesso.',
+                                'success'
+                            ).then(() => {
+                                location.reload();
+                            });
+                        },
+                        error: function() {
+                            Swal.fire(
+                                'Erro!',
+                                'Erro ao excluir o anexo.',
+                                'error'
+                            );
+                        }
+                    });
+                }
+            });
         });
+
 
         $(document).on('click', '.editar-comentario', function() {
             var comment = $(this).data('comment');

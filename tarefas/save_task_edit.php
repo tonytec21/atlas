@@ -30,9 +30,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->bind_param('sssssssssi', $title, $category, $origin, $deadline, $employee, $description, $updatedAt, $updatedBy, $nivel_de_prioridade, $taskId);
 
     if ($stmt->execute()) {
-        echo "Tarefa atualizada com sucesso.";
+        // Retornar um JSON para sucesso
+        echo json_encode(['status' => 'success', 'message' => 'Tarefa atualizada com sucesso.']);
     } else {
-        echo "Erro ao atualizar a tarefa: " . $stmt->error;
+        // Retornar um JSON para erro
+        echo json_encode(['status' => 'error', 'message' => 'Erro ao atualizar a tarefa: ' . $stmt->error]);
     }
 
     // Handle file uploads

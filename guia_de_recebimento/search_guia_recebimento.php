@@ -7,8 +7,10 @@ ini_set('display_errors', 1);
 include(__DIR__ . '/db_connection.php');
 
 // Obter os parâmetros de pesquisa
+$numeroGuia = isset($_GET['numeroGuia']) ? $_GET['numeroGuia'] : '';
+$numeroTarefa = isset($_GET['numeroTarefa']) ? $_GET['numeroTarefa'] : '';
 $cliente = isset($_GET['cliente']) ? $_GET['cliente'] : '';
-$documentoApresentante = isset($_GET['documentoApresentante']) ? $_GET['documentoApresentante'] : ''; // Campo CPF/CNPJ
+$documentoApresentante = isset($_GET['documentoApresentante']) ? $_GET['documentoApresentante'] : '';
 $funcionario = isset($_GET['funcionario']) ? $_GET['funcionario'] : '';
 $dataRecebimento = isset($_GET['dataRecebimento']) ? $_GET['dataRecebimento'] : '';
 $action = isset($_GET['action']) ? $_GET['action'] : 'task_id_zero'; // Define como 'task_id_zero' na primeira carga da página
@@ -28,11 +30,18 @@ if ($action === 'task_id_zero') {
             WHERE 1=1"; // Iniciar com uma condição sempre verdadeira para aplicar os filtros abaixo
 
     // Adicionar condições de pesquisa com base nos filtros fornecidos pelo usuário
+    if (!empty($numeroGuia)) {
+        $sql .= " AND guia.id = '" . $conn->real_escape_string($numeroGuia) . "'";
+    }
+
+    if (!empty($numeroTarefa)) {
+        $sql .= " AND guia.task_id = '" . $conn->real_escape_string($numeroTarefa) . "'";
+    }
+
     if (!empty($cliente)) {
         $sql .= " AND guia.cliente LIKE '%" . $conn->real_escape_string($cliente) . "%'";
     }
 
-    // Filtro de CPF/CNPJ
     if (!empty($documentoApresentante)) {
         $sql .= " AND guia.documento_apresentante LIKE '%" . $conn->real_escape_string($documentoApresentante) . "%'";
     }

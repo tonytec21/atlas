@@ -4,6 +4,11 @@ checkSession();
 include(__DIR__ . '/db_connection.php');
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Verificar se a ação foi definida
+    if (!isset($_POST['action']) || $_POST['action'] !== 'delete_attachment') {
+        die('Ação inválida.');
+    }
+
     $filePath = $_POST['file'];
     $taskId = $_POST['taskId'];
 
@@ -41,4 +46,5 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->close();
     $conn->close();
 }
+
 ?>

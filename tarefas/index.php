@@ -17,6 +17,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
 
     <style>
 
@@ -610,7 +611,7 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <!-- Modal Adicionar Comentário -->
     <div class="modal fade" id="addCommentModal" tabindex="-1" role="dialog" aria-labelledby="addCommentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-dialog modal-lg" role="document" style="max-width: 60%;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addCommentModalLabel">Adicionar Comentário e Anexos</h5>
@@ -746,7 +747,7 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <!-- Modal Criar Subtarefa -->
 <div class="modal fade" id="createSubTaskModal" tabindex="-1" role="dialog" aria-labelledby="createSubTaskModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog modal-lg" role="document" style="max-width: 60%;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createSubTaskModalLabel">Criar Subtarefa</h5>
@@ -850,6 +851,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <script src="../script/jquery.mask.min.js"></script>
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -1262,31 +1264,42 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
         });
     });
 
-            $('#commentForm').on('submit', function(e) {
-                e.preventDefault();
+        $('#commentForm').on('submit', function(e) {
+            e.preventDefault();
 
-                var formData = new FormData(this);
-                var taskToken = $('#viewTitle').data('tasktoken'); // Assume que o token da tarefa está armazenado como atributo de dados
+            var formData = new FormData(this);
+            var taskToken = $('#viewTitle').data('tasktoken'); // Assume que o token da tarefa está armazenado como atributo de dados
 
-                formData.append('taskToken', taskToken);
+            formData.append('taskToken', taskToken);
 
-                $.ajax({
-                    url: 'add_comment.php',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        $('#addCommentModal').modal('hide');
-                        $('body').removeClass('modal-open'); // Corrigir problema de rolagem
-                        alert('Comentário adicionado com sucesso!');
+            $.ajax({
+                url: 'add_comment.php',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    $('#addCommentModal').modal('hide');
+                    $('body').removeClass('modal-open'); // Corrigir problema de rolagem
+
+                    Swal.fire({
+                        title: 'Sucesso!',
+                        text: 'Comentário adicionado com sucesso!',
+                        icon: 'success'
+                    }).then(() => {
                         viewTask(taskToken); // Atualizar a visualização da tarefa
-                    },
-                    error: function() {
-                        alert('Erro ao adicionar comentário');
-                    }
-                });
+                    });
+                },
+                error: function() {
+                    Swal.fire({
+                        title: 'Erro!',
+                        text: 'Erro ao adicionar comentário',
+                        icon: 'error'
+                    });
+                }
             });
+        });
+
 
             $('#saveStatusButton').on('click', function() {
                 var taskToken = $('#viewTitle').data('tasktoken');
@@ -1730,6 +1743,96 @@ function viewTask(taskToken) {
             });
         });
 
+
+        // Ação para abrir o formulário usando SweetAlert2
+        function showAddCommentForm() {
+            Swal.fire({
+                title: 'Adicionar Comentário e Anexos',
+                html: `
+                    <form id="swalCommentForm" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="swalCommentDescription">Comentário:</label>
+                            <textarea class="form-control" id="swalCommentDescription" name="commentDescription" rows="5"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="swalCommentAttachments">Anexar arquivos:</label>
+                            <input type="file" id="swalCommentAttachments" name="commentAttachments[]" multiple class="form-control-file">
+                        </div>
+                    </form>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Salvar Comentário',
+                cancelButtonText: 'Fechar',
+                preConfirm: () => {
+                    // Coletar dados do formulário antes de confirmar
+                    const commentDescription = document.getElementById('swalCommentDescription').value;
+                    const attachments = document.getElementById('swalCommentAttachments').files;
+
+                    if (!commentDescription) {
+                        Swal.showValidationMessage('O campo de comentário é obrigatório.');
+                        return false;
+                    }
+
+                    return {
+                        commentDescription: commentDescription,
+                        attachments: attachments
+                    };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Criar um FormData para enviar os dados via AJAX
+                    const formData = new FormData();
+                    formData.append('commentDescription', result.value.commentDescription);
+
+                    for (let i = 0; i < result.value.attachments.length; i++) {
+                        formData.append('commentAttachments[]', result.value.attachments[i]);
+                    }
+
+                    // Fazer a requisição AJAX para salvar o comentário
+                    $.ajax({
+                        url: 'add_comment.php',
+                        type: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function(response) {
+                            Swal.fire({
+                                title: 'Sucesso!',
+                                text: 'Comentário adicionado com sucesso!',
+                                icon: 'success'
+                            }).then(() => {
+                                // Atualizar a visualização da tarefa
+                                location.reload();
+                            });
+                        },
+                        error: function() {
+                            Swal.fire({
+                                title: 'Erro!',
+                                text: 'Erro ao adicionar comentário.',
+                                icon: 'error'
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        $(document).on('show.bs.modal', function () {
+            // Desativa a rolagem do fundo
+            $('body').css('overflow', 'hidden');
+        });
+
+        $(document).on('hidden.bs.modal', function () {
+            // Restaura a rolagem do fundo apenas se não houver mais modais abertos
+            if ($('.modal.show').length === 0) {
+                $('body').css('overflow', 'auto');
+            }
+        });
+
+        // Adicionar rolagem ao modal principal após fechar o secundário
+        $('#addCommentModal').on('hidden.bs.modal', function () {
+            $('#viewTaskModal').css('overflow-y', 'auto');
+        });
 
 
     </script>
