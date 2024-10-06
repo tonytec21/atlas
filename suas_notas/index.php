@@ -79,6 +79,7 @@ $orderData['groups'] = $groupedFiles;
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         .create-group-expansion {
             display: flex;
@@ -363,6 +364,7 @@ $orderData['groups'] = $groupedFiles;
 
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
 
         // Abrir o modal ao clicar no botão "Nova Nota"
@@ -388,39 +390,81 @@ $orderData['groups'] = $groupedFiles;
                     conteudo: conteudo
                 },
                 success: function(response) {
-                    // Exibir a notificação de sucesso
-                    $('body').append(response);
-                    
+                    // Exibir a notificação de sucesso usando SweetAlert2
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Nota criada com sucesso!',
+                        showConfirmButton: false,
+                        timer: 2000
+                    }).then(() => {
+                        // Atualizar a página após fechar o alerta
+                        location.reload();
+                    });
+
                     // Limpar os campos do formulário e fechar o modal
                     $('#novaNotaForm')[0].reset();
                     $('#novaNotaModal').modal('hide');
                 },
                 error: function() {
-                    alert('Erro ao criar o lembrete.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao criar a nota.',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
                 }
             });
         });
+
         
         // Função para mover o arquivo para a lixeira com confirmação
         function moveToTrash(filename) {
-            if (confirm('Tem certeza que deseja excluir esta nota?')) {
-                $.ajax({
-                    url: 'move_to_trash.php',
-                    method: 'POST',
-                    data: { filename: filename },
-                    success: function(response) {
-                        if (response === 'success') {
-                            document.querySelector(`.card[data-filename='${filename}']`).remove();
-                        } else {
-                            alert('Erro ao mover para a lixeira.');
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: 'Tem certeza que deseja excluir esta nota?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, excluir',
+                cancelButtonText: 'Não, cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Realiza a requisição AJAX para mover o arquivo para a lixeira
+                    $.ajax({
+                        url: 'move_to_trash.php',
+                        method: 'POST',
+                        data: { filename: filename },
+                        success: function(response) {
+                            if (response === 'success') {
+                                document.querySelector(`.card[data-filename='${filename}']`).remove();
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Excluído!',
+                                    text: 'A nota foi movida para a lixeira com sucesso.'
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro',
+                                    text: 'Erro ao mover para a lixeira.'
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Erro ao mover para a lixeira.'
+                            });
                         }
-                    },
-                    error: function() {
-                        alert('Erro ao mover para a lixeira.');
-                    }
-                });
-            }
+                    });
+                }
+            });
         }
+
 
         // Função para alternar a exibição dos grupos
         function toggleGroup(header) {
@@ -698,26 +742,37 @@ $orderData['groups'] = $groupedFiles;
 
         // Função para excluir grupos vazios
         function deleteGroup(element) {
-            if (confirm('Tem certeza que deseja excluir este grupo?')) {
-                // Obtém o nome do grupo a partir do atributo data-group-name e remove espaços extras
-                const groupName = element.getAttribute('data-group-name').trim();
+            // Solicita confirmação usando SweetAlert2
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: 'Tem certeza que deseja excluir este grupo?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, excluir',
+                cancelButtonText: 'Não, cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Obtém o nome do grupo a partir do atributo data-group-name e remove espaços extras
+                    const groupName = element.getAttribute('data-group-name').trim();
 
-                // Escapa o nome do grupo para uso no seletor CSS
-                const escapedGroupName = CSS.escape(groupName);
+                    // Escapa o nome do grupo para uso no seletor CSS
+                    const escapedGroupName = CSS.escape(groupName);
 
-                // Remove o grupo do DOM
-                const groupElement = document.querySelector(`[data-group="${escapedGroupName}"]`);
-                if (groupElement) {
-                    groupElement.parentElement.remove();
-                } else {
-                    console.error(`Grupo não encontrado: ${groupName}`);
+                    // Remove o grupo do DOM
+                    const groupElement = document.querySelector(`[data-group="${escapedGroupName}"]`);
+                    if (groupElement) {
+                        groupElement.parentElement.remove();
+                    } else {
+                        console.error(`Grupo não encontrado: ${groupName}`);
+                    }
+
+                    // Atualiza o arquivo JSON
+                    updateOrder();
                 }
-
-                // Atualiza o arquivo JSON
-                updateOrder();
-            }
+            });
         }
-
 
         // Função para criar um novo grupo de cards
         function createGroup() {
@@ -758,10 +813,10 @@ $orderData['groups'] = $groupedFiles;
             updateOrder();
         }
 
-        // Recarrega a página ao fechar o modal "novaNotaModal"
-        $('#novaNotaModal').on('hidden.bs.modal', function () {
-            location.reload();
-        });
+        // // Recarrega a página ao fechar o modal "novaNotaModal"
+        // $('#novaNotaModal').on('hidden.bs.modal', function () {
+        //     location.reload();
+        // });
 
         // Recarrega a página ao fechar o modal "noteModal"
             $('#noteModal').on('hidden.bs.modal', function () {
