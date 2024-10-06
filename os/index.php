@@ -16,9 +16,21 @@ include(__DIR__ . '/db_connection.php');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
+        .situacao-pago {
+            background-color: #28a745;
+            color: white;
+            width: 80px;
+            text-align: center;
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-block;
+            font-size: 13px;
+        }
+
         .situacao-ativo {
-            background-color: #28a745; /* Verde */
+            background-color: #ffa907; 
             color: white;
             width: 80px;
             text-align: center;
@@ -29,7 +41,7 @@ include(__DIR__ . '/db_connection.php');
         }
 
         .situacao-cancelado {
-            background-color: #dc3545; /* Vermelho */
+            background-color: #dc3545;
             color: white;
             width: 80px;
             text-align: center;
@@ -145,7 +157,7 @@ include(__DIR__ . '/db_connection.php');
         }
 
         .status-parcialmente {
-            background-color: #ffc107;
+            background-color: #ffa907;
             width: 75px;
             text-align: center;
         }
@@ -383,28 +395,38 @@ include(__DIR__ . '/db_connection.php');
                             $atos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                             $statusOS = 'Pendente';
-                            $statusClasses = ['Pendente' => 'status-pendente', 'Parcial' => 'status-parcialmente', 'Liquidado' => 'status-liquidado'];
+                            $statusClasses = [
+                                'Pendente' => 'status-pendente', 
+                                'Parcial' => 'status-parcialmente', 
+                                'Liquidado' => 'status-liquidado',
+                                'Cancelado' => 'situacao-cancelado'
+                            ];
 
-                            $allLiquidado = true;
-                            $hasParcialmenteLiquidado = false;
-                            $allPendente = true;
+                            // Verificar se a ordem está cancelada
+                            if ($ordem['status'] === 'Cancelado') {
+                                $statusOS = 'Cancelado';
+                            } else {
+                                $allLiquidado = true;
+                                $hasParcialmenteLiquidado = false;
+                                $allPendente = true;
 
-                            foreach ($atos as $ato) {
-                                if ($ato['status'] == 'liquidado') {
-                                    $allPendente = false;
-                                } elseif ($ato['status'] == 'parcialmente liquidado') {
-                                    $hasParcialmenteLiquidado = true;
-                                    $allPendente = false;
-                                    $allLiquidado = false;
-                                } elseif ($ato['status'] == null) {
-                                    $allLiquidado = false;
+                                foreach ($atos as $ato) {
+                                    if ($ato['status'] == 'liquidado') {
+                                        $allPendente = false;
+                                    } elseif ($ato['status'] == 'parcialmente liquidado') {
+                                        $hasParcialmenteLiquidado = true;
+                                        $allPendente = false;
+                                        $allLiquidado = false;
+                                    } elseif ($ato['status'] == null) {
+                                        $allLiquidado = false;
+                                    }
                                 }
-                            }
 
-                            if ($allLiquidado && count($atos) > 0) {
-                                $statusOS = 'Liquidado';
-                            } elseif ($hasParcialmenteLiquidado || !$allPendente) {
-                                $statusOS = 'Parcial';
+                                if ($allLiquidado && count($atos) > 0) {
+                                    $statusOS = 'Liquidado';
+                                } elseif ($hasParcialmenteLiquidado || !$allPendente) {
+                                    $statusOS = 'Parcial';
+                                }
                             }
 
                             // Calcular saldo considerando devoluções
@@ -423,13 +445,34 @@ include(__DIR__ . '/db_connection.php');
                                 <td data-order="<?php echo date('Y-m-d', strtotime($ordem['data_criacao'])); ?>"><?php echo date('d/m/Y', strtotime($ordem['data_criacao'])); ?></td>
                                 <td><span style="font-size: 13px" class="status-label <?php echo $statusClasses[$statusOS]; ?>"><?php echo $statusOS; ?></span></td>
                                 <td>
-                                    <span class="<?php echo $ordem['status'] === 'Ativo' ? 'situacao-ativo' : 'situacao-cancelado'; ?>">
-                                        <?php echo $ordem['status']; ?>
+                                    <?php
+                                    // Definir a classe e o texto do status da OS
+                                    $statusClass = '';
+                                    $statusText = '';
+
+                                    if ($ordem['status'] === 'Cancelado') {
+                                        $statusClass = 'situacao-cancelado';
+                                        $statusText = 'Cancelada';
+                                    } elseif ($deposito_previo > 0) {
+                                        $statusClass = 'situacao-pago'; 
+                                        $statusText = 'Pago';
+                                    } elseif ($ordem['status'] === 'Ativo') {
+                                        $statusClass = 'situacao-ativo';
+                                        $statusText = 'Ativa';
+                                    }
+                                    ?>
+                                    <span class="<?php echo $statusClass; ?>">
+                                        <?php echo $statusText; ?>
                                     </span>
                                 </td>
+
                                 <td>
                                     <button class="btn btn-info btn-sm" title="Visualizar OS" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('visualizar_os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                    <button class="btn btn-success btn-sm" title="Pagamentos e Devoluções" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')"><i class="fa fa-money" aria-hidden="true"></i></button>
+                                    <button class="btn btn-success btn-sm" title="Pagamentos e Devoluções" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" 
+                                        onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')" 
+                                        <?php echo ($ordem['status'] === 'Cancelado') ? 'disabled' : ''; ?>>
+                                        <i class="fa fa-money" aria-hidden="true"></i>
+                                    </button>
                                     <button type="button" title="Imprimir OS" class="btn btn-primary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="verificarTimbrado(<?php echo $ordem['id']; ?>)"><i class="fa fa-print" aria-hidden="true"></i></button>
                                     <button class="btn btn-secondary btn-sm" title="Anexos" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="abrirAnexoModal(<?php echo $ordem['id']; ?>)"><i class="fa fa-paperclip" aria-hidden="true"></i></button>
                                 </td>
@@ -445,7 +488,7 @@ include(__DIR__ . '/db_connection.php');
 
     <!-- Modal de Pagamento -->
     <div class="modal fade" id="pagamentoModal" tabindex="-1" role="dialog" aria-labelledby="pagamentoModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
+        <div class="modal-dialog" role="document" style="max-width: 50%">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="pagamentoModalLabel">Efetuar Pagamento</h5>
@@ -458,25 +501,50 @@ include(__DIR__ . '/db_connection.php');
                         <label for="total_os_modal">Valor Total da OS</label>
                         <input type="text" class="form-control" id="total_os_modal" readonly>
                     </div>
-                    <div class="form-group">
-                        <label for="forma_pagamento">Forma de Pagamento</label>
-                        <select class="form-control" id="forma_pagamento">
-                            <option value="">Selecione</option>
-                            <option value="Espécie">Espécie</option>
-                            <option value="Crédito">Crédito</option>
-                            <option value="Débito">Débito</option>
-                            <option value="PIX">PIX</option>
-                            <option value="Transferência Bancária">Transferência Bancária</option>
-                            <option value="Boleto">Boleto</option>
-                            <option value="Cheque">Cheque</option>
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="forma_pagamento">Forma de Pagamento</label>
+                            <select class="form-control" id="forma_pagamento">
+                                <option value="">Selecione</option>
+                                <option value="Espécie">Espécie</option>
+                                <option value="Crédito">Crédito</option>
+                                <option value="Débito">Débito</option>
+                                <option value="PIX">PIX</option>
+                                <option value="Transferência Bancária">Transferência Bancária</option>
+                                <option value="Boleto">Boleto</option>
+                                <option value="Cheque">Cheque</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="valor_pagamento">Valor do Pagamento</label>
+                            <input type="text" class="form-control" id="valor_pagamento">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="valor_pagamento">Valor do Pagamento</label>
-                        <input type="text" class="form-control" id="valor_pagamento">
-                    </div>
-                    <button type="button" class="btn btn-primary" onclick="adicionarPagamento()">Adicionar</button>
+                    <button type="button" class="btn btn-primary w-100" onclick="adicionarPagamento()">Adicionar</button>
                     <hr>
+                    <div class="form-row">
+                        <div class="form-group col-md-3">
+                            <label for="total_pagamento">Valor Pago</label>
+                            <input type="text" class="form-control" id="total_pagamento" readonly>
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="valor_liquidado_modal">Valor Liquidado</label>
+                            <input type="text" class="form-control" id="valor_liquidado_modal" readonly>
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="saldo_modal">Saldo</label>
+                            <input type="text" class="form-control" id="saldo_modal" readonly>
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="valor_devolvido_modal">Valor Devolvido</label>
+                            <input type="text" class="form-control" id="valor_devolvido_modal" readonly>
+                        </div>
+                    </div>
+
+                        <?php if ($saldo > 0.001): ?>
+                            <button type="button" class="btn btn-warning" id="btnDevolver" onclick="abrirDevolucaoModal()">Devolver valores</button>
+                        <?php endif; ?>
+                    
                     <div id="pagamentosAdicionados">
                         <h5>Pagamentos Adicionados</h5>
                         <table class="table">
@@ -492,26 +560,7 @@ include(__DIR__ . '/db_connection.php');
                             </tbody>
                         </table>
                     </div>
-                    <div class="form-group">
-                        <label for="total_pagamento">Valor Pago</label>
-                        <input type="text" class="form-control" id="total_pagamento" readonly>
                     </div>
-                    <div class="form-group">
-                        <label for="valor_liquidado_modal">Valor Liquidado</label>
-                        <input type="text" class="form-control" id="valor_liquidado_modal" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label for="saldo_modal">Saldo</label>
-                        <input type="text" class="form-control" id="saldo_modal" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label for="valor_devolvido_modal">Valor Devolvido</label>
-                        <input type="text" class="form-control" id="valor_devolvido_modal" readonly>
-                    </div>
-                    <?php if ($saldo > 0.001): ?>
-                        <button type="button" class="btn btn-warning" id="btnDevolver" onclick="abrirDevolucaoModal()">Devolver valores</button>
-                    <?php endif; ?>
-                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
                 </div>
@@ -618,14 +667,13 @@ include(__DIR__ . '/db_connection.php');
         <div id="toastContainer" style="position: absolute; top: -20px; right: 0;"></div>
     </div>
 
-
-    <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/jquery-3.6.0.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
         $(document).ready(function() {
             $('#cpf_cliente').mask('000.000.000-00', { reverse: true }).on('blur', function() {
@@ -700,50 +748,89 @@ include(__DIR__ . '/db_connection.php');
             atualizarTabelaPagamentos();
         }
 
+
         function adicionarPagamento() {
             var formaPagamento = $('#forma_pagamento').val();
             var valorPagamento = parseFloat($('#valor_pagamento').val().replace('.', '').replace(',', '.'));
 
             if (formaPagamento === "") {
-                exibirMensagem('Por favor, selecione uma forma de pagamento.', 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Por favor, selecione uma forma de pagamento.'
+                });
                 return;
             }
 
             if (isNaN(valorPagamento) || valorPagamento <= 0) {
-                exibirMensagem('Por favor, insira um valor válido para o pagamento.', 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Por favor, insira um valor válido para o pagamento.'
+                });
                 return;
             }
 
-            $.ajax({
-                url: 'salvar_pagamento.php',
-                type: 'POST',
-                data: {
-                    os_id: window.currentOsId,
-                    cliente: window.currentClient,
-                    total_os: parseFloat($('#total_os_modal').val().replace('R$ ', '').replace('.', '').replace(',', '.')),
-                    funcionario: '<?php echo $_SESSION['username']; ?>',
-                    forma_pagamento: formaPagamento,
-                    valor_pagamento: valorPagamento
-                },
-                success: function(response) {
-                    try {
-                        response = JSON.parse(response);
-                        if (response.success) {
-                            atualizarTabelaPagamentos();
-                            $('#valor_pagamento').val('');
-                            exibirMensagem('Pagamento adicionado com sucesso!', 'success');
-                        } else {
-                            exibirMensagem('Erro ao adicionar pagamento.', 'error');
+            // Solicita a confirmação do usuário antes de adicionar o pagamento
+            Swal.fire({
+                title: 'Confirmar Pagamento',
+                text: `Deseja realmente adicionar o pagamento de R$ ${valorPagamento.toFixed(2).replace('.', ',')} na forma de ${formaPagamento}?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Sim',
+                cancelButtonText: 'Não'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Se o usuário confirmar, realiza a requisição AJAX
+                    $.ajax({
+                        url: 'salvar_pagamento.php',
+                        type: 'POST',
+                        data: {
+                            os_id: window.currentOsId,
+                            cliente: window.currentClient,
+                            total_os: parseFloat($('#total_os_modal').val().replace('R$ ', '').replace('.', '').replace(',', '.')),
+                            funcionario: '<?php echo $_SESSION['username']; ?>',
+                            forma_pagamento: formaPagamento,
+                            valor_pagamento: valorPagamento
+                        },
+                        success: function(response) {
+                            try {
+                                response = JSON.parse(response);
+                                if (response.success) {
+                                    atualizarTabelaPagamentos();
+                                    $('#valor_pagamento').val('');
+                                    Swal.fire({
+                                        icon: 'success',
+                                        title: 'Sucesso',
+                                        text: 'Pagamento adicionado com sucesso!'
+                                    });
+                                } else {
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Erro',
+                                        text: 'Erro ao adicionar pagamento.'
+                                    });
+                                }
+                            } catch (e) {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro',
+                                    text: 'Erro ao processar resposta do servidor.'
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Erro ao adicionar pagamento.'
+                            });
                         }
-                    } catch (e) {
-                        exibirMensagem('Erro ao processar resposta do servidor.', 'error');
-                    }
-                },
-                error: function() {
-                    exibirMensagem('Erro ao adicionar pagamento.', 'error');
+                    });
                 }
             });
         }
+
 
         function atualizarTabelaPagamentos() {
             var pagamentosTable = $('#pagamentosTable');

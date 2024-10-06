@@ -147,6 +147,38 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
+        .situacao-pago {
+            background-color: #28a745;
+            color: white;
+            width: 290px;
+            text-align: center;
+            padding: 2px 10px;
+            border-radius: 5px;
+            display: inline-block;
+            font-size: 13px;
+        }
+
+        .situacao-ativo {
+            background-color: #ffa907; 
+            color: white;
+            width: 290px;
+            text-align: center;
+            padding: 2px 10px;
+            border-radius: 5px;
+            display: inline-block;
+            font-size: 13px;
+        }
+
+        .situacao-cancelado {
+            background-color: #dc3545;
+            color: white;
+            width: 290px;
+            text-align: center;
+            padding: 2px 10px;
+            border-radius: 5px;
+            display: inline-block;
+            font-size: 13px;
+        }
         /* Remover a borda de foco no botão de fechar */
         .btn-close {
             outline: none; /* Remove a borda ao clicar */
@@ -206,7 +238,7 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
             background-color: #28a745; /* verde */
         }
         .status-parcial {
-            background-color: #ffc107; /* amarelo */
+            background-color: #ffa907; /* amarelo */
         }
         /* CSS personalizado para aumentar o tamanho do modal de criação de tarefas */
         #tarefaModal .modal-dialog {
@@ -273,7 +305,34 @@ include(__DIR__ . '/../menu.php');
         <hr>
         <div class="text-center">
             <h4>ORDEM DE SERVIÇO Nº: <?php echo $ordem_servico['id']; ?></h4>
+            <!-- Legenda do Status da OS -->
+            <div style="margin-top: -9px;">
+                <?php
+                // Definir a legenda do status da OS e a classe CSS
+                $statusLegenda = '';
+                $statusClass = '';
+
+                if ($ordem_servico['status'] === 'Cancelado') {
+                    $statusLegenda = 'Cancelada';
+                    $statusClass = 'situacao-cancelado';
+                } elseif ($total_pagamentos > 0) {
+                    $statusLegenda = 'Pago (Depósito Prévio)';
+                    $statusClass = 'situacao-pago';
+                } elseif ($ordem_servico['status'] === 'Ativo') {
+                    $statusLegenda = 'Ativa (Pendente de Pagamento)';
+                    $statusClass = 'situacao-ativo';
+                }
+
+                // Exibir a legenda se estiver definida
+                if ($statusLegenda) {
+                    echo '<small class="' . $statusClass . '">' . $statusLegenda . '</small>';
+                }
+                ?>
+            </div>
         </div>
+
+
+
         <hr>
         <form id="osForm" method="POST">
             <div class="form-row">
@@ -399,7 +458,7 @@ include(__DIR__ . '/../menu.php');
 
 <!-- Modal de Pagamento -->
 <div class="modal fade" id="pagamentoModal" tabindex="-1" role="dialog" aria-labelledby="pagamentoModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog" role="document" style="max-width: 40%">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="pagamentoModalLabel">Efetuar Pagamento</h5>
@@ -412,25 +471,80 @@ include(__DIR__ . '/../menu.php');
                     <label for="total_os_modal">Valor Total da OS</label>
                     <input type="text" class="form-control" id="total_os_modal" value="<?php echo 'R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.'); ?>" readonly>
                 </div>
-                <div class="form-group">
-                    <label for="forma_pagamento">Forma de Pagamento</label>
-                    <select class="form-control" id="forma_pagamento">
-                        <option value="">Selecione</option>
-                        <option value="Espécie">Espécie</option>
-                        <option value="Crédito">Crédito</option>
-                        <option value="Débito">Débito</option>
-                        <option value="PIX">PIX</option>
-                        <option value="Transferência Bancária">Transferência Bancária</option>
-                        <option value="Boleto">Boleto</option>
-                        <option value="Cheque">Cheque</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="forma_pagamento">Forma de Pagamento</label>
+                        <select class="form-control" id="forma_pagamento">
+                            <option value="">Selecione</option>
+                            <option value="Espécie">Espécie</option>
+                            <option value="Crédito">Crédito</option>
+                            <option value="Débito">Débito</option>
+                            <option value="PIX">PIX</option>
+                            <option value="Transferência Bancária">Transferência Bancária</option>
+                            <option value="Boleto">Boleto</option>
+                            <option value="Cheque">Cheque</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="valor_pagamento">Valor do Pagamento</label>
+                        <input type="text" class="form-control" id="valor_pagamento">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="valor_pagamento">Valor do Pagamento</label>
-                    <input type="text" class="form-control" id="valor_pagamento">
-                </div>
-                <button type="button" style="width: 100%" class="btn btn-primary" onclick="adicionarPagamento()">Adicionar</button>
+                <button type="button" class="btn btn-primary w-100" onclick="adicionarPagamento()">Adicionar</button>
                 <hr>
+                <div class="form-row">
+                    <?php if ($total_pagamentos > 0): ?>
+                        <div class="form-group col-md-3">
+                            <label for="total_pagamento_modal">Valor Pago</label>
+                            <input type="text" class="form-control" id="total_pagamento_modal" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($total_liquidado > 0): ?>
+                        <div class="form-group col-md-3">
+                            <label for="valor_liquidado_modal">Valor Liquidado</label>
+                            <input type="text" class="form-control" id="valor_liquidado_modal" value="<?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?>" readonly>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($saldo > 0): ?>
+                        <div class="form-group col-md-3">
+                            <label for="saldo_modal">Saldo</label>
+                            <input type="text" class="form-control" id="saldo_modal" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($total_devolucoes > 0): ?>
+                        <div class="form-group col-md-3">
+                            <label for="valor_devolvido_modal">Valor Devolvido</label>
+                            <input type="text" class="form-control" id="valor_devolvido_modal" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($total_repasses > 0): ?>
+                        <div class="form-group col-md-3">
+                            <label for="total_repasses_modal">Repasse Credor</label>
+                            <input type="text" class="form-control" id="total_repasses_modal" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                
+                <div class="form-row">
+                    <?php if ($saldo > 0.01 && $has_ato_17): ?>
+                        <div class="<?php echo ($saldo > 0.01) ? 'col-md-6' : 'col-12'; ?>">
+                            <button type="button" class="btn btn-warning w-100" onclick="abrirRepasseModal()">Repasse Credor</button>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($saldo > 0.01): ?>
+                        <div class="<?php echo ($has_ato_17) ? 'col-md-6' : 'col-12'; ?>">
+                            <button type="button" class="btn btn-warning w-100" onclick="abrirDevolucaoModal()">Devolver valores</button>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                    <hr>
                 <div id="pagamentosAdicionados">
                     <h5>Pagamentos Adicionados</h5>
                     <table id="tabelaIPagamentoOS" class="table table-striped table-bordered" style="zoom: 80%">
@@ -453,42 +567,6 @@ include(__DIR__ . '/../menu.php');
                         </tbody>
                     </table>
                 </div>
-                <?php if ($total_pagamentos > 0): ?>
-                <div class="form-group">
-                    <label for="total_pagamento">Valor Pago</label>
-                    <input type="text" class="form-control" id="total_pagamento_modal" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
-                </div>
-                <?php endif; ?>
-                <?php if ($total_liquidado > 0): ?>
-                <div class="form-group">
-                    <label for="valor_liquidado_modal">Valor Liquidado</label>
-                    <input type="text" class="form-control" id="valor_liquidado_modal" value="<?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?>" readonly>
-                </div>
-                <?php endif; ?>
-                <?php if ($saldo > 0): ?>
-                <div class="form-group">
-                    <label for="saldo_modal">Saldo</label>
-                    <input type="text" class="form-control" id="saldo_modal" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>
-                </div>
-                <?php endif; ?>
-                <?php if ($total_devolucoes > 0): ?>
-                <div class="form-group">
-                    <label for="valor_devolvido_modal">Valor Devolvido</label>
-                    <input type="text" class="form-control" id="valor_devolvido_modal" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
-                </div>
-                <?php endif; ?>
-                <?php if ($total_repasses > 0): ?>
-                <div class="form-group">
-                    <label for="total_repasses_modal">Repasse Credor</label>
-                    <input type="text" class="form-control" id="total_repasses_modal" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>
-                </div>
-                <?php endif; ?>
-                <?php if ($saldo > 0.01 && $has_ato_17): ?>
-                <button type="button" class="btn btn-warning btn-repasse" onclick="abrirRepasseModal()">Repasse Credor</button>
-                <?php endif; ?>
-                <?php if ($saldo > 0.01): ?>
-                <button type="button" class="btn btn-warning" onclick="abrirDevolucaoModal()">Devolver valores</button>
-                <?php endif; ?>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
@@ -555,7 +633,7 @@ include(__DIR__ . '/../menu.php');
 
 <!-- Modal de Devolução -->
 <div class="modal fade" id="devolucaoModal" tabindex="-1" role="dialog" aria-labelledby="devolucaoModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="devolucaoModalLabel">Devolver Valores</h5>
@@ -577,7 +655,7 @@ include(__DIR__ . '/../menu.php');
                     <label for="valor_devolucao">Valor da Devolução</label>
                     <input type="text" class="form-control" id="valor_devolucao" placeholder="0,00">
                 </div>
-                <button type="button" class="btn btn-primary" onclick="salvarDevolucao()">Salvar</button>
+                <button type="button" class="btn btn-primary w-100" onclick="salvarDevolucao()">Salvar</button>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
@@ -1207,8 +1285,13 @@ include(__DIR__ . '/../menu.php');
 
         // Se o total de pagamentos for maior que o total de devoluções, alertar e abrir o modal de devolução
         if (totalPagamentos > totalDevolucoes) {
-            exibirMensagem('Há pagamentos nesta OS que ainda não foram totalmente devolvidos. Você precisa devolver o saldo antes de cancelar a OS.', 'error');
-            abrirDevolucaoModal(); // Abrir o modal de devolução
+            Swal.fire({
+                icon: 'error',
+                title: 'Atenção',
+                text: 'Há pagamentos nesta OS que ainda não foram totalmente devolvidos. Você precisa devolver o saldo antes de cancelar a OS.'
+            }).then(() => {
+                abrirDevolucaoModal(); // Abrir o modal de devolução
+            });
             return;
         }
 
@@ -1235,22 +1318,56 @@ include(__DIR__ . '/../menu.php');
                         try {
                             response = JSON.parse(response);
                             if (response.success) {
-                                exibirMensagem('Ordem de Serviço cancelada com sucesso!', 'success');
-                                window.location.reload();
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Sucesso',
+                                    text: 'Ordem de Serviço cancelada com sucesso!'
+                                }).then(() => {
+                                    window.location.reload();
+                                });
                             } else {
-                                exibirMensagem('Erro ao cancelar a Ordem de Serviço.', 'error');
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro',
+                                    text: 'Erro ao cancelar a Ordem de Serviço.'
+                                });
                             }
                         } catch (e) {
-                            exibirMensagem('Erro ao processar resposta do servidor.', 'error');
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Erro ao processar resposta do servidor.'
+                            });
                         }
                     },
                     error: function() {
-                        exibirMensagem('Erro ao cancelar a Ordem de Serviço.', 'error');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Erro ao cancelar a Ordem de Serviço.'
+                        });
                     }
                 });
             }
         });
     }
+
+    $(document).on('show.bs.modal', function () {
+        // Desativa a rolagem do fundo
+        $('body').css('overflow', 'hidden');
+    });
+
+    $(document).on('hidden.bs.modal', function () {
+        // Restaura a rolagem do fundo apenas se não houver mais modais abertos
+        if ($('.modal.show').length === 0) {
+            $('body').css('overflow', 'auto');
+        }
+    });
+
+    // Adicionar rolagem ao modal principal após fechar o secundário
+    $('#devolucaoModal').on('hidden.bs.modal', function () {
+        $('#pagamentoModal').css('overflow-y', 'auto');
+    });
 
 </script>
 <?php
