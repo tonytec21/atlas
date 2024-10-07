@@ -18,7 +18,7 @@ function criarTabelaSeNecessario($conn, $queryCriarTabela) {
 }
 
 $tabelas = [
-    "ALTER TABLE `oficios` ADD COLUMN `dados_complementares` TEXT NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_520_nopad_ci' AFTER `status`;"
+    "ALTER TABLE `oficios` ADD COLUMN `dados_complementares` TEXT NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci' AFTER `status`;"
 ];
 
 // Executa a criação de todas as tabelas
