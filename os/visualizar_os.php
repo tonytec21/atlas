@@ -145,7 +145,6 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         .situacao-pago {
             background-color: #28a745;
