@@ -14,9 +14,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
-
     <style>
         .table th:nth-child(1), .table td:nth-child(1) { /* Atribuição */
         width: 8%;

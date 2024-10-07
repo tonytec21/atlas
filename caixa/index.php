@@ -16,7 +16,6 @@ include(__DIR__ . '/db_connection.php');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         .btn-4 {
             background: #34495e;

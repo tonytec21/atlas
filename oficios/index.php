@@ -62,7 +62,6 @@ $conn->close();
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
-    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
         /* Remover a borda de foco no botão de fechar */
         .btn-close {

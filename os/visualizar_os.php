@@ -158,6 +158,10 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
             font-size: 13px;
         }
 
+        .custom-file-input ~ .custom-file-label::after {
+            content: "Escolher";
+        }
+
         .situacao-ativo {
             background-color: #ffa907; 
             color: white;
@@ -296,6 +300,7 @@ include(__DIR__ . '/../menu.php');
             <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
             <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" type="button" class="btn btn-info2 btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
             <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal" <?php echo ($ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
+            <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" type="button" class="btn btn-secondary" onclick="$('#anexoModal').modal('show');"><i class="fa fa-paperclip" aria-hidden="true"></i> Anexos</button>
             <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()" <?php echo ($ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
             <button style="height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-danger btn-cancel btn-sm" onclick="cancelarOS()" <?php echo ($has_liquidated || $ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>><i class="fa fa-ban" aria-hidden="true"></i> Cancelar OS</button>
             <button type="button" class="btn btn-4 btn-sm" style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" data-toggle="modal" data-target="#tarefaModal"><i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa</button>
@@ -545,27 +550,27 @@ include(__DIR__ . '/../menu.php');
                 </div>
 
                     <hr>
-                <div id="pagamentosAdicionados">
+                <div class="table-responsive">
                     <h5>Pagamentos Adicionados</h5>
-                    <table id="tabelaIPagamentoOS" class="table table-striped table-bordered" style="zoom: 80%">
-                        <thead>
-                            <tr>
-                                <th style="width: 20%;">Forma de Pagamento</th>
-                                <th>Valor</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="pagamentosTable">
-                            <!-- Pagamentos adicionados serão listados aqui -->
-                            <?php foreach ($pagamentos as $pagamento): ?>
-                            <tr>
-                                <td><?php echo $pagamento['forma_de_pagamento']; ?></td>
-                                <td><?php echo 'R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.'); ?></td>
-                                <td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(<?php echo $pagamento['id']; ?>)" <?php echo $has_liquidated ? 'disabled' : ''; ?>><i class="fa fa-trash" aria-hidden="true"></i></button></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                    <table id="tabelaIPagamentoOS" class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Forma de Pagamento</th>
+                                    <th>Valor</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pagamentosTable">
+                                <!-- Pagamentos adicionados serão listados aqui -->
+                                <?php foreach ($pagamentos as $pagamento): ?>
+                                <tr>
+                                    <td><?php echo $pagamento['forma_de_pagamento']; ?></td>
+                                    <td><?php echo 'R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.'); ?></td>
+                                    <td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(<?php echo $pagamento['id']; ?>)" <?php echo $has_liquidated ? 'disabled' : ''; ?>><i class="fa fa-trash" aria-hidden="true"></i></button></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                 </div>
             </div>
             <div class="modal-footer">
@@ -777,6 +782,48 @@ include(__DIR__ . '/../menu.php');
     </div>
 </div>
 
+<!-- Modal de Anexos -->
+<div class="modal fade" id="anexoModal" tabindex="-1" role="dialog" aria-labelledby="anexoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 30%">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="anexoModalLabel">Anexos</h5>
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    &times;
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="formAnexos" enctype="multipart/form-data">
+                    <div class="custom-file mb-3">
+                        <input type="file" class="custom-file-input" id="novo_anexo" name="novo_anexo[]" multiple>
+                        <label class="custom-file-label" for="novo_anexo">Selecione os arquivos para anexar</label>
+                    </div>
+                    <button type="button" style="width: 100%" class="btn btn-success" onclick="salvarAnexo()"><i class="fa fa-paperclip" aria-hidden="true"></i> Anexar</button>
+                </form>
+                <hr>
+                <div class="table-responsive">
+                    <h5>Anexos Adicionados</h5>
+                    <table id="anexosTable" class="table table-striped table-bordered">
+                        <thead>
+                            <tr>
+                                <th style="width: 85%">Anexo</th>
+                                <th style="width: 15%">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- O conteúdo será preenchido pelo JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
@@ -823,6 +870,14 @@ include(__DIR__ . '/../menu.php');
     });
 
     $('#tabelaPagamentoOS').DataTable({
+        "language": {
+            "url": "../style/Portuguese-Brasil.json"
+        },
+        "pageLength": 100,
+        "order": [], // Sem ordenação inicial
+    });
+
+    $('#tabelaIPagamentoOS').DataTable({
         "language": {
             "url": "../style/Portuguese-Brasil.json"
         },
@@ -1368,6 +1423,202 @@ include(__DIR__ . '/../menu.php');
     $('#devolucaoModal').on('hidden.bs.modal', function () {
         $('#pagamentoModal').css('overflow-y', 'auto');
     });
+
+
+    // Carregar anexos quando o modal for aberto
+    $('#anexoModal').on('show.bs.modal', function() {
+        window.currentOsId = <?php echo $os_id; ?>; // Define o ID da OS atual
+        atualizarTabelaAnexos();
+    });
+
+    function salvarAnexo() {
+        var formData = new FormData($('#formAnexos')[0]);
+        formData.append('os_id', window.currentOsId);
+        formData.append('funcionario', '<?php echo $_SESSION['username']; ?>');
+
+        $.ajax({
+            url: 'salvar_anexo.php',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                try {
+                    response = JSON.parse(response);
+                    if (response.success) {
+                        $('#novo_anexo').val('');
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso',
+                            text: 'Anexo salvo com sucesso!'
+                        }).then(() => {
+                            // Recarregar a página quando a mensagem de sucesso for fechada
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Erro ao salvar anexo.'
+                        });
+                    }
+                } catch (e) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: 'Erro ao processar resposta do servidor.'
+                    });
+                }
+            },
+            error: function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao salvar anexo.'
+                });
+            }
+        });
+    }
+
+    function atualizarTabelaAnexos() {
+        var anexosTableBody = $('#anexosTable tbody');
+        anexosTableBody.empty();
+
+        $.ajax({
+            url: 'obter_anexos.php',
+            type: 'POST',
+            data: {
+                os_id: window.currentOsId
+            },
+            success: function(response) {
+                try {
+                    response = JSON.parse(response);
+
+                    response.anexos.forEach(function(anexo, index) {
+                        var caminhoCompleto = 'anexos/' + window.currentOsId + '/' + anexo.caminho_anexo;
+                        anexosTableBody.append(`
+                            <tr>
+                                <td>${anexo.caminho_anexo}</td>
+                                <td>
+                                    <button type="button" class="btn btn-info btn-sm" onclick="visualizarAnexo('${caminhoCompleto}')">
+                                        <i class="fa fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-delete btn-sm" onclick="removerAnexo(${anexo.id})">
+                                        <i class="fa fa-trash-o" aria-hidden="true"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `);
+                    });
+
+                    // Inicializar ou re-inicializar o DataTable
+                    if ($.fn.DataTable.isDataTable('#anexosTable')) {
+                        $('#anexosTable').DataTable().clear().destroy();
+                    }
+
+                    $('#anexosTable').DataTable({
+                        paging: true,
+                        searching: true,
+                        ordering: true,
+                        info: true,
+                        autoWidth: false, // Desabilitar a largura automática
+                        responsive: true, // Torna a tabela responsiva
+                        language: {
+                            url: '../style/Portuguese-Brasil.json'
+                        }
+                    });
+                } catch (e) {
+                    exibirMensagem('Erro ao processar resposta do servidor.', 'error');
+                }
+            },
+            error: function() {
+                exibirMensagem('Erro ao atualizar tabela de anexos.', 'error');
+            }
+        });
+    }
+
+        function visualizarAnexo(caminho) {
+            window.open(caminho, '_blank');
+        }
+
+        function removerAnexo(anexoId) {
+            Swal.fire({
+                title: 'Confirmar Remoção',
+                text: 'Deseja realmente remover este anexo?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, remover',
+                cancelButtonText: 'Não, cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: 'remover_anexo.php',
+                        type: 'POST',
+                        data: {
+                            anexo_id: anexoId
+                        },
+                        success: function(response) {
+                            try {
+                                response = JSON.parse(response);
+                                if (response.success) {
+                                    Swal.fire({
+                                        icon: 'success',
+                                        title: 'Sucesso',
+                                        text: 'Anexo removido com sucesso!'
+                                    }).then(() => {
+                                        // Recarregar a página quando a mensagem de sucesso for fechada
+                                        location.reload();
+                                    });
+                                } else {
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Erro',
+                                        text: 'Erro ao remover anexo.'
+                                    });
+                                }
+                            } catch (e) {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro',
+                                    text: 'Erro ao processar resposta do servidor.'
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Erro ao remover anexo.'
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+
+        document.getElementById('novo_anexo').addEventListener('change', function() {
+            var input = this;
+            var label = input.nextElementSibling;
+            var files = input.files;
+
+            if (files.length === 1) {
+                // Exibir o nome do arquivo selecionado
+                label.textContent = files[0].name;
+            } else if (files.length > 1) {
+                // Exibir a quantidade de arquivos selecionados
+                label.textContent = files.length + ' arquivos selecionados';
+            } else {
+                // Voltar ao texto padrão
+                label.textContent = 'Selecione os arquivos para anexar';
+            }
+        });
+
+        
+        $('#anexoModal').on('hidden.bs.modal', function () {
+            location.reload(); // Recarrega a página quando o modal for fechado
+        });
+
 
 </script>
 <?php

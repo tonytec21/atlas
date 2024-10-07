@@ -79,13 +79,31 @@ $orderData['groups'] = $groupedFiles;
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
-    <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
+        
+        .btn-close {
+            outline: none;
+            border: none; 
+            background: none;
+            padding: 0; 
+            font-size: 1.5rem; 
+            cursor: pointer; 
+            transition: transform 0.2s ease;
+        }
+
+        .btn-close:hover {
+            transform: scale(2.10);
+        }
+
+        .btn-close:focus {
+            outline: none;
+        }
+
         .create-group-expansion {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px; /* Espaçamento entre os elementos */
+            gap: 10px;
             margin-top: 50px;
             margin-bottom: 50px;
         }
@@ -115,15 +133,15 @@ $orderData['groups'] = $groupedFiles;
             gap: 15px;
             justify-content: flex-start;
             margin-bottom: 20px;
-            min-height: 50px; /* Adiciona altura mínima para facilitar o drop */
-            border: 1px dashed transparent; /* Borda invisível que aparecerá quando um card for arrastado */
+            min-height: 50px;
+            border: 1px dashed transparent;
         }
         .card-container.drag-over {
-            border: 1px dashed #007bff; /* Borda visível ao arrastar */
+            border: 1px dashed #007bff;
         }
         .card {
-            width: 250px;
-            height: 250px; /* Aumenta a altura do card */
+            width: 300px;
+            height: 300px;
             border: 1px solid #ccc;
             border-radius: 8px;
             padding: 15px;
@@ -136,13 +154,12 @@ $orderData['groups'] = $groupedFiles;
         }
 
         .card-content {
-            flex: 1; /* Permite que o conteúdo ocupe todo o espaço disponível */
-            overflow-y: auto; /* Habilita a rolagem vertical */
-            max-height: 200px; /* Limita a altura do conteúdo para que a barra de rolagem vertical apareça */
-            word-wrap: break-word; /* Quebra as palavras longas */
-            white-space: normal; /* Permite a quebra de linha */
+            flex: 1;
+            overflow-y: auto;
+            max-height: 200px;
+            word-wrap: break-word;
+            white-space: normal; 
         }
-
 
         .btn-delete {
             background-color: #dc3545;
@@ -151,7 +168,11 @@ $orderData['groups'] = $groupedFiles;
             padding: 5px 10px;
             border-radius: 5px;
             cursor: pointer;
-            margin-left: 80%;
+            margin-left: 90%;
+            width: 30px;
+            height: 30px;
+            font-size: 10px;
+            margin-bottom: -3px !important;
         }
         .btn-delete:hover {
             background-color: #c82333;
@@ -224,7 +245,7 @@ $orderData['groups'] = $groupedFiles;
                             echo '<div class="card-content">';
                             echo '<div>' . nl2br(htmlspecialchars($corpo)) . '</div>';
                             echo '</div>';
-                            echo '<button class="btn-delete mt-2" onclick="event.stopPropagation(); moveToTrash(\'' . $filename . '\')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
+                            echo '<button class="btn-delete mt-2" title="Excluir" onclick="event.stopPropagation(); moveToTrash(\'' . $filename . '\')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
                             echo '</div>';
                         }
                     }
@@ -282,7 +303,7 @@ $orderData['groups'] = $groupedFiles;
                             echo '<div class="card-content">';
                             echo '<div>' . nl2br(htmlspecialchars($corpo)) . '</div>';
                             echo '</div>';
-                            echo '<button class="btn-delete mt-2" onclick="event.stopPropagation(); moveToTrash(\'' . $filename . '\')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
+                            echo '<button class="btn-delete mt-2" title="Excluir" onclick="event.stopPropagation(); moveToTrash(\'' . $filename . '\')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
                             echo '</div>';
                         }
                     }
@@ -304,22 +325,22 @@ $orderData['groups'] = $groupedFiles;
 
     <!-- Modal para visualização e edição do lembrete -->
     <div class="modal fade" id="noteModal" tabindex="-1" role="dialog" aria-labelledby="noteModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 40%">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 60%">
             <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Lembrete</h5>
+                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
+                    </button>
+                </div>
                 <form id="editNoteForm" method="post" class="mt-4">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Editar Lembrete</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="noteTitle" class="form-label">Título</label>
+                            <label for="noteTitle" class="form-label">Título:</label>
                             <input type="text" id="noteTitle" name="titulo" class="form-control" required>
                         </div>
                         <div class="mb-3">
-                            <label for="noteContent" class="form-label">Conteúdo</label>
+                            <label for="noteContent" class="form-label">Conteúdo:</label>
                             <textarea id="noteContent" name="conteudo" rows="5" class="form-control" required></textarea>
                         </div>
                     </div>
@@ -334,22 +355,22 @@ $orderData['groups'] = $groupedFiles;
 
     <!-- Modal para criar nova nota -->
     <div class="modal fade" id="novaNotaModal" tabindex="-1" role="dialog" aria-labelledby="novaNotaModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 40%">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 60%">
             <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="novaNotaModalLabel">Criar Nota</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
+                    </button>
+                </div>
                 <form id="novaNotaForm" method="post">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="novaNotaModalLabel">Criar Nota</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="titulo" class="form-label">Título</label>
+                            <label for="titulo" class="form-label">Título:</label>
                             <input type="text" id="titulo" name="titulo" class="form-control" required>
                         </div>
                         <div class="mb-3">
-                            <label for="conteudo" class="form-label">Conteúdo</label>
+                            <label for="conteudo" class="form-label">Conteúdo:</label>
                             <textarea id="conteudo" name="conteudo" rows="5" class="form-control" required></textarea>
                         </div>
                     </div>
@@ -728,17 +749,35 @@ $orderData['groups'] = $groupedFiles;
                             console.error('Erro: O card correspondente não foi encontrado no DOM.');
                         }
 
-                        // Fechar o modal após salvar
-                        $('#noteModal').modal('hide');
+                        // Exibir mensagem de sucesso usando SweetAlert2
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Nota salva com sucesso!',
+                            showConfirmButton: false,
+                            timer: 2000
+                        }).then(() => {
+                            // Fechar o modal após salvar
+                            $('#noteModal').modal('hide');
+                        });
                     } else {
-                        alert('Erro ao salvar o lembrete.');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao salvar o nota.'
+                        });
                     }
                 },
                 error: function() {
-                    alert('Erro ao salvar o lembrete.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao salvar o nota.'
+                    });
                 }
             });
         }
+
 
         // Função para excluir grupos vazios
         function deleteGroup(element) {
