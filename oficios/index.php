@@ -62,27 +62,47 @@ $conn->close();
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
-        /* Remover a borda de foco no botão de fechar */
         .btn-close {
-            outline: none; /* Remove a borda ao clicar */
-            border: none; /* Remove qualquer borda padrão */
-            background: none; /* Remove o fundo padrão */
-            padding: 0; /* Remove o espaçamento extra */
-            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
-            cursor: pointer; /* Mostra o ponteiro de clique */
-            transition: transform 0.2s ease; /* Suaviza a transição do hover */
+            outline: none;
+            border: none; 
+            background: none;
+            padding: 0; 
+            font-size: 1.5rem;
+            cursor: pointer; 
+            transition: transform 0.2s ease;
         }
 
-        /* Aumentar o tamanho do botão em 5% no hover */
         .btn-close:hover {
-            transform: scale(2.10); /* Aumenta 5% */
+            transform: scale(2.10);
         }
 
-        /* Opcional: Adicionar foco suave sem borda visível */
         .btn-close:focus {
-            outline: none; /* Remove a borda ao foco */
+            outline: none;
         }
+
+        #viewOficioModal .modal-dialog {
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+        }
+
+        #viewOficioModal .modal-content {
+            height: 95%;
+        }
+
+        #viewOficioModal .modal-body {
+            flex-grow: 1;
+            padding: 0; 
+        }
+
+        #viewOficioModal #oficioPDF {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
     </style>
 </head>
 <body class="light-mode">
@@ -175,7 +195,7 @@ include(__DIR__ . '/../menu.php');
                     </button>
                 </div>
                 <div class="modal-body">
-                    <iframe id="oficioPDF" src="" frameborder="0" style="width: 100%; height: 500px;"></iframe>
+                    <iframe id="oficioPDF" src="" frameborder="0"></iframe>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-primary" id="lockButton">Travar Edição</button>
@@ -272,10 +292,25 @@ include(__DIR__ . '/../menu.php');
     <script src="../script/jquery.mask.min.js"></script>
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
         $(document).ready(function() {
-            
+            $('#viewOficioModal').on('shown.bs.modal', function() {
+                // Ajustar a altura do modal para ocupar 100% da tela
+                $(this).find('.modal-dialog').css({
+                    'max-height': '100vh', // Limite máximo de altura igual à altura da viewport
+                    'height': '100vh'      // Define o modal para ocupar 100% da altura da tela
+                });
+            });
         });
+
+             // Inicializar DataTable
+             $('#tabelaResultados').DataTable({
+                "language": {
+                    "url": "../style/Portuguese-Brasil.json"
+                },
+                "order": [[1, 'desc']]
+            });
 
         function viewOficio(numero) {
             // Primeiro, verificamos o JSON de configuração
@@ -394,33 +429,28 @@ include(__DIR__ . '/../menu.php');
             });
         }
 
-        
-         // Inicializar DataTable
-         $('#tabelaResultados').DataTable({
-                "language": {
-                    "url": "../style/Portuguese-Brasil.json"
-                },
-                "order": [[1, 'desc']]
-            });
-
         function formatDateToBrazilian(date) {
             var dateParts = date.split('-');
             return dateParts[2] + '/' + dateParts[1] + '/' + dateParts[0];
         }
 
         function loadAttachments(numero) {
+            console.log("Carregando anexos para o número:", numero); // Verifica se o valor do número está correto
             $.ajax({
                 url: 'get_attachments.php',
                 type: 'GET',
                 data: { numero: numero },
                 success: function(response) {
+                    console.log("Resposta recebida:", response); // Verifica o conteúdo da resposta
                     $('#attachmentsContent').html(response); // Exibe os anexos no modal
                 },
-                error: function() {
+                error: function(xhr, status, error) {
+                    console.log("Erro na requisição:", error); // Exibe o erro no console
                     alert('Erro ao carregar anexos.');
                 }
             });
         }
+
 
         $(document).on('click', '.visualizar-anexo', function() {
             var filePath = $(this).data('file');
@@ -429,11 +459,10 @@ include(__DIR__ . '/../menu.php');
             window.open(filePath, '_blank');
         });
 
-
-
         $('#uploadForm').on('submit', function(e) {
             e.preventDefault();
             var formData = new FormData(this);
+            
             $.ajax({
                 url: 'upload_attachment.php',
                 type: 'POST',
@@ -441,35 +470,124 @@ include(__DIR__ . '/../menu.php');
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    alert('Arquivo anexado com sucesso.');
-                    loadAttachments($('#numeroOficio').val());
+                    // Exibir mensagem de sucesso usando SweetAlert2
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Arquivo anexado com sucesso.',
+                        showConfirmButton: false,
+                        timer: 2000
+                    }).then(() => {
+                        // Recarregar anexos após fechar o alerta
+                        loadAttachments($('#numeroOficio').val());
+                    });
                 },
                 error: function() {
-                    alert('Erro ao anexar arquivo.');
+                    // Exibir mensagem de erro usando SweetAlert2
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao anexar arquivo.',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
                 }
             });
         });
+
 
         function editOficio(numero) {
             window.location.href = 'edit_oficio.php?numero=' + numero;
         }
 
         function lockOficio(numero) {
-            if (confirm('Tem certeza que deseja travar a edição deste ofício?')) {
-                $.ajax({
-                    url: 'lock_oficio.php',
-                    type: 'POST',
-                    data: { numero: numero },
-                    success: function(response) {
-                        alert('Edição do ofício travada com sucesso.');
-                        location.reload();
-                    },
-                    error: function() {
-                        alert('Erro ao travar a edição do ofício.');
-                    }
-                });
-            }
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: 'Tem certeza que deseja travar a edição deste ofício?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, travar',
+                cancelButtonText: 'Não, cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Se o usuário confirmar, realiza a requisição AJAX
+                    $.ajax({
+                        url: 'lock_oficio.php',
+                        type: 'POST',
+                        data: { numero: numero },
+                        success: function(response) {
+                            // Exibe mensagem de sucesso usando SweetAlert2
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Edição do ofício travada com sucesso.',
+                                showConfirmButton: false,
+                                timer: 2000
+                            }).then(() => {
+                                // Recarrega a página após fechar o alerta
+                                location.reload();
+                            });
+                        },
+                        error: function() {
+                            // Exibe mensagem de erro usando SweetAlert2
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: 'Erro ao travar a edição do ofício.',
+                                showConfirmButton: false,
+                                timer: 2000
+                            });
+                        }
+                    });
+                }
+            });
         }
+
+        
+        $(document).on('click', '.excluir-anexo', function() {
+            var filePath = $(this).data('file'); // Obtém o caminho do arquivo
+            var numero = $(this).data('numero'); // Obtém o número do ofício
+
+            // Confirmação antes de excluir
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: "Você quer mover esse arquivo para a Lixeira?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, mover para Lixeira!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Faz a requisição para mover o arquivo
+                    $.ajax({
+                        url: 'mover_para_lixeira.php',
+                        type: 'POST',
+                        data: { file: filePath, numero: numero }, // Envia os dados corretos
+                        success: function(response) {
+                            var data = JSON.parse(response);
+                            if (data.status === 'success') {
+                                Swal.fire(
+                                    'Movido!',
+                                    data.message,
+                                    'success'
+                                );
+                                // Recarregar a lista de anexos após mover o arquivo
+                                loadAttachments(numero);
+                            } else {
+                                Swal.fire('Erro', data.message, 'error');
+                            }
+                        },
+                        error: function() {
+                            Swal.fire('Erro', 'Falha ao mover o arquivo.', 'error');
+                        }
+                    });
+                }
+            });
+        });
+
 
     </script>
 
