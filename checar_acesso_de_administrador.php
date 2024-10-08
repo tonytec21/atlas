@@ -15,6 +15,6 @@ $nivel_de_acesso = $user['nivel_de_acesso'];
 // Se o usuário não for administrador, redireciona para a página de erro ou outra página
 if ($nivel_de_acesso !== 'administrador') {
     // Exibir mensagem de erro ou redirecionar
-    echo "<script>alert('Você não tem permissão para acessar esta página!'); window.location.href = '../index.php';</script>";
+    echo "<script>alert('Você não tem permissão para acessar esta página!'); window.location.href = 'index.php';</script>";
     exit;
 }
