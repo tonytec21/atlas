@@ -414,13 +414,22 @@ include(__DIR__ . '/../menu.php');
                 type: 'GET',
                 data: { numero: numero },
                 success: function(response) {
-                    $('#attachmentsContent').html(response);
+                    $('#attachmentsContent').html(response); // Exibe os anexos no modal
                 },
                 error: function() {
                     alert('Erro ao carregar anexos.');
                 }
             });
         }
+
+        $(document).on('click', '.visualizar-anexo', function() {
+            var filePath = $(this).data('file');
+            
+            // Abrir o anexo em uma nova aba/janela ou dentro de um modal
+            window.open(filePath, '_blank');
+        });
+
+
 
         $('#uploadForm').on('submit', function(e) {
             e.preventDefault();
