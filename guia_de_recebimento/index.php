@@ -766,6 +766,31 @@ date_default_timezone_set('America/Sao_Paulo');
         }
     });
 
+    $(document).ready(function() {
+        var currentYear = new Date().getFullYear();
+
+        // Função de validação de data
+        function validateDate(input) {
+            var selectedDate = new Date($(input).val());
+            if (selectedDate.getFullYear() > currentYear) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Data inválida',
+                    text: 'O ano não pode ser maior que o ano atual.',
+                    confirmButtonText: 'Ok'
+                });
+                $(input).val(''); // Limpa o campo da data
+            }
+        }
+
+        // Aplicar a validação de data nos campos de filtro de pesquisa
+        $('#dataRecebimento').on('change', function() {
+            // Certifique-se de que há um valor antes de validar
+            if ($(this).val()) {
+                validateDate(this);
+            }
+        });
+    });
 
     </script>
 
