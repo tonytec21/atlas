@@ -17,6 +17,24 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../../style/css/dataTables.bootstrap4.min.css">
     <style>
+        .btn-close {
+            outline: none;
+            border: none; 
+            background: none;
+            padding: 0; 
+            font-size: 1.5rem; 
+            cursor: pointer; 
+            transition: transform 0.2s ease;
+        }
+
+        .btn-close:hover {
+            transform: scale(2.10);
+        }
+
+        .btn-close:focus {
+            outline: none;
+        }
+        
         .btn-edit {
             margin-left: 5px;
         }
@@ -182,8 +200,8 @@ include(__DIR__ . '/../../menu.php');
                 <div class="modal-content modal-cadastro">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addRegistryModalLabel">Adicionar Registro</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                            <span aria-hidden="true">&times;</span>
+                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                            &times;
                         </button>
                     </div>
                     <div class="modal-body">
@@ -256,8 +274,8 @@ include(__DIR__ . '/../../menu.php');
                 <div class="modal-content modal-edicao">
                     <div class="modal-header">
                         <h5 class="modal-title" id="editRegistryModalLabel">Editar Registro</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                            <span aria-hidden="true">&times;</span>
+                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                            &times;
                         </button>
                     </div>
                     <div class="modal-body">
@@ -334,8 +352,8 @@ include(__DIR__ . '/../../menu.php');
                  <div class="modal-content modal-visualizacao">
                     <div class="modal-header">
                         <h5 class="modal-title" id="viewRegistryModalLabel">Visualizar Registro</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                            <span aria-hidden="true">&times;</span>
+                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                            &times;
                         </button>
                     </div>
                     <div class="modal-body">
@@ -388,33 +406,13 @@ include(__DIR__ . '/../../menu.php');
             </div>
         </div>
 
-        <!-- Modal de Confirmação de Remoção de Anexo -->
-        <div class="modal fade" id="confirmRemoveAttachmentModal" tabindex="-1" role="dialog" aria-labelledby="confirmRemoveAttachmentModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="confirmRemoveAttachmentModalLabel">Confirmar Remoção</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        Tem certeza de que deseja remover este anexo?
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                        <button type="button" id="confirmRemoveBtn" class="btn btn-danger btn-confirm-remove">Remover</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
 <script src="../../script/jquery-3.5.1.min.js"></script>
 <script src="../../script/bootstrap.min.js"></script>
 <script src="../../script/bootstrap.bundle.min.js"></script>
 <script src="../../script/jquery.mask.min.js"></script>
 <script src="../../script/jquery.dataTables.min.js"></script>
 <script src="../../script/dataTables.bootstrap4.min.js"></script>
+<script src="../../script/sweetalert2.js"></script>
 <script>
     $(document).ready(function() {
         var addAttachments = []; // Para armazenar anexos adicionados no modal "Adicionar Registro"
@@ -553,13 +551,28 @@ include(__DIR__ . '/../../menu.php');
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    showAlert('Registro adicionado com sucesso', 'success');
-                    $('#addRegistryModal').modal('hide');
-                    loadFilteredRegistries(); // Carregar registros recentes após salvar
-                    addAttachments = []; // Limpar anexos após salvar
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Registro adicionado com sucesso.',
+                        confirmButtonText: 'Ok'
+                    }).then(() => {
+                        $('#addRegistryModal').modal('hide');
+                        loadFilteredRegistries(); // Carregar registros recentes após salvar
+                        addAttachments = []; // Limpar anexos após salvar
+                    });
+                },
+                error: function(xhr, status, error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: 'Houve um problema ao adicionar o registro.',
+                        confirmButtonText: 'Ok'
+                    });
                 }
             });
         });
+
 
         // Adicionar Anexo no Modal "Adicionar Registro"
         $('#add-attachment-btn').on('click', function() {
@@ -644,45 +657,49 @@ include(__DIR__ . '/../../menu.php');
 
         // Impedir o disparo da ação de "Salvar registro" ao clicar no botão de "Remover Anexo"
         $(document).on('click', '.btn-delete-attachment', function(event) {
-            event.stopPropagation(); // Previne o clique de se propagar para outros elementos
-            event.preventDefault(); // Previne a ação padrão do botão
+            event.stopPropagation(); 
+            event.preventDefault(); 
             attachmentIdToRemove = $(this).data('id');
-            $('#confirmRemoveAttachmentModal').modal('show');
-        });
-
-        // Confirmar remoção de anexo
-        $('#confirmRemoveBtn').on('click', function() {
-            $.ajax({
-                type: 'POST',
-                url: 'remover_anexo.php',
-                data: { id: attachmentIdToRemove },
-                success: function(response) {
-                    showAlert('Anexo removido com sucesso', 'success');
-                    $('#confirmRemoveAttachmentModal').modal('hide');
-                    loadAttachments($('#edit-id').val()); // Recarregar anexos após remover
+            
+            // Substituir o modal pela confirmação via SweetAlert2
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: 'Você realmente deseja remover este anexo?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, remover',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        type: 'POST',
+                        url: 'remover_anexo.php',
+                        data: { id: attachmentIdToRemove },
+                        success: function(response) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Anexo removido com sucesso.',
+                                confirmButtonText: 'Ok'
+                            }).then(() => {
+                                loadAttachments($('#edit-id').val()); // Recarregar anexos após remover
+                            });
+                        },
+                        error: function(xhr, status, error) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Ocorreu um problema ao remover o anexo.',
+                                confirmButtonText: 'Ok'
+                            });
+                        }
+                    });
                 }
             });
         });
 
-        // Remover anexo no modal de edição
-        $(document).on('click', '.btn-delete-attachment', function() {
-            attachmentIdToRemove = $(this).data('id');
-            $('#confirmRemoveAttachmentModal').modal('show');
-        });
-
-        // Confirmar remoção de anexo
-        $('#confirmRemoveBtn').on('click', function() {
-            $.ajax({
-                type: 'POST',
-                url: 'remover_anexo.php',
-                data: { id: attachmentIdToRemove },
-                success: function(response) {
-                    showAlert('Anexo removido com sucesso', 'success');
-                    $('#confirmRemoveAttachmentModal').modal('hide');
-                    loadAttachments($('#edit-id').val()); // Recarregar anexos após remover
-                }
-            });
-        });
 
         // Enviar formulário de edição
         $('#edit-registry-form').on('submit', function(e) {
@@ -696,12 +713,27 @@ include(__DIR__ . '/../../menu.php');
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    showAlert('Registro atualizado com sucesso', 'success');
-                    $('#editRegistryModal').modal('hide');
-                    loadFilteredRegistries(); // Carregar registros recentes após atualizar
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Registro atualizado com sucesso.',
+                        confirmButtonText: 'Ok'
+                    }).then(() => {
+                        $('#editRegistryModal').modal('hide');
+                        loadFilteredRegistries(); // Carregar registros recentes após atualizar
+                    });
+                },
+                error: function(xhr, status, error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: 'Ocorreu um problema ao atualizar o registro.',
+                        confirmButtonText: 'Ok'
+                    });
                 }
             });
         });
+
 
         // Adicionar Anexo no Modal "Editar Registro"
         $('#edit-add-attachment-btn').on('click', function() {
@@ -722,19 +754,34 @@ include(__DIR__ . '/../../menu.php');
                     processData: false,
                     contentType: false,
                     success: function(response) {
-                        showAlert('Anexo adicionado com sucesso', 'success');
-                        loadAttachments(registryId); // Recarregar anexos após adicionar
-                        fileInput.value = ''; // Limpar o input de arquivo
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Anexo adicionado com sucesso.',
+                            confirmButtonText: 'Ok'
+                        }).then(() => {
+                            loadAttachments(registryId); // Recarregar anexos após adicionar
+                            fileInput.value = ''; // Limpar o input de arquivo
+                        });
                     },
                     error: function(xhr, status, error) {
-                        showAlert('Erro ao adicionar anexo: ' + error, 'error');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Erro ao adicionar anexo: ' + error,
+                            confirmButtonText: 'Ok'
+                        });
                     }
                 });
             } else {
-                showAlert('Por favor, selecione um arquivo para adicionar.', 'warning');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Aviso',
+                    text: 'Por favor, selecione um arquivo para adicionar.',
+                    confirmButtonText: 'Ok'
+                });
             }
         });
-
 
         // Visualizar Registro
         $(document).on('click', '.btn-view', function() {
@@ -796,17 +843,42 @@ include(__DIR__ . '/../../menu.php');
         $(document).on('click', '.btn-delete', function() {
             var registryId = $(this).data('id');
 
-            if (confirm('Tem certeza de que deseja excluir este registro?')) {
-                $.ajax({
-                    type: 'POST',
-                    url: 'remover_registro.php',
-                    data: { id: registryId },
-                    success: function(response) {
-                        showAlert('Registro removido com sucesso', 'success');
-                        loadFilteredRegistries(); // Carregar registros recentes após excluir
-                    }
-                });
-            }
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: 'Você realmente deseja excluir este registro?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, excluir',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        type: 'POST',
+                        url: 'remover_registro.php',
+                        data: { id: registryId },
+                        success: function(response) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Registro removido com sucesso.',
+                                confirmButtonText: 'Ok'
+                            }).then(() => {
+                                loadFilteredRegistries(); // Carregar registros recentes após excluir
+                            });
+                        },
+                        error: function(xhr, status, error) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Ocorreu um problema ao remover o registro.',
+                                confirmButtonText: 'Ok'
+                            });
+                        }
+                    });
+                }
+            });
         });
 
         // Inicializar o modal de adicionar
@@ -814,31 +886,31 @@ include(__DIR__ . '/../../menu.php');
             show: false
         });
 
-        // Função para mostrar alertas personalizados
+        // Função para mostrar alertas personalizados com SweetAlert2
         function showAlert(message, type) {
-            var icon = '';
+            let iconType = '';
+            
+            // Definir o tipo de ícone com base no tipo de mensagem
             switch (type) {
                 case 'success':
-                    icon = '✔️';
+                    iconType = 'success';
                     break;
                 case 'error':
-                    icon = '❌';
+                    iconType = 'error';
                     break;
                 case 'warning':
-                    icon = '⚠️';
+                    iconType = 'warning';
                     break;
                 default:
-                    icon = '';
+                    iconType = 'info'; // Padrão para qualquer outro caso
             }
 
-            var alertPopup = $('<div class="alert-popup alert-' + type + '"><span>' + icon + ' ' + message + '</span></div>');
-            $('body').append(alertPopup);
-
-            setTimeout(function() {
-                alertPopup.fadeOut(function() {
-                    $(this).remove();
-                });
-            }, 3000);
+            // Usando SweetAlert2 para exibir a mensagem
+            Swal.fire({
+                icon: iconType,
+                title: message,
+                confirmButtonText: 'Ok'
+            });
         }
 
         // Adicionar evento para recarregar a página ao fechar os modais
@@ -854,6 +926,66 @@ include(__DIR__ . '/../../menu.php');
             location.reload();
         });
     });
+
+    $(document).ready(function() {
+        var currentYear = new Date().getFullYear();
+
+        // Validação de data no modal de Adição de Registro
+        $('#registry-date, #birthdate').on('change', function() {
+            var selectedDate = new Date($(this).val());
+            if (selectedDate.getFullYear() > currentYear) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Data inválida',
+                    text: 'O ano não pode ser maior que o ano atual.',
+                    confirmButtonText: 'Ok'
+                });
+                $(this).val(''); // Limpa o campo da data
+            }
+        });
+
+        // Validação de data no modal de Edição de Registro
+        $('#edit-registry-date, #edit-birthdate').on('change', function() {
+            var selectedDate = new Date($(this).val());
+            if (selectedDate.getFullYear() > currentYear) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Data inválida',
+                    text: 'O ano não pode ser maior que o ano atual.',
+                    confirmButtonText: 'Ok'
+                });
+                $(this).val(''); // Limpa o campo da data
+            }
+        });
+
+    });
+
+    $(document).ready(function() {
+        var currentYear = new Date().getFullYear();
+
+        // Função de validação de data
+        function validateDate(input) {
+            var selectedDate = new Date($(input).val());
+            if (selectedDate.getFullYear() > currentYear) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Data inválida',
+                    text: 'O ano não pode ser maior que o ano atual.',
+                    confirmButtonText: 'Ok'
+                });
+                $(input).val(''); // Limpa o campo da data
+            }
+        }
+
+        // Aplicar a validação de data nos campos de filtro de pesquisa
+        $('#search-birthdate, #search-registry-date').on('change', function() {
+            // Certifique-se de que há um valor antes de validar
+            if ($(this).val()) {
+                validateDate(this);
+            }
+        });
+    });
+
 </script>
 
 </body>
