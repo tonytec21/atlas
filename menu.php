@@ -143,7 +143,7 @@ $mode_query->close();
             <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/cadastrar-oficio.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Ofício</a>
         </div>
 
-        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/suas_notas/index.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Notas de Lembrete</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/suas_notas/index.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Anotações</a>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/manuais/index.php'?>"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
 
         <?php if ($nivel_de_acesso === 'administrador'): ?>

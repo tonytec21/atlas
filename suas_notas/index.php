@@ -74,7 +74,7 @@ $orderData['groups'] = $groupedFiles;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Visualizar Notas</title>
+    <title>Atlas - Visualizar Anotações</title>
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
@@ -200,11 +200,11 @@ $orderData['groups'] = $groupedFiles;
     <?php include(__DIR__ . '/../menu.php'); ?>
     <div id="main" class="main-content">
         <div class="container">
-            <h3 class="mt-4">Suas Notas</h3>
+            <h3 class="mt-4">Suas Anotações</h3>
 
             <!-- Barra de pesquisa e botão "Nova Nota" -->
             <div class="d-flex align-items-center mb-4">
-                <input type="text" id="searchBar" class="form-control search-bar mr-2" placeholder="Pesquisar notas...">
+                <input type="text" id="searchBar" class="form-control search-bar mr-2" placeholder="Pesquisar anotações...">
                 <button class="btn btn-success" id="novaNotaBtn" style="flex: 0 0 10%;"><i class="fa fa-plus-circle" aria-hidden="true"></i> Nova Nota</button>
             </div>
 
@@ -328,7 +328,7 @@ $orderData['groups'] = $groupedFiles;
         <div class="modal-dialog modal-dialog-centered" role="document" style="width: 60%">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Editar Lembrete</h5>
+                    <h5 class="modal-title">Editar anotação</h5>
                         <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
                         &times;
                     </button>
