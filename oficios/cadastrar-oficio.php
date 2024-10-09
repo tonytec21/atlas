@@ -48,8 +48,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->close();
     $conn->close();
 
-    echo "<script>alert('Ofício salvo com sucesso!'); window.location.href = 'index.php';</script>";
+    // A saída precisa estar em conformidade com o DOM e JavaScript
+    echo "<script src='../script/sweetalert2.js'></script>
+          <script>
+              document.addEventListener('DOMContentLoaded', function() {
+                  Swal.fire({
+                      icon: 'success',
+                      title: 'Ofício salvo com sucesso!',
+                      showConfirmButton: true,
+                      confirmButtonText: 'OK'
+                  }).then((result) => {
+                      if (result.isConfirmed) {
+                          window.location.href = 'index.php';
+                      }
+                  });
+              });
+          </script>";
 }
+
 
 // Conexão com o banco de dados "atlas"
 $atlasConn = new mysqli($servername, $username, $password, "atlas");
@@ -84,6 +100,7 @@ $loggedUser = $_SESSION['username'];
     <script src="../ckeditor/ckeditor.js"></script>
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <style>
         .cke_notification_warning { display: none !important; }
     </style>
@@ -174,6 +191,32 @@ include(__DIR__ . '/../menu.php');
 
                 $('#cargo_assinante').val(cargoAssinante);
             }).trigger('change'); // Trigger change event to set initial value
+        });
+
+        $(document).ready(function() {
+            var currentYear = new Date().getFullYear();
+
+            // Função de validação de data
+            function validateDate(input) {
+                var selectedDate = new Date($(input).val());
+                if (selectedDate.getFullYear() > currentYear) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Data inválida',
+                        text: 'O ano não pode ser maior que o ano atual.',
+                        confirmButtonText: 'Ok'
+                    });
+                    $(input).val(''); // Limpa o campo da data
+                }
+            }
+
+            // Aplicar a validação de data nos campos de filtro de pesquisa
+            $('#data').on('change', function() {
+                // Certifique-se de que há um valor antes de validar
+                if ($(this).val()) {
+                    validateDate(this);
+                }
+            });
         });
     </script>
 <?php

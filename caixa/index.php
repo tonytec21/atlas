@@ -1201,18 +1201,39 @@ include(__DIR__ . '/db_connection.php');
                     dataType: 'json',
                     success: function(response) {
                         if (response.success) {
-                            alert('Caixa aberto com sucesso!');
-                            $('#abrirCaixaModal').modal('hide');
-                            location.reload();
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Caixa aberto com sucesso!',
+                                showConfirmButton: true,
+                                confirmButtonText: 'OK'
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    $('#abrirCaixaModal').modal('hide');
+                                    location.reload(); // Recarregar a página após fechar o modal
+                                }
+                            });
                         } else {
-                            alert('Erro ao abrir caixa: ' + response.error);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Erro ao abrir caixa: ' + response.error,
+                                showConfirmButton: true,
+                                confirmButtonText: 'OK'
+                            });
                         }
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
-                        alert('Erro ao abrir caixa: ' + textStatus + ' - ' + errorThrown);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Erro ao abrir caixa: ' + textStatus + ' - ' + errorThrown,
+                            showConfirmButton: true,
+                            confirmButtonText: 'OK'
+                        });
                     }
                 });
             });
+
         });
 
         function abrirCaixaModal() {
@@ -1882,6 +1903,32 @@ include(__DIR__ . '/db_connection.php');
 
         $('#verDepositosCaixaModal').on('hidden.bs.modal', function () {
             location.reload();
+        });
+
+        $(document).ready(function() {
+            var currentYear = new Date().getFullYear();
+
+            // Função de validação de data
+            function validateDate(input) {
+                var selectedDate = new Date($(input).val());
+                if (selectedDate.getFullYear() > currentYear) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Data inválida',
+                        text: 'O ano não pode ser maior que o ano atual.',
+                        confirmButtonText: 'Ok'
+                    });
+                    $(input).val(''); // Limpa o campo da data
+                }
+            }
+
+            // Aplicar a validação de data nos campos de filtro de pesquisa
+            $('#data_inicial, #data_final').on('change', function() {
+                // Certifique-se de que há um valor antes de validar
+                if ($(this).val()) {
+                    validateDate(this);
+                }
+            });
         });
     </script>
 

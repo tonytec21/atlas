@@ -1166,6 +1166,32 @@ include(__DIR__ . '/db_connection.php');
             location.reload(); // Recarrega a página quando o modal for fechado
         });
 
+        $(document).ready(function() {
+            var currentYear = new Date().getFullYear();
+
+            // Função de validação de data
+            function validateDate(input) {
+                var selectedDate = new Date($(input).val());
+                if (selectedDate.getFullYear() > currentYear) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Data inválida',
+                        text: 'O ano não pode ser maior que o ano atual.',
+                        confirmButtonText: 'Ok'
+                    });
+                    $(input).val(''); // Limpa o campo da data
+                }
+            }
+
+            // Aplicar a validação de data nos campos de filtro de pesquisa
+            $('#data_inicial, #data_final').on('change', function() {
+                // Certifique-se de que há um valor antes de validar
+                if ($(this).val()) {
+                    validateDate(this);
+                }
+            });
+        });
+
     </script>
     <?php
     include(__DIR__ . '/../rodape.php');

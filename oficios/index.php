@@ -441,8 +441,8 @@ include(__DIR__ . '/../menu.php');
                 type: 'GET',
                 data: { numero: numero },
                 success: function(response) {
-                    console.log("Resposta recebida:", response); // Verifica o conteúdo da resposta
-                    $('#attachmentsContent').html(response); // Exibe os anexos no modal
+                    console.log("Resposta recebida:", response); 
+                    $('#attachmentsContent').html(response); 
                 },
                 error: function(xhr, status, error) {
                     console.log("Erro na requisição:", error); // Exibe o erro no console
@@ -547,18 +547,18 @@ include(__DIR__ . '/../menu.php');
 
         
         $(document).on('click', '.excluir-anexo', function() {
-            var filePath = $(this).data('file'); // Obtém o caminho do arquivo
-            var numero = $(this).data('numero'); // Obtém o número do ofício
+            var filePath = $(this).data('file'); 
+            var numero = $(this).data('numero'); 
 
             // Confirmação antes de excluir
             Swal.fire({
                 title: 'Tem certeza?',
-                text: "Você quer mover esse arquivo para a Lixeira?",
+                text: "Você quer excluir esse anexo?",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#3085d6',
                 cancelButtonColor: '#d33',
-                confirmButtonText: 'Sim, mover para Lixeira!'
+                confirmButtonText: 'Sim, excluir!'
             }).then((result) => {
                 if (result.isConfirmed) {
                     // Faz a requisição para mover o arquivo
@@ -570,7 +570,7 @@ include(__DIR__ . '/../menu.php');
                             var data = JSON.parse(response);
                             if (data.status === 'success') {
                                 Swal.fire(
-                                    'Movido!',
+                                    'Excluído!',
                                     data.message,
                                     'success'
                                 );
@@ -581,9 +581,35 @@ include(__DIR__ . '/../menu.php');
                             }
                         },
                         error: function() {
-                            Swal.fire('Erro', 'Falha ao mover o arquivo.', 'error');
+                            Swal.fire('Erro', 'Falha ao excluir o anexo.', 'error');
                         }
                     });
+                }
+            });
+        });
+
+        $(document).ready(function() {
+            var currentYear = new Date().getFullYear();
+
+            // Função de validação de data
+            function validateDate(input) {
+                var selectedDate = new Date($(input).val());
+                if (selectedDate.getFullYear() > currentYear) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Data inválida',
+                        text: 'O ano não pode ser maior que o ano atual.',
+                        confirmButtonText: 'Ok'
+                    });
+                    $(input).val(''); // Limpa o campo da data
+                }
+            }
+
+            // Aplicar a validação de data nos campos de filtro de pesquisa
+            $('#data').on('change', function() {
+                // Certifique-se de que há um valor antes de validar
+                if ($(this).val()) {
+                    validateDate(this);
                 }
             });
         });

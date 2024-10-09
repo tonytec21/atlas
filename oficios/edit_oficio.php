@@ -138,6 +138,7 @@ include(__DIR__ . '/../menu.php');
 
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
+<script src="../script/sweetalert2.js"></script>
 <script>
 
     $(document).ready(function() {
@@ -182,13 +183,53 @@ include(__DIR__ . '/../menu.php');
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    alert('Ofício salvo com sucesso!');
-                    window.location.href = 'index.php';
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Ofício salvo com sucesso!',
+                        showConfirmButton: true,
+                        confirmButtonText: 'OK'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.href = 'index.php'; // Redireciona após confirmação
+                        }
+                    });
                 },
                 error: function(error) {
-                    alert('Erro ao salvar o ofício.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: 'Erro ao salvar o ofício.',
+                        showConfirmButton: true,
+                        confirmButtonText: 'OK'
+                    });
                 }
             });
+        });
+    });
+
+    $(document).ready(function() {
+        var currentYear = new Date().getFullYear();
+
+        // Função de validação de data
+        function validateDate(input) {
+            var selectedDate = new Date($(input).val());
+            if (selectedDate.getFullYear() > currentYear) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Data inválida',
+                    text: 'O ano não pode ser maior que o ano atual.',
+                    confirmButtonText: 'Ok'
+                });
+                $(input).val(''); // Limpa o campo da data
+            }
+        }
+
+        // Aplicar a validação de data nos campos de filtro de pesquisa
+        $('#data').on('change', function() {
+            // Certifique-se de que há um valor antes de validar
+            if ($(this).val()) {
+                validateDate(this);
+            }
         });
     });
 </script>
