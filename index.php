@@ -65,7 +65,16 @@ $nivel_de_acesso = $user['nivel_de_acesso'];
             background: #366879;
             color: #fff;
         }
+        
+        .btn-indexador {
+            background: #8e427c;
+            color: #fff;
+        }
 
+        .btn-indexador:hover {
+            background: #783768;
+            color: #fff;
+        }
 
         /* Estilos exclusivos para o modal com a classe modal-alerta */
         .modal-alerta .modal-content {
@@ -382,6 +391,21 @@ include(__DIR__ . '/menu.php');
             <div class="col-md-4 ui-sortable-handle" id="btn-manuais">
                 <a href="manuais/index.php" class="btn btn-6 w-100"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
             </div>
+            <?php
+            $configFile = __DIR__ . '/indexador/config_indexador.json';
+            if (file_exists($configFile)) {
+                $configData = json_decode(file_get_contents($configFile), true);
+                if (isset($configData['indexador_ativo']) && $configData['indexador_ativo'] === 'S') {
+                    echo '
+                    <div class="col-md-4 ui-sortable-handle" id="btn-indexador">
+                        <a href="indexador/index.php" class="btn btn-indexador w-100">
+                            <i class="fa fa-file-text-o" aria-hidden="true"></i> Indexador
+                        </a>
+                    </div>';
+                }
+            }
+            ?>
+
         </div>
 
         <div class="row mb-4">

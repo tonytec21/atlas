@@ -1,4 +1,4 @@
 <?php 
-header('location: ../../index.php');
+header('location: nascimento/index.php');
 
 ?>
