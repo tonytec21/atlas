@@ -1832,10 +1832,16 @@ include(__DIR__ . '/db_connection.php');
         }
 
         function transportarSaldoFecharCaixa() {
+            // Pega o valor de total_em_caixa e formata corretamente
+            var totalEmCaixa = $('#total_em_caixa').text().replace('.', '').replace(',', '.');
+
+            // Formata o valor para exibir na mensagem de confirmação
+            var totalEmCaixaFormatado = $('#total_em_caixa').text();
+
             // Exibe o alerta de confirmação com SweetAlert2
             Swal.fire({
                 title: 'Tem certeza?',
-                text: "Você realmente deseja fechar o caixa e transportar o saldo para o caixa seguinte?",
+                text: `Você realmente deseja fechar o caixa e transportar o saldo de ${totalEmCaixaFormatado} para o caixa seguinte?`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#3085d6',
@@ -1845,7 +1851,6 @@ include(__DIR__ . '/db_connection.php');
             }).then((result) => {
                 if (result.isConfirmed) {
                     // Se o usuário confirmar, prossegue com o fechamento do caixa
-                    var totalEmCaixa = $('#total_em_caixa').text().replace('.', '').replace(',', '.');
                     var dataCaixa = $('#data_caixa_deposito').val();
                     var funcionario = $('#funcionario_deposito').val();
 
@@ -1886,6 +1891,7 @@ include(__DIR__ . '/db_connection.php');
                 }
             });
         }
+
 
 
         // Adicionar evento para recarregar a página ao fechar os modais
