@@ -896,14 +896,24 @@ include(__DIR__ . '/db_connection.php');
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="comprovante_deposito">Comprovante de Depósito</label>
-                            <input type="file" class="form-control-file" id="comprovante_deposito" name="comprovante_deposito" required>
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="comprovante_deposito">Comprovante de Depósito</label>
+                                <input type="file" class="form-control-file" id="comprovante_deposito" name="comprovante_deposito" required>
+                            </div>
+                            <div class="form-group col-md-6" id="sem-comprovante-group" style="display:none;">
+                                <input type="checkbox" id="sem_comprovante" name="sem_comprovante">
+                                <label for="sem_comprovante">Sem comprovante</label>
+                            </div>
                         </div>
                         <input type="hidden" id="data_caixa_deposito" name="data_caixa_deposito">
                         <input type="hidden" id="funcionario_deposito" name="funcionario_deposito">
-                        <button type="submit" id="btnAdicionarDeposito" style="width: 100%" class="btn btn-primary"><i class="fa fa-plus-circle" aria-hidden="true"></i> Adicionar</button>
+                        <button type="submit" id="btnAdicionarDeposito" style="width: 100%" class="btn btn-primary">
+                            <i class="fa fa-plus-circle" aria-hidden="true"></i> Adicionar
+                        </button>
                     </form>
+
+
                     <hr>
                     <h5>Depósitos Registrados</h5>
                     <table id="tabelaDepositosRegistrados" class="table table-striped table-bordered" style="zoom: 80%">
@@ -1054,62 +1064,101 @@ include(__DIR__ . '/db_connection.php');
 
 
             // Evento de submissão do formulário de depósito
-            $('#formCadastroDeposito').on('submit', function(e) {
-                e.preventDefault();
+            $(document).ready(function() {
+                // Verificar o tipo de depósito e exibir a opção "Sem comprovante" se for "Espécie"
+                $('#tipo_deposito').on('change', function() {
+                    var tipoDeposito = $(this).val();
 
-                // Solicitar confirmação do usuário
-                Swal.fire({
-                    title: 'Você tem certeza?',
-                    text: 'Deseja realmente inserir este Depósito/Repasse?',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'Sim, inserir',
-                    cancelButtonText: 'Cancelar'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        var formData = new FormData(this);
-                        $.ajax({
-                            url: 'salvar_deposito.php',
-                            type: 'POST',
-                            data: formData,
-                            contentType: false,
-                            processData: false,
-                            dataType: 'json',
-                            success: function(response) {
-                                if (response.success) {
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Sucesso!',
-                                        text: 'Depósito cadastrado com sucesso!',
-                                        confirmButtonText: 'OK'
-                                    }).then(() => {
-                                        $('#cadastroDepositoModal').modal('hide');
-                                        location.reload();
-                                    });
-                                } else {
+                    if (tipoDeposito === 'Espécie') {
+                        $('#sem-comprovante-group').show();
+                        $('#comprovante_deposito').prop('required', true);
+                    } else {
+                        $('#sem-comprovante-group').hide();
+                        $('#sem_comprovante').prop('checked', false); // Desmarcar a opção "Sem comprovante"
+                        $('#comprovante_deposito').prop('required', true);
+                    }
+                });
+
+                // Alterar obrigatoriedade do comprovante baseado na opção "Sem comprovante"
+                $('#sem_comprovante').on('change', function() {
+                    if ($(this).is(':checked')) {
+                        $('#comprovante_deposito').prop('required', false);
+                    } else {
+                        $('#comprovante_deposito').prop('required', true);
+                    }
+                });
+
+                // Evento de submissão do formulário de depósito
+                $('#formCadastroDeposito').on('submit', function(e) {
+                    e.preventDefault();
+
+                    var totalEmCaixa = parseFloat($('#total_em_caixa').text().replace('R$ ', '').replace('.', '').replace(',', '.'));
+                    var valorDeposito = parseFloat($('#valor_deposito').val().replace('.', '').replace(',', '.'));
+
+                    // Verificar se o valor do depósito é maior do que o total em caixa
+                    if (valorDeposito > totalEmCaixa) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'O valor do depósito não pode ser maior do que o total disponível em caixa.',
+                            confirmButtonText: 'OK'
+                        });
+                        return;
+                    }
+
+                    // Solicitar confirmação do usuário
+                    Swal.fire({
+                        title: 'Você tem certeza?',
+                        text: `Deseja realmente inserir o depósito de R$ ${valorDeposito.toFixed(2).replace('.', ',')}?`,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#3085d6',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: 'Sim, inserir',
+                        cancelButtonText: 'Cancelar'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            var formData = new FormData(this);
+                            $.ajax({
+                                url: 'salvar_deposito.php',
+                                type: 'POST',
+                                data: formData,
+                                contentType: false,
+                                processData: false,
+                                dataType: 'json',
+                                success: function(response) {
+                                    if (response.success) {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: 'Sucesso!',
+                                            text: 'Depósito cadastrado com sucesso!',
+                                            confirmButtonText: 'OK'
+                                        }).then(() => {
+                                            $('#cadastroDepositoModal').modal('hide');
+                                            location.reload();
+                                        });
+                                    } else {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Erro!',
+                                            text: 'Erro ao cadastrar depósito: ' + response.error,
+                                            confirmButtonText: 'OK'
+                                        });
+                                    }
+                                },
+                                error: function(jqXHR, textStatus, errorThrown) {
                                     Swal.fire({
                                         icon: 'error',
                                         title: 'Erro!',
-                                        text: 'Erro ao cadastrar depósito: ' + response.error,
+                                        text: 'Erro ao cadastrar depósito: ' + textStatus + ' - ' + errorThrown,
                                         confirmButtonText: 'OK'
                                     });
                                 }
-                            },
-                            error: function(jqXHR, textStatus, errorThrown) {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Erro!',
-                                    text: 'Erro ao cadastrar depósito: ' + textStatus + ' - ' + errorThrown,
-                                    confirmButtonText: 'OK'
-                                });
-                            }
-                        });
-                    }
+                            });
+                        }
+                    });
                 });
             });
-
 
             // Carregar Saídas/Despesas no Modal
             $('#cadastroSaidaModal').on('shown.bs.modal', function () {
@@ -1931,6 +1980,38 @@ include(__DIR__ . '/db_connection.php');
                 // Certifique-se de que há um valor antes de validar
                 if ($(this).val()) {
                     validateDate(this);
+                }
+            });
+        });
+
+        $(document).ready(function() {
+            // Detectar mudanças no campo tipo_deposito
+            $('#tipo_deposito').on('change', function() {
+                var tipo = $(this).val();
+
+                if (tipo === 'Espécie') {
+                    // Mostrar a opção "Sem Comprovante"
+                    $('#semComprovanteDiv').show();
+                } else {
+                    // Ocultar a opção "Sem Comprovante" e restaurar obrigatoriedade do comprovante
+                    $('#semComprovanteDiv').hide();
+                    $('#sem_comprovante').val('nao');
+                    $('#comprovante_deposito').prop('required', true);
+                }
+            });
+
+            // Detectar mudanças no select "Sem Comprovante"
+            $('#sem_comprovante').on('change', function() {
+                var semComprovante = $(this).val();
+                
+                if (semComprovante === 'sim') {
+                    // Se "Sem Comprovante" for selecionado, remover obrigatoriedade do anexo
+                    $('#comprovante_deposito').prop('required', false);
+                    $('#divComprovante').hide(); // Esconder o campo de anexo
+                } else {
+                    // Restaurar obrigatoriedade do anexo se "Sem Comprovante" for "Não"
+                    $('#comprovante_deposito').prop('required', true);
+                    $('#divComprovante').show(); // Mostrar o campo de anexo
                 }
             });
         });

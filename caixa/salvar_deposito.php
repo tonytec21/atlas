@@ -25,13 +25,47 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
 
-        // Definindo o caminho do arquivo
-        $file_name = basename($_FILES["comprovante_deposito"]["name"]);
-        $target_file = $target_dir . $file_name;
+        // Verificando se o comprovante foi carregado ou se a opção "Sem comprovante" foi marcada
+        if (isset($_POST['sem_comprovante']) && $_POST['sem_comprovante'] === 'on') {
+            // Caso "Sem comprovante" tenha sido marcado
+            $file_name = "sem_comprovante.php";
+            $file_path = $target_dir . $file_name;
 
-        // Movendo o arquivo carregado
-        if (!move_uploaded_file($_FILES["comprovante_deposito"]["tmp_name"], $target_file)) {
-            throw new Exception("Falha ao mover o arquivo carregado para o diretório alvo.");
+            // Criando o conteúdo PHP com a mensagem centralizada e layout completo
+            $php_content = "<!DOCTYPE html>\n";
+            $php_content .= "<html lang=\"pt-br\">\n";
+            $php_content .= "<head>\n";
+            $php_content .= "    <meta charset=\"UTF-8\">\n";
+            $php_content .= "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
+            $php_content .= "    <title>Atlas - Sem Comprovante</title>\n";
+            $php_content .= "    <link rel=\"stylesheet\" href=\"../../../../style/css/bootstrap.min.css\">\n";
+            $php_content .= "    <link rel=\"stylesheet\" href=\"../../../../style/css/style.css\">\n";
+            $php_content .= "    <link rel=\"icon\" href=\"../../../../style/img/favicon.png\" type=\"image/png\">\n";
+            $php_content .= "</head>\n";
+            $php_content .= "<body class=\"light-mode\">\n";
+            $php_content .= "    <?php include(__DIR__ . '/../../../../menu.php'); ?>\n";
+            $php_content .= "    <div style=\"text-align: center; margin-top: 10%;\">\n";
+            $php_content .= "        <h2>SEM COMPROVANTE/RECIBO - CAIXA DE " . strtoupper($funcionario) . " - DATA " . date('d/m/Y', strtotime($data_caixa)) . "</h2>\n";
+            $php_content .= "    </div>\n";
+            $php_content .= "</body>\n";
+            $php_content .= "</html>";
+
+            // Salvando o arquivo PHP
+            if (!file_put_contents($file_path, $php_content)) {
+                throw new Exception("Falha ao criar o arquivo 'sem_comprovante.php'.");
+            }
+        } elseif (isset($_FILES["comprovante_deposito"]) && $_FILES["comprovante_deposito"]["error"] === UPLOAD_ERR_OK) {
+            // Processando o comprovante, se ele foi carregado
+            $file_name = basename($_FILES["comprovante_deposito"]["name"]);
+            $target_file = $target_dir . $file_name;
+
+            // Movendo o arquivo carregado
+            if (!move_uploaded_file($_FILES["comprovante_deposito"]["tmp_name"], $target_file)) {
+                throw new Exception("Falha ao mover o arquivo carregado para o diretório alvo.");
+            }
+        } else {
+            // Caso não tenha sido enviado nenhum arquivo e "Sem comprovante" não foi marcado
+            throw new Exception("Nenhum comprovante foi enviado.");
         }
 
         // Preparando a declaração SQL
@@ -56,4 +90,3 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 ob_end_clean();
 echo json_encode($response);
 exit;
-?>
