@@ -1892,8 +1892,6 @@ include(__DIR__ . '/db_connection.php');
             });
         }
 
-
-
         // Adicionar evento para recarregar a página ao fechar os modais
         $('#detalhesModal').on('hidden.bs.modal', function () {
             location.reload();
