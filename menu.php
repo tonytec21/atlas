@@ -122,10 +122,6 @@ $mode_query->close();
         body.dark-mode .card-header {
             background-color: rgb(255 0 0 / 3%)
         }
-        body.dark-mode .form-control:disabled {
-	        background-color: #e9ecef4f;
-        }
-
     </style>
 </head>
 <body class="<?php echo $mode; ?>">
