@@ -1194,7 +1194,7 @@ include(__DIR__ . '/db_connection.php');
 
     </script>
     <?php
-    include(__DIR__ . '/../rodape.php');
+        include(__DIR__ . '/../rodape.php');
     ?>
 </body>
 

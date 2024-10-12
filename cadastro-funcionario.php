@@ -2,7 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
-include(__DIR__ . '/checar_acesso_de_administrador.php');
+include(__DIR__ . '/checar_acesso_cadastro.php');
 
 $notificationMessage = null;
 $notificationType = null;
@@ -10,17 +10,19 @@ $notificationType = null;
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $id = isset($_POST['id']) ? $_POST['id'] : null;
     $usuario = $_POST['usuario'];
-    $senha = $_POST['senha'];
+    $senha = isset($_POST['senha']) ? $_POST['senha'] : null;
     $nome_completo = $_POST['nome_completo'];
     $cargo = $_POST['cargo'];
     $nivel_de_acesso = $_POST['nivel_de_acesso'];
+    $e_mail = !empty($_POST['e_mail']) ? $_POST['e_mail'] : null;
+    $acesso_adicional = !empty($_POST['acesso_adicional']) ? implode(',', $_POST['acesso_adicional']) : null;
 
     // Validação para permitir apenas letras e números no campo "Usuário"
     if (!preg_match('/^[a-zA-Z0-9]+$/', $usuario)) {
         $notificationMessage = "O campo Usuário deve conter apenas letras e números, sem espaços ou caracteres especiais.";
         $notificationType = 'danger';
     } else {
-        $errorMessage = saveFuncionario($id, $usuario, $senha, $nome_completo, $cargo, $nivel_de_acesso);
+        $errorMessage = saveFuncionario($id, $usuario, $senha, $nome_completo, $cargo, $nivel_de_acesso, $acesso_adicional, $e_mail);
         if ($errorMessage) {
             $notificationMessage = $errorMessage;
             $notificationType = 'danger';
@@ -32,8 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Função para cadastrar ou atualizar funcionários nos dois bancos de dados
-function saveFuncionario($id, $usuario, $senha, $nome_completo, $cargo, $nivel_de_acesso) {
-    $senha_base64 = base64_encode($senha);
+function saveFuncionario($id, $usuario, $senha, $nome_completo, $cargo, $nivel_de_acesso, $acesso_adicional, $e_mail) {
+    // Verificar se uma nova senha foi fornecida
+    $senha_base64 = !empty($senha) ? base64_encode($senha) : null;
 
     // Conexão com o banco de dados "atlas"
     $connAtlas = new mysqli("localhost", "root", "", "atlas");
@@ -65,15 +68,28 @@ function saveFuncionario($id, $usuario, $senha, $nome_completo, $cargo, $nivel_d
 
     // Verificar se é um novo cadastro ou atualização
     if ($id) {
-        $stmtAtlas = $connAtlas->prepare("UPDATE funcionarios SET usuario = ?, senha = ?, nome_completo = ?, cargo = ?, nivel_de_acesso = ? WHERE id = ?");
-        $stmtAtlas->bind_param("sssssi", $usuario, $senha_base64, $nome_completo, $cargo, $nivel_de_acesso, $id);
-        $stmtOficios = $connOficios->prepare("UPDATE funcionarios SET usuario = ?, senha = ?, nome_completo = ?, cargo = ?, nivel_de_acesso = ? WHERE id = ?");
-        $stmtOficios->bind_param("sssssi", $usuario, $senha_base64, $nome_completo, $cargo, $nivel_de_acesso, $id);
+        // Atualização: verificar se a senha foi fornecida
+        if ($senha_base64) {
+            $stmtAtlas = $connAtlas->prepare("UPDATE funcionarios SET usuario = ?, senha = ?, nome_completo = ?, cargo = ?, nivel_de_acesso = ?, acesso_adicional = ?, e_mail = ? WHERE id = ?");
+            $stmtAtlas->bind_param("sssssssi", $usuario, $senha_base64, $nome_completo, $cargo, $nivel_de_acesso, $acesso_adicional, $e_mail, $id);
+
+            $stmtOficios = $connOficios->prepare("UPDATE funcionarios SET usuario = ?, senha = ?, nome_completo = ?, cargo = ?, nivel_de_acesso = ?, acesso_adicional = ?, e_mail = ? WHERE id = ?");
+            $stmtOficios->bind_param("sssssssi", $usuario, $senha_base64, $nome_completo, $cargo, $nivel_de_acesso, $acesso_adicional, $e_mail, $id);
+        } else {
+            // Se não houver nova senha, não altere a senha
+            $stmtAtlas = $connAtlas->prepare("UPDATE funcionarios SET usuario = ?, nome_completo = ?, cargo = ?, nivel_de_acesso = ?, acesso_adicional = ?, e_mail = ? WHERE id = ?");
+            $stmtAtlas->bind_param("ssssssi", $usuario, $nome_completo, $cargo, $nivel_de_acesso, $acesso_adicional, $e_mail, $id);
+
+            $stmtOficios = $connOficios->prepare("UPDATE funcionarios SET usuario = ?, nome_completo = ?, cargo = ?, nivel_de_acesso = ?, acesso_adicional = ?, e_mail = ? WHERE id = ?");
+            $stmtOficios->bind_param("ssssssi", $usuario, $nome_completo, $cargo, $nivel_de_acesso, $acesso_adicional, $e_mail, $id);
+        }
     } else {
-        $stmtAtlas = $connAtlas->prepare("INSERT INTO funcionarios (usuario, senha, nome_completo, cargo, nivel_de_acesso) VALUES (?, ?, ?, ?, ?)");
-        $stmtAtlas->bind_param("sssss", $usuario, $senha_base64, $nome_completo, $cargo, $nivel_de_acesso);
-        $stmtOficios = $connOficios->prepare("INSERT INTO funcionarios (usuario, senha, nome_completo, cargo, nivel_de_acesso) VALUES (?, ?, ?, ?, ?)");
-        $stmtOficios->bind_param("sssss", $usuario, $senha_base64, $nome_completo, $cargo, $nivel_de_acesso);
+        // Inserção de um novo funcionário
+        $stmtAtlas = $connAtlas->prepare("INSERT INTO funcionarios (usuario, senha, nome_completo, cargo, nivel_de_acesso, acesso_adicional, e_mail) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmtAtlas->bind_param("sssssss", $usuario, $senha_base64, $nome_completo, $cargo, $nivel_de_acesso, $acesso_adicional, $e_mail);
+
+        $stmtOficios = $connOficios->prepare("INSERT INTO funcionarios (usuario, senha, nome_completo, cargo, nivel_de_acesso, acesso_adicional, e_mail) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmtOficios->bind_param("sssssss", $usuario, $senha_base64, $nome_completo, $cargo, $nivel_de_acesso, $acesso_adicional, $e_mail);
     }
 
     $stmtAtlas->execute();
@@ -149,6 +165,7 @@ $connAtlas->close();
     <script src="script/chart.js"></script>
     <link rel="stylesheet" href="style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="style/css/dataTables.bootstrap4.min.css">
+    <link href="style/css/select2.min.css" rel="stylesheet" />
     <style>
         .chart-container {
             position: relative;
@@ -194,6 +211,66 @@ $connAtlas->close();
             float: right;
             margin-left: 10px;
         }
+
+        .select2-container--default .select2-selection--multiple {
+            display: block;
+            width: 100%;
+            height: auto;
+            padding: .375rem .75rem;
+            font-size: 1rem;
+            font-weight: 400;
+            line-height: 1.5;
+            color: #495057;
+            background-color: #fff;
+            background-clip: padding-box;
+            border: 1px solid #ced4da; 
+            border-radius: .25rem;
+            transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+        }
+
+        .select2-container--default .select2-selection--multiple:focus,
+        .select2-container--default .select2-selection--multiple:active {
+            color: #495057;
+            background-color: #fff;
+            border-color: #80bdff; 
+            outline: 0;
+            box-shadow: 0 0 0 .2rem rgba(0, 123, 255, .25); 
+        }
+
+        .select2-container--default .select2-selection--multiple .select2-selection__placeholder {
+            color: #6c757d; 
+        }
+
+        .select2-container--default .select2-selection--multiple .select2-selection__choice {
+            background-color: #007bff; 
+            color: white; 
+            border-radius: .2rem;
+            padding: 0.25rem 0.75rem 0.25rem 0.5rem; 
+            margin-right: 0.25rem; 
+            margin-top: 0.25rem; 
+            display: inline-block;
+        }
+
+        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+            position: relative; 
+            right: 0;
+            margin-left: -0.5rem;
+            font-weight: bold;
+            font-size: 1rem; 
+            color: white; 
+            cursor: pointer;
+        }
+
+        .select2-container--default .select2-selection--multiple:focus {
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); 
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .select2-container--default .select2-selection--multiple {
+                transition: none;
+            }
+        }
     </style>
 </head>
 <body class="light-mode">
@@ -214,7 +291,7 @@ include(__DIR__ . '/menu.php');
                 </div>
                 <div class="form-group col-md-4">
                     <label for="senha">Senha</label>
-                    <input type="password" class="form-control" id="senha" name="senha" required>
+                    <input type="password" class="form-control" id="senha" name="senha">
                 </div>
                 <div class="form-group col-md-4">
                     <label for="nivel_de_acesso">Nível de Acesso</label>
@@ -236,6 +313,23 @@ include(__DIR__ . '/menu.php');
                 </div>
             </div>
 
+            <div class="row">
+                <div class="form-group col-md-8" id="email-container">
+                    <label for="e_mail">E-mail</label>
+                    <input type="email" class="form-control" id="e_mail" name="e_mail">
+                </div>
+                <div class="form-group col-md-4" id="acesso-adicional-container">
+                    <label for="acesso_adicional">Acesso Adicional</label>
+                    <select class="form-control select2" id="acesso_adicional" name="acesso_adicional[]" multiple="multiple">
+                        <option value="Controle de Tarefas">Controle de Tarefas</option>
+                        <option value="Fluxo de Caixa">Fluxo de Caixa</option>
+                        <option value="Controle de Contas a Pagar">Controle de Contas a Pagar</option>
+                        <option value="Cadastro de Funcionários">Cadastro de Funcionários</option>
+                        <!-- <option value="Configuração de Contas">Configuração de Contas</option> -->
+                    </select>
+                </div>
+            </div>
+
             <button type="submit" id="submit-button" class="btn btn-secondary" style="width: 100%"><i class="fa fa-floppy-o" aria-hidden="true"></i> Cadastrar</button>
         </form>
         <hr>
@@ -248,6 +342,8 @@ include(__DIR__ . '/menu.php');
                             <th>Nome Completo</th>
                             <th>Cargo</th>
                             <th>Nível de Acesso</th>
+                            <th>E-mail</th>
+                            <th>Acesso Adicional</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -258,9 +354,19 @@ include(__DIR__ . '/menu.php');
                                 <td><?php echo htmlspecialchars($funcionario['nome_completo'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($funcionario['cargo'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars(ucfirst($funcionario['nivel_de_acesso']), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars($funcionario['e_mail'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars($funcionario['acesso_adicional'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td>
-                                    <button class="btn btn-warning btn-edit" data-id="<?php echo $funcionario['id']; ?>" data-usuario="<?php echo htmlspecialchars($funcionario['usuario'], ENT_QUOTES, 'UTF-8'); ?>" data-nome="<?php echo htmlspecialchars($funcionario['nome_completo'], ENT_QUOTES, 'UTF-8'); ?>" data-cargo="<?php echo htmlspecialchars($funcionario['cargo'], ENT_QUOTES, 'UTF-8'); ?>" data-nivel_de_acesso="<?php echo htmlspecialchars($funcionario['nivel_de_acesso'], ENT_QUOTES, 'UTF-8'); ?>"><i class="fa fa-pencil" aria-hidden="true"></i></button>
-                                    <a href="?delete_id=<?php echo $funcionario['id']; ?>" class="btn btn-delete" onclick="return confirm('Tem certeza que deseja excluir este funcionário?');"><i class="fa fa-trash" aria-hidden="true"></i></a>
+                                    <button class="btn btn-warning btn-edit" 
+                                            data-id="<?php echo $funcionario['id']; ?>" 
+                                            data-usuario="<?php echo htmlspecialchars($funcionario['usuario'], ENT_QUOTES, 'UTF-8'); ?>" 
+                                            data-nome="<?php echo htmlspecialchars($funcionario['nome_completo'], ENT_QUOTES, 'UTF-8'); ?>" 
+                                            data-cargo="<?php echo htmlspecialchars($funcionario['cargo'], ENT_QUOTES, 'UTF-8'); ?>" 
+                                            data-nivel_de_acesso="<?php echo htmlspecialchars($funcionario['nivel_de_acesso'], ENT_QUOTES, 'UTF-8'); ?>" 
+                                            data-e_mail="<?php echo htmlspecialchars($funcionario['e_mail'], ENT_QUOTES, 'UTF-8'); ?>" 
+                                            data-acesso_adicional="<?php echo htmlspecialchars($funcionario['acesso_adicional'], ENT_QUOTES, 'UTF-8'); ?>"><i class="fa fa-pencil" aria-hidden="true"></i>
+                                    </button>
+                                    <a href="#" class="btn btn-delete" onclick="confirmDelete('<?php echo $funcionario['id']; ?>'); return false;"><i class="fa fa-trash" aria-hidden="true"></i></a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -280,21 +386,45 @@ include(__DIR__ . '/menu.php');
 <script src="script/jquery.mask.min.js"></script>
 <script src="script/jquery.dataTables.min.js"></script>
 <script src="script/dataTables.bootstrap4.min.js"></script>
+<script src="script/select2.min.js"></script>
+<script src="script/sweetalert2.js"></script>
 <script>
     function showNotification(message, type) {
-        var notification = $('.notification');
-        notification.removeClass('alert-success alert-danger');
         if (type === 'success') {
-            notification.css('background-color', '#28a745');
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: message,
+                showConfirmButton: false,
+                timer: 5000
+            });
         } else {
-            notification.css('background-color', '#dc3545');
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: message,
+                showConfirmButton: false,
+                timer: 5000
+            });
         }
-        $('#notification-message').text(message);
-        notification.fadeIn();
+    }
 
-        setTimeout(function() {
-            notification.fadeOut();
-        }, 5000);
+    function confirmDelete(id) {
+        Swal.fire({
+            title: 'Tem certeza?',
+            text: 'Tem certeza que deseja excluir este funcionário?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sim, excluir',
+            cancelButtonText: 'Não, cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Redireciona para a URL de exclusão se o usuário confirmar
+                window.location.href = '?delete_id=' + id;
+            }
+        });
     }
 
     $(document).ready(function() {
@@ -310,9 +440,48 @@ include(__DIR__ . '/menu.php');
             $('#nome_completo').val($(this).data('nome'));
             $('#cargo').val($(this).data('cargo'));
             $('#nivel_de_acesso').val($(this).data('nivel_de_acesso'));
-            $('#senha').val(''); // Limpar campo de senha ao editar
+            $('#e_mail').val($(this).data('e_mail'));
+
+            // Desabilitar o campo de senha e remover a obrigatoriedade ao editar
+            $('#senha').val(''); // Limpar o campo de senha
+            $('#senha').prop('disabled', true); // Desabilitar o campo de senha
+            $('#senha').removeAttr('required'); // Remover a obrigatoriedade
+            $('#senha-help-text').text('Deixe em branco para não alterar a senha.'); // Atualizar texto de ajuda
+
+            // Carregar o campo de acesso adicional corretamente
+            $('#acesso_adicional').val(null).trigger('change');
+            var acessoAdicional = $(this).data('acesso_adicional');
+            if (acessoAdicional) {
+                var acessos = acessoAdicional.split(',');
+                $('#acesso_adicional').val(acessos).trigger('change');
+            }
+
+            // Alterar o texto do botão para "Salvar Alterações"
             $('#submit-button').html('<i class="fa fa-floppy-o" aria-hidden="true"></i> Salvar Alterações');
-            $('html, body').animate({ scrollTop: 0 }, 'slow'); // Rolar para o topo do formulário
+            $('html, body').animate({ scrollTop: 0 }, 'slow');
+        });
+
+        // Resetar o formulário para o cadastro de novo funcionário
+        $('#novo-funcionario').on('click', function() {
+            $('#funcionario-id').val(''); // Limpar o ID
+            $('#usuario').val('');
+            $('#nome_completo').val('');
+            $('#cargo').val('');
+            $('#nivel_de_acesso').val('');
+            $('#e_mail').val('');
+
+            // Habilitar o campo de senha e definir como obrigatório ao cadastrar
+            $('#senha').val('');
+            $('#senha').prop('disabled', false); // Habilitar o campo de senha
+            $('#senha').attr('required', true); // Definir como obrigatório
+            $('#senha-help-text').text('Obrigatório ao cadastrar.');
+
+            // Limpar o campo de acesso adicional
+            $('#acesso_adicional').val(null).trigger('change');
+
+            // Alterar o texto do botão para "Cadastrar"
+            $('#submit-button').html('<i class="fa fa-floppy-o" aria-hidden="true"></i> Cadastrar');
+            $('html, body').animate({ scrollTop: 0 }, 'slow');
         });
 
         // Inicializar o DataTable após os dados serem carregados
@@ -338,12 +507,45 @@ include(__DIR__ . '/menu.php');
         // Validação do campo "Usuário" para aceitar apenas letras e números
         $('#usuario').on('input', function() {
             var usuario = $(this).val();
-            var sanitizedUsuario = usuario.replace(/[^a-zA-Z0-9]/g, ''); // Remove espaços e caracteres especiais
+            var sanitizedUsuario = usuario.replace(/[^a-zA-Z0-9]/g, '');
             if (usuario !== sanitizedUsuario) {
-                $(this).val(sanitizedUsuario); // Atualiza o campo com o valor sanitizado
+                $(this).val(sanitizedUsuario); 
             }
         });
     });
+
+    $(document).ready(function() {
+        $('.select2').select2({
+            placeholder: "",
+            allowClear: true
+        });
+    });
+
+    $(document).ready(function() {
+        // Inicializar o select2
+        $('.select2').select2({
+            placeholder: "Selecione os acessos adicionais",
+            allowClear: true
+        });
+
+        function toggleAcessoAdicional() {
+            var nivelDeAcesso = $('#nivel_de_acesso').val();
+            if (nivelDeAcesso === 'usuario') {
+                $('#acesso-adicional-container').show(); 
+                $('#email-container').removeClass('col-md-12').addClass('col-md-8');
+            } else {
+                $('#acesso-adicional-container').hide(); 
+                $('#email-container').removeClass('col-md-8').addClass('col-md-12'); 
+            }
+        }
+
+        toggleAcessoAdicional();
+
+        $('#nivel_de_acesso').on('change', function() {
+            toggleAcessoAdicional();
+        });
+    });
+
 </script>
 
 <br><br><br>

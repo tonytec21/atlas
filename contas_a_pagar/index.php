@@ -2,7 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
-include '../checar_acesso_de_administrador.php';
+include(__DIR__ . '/checar_acesso_de_administrador.php');
 date_default_timezone_set('America/Sao_Paulo');
 
 // Função para atualizar recorrências automaticamente
@@ -70,6 +70,46 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
             border-radius: 5px;
             border: none;
         }
+
+        #modalVisualizarComprovante .modal-dialog, #visualizarModal .modal-dialog {
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+        }
+
+        #modalVisualizarComprovante .modal-content, #visualizarModal .modal-content {
+            height: 95%;
+        }
+
+        #modalVisualizarComprovante .modal-body, #visualizarModal .modal-body {
+            flex-grow: 1;
+            padding: 0; 
+        }
+
+        #modalVisualizarComprovante #comprovante_visualizacao, #visualizarModal #anexo_visualizacao {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .btn-close {
+            outline: none;
+            border: none; 
+            background: none;
+            padding: 0; 
+            font-size: 1.5rem;
+            cursor: pointer; 
+            transition: transform 0.2s ease;
+        }
+
+        .btn-close:hover {
+            transform: scale(2.10);
+        }
+
+        .btn-close:focus {
+            outline: none;
+        }
+
 
     </style>
 
@@ -256,16 +296,16 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
 
     <!-- Modal para visualização do anexo -->
     <div class="modal fade" id="visualizarModal" tabindex="-1" role="dialog" aria-labelledby="visualizarModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" style="max-width: 70%;">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header d-block text-center">
+                <div class="modal-header">
                     <h5 class="modal-title" id="visualizarModalLabel">Visualizar Anexo</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="position: absolute; top: 10px; right: 10px;">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
-                    <iframe id="anexo_visualizacao" style="width: 100%; height: 600px;" frameborder="0"></iframe>
+                    <iframe id="anexo_visualizacao" frameborder="0"></iframe>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
@@ -278,10 +318,10 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
     <div class="modal fade" id="contasModal" tabindex="-1" role="dialog" aria-labelledby="contasModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
-                <div class="modal-header d-block text-center">
+                <div class="modal-header">
                     <h5 class="modal-title" id="contasModalLabel">Contas Vencidas e Prestes a Vencer</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="position: absolute; top: 10px; right: 10px;">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
@@ -349,12 +389,12 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
 
     <!-- Modal para Anexar Comprovante -->
     <div class="modal fade" id="modalAnexo" tabindex="-1" role="dialog" aria-labelledby="modalAnexoLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 20%;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modalAnexoLabel">Anexar Comprovante de Pagamento</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
@@ -364,7 +404,7 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                             <label for="comprovante">Selecione o comprovante:</label>
                             <input type="file" class="form-control" id="comprovante" name="comprovante" required>
                         </div>
-                        <button type="submit" class="btn btn-primary">Enviar</button>
+                        <button type="submit" class="btn btn-primary w-100">Enviar</button>
                     </form>
                 </div>
             </div>
@@ -377,12 +417,12 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modalVisualizarComprovanteLabel">Visualizar Comprovante</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
-                    <iframe id="comprovante_visualizacao" style="width: 100%; height: 600px;" frameborder="0"></iframe>
+                    <iframe id="comprovante_visualizacao"  frameborder="0"></iframe>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
@@ -397,6 +437,7 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
+    <script src='../script/sweetalert2.js'></script>
     <script>
         $(document).ready(function() {
             // Inicializa a máscara de moeda no campo de valor
@@ -418,7 +459,12 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                 $('#anexo_visualizacao').attr('src', caminhoAnexo);
                 $('#visualizarModal').modal('show');
             } else {
-                alert('Nenhum anexo disponível para esta conta.');
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Sem Anexo',
+                    text: 'Nenhum anexo disponível para esta conta.',
+                    confirmButtonText: 'OK'
+                });
             }
         }
 
@@ -429,57 +475,112 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
 
         // Função para cancelar a conta (definir status como "Cancelado")
         function excluirConta(id) {
-            if (confirm('Tem certeza que deseja cancelar esta conta?')) {
-                $.ajax({
-                    url: 'excluir_conta.php',
-                    type: 'POST',
-                    data: { id: id },
-                    success: function(response) {
-                        var res = JSON.parse(response);
-                        if (res.success) {
-                            alert('Conta cancelada com sucesso.');
-                            window.location.reload();
-                        } else {
-                            alert('Erro ao cancelar a conta: ' + res.message);
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: "Deseja realmente cancelar esta conta?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, cancelar!',
+                cancelButtonText: 'Não, cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: 'excluir_conta.php',
+                        type: 'POST',
+                        data: { id: id },
+                        success: function(response) {
+                            var res = JSON.parse(response);
+                            if (res.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Cancelada!',
+                                    text: 'Conta cancelada com sucesso.',
+                                    confirmButtonText: 'OK'
+                                }).then(() => {
+                                    window.location.reload();
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro!',
+                                    text: 'Erro ao cancelar a conta: ' + res.message,
+                                    confirmButtonText: 'OK'
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: 'Erro ao cancelar a conta.',
+                                confirmButtonText: 'OK'
+                            });
                         }
-                    },
-                    error: function() {
-                        alert('Erro ao cancelar a conta.');
-                    }
-                });
-            }
+                    });
+                }
+            });
         }
 
         // Função para definir a conta como paga
         function definirComoPago(id) {
-            if (confirm('Tem certeza que deseja definir esta conta como paga?')) {
-                $.ajax({
-                    url: 'definir_pago.php',
-                    type: 'POST',
-                    data: { id: id },
-                    success: function(response) {
-                        var res = JSON.parse(response);
-                        if (res.success) {
-                            alert('Conta marcada como paga.');
-                            window.location.reload();
-                        } else {
-                            alert('Erro ao marcar a conta como paga: ' + res.message);
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: "Deseja realmente definir esta conta como paga?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, definir!',
+                cancelButtonText: 'Não'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: 'definir_pago.php',
+                        type: 'POST',
+                        data: { id: id },
+                        success: function(response) {
+                            var res = JSON.parse(response);
+                            if (res.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Marcada como paga!',
+                                    text: 'Conta marcada como paga com sucesso.',
+                                    confirmButtonText: 'OK'
+                                }).then(() => {
+                                    window.location.reload();
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro!',
+                                    text: 'Erro ao marcar a conta como paga: ' + res.message,
+                                    confirmButtonText: 'OK'
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: 'Erro ao marcar a conta como paga.',
+                                confirmButtonText: 'OK'
+                            });
                         }
-                    },
-                    error: function() {
-                        alert('Erro ao marcar a conta como paga.');
-                    }
-                });
-            }
+                    });
+                }
+            });
         }
-    
+
         function visualizarComprovante(caminho_comprovante) {
             // Se o comprovante existe, mostrar no modal
             if (caminho_comprovante) {
                 $('#comprovante_visualizacao').attr('src', caminho_comprovante);
                 $('#modalVisualizarComprovante').modal('show');
             } else {
-                alert('Nenhum comprovante disponível para esta conta.');
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Sem Comprovante',
+                    text: 'Nenhum comprovante disponível para esta conta.',
+                    confirmButtonText: 'OK'
+                });
             }
         }
 
@@ -502,23 +603,45 @@ $contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
                         res = JSON.parse(response);  // Valida a resposta JSON
                     } catch (error) {
                         console.error('Erro ao processar JSON: ', error, response);
-                        alert('Erro ao processar a resposta do servidor.');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao processar a resposta do servidor.',
+                            confirmButtonText: 'OK'
+                        });
                         return;
                     }
 
                     if (res.success) {
-                        alert('Comprovante enviado com sucesso.');
-                        $('#modalAnexo').modal('hide');
-                        window.location.reload();  // Atualiza a página para refletir a mudança
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Comprovante enviado com sucesso.',
+                            confirmButtonText: 'OK'
+                        }).then(() => {
+                            $('#modalAnexo').modal('hide');
+                            window.location.reload();
+                        });
                     } else {
-                        alert('Erro ao enviar o comprovante: ' + res.message);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao enviar o comprovante: ' + res.message,
+                            confirmButtonText: 'OK'
+                        });
                     }
                 },
                 error: function() {
-                    alert('Erro ao enviar o comprovante.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao enviar o comprovante.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             });
         });
+
 
 
 

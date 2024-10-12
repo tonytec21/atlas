@@ -21,25 +21,23 @@ include(__DIR__ . '/db_connection.php');
             background: #34495e;
             color: #fff;
         }
-        /* Remover a borda de foco no botão de fechar */
+        
         .btn-close {
-            outline: none; /* Remove a borda ao clicar */
-            border: none; /* Remove qualquer borda padrão */
-            background: none; /* Remove o fundo padrão */
-            padding: 0; /* Remove o espaçamento extra */
-            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
-            cursor: pointer; /* Mostra o ponteiro de clique */
-            transition: transform 0.2s ease; /* Suaviza a transição do hover */
+            outline: none; 
+            border: none; 
+            background: none;
+            padding: 0; 
+            font-size: 1.5rem;
+            cursor: pointer; 
+            transition: transform 0.2s ease;
         }
 
-        /* Aumentar o tamanho do botão em 5% no hover */
         .btn-close:hover {
-            transform: scale(2.10); /* Aumenta 5% */
+            transform: scale(2.10); 
         }
 
-        /* Opcional: Adicionar foco suave sem borda visível */
         .btn-close:focus {
-            outline: none; /* Remove a borda ao foco */
+            outline: none;
         }
         .btn-adicionar {
             height: 38px;
@@ -222,6 +220,23 @@ include(__DIR__ . '/db_connection.php');
         echo "<script>alert('O usuário não tem acesso à página.'); window.location.href='../index.php';</script>";
         exit;
     }
+
+    $query = "SELECT usuario, nome_completo, nivel_de_acesso, acesso_adicional FROM funcionarios WHERE usuario = :usuario";
+    $stmt = $conn->prepare($query);
+    $stmt->bindParam(':usuario', $_SESSION['username']);
+    $stmt->execute();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $temAcessoFluxoDeCaixa = false;
+
+    // Verifica se o nível de acesso é "usuario" e se tem o acesso adicional "Fluxo de Caixa"
+    if ($user['nivel_de_acesso'] === 'usuario' && !empty($user['acesso_adicional'])) {
+        $acessosAdicionais = explode(',', $user['acesso_adicional']);
+        $acessosAdicionais = array_map('trim', $acessosAdicionais); // Remove espaços extras
+        if (in_array('Fluxo de Caixa', $acessosAdicionais)) {
+            $temAcessoFluxoDeCaixa = true;
+        }
+    }
     ?>
 
     <div id="main" class="main-content">
@@ -232,19 +247,26 @@ include(__DIR__ . '/db_connection.php');
                 <div class="form-row">
                     <div class="form-group col-md-4">
                         <label for="funcionario">Funcionário:</label>
-                        <select class="form-control" id="funcionario" name="funcionario" <?php echo $user['nivel_de_acesso'] === 'usuario' ? 'disabled' : ''; ?>>
-                            <?php if ($user['nivel_de_acesso'] === 'administrador') { ?>
+                        <select class="form-control" id="funcionario" name="funcionario" <?php echo $user['nivel_de_acesso'] === 'usuario' && !$temAcessoFluxoDeCaixa ? 'disabled' : ''; ?>>
+                            <?php if ($user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxoDeCaixa) { ?>
                                 <option value="todos">Todos</option>
-                                <!-- <option value="caixa_unificado">Caixa Unificado</option> -->
+                                <option value="caixa_unificado">Caixa Unificado</option>
                             <?php } ?>
                             <?php
-                            $query = $user['nivel_de_acesso'] === 'administrador' ? "SELECT usuario, nome_completo FROM funcionarios WHERE status = 'ativo'" : "SELECT usuario, nome_completo FROM funcionarios WHERE usuario = :usuario";
-                            $stmt = $conn->prepare($query);
-                            if ($user['nivel_de_acesso'] !== 'administrador') {
+                            // Definir a query de acordo com o nível de acesso ou o acesso adicional
+                            $queryFuncionarios = $user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxoDeCaixa ?
+                                "SELECT usuario, nome_completo FROM funcionarios WHERE status = 'ativo'" :
+                                "SELECT usuario, nome_completo FROM funcionarios WHERE usuario = :usuario";
+
+                            $stmt = $conn->prepare($queryFuncionarios);
+                            
+                            if ($user['nivel_de_acesso'] !== 'administrador' && !$temAcessoFluxoDeCaixa) {
                                 $stmt->bindParam(':usuario', $user['usuario']);
                             }
+                            
                             $stmt->execute();
                             $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            
                             foreach ($funcionarios as $funcionario) {
                                 echo '<option value="' . $funcionario['usuario'] . '">' . $funcionario['nome_completo'] . '</option>';
                             }
@@ -277,13 +299,14 @@ include(__DIR__ . '/db_connection.php');
                         <tr>
                             <th>Funcionário</th>
                             <th>Data</th>
+                            <th class="saldoInicialColumn">Saldo Inicial</th>
                             <th>Atos Liquidados</th>
                             <th>Recebido em Conta</th>
                             <th>Recebido em Espécie</th>
                             <th>Devoluções</th>
                             <th>Saídas e Despesas</th>
                             <th>Depósito do Caixa</th>
-                            <th>Total em Caixa</th>
+                            <th class="totalEmCaixaColumn">Total em Caixa</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -294,17 +317,26 @@ include(__DIR__ . '/db_connection.php');
                         $filtered = false;
                         $isUnificado = false;
 
+                        // Verifica se o usuário é "administrador" ou se tem acesso adicional para "Fluxo de Caixa"
+                        $temAcessoCompleto = ($user['nivel_de_acesso'] === 'administrador' || in_array('Fluxo de Caixa', explode(',', $user['acesso_adicional'])));
+
                         if (isset($_GET['funcionario']) && $_GET['funcionario'] !== 'todos' && $_GET['funcionario'] !== 'caixa_unificado') {
+                            // Se um funcionário específico foi selecionado
                             $conditions[] = 'funcionario = :funcionario';
                             $params[':funcionario'] = $_GET['funcionario'];
                             $filtered = true;
-                        } elseif ($user['nivel_de_acesso'] === 'usuario') {
+                        } elseif ($temAcessoCompleto) {
+                            // Se o usuário tem acesso completo (administrador ou Fluxo de Caixa), ele pode ver todos os caixas
+                            // Não há filtro de funcionário, o usuário pode visualizar todos os funcionários
+                            if (isset($_GET['funcionario']) && $_GET['funcionario'] === 'caixa_unificado') {
+                                $isUnificado = true;
+                            }
+                        } else {
                             $conditions[] = 'funcionario = :funcionario';
                             $params[':funcionario'] = $user['usuario'];
                             $filtered = true;
-                        } elseif (isset($_GET['funcionario']) && $_GET['funcionario'] === 'caixa_unificado') {
-                            $isUnificado = true;
                         }
+                        
 
                         if (!empty($_GET['data_inicial']) && !empty($_GET['data_final'])) {
                             $conditions[] = 'DATE(data) BETWEEN :data_inicial AND :data_final';
@@ -411,7 +443,7 @@ include(__DIR__ . '/db_connection.php');
                             $total_devolucoes = $resultado['total_devolucoes'];
                             $total_saidas = $resultado['total_saidas'];
                             $total_depositos = $resultado['total_depositos'];
-                            $saldo_inicial = $resultado['saldo_inicial'];
+                            $saldo_inicial = isset($resultado['saldo_inicial']) ? $resultado['saldo_inicial'] : 0.0;
 
                             // Calculando valores
                             $totalRecebidoConta = 0;
@@ -481,14 +513,30 @@ include(__DIR__ . '/db_connection.php');
                             $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
 
                             // Total em Caixa
-                            $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa - $totalSaldoTransportado;
+                            // Para caixas unificados, considere o saldo transportado:
+                            if ($isUnificado) {
+                                $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa;
+                                
+                                // Subtrai o saldo transportado para o caixa unificado
+                                $stmt = $conn->prepare('SELECT SUM(valor_transportado) as total_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data');
+                                $stmt->bindParam(':data', $data);
+                                $stmt->execute();
+                                $saldoTransportado = $stmt->fetch(PDO::FETCH_ASSOC);
+                                
+                                if ($saldoTransportado && isset($saldoTransportado['total_transportado'])) {
+                                    $totalEmCaixa -= $saldoTransportado['total_transportado'];
+                                }
+                            } else {
+                                // Para caixas individuais
+                                $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa - $totalSaldoTransportado;
+                            }
+
 
                             ?>
                             <tr>
                                 <td><?php echo $funcionarios; ?></td>
-                                <td data-order="<?php echo date('Y-m-d', strtotime($data)); ?>">
-                                    <?php echo date('d/m/Y', strtotime($data)); ?>
-                                </td>
+                                <td data-order="<?php echo date('Y-m-d', strtotime($data)); ?>"><?php echo date('d/m/Y', strtotime($data)); ?></td>
+                                <td><?php echo 'R$ ' . number_format($saldoInicial, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_atos, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($totalRecebidoConta, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($totalRecebidoEspecie, 2, ',', '.'); ?></td>
@@ -514,7 +562,6 @@ include(__DIR__ . '/db_connection.php');
             </div>
         </div>
     </div>
-
 
     <!-- Modal de Detalhes -->
     <div class="modal fade" id="detalhesModal" tabindex="-1" role="dialog" aria-labelledby="detalhesModalLabel" aria-hidden="true">
@@ -1005,13 +1052,61 @@ include(__DIR__ . '/db_connection.php');
     <script src="../script/sweetalert2.js"></script>
     <script>
         $(document).ready(function() {
-            // Inicializar DataTable
-            $('#tabelaResultados').DataTable({
+            var table = $('#tabelaResultados').DataTable({
                 "language": {
                     "url": "../style/Portuguese-Brasil.json"
                 },
                 "pageLength": 10,
-                "order": [[1, 'desc']] // Ordena a primeira coluna (índice 0) em ordem decrescente
+                "order": [[1, 'desc']], // Ordena a primeira coluna (índice 1) em ordem decrescente
+                "autoWidth": false, // Desativa o ajuste automático de largura
+                "responsive": true // Para garantir que a tabela seja responsiva
+            });
+
+            function toggleColumns(isUnificado) {
+                var saldoInicialColumn = table.column('.saldoInicialColumn');
+                var totalEmCaixaColumn = table.column('.totalEmCaixaColumn');
+
+                if (isUnificado) {
+                    saldoInicialColumn.visible(false); // Oculta a coluna Saldo Inicial
+                    totalEmCaixaColumn.visible(false); // Oculta a coluna Total em Caixa
+                } else {
+                    saldoInicialColumn.visible(true);  // Exibe a coluna Saldo Inicial
+                    totalEmCaixaColumn.visible(true);  // Exibe a coluna Total em Caixa
+                }
+            }
+
+            // Função para detectar o valor de um parâmetro na URL
+            function getParameterByName(name) {
+                var url = window.location.href;
+                name = name.replace(/[\[\]]/g, '\\$&');
+                var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
+                var results = regex.exec(url);
+                if (!results) return null;
+                if (!results[2]) return '';
+                return decodeURIComponent(results[2].replace(/\+/g, ' '));
+            }
+
+            // Verifica se a opção "caixa_unificado" foi selecionada no filtro da pesquisa
+            var selectedFuncionario = getParameterByName('funcionario');
+
+            if (selectedFuncionario === 'caixa_unificado') {
+                toggleColumns(true); // Oculta as colunas necessárias se for caixa unificado
+            } else {
+                toggleColumns(false); // Exibe as colunas se for um funcionário específico ou todos
+            }
+
+            $('#pesquisarForm').on('submit', function(event) {
+                event.preventDefault(); // Previne o envio do formulário padrão
+
+                var selectedOption = $('#funcionario').val();
+
+                if (selectedOption === 'caixa_unificado') {
+                    toggleColumns(true);
+                } else {
+                    toggleColumns(false);
+                }
+
+                this.submit(); // Envia o formulário manualmente após alterar as colunas
             });
 
             // Inicializar máscara de dinheiro
@@ -2016,7 +2111,8 @@ include(__DIR__ . '/db_connection.php');
             });
         });
     </script>
-
-
+        <?php
+            include(__DIR__ . '/../rodape.php');
+      ?>
 </body>
 </html>

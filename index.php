@@ -9,14 +9,19 @@ date_default_timezone_set('America/Sao_Paulo');
 $username = $_SESSION['username'];
 $connAtlas = new mysqli("localhost", "root", "", "atlas");
 
-// Consulta para verificar o nível de acesso do usuário
-$sql = "SELECT nivel_de_acesso FROM funcionarios WHERE usuario = ?";
+// Consulta para verificar o nível de acesso e acesso adicional do usuário
+$sql = "SELECT nivel_de_acesso, acesso_adicional FROM funcionarios WHERE usuario = ?";
 $stmt = $connAtlas->prepare($sql);
 $stmt->bind_param("s", $username);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 $nivel_de_acesso = $user['nivel_de_acesso'];
+
+// Verificar se o usuário tem acesso adicional a "Controle de Tarefas"
+$acesso_adicional = $user['acesso_adicional'];
+$acessos = array_map('trim', explode(',', $acesso_adicional));
+$tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
 
 ?>
 <!DOCTYPE html>
@@ -382,12 +387,9 @@ include(__DIR__ . '/menu.php');
                 <a href="guia_de_recebimento/index.php" class="btn btn-4 w-100"><i class="fa fa-file-text" aria-hidden="true"></i> Guia de Recebimento</a>
             </div>
             <div class="col-md-4 ui-sortable-handle" id="btn-contas">
-                <?php if ($nivel_de_acesso === 'administrador') : ?>
                     <a href="contas_a_pagar/index.php" class="btn btn-5 w-100"><i class="fa fa-usd" aria-hidden="true"></i> Controle de Contas a Pagar</a>
-                <?php else : ?>
-                    <button class="btn btn-5 w-100" data-bs-toggle="modal" data-bs-target="#accessDeniedModal"><i class="fa fa-usd" aria-hidden="true"></i> Controle de Contas a Pagar</button>
-                <?php endif; ?>
             </div>
+
             <div class="col-md-4 ui-sortable-handle" id="btn-manuais">
                 <a href="manuais/index.php" class="btn btn-6 w-100"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
             </div>

@@ -205,9 +205,16 @@ try {
         return $carry + floatval($item['valor_transportado']);
     }, 0.0);
 
-    $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
-    $stmt->bindParam(':data', $data);
-    $stmt->bindParam(':funcionario', $funcionarios);
+    if ($tipo === 'unificado') {
+        // Para o caixa unificado, somamos os saldos iniciais de todos os caixas na data especificada
+        $stmt = $conn->prepare('SELECT SUM(saldo_inicial) as saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data');
+        $stmt->bindParam(':data', $data);
+    } else {
+        // Para o caixa individual, pegamos o saldo inicial específico do funcionário
+        $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
+        $stmt->bindParam(':data', $data);
+        $stmt->bindParam(':funcionario', $funcionarios);
+    }    
     $stmt->execute();
     $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
     $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;

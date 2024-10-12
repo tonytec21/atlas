@@ -10,14 +10,19 @@ if (isset($_SESSION['username'])) {
     die('Usuário não logado.');
 }
 
-// Verifique o nome completo e o nível de acesso do usuário logado
-$sqlUser = "SELECT nome_completo, nivel_de_acesso FROM funcionarios WHERE usuario = '$usuarioLogado' AND status = 'ativo'";
+// Verifique o nome completo, nível de acesso e acesso adicional do usuário logado
+$sqlUser = "SELECT nome_completo, nivel_de_acesso, acesso_adicional FROM funcionarios WHERE usuario = '$usuarioLogado' AND status = 'ativo'";
 $resultUser = $conn->query($sqlUser);
 
 if ($resultUser->num_rows > 0) {
     $userData = $resultUser->fetch_assoc();
     $nomeCompleto = $userData['nome_completo'];
     $nivelAcesso = $userData['nivel_de_acesso'];
+    $acessoAdicional = $userData['acesso_adicional'];
+
+    // Verificar se o usuário tem acesso adicional a "Controle de Tarefas"
+    $acessos = array_map('trim', explode(',', $acessoAdicional));
+    $temAcessoTotal = in_array('Controle de Tarefas', $acessos);
 } else {
     die('Usuário não encontrado ou inativo.');
 }
@@ -39,8 +44,8 @@ $sql = "SELECT tarefas.*, categorias.titulo AS categoria_titulo, origem.titulo A
         LEFT JOIN origem ON tarefas.origem = origem.id 
         WHERE 1=1";
 
-// Se o nível de acesso for 'usuario', filtrar apenas as tarefas atribuídas ao usuário logado
-if ($nivelAcesso === 'usuario') {
+// Se o nível de acesso for 'usuario', mas ele não tiver acesso total, filtrar apenas as tarefas atribuídas ao usuário logado
+if ($nivelAcesso === 'usuario' && !$temAcessoTotal) {
     $sql .= " AND tarefas.funcionario_responsavel = '$nomeCompleto'";
 }
 

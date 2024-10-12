@@ -1,7 +1,7 @@
 <?php
 include(__DIR__ . '/session_check.php');
 checkSession();
-include '../checar_acesso_de_administrador.php';
+include(__DIR__ . '/checar_acesso_de_administrador.php');
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -15,7 +15,6 @@ include '../checar_acesso_de_administrador.php';
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
-    <link rel="stylesheet" href="../style/css/toastr.min.css">
 </head>
 
 <body class="light-mode">
@@ -89,7 +88,7 @@ include '../checar_acesso_de_administrador.php';
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
-    <script src="../script/toastr.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
         $(document).ready(function() {
             // Formatar o campo de valor como moeda brasileira
@@ -119,24 +118,46 @@ include '../checar_acesso_de_administrador.php';
                                 response = JSON.parse(response);
                             }
                             if (response.success) {
-                                toastr.success(response.message, 'Sucesso');
-                                setTimeout(function() {
-                                    window.location.reload();
-                                }, 2000);
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Sucesso!',
+                                    text: response.message,
+                                    confirmButtonText: 'OK'
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        window.location.reload();
+                                    }
+                                });
                             } else {
-                                toastr.error(response.message, 'Erro');
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro!',
+                                    text: response.message,
+                                    confirmButtonText: 'OK'
+                                });
                             }
                         } catch (e) {
-                            toastr.error('Erro ao processar resposta do servidor.', 'Erro');
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: 'Erro ao processar resposta do servidor.',
+                                confirmButtonText: 'OK'
+                            });
                             console.error('Erro de parsing JSON:', e);
                         }
                     },
                     error: function() {
-                        toastr.error('Erro ao cadastrar conta.', 'Erro');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao cadastrar conta.',
+                            confirmButtonText: 'OK'
+                        });
                     }
                 });
             });
         });
+
     </script>
     <?php include(__DIR__ . '/../rodape.php'); ?>
 </body>

@@ -23,6 +23,30 @@ $connAtlas->close();
 
 $nivel_de_acesso = $userData['nivel_de_acesso'];
 
+// Verificar o acesso adicional do usuário logado
+$tem_acesso_controle_contas = false;
+$tem_acesso_cadastro_funcionarios = false;
+
+if ($nivel_de_acesso === 'usuario') {
+    // Fazer uma única consulta para pegar o acesso adicional do usuário
+    $stmt_acesso = $conn->prepare("SELECT acesso_adicional FROM funcionarios WHERE usuario = ?");
+    $stmt_acesso->bind_param("s", $username);
+    $stmt_acesso->execute();
+    $result_acesso = $stmt_acesso->get_result();
+    $user_acesso_data = $result_acesso->fetch_assoc();
+    $stmt_acesso->close();
+
+    // Verificar se o acesso adicional contém "Controle de Contas a Pagar"
+    if (strpos($user_acesso_data['acesso_adicional'], 'Controle de Contas a Pagar') !== false) {
+        $tem_acesso_controle_contas = true;
+    }
+
+    // Verificar se o acesso adicional contém "Cadastro de Funcionários"
+    if (strpos($user_acesso_data['acesso_adicional'], 'Cadastro de Funcionários') !== false) {
+        $tem_acesso_cadastro_funcionarios = true;
+    }
+}
+
 // Verificar o modo atual do usuário (light-mode ou dark-mode)
 $mode = 'light-mode';
 $mode_query = $conn->prepare("SELECT modo FROM modo_usuario WHERE usuario = ?");
@@ -146,20 +170,28 @@ $mode_query->close();
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/suas_notas/index.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Anotações</a>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/manuais/index.php'?>"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
 
-        <?php if ($nivel_de_acesso === 'administrador'): ?>
+        <?php if ($nivel_de_acesso === 'administrador' || $tem_acesso_controle_contas): ?>
+            <button class="dropdown-btn"><i class="fa fa-usd" aria-hidden="true"></i> Contas a Pagar 
+                <i class="fa fa-caret-down"></i>
+            </button>
             <div class="dropdown-container">
-                <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/index.php'?>"><i class="fa fa-eye" aria-hidden="true"></i> Ver Ofícios</a>
-                <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/oficios/cadastrar-oficio.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Criar Ofício</a>
+                <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/contas_a_pagar/index.php'?>"><i class="fa fa-eye" aria-hidden="true"></i> Ver Contas a Pagar</a>
+                <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/contas_a_pagar/cadastrar.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Cadastrar Contas a Pagar</a>
             </div>
-            <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/contas_a_pagar/index.php'?>"><i class="fa fa-usd" aria-hidden="true"></i> Controle de Contas a Pagar</a>
-            <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/contas_a_pagar/cadastrar.php'?>"><i class="fa fa-plus-circle" aria-hidden="true"></i> Cadastrar Contas a Pagar</a>
+        <?php endif; ?>
+
+        <?php if ($nivel_de_acesso === 'administrador' || $tem_acesso_cadastro_funcionarios): ?>            
             <button class="dropdown-btn"><i class="fa fa-cog" aria-hidden="true"></i> Administração 
                 <i class="fa fa-caret-down"></i>
             </button>
             <div class="dropdown-container">
-                <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-serventia.php'?>"><i class="fa fa-cog" aria-hidden="true"></i> Dados da Serventia</a>
-                <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-funcionario.php'?>"><i class="fa fa-users" aria-hidden="true"></i> Cadastro de Funcionários</a>
-                <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/os/configuracao_os.php'?>"><i class="fa fa-university" aria-hidden="true"></i> Configuração de Contas</a>
+                <?php if ($nivel_de_acesso === 'administrador'): ?>
+                    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-serventia.php'?>"><i class="fa fa-cog" aria-hidden="true"></i> Dados da Serventia</a>
+                    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/os/configuracao_os.php'?>"><i class="fa fa-university" aria-hidden="true"></i> Configuração de Contas</a>
+                <?php endif; ?>
+                <?php if ($nivel_de_acesso === 'administrador' || $tem_acesso_cadastro_funcionarios): ?>
+                    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-funcionario.php'?>"><i class="fa fa-users" aria-hidden="true"></i> Cadastro de Funcionários</a>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>

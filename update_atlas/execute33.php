@@ -18,7 +18,7 @@ function criarTabelaSeNecessario($conn, $queryCriarTabela) {
 }
 
 $tabelas = [
-    "ALTER TABLE `funcionarios` ADD COLUMN `acesso_adicional` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8_general_ci' AFTER `status`;",
+    "ALTER TABLE `funcionarios` ADD COLUMN `acesso_adicional` MEDIUMTEXT NULL DEFAULT NULL COLLATE 'utf8_general_ci' AFTER `status`;",
     "ALTER TABLE `funcionarios` ADD COLUMN `e_mail` VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8_general_ci' AFTER `acesso_adicional`;"
 ];
 

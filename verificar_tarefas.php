@@ -12,10 +12,10 @@ function checkSession() {
 
 checkSession();
 
-// Obtendo o nome completo e nível de acesso do usuário logado
+// Obtendo o nome completo, nível de acesso e acessos adicionais do usuário logado
 $username = $_SESSION['username'];
 
-$sql = "SELECT nome_completo, nivel_de_acesso FROM funcionarios WHERE usuario = ?";
+$sql = "SELECT nome_completo, nivel_de_acesso, acesso_adicional FROM funcionarios WHERE usuario = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $username);
 $stmt->execute();
@@ -24,6 +24,11 @@ $funcionario = $result->fetch_assoc();
 $nome_completo = $funcionario['nome_completo'];
 $nivel_de_acesso = $funcionario['nivel_de_acesso'];
 
+// Verificar se o usuário tem acesso adicional a "Controle de Tarefas"
+$acesso_adicional = $funcionario['acesso_adicional'];
+$acessos = array_map('trim', explode(',', $acesso_adicional));
+$tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
+
 $response = [
     'tarefas' => [],
     'novas_tarefas' => []
@@ -31,8 +36,8 @@ $response = [
 
 $now = new DateTime();
 
-// Se o usuário for administrador, buscar as tarefas de todos os funcionários
-if ($nivel_de_acesso === 'administrador') {
+// Se o usuário for administrador ou tiver acesso adicional "Controle de Tarefas", buscar as tarefas de todos os funcionários
+if ($nivel_de_acesso === 'administrador' || $tem_acesso_controle_tarefas) {
     $sql_tarefas = "
         SELECT id, titulo, descricao, data_limite, data_criacao, nivel_de_prioridade, status, funcionario_responsavel, token
         FROM tarefas 
