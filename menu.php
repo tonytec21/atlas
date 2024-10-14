@@ -7,23 +7,23 @@ include(__DIR__ . '/db_connection.php');
 
 // Verificar o nível de acesso do usuário logado
 $username = $_SESSION['username'];
-$connAtlas = new mysqli("localhost", "root", "", "atlas");
+$conn = new mysqli("localhost", "root", "", "atlas");
 
-if ($connAtlas->connect_error) {
-    die("Falha na conexão com o banco atlas: " . $connAtlas->connect_error);
+if ($conn->connect_error) {
+    die("Falha na conexão com o banco atlas: " . $conn->connect_error);
 }
 
-$stmt = $connAtlas->prepare("SELECT nivel_de_acesso FROM funcionarios WHERE usuario = ?");
+// Preparar a consulta para buscar o nível de acesso
+$stmt = $conn->prepare("SELECT nivel_de_acesso FROM funcionarios WHERE usuario = ?");
 $stmt->bind_param("s", $username);
 $stmt->execute();
 $result = $stmt->get_result();
 $userData = $result->fetch_assoc();
 $stmt->close();
-$connAtlas->close();
 
 $nivel_de_acesso = $userData['nivel_de_acesso'];
 
-// Verificar o acesso adicional do usuário logado
+// Inicializar as variáveis de acesso
 $tem_acesso_controle_contas = false;
 $tem_acesso_cadastro_funcionarios = false;
 
@@ -36,20 +36,21 @@ if ($nivel_de_acesso === 'usuario') {
     $user_acesso_data = $result_acesso->fetch_assoc();
     $stmt_acesso->close();
 
-    // Inicializar as variáveis de acesso
-    $tem_acesso_controle_contas = false;
-    $tem_acesso_cadastro_funcionarios = false;
-
     // Verificar se o campo acesso_adicional não é nulo e não está vazio
     if (!empty($user_acesso_data['acesso_adicional'])) {
-        // Verificar se o acesso adicional contém "Controle de Contas a Pagar"
-        if (strpos($user_acesso_data['acesso_adicional'], 'Controle de Contas a Pagar') !== false) {
-            $tem_acesso_controle_contas = true;
-        }
+        // Usar explode() somente se não estiver vazio
+        $acesso_adicional = $user_acesso_data['acesso_adicional'] ?? '';
+        if (!empty($acesso_adicional)) {
+            $acessos = explode(',', $acesso_adicional);
+            // Verificar se o acesso adicional contém "Controle de Contas a Pagar"
+            if (in_array('Controle de Contas a Pagar', $acessos)) {
+                $tem_acesso_controle_contas = true;
+            }
 
-        // Verificar se o acesso adicional contém "Cadastro de Funcionários"
-        if (strpos($user_acesso_data['acesso_adicional'], 'Cadastro de Funcionários') !== false) {
-            $tem_acesso_cadastro_funcionarios = true;
+            // Verificar se o acesso adicional contém "Cadastro de Funcionários"
+            if (in_array('Cadastro de Funcionários', $acessos)) {
+                $tem_acesso_cadastro_funcionarios = true;
+            }
         }
     }
 }
