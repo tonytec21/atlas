@@ -29,7 +29,7 @@ function carregarDados($conn, $filtro = [])
         $filtroStatusEscapado = $conn->real_escape_string($filtroStatus);
         $condicoes[] = "tarefas.status = '$filtroStatusEscapado'";
     } elseif ($filtroStatus == 'todos') {
-        $condicoes[] = "1 = 1"; // Um placeholder para garantir que o WHERE continue válido
+        $condicoes[] = "1 = 1"; 
     }
     if (!empty($filtro['funcionario']) && $filtro['funcionario'] != 'todos') {
         $filtroFuncionarioEscapado = $conn->real_escape_string($filtro['funcionario']);
@@ -61,7 +61,7 @@ function carregarDados($conn, $filtro = [])
     ");
 
     while ($row = $result->fetch_assoc()) {
-        $categoriaData[] = $row;  /* Salva os resultados em um array */
+        $categoriaData[] = $row; 
     }
 
     $funcionarioData = [];
@@ -160,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'mes' => $_POST['filtroMes'] ?? '',
         'ano' => $_POST['filtroAno'] ?? '',
         'status' => $_POST['filtroStatus'] ?? '',
-        'funcionario' => $_POST['filtroFuncionario'] ?? 'todos' // Filtro de funcionário
+        'funcionario' => $_POST['filtroFuncionario'] ?? 'todos'
     ];
 
     $dados = carregarDados($conn, $filtros);
@@ -187,8 +187,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: block;
             margin-left: auto;
             margin-right: auto;
-            width: 90%; /* O gráfico agora ocupa 100% da largura da página */
-            height: auto; /* Mantém a altura proporcional */
+            width: 90%; 
+            height: auto; 
         }
 
 
@@ -451,7 +451,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         // Atualizar a tabela de resultados
                         var tabelaBody = $('#tabelaResultados tbody');
-                        tabelaBody.empty(); // Limpar tabela atual
+                        tabelaBody.empty(); 
                         dados.tarefas.forEach(function (tarefa) {
                             var dataConclusao = tarefa.data_conclusao ? tarefa.data_conclusao : '-';
                             var tempoExecucao = '-';
@@ -517,16 +517,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Inicializa o array de totais por categoria e por semana
                     dados.categoriaData.forEach(function (cat) {
                         if (!totaisPorCategoria[cat.categoria_titulo]) {
-                            totaisPorCategoria[cat.categoria_titulo] = {}; // Inicializa um objeto vazio para semanas
+                            totaisPorCategoria[cat.categoria_titulo] = {};
                         }
-                        totaisPorCategoria[cat.categoria_titulo][cat.semana] = cat.total; // Associa o total à semana correta
+                        totaisPorCategoria[cat.categoria_titulo][cat.semana] = cat.total;
                     });
 
                     // Gera as cores e os datasets para o gráfico
                     var datasets = Object.keys(totaisPorCategoria).map((categoria, index) => {
                         return {
                             label: categoria,
-                            data: Object.values(totaisPorCategoria[categoria]), // Extrai os totais por semana
+                            data: Object.values(totaisPorCategoria[categoria]), 
                             borderColor: gerarCorAleatoria(),
                             backgroundColor: gerarCorAleatoria(),
                             fill: false,
@@ -541,8 +541,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     chartCategoria = new Chart(ctxCategoria, {
                         type: 'line',
                         data: {
-                            labels: semanas.map(sem => `Semana ${sem}`), // Mapeia as semanas
-                            datasets: datasets // Um dataset para cada categoria
+                            labels: semanas.map(sem => `Semana ${sem}`), 
+                            datasets: datasets 
                         },
                         options: {
                             plugins: {
@@ -645,7 +645,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             datasets: [{
                                 label: 'Tarefas por mês',
                                 data: totaisMes,
-                                backgroundColor: coresMes.slice(0, meses.length) // Ajusta o número de cores conforme a quantidade de meses
+                                backgroundColor: coresMes.slice(0, meses.length)
                             }]
                         },
                         options: {
@@ -719,7 +719,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             datasets: [{
                                 label: 'Tarefas por semana',
                                 data: totaisSemana,
-                                backgroundColor: coresSemana.slice(0, semanas.length) // Ajusta o número de cores conforme a quantidade de semanas
+                                backgroundColor: coresSemana.slice(0, semanas.length) 
                             }]
                         },
                         options: {
