@@ -137,7 +137,7 @@ $mode_query->close();
     <div id="mySidebar" class="sidebar">
         <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
         <button class="mode-switch" onclick="toggleMode()"><span id="mode-icon"><?php echo $mode === 'dark-mode' ? '🌙' : '☀️'; ?></span> Modo</button>
-        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>"><i class="fa fa-home" aria-hidden="true"></i> Página Inicial</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>"><i class="fa fa-home" aria-hidden="true"></i> Central de Acesso</a>
 
         <button class="dropdown-btn"><i class="fa fa-folder-open" aria-hidden="true"></i> Arquivamento 
             <i class="fa fa-caret-down"></i>

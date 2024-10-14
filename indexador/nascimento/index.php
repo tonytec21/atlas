@@ -196,7 +196,7 @@ include(__DIR__ . '/../../menu.php');
 
         <!-- Modal de Adição de Registro -->
         <div class="modal fade" id="addRegistryModal" tabindex="-1" role="dialog" aria-labelledby="addRegistryModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-custom" role="document">
+            <div class="modal-dialog modal-custom modal-dialog-centered" role="document">
                 <div class="modal-content modal-cadastro">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addRegistryModalLabel">Adicionar Registro</h5>
@@ -270,7 +270,7 @@ include(__DIR__ . '/../../menu.php');
 
         <!-- Modal de Edição de Registro -->
         <div class="modal fade" id="editRegistryModal" tabindex="-1" role="dialog" aria-labelledby="editRegistryModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-custom" role="document">
+            <div class="modal-dialog modal-custom modal-dialog-centered" role="document">
                 <div class="modal-content modal-edicao">
                     <div class="modal-header">
                         <h5 class="modal-title" id="editRegistryModalLabel">Editar Registro</h5>
@@ -348,7 +348,7 @@ include(__DIR__ . '/../../menu.php');
 
         <!-- Modal de Visualização de Registro -->
         <div class="modal fade" id="viewRegistryModal" tabindex="-1" role="dialog" aria-labelledby="viewRegistryModalLabel" aria-hidden="true">
-             <div class="modal-dialog modal-lg" role="document">
+             <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
                  <div class="modal-content modal-visualizacao">
                     <div class="modal-header">
                         <h5 class="modal-title" id="viewRegistryModalLabel">Visualizar Registro</h5>
@@ -551,16 +551,51 @@ include(__DIR__ . '/../../menu.php');
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: 'Registro adicionado com sucesso.',
-                        confirmButtonText: 'Ok'
-                    }).then(() => {
-                        $('#addRegistryModal').modal('hide');
-                        loadFilteredRegistries(); // Carregar registros recentes após salvar
-                        addAttachments = []; // Limpar anexos após salvar
-                    });
+                    var result = JSON.parse(response);
+                    if (result.status === 'duplicate') {
+                        Swal.fire({
+                            title: 'Registro Duplicado!',
+                            text: 'Já existe um registro com o mesmo livro, folha, termo e data de registro em nome de: ' + result.nome_registrado + '. Deseja continuar?',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonText: 'Sim, continuar',
+                            cancelButtonText: 'Não, cancelar'
+                        }).then((willSubmit) => {
+                            if (willSubmit.isConfirmed) {
+                                // Forçar o envio mesmo com o registro duplicado
+                                $.ajax({
+                                    type: 'POST',
+                                    url: 'salvar_registro.php',
+                                    data: formData,
+                                    processData: false,
+                                    contentType: false,
+                                    success: function(response) {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: 'Sucesso!',
+                                            text: 'Registro adicionado com sucesso.',
+                                            confirmButtonText: 'Ok'
+                                        }).then(() => {
+                                            $('#addRegistryModal').modal('hide');
+                                            loadFilteredRegistries();
+                                            addAttachments = []; // Limpar anexos após salvar
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Registro adicionado com sucesso.',
+                            confirmButtonText: 'Ok'
+                        }).then(() => {
+                            $('#addRegistryModal').modal('hide');
+                            loadFilteredRegistries(); // Carregar registros recentes após salvar
+                            addAttachments = []; // Limpar anexos após salvar
+                        });
+                    }
                 },
                 error: function(xhr, status, error) {
                     Swal.fire({
@@ -572,7 +607,6 @@ include(__DIR__ . '/../../menu.php');
                 }
             });
         });
-
 
         // Adicionar Anexo no Modal "Adicionar Registro"
         $('#add-attachment-btn').on('click', function() {
