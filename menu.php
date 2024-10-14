@@ -29,10 +29,11 @@ $tem_acesso_controle_contas = false;
 $tem_acesso_cadastro_funcionarios = false;
 
 if ($nivel_de_acesso === 'usuario') {
-    // Verificar se o campo acesso_adicional não é nulo e não está vazio
-    if (!empty($acesso_adicional)) {
+    // Verificar se o campo acesso_adicional não é nulo e é uma string válida
+    if (is_string($acesso_adicional) && !empty($acesso_adicional)) {
         // Usar explode() somente se não estiver vazio
         $acessos = explode(',', $acesso_adicional);
+
         // Verificar se o acesso adicional contém "Controle de Contas a Pagar"
         if (in_array('Controle de Contas a Pagar', $acessos)) {
             $tem_acesso_controle_contas = true;
