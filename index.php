@@ -45,6 +45,10 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             cursor: move;
         }
 
+        .btn-warning {
+            color: #fff!important;
+        }
+
         .btn-4 {
             background: #34495e;
             color: #fff;
