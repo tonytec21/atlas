@@ -543,7 +543,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     var ctxCategoria = document.getElementById('graficoCategoria').getContext('2d');
                     chartCategoria = new Chart(ctxCategoria, {
-                        type: 'line',
+                        type: 'bar',
                         data: {
                             labels: semanas.map(sem => `Semana ${sem}`), // Mapeia as semanas
                             datasets: datasets // Um dataset para cada categoria
