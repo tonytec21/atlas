@@ -54,6 +54,10 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             color: #fff;
         }
 
+        .text-4 {
+            color: #34495e;
+        }
+
         .btn-5 {
             background: #ff8a80;
             color: #fff;
@@ -62,6 +66,11 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             background: #e3786f;
             color: #fff;
         }
+
+        .text-5 {
+            color: #ff8a80;
+        }
+
         .btn-6 {
             background: #427b8e;
             color: #fff;
@@ -69,6 +78,10 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
         .btn-6:hover {
             background: #366879;
             color: #fff;
+        }
+
+        .text-6 {
+            color: #427b8e;
         }
         
         .btn-indexador {
@@ -79,6 +92,10 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
         .btn-indexador:hover {
             background: #783768;
             color: #fff;
+        }
+
+        .text-indexador {
+            color: #8e427c;
         }
 
         /* Estilos exclusivos para o modal com a classe modal-alerta */
@@ -360,122 +377,130 @@ include(__DIR__ . '/menu.php');
 ?>
 
 <div id="main" class="main-content">
-    <div class="container">
-        <h3>Dashboard - Visão Geral do Sistema</h3>
-        <!-- Estrutura de Botões -->
-        <div id="sortable-buttons" class="row mb-4">
-            <!-- Cada botão precisa de um ID único -->
-            <div class="col-md-4 ui-sortable-handle" id="btn-arquivamento">
-                <a href="arquivamento/index.php" class="btn btn-primary w-100"><i class="fa fa-folder-open" aria-hidden="true"></i> Arquivamentos</a>
-            </div>
-            <div class="col-md-4 ui-sortable-handle" id="btn-os">
-                <a href="os/index.php" class="btn btn-info2 w-100"><i class="fa fa-money" aria-hidden="true"></i> Ordens de Serviço</a>
-            </div>
-            <div class="col-md-4 ui-sortable-handle" id="btn-caixa">
-                <a href="caixa/index.php" class="btn btn-success w-100"><i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa</a>
-            </div>
-            <div class="col-md-4 ui-sortable-handle" id="btn-tarefas">
-                <a href="tarefas/index.php" class="btn btn-secondary w-100"><i class="fa fa-clock-o" aria-hidden="true"></i> Tarefas</a>
-            </div>
-            <div class="col-md-4 ui-sortable-handle" id="btn-oficios">
-                <a href="oficios/index.php" class="btn btn-oficio w-100"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> Ofícios</a>
-            </div>
-            <div class="col-md-4 ui-sortable-handle" id="btn-provimento">
-                <a href="provimentos/index.php" class="btn btn-assinador w-100"><i class="fa fa-balance-scale" aria-hidden="true"></i> Provimentos e Resoluções</a>
-            </div>
-            <div class="col-md-4 ui-sortable-handle" id="btn-guia">
-                <a href="guia_de_recebimento/index.php" class="btn btn-4 w-100"><i class="fa fa-file-text" aria-hidden="true"></i> Guia de Recebimento</a>
-            </div>
-            <div class="col-md-4 ui-sortable-handle" id="btn-contas">
-                    <a href="contas_a_pagar/index.php" class="btn btn-5 w-100"><i class="fa fa-usd" aria-hidden="true"></i> Controle de Contas a Pagar</a>
+    <div class="container mt-4">
+        <h2 class="text-center mb-4">Central de Acesso</h2>
+
+        <!-- Cards de Módulos -->
+        <div id="sortable-cards" class="row">
+            <!-- Arquivamentos -->
+            <div class="col-md-4 mb-3" id="card-arquivamento">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-folder-open fa-3x text-primary mb-2"></i>
+                        <h5 class="card-title">Arquivamentos</h5>
+                        <a href="arquivamento/index.php" class="btn btn-primary w-100">Acessar</a>
+                    </div>
+                </div>
             </div>
 
-            <div class="col-md-4 ui-sortable-handle" id="btn-manuais">
-                <a href="manuais/index.php" class="btn btn-6 w-100"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
+            <!-- Ordens de Serviço -->
+            <div class="col-md-4 mb-3" id="card-os">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-money fa-3x text-info mb-2"></i>
+                        <h5 class="card-title">Ordens de Serviço</h5>
+                        <a href="os/index.php" class="btn btn-info w-100">Acessar</a>
+                    </div>
+                </div>
             </div>
-            <?php
-            $configFile = __DIR__ . '/indexador/config_indexador.json';
-            if (file_exists($configFile)) {
-                $configData = json_decode(file_get_contents($configFile), true);
-                if (isset($configData['indexador_ativo']) && $configData['indexador_ativo'] === 'S') {
-                    echo '
-                    <div class="col-md-4 ui-sortable-handle" id="btn-indexador">
-                        <a href="indexador/index.php" class="btn btn-indexador w-100">
-                            <i class="fa fa-file-text-o" aria-hidden="true"></i> Indexador
-                        </a>
-                    </div>';
+
+            <!-- Controle de Caixa -->
+            <div class="col-md-4 mb-3" id="card-caixa">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-university fa-3x text-success mb-2"></i>
+                        <h5 class="card-title">Controle de Caixa</h5>
+                        <a href="caixa/index.php" class="btn btn-success w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarefas -->
+            <div class="col-md-4 mb-3" id="card-tarefas">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-clock-o fa-3x text-secondary mb-2"></i>
+                        <h5 class="card-title">Tarefas</h5>
+                        <a href="tarefas/index.php" class="btn btn-secondary w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ofícios -->
+            <div class="col-md-4 mb-3" id="card-oficios">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-file-pdf-o fa-3x text-warning mb-2"></i>
+                        <h5 class="card-title">Ofícios</h5>
+                        <a href="oficios/index.php" class="btn btn-warning w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Provimentos e Resoluções -->
+            <div class="col-md-4 mb-3" id="card-provimento">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-balance-scale fa-3x text-6 mb-2"></i>
+                        <h5 class="card-title">Provimento e Resoluções</h5>
+                        <a href="provimentos/index.php" class="btn btn-6 w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Guia de Recebimento -->
+            <div class="col-md-4 mb-3" id="card-guia">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-file-text fa-3x text-4 mb-2"></i>
+                        <h5 class="card-title">Guia de Recebimento</h5>
+                        <a href="guia_de_recebimento/index.php" class="btn btn-4 w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controle de Contas a Pagar -->
+            <div class="col-md-4 mb-3" id="card-contas">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-usd fa-3x text-5 mb-2"></i>
+                        <h5 class="card-title">Controle de Contas a Pagar</h5>
+                        <a href="contas_a_pagar/index.php" class="btn btn-5 w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vídeos Tutoriais -->
+            <div class="col-md-4 mb-3" id="card-manuais">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-file-video-o fa-3x text-info mb-2"></i>
+                        <h5 class="card-title">Vídeos Tutoriais</h5>
+                        <a href="manuais/index.php" class="btn btn-info w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
+
+             <!-- Indexador -->
+             <?php
+                $configFile = __DIR__ . '/indexador/config_indexador.json';
+                if (file_exists($configFile)) {
+                    $configData = json_decode(file_get_contents($configFile), true);
+                    if (isset($configData['indexador_ativo']) && $configData['indexador_ativo'] === 'S') {
+                        echo '
+                            <div class="col-md-4 mb-3" id="card-indexador">
+                                <div class="card shadow-sm">
+                                    <div class="card-body text-center">
+                                        <i class="fa fa-file-text-o fa-3x text-indexador mb-2"></i>
+                                        <h5 class="card-title">Indexador</h5>
+                                        <a href="indexador/index.php" class="btn btn-indexador w-100">Acessar</a>
+                                    </div>
+                                </div>
+                            </div>';
+                    }
                 }
-            }
             ?>
 
-        </div>
-
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="card text-white bg-primary">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h2 id="totalAcervos">0</h2>
-                                <p>Total de arquivamentos</p>
-                            </div>
-                            <i class="fa fa-folder fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card text-white bg-success">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h2 id="novosCadastros">0</h2>
-                                <p>Novos arquivamentos</p>
-                            </div>
-                            <i class="fa fa-plus fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card text-white bg-danger">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h2 id="atosExcluidos">0</h2>
-                                <p>Arquivamentos excluídos</p>
-                            </div>
-                            <a style="color: #ffffff" href="arquivamento/lixeira.php"><i class="fa fa-trash fa-2x"></i></a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-md-4 chart-container">
-                <h5>Arquivamentos diários</h5>
-                <canvas id="dailyAtosChart"></canvas>
-            </div>
-            <div class="col-md-4 chart-container">
-                <h5>Arquivamentos semanais</h5>
-                <canvas id="weeklyAtosChart"></canvas>
-            </div>
-            <div class="col-md-4 chart-container">
-                <h5>Arquivamentos mensais</h5>
-                <canvas id="monthlyAtosChart"></canvas>
-            </div>
-            <div class="col-md-4 chart-container full-height">
-                <h5>Arquivamentos por categoria</h5>
-                <canvas id="categoryAtosChart"></canvas>
-            </div>
-            <div class="col-md-4 chart-container full-height">
-                <h5>Arquivamentos por usuários</h5>
-                <canvas id="userPerformanceChart"></canvas>
-            </div>
-            <div class="col-md-4 chart-container full-height">
-                <h5>Tarefas por status</h5>
-                <canvas id="tasksChart"></canvas>
-            </div>
         </div>
     </div>
 </div>
@@ -889,31 +914,25 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
         });
     });
 
-    // window.onload = function() {
-    //     clearCache();
-    // };
 </script>
 
-<!-- Script de Drag-and-Drop e Salvamento -->
+
 <script>
     $(document).ready(function () {
-        // Inicializa o sortable
-        $("#sortable-buttons").sortable({
-            placeholder: "ui-state-highlight", // Realça o espaço ao arrastar
-            helper: 'clone', // Ajuda a tornar o elemento mais claro enquanto arrasta
-            containment: 'parent', // Restringe o movimento dentro do container pai
+        // Inicializa o sortable para os cards
+        $("#sortable-cards").sortable({
+            placeholder: "ui-state-highlight", 
+            helper: 'clone', 
+            containment: 'parent',
             update: function (event, ui) {
-                // Quando a ordem for alterada, salva a nova ordem
-                saveButtonOrder();
+                saveCardOrder();
             }
         });
 
-
-        // Função para salvar a ordem dos botões no arquivo JSON
-        function saveButtonOrder() {
+        // Função para salvar a ordem dos cards no arquivo JSON
+        function saveCardOrder() {
             let order = [];
-            // Percorre cada botão e salva seu ID na ordem atual
-            $("#sortable-buttons .col-md-4").each(function () {
+            $("#sortable-cards .col-md-4").each(function () {
                 order.push($(this).attr('id'));
             });
 
@@ -931,16 +950,15 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
             });
         }
 
-        // Carrega a ordem dos botões do arquivo JSON
-        function loadButtonOrder() {
+        // Carrega a ordem dos cards do arquivo JSON
+        function loadCardOrder() {
             $.ajax({
                 url: 'load_order.php',
                 type: 'GET',
                 dataType: 'json',
                 success: function (data) {
-                    // Ordena os botões com base na ordem do arquivo JSON
-                    $.each(data.order, function (index, btnId) {
-                        $("#" + btnId).appendTo("#sortable-buttons");
+                    $.each(data.order, function (index, cardId) {
+                        $("#" + cardId).appendTo("#sortable-cards");
                     });
                 },
                 error: function (xhr, status, error) {
@@ -950,9 +968,10 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
         }
 
         // Carrega a ordem ao carregar a página
-        loadButtonOrder();
+        loadCardOrder();
     });
 </script>
+
 <br><br><br>
 <?php
 include(__DIR__ . '/rodape.php');
