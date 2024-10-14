@@ -607,7 +607,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         options: {
                             plugins: {
                                 legend: {
-                                    display: false // Deixe o Chart.js gerenciar as legendas automaticamente
+                                    display: false
                                 },
                                 title: {
                                     display: true,
@@ -619,10 +619,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             },
                             scales: {
                                 x: {
-                                    display: true // Exibe os nomes dos funcionários no eixo X
+                                    display: true 
                                 },
                                 y: {
-                                    beginAtZero: true // Garante que o eixo Y comece do zero
+                                    beginAtZero: true 
                                 }
                             }
                         }
