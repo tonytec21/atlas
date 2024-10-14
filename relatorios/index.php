@@ -601,13 +601,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             datasets: [{
                                 label: 'Tarefas por funcionário',
                                 data: totaisFuncionario,
-                                backgroundColor: cores // Usa as cores dinâmicas
+                                backgroundColor: cores 
                             }]
                         },
                         options: {
                             plugins: {
                                 legend: {
-                                    display: true // Deixe o Chart.js gerenciar as legendas automaticamente
+                                    display: false // Deixe o Chart.js gerenciar as legendas automaticamente
                                 },
                                 title: {
                                     display: true,
