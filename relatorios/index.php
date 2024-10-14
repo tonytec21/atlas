@@ -590,7 +590,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     dados.funcionarioData.forEach(function (func, index) {
                         funcionarios.push(func.funcionario_responsavel);
                         totaisFuncionario.push(func.total);
-                        cores.push(gerarCorAleatoria()); // Gera uma cor para cada funcionário
+                        cores.push(gerarCorAleatoria()); 
                     });
 
                     var ctxFuncionario = document.getElementById('graficoFuncionario').getContext('2d');
