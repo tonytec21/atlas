@@ -203,7 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flex: 1 1 45%; 
             max-width: 1200px;
             min-width: 300px;
-            height: 400px;
+            height: auto;
             display: flex;
             justify-content: center;
         }
