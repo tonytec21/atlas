@@ -510,23 +510,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if (Array.isArray(dados.categoriaData)) {
-                    var categorias = [];
                     var totaisPorCategoria = {};
-                    var coresAleatorias = [];
 
-                    // Inicializa o array de totais por categoria e por semana
+                    // Inicializa o array de totais por categoria e semana, somando os valores de semanas repetidas
                     dados.categoriaData.forEach(function (cat) {
                         if (!totaisPorCategoria[cat.categoria_titulo]) {
-                            totaisPorCategoria[cat.categoria_titulo] = {};
+                            totaisPorCategoria[cat.categoria_titulo] = {}; // Inicializa o objeto para a categoria
                         }
-                        totaisPorCategoria[cat.categoria_titulo][cat.semana] = cat.total;
+
+                        // Se já existir um valor para a semana, somamos ao valor atual
+                        if (!totaisPorCategoria[cat.categoria_titulo][cat.semana]) {
+                            totaisPorCategoria[cat.categoria_titulo][cat.semana] = 0;
+                        }
+                        totaisPorCategoria[cat.categoria_titulo][cat.semana] += cat.total; // Soma os totais por semana
                     });
 
                     // Gera as cores e os datasets para o gráfico
                     var datasets = Object.keys(totaisPorCategoria).map((categoria, index) => {
+                        var semanasOrdenadas = Object.keys(totaisPorCategoria[categoria]).sort(); // Ordena as semanas
                         return {
                             label: categoria,
-                            data: Object.values(totaisPorCategoria[categoria]), 
+                            data: semanasOrdenadas.map(semana => totaisPorCategoria[categoria][semana]), // Extrai os totais por semana
                             borderColor: gerarCorAleatoria(),
                             backgroundColor: gerarCorAleatoria(),
                             fill: false,
@@ -534,15 +538,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         };
                     });
 
-                    // Gera uma lista com as semanas que foram retornadas nos dados
-                    var semanas = Array.from(new Set(dados.categoriaData.map(cat => cat.semana)));
+                    // Gera uma lista única de semanas ordenadas
+                    var semanas = Array.from(new Set(dados.categoriaData.map(cat => cat.semana))).sort();
 
                     var ctxCategoria = document.getElementById('graficoCategoria').getContext('2d');
                     chartCategoria = new Chart(ctxCategoria, {
                         type: 'line',
                         data: {
-                            labels: semanas.map(sem => `Semana ${sem}`), 
-                            datasets: datasets 
+                            labels: semanas.map(sem => `Semana ${sem}`), // Mapeia as semanas
+                            datasets: datasets // Um dataset para cada categoria
                         },
                         options: {
                             plugins: {
@@ -565,7 +569,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     });
                 }
-
 
 
                 if (Array.isArray(dados.funcionarioData)) {
