@@ -36,14 +36,21 @@ if ($nivel_de_acesso === 'usuario') {
     $user_acesso_data = $result_acesso->fetch_assoc();
     $stmt_acesso->close();
 
-    // Verificar se o acesso adicional contém "Controle de Contas a Pagar"
-    if (strpos($user_acesso_data['acesso_adicional'], 'Controle de Contas a Pagar') !== false) {
-        $tem_acesso_controle_contas = true;
-    }
+    // Inicializar as variáveis de acesso
+    $tem_acesso_controle_contas = false;
+    $tem_acesso_cadastro_funcionarios = false;
 
-    // Verificar se o acesso adicional contém "Cadastro de Funcionários"
-    if (strpos($user_acesso_data['acesso_adicional'], 'Cadastro de Funcionários') !== false) {
-        $tem_acesso_cadastro_funcionarios = true;
+    // Verificar se o campo acesso_adicional não é nulo e não está vazio
+    if (!empty($user_acesso_data['acesso_adicional'])) {
+        // Verificar se o acesso adicional contém "Controle de Contas a Pagar"
+        if (strpos($user_acesso_data['acesso_adicional'], 'Controle de Contas a Pagar') !== false) {
+            $tem_acesso_controle_contas = true;
+        }
+
+        // Verificar se o acesso adicional contém "Cadastro de Funcionários"
+        if (strpos($user_acesso_data['acesso_adicional'], 'Cadastro de Funcionários') !== false) {
+            $tem_acesso_cadastro_funcionarios = true;
+        }
     }
 }
 
