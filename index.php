@@ -49,6 +49,20 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             color: #fff!important;
         }
 
+        .text-tutoriais {
+            color: #1762b8;
+        }
+
+        .btn-tutoriais {
+            background: #1762b8;
+            color: #fff;
+        }
+
+        .btn-tutoriais:hover {
+            background: #0c52a3;
+            color: #fff;
+        }
+
         .btn-4 {
             background: #34495e;
             color: #fff;
@@ -403,7 +417,7 @@ include(__DIR__ . '/menu.php');
                     <div class="card-body text-center">
                         <i class="fa fa-money fa-3x text-info mb-2"></i>
                         <h5 class="card-title">Ordens de Serviço</h5>
-                        <a href="os/index.php" class="btn btn-info w-100">Acessar</a>
+                        <a href="os/index.php" class="btn btn-info2 w-100">Acessar</a>
                     </div>
                 </div>
             </div>
@@ -478,9 +492,9 @@ include(__DIR__ . '/menu.php');
             <div class="col-md-4 mb-3" id="card-manuais">
                 <div class="card shadow-sm">
                     <div class="card-body text-center">
-                        <i class="fa fa-file-video-o fa-3x text-info mb-2"></i>
+                        <i class="fa fa-file-video-o fa-3x text-tutoriais mb-2"></i>
                         <h5 class="card-title">Vídeos Tutoriais</h5>
-                        <a href="manuais/index.php" class="btn btn-info w-100">Acessar</a>
+                        <a href="manuais/index.php" class="btn btn-tutoriais w-100">Acessar</a>
                     </div>
                 </div>
             </div>
