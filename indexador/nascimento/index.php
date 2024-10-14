@@ -578,7 +578,7 @@ include(__DIR__ . '/../../menu.php');
                                         }).then(() => {
                                             $('#addRegistryModal').modal('hide');
                                             loadFilteredRegistries();
-                                            addAttachments = []; // Limpar anexos após salvar
+                                            addAttachments = []; 
                                         });
                                     }
                                 });
@@ -592,8 +592,8 @@ include(__DIR__ . '/../../menu.php');
                             confirmButtonText: 'Ok'
                         }).then(() => {
                             $('#addRegistryModal').modal('hide');
-                            loadFilteredRegistries(); // Carregar registros recentes após salvar
-                            addAttachments = []; // Limpar anexos após salvar
+                            loadFilteredRegistries(); 
+                            addAttachments = []; 
                         });
                     }
                 },

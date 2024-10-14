@@ -1299,32 +1299,57 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
         });
 
 
-            $('#saveStatusButton').on('click', function() {
-                var taskToken = $('#viewTitle').data('tasktoken');
-                var status = $('#viewStatus').val();
-                var currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        $('#saveStatusButton').on('click', function() {
+            var taskToken = $('#viewTitle').data('tasktoken');
+            var status = $('#viewStatus').val();
+            var currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-                $.ajax({
-                    url: 'update_status.php',
-                    type: 'POST',
-                    data: {
-                        taskToken: taskToken,
-                        status: status,
-                        dataConclusao: status.toLowerCase() === 'concluída' ? currentDate : null
-                    },
-                    success: function(response) {
-                        alert('Status atualizado com sucesso!');
-                        $('#viewTaskModal').modal('hide');
-                        $('#searchForm').submit(); // Atualizar a lista de tarefas
-                    },
-                    error: function() {
-                        alert('Erro ao atualizar o status');
-                    }
-                });
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: 'Deseja realmente atualizar o status da tarefa para "' + status + '"?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, atualizar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Se o usuário confirmar, proceder com a atualização
+                    $.ajax({
+                        url: 'update_status.php',
+                        type: 'POST',
+                        data: {
+                            taskToken: taskToken,
+                            status: status,
+                            dataConclusao: status.toLowerCase() === 'concluída' ? currentDate : null
+                        },
+                        success: function(response) {
+                            // SweetAlert2 para sucesso, mas sem fechar o modal
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Status atualizado com sucesso!'
+                            }).then(() => {
+                                $('#searchForm').submit(); // Atualizar a lista de tarefas, se necessário
+                                // O modal continuará aberto após a atualização
+                            });
+                        },
+                        error: function() {
+                            // SweetAlert2 para erro
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Ocorreu um erro ao atualizar o status.'
+                            });
+                        }
+                    });
+                }
             });
+        });
 
 // Resolver problema de rolagem com modais empilhados
-$('#addCommentModal').on('shown.bs.modal', function() {
+$('#addCommentModal, #createSubTaskModal, #guiaRecebimentoModal, #reciboEntregaModal, #vincularOficioModal').on('shown.bs.modal', function() {
     $('body').addClass('modal-open');
 }).on('hidden.bs.modal', function() {
     $('body').removeClass('modal-open');
@@ -1828,10 +1853,9 @@ function viewTask(taskToken) {
         });
 
         // Adicionar rolagem ao modal principal após fechar o secundário
-        $('#addCommentModal').on('hidden.bs.modal', function () {
+        $('#vincularOficioModal, #reciboEntregaModal, #guiaRecebimentoModal, #createSubTaskModal, #addCommentModal').on('hidden.bs.modal', function () {
             $('#viewTaskModal').css('overflow-y', 'auto');
         });
-
 
     </script>
     <?php

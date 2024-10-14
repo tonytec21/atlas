@@ -20,53 +20,50 @@ date_default_timezone_set('America/Sao_Paulo');
     <style>
 
 .status-prestes-vencer {
-    background-color: #ffc107; /* Cor amarelada para "Prestes a vencer" */
+    background-color: #ffc107; 
 }
 
 .status-vencida {
-    background-color: #dc3545; /* Cor avermelhada para "Vencida" */
+    background-color: #dc3545; 
 }
-        /* Remover a borda de foco no botão de fechar */
         .btn-close {
-            outline: none; /* Remove a borda ao clicar */
-            border: none; /* Remove qualquer borda padrão */
-            background: none; /* Remove o fundo padrão */
-            padding: 0; /* Remove o espaçamento extra */
-            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
-            cursor: pointer; /* Mostra o ponteiro de clique */
-            transition: transform 0.2s ease; /* Suaviza a transição do hover */
+            outline: none; 
+            border: none; 
+            background: none;
+            padding: 0; 
+            font-size: 1.5rem;
+            cursor: pointer; 
+            transition: transform 0.2s ease;
         }
 
-        /* Aumentar o tamanho do botão em 5% no hover */
         .btn-close:hover {
-            transform: scale(2.10); /* Aumenta 5% */
+            transform: scale(2.10); 
         }
 
-        /* Opcional: Adicionar foco suave sem borda visível */
         .btn-close:focus {
-            outline: none; /* Remove a borda ao foco */
+            outline: none; 
         }
-.timeline-badge.subtask {
-    background-color: #ffc107;
-}
+        .timeline-badge.subtask {
+            background-color: #ffc107;
+        }
 
-.timeline-panel.subtask-panel {
-    border-left: 4px solid #ffc107;
-    background-color: #fffbe6;
-}
+        .timeline-panel.subtask-panel {
+            border-left: 4px solid #ffc107;
+            background-color: #fffbe6;
+        }
 
-.subtask-title {
-    font-weight: bold;
-    color: #ffc107;
-    margin-bottom: 10px;
-}
+        .subtask-title {
+            font-weight: bold;
+            color: #ffc107;
+            margin-bottom: 10px;
+        }
 
-.timeline-panel.subtask-panel .timeline-body {
-    background-color: #fffde7;
-    padding: 10px;
-    border-radius: 4px;
-    border: 1px solid #ffecb3;
-}
+        .timeline-panel.subtask-panel .timeline-body {
+            background-color: #fffde7;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ffecb3;
+        }
 
         .btn-edit {
             margin-left: 5px;
@@ -77,44 +74,44 @@ date_default_timezone_set('America/Sao_Paulo');
         }
 
         .priority-medium {
-            background-color: #fff9c4 !important; /* Amarelo claro */
+            background-color: #fff9c4 !important; 
         }
 
         .priority-high {
-            background-color: #ffe082 !important; /* Laranja claro */
+            background-color: #ffe082 !important; 
         }
 
         .priority-critical {
-            background-color: #ff8a80 !important; /* Vermelho claro */
+            background-color: #ff8a80 !important; 
         }
         .row-quase-vencida {
-            background-color: #ffebcc!important; /* Amarelo claro */
+            background-color: #ffebcc!important; 
         }
 
         .row-vencida {
-            background-color: #ffcccc!important; /* Vermelho claro */
+            background-color: #ffcccc!important; 
         }
 
         body.dark-mode .priority-medium td {
-            background-color: #fff9c4 !important; /* Amarelo claro */
+            background-color: #fff9c4 !important;
             color: #000!important;
         }
 
         body.dark-mode .priority-high td {
-            background-color: #ffe082 !important; /* Laranja claro */
+            background-color: #ffe082 !important; 
             color: #000!important;
         }
 
         body.dark-mode .priority-critical td {
-            background-color: #ff8a80 !important; /* Vermelho claro */
+            background-color: #ff8a80 !important; 
         }
         body.dark-mode .row-quase-vencida td {
-            background-color: #ffebcc!important; /* Amarelo claro */
+            background-color: #ffebcc!important; 
             color: #000!important;
         }
 
         body.dark-mode .row-vencida td {
-            background-color: #ffcccc!important; /* Vermelho claro */
+            background-color: #ffcccc!important;
             color: #000!important;
         }
 
@@ -1299,32 +1296,57 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
         });
 
 
-            $('#saveStatusButton').on('click', function() {
-                var taskToken = $('#viewTitle').data('tasktoken');
-                var status = $('#viewStatus').val();
-                var currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        $('#saveStatusButton').on('click', function() {
+            var taskToken = $('#viewTitle').data('tasktoken');
+            var status = $('#viewStatus').val();
+            var currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-                $.ajax({
-                    url: 'update_status.php',
-                    type: 'POST',
-                    data: {
-                        taskToken: taskToken,
-                        status: status,
-                        dataConclusao: status.toLowerCase() === 'concluída' ? currentDate : null
-                    },
-                    success: function(response) {
-                        alert('Status atualizado com sucesso!');
-                        $('#viewTaskModal').modal('hide');
-                        $('#searchForm').submit(); // Atualizar a lista de tarefas
-                    },
-                    error: function() {
-                        alert('Erro ao atualizar o status');
-                    }
-                });
+            Swal.fire({
+                title: 'Tem certeza?',
+                text: 'Deseja realmente atualizar o status da tarefa para "' + status + '"?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim, atualizar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Se o usuário confirmar, proceder com a atualização
+                    $.ajax({
+                        url: 'update_status.php',
+                        type: 'POST',
+                        data: {
+                            taskToken: taskToken,
+                            status: status,
+                            dataConclusao: status.toLowerCase() === 'concluída' ? currentDate : null
+                        },
+                        success: function(response) {
+                            // SweetAlert2 para sucesso, mas sem fechar o modal
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: 'Status atualizado com sucesso!'
+                            }).then(() => {
+                                $('#searchForm').submit(); // Atualizar a lista de tarefas, se necessário
+                                // O modal continuará aberto após a atualização
+                            });
+                        },
+                        error: function() {
+                            // SweetAlert2 para erro
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Ocorreu um erro ao atualizar o status.'
+                            });
+                        }
+                    });
+                }
             });
+        });
 
 // Resolver problema de rolagem com modais empilhados
-$('#addCommentModal').on('shown.bs.modal', function() {
+$('#addCommentModal, #createSubTaskModal, #guiaRecebimentoModal, #reciboEntregaModal, #vincularOficioModal').on('shown.bs.modal', function() {
     $('body').addClass('modal-open');
 }).on('hidden.bs.modal', function() {
     $('body').removeClass('modal-open');
@@ -1828,7 +1850,7 @@ function viewTask(taskToken) {
         });
 
         // Adicionar rolagem ao modal principal após fechar o secundário
-        $('#addCommentModal').on('hidden.bs.modal', function () {
+        $('#vincularOficioModal, #reciboEntregaModal, #guiaRecebimentoModal, #createSubTaskModal, #addCommentModal').on('hidden.bs.modal', function () {
             $('#viewTaskModal').css('overflow-y', 'auto');
         });
 
@@ -1851,8 +1873,8 @@ function viewTask(taskToken) {
 
             // Adiciona um evento para voltar à página anterior quando o modal for fechado e se houver um token
             $('#viewTaskModal').on('hidden.bs.modal', function () {
-                if (taskToken) { // Verifica se o token está presente
-                    window.history.back(); // Volta para a página anterior no histórico do navegador
+                if (taskToken) { 
+                    window.history.back();
                 }
             });
         });

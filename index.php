@@ -34,7 +34,6 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
     <link rel="stylesheet" href="style/css/font-awesome.min.css">
     <link rel="stylesheet" href="style/css/style.css">
     <link rel="icon" href="style/img/favicon.png" type="image/png">
-    <script src="script/chart.js"></script>
     <script src="script/jquery-3.6.0.min.js"></script>
     <script src="script/jquery-ui.min.js"></script>
     <link rel="stylesheet" href="style/css/jquery-ui.css">
@@ -76,6 +75,19 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             color: #34495e;
         }
 
+        body.dark-mode .btn-4 {
+            background: #54718e;
+            color: #fff;
+        }
+        body.dark-mode .btn-4:hover {
+            background: #435c74;
+            color: #fff;
+        }
+
+        body.dark-mode .text-4 {
+            color: #54718e;
+        }
+
         .btn-5 {
             background: #ff8a80;
             color: #fff;
@@ -84,11 +96,11 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             background: #e3786f;
             color: #fff;
         }
-
+        
         .text-5 {
             color: #ff8a80;
         }
-
+        
         .btn-6 {
             background: #427b8e;
             color: #fff;
@@ -97,7 +109,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             background: #366879;
             color: #fff;
         }
-
+        
         .text-6 {
             color: #427b8e;
         }
@@ -106,55 +118,67 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             background: #8e427c;
             color: #fff;
         }
-
+        
         .btn-indexador:hover {
             background: #783768;
             color: #fff;
         }
-
+        
         .text-indexador {
             color: #8e427c;
+        }
+        
+        .btn-info2{
+            background-color: #17a2b8;
+            color: white;
+            margin-bottom: 5px;
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            border: none;
+        }
+        .btn-info2:hover {
+            color: #fff;
         }
 
         /* Estilos exclusivos para o modal com a classe modal-alerta */
         .modal-alerta .modal-content {
-            border: 2px solid #dc3545; /* Borda vermelha */
-            background-color: #f8d7da; /* Fundo rosa claro */
-            color: #721c24; /* Texto vermelho escuro */
+            border: 2px solid #dc3545; 
+            background-color: #f8d7da; 
+            color: #721c24; 
         }
 
         .modal-alerta .modal-header {
-            background-color: #dc3545; /* Cabeçalho vermelho */
-            color: white; /* Texto branco no cabeçalho */
+            background-color: #dc3545; 
+            color: white; 
         }
 
         .modal-alerta .modal-body {
-            font-weight: bold; /* Texto da mensagem em negrito */
+            font-weight: bold; 
         }
 
         .modal-alerta .modal-footer {
-            background-color: #f5c6cb; /* Fundo do rodapé em tom claro */
+            background-color: #f5c6cb;
         }
 
-        /* Estilo do botão de fechar */
+        
         .modal-alerta .btn-close {
             background-color: white;
-            border: 1px solid #dc3545; /* Borda vermelha */
+            border: 1px solid #dc3545;
         }
 
         .modal-alerta .btn-close:hover {
-            background-color: #dc3545; /* Cor ao passar o mouse */
+            background-color: #dc3545;
             color: white;
         }
 
-        /* Estilo do botão "Fechar" */
         .modal-alerta .modal-footer .btn-secondary {
-            background-color: #dc3545; /* Botão vermelho */
+            background-color: #dc3545; 
             border: none;
         }
 
         .modal-alerta .modal-footer .btn-secondary:hover {
-            background-color: #c82333; /* Tom mais escuro ao passar o mouse */
+            background-color: #c82333; 
         }
 
 
@@ -197,135 +221,126 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
         }
 
         .status-prestes-vencer {
-            background-color: #ffc107; /* Cor amarelada para "Prestes a vencer" */
+            background-color: #ffc107; 
         }
 
         .status-vencida {
-            background-color: #dc3545; /* Cor avermelhada para "Vencida" */
+            background-color: #dc3545; 
         }
 
-        /* Remover a borda de foco no botão de fechar */
         .btn-close {
-            outline: none; /* Remove a borda ao clicar */
-            border: none; /* Remove qualquer borda padrão */
-            background: none; /* Remove o fundo padrão */
-            padding: 0; /* Remove o espaçamento extra */
-            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
-            cursor: pointer; /* Mostra o ponteiro de clique */
-            transition: transform 0.2s ease; /* Suaviza a transição do hover */
+            outline: none; 
+            border: none; 
+            background: none;
+            padding: 0; 
+            font-size: 1.5rem;
+            cursor: pointer; 
+            transition: transform 0.2s ease;
         }
 
-        /* Aumentar o tamanho do botão em 5% no hover */
         .btn-close:hover {
-            transform: scale(2.10); /* Aumenta 5% */
+            transform: scale(2.10); 
         }
 
-        /* Opcional: Adicionar foco suave sem borda visível */
         .btn-close:focus {
-            outline: none; /* Remove a borda ao foco */
+            outline: none;
         }
 
-         /* Remover marcadores de lista */
         .modal-body ul {
-            list-style-type: none; /* Remove os marcadores de lista */
-            padding-left: 0; /* Remove o padding padrão */
+            list-style-type: none;
+            padding-left: 0;
         }
 
-        /* Recuo personalizado para os itens da lista */
         .modal-body li {
-            padding-left: 20px!important; /* Recuo da lista */
-            padding: 10px 0; /* Adiciona espaço vertical */
-            border-bottom: 1px solid #ddd; /* Linha separadora */
+            padding-left: 20px!important;
+            padding: 10px 0; 
+            border-bottom: 1px solid #ddd;
         }
 
-        /* Estilo dos títulos de funcionários */
         .modal-body h5 {
             /* margin-top: 20px;
             margin-bottom: 10px; */
             font-weight: bold;
         }
 
-        /* Exemplo de ajuste no modal para torná-lo mais largo */
         .modal-dialog {
-            max-width: 700px; /* Aumenta a largura do modal */
+            max-width: 700px;
         }
 
         /* Prioridades */
         .priority-medium {
-            background-color: #fff9c4 !important; /* Amarelo claro */
+            background-color: #fff9c4 !important; 
             padding: 10px;
         }
 
         .priority-high {
-            background-color: #ffe082 !important; /* Laranja claro */
+            background-color: #ffe082 !important;
             padding: 10px;
         }
 
         .priority-critical {
-            background-color: #ff8a80 !important; /* Vermelho claro */
+            background-color: #ff8a80 !important;
             padding: 10px;
         }
 
-        /* Tarefas quase vencidas e vencidas */
         .row-quase-vencida {
-            background-color: #ffebcc!important; /* Amarelo claro */
+            background-color: #ffebcc!important;
             padding: 10px;
         }
 
         .row-vencida {
-            background-color: #ffcccc!important; /* Vermelho claro */
+            background-color: #ffcccc!important;
             padding: 10px;
         }
 
-        /* Modo escuro - Prioridades */
         body.dark-mode .priority-medium {
-            background-color: #fff9c4 !important; /* Amarelo claro */
+            background-color: #fff9c4 !important;
             color: #000!important;
         }
 
         body.dark-mode .priority-high {
-            background-color: #ffe082 !important; /* Laranja claro */
+            background-color: #ffe082 !important;
             color: #000!important;
         }
 
         body.dark-mode .priority-critical {
-            background-color: #ff8a80 !important; /* Vermelho claro */
+            background-color: #ff8a80 !important;
         }
 
         /* Modo escuro - Quase vencida e vencida */
         body.dark-mode .row-quase-vencida {
-            background-color: #ffebcc!important; /* Amarelo claro */
+            background-color: #ffebcc!important; 
             color: #000!important;
         }
 
         body.dark-mode .row-vencida {
-            background-color: #ffcccc!important; /* Vermelho claro */
+            background-color: #ffcccc!important; 
             color: #000!important;
         }
 
         /* Status das tarefas */
         .status-iniciada {
-            background-color: #007bff; /* Azul */
+            background-color: #007bff;
             color: #fff;
         }
 
         .status-em-espera {
-            background-color: #ffa500; /* Laranja */
+            background-color: #ffa500; 
             color: #fff;
         }
 
         .status-em-andamento {
-            background-color: #0056b3; /* Azul escuro */
+            background-color: #0056b3;
             color: #fff;
         }
 
         .status-concluida {
-            background-color: #28a745; /* Verde */
+            background-color: #28a745;
             color: #fff;
         }
 
         .status-cancelada {
-            background-color: #dc3545; /* Vermelho */
+            background-color: #dc3545; 
             color: #fff;
         }
 
@@ -341,18 +356,6 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
         .chart-container.full-height {
             height: 360px;
             margin-top: 30px;
-        }
-        .btn-info2{
-            background-color: #17a2b8;
-            color: white;
-            margin-bottom: 5px;
-            width: 40px;
-            height: 40px;
-            border-radius: 5px;
-            border: none;
-     }
-        .btn-info2:hover {
-            color: #fff;
         }
         @media (max-width: 768px) {
             .chart-container {
@@ -715,7 +718,6 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
     return tabela;
 }
 
-
     // Carregar as tarefas pendentes ao carregar a página
     $.ajax({
         url: 'verificar_tarefas.php',
@@ -795,35 +797,6 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
         }
     });
 });
-</script>
-
-
-<script>
-    function createChart(ctx, type, data, options) {
-        return new Chart(ctx, {
-            type: type,
-            data: data,
-            options: $.extend(true, {
-                plugins: {
-                    legend: {
-                        display: type !== 'doughnut' && type !== 'bar' // Hide legend for doughnut and bar charts
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: {
-                            color: getFontColor()
-                        }
-                    },
-                    y: {
-                        ticks: {
-                            color: getFontColor()
-                        }
-                    }
-                }
-            }, options)
-        });
-    }
 
     $(document).ready(function() {
           // Função para alternar modos claro e escuro
@@ -840,102 +813,12 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
             });
         });
 
-        // Carregar dados do dashboard
-        $.ajax({
-            url: 'load_dashboard_data.php',
-            method: 'GET',
-            dataType: 'json',
-            success: function(data) {
-                $('#totalAcervos').text(data.totalAtos);
-                $('#novosCadastros').text(data.novosCadastros);
-                $('#atosExcluidos').text(data.atosExcluidos);
-
-                const dailyAtosCtx = document.getElementById('dailyAtosChart').getContext('2d');
-                const weeklyAtosCtx = document.getElementById('weeklyAtosChart').getContext('2d');
-                const monthlyAtosCtx = document.getElementById('monthlyAtosChart').getContext('2d');
-                const categoryAtosCtx = document.getElementById('categoryAtosChart').getContext('2d');
-                const userPerformanceCtx = document.getElementById('userPerformanceChart').getContext('2d');
-                const tasksCtx = document.getElementById('tasksChart').getContext('2d');
-
-                const dailyColors = ['#ff6384', '#36a2eb', '#cc65fe', '#ffce56', '#2ecc71', '#e74c3c', '#3498db'];
-                const weeklyColors = ['#ff6384', '#36a2eb', '#cc65fe', '#ffce56', '#2ecc71'];
-                const monthlyColors = ['#ff6384', '#36a2eb', '#cc65fe', '#ffce56', '#2ecc71', '#e74c3c', '#3498db', '#f39c12', '#9b59b6', '#1abc9c', '#c0392b', '#8e44ad'];
-                const userColors = ['#36a2eb', '#ff6384', '#cc65fe', '#ffce56', '#2ecc71', '#e74c3c', '#3498db'];
-                const categoryColors = ['#ff6384', '#36a2eb', '#cc65fe', '#ffce56', '#2ecc71', '#e74c3c', '#3498db', '#f39c12', '#9b59b6', '#1abc9c', '#c0392b', '#8e44ad'];
-                const taskColors = ['#ffce56', '#36a2eb', '#2ecc71', '#e74c3c', '#9b59b6', '#f39c12']; // Added new colors
-
-                createChart(dailyAtosCtx, 'bar', {
-                    labels: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
-                    datasets: [{
-                        label: 'Atos Diários',
-                        data: data.dailyAtos,
-                        backgroundColor: dailyColors
-                    }]
-                });
-
-                createChart(weeklyAtosCtx, 'bar', {
-                    labels: ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Semana 5'],
-                    datasets: [{
-                        label: 'Atos Semanais',
-                        data: data.weeklyAtos,
-                        backgroundColor: weeklyColors
-                    }]
-                });
-
-                createChart(monthlyAtosCtx, 'bar', {
-                    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                    datasets: [{
-                        label: 'Atos Mensais',
-                        data: data.monthlyAtos,
-                        backgroundColor: monthlyColors
-                    }]
-                });
-
-                createChart(categoryAtosCtx, 'pie', {
-                    labels: Object.keys(data.atosByCategory),
-                    datasets: [{
-                        data: Object.values(data.atosByCategory),
-                        backgroundColor: categoryColors
-                    }]
-                });
-
-                createChart(userPerformanceCtx, 'pie', {
-                    labels: Object.keys(data.atosByUser),
-                    datasets: [{
-                        label: 'Quantidade de atos por usuário',
-                        data: Object.values(data.atosByUser),
-                        backgroundColor: userColors
-                    }]
-                });
-
-                createChart(tasksCtx, 'pie', {
-                    labels: ['Pendente', 'Em Andamento', 'Concluída', 'Cancelada', 'Data Limite Ultrapassada', 'Prestes a Vencer'],
-                    datasets: [{
-                        label: 'Tarefas',
-                        data: [
-                            data.tarefasStatus.pendente,
-                            data.tarefasStatus['em andamento'] + data.tarefasStatus['iniciada'], // Sum 'Em Andamento' and 'Iniciada'
-                            data.tarefasStatus.concluída,
-                            data.tarefasStatus.cancelada,
-                            data.overdueTasks,
-                            data.upcomingTasks
-                        ],
-                        backgroundColor: taskColors
-                    }]
-                });
-            }
-        });
-
         // Função para fechar a notificação
         $('.notification .close-btn').on('click', function() {
             $(this).parent().hide();
         });
     });
 
-</script>
-
-
-<script>
     $(document).ready(function () {
         // Inicializa o sortable para os cards
         $("#sortable-cards").sortable({
