@@ -607,18 +607,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         options: {
                             plugins: {
                                 legend: {
-                                    display: true,
-                                    labels: {
-                                        generateLabels: function (chart) {
-                                            return funcionarios.map((funcionario, index) => ({
-                                                text: funcionario,
-                                                fillStyle: cores[index],
-                                                strokeStyle: cores[index],
-                                                hidden: false,
-                                                index: index
-                                            }));
-                                        }
-                                    }
+                                    display: true // Deixe o Chart.js gerenciar as legendas automaticamente
                                 },
                                 title: {
                                     display: true,
@@ -630,15 +619,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             },
                             scales: {
                                 x: {
-                                    display: true
+                                    display: true // Exibe os nomes dos funcionários no eixo X
                                 },
                                 y: {
-                                    beginAtZero: true
+                                    beginAtZero: true // Garante que o eixo Y comece do zero
                                 }
                             }
                         }
                     });
                 }
+
 
 
                 // Atualizar gráfico de meses (tarefas por mês, cores diferentes por mês)
