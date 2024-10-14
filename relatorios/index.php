@@ -574,11 +574,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (Array.isArray(dados.funcionarioData)) {
                     var funcionarios = [];
                     var totaisFuncionario = [];
-                    var cores = ['#007bff', '#dc3545', '#ffc107', '#28a745', '#17a2b8'];
+                    var cores = [];
 
+                    // Função para gerar cores aleatórias
+                    function gerarCorAleatoria() {
+                        const letras = '0123456789ABCDEF';
+                        let cor = '#';
+                        for (let i = 0; i < 6; i++) {
+                            cor += letras[Math.floor(Math.random() * 16)];
+                        }
+                        return cor;
+                    }
+
+                    // Preenche os dados e gera cores dinâmicas
                     dados.funcionarioData.forEach(function (func, index) {
                         funcionarios.push(func.funcionario_responsavel);
                         totaisFuncionario.push(func.total);
+                        cores.push(gerarCorAleatoria()); // Gera uma cor para cada funcionário
                     });
 
                     var ctxFuncionario = document.getElementById('graficoFuncionario').getContext('2d');
@@ -589,16 +601,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             datasets: [{
                                 label: 'Tarefas por funcionário',
                                 data: totaisFuncionario,
-                                backgroundColor: cores
+                                backgroundColor: cores // Usa as cores dinâmicas
                             }]
-                            
                         },
                         options: {
                             plugins: {
                                 legend: {
                                     display: true,
                                     labels: {
-                                        generateLabels: function(chart) {
+                                        generateLabels: function (chart) {
                                             return funcionarios.map((funcionario, index) => ({
                                                 text: funcionario,
                                                 fillStyle: cores[index],
@@ -619,7 +630,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             },
                             scales: {
                                 x: {
-                                    display: false
+                                    display: true
                                 },
                                 y: {
                                     beginAtZero: true
@@ -628,6 +639,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     });
                 }
+
 
                 // Atualizar gráfico de meses (tarefas por mês, cores diferentes por mês)
                 if (Array.isArray(dados.mesData) && dados.mesData.length > 0) {
