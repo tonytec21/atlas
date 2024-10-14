@@ -201,9 +201,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .grafico-barra {
             flex: 1 1 45%; 
-            max-width: 600px;
+            max-width: 1200px;
             min-width: 300px;
-            height: 300px;
+            height: 400px;
             display: flex;
             justify-content: center;
         }
