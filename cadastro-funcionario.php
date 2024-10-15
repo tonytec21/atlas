@@ -372,8 +372,9 @@ include(__DIR__ . '/menu.php');
                         <?php endforeach; ?>
                     </tbody>
                 </table>
-            </div>
         </div>
+    </div>
+</div>
 
 <div class="notification">
     <span class="close-btn">&times;</span>
