@@ -147,45 +147,46 @@ include(__DIR__ . '/../menu.php');
                         <?php endforeach; ?>
                     </tbody>
                 </table>
-            </div>
-        </div>
-
-<!-- Modal para QR Code -->
-<div class="modal fade" id="qrCodeModal" tabindex="-1" role="dialog" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="qrCodeModalLabel">QR Code PIX</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body" id="qrCodeModalBody">
-                <!-- QR Code vai aqui -->
-            </div>
         </div>
     </div>
 </div>
 
-<!-- Modal para alertas -->
-<div class="modal fade" id="alertModal" tabindex="-1" role="dialog" aria-labelledby="alertModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <div class="modal-header" id="alertModalHeader">
-                <h5 class="modal-title" id="alertModalLabel">Alerta</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body" id="alertModalBody">
-                <!-- Alerta vai aqui -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+    <!-- Modal para QR Code -->
+    <div class="modal fade" id="qrCodeModal" tabindex="-1" role="dialog" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="qrCodeModalLabel">QR Code PIX</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="qrCodeModalBody">
+                    <!-- QR Code vai aqui -->
+                </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- Modal para alertas -->
+    <div class="modal fade" id="alertModal" tabindex="-1" role="dialog" aria-labelledby="alertModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header" id="alertModalHeader">
+                    <h5 class="modal-title" id="alertModalLabel">Alerta</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="alertModalBody">
+                    <!-- Alerta vai aqui -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
