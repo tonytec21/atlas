@@ -21,7 +21,7 @@ if (file_exists($jsonFile)) {
 $atualizacaoAtual = $jsonData["atualizacao"];
 $mensagem = '';
 
-// Loop para executar todas as atualizações a partir do valor presente no JSON
+// Loop para executar todas as atualizações em sequência
 while (true) {
     // Define a próxima atualização como a sequência do número atual
     $proximaAtualizacao = $atualizacaoAtual + 1;
@@ -29,17 +29,22 @@ while (true) {
 
     // Verifica se o arquivo de execução da próxima atualização existe
     if (file_exists($arquivoExecute)) {
-        include $arquivoExecute; // Executa a atualização
+        try {
+            include $arquivoExecute; // Executa a atualização
 
-        // Atualiza o número da versão no JSON
-        $atualizacaoAtual = $proximaAtualizacao;
-        $jsonData["atualizacao"] = $atualizacaoAtual;
+            // Atualiza o número da versão no JSON
+            $atualizacaoAtual = $proximaAtualizacao;
+            $jsonData["atualizacao"] = $atualizacaoAtual;
 
-        if (file_put_contents($jsonFile, json_encode($jsonData)) === false) {
-            $mensagem .= "Erro ao atualizar o arquivo de versão para a atualização {$proximaAtualizacao}.<br>";
-            break;
-        } else {
-            $mensagem .= "Atualização {$proximaAtualizacao} aplicada com sucesso.<br>";
+            if (file_put_contents($jsonFile, json_encode($jsonData)) === false) {
+                $mensagem .= "Erro ao atualizar o arquivo de versão para a atualização {$proximaAtualizacao}.<br>";
+                break; // Encerra o loop em caso de erro ao salvar o JSON
+            } else {
+                $mensagem .= "Atualização {$proximaAtualizacao} aplicada com sucesso.<br>";
+            }
+        } catch (Exception $e) {
+            $mensagem .= "Erro durante a execução da atualização {$proximaAtualizacao}: " . $e->getMessage() . "<br>";
+            break; // Encerra o loop em caso de erro durante a execução
         }
     } else {
         // Se o próximo arquivo de atualização não existir, encerra o loop
