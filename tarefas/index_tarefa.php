@@ -19,6 +19,23 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
 
+#compartilharAnexos {
+    margin-left: 10px;
+}
+
+.form-check-inline {
+    margin-left: 5px;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+#subTaskAttachments {
+    margin-top: 8px; 
+}
+
+
 .status-prestes-vencer {
     background-color: #ffc107; 
 }
@@ -827,9 +844,29 @@ date_default_timezone_set('America/Sao_Paulo');
                         <textarea class="form-control" id="subTaskDescription" name="description" rows="5"></textarea>
                     </div>
                     <div class="form-group">
-                        <label for="subTaskAttachments">Anexos:</label>
+                        <div class="d-flex align-items-center">
+                            <label for="subTaskAttachments" class="mr-2">Anexos:</label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="compartilharAnexos" name="compartilharAnexos">
+                                <label class="form-check-label" for="compartilharAnexos">Compartilhar anexos da tarefa principal</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-2">
                         <input type="file" id="subTaskAttachments" name="attachments[]" multiple class="form-control-file">
                     </div>
+
+                    <script>
+                        $('#compartilharAnexos').change(function () {
+                            if ($(this).is(':checked')) {
+                                $('#subTaskAttachments').prop('disabled', true);
+                            } else {
+                                $('#subTaskAttachments').prop('disabled', false);
+                            }
+                        });
+                    </script>
+
                     <input type="hidden" id="subTaskCreatedBy" name="createdBy" value="<?php echo $_SESSION['username']; ?>">
                     <input type="hidden" id="subTaskCreatedAt" name="createdAt" value="<?php echo date('Y-m-d H:i:s'); ?>">
                     <input type="hidden" id="subTaskPrincipalId" name="id_tarefa_principal">
@@ -1878,6 +1915,15 @@ function viewTask(taskToken) {
                 }
             });
         });
+
+        $('#compartilharAnexos').change(function () {
+            if ($(this).is(':checked')) {
+                $('#subTaskAttachments').prop('disabled', true); // Desabilita o botão "Escolher arquivos"
+            } else {
+                $('#subTaskAttachments').prop('disabled', false); // Habilita o botão novamente se desmarcado
+            }
+        });
+
 
     </script>
     <?php

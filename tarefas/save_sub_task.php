@@ -20,10 +20,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Aqui você captura o valor de id_tarefa_principal
     $id_tarefa_principal = $_POST['id_tarefa_principal'];
 
-    // Verifica se há arquivos anexados
-    if (!empty($_FILES['attachments']['name'][0])) {
+    // Captura se o usuário marcou a opção de compartilhar anexos
+    $compartilharAnexos = isset($_POST['compartilharAnexos']);
+
+    // Verifica se deve compartilhar os anexos da tarefa principal
+    if ($compartilharAnexos) {
+        $sqlAnexos = "SELECT caminho_anexo FROM tarefas WHERE id = ?";
+        $stmtAnexos = $conn->prepare($sqlAnexos);
+        $stmtAnexos->bind_param("i", $id_tarefa_principal);
+        $stmtAnexos->execute();
+        $stmtAnexos->bind_result($caminho_anexo_principal);
+        $stmtAnexos->fetch();
+        $stmtAnexos->close();
+
+        $caminho_anexo = $caminho_anexo_principal; // Copia os anexos da tarefa principal
+    } elseif (!empty($_FILES['attachments']['name'][0])) {
         $targetDir = "/arquivos/$token/";
         $fullTargetDir = __DIR__ . $targetDir;
+
         if (!is_dir($fullTargetDir)) {
             mkdir($fullTargetDir, 0777, true);
         }
@@ -34,9 +48,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $caminho_anexo .= "$targetDir" . basename($name) . ";";
             }
         }
-        // Remover o ponto e vírgula final
         $caminho_anexo = rtrim($caminho_anexo, ';');
     }
+
 
     // Inserir dados da tarefa no banco de dados
     $sql = "INSERT INTO tarefas (token, titulo, categoria, origem, descricao, data_limite, funcionario_responsavel, criado_por, data_criacao, caminho_anexo, nivel_de_prioridade, sub_categoria, id_tarefa_principal) 
