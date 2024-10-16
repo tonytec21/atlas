@@ -17,20 +17,21 @@ if (file_exists($jsonFile)) {
     file_put_contents($jsonFile, json_encode($jsonData));
 }
 
-// Identifica o número da atualização atual
+// Identifica o número da atualização atual a partir do JSON
 $atualizacaoAtual = $jsonData["atualizacao"];
 $mensagem = '';
 
-// Loop para executar todas as atualizações disponíveis
+// Loop para executar todas as atualizações a partir do valor presente no JSON
 while (true) {
+    // Define a próxima atualização como a sequência do número atual
     $proximaAtualizacao = $atualizacaoAtual + 1;
     $arquivoExecute = $updateDir . "execute{$proximaAtualizacao}.php";
 
     // Verifica se o arquivo de execução da próxima atualização existe
     if (file_exists($arquivoExecute)) {
-        include $arquivoExecute;
+        include $arquivoExecute; // Executa a atualização
 
-        // Atualiza o número da versão no arquivo JSON
+        // Atualiza o número da versão no JSON
         $atualizacaoAtual = $proximaAtualizacao;
         $jsonData["atualizacao"] = $atualizacaoAtual;
 
@@ -41,6 +42,7 @@ while (true) {
             $mensagem .= "Atualização {$proximaAtualizacao} aplicada com sucesso.<br>";
         }
     } else {
+        // Se o próximo arquivo de atualização não existir, encerra o loop
         $mensagem .= "Sistema atualizado. Nenhuma atualização pendente.<br>";
         break;
     }
