@@ -48,13 +48,18 @@ $html = '
         </tr>
 ';
 
-// Consulta das Ordens de Serviço
-$os_query = $conn->query("SELECT id, cliente, cpf_cliente, total_os, data_criacao FROM ordens_de_servico");
+// Consulta das Ordens de Serviço com pagamento
+$os_query = $conn->query("
+    SELECT os.id, os.cliente, os.cpf_cliente, os.total_os, os.data_criacao 
+    FROM ordens_de_servico os
+    INNER JOIN pagamento_os po ON os.id = po.ordem_de_servico_id
+    GROUP BY os.id
+");
 
 while ($os = $os_query->fetch_assoc()) {
     $os_id = $os['id'];
     $cliente = $os['cliente'];
-    $cpf_cnpj = $os['cpf_cliente'] ?: '---';  // Exibir '---' se CPF/CNPJ não estiver preenchido
+    $cpf_cnpj = $os['cpf_cliente'] ?: '---';
     $total_os = 'R$ ' . number_format($os['total_os'], 2, ',', '.');
     $data_os = date('d/m/Y', strtotime($os['data_criacao']));
 
@@ -77,20 +82,28 @@ while ($os = $os_query->fetch_assoc()) {
     $atos_query->execute();
     $atos_result = $atos_query->get_result();
     $atos_info = '<b>Atos Liquidados:</b><br/>';
+    $total_geral_atos = 0;
+
     while ($ato = $atos_result->fetch_assoc()) {
         $descricao_ato = $ato['ato'];
         $quantidade = $ato['quantidade_liquidada'];
-        $total = 'R$ ' . number_format($ato['total'], 2, ',', '.');
+        $total = $ato['total'];
         $data_ato = date('d/m/Y', strtotime($ato['data']));
-        $atos_info .= "$descricao_ato - $quantidade - $total - $data_ato<br/>";
+
+        $total_geral_atos += $total;  // Somar o total dos atos
+
+        $atos_info .= "$descricao_ato - Qtd: $quantidade - Total: R$ " . number_format($total, 2, ',', '.') . " - Data: $data_ato<br/>";
     }
+
+    // Adicionar o total geral dos atos liquidados
+    $atos_info .= '<b>Total Geral dos Atos:</b> R$ ' . number_format($total_geral_atos, 2, ',', '.') . '<br/>';
 
     // Consulta das Devoluções
     $devolucao_query = $conn->prepare("SELECT total_devolucao, forma_devolucao, data_devolucao FROM devolucao_os WHERE ordem_de_servico_id = ?");
     $devolucao_query->bind_param("i", $os_id);
     $devolucao_query->execute();
     $devolucao_result = $devolucao_query->get_result();
-    
+
     if ($devolucao_result->num_rows > 0) {
         $atos_info .= '<b>Devoluções:</b><br/>';
         while ($devolucao = $devolucao_result->fetch_assoc()) {
@@ -122,5 +135,4 @@ $pdf->writeHTML($html, true, false, true, false, '');
 
 // Gerar o PDF
 $pdf->Output('Livro_Deposito_Previo.pdf', 'I');
-
 ?>
