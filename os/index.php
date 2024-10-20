@@ -375,11 +375,31 @@ include(__DIR__ . '/db_connection.php');
                             $stmt->execute();
                             $deposito_previo = $stmt->fetchColumn() ?: 0;
 
-                            // Calcula o total liquidado
-                            $stmt = $conn->prepare('SELECT SUM(total) as total_liquidado FROM atos_liquidados WHERE ordem_servico_id = :os_id');
+                            // Total dos atos liquidados
+                            $stmt = $conn->prepare('
+                            SELECT 
+                                COALESCE(SUM(total), 0) AS total_liquidado 
+                            FROM atos_liquidados 
+                            WHERE ordem_servico_id = :os_id
+                            ');
                             $stmt->bindParam(':os_id', $ordem['id']);
                             $stmt->execute();
-                            $total_liquidado = $stmt->fetchColumn() ?: 0;
+                            $total_liquidado_1 = $stmt->fetchColumn() ?: 0;
+
+                            // Total dos atos manuais liquidados
+                            $stmt = $conn->prepare('
+                            SELECT 
+                                COALESCE(SUM(total), 0) AS total_liquidado 
+                            FROM atos_manuais_liquidados 
+                            WHERE ordem_servico_id = :os_id
+                            ');
+                            $stmt->bindParam(':os_id', $ordem['id']);
+                            $stmt->execute();
+                            $total_liquidado_2 = $stmt->fetchColumn() ?: 0;
+
+                            // Soma dos atos liquidados em ambas as tabelas
+                            $total_liquidado = $total_liquidado_1 + $total_liquidado_2;
+
 
                             // Calcula o total devolvido
                             $stmt = $conn->prepare('SELECT SUM(total_devolucao) as total_devolvido FROM devolucao_os WHERE ordem_de_servico_id = :os_id');

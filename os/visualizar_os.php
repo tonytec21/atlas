@@ -85,13 +85,24 @@ $devolucoes_query->execute();
 $devolucoes_result = $devolucoes_query->get_result();
 $devolucoes = $devolucoes_result->fetch_all(MYSQLI_ASSOC);
 
-// Buscar dados dos atos liquidados
+// Consulta para atos liquidados normais
 $atos_liquidados_query = $conn->prepare("SELECT SUM(total) as total_liquidado FROM atos_liquidados WHERE ordem_servico_id = ?");
 $atos_liquidados_query->bind_param("i", $os_id);
 $atos_liquidados_query->execute();
 $atos_liquidados_result = $atos_liquidados_query->get_result();
 $atos_liquidados = $atos_liquidados_result->fetch_assoc();
-$total_liquidado = $atos_liquidados['total_liquidado'] ?? 0.0; // Valor padrão 0.0 se nenhum ato for liquidado
+$total_liquidado_normal = $atos_liquidados['total_liquidado'] ?? 0.0;
+
+// Consulta para atos manuais liquidados
+$atos_manuais_query = $conn->prepare("SELECT SUM(total) as total_manuais_liquidado FROM atos_manuais_liquidados WHERE ordem_servico_id = ?");
+$atos_manuais_query->bind_param("i", $os_id);
+$atos_manuais_query->execute();
+$atos_manuais_result = $atos_manuais_query->get_result();
+$atos_manuais = $atos_manuais_result->fetch_assoc();
+$total_manuais_liquidado = $atos_manuais['total_manuais_liquidado'] ?? 0.0;
+
+// Soma dos atos liquidados de ambas as tabelas
+$total_liquidado = $total_liquidado_normal + $total_manuais_liquidado;
 
 // Verificar se há itens liquidados
 $has_liquidated = false;
@@ -378,7 +389,7 @@ include(__DIR__ . '/../menu.php');
                     <input type="text" class="form-control" id="total_repasses" name="total_repasses" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>
                 </div>
                 <?php endif; ?>
-                <?php if ($saldo > 0): ?>
+                <?php if ($saldo != 0): ?>
                 <div class="form-group col-md-3">
                     <label for="saldo">Saldo:</label>
                     <input type="text" class="form-control" id="saldo" name="saldo" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>
@@ -511,7 +522,7 @@ include(__DIR__ . '/../menu.php');
                         </div>
                     <?php endif; ?>
                     
-                    <?php if ($saldo > 0): ?>
+                    <?php if ($saldo != 0): ?>
                         <div class="form-group col-md-3">
                             <label for="saldo_modal">Saldo</label>
                             <input type="text" class="form-control" id="saldo_modal" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>

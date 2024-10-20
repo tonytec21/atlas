@@ -4,7 +4,6 @@ checkSession();
 require_once('../oficios/tcpdf/tcpdf.php');
 include(__DIR__ . '/db_connection2.php');
 
-// Suprimir avisos de erros
 error_reporting(E_ERROR | E_PARSE);
 date_default_timezone_set('America/Sao_Paulo');
 
@@ -60,29 +59,30 @@ while ($os = $os_query->fetch_assoc()) {
     $pagamento_query->execute();
     $pagamento_result = $pagamento_query->get_result();
 
-    $observacoes .= "<b>Depósitos Prévio: </b>";
-    $pagamentos = []; // Array para armazenar os pagamentos
+    $observacoes .= "<b>DEPÓSITOS PRÉVIO: </b>";
+    $pagamentos = []; 
+
     while ($pagamento = $pagamento_result->fetch_assoc()) {
         $valor = $pagamento['total_pagamento'];
         $forma = $pagamento['forma_de_pagamento'];
         $data_pagamento = date('d/m/Y', strtotime($pagamento['data_pagamento']));
 
-        // Acumular o valor do depósito
         $deposito_previo_total += $valor;
 
-        // Armazenar cada pagamento formatado no array
         $pagamentos[] = 'R$ ' . number_format($valor, 2, ',', '.') . " - $forma - $data_pagamento";
     }
 
     $observacoes .= implode(' | ', $pagamentos);
 
-    // Atos Praticados
+    $observacoes .= " | <b>TOTAL EM DEP. PRÉVIO: </b> R$ " . number_format($deposito_previo_total, 2, ',', '.');
+
+    // Atos Praticados - atos_liquidados
     $atos_query = $conn->prepare("SELECT ato, quantidade_liquidada, total, data FROM atos_liquidados WHERE ordem_servico_id = ?");
     $atos_query->bind_param("i", $os_id);
     $atos_query->execute();
     $atos_result = $atos_query->get_result();
 
-    $observacoes .= " | <b>Atos Praticados: </b>";
+    $observacoes .= " | <b>ATOS PRATICADOS: </b>";
     while ($ato = $atos_result->fetch_assoc()) {
         $descricao_ato = $ato['ato'];
         $quantidade = $ato['quantidade_liquidada'];
@@ -94,7 +94,29 @@ while ($os = $os_query->fetch_assoc()) {
         $observacoes .= "$descricao_ato - Qtd: $quantidade - Total: R$ " . number_format($total, 2, ',', '.') . " - Data: $data_ato | ";
     }
 
-    $observacoes .= "<b>Total Geral dos Atos:</b> R$ " . number_format($total_geral_atos, 2, ',', '.');
+    // Atos Praticados - atos_manuais_liquidados
+    $atos_manuais_query = $conn->prepare("SELECT ato, quantidade_liquidada, total, data FROM atos_manuais_liquidados WHERE ordem_servico_id = ?");
+    $atos_manuais_query->bind_param("i", $os_id);
+    $atos_manuais_query->execute();
+    $atos_manuais_result = $atos_manuais_query->get_result();
+
+    if ($atos_manuais_result->num_rows > 0) {
+        $observacoes .= " | <b>ATOS MANUAIS PRATICADOS: </b>";
+        while ($ato_manual = $atos_manuais_result->fetch_assoc()) {
+            $descricao_ato_manual = $ato_manual['ato'];
+            $quantidade_manual = $ato_manual['quantidade_liquidada'];
+            $total_manual = $ato_manual['total'];
+            $data_ato_manual = date('d/m/Y', strtotime($ato_manual['data']));
+
+            $total_geral_atos += $total_manual;
+
+            $observacoes .= "$descricao_ato_manual - Qtd: $quantidade_manual - Total: R$ " . number_format($total_manual, 2, ',', '.') . " - Data: $data_ato_manual | ";
+        }
+    }
+
+    // Exibir o Total Geral dos Atos
+    $observacoes .= "<b>TOTAL GERAL DOS ATOS:</b> R$ " . number_format($total_geral_atos, 2, ',', '.');
+
 
     // Devoluções
     $devolucao_query = $conn->prepare("SELECT total_devolucao, forma_devolucao, data_devolucao FROM devolucao_os WHERE ordem_de_servico_id = ?");
@@ -103,9 +125,9 @@ while ($os = $os_query->fetch_assoc()) {
     $devolucao_result = $devolucao_query->get_result();
 
     if ($devolucao_result->num_rows > 0) {
-        $observacoes .= " | <b>Devoluções: </b>";
+        $observacoes .= " | <b>DEVOLUÇÕES: </b>";
         
-        $devolucoes = []; // Array para armazenar as devoluções
+        $devolucoes = [];
         while ($devolucao = $devolucao_result->fetch_assoc()) {
             $valor_devolucao = $devolucao['total_devolucao'];
             $forma_devolucao = $devolucao['forma_devolucao'];
@@ -124,23 +146,22 @@ while ($os = $os_query->fetch_assoc()) {
 
     // Verificar se o saldo é exatamente 0.00
     if (round($saldo, 2) != 0) {  
-        $observacoes .= " | <b>Saldo: </b> R$ " . number_format($saldo, 2, ',', '.');
+        $observacoes .= " | <b>SALDO: </b> R$ " . number_format($saldo, 2, ',', '.');
     }
-
 
     // Tabela Principal da OS com a nova célula "OBSERVAÇÕES"
     $pdf->SetFillColor(242, 242, 242);
     $pdf->SetFont('helvetica', 'B', 8);
     $pdf->Cell(15, 6, 'Nº OS', 1, 0, 'C', true);
-    $pdf->Cell(85, 6, 'APRESENTANTE', 1, 0, 'C', true);
-    $pdf->Cell(40, 6, 'CPF/CNPJ', 1, 0, 'C', true);
+    $pdf->Cell(95, 6, 'APRESENTANTE', 1, 0, 'C', true);
+    $pdf->Cell(30, 6, 'CPF/CNPJ', 1, 0, 'C', true);
     $pdf->Cell(30, 6, 'TOTAL OS (R$)', 1, 0, 'C', true);
     $pdf->Cell(20, 6, 'DATA OS', 1, 1, 'C', true);
 
     $pdf->SetFont('helvetica', '', 8);
     $pdf->Cell(15, 6, $os_id, 1);
-    $pdf->Cell(85, 6, $cliente, 1);
-    $pdf->Cell(40, 6, $cpf_cnpj, 1);
+    $pdf->Cell(95, 6, $cliente, 1);
+    $pdf->Cell(30, 6, $cpf_cnpj, 1);
     $pdf->Cell(30, 6, $total_os, 1);
     $pdf->Cell(20, 6, $data_os, 1, 1);
     
