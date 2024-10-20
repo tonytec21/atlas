@@ -34,21 +34,6 @@ $pdf->Ln(10);
 $pdf->SetFont('helvetica', '', 8);
 $conn->set_charset("utf8");
 
-// Início da Tabela com Cabeçalho e Corpo Integrado
-$html = '
-    <table border="1" cellpadding="4" cellspacing="0" width="100%">
-        <tr>
-            <th style="width: 6%; text-align: center;"><b>Nº OS</b></th>
-            <th style="width: 15%; text-align: center;"><b>Apresentante</b></th>
-            <th style="width: 15%; text-align: center;"><b>CPF/CNPJ</b></th>
-            <th style="width: 11%; text-align: center;"><b>Total OS (R$)</b></th>
-            <th style="width: 9%; text-align: center;"><b>Data OS</b></th>
-            <th style="width: 14%; text-align: center;"><b>Depósito Prévio</b></th>
-            <th style="width: 30%; text-align: center;"><b>Atos Praticados</b></th>
-        </tr>
-';
-
-// Consulta das Ordens de Serviço com pagamento
 $os_query = $conn->query("
     SELECT os.id, os.cliente, os.cpf_cliente, os.total_os, os.data_criacao 
     FROM ordens_de_servico os
@@ -63,75 +48,109 @@ while ($os = $os_query->fetch_assoc()) {
     $total_os = 'R$ ' . number_format($os['total_os'], 2, ',', '.');
     $data_os = date('d/m/Y', strtotime($os['data_criacao']));
 
-    // Consulta dos Pagamentos
+    // Variáveis para observações e cálculos
+    $observacoes = '';
+    $total_geral_atos = 0;
+    $total_devolucoes = 0;
+    $deposito_previo_total = 0;
+
+    // Pagamentos (Depósito Prévio)
     $pagamento_query = $conn->prepare("SELECT total_pagamento, forma_de_pagamento, data_pagamento FROM pagamento_os WHERE ordem_de_servico_id = ?");
     $pagamento_query->bind_param("i", $os_id);
     $pagamento_query->execute();
     $pagamento_result = $pagamento_query->get_result();
-    $pagamento_info = '';
+
+    $observacoes .= "<b>Depósitos Prévio: </b>";
+    $pagamentos = []; // Array para armazenar os pagamentos
     while ($pagamento = $pagamento_result->fetch_assoc()) {
-        $valor = 'R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.');
+        $valor = $pagamento['total_pagamento'];
         $forma = $pagamento['forma_de_pagamento'];
         $data_pagamento = date('d/m/Y', strtotime($pagamento['data_pagamento']));
-        $pagamento_info .= "$valor - $forma - $data_pagamento<br/>";
+
+        // Acumular o valor do depósito
+        $deposito_previo_total += $valor;
+
+        // Armazenar cada pagamento formatado no array
+        $pagamentos[] = 'R$ ' . number_format($valor, 2, ',', '.') . " - $forma - $data_pagamento";
     }
 
-    // Consulta dos Atos Praticados
+    $observacoes .= implode(' | ', $pagamentos);
+
+    // Atos Praticados
     $atos_query = $conn->prepare("SELECT ato, quantidade_liquidada, total, data FROM atos_liquidados WHERE ordem_servico_id = ?");
     $atos_query->bind_param("i", $os_id);
     $atos_query->execute();
     $atos_result = $atos_query->get_result();
-    $atos_info = '<b>Atos Liquidados:</b><br/>';
-    $total_geral_atos = 0;
 
+    $observacoes .= " | <b>Atos Praticados: </b>";
     while ($ato = $atos_result->fetch_assoc()) {
         $descricao_ato = $ato['ato'];
         $quantidade = $ato['quantidade_liquidada'];
         $total = $ato['total'];
         $data_ato = date('d/m/Y', strtotime($ato['data']));
 
-        $total_geral_atos += $total;  // Somar o total dos atos
+        $total_geral_atos += $total;
 
-        $atos_info .= "$descricao_ato - Qtd: $quantidade - Total: R$ " . number_format($total, 2, ',', '.') . " - Data: $data_ato<br/>";
+        $observacoes .= "$descricao_ato - Qtd: $quantidade - Total: R$ " . number_format($total, 2, ',', '.') . " - Data: $data_ato | ";
     }
 
-    // Adicionar o total geral dos atos liquidados
-    $atos_info .= '<b>Total Geral dos Atos:</b> R$ ' . number_format($total_geral_atos, 2, ',', '.') . '<br/>';
+    $observacoes .= "<b>Total Geral dos Atos:</b> R$ " . number_format($total_geral_atos, 2, ',', '.');
 
-    // Consulta das Devoluções
+    // Devoluções
     $devolucao_query = $conn->prepare("SELECT total_devolucao, forma_devolucao, data_devolucao FROM devolucao_os WHERE ordem_de_servico_id = ?");
     $devolucao_query->bind_param("i", $os_id);
     $devolucao_query->execute();
     $devolucao_result = $devolucao_query->get_result();
 
     if ($devolucao_result->num_rows > 0) {
-        $atos_info .= '<b>Devoluções:</b><br/>';
+        $observacoes .= " | <b>Devoluções: </b>";
+        
+        $devolucoes = []; // Array para armazenar as devoluções
         while ($devolucao = $devolucao_result->fetch_assoc()) {
-            $valor_devolucao = 'R$ ' . number_format($devolucao['total_devolucao'], 2, ',', '.');
+            $valor_devolucao = $devolucao['total_devolucao'];
             $forma_devolucao = $devolucao['forma_devolucao'];
             $data_devolucao = date('d/m/Y', strtotime($devolucao['data_devolucao']));
-            $atos_info .= "$valor_devolucao - $forma_devolucao - $data_devolucao<br/>";
+
+            $total_devolucoes += $valor_devolucao;
+
+            $devolucoes[] = 'R$ ' . number_format($valor_devolucao, 2, ',', '.') . " - $forma_devolucao - $data_devolucao";
         }
+
+        $observacoes .= implode(' | ', $devolucoes);
     }
 
-    // Adicionar Linha da OS na Tabela
-    $html .= "
-        <tr>
-            <td style='width: 6%; text-align: center;'>{$os_id}</td>
-            <td style='width: 15%; text-align: left;'>{$cliente}</td>
-            <td style='width: 15%; text-align: center;'>{$cpf_cnpj}</td>
-            <td style='width: 11%; text-align: center;'>{$total_os}</td>
-            <td style='width: 9%; text-align: center;'>{$data_os}</td>
-            <td style='width: 14%; text-align: left;'>{$pagamento_info}</td>
-            <td style='width: 30%; text-align: left;'>{$atos_info}</td>
-        </tr>
-    ";
+    // Cálculo do Saldo
+    $saldo = $deposito_previo_total - $total_geral_atos - $total_devolucoes;
+
+    // Verificar se o saldo é exatamente 0.00
+    if (round($saldo, 2) != 0) {  
+        $observacoes .= " | <b>Saldo: </b> R$ " . number_format($saldo, 2, ',', '.');
+    }
+
+
+    // Tabela Principal da OS com a nova célula "OBSERVAÇÕES"
+    $pdf->SetFillColor(242, 242, 242);
+    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->Cell(15, 6, 'Nº OS', 1, 0, 'C', true);
+    $pdf->Cell(85, 6, 'APRESENTANTE', 1, 0, 'C', true);
+    $pdf->Cell(40, 6, 'CPF/CNPJ', 1, 0, 'C', true);
+    $pdf->Cell(30, 6, 'TOTAL OS (R$)', 1, 0, 'C', true);
+    $pdf->Cell(20, 6, 'DATA OS', 1, 1, 'C', true);
+
+    $pdf->SetFont('helvetica', '', 8);
+    $pdf->Cell(15, 6, $os_id, 1);
+    $pdf->Cell(85, 6, $cliente, 1);
+    $pdf->Cell(40, 6, $cpf_cnpj, 1);
+    $pdf->Cell(30, 6, $total_os, 1);
+    $pdf->Cell(20, 6, $data_os, 1, 1);
+    
+    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->Cell(0, 6, 'OBSERVAÇÕES', 1, 1, 'C', true);
+
+    $pdf->SetFont('helvetica', '', 8);
+    $pdf->writeHTMLCell(0, 0, '', '', $observacoes, 1, 1, false, true, 'J', true);
+    $pdf->Ln(5);
 }
-
-$html .= '</table>';
-
-// Adicionar a Tabela ao PDF
-$pdf->writeHTML($html, true, false, true, false, '');
 
 // Gerar o PDF
 $pdf->Output('Livro_Deposito_Previo.pdf', 'I');
