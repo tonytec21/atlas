@@ -236,7 +236,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         table.dataTable td:nth-child(9) {
             width: 12%;
         }
+        
+        .card {
+            border-radius: 12px;
+            text-align: center;
+        }
 
+        .card h5 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .card p {
+            font-size: 2rem;
+            margin: 0;
+            font-weight: bold;
+        }
 
     </style>
 </head>
