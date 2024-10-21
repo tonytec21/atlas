@@ -428,7 +428,7 @@ function obterStatusOS($conn, $os_id) {
             </div>
 
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-6" style="width: 400px; height: 400px;">
                     <canvas id="osPorFuncionario"></canvas>
                 </div>
                 <div class="col-md-6">
@@ -670,7 +670,7 @@ function obterStatusOS($conn, $os_id) {
 
                     // Gráfico de OS por Funcionário
                     new Chart(document.getElementById('osPorFuncionario'), {
-                        type: 'pie',
+                        type: 'doughnut',
                         data: {
                             labels: osFuncionario.labels,
                             datasets: [{
@@ -719,7 +719,7 @@ function obterStatusOS($conn, $os_id) {
                                     }
                                 },
                                 legend: {
-                                    display: true,
+                                    display: false,
                                     position: 'top'
                                 }
                             }
