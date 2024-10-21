@@ -428,7 +428,7 @@ function obterStatusOS($conn, $os_id) {
             </div>
 
             <div class="row">
-                <div class="col-md-6" style="width: 400px; height: 400px;">
+                <div class="col-md-6" style="height: 500px;">
                     <canvas id="osPorFuncionario"></canvas>
                 </div>
                 <div class="col-md-6">
