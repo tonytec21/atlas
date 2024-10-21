@@ -220,6 +220,8 @@ function obterStatusOS($conn, $os_id) {
     <title>Relatório e Ordens de Serviço</title>
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <style>
@@ -301,7 +303,13 @@ function obterStatusOS($conn, $os_id) {
 
     <div id="main" class="main-content">
         <div class="container">
-            <h3>Relatório O.S e Depósito Prévio</h3>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3>Relatório O.S e Depósito Prévio</h3>
+                <a href="livro_dep_previo.php" target="_blank" class="btn btn-primary">
+                    <i class="fa fa-print" aria-hidden="true"></i> Livro de Depósito Prévio
+                </a>
+            </div>
+
             <hr>
             <div class="row g-3 justify-content-center">
                 <div class="col-md-3">
