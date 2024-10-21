@@ -19,7 +19,7 @@ if (strpos($output, 'Already up to date.') !== false) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>ATLAS</title>
     <link rel="stylesheet" href="style/css/bootstrap.min.css">
     <link rel="stylesheet" href="style/css/custom.css">
     <link rel="icon" href="style/img/favicon.png" type="image/png">

@@ -29,7 +29,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Dashboard</title>
+    <title>Atlas - Central de Acesso</title>
     <link rel="stylesheet" href="style/css/bootstrap.min.css">
     <link rel="stylesheet" href="style/css/font-awesome.min.css">
     <link rel="stylesheet" href="style/css/style.css">
