@@ -253,6 +253,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: bold;
         }
 
+        .col-md-3 {
+            margin-bottom: 20px;
+        }
+
     </style>
 </head>
 

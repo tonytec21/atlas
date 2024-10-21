@@ -305,9 +305,9 @@ function obterStatusOS($conn, $os_id) {
         <div class="container">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3>Relatório O.S e Depósito Prévio</h3>
-                <a href="livro_dep_previo.php" target="_blank" class="btn btn-primary">
+                <button onclick="imprimir()" target="_blank" class="btn btn-primary">
                     <i class="fa fa-print" aria-hidden="true"></i> Livro de Depósito Prévio
-                </a>
+                </button>
             </div>
 
             <hr>
@@ -629,6 +629,29 @@ function obterStatusOS($conn, $os_id) {
             carregarGraficosComFiltros(); // Chamada inicial.
         });
 
+        function imprimir() {
+            // Gerar um timestamp para evitar cache
+            const timestamp = new Date().getTime();
+            
+            // Fazer a requisição para o arquivo JSON com o timestamp
+            fetch(`../style/configuracao.json?nocache=${timestamp}`)
+                .then(response => response.json())
+                .then(data => {
+                    let url = '';
+                    
+                    if (data.timbrado === 'S') {
+                        url = `livro_dep_previo.php`;
+                    } else {
+                        url = `livro-dep-previo.php`;
+                    }
+                    
+                    // Abrir o link correspondente em uma nova aba
+                    window.open(url, '_blank');
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar o arquivo JSON:', error);
+                });
+        }
 
     </script>
 
