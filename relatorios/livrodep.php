@@ -516,10 +516,12 @@ function obterStatusOS($conn, $os_id) {
             });
         });
 
+        let chartInstances = {};
+
         function gerarCores(quantidade) {
             const cores = [];
             for (let i = 0; i < quantidade; i++) {
-                const cor = `hsl(${(i * 360) / quantidade}, 70%, 50%)`; // Gera cores dinâmicas
+                const cor = `hsl(${(i * 360) / quantidade}, 70%, 50%)`;
                 cores.push(cor);
             }
             return cores;
@@ -530,9 +532,8 @@ function obterStatusOS($conn, $os_id) {
                 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
                 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
             ];
-
             const [ano, mes] = anoMes.split('-');
-            return `${meses[parseInt(mes) - 1]} de ${ano}`; 
+            return `${meses[parseInt(mes) - 1]} de ${ano}`;
         }
 
         function formatarSemana(anoSemana) {
@@ -540,191 +541,71 @@ function obterStatusOS($conn, $os_id) {
             return `${semana}-${ano}`;
         }
 
-        function carregarGraficos() {
+        function atualizarGrafico(id, titulo, tipo, dados, formatarLabel = (label) => label) {
+            console.log(`Atualizando gráfico: ${id}`, dados); // Log dos dados recebidos.
+
+            if (!dados || !dados.labels || !dados.data) {
+                console.warn(`Dados inválidos para o gráfico ${id}`);
+                return;
+            }
+
+            // Destroi o gráfico anterior se ele existir.
+            if (chartInstances[id]) {
+                chartInstances[id].destroy();
+            }
+
+            const ctx = document.getElementById(id).getContext('2d');
+            chartInstances[id] = new Chart(ctx, {
+                type: tipo,
+                data: {
+                    labels: dados.labels.map(formatarLabel),
+                    datasets: [{
+                        label: titulo,
+                        data: dados.data,
+                        backgroundColor: gerarCores(dados.labels.length),
+                        borderColor: gerarCores(1)[0],
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: titulo,
+                            font: { size: 18 }
+                        },
+                        legend: {
+                            display: tipo !== 'line',
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        function carregarGraficosComFiltros() {
+            const filtros = {
+                dia: $('#filtroDia').val(),
+                mes: $('#filtroMes').val(),
+                ano: $('#filtroAno').val(),
+                status: $('#filtroStatus').val(),
+                situacao: $('#filtroSituacao').val(),
+                funcionario: $('#filtroFuncionario').val()
+            };
+
             $.ajax({
                 url: 'buscar_dados_graficos.php',
                 method: 'GET',
+                data: filtros,
                 success: function (data) {
-                    const { osMes, osSemana, faturamentoMes, faturamentoSemana, osFuncionario, faturamentoFuncionario } = data;
+                    console.log(data); // Verificar os dados recebidos.
 
-                    // Gráfico de Quantidade de OS por Mês
-                    new Chart(document.getElementById('osPorMes'), {
-                        type: 'bar',
-                        data: {
-                            labels: osMes.labels.map(formatarMes), // Aplica o formato desejado
-                            datasets: [{
-                                label: 'Quantidade de OS',
-                                data: osMes.data,
-                                backgroundColor: gerarCores(osMes.labels.length),
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Quantidade de O.S. por mês',
-                                    font: {
-                                        size: 18
-                                    }
-                                },
-                                legend: {
-                                    display: false,
-                                    position: 'top'
-                                }
-                            }
-                        }
-                    });
-
-
-                    // Gráfico de Quantidade de OS por Semana
-                    new Chart(document.getElementById('osPorSemana'), {
-                        type: 'line',
-                        data: {
-                            labels: osSemana.labels.map(formatarSemana), // Aplica o formato desejado
-                            datasets: [{
-                                label: 'Quantidade de OS',
-                                data: osSemana.data,
-                                borderColor: gerarCores(1)[0],
-                                fill: false
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Quantidade de O.S. por semana',
-                                    font: {
-                                        size: 18
-                                    }
-                                },
-                                legend: {
-                                    display: true,
-                                    position: 'top'
-                                }
-                            }
-                        }
-                    });
-
-                    // Gráfico de Faturamento por Mês
-                    new Chart(document.getElementById('faturamentoPorMes'), {
-                        type: 'bar',
-                        data: {
-                            labels: faturamentoMes.labels.map(formatarMes), // Aplica o formato desejado
-                            datasets: [{
-                                label: 'Faturamento (R$)',
-                                data: faturamentoMes.data,
-                                backgroundColor: gerarCores(faturamentoMes.labels.length),
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Faturamento por mês',
-                                    font: {
-                                        size: 18
-                                    }
-                                },
-                                legend: {
-                                    display: false,
-                                    position: 'top'
-                                }
-                            }
-                        }
-                    });
-
-
-                    // Gráfico de Faturamento por Semana
-                    new Chart(document.getElementById('faturamentoPorSemana'), {
-                        type: 'line',
-                        data: {
-                            labels: faturamentoSemana.labels.map(formatarSemana),
-                            datasets: [{
-                                label: 'Faturamento (R$)',
-                                data: faturamentoSemana.data,
-                                borderColor: gerarCores(1)[0],
-                                fill: false
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Faturamento por semana',
-                                    font: {
-                                        size: 18
-                                    }
-                                },
-                                legend: {
-                                    display: true,
-                                    position: 'top'
-                                }
-                            }
-                        }
-                    });
-
-
-                    // Gráfico de OS por Funcionário
-                    new Chart(document.getElementById('osPorFuncionario'), {
-                        type: 'doughnut',
-                        data: {
-                            labels: osFuncionario.labels,
-                            datasets: [{
-                                label: 'OS por Funcionário',
-                                data: osFuncionario.data,
-                                backgroundColor: gerarCores(osFuncionario.labels.length),
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Quantidade de O.S. por funcionário',
-                                    font: {
-                                        size: 18
-                                    }
-                                },
-                                legend: {
-                                    display: true,
-                                    position: 'top'
-                                }
-                            }
-                        }
-                    });
-
-                    // Gráfico de Faturamento por Funcionário
-                    new Chart(document.getElementById('faturamentoPorFuncionario'), {
-                        type: 'line',
-                        data: {
-                            labels: faturamentoFuncionario.labels,
-                            datasets: [{
-                                label: 'Faturamento por Funcionário',
-                                data: faturamentoFuncionario.data,
-                                backgroundColor: gerarCores(faturamentoFuncionario.labels.length),
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                title: {
-                                    display: true,
-                                    text: 'Faturamento por funcionário',
-                                    font: {
-                                        size: 18
-                                    }
-                                },
-                                legend: {
-                                    display: false,
-                                    position: 'top'
-                                }
-                            }
-                        }
-                    });
+                    atualizarGrafico('osPorMes', 'Quantidade de O.S. por mês', 'bar', data.osMes, formatarMes);
+                    atualizarGrafico('osPorSemana', 'Quantidade de O.S. por semana', 'line', data.osSemana, formatarSemana);
+                    atualizarGrafico('faturamentoPorMes', 'Faturamento por mês', 'bar', data.faturamentoMes, formatarMes);
+                    atualizarGrafico('faturamentoPorSemana', 'Faturamento por semana', 'line', data.faturamentoSemana, formatarSemana);
+                    atualizarGrafico('osPorFuncionario', 'Quantidade de O.S. por funcionário', 'doughnut', data.osFuncionario);
+                    atualizarGrafico('faturamentoPorFuncionario', 'Faturamento por funcionário', 'line', data.faturamentoFuncionario);
                 },
                 error: function (xhr, status, error) {
                     console.error('Erro ao carregar os gráficos:', error);
@@ -732,7 +613,13 @@ function obterStatusOS($conn, $os_id) {
             });
         }
 
-        carregarGraficos();
+        // Chamada inicial e para filtros.
+        $(document).ready(function () {
+            $('#filtroDia, #filtroMes, #filtroAno, #filtroStatus, #filtroSituacao, #filtroFuncionario')
+                .on('change keyup', carregarGraficosComFiltros);
+
+            carregarGraficosComFiltros(); // Chamada inicial.
+        });
 
 
     </script>
