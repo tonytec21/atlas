@@ -323,7 +323,7 @@ function obterStatusOS($conn, $os_id) {
                 <div class="col-md-3">
                     <div class="card card-pagas text-center shadow h-100">
                         <div class="card-body d-flex flex-column justify-content-center">
-                            <h5>Todal de O.S. Pagas</h5>
+                            <h5>Total de O.S. Pagas</h5>
                             <p><?= htmlspecialchars($os_pagas) ?></p>
                         </div>
                     </div>
