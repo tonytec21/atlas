@@ -10,7 +10,7 @@ date_default_timezone_set('America/Sao_Paulo');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Central de Relatórios</title>
+    <title>Atlas - Central de Relatório</title>
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
 
@@ -382,7 +382,7 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container mt-4">
-        <h2 class="text-center mb-4">Central de Relatórios</h2>
+        <h2 class="text-center mb-4">Central de Relatório</h2>
 
         <!-- Cards de Módulos -->
         <div id="sortable-cards" class="row">
