@@ -217,7 +217,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         </div>
                         <input type="hidden" id="createdBy" name="createdBy" value="<?php echo $_SESSION['username']; ?>">
                         <input type="hidden" id="createdAt" name="createdAt" value="<?php echo date('Y-m-d H:i:s'); ?>">
-                        <input type="hidden" id="guiaId" name="guiaId"> <!-- Campo oculto para armazenar o ID da guia -->
+                        <input type="hidden" id="guiaId" name="guiaId">
                         <button type="submit" class="btn btn-primary w-100">Criar Tarefa</button>
                     </form>
                 </div>
@@ -399,17 +399,12 @@ date_default_timezone_set('America/Sao_Paulo');
 
                         if (response.length > 0) {
                             response.forEach(function(guia) {
-                                // Função para formatar a data no formato brasileiro
+
                                 function formatarDataBrasileira(dataString) {
-                                    // Substitui o espaço entre a data e a hora por 'T' para que o JavaScript entenda
                                     var data = new Date(dataString.replace(' ', 'T'));
-
-                                    // Verifica se a data é válida
                                     if (isNaN(data.getTime())) {
-                                        return dataString; // Retorna a string original se a data for inválida
+                                        return dataString;
                                     }
-
-                                    // Retorna a data no formato brasileiro
                                     return data.toLocaleString('pt-BR', {
                                         year: 'numeric',
                                         month: '2-digit',
@@ -420,7 +415,6 @@ date_default_timezone_set('America/Sao_Paulo');
                                     });
                                 }
 
-                                // Função assíncrona para verificar o valor do campo "timbrado" no arquivo configuracao.json
                                 async function verificarTimbrado() {
                                     try {
                                         const response = await fetch('../style/configuracao.json');
@@ -432,11 +426,8 @@ date_default_timezone_set('America/Sao_Paulo');
                                     }
                                 }
 
-                                // Função para abrir a guia de impressão com a URL correta
                                 async function visualizarGuia(taskId, guiaId) {
                                     const timbrado = await verificarTimbrado();
-                                    
-                                    // Verifica se taskId é 0 ou NULL, e abre com o guiaId
                                     if (!taskId || taskId == 0) {
                                         if (timbrado === 'S') {
                                             window.open(`guia_recebimento.php?id=${guiaId}`, '_blank');
@@ -446,7 +437,6 @@ date_default_timezone_set('America/Sao_Paulo');
                                             alert('Erro: Não foi possível determinar o tipo de guia de recebimento.');
                                         }
                                     } else {
-                                        // Caso contrário, usa taskId na URL
                                         if (timbrado === 'S') {
                                             window.open(`../tarefas/guia_recebimento.php?id=${taskId}`, '_blank');
                                         } else if (timbrado === 'N') {
@@ -457,47 +447,59 @@ date_default_timezone_set('America/Sao_Paulo');
                                     }
                                 }
 
-                                // Código principal que insere as ações no DataTable
                                 var acoes = '';
 
-                                // Verifica se o task_id é 0 ou NULL, caso seja, exibe o botão "Criar Tarefa"
-                                if (!guia.task_id || guia.task_id == 0) {
-                                    acoes = `
-                                        <button class="btn btn-primary btn-sm btn-print" data-task-id="${guia.task_id}" data-guia-id="${guia.id}" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Imprimir Guia de Recebimento"><i class="fa fa-print" aria-hidden="true"></i></button>
-                                        <button class="btn btn-success btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Criar Tarefa" onclick='abrirModalTarefa(${guia.id}, ${JSON.stringify(guia.cliente)}, ${JSON.stringify(guia.documentos_recebidos)})'><i class="fa fa-clock-o" aria-hidden="true"></i></button>
-                                        <button class="btn btn-secondary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Vincular Tarefa" onclick="abrirModalVincularTarefa(${guia.id})"><i class="fa fa-link" aria-hidden="true"></i></button>
-                                        <button class="btn btn-warning btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Editar Guia" onclick="abrirModalEditarGuia(${guia.id})"><i class="fa fa-edit" aria-hidden="true"></i></button>
-                                    `;
+                                // Verificar o acesso do usuário antes de exibir os botões
+                                $.ajax({
+                                    url: 'verificar_acesso.php',
+                                    type: 'GET',
+                                    dataType: 'json',
+                                    success: function(accessResponse) {
+                                        const temAcesso = accessResponse.tem_acesso;
 
-                                } else {
-                                    // Caso já exista um task_id, exibe o botão "Visualizar Tarefa" com o link para a página da tarefa
-                                    acoes = `
-                                        <button class="btn btn-primary btn-sm btn-print" data-task-id="${guia.task_id}" data-guia-id="${guia.id}" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Imprimir Guia de Recebimento"><i class="fa fa-print" aria-hidden="true"></i></button>
-                                        <button class="btn btn-info btn-sm" title="Visualizar Tarefa" onclick="window.location.href='../tarefas/index_tarefa.php?token=${guia.task_token}'"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                        <button class="btn btn-warning btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Editar Guia" onclick="abrirModalEditarGuia(${guia.id})"><i class="fa fa-edit" aria-hidden="true"></i></button>
-                                    `;
-                                }
+                                        if (!guia.task_id || guia.task_id == 0) {
+                                            acoes = `
+                                                <button class="btn btn-primary btn-sm btn-print" data-task-id="${guia.task_id}" data-guia-id="${guia.id}" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Imprimir Guia de Recebimento"><i class="fa fa-print" aria-hidden="true"></i></button>
+                                            `;
+                                            if (temAcesso) {
+                                                acoes += `
+                                                    <button class="btn btn-success btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Criar Tarefa" onclick='abrirModalTarefa(${guia.id}, ${JSON.stringify(guia.cliente)}, ${JSON.stringify(guia.documentos_recebidos)})'><i class="fa fa-clock-o" aria-hidden="true"></i></button>
+                                                    <button class="btn btn-secondary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Vincular Tarefa" onclick="abrirModalVincularTarefa(${guia.id})"><i class="fa fa-link" aria-hidden="true"></i></button>
+                                                `;
+                                            }
+                                            acoes += `
+                                                <button class="btn btn-warning btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Editar Guia" onclick="abrirModalEditarGuia(${guia.id})"><i class="fa fa-edit" aria-hidden="true"></i></button>
+                                            `;
+                                        } else {
+                                            acoes = `
+                                                <button class="btn btn-primary btn-sm btn-print" data-task-id="${guia.task_id}" data-guia-id="${guia.id}" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Imprimir Guia de Recebimento"><i class="fa fa-print" aria-hidden="true"></i></button>
+                                                <button class="btn btn-info btn-sm" title="Visualizar Tarefa" onclick="window.location.href='../tarefas/index_tarefa.php?token=${guia.task_token}'"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                                <button class="btn btn-warning btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Editar Guia" onclick="abrirModalEditarGuia(${guia.id})"><i class="fa fa-edit" aria-hidden="true"></i></button>
+                                            `;
+                                        }
 
-                               // Adiciona o conteúdo ao DataTable
-                                dataTable.row.add([
-                                    guia.id,  // ID da guia
-                                    guia.task_id || '-',  // Protocolo Tarefa
-                                    guia.cliente,  // Cliente
-                                    guia.documento_apresentante,  // Cliente
-                                    guia.funcionario,  // Funcionário
-                                    formatarDataBrasileira(guia.data_recebimento),  // Data de Recebimento formatada
-                                    guia.documentos_recebidos,  // Documentos Recebidos
-                                    guia.observacoes,  // Observações
-                                    acoes  // Coluna de Ações
-                                ]).draw();
+                                        dataTable.row.add([
+                                            guia.id,
+                                            guia.task_id || '-',
+                                            guia.cliente,
+                                            guia.documento_apresentante,
+                                            guia.funcionario,
+                                            formatarDataBrasileira(guia.data_recebimento),
+                                            guia.documentos_recebidos,
+                                            guia.observacoes,
+                                            acoes
+                                        ]).draw();
 
-                                // Após a tabela ser desenhada, remove event listeners antigos e adiciona novos para os botões de impressão
-                                $('.btn-print').off('click').on('click', function() {
-                                    const taskId = $(this).data('task-id');
-                                    const guiaId = $(this).data('guia-id');
-                                    visualizarGuia(taskId, guiaId);
+                                        $('.btn-print').off('click').on('click', function() {
+                                            const taskId = $(this).data('task-id');
+                                            const guiaId = $(this).data('guia-id');
+                                            visualizarGuia(taskId, guiaId);
+                                        });
+                                    },
+                                    error: function() {
+                                        console.error('Erro ao verificar o acesso do usuário.');
+                                    }
                                 });
-
                             });
                         } else {
                             // alert('Nenhum registro encontrado.');
@@ -508,6 +510,7 @@ date_default_timezone_set('America/Sao_Paulo');
                     }
                 });
             }
+
         });
 
         function abrirModalTarefa(guiaId, cliente, documentosRecebidos) {
@@ -543,22 +546,30 @@ date_default_timezone_set('America/Sao_Paulo');
                     task_id: protocolo
                 },
                 success: function(response) {
-                    $('#vincularTarefaModal').modal('hide'); // Fecha o modal após a operação
-                    
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: response,
-                        confirmButtonText: 'OK'
-                    }).then(() => {
-                        location.reload(); // Recarrega a página para refletir as alterações
-                    });
+                    if (response.includes('Sucesso')) {
+                        $('#vincularTarefaModal').modal('hide'); // Fecha o modal após a operação
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: response,
+                            confirmButtonText: 'OK'
+                        }).then(() => {
+                            location.reload(); // Recarrega a página para refletir as alterações
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: response,
+                            confirmButtonText: 'OK'
+                        });
+                    }
                 },
                 error: function() {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro!',
-                        text: 'Erro ao vincular tarefa.',
+                        text: 'Erro ao conectar com o servidor.',
                         confirmButtonText: 'OK'
                     });
                 }
