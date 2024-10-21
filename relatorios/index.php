@@ -187,7 +187,6 @@ include(__DIR__ . '/../menu.php');
                 </div>
             </div>
 
-
             <!-- Tarefas -->
             <!-- <div class="col-md-4 mb-3" id="card-tarefas">
                 <div class="card shadow-sm">
