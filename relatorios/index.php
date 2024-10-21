@@ -10,10 +10,9 @@ date_default_timezone_set('America/Sao_Paulo');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Central de Relatório</title>
+    <title>Atlas - Central de Relatórios</title>
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
-
+    <link href="../style/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
@@ -124,93 +123,7 @@ date_default_timezone_set('America/Sao_Paulo');
             color: #fff;
         }
 
-        /* Estilos exclusivos para o modal com a classe modal-alerta */
-        .modal-alerta .modal-content {
-            border: 2px solid #dc3545; 
-            background-color: #f8d7da; 
-            color: #721c24; 
-        }
-
-        .modal-alerta .modal-header {
-            background-color: #dc3545; 
-            color: white; 
-        }
-
-        .modal-alerta .modal-body {
-            font-weight: bold; 
-        }
-
-        .modal-alerta .modal-footer {
-            background-color: #f5c6cb;
-        }
-
         
-        .modal-alerta .btn-close {
-            background-color: white;
-            border: 1px solid #dc3545;
-        }
-
-        .modal-alerta .btn-close:hover {
-            background-color: #dc3545;
-            color: white;
-        }
-
-        .modal-alerta .modal-footer .btn-secondary {
-            background-color: #dc3545; 
-            border: none;
-        }
-
-        .modal-alerta .modal-footer .btn-secondary:hover {
-            background-color: #c82333; 
-        }
-
-
-        .status-label {
-            display: inline-block;
-            padding: 0.2em 0.6em;
-            font-size: 75%;
-            font-weight: 700;
-            line-height: 2;
-            color: #fff;
-            text-align: center;
-            white-space: nowrap;
-            vertical-align: baseline;
-            border-radius: 0.25em;
-            width: 100px;
-        }
-
-        .status-iniciada {
-            background-color: #007bff;
-        }
-
-        .status-em-espera {
-            background-color: #ffa500;
-        }
-
-        .status-em-andamento {
-            background-color: #0056b3;
-        }
-
-        .status-concluida {
-            background-color: #28a745;
-        }
-
-        .status-cancelada {
-            background-color: #dc3545;
-        }
-
-        .status-pendente {
-            background-color: gray;
-        }
-
-        .status-prestes-vencer {
-            background-color: #ffc107; 
-        }
-
-        .status-vencida {
-            background-color: #dc3545; 
-        }
-
         .btn-close {
             outline: none; 
             border: none; 
@@ -228,151 +141,6 @@ date_default_timezone_set('America/Sao_Paulo');
         .btn-close:focus {
             outline: none;
         }
-
-        .modal-body ul {
-            list-style-type: none;
-            padding-left: 0;
-        }
-
-        .modal-body li {
-            padding-left: 20px!important;
-            padding: 10px 0; 
-            border-bottom: 1px solid #ddd;
-        }
-
-        .modal-body h5 {
-            /* margin-top: 20px;
-            margin-bottom: 10px; */
-            font-weight: bold;
-        }
-
-        .modal-dialog {
-            max-width: 700px;
-        }
-
-        /* Prioridades */
-        .priority-medium {
-            background-color: #fff9c4 !important; 
-            padding: 10px;
-        }
-
-        .priority-high {
-            background-color: #ffe082 !important;
-            padding: 10px;
-        }
-
-        .priority-critical {
-            background-color: #ff8a80 !important;
-            padding: 10px;
-        }
-
-        .row-quase-vencida {
-            background-color: #ffebcc!important;
-            padding: 10px;
-        }
-
-        .row-vencida {
-            background-color: #ffcccc!important;
-            padding: 10px;
-        }
-
-        body.dark-mode .priority-medium {
-            background-color: #fff9c4 !important;
-            color: #000!important;
-        }
-
-        body.dark-mode .priority-high {
-            background-color: #ffe082 !important;
-            color: #000!important;
-        }
-
-        body.dark-mode .priority-critical {
-            background-color: #ff8a80 !important;
-        }
-
-        /* Modo escuro - Quase vencida e vencida */
-        body.dark-mode .row-quase-vencida {
-            background-color: #ffebcc!important; 
-            color: #000!important;
-        }
-
-        body.dark-mode .row-vencida {
-            background-color: #ffcccc!important; 
-            color: #000!important;
-        }
-
-        /* Status das tarefas */
-        .status-iniciada {
-            background-color: #007bff;
-            color: #fff;
-        }
-
-        .status-em-espera {
-            background-color: #ffa500; 
-            color: #fff;
-        }
-
-        .status-em-andamento {
-            background-color: #0056b3;
-            color: #fff;
-        }
-
-        .status-concluida {
-            background-color: #28a745;
-            color: #fff;
-        }
-
-        .status-cancelada {
-            background-color: #dc3545; 
-            color: #fff;
-        }
-
-        .status-pendente {
-            background-color: gray;
-            color: #fff;
-        }
-
-        .chart-container {
-            position: relative;
-            height: 240px;
-        }
-        .chart-container.full-height {
-            height: 360px;
-            margin-top: 30px;
-        }
-        @media (max-width: 768px) {
-            .chart-container {
-                height: 200px;
-                margin-top: 20px;
-            }
-            .chart-container.full-height {
-                height: 300px;
-                margin-top: 20px;
-                margin-bottom: 20px;
-            }
-            .card-body {
-                padding: 1rem;
-            }
-            .card {
-                margin-bottom: 1rem;
-            }
-        }
-        .notification {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background-color: #343a40;
-            color: #fff;
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-        }
-        .notification .close-btn {
-            cursor: pointer;
-            float: right;
-            margin-left: 10px;
-        }
     </style>
 </head>
 <body class="light-mode">
@@ -382,7 +150,7 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container mt-4">
-        <h2 class="text-center mb-4">Central de Relatório</h2>
+        <h2 class="text-center mb-4">Central de Relatórios</h2>
 
         <!-- Cards de Módulos -->
         <div id="sortable-cards" class="row">
