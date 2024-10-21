@@ -21,7 +21,6 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/jquery-ui.css">
     <style>
 
-        /* Cursor para indicar que os elementos são arrastáveis */
         #sortable-buttons .col-md-4 {
             cursor: move;
         }
@@ -113,7 +112,7 @@ date_default_timezone_set('America/Sao_Paulo');
         .btn-info2{
             background-color: #17a2b8;
             color: white;
-            margin-bottom: 5px;
+            margin-bottom: 3px!important;
             width: 40px;
             height: 40px;
             border-radius: 5px;
@@ -140,6 +139,9 @@ date_default_timezone_set('America/Sao_Paulo');
 
         .btn-close:focus {
             outline: none;
+        }
+        .w-100 {
+            margin-bottom: 5px;
         }
     </style>
 </head>

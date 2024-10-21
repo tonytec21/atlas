@@ -131,7 +131,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
         .btn-info2{
             background-color: #17a2b8;
             color: white;
-            margin-bottom: 5px;
+            margin-bottom: 3px!important;
             width: 40px;
             height: 40px;
             border-radius: 5px;
@@ -389,6 +389,9 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             cursor: pointer;
             float: right;
             margin-left: 10px;
+        }
+        .w-100 {
+            margin-bottom: 5px;
         }
     </style>
 </head>

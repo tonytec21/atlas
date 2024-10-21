@@ -289,7 +289,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card text-white bg-danger">
+                    <div class="card text-white bg-warning">
                         <div class="card-body">
                             <h5 class="card-title">Pendentes</h5>
                             <p class="card-text" id="pendentes"><?= $dados['pendentes'] ?></p>
@@ -297,7 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card text-white bg-warning">
+                    <div class="card text-white bg-danger">
                         <div class="card-body">
                             <h5 class="card-title">Em Atraso</h5>
                             <p class="card-text" id="atraso"><?= $dados['atraso'] ?></p>
