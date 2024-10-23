@@ -107,6 +107,7 @@ if ($result->num_rows > 0) {
                 <button class='btn btn-info' onclick='abrirModalVisualizar({$row['id']})'><i class='fa fa-eye' aria-hidden='true'></i></button>
                 <button class='btn btn-warning' onclick='abrirModalEditar({$row['id']})'><i class='fa fa-pencil' aria-hidden='true'></i></button>
                 <button class='btn btn-secondary' onclick='abrirModalSituacao({$row['id']})'><i class='fa fa-bell' aria-hidden='true'></i></button>
+                <button class='btn btn-success' onclick='imprimirGuia({$row['id']})'><i class='fa fa-print' aria-hidden='true'></i></button>
             </td>
         </tr>";
     }

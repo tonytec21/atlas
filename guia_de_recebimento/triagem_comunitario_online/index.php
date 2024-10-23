@@ -24,7 +24,7 @@ date_default_timezone_set('America/Sao_Paulo');
             max-width: 60%;
         }
 
-        .btn-warning, .btn-secondary {
+        .btn-warning, .btn-secondary, .btn-success {
             width: 40px;
             height: 40px;
             margin-bottom: 5px;
@@ -885,6 +885,10 @@ date_default_timezone_set('America/Sao_Paulo');
             location.reload(); // Recarrega a página
         });
 
+        function imprimirGuia(id) {
+            const url = `guia_de_impressao.php?id=${id}`;
+            window.open(url, '_blank'); // Abre a URL em uma nova aba
+        }
 
     </script>
 

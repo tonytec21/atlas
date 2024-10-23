@@ -45,7 +45,10 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <div id="main" class="main-content">
         <div class="container">
-            <h3>Pesquisa de Guias de Recebimento</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0;">Pesquisa de Guias de Recebimento</h3>
+                <button id="btnTriagemComunitario" style="display: none;" class="btn btn-secondary" onclick="abrirTriagem()">Triagem Comunitário</button>
+            </div>
             <hr>
             <form id="searchForm">
     <div class="form-row">
@@ -803,6 +806,40 @@ date_default_timezone_set('America/Sao_Paulo');
         });
     });
 
+    // Função para carregar e verificar o JSON
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('config_guia_de_recebimento.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao carregar o JSON.');
+                }
+                return response.json();
+            })
+            .then(config => {
+                if (config.triagem_comunitario_ativo === 'S') {
+                    document.getElementById('btnTriagemComunitario').style.display = 'inline-block';
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+            });
+    });
+
+    // Função para abrir o diretório correto com base no tipo de conexão
+    function abrirTriagem() {
+        fetch('config_guia_de_recebimento.json')
+            .then(response => response.json())
+            .then(config => {
+                if (config.tipo_de_conexao === 'local') {
+                    window.location.href = 'triagem_comunitario/index.php';
+                } else if (config.tipo_de_conexao === 'online') {
+                    window.location.href = 'triagem_comunitario_online/index.php';
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao abrir o diretório:', error);
+            });
+    }
     </script>
 
     <?php include(__DIR__ . '/../rodape.php'); ?>
