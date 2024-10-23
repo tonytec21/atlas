@@ -16,6 +16,13 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="icon" href="../../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../../style/css/dataTables.bootstrap4.min.css">
+    <script src="../../script/jquery-3.5.1.min.js"></script>
+    <script src="../../script/bootstrap.min.js"></script>
+    <script src="../../script/bootstrap.bundle.min.js"></script>
+    <script src="../../script/jquery.mask.min.js"></script>
+    <script src="../../script/jquery.dataTables.min.js"></script>
+    <script src="../../script/dataTables.bootstrap4.min.js"></script>
+    <script src="../../script/sweetalert2.js"></script>
     <style>
         .btn-close {
             outline: none;
@@ -405,14 +412,6 @@ include(__DIR__ . '/../../menu.php');
                 </div>
             </div>
         </div>
-
-<script src="../../script/jquery-3.5.1.min.js"></script>
-<script src="../../script/bootstrap.min.js"></script>
-<script src="../../script/bootstrap.bundle.min.js"></script>
-<script src="../../script/jquery.mask.min.js"></script>
-<script src="../../script/jquery.dataTables.min.js"></script>
-<script src="../../script/dataTables.bootstrap4.min.js"></script>
-<script src="../../script/sweetalert2.js"></script>
 <script>
     $(document).ready(function() {
         var addAttachments = []; // Para armazenar anexos adicionados no modal "Adicionar Registro"
