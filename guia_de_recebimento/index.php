@@ -134,7 +134,7 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <!-- Modal para criação de Tarefa -->
     <div class="modal fade" id="tarefaModal" tabindex="-1" role="dialog" aria-labelledby="tarefaModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document"> <!-- Modal ajustado para ser grande -->
+        <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="tarefaModalLabel">Criar Tarefa</h5>
