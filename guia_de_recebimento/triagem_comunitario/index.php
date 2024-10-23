@@ -132,8 +132,8 @@ date_default_timezone_set('America/Sao_Paulo');
 
             
 
-            <div class="form-group col-md-4" style="margin-top: 0.5rem!important">
-                <button type="submit" class="btn btn-success btn-block mt-4">Pesquisar</button>
+            <div class="form-group col-md-4">
+                <button type="submit" class="btn btn-success btn-block w-100">Pesquisar</button>
             </div>
         </form>
 
