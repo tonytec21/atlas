@@ -401,7 +401,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         <div class="form-group">
                             <label for="editarAnexos">Anexos</label>
                             <input type="file" id="editarAnexos" name="anexos[]" class="form-control-file" multiple>
-                            <button type="button" class="btn btn-success mt-2" onclick="adicionarAnexos()">Adicionar Anexos</button>
+                            <button type="button" class="btn btn-success w-100" onclick="adicionarAnexos()">Adicionar Anexos</button>
 
                             <table class="table table-bordered mt-2">
                                 <thead>
