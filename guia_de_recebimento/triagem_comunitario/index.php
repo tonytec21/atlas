@@ -58,7 +58,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h3 class="mb-0">Triagem Comunitário</h3>
-            <button class="btn btn-primary" data-toggle="modal" data-target="#modalCadastro">Cadastrar Novo</button>
+            <button class="btn btn-primary" data-toggle="modal" data-target="#modalCadastro"><i class="fa fa-plus" aria-hidden="true"></i> Cadastrar Novo</button>
         </div>
         <hr>
 
