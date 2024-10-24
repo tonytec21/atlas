@@ -133,7 +133,7 @@ date_default_timezone_set('America/Sao_Paulo');
             
 
             <div class="form-group col-md-4">
-                <button type="submit" class="btn btn-success btn-block w-100">Pesquisar</button>
+                <button type="submit" class="btn btn-success btn-block w-100"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar</button>
             </div>
         </form>
 
