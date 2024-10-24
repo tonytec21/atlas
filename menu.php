@@ -176,7 +176,7 @@ $mode_query->close();
         </div>
 
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/suas_notas/index.php'?>"><i class="fa fa-check-square-o" aria-hidden="true"></i> Anotações</a>
-        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/relatorios/index.php'?>"><i class="fa fa-line-chart" aria-hidden="true"></i> Relatórios</a>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/relatorios/index.php'?>"><i class="fa fa-line-chart" aria-hidden="true"></i> Relatórios e Livros</a>
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/manuais/index.php'?>"><i class="fa fa-file-video-o" aria-hidden="true"></i> Vídeos Tutoriais</a>
 
         <?php if ($nivel_de_acesso === 'administrador' || $tem_acesso_controle_contas): ?>
