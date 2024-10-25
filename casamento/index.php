@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
+    <link rel="icon" href="../style/img/favicon.png" type="image/png">
 </head>
 <body class="light-mode">
     <div id="mySidebar" class="sidebar">
