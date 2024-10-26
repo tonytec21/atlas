@@ -17,6 +17,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <script src="../script/jquery-3.5.1.min.js"></script>
     <style>
 
 #compartilharAnexos {
@@ -581,6 +582,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <th>Data de Criação</th>
                                 <th>Data Limite</th>
                                 <th>Status</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody id="mainTaskTableBody">
@@ -601,6 +603,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <th>Data de Criação</th>
                                 <th>Data Limite</th>
                                 <th>Status</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody id="subTasksTableBody">
@@ -876,8 +879,6 @@ date_default_timezone_set('America/Sao_Paulo');
         </div>
     </div>
 </div>
-
-    <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
@@ -971,6 +972,8 @@ date_default_timezone_set('America/Sao_Paulo');
                             '<td>' + new Date(mainTask.data_criacao).toLocaleString("pt-BR") + '</td>' +
                             '<td>' + new Date(mainTask.data_limite).toLocaleString("pt-BR") + '</td>' +
                             '<td><span class="' + getStatusClass(mainTask.status) + '">' + capitalize(mainTask.status) + '</span></td>' +
+                            '<td><button title="Visualizar" class="btn btn-info btn-sm" onclick="abrirTarefaEmNovaGuia(' + mainTask.id + ')">' +
+                            '<i class="fa fa-eye" aria-hidden="true"></i></button></td>' +
                             '</tr>';
                         mainTaskTableBody.append(row);
                     }
@@ -1017,6 +1020,8 @@ date_default_timezone_set('America/Sao_Paulo');
                                 '<td>' + new Date(subTask.data_criacao).toLocaleString("pt-BR") + '</td>' +
                                 '<td>' + new Date(subTask.data_limite).toLocaleString("pt-BR") + '</td>' +
                                 '<td><span class="' + statusClass + '">' + capitalize(subTask.status) + '</span></td>' +
+                                '<td><button title="Visualizar" class="btn btn-info btn-sm" onclick="abrirTarefaEmNovaGuia(' + subTask.id + ')">' +
+                                '<i class="fa fa-eye" aria-hidden="true"></i></button></td>' +
                                 '</tr>';
                             subTasksTableBody.append(row);
                         });
@@ -1890,6 +1895,34 @@ function viewTask(taskToken) {
         $('#vincularOficioModal, #reciboEntregaModal, #guiaRecebimentoModal, #createSubTaskModal, #addCommentModal').on('hidden.bs.modal', function () {
             $('#viewTaskModal').css('overflow-y', 'auto');
         });
+
+        function abrirTarefaEmNovaGuia(tarefaId) {
+            $.ajax({
+                url: 'get_token.php',
+                type: 'GET',
+                data: { id: tarefaId },
+                success: function(response) {
+                    var result = JSON.parse(response);
+                    if (result.token) {
+                        var url = 'index_tarefa.php?token=' + result.token;
+                        window.open(url, '_blank'); // Abre a nova aba com o token
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Token não encontrado para essa tarefa.'
+                        });
+                    }
+                },
+                error: function() {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao buscar o token da tarefa.'
+                    });
+                }
+            });
+        }
 
         $(document).ready(function() {
             // Função para obter o valor do parâmetro da URL

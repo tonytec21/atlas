@@ -143,6 +143,14 @@ $valor_pago_liquido = $total_pagamentos - $total_devolucoes;
 
 // Calcular saldo
 $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
+
+$temItensNaoLiquidados = false;
+foreach ($ordem_servico_itens as $item) {
+    if ($item['status'] != 'liquidado') {
+        $temItensNaoLiquidados = true;
+        break;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -297,6 +305,16 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
             background: #138496;
             color: #fff;
         }
+        .btn-liquidartudo {
+            color: #fff;
+            background-color: #1f009e;
+            border-color: #1f009e;
+        }
+        .btn-liquidartudo:hover {
+            color: #fff;
+            background-color: #160070;
+            border-color: #160070;
+        }
     </style>
 </head>
 <body>
@@ -414,7 +432,18 @@ include(__DIR__ . '/../menu.php');
             </div>
         </form>
         <div id="osItens" class="mt-4">
-            <h4>Itens da Ordem de Serviço</h4>
+            <div class="d-flex justify-content-between align-items-center">
+                <h4>Itens da Ordem de Serviço</h4>
+                <button 
+                    type="button" 
+                    class="btn btn-primary btn-sm" 
+                    onclick="liquidarTudo()" 
+                    id="btnLiquidarTudo" 
+                    <?php echo $temItensNaoLiquidados ? '' : 'disabled'; ?>>
+                    Liquidar Tudo
+                </button>
+            </div>
+
             <table id="tabelaItensOS" class="table table-striped table-bordered" style="zoom: 80%">
                 <thead>
                     <tr>
@@ -1082,8 +1111,45 @@ include(__DIR__ . '/../menu.php');
         });
     }
 
-    // Função para liquidar ato
+    // // Função para liquidar ato
+    // function liquidarAto(itemId, quantidade, quantidadeLiquidada, status) {
+    //     liquidacaoItemId = itemId;
+    //     quantidadeTotal = quantidade;
+    //     quantidadeLiquidada = quantidadeLiquidada;
+
+    //     var quantidadeRestante = quantidadeTotal - quantidadeLiquidada;
+    //     $('#quantidade_liquidar').val(quantidadeRestante);
+
+    //     if (quantidadeRestante === 1) {
+    //         $('#quantidade_liquidar').prop('readonly', true);
+    //     } else {
+    //         $('#quantidade_liquidar').prop('readonly', false);
+    //     }
+
+    //     $('#liquidacaoModal').modal('show');
+    // }
+
+
     function liquidarAto(itemId, quantidade, quantidadeLiquidada, status) {
+        if (<?php echo $total_pagamentos; ?> <= 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Depósito Prévio ausente',
+                text: 'A OS não possui pagamento registrado. Adicione um pagamento antes de continuar.',
+                showCancelButton: true,
+                confirmButtonText: 'Adicionar Pagamento',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $('#pagamentoModal').modal('show'); // Abrir o modal de pagamento
+                }
+            });
+        } else {
+            abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada);
+        }
+    }
+
+    function abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada) {
         liquidacaoItemId = itemId;
         quantidadeTotal = quantidade;
         quantidadeLiquidada = quantidadeLiquidada;
@@ -1091,14 +1157,10 @@ include(__DIR__ . '/../menu.php');
         var quantidadeRestante = quantidadeTotal - quantidadeLiquidada;
         $('#quantidade_liquidar').val(quantidadeRestante);
 
-        if (quantidadeRestante === 1) {
-            $('#quantidade_liquidar').prop('readonly', true);
-        } else {
-            $('#quantidade_liquidar').prop('readonly', false);
-        }
-
         $('#liquidacaoModal').modal('show');
     }
+
+
 
     // Função para confirmar liquidação
     function confirmarLiquidacao() {
@@ -1629,6 +1691,68 @@ include(__DIR__ . '/../menu.php');
             location.reload(); // Recarrega a página quando o modal for fechado
         });
 
+        function liquidarTudo() {
+            if (<?php echo $total_pagamentos; ?> <= 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Depósito Prévio ausente',
+                    text: 'A OS não possui pagamento registrado. Adicione um pagamento antes de continuar.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Adicionar Pagamento',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $('#pagamentoModal').modal('show'); // Abrir o modal de pagamento
+                    }
+                });
+            } else {
+                confirmarLiquidacaoTudo();
+            }
+        }
+
+        function confirmarLiquidacaoTudo() {
+            Swal.fire({
+                title: 'Confirmação',
+                text: 'Deseja realmente liquidar todos os atos desta Ordem de Serviço?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, liquidar tudo',
+                cancelButtonText: 'Cancelar',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: 'liquidar_os.php',
+                        type: 'POST',
+                        data: { os_id: <?php echo $os_id; ?> },
+                        success: function(response) {
+                            response = JSON.parse(response);
+                            if (response.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Sucesso',
+                                    text: 'Todos os atos foram liquidados com sucesso!',
+                                }).then(() => {
+                                    window.location.reload();
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro',
+                                    text: response.error || 'Erro ao liquidar atos.',
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro',
+                                text: 'Erro ao processar a solicitação.',
+                            });
+                        }
+                    });
+                }
+            });
+        }
 
 </script>
 <?php
