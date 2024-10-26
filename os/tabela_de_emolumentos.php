@@ -9,7 +9,7 @@ include(__DIR__ . '/db_connection.php');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tabela de Emolumentos</title>
+    <title>Atlas - Tabela de Emolumentos</title>
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
