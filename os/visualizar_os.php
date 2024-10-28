@@ -315,6 +315,20 @@ foreach ($ordem_servico_itens as $item) {
             background-color: #160070;
             border-color: #160070;
         }
+        .swal2-deny {
+            margin-top: 10px!important;
+            border: 0!important;
+            border-radius: .25em!important;
+            color: #fff!important;
+            font-size: 1em!important;
+        }
+        .swal2-cancel {
+            margin-top: 10px!important;
+            border: 0!important;
+            border-radius: .25em!important;
+            color: #fff!important;
+            font-size: 1em!important;
+        }
     </style>
 </head>
 <body>
@@ -1135,13 +1149,17 @@ include(__DIR__ . '/../menu.php');
             Swal.fire({
                 icon: 'warning',
                 title: 'Depósito Prévio ausente',
-                text: 'A OS não possui pagamento registrado. Adicione um pagamento antes de continuar.',
+                text: 'A OS não possui pagamento registrado. O que você deseja fazer?',
+                showDenyButton: true,
                 showCancelButton: true,
                 confirmButtonText: 'Adicionar Pagamento',
+                denyButtonText: 'Continuar sem Pagamento',
                 cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $('#pagamentoModal').modal('show'); // Abrir o modal de pagamento
+                } else if (result.isDenied) {
+                    abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada);
                 }
             });
         } else {
@@ -1159,7 +1177,6 @@ include(__DIR__ . '/../menu.php');
 
         $('#liquidacaoModal').modal('show');
     }
-
 
 
     // Função para confirmar liquidação
@@ -1696,13 +1713,17 @@ include(__DIR__ . '/../menu.php');
                 Swal.fire({
                     icon: 'warning',
                     title: 'Depósito Prévio ausente',
-                    text: 'A OS não possui pagamento registrado. Adicione um pagamento antes de continuar.',
+                    text: 'A OS não possui pagamento registrado. O que você deseja fazer?',
+                    showDenyButton: true,
                     showCancelButton: true,
                     confirmButtonText: 'Adicionar Pagamento',
+                    denyButtonText: 'Continuar sem Pagamento',
                     cancelButtonText: 'Cancelar'
                 }).then((result) => {
                     if (result.isConfirmed) {
                         $('#pagamentoModal').modal('show'); // Abrir o modal de pagamento
+                    } else if (result.isDenied) {
+                        confirmarLiquidacaoTudo();
                     }
                 });
             } else {
@@ -1753,6 +1774,7 @@ include(__DIR__ . '/../menu.php');
                 }
             });
         }
+
 
 </script>
 <?php
