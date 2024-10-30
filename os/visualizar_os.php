@@ -221,9 +221,6 @@ foreach ($ordem_servico_itens as $item) {
         .btn-close:focus {
             outline: none; /* Remove a borda ao foco */
         }
-        .btn-print, .btn-payment, .btn-repasse {
-            margin-left: 10px;
-        }
         .modal-content {
             border-radius: 10px;
         }
@@ -329,6 +326,16 @@ foreach ($ordem_servico_itens as $item) {
             color: #fff!important;
             font-size: 1em!important;
         }
+
+        .btn-sm {
+            padding: .25rem .6rem;
+            font-size: .920rem;
+            line-height: 1.7;
+            border-radius: .3rem;
+        }
+        .w-100 {
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -338,17 +345,60 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="d-flex justify-content-center align-items-center">
-            <button style="margin-bottom: 5px!important;" type="button" class="btn btn-primary btn-print" onclick="imprimirOS()"><i class="fa fa-print" aria-hidden="true"></i> Imprimir OS</button>
-            <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" type="button" class="btn btn-info2 btn-print" onclick="imprimirRecibo()"><i class="fa fa-print" aria-hidden="true"></i> Recibo</button>
-            <button style="margin-bottom: 5px!important;" type="button" class="btn btn-success btn-payment" data-toggle="modal" data-target="#pagamentoModal" <?php echo ($ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>><i class="fa fa-money" aria-hidden="true"></i> Pagamentos</button>
-            <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" type="button" class="btn btn-secondary" onclick="$('#anexoModal').modal('show');"><i class="fa fa-paperclip" aria-hidden="true"></i> Anexos</button>
-            <button style="width: 100px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()" <?php echo ($ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>><i class="fa fa-pencil" aria-hidden="true"></i> Editar OS</button>
-            <button style="height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-danger btn-cancel btn-sm" onclick="cancelarOS()" <?php echo ($has_liquidated || $ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>><i class="fa fa-ban" aria-hidden="true"></i> Cancelar OS</button>
-            <button type="button" class="btn btn-4 btn-sm" style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" data-toggle="modal" data-target="#tarefaModal"><i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa</button>
-            <button style="width: 120px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
-            <button type="button" class="btn btn-info3 btn-sm" style="width: 190px; height: 38px!important; margin-bottom: 5px!important; margin-left: 10px; color: #fff!important" onclick="window.location.href='criar_os.php'"><i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço</button>
+        <div class="container-fluid">
+            <div class="row justify-content-center align-items-center g-2">
+                <div class="col-auto">
+                    <button type="button" class="btn btn-primary btn-print btn-sm w-100" onclick="imprimirOS()">
+                        <i class="fa fa-print" aria-hidden="true"></i> Imprimir OS
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-info2 btn-print btn-sm w-100" onclick="imprimirRecibo()">
+                        <i class="fa fa-print" aria-hidden="true"></i> Recibo
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-success btn-payment btn-sm w-100" data-toggle="modal" data-target="#pagamentoModal" 
+                        <?php echo ($ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>>
+                        <i class="fa fa-money" aria-hidden="true"></i> Pagamentos
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-secondary btn-sm w-100" onclick="$('#anexoModal').modal('show');">
+                        <i class="fa fa-paperclip" aria-hidden="true"></i> Anexos
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-edit2 btn-sm w-100" onclick="editarOS()" 
+                        <?php echo ($ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>>
+                        <i class="fa fa-pencil" aria-hidden="true"></i> Editar OS
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-danger btn-cancel btn-sm w-100" onclick="cancelarOS()" 
+                        <?php echo ($has_liquidated || $ordem_servico['status'] == 'Cancelado') ? 'disabled' : ''; ?>>
+                        <i class="fa fa-ban" aria-hidden="true"></i> Cancelar OS
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-4 btn-sm w-100" data-toggle="modal" data-target="#tarefaModal">
+                        <i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-secondary btn-sm w-100" onclick="window.location.href='index.php'">
+                        <i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-info3 btn-sm w-100" onclick="window.location.href='criar_os.php'">
+                        <i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço
+                    </button>
+                </div>
+            </div>
         </div>
+
+
         <hr>
         <div class="text-center">
             <h4>ORDEM DE SERVIÇO Nº: <?php echo $ordem_servico['id']; ?></h4>
@@ -744,7 +794,7 @@ include(__DIR__ . '/../menu.php');
 
 <!-- Modal para criação de Tarefa -->
 <div class="modal fade" id="tarefaModal" tabindex="-1" role="dialog" aria-labelledby="tarefaModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document"> <!-- Modal ajustado para ser grande -->
+    <div class="modal-dialog modal-lg" style="max-width: 50%" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="tarefaModalLabel">Criar Tarefa</h5>
