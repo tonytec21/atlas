@@ -17,6 +17,9 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
+        .w-100 {
+            margin-top: 5px;
+        }
         .situacao-pago {
             background-color: #28a745;
             color: white;
@@ -168,19 +171,19 @@ include(__DIR__ . '/db_connection.php');
         }
 
         .btn-info:hover {
-            color: #212529;
+            color: #fff;
         }
 
         .btn-success:hover {
-            color: #212529!important;
+            color: #fff!important;
         }
 
         .btn-secondary:hover {
-            color: #212529!important;
+            color: #fff!important;
         }
 
         .btn-primary:hover {
-            color: #212529!important;
+            color: #fff!important;
         }
 
     </style>
@@ -254,20 +257,34 @@ include(__DIR__ . '/db_connection.php');
                         <input type="text" class="form-control" id="observacoes" name="observacoes">
                     </div>
                 </div>
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <button type="submit" style="width: 100%; color: #fff!important" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
-                    </div>
-                    <div class="col-md-3">
-                        <button id="add-button" type="button" style="width: 100%; color: #fff!important" class="btn btn-secondary" onclick="window.open('tabela_de_emolumentos.php')"><i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos</button>
-                    </div>
-                    <div class="col-md-3">
-                        <button id="add-button" type="button" style="width: 100%; color: #fff!important" class="btn btn-info" onclick="window.location.href='criar_os.php'"><i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço</button>
-                    </div>
-                    <div class="col-md-3">
-                        <button id="add-button" type="button" style="width: 100%; color: #fff!important" class="btn btn-success" onclick="window.open('../caixa/index.php')"><i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa</button>
+                <div class="container">
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3">
+                        <div class="col">
+                            <button type="submit" class="btn btn-primary w-100 text-white">
+                                <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button id="add-button" type="button" class="btn btn-secondary w-100 text-white" 
+                                    onclick="window.open('tabela_de_emolumentos.php')">
+                                <i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button id="add-button" type="button" class="btn btn-info2 w-100 text-white" 
+                                    onclick="window.location.href='criar_os.php'">
+                                <i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço
+                            </button>
+                        </div>
+                        <div class="col">
+                            <button id="add-button" type="button" class="btn btn-success w-100 text-white" 
+                                    onclick="window.open('../caixa/index.php')">
+                                <i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa
+                            </button>
+                        </div>
                     </div>
                 </div>
+
             </form>
             <hr>
             <div class="table-responsive">
@@ -505,7 +522,7 @@ include(__DIR__ . '/db_connection.php');
                                 </td>
 
                                 <td>
-                                    <button class="btn btn-info btn-sm" title="Visualizar OS" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('visualizar_os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    <button class="btn btn-info2 btn-sm" title="Visualizar OS" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('visualizar_os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <button class="btn btn-success btn-sm" title="Pagamentos e Devoluções" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" 
                                         onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')" 
                                         <?php echo ($ordem['status'] === 'Cancelado') ? 'disabled' : ''; ?>>
