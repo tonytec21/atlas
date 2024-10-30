@@ -29,6 +29,23 @@ class PDF extends TCPDF
    
            // Inserir a imagem ocupando toda a página
            @$this->Image($image_file, 0, 0, 210, 297, 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);
+
+           // Adicionar a marca d'água se necessário
+            global $isCanceled; 
+            if ($isCanceled) {
+                $this->SetAlpha(0.2);
+                $this->StartTransform();
+
+                // Rotaciona e adiciona a marca d'água
+                $this->Rotate(45, $this->getPageWidth() / 2, $this->getPageHeight() / 2); 
+                $this->SetFont('helvetica', 'B', 60);
+                $this->SetTextColor(255, 0, 0);
+
+                // Adiciona o texto da marca d'água no centro da página
+                $this->Text($this->getPageWidth() / 7, $this->getPageHeight() / 2.5, 'O.S. CANCELADA');
+                $this->StopTransform(); 
+                $this->SetAlpha(1);
+            }
            
            // Restaura o AutoPageBreak e as margens para o conteúdo subsequente
            $this->SetAutoPageBreak(true, 25); // Ativa novamente o AutoPageBreak com a margem inferior padrão
@@ -92,6 +109,10 @@ if (isset($_GET['id'])) {
     $os_query->execute();
     $os_result = $os_query->get_result();
     $ordem_servico = $os_result->fetch_assoc();
+
+    // Verificar o status da OS
+    $status_os = $ordem_servico['status'];
+    $isCanceled = ($status_os === 'Cancelado');
 
     // Obter dados de itens da OS ordenados pela coluna ordem_exibicao
     $os_items_query = $conn->prepare("SELECT * FROM ordens_de_servico_itens WHERE ordem_servico_id = ? ORDER BY ordem_exibicao ASC");

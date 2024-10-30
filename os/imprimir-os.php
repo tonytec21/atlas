@@ -21,16 +21,43 @@ class PDF extends TCPDF
         $image_file = '../style/img/logo.png'; // Verifique se o caminho está correto
         @$this->Image($image_file, 20, 8, 170, '', 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);
         $this->SetY(25);
+    // Adicionar a marca d'água se necessário
+    global $isCanceled; 
+    if ($isCanceled) {
+        $this->SetAlpha(0.2);
+        $this->StartTransform();
+
+        // Rotaciona e adiciona a marca d'água
+        $this->Rotate(45, $this->getPageWidth() / 2, $this->getPageHeight() / 2); 
+        $this->SetFont('helvetica', 'B', 60);
+        $this->SetTextColor(255, 0, 0);
+
+        // Adiciona o texto da marca d'água no centro da página
+        $this->Text($this->getPageWidth() / 7, $this->getPageHeight() / 2.5, 'O.S. CANCELADA');
+        $this->StopTransform(); 
+        $this->SetAlpha(1);
+    }
+
     }
 
     // Rodapé do PDF
     public function Footer()
     {
-        $this->SetY(-15);
+        // Número da página no canto inferior direito, na cor branca
+        $this->SetY(-14.5);
         $this->SetFont('arial', 'I', 8);
-        // Adiciona o nome do usuário que criou a OS
-        $this->Cell(0, 10, 'Página ' . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 0, false, 'L', 0, '', 0, false, 'T', 'M');
-        $this->Cell(0, 10, 'Criado por: ' . $this->criado_por, 0, false, 'R', 0, '', 0, false, 'T', 'M');
+        $this->SetTextColor(0, 0, 0);
+
+        // Ajustar a posição horizontal com SetX para aproximar mais do canto
+        $this->SetX(-23); 
+
+        $this->Cell(0, 11, 'Página ' . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 0, false, 'L', 0, '', 0, false, 'T', 'M');
+       // Posicionar o texto na lateral direita, com rotação para orientação vertical
+        $this->SetXY(-10, ($this->getPageHeight() / 2)); // Posição X na margem direita, Y centralizada verticalmente
+        $this->StartTransform(); // Iniciar transformação
+        $this->Rotate(90); // Rotacionar 90 graus
+        $this->Cell(0, 10, 'Criado por: ' . $this->criado_por, 0, false, 'C', 0, '', 0, false, 'T', 'M'); // Texto centralizado verticalmente
+        $this->StopTransform(); // Parar transformação
     }
 
     public function setCriadoPor($criado_por)
@@ -62,6 +89,10 @@ if (isset($_GET['id'])) {
     $os_query->execute();
     $os_result = $os_query->get_result();
     $ordem_servico = $os_result->fetch_assoc();
+
+    // Verificar o status da OS
+    $status_os = $ordem_servico['status'];
+    $isCanceled = ($status_os === 'Cancelado');
 
     // Obter dados de itens da OS ordenados pela coluna ordem_exibicao
     $os_items_query = $conn->prepare("SELECT * FROM ordens_de_servico_itens WHERE ordem_servico_id = ? ORDER BY ordem_exibicao ASC");
