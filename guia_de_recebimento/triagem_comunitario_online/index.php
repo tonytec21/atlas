@@ -491,7 +491,7 @@ date_default_timezone_set('America/Sao_Paulo');
         $(document).ready(function() {
             var dataTable = $('#resultadosTabela').DataTable({
                 "language": {
-                    "url": "../style/Portuguese-Brasil.json"
+                    "url": "../../style/Portuguese-Brasil.json"
                 },
                 "order": [[1, 'desc']],  // Ordenar por ID de forma decrescente
             });
