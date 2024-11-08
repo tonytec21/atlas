@@ -185,7 +185,11 @@ include(__DIR__ . '/../../menu.php');
                         echo '<td>' .
                                 '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
                                 '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
-                                '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' .
+                                '<?php if ($nivel_de_acesso === 'administrador'): ?>
+                                    <button class="btn btn-delete" data-id="<?php echo $row['id']; ?>">
+                                        <i class="fa fa-trash" aria-hidden="true"></i>
+                                    </button>
+                                <?php endif; ?>' .
                              '</td>';
                         echo '</tr>';
                     }
@@ -634,13 +638,7 @@ include(__DIR__ . '/../../menu.php');
 
                             var row = '<tr>' +
                                 '<td>' + file.name + '</td>' +
-                                    <?php if ($nivel_de_acesso === 'administrador'): ?>
-                                        <td>
-                                            <button class="btn btn-danger btn-remove-add-attachment">
-                                                <i class="fa fa-trash" aria-hidden="true"></i>
-                                            </button>
-                                        </td>
-                                    <?php endif; ?>
+                                '<td><button class="btn btn-danger btn-remove-add-attachment"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
                                 '</tr>';
                             $('#add-attachments-table-body').append(row);
 
