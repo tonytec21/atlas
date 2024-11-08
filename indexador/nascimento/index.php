@@ -634,7 +634,13 @@ include(__DIR__ . '/../../menu.php');
 
                             var row = '<tr>' +
                                 '<td>' + file.name + '</td>' +
-                                '<td><button class="btn btn-danger btn-remove-add-attachment"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
+                                    <?php if ($nivel_de_acesso === 'administrador'): ?>
+                                        <td>
+                                            <button class="btn btn-danger btn-remove-add-attachment">
+                                                <i class="fa fa-trash" aria-hidden="true"></i>
+                                            </button>
+                                        </td>
+                                    <?php endif; ?>
                                 '</tr>';
                             $('#add-attachments-table-body').append(row);
 
