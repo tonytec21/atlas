@@ -183,14 +183,11 @@ include(__DIR__ . '/../../menu.php');
                         echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
                         echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';                        
                         echo '<td>' .
-                                '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
-                                '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
-                                '<?php if ($nivel_de_acesso === 'administrador'): ?>
-                                    <button class="btn btn-delete" data-id="<?php echo $row['id']; ?>">
-                                        <i class="fa fa-trash" aria-hidden="true"></i>
-                                    </button>
-                                <?php endif; ?>' .
-                             '</td>';
+                        '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
+                        '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
+                        ($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
+                        '</td>';
+
                         echo '</tr>';
                     }
                     ?>
