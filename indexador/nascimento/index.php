@@ -446,11 +446,7 @@ include(__DIR__ . '/../../menu.php');
                     '<td>' +
                         '<button title="Visualizar Registro" class="btn btn-info btn-view" data-id="' + registry.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
                         '<button title="Editar Registro" class="btn btn-edit" data-id="' + registry.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' +
-                        <?php if ($nivel_de_acesso === 'administrador'): ?>
-                            <button title="Remover Registro" class="btn btn-delete" data-id="<?php echo $registry['id']; ?>">
-                                <i class="fa fa-trash" aria-hidden="true"></i>
-                            </button>
-                        <?php endif; ?>
+                        '($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '')' +
                     '</td>' +
                     '</tr>';
                 tableBody.append(row);
