@@ -435,7 +435,11 @@ include(__DIR__ . '/../../menu.php');
             $.each(registries, function(index, registry) {
                 var filiacao = registry.nome_pai ? `${registry.nome_pai} e ${registry.nome_mae}` : registry.nome_mae;
 
-                var row = '<tr>' +
+                // Definindo uma variável de acesso no JavaScript com base no nível de acesso em PHP
+    var isAdmin = <?php echo ($nivel_de_acesso === 'administrador') ? 'true' : 'false'; ?>;
+    
+    // Gerando a linha da tabela com base no nível de acesso
+    var row = '<tr>' +
                     '<td>' + registry.termo + '</td>' +
                     '<td>' + registry.livro + '</td>' +
                     '<td>' + registry.folha + '</td>' +
@@ -443,17 +447,17 @@ include(__DIR__ . '/../../menu.php');
                     '<td>' + filiacao + '</td>' +
                     '<td data-order="' + registry.data_nascimento + '">' + formatDate(registry.data_nascimento) + '</td>' +
                     '<td data-order="' + registry.data_registro + '">' + formatDate(registry.data_registro) + '</td>' +
-                    
-                    <?php
-echo '<td>' .
-        '<button title="Visualizar Registro" class="btn btn-info btn-view" data-id="' . $registry['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
-        '<button title="Editar Registro" class="btn btn-edit" data-id="' . $registry['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
-        ($nivel_de_acesso === 'administrador' ? '<button title="Remover Registro" class="btn btn-delete" data-id="' . $registry['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
-     '</td>';
-?>
+                    '<td>' +
+                        '<button title="Visualizar Registro" class="btn btn-info btn-view" data-id="' + registry.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
+                        '<button title="Editar Registro" class="btn btn-edit" data-id="' + registry.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ';
+                        
+    // Adiciona o botão "Remover Registro" somente se for administrador
+    if (isAdmin) {
+        row += '<button title="Remover Registro" class="btn btn-delete" data-id="' + registry.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>';
+    }
 
-                         +
-                    '</tr>';
+    row += '</td>' +
+           '</tr>';
                 tableBody.append(row);
             });
 
