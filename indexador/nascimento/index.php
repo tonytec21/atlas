@@ -443,13 +443,13 @@ include(__DIR__ . '/../../menu.php');
                     '<td>' + filiacao + '</td>' +
                     '<td data-order="' + registry.data_nascimento + '">' + formatDate(registry.data_nascimento) + '</td>' +
                     '<td data-order="' + registry.data_registro + '">' + formatDate(registry.data_registro) + '</td>' +
-                    <?php
-                        echo '<td>' .
+                    
+                         '<td>' .
                                 '<button title="Visualizar Registro" class="btn btn-info btn-view" data-id="' . $registry['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
                                 '<button title="Editar Registro" class="btn btn-edit" data-id="' . $registry['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
                                 ($nivel_de_acesso === 'administrador' ? '<button title="Remover Registro" class="btn btn-delete" data-id="' . $registry['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
-                            '</td>';
-                        ?>+
+                            '</td>'
+                         +
                     '</tr>';
                 tableBody.append(row);
             });
