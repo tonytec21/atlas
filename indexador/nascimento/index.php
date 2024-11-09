@@ -39,6 +39,10 @@ date_default_timezone_set('America/Sao_Paulo');
             margin-left: 5px;
         }
 
+        .btn-delete {
+            margin-left: 5px;
+        }
+
         .btn-info {
             width: 40px;
             height: 40px;
