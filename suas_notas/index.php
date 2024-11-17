@@ -12,7 +12,7 @@ $username = $_SESSION['username'];
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $titulo = $_POST['titulo'] ?? '';
     $conteudo = $_POST['conteudo'] ?? '';
-    $cor = $_POST['cor'] ?? '#FFF9C4'; // Cor padrão (Amarelo Pastel)
+    $cor = $_POST['cor'] ?? '#F6EAC2'; // Cor padrão (Amarelo Pastel)
 
     // Cria o diretório para o usuário, se não existir
     $userDirectory = 'lembretes/' . $username;
@@ -143,6 +143,45 @@ $orderData['groups'] = $groupedFiles;
             margin: 0 10px;
         }
 
+
+        .card {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), 
+                        0 0 5px rgba(0, 0, 0, 0.1), 
+                        -5px -5px 15px rgba(255, 255, 255, 0.5);
+            cursor: grab;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        /* Efeito de hover */
+        .card:hover {
+            transform: scale(1.02);
+            box-shadow: 8px 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Canto solto (pseudo-elemento) */
+        .card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0) 100%);
+            clip-path: polygon(0 0, 100% 0, 0 100%);
+            transform: rotate(2deg);
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+
         .card-container {
             display: flex;
             flex-wrap: wrap;
@@ -155,7 +194,7 @@ $orderData['groups'] = $groupedFiles;
         .card-container.drag-over {
             border: 1px dashed #007bff;
         }
-        .card {
+        /* .card {
             width: 300px;
             height: 300px;
             border: 1px solid #ccc;
@@ -167,7 +206,7 @@ $orderData['groups'] = $groupedFiles;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-        }
+        } */
 
         .card-content {
             flex: 1;
@@ -211,18 +250,44 @@ $orderData['groups'] = $groupedFiles;
             /* margin-bottom: 20px; */
         }
 
-        .color-circle {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            margin-right: 10px;
-            cursor: pointer;
-            border: 2px solid transparent;
-            transition: border 0.3s ease;
-        }
         .color-circle.selected {
             border: 2px solid #000;
         }
+
+        /* Ajusta o tamanho dos círculos */
+        .color-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.2);
+            border: 1px solid #ddd;
+        }
+
+        /* Responsividade para o container */
+        #editColorPicker {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px; /* Espaçamento entre os círculos */
+            justify-content: flex-start; /* Alinha os círculos à esquerda */
+        }
+
+        /* Adaptação para tamanhos menores */
+        @media (max-width: 768px) {
+            .color-circle {
+                width: 35px;
+                height: 35px;
+            }
+        }
+
+        /* Adaptação para telas muito pequenas */
+        @media (max-width: 576px) {
+            .color-circle {
+                width: 30px;
+                height: 30px;
+            }
+        }
+
 
     </style>
 </head>
@@ -268,7 +333,7 @@ $orderData['groups'] = $groupedFiles;
                                 error_log("Erro ao interpretar o arquivo JSON: " . json_last_error_msg());
                             }
                         } else {
-                            $notaCores[$noteId] = '#FFF9C4';
+                            $notaCores[$noteId] = '#F6EAC2';
                         }
                     }
 
@@ -276,7 +341,7 @@ $orderData['groups'] = $groupedFiles;
                     foreach ($groupedFiles['Novos'] as $filename) {
                         if (file_exists($userDirectory . '/' . $filename)) {
                             $noteId = basename($filename, '.txt'); 
-                            $cor = $notaCores[$noteId] ?? '#FFF9C4'; 
+                            $cor = $notaCores[$noteId] ?? '#F6EAC2'; 
 
                             $conteudo = file_get_contents($userDirectory . '/' . $filename);
                             $linhas = explode("\n", $conteudo);
@@ -323,7 +388,7 @@ $orderData['groups'] = $groupedFiles;
                             error_log("Erro ao interpretar o arquivo JSON: " . json_last_error_msg());
                         }
                     } else {
-                        $notaCores[$noteId] = '#FFF9C4'; 
+                        $notaCores[$noteId] = '#F6EAC2'; 
                     }
                 }
 
@@ -358,7 +423,7 @@ $orderData['groups'] = $groupedFiles;
                         if (file_exists($userDirectory . '/' . $filename)) {
                             $noteId = basename($filename, '.txt'); 
                             // Aplica a cor da nota ou a cor padrão
-                            $cor = isset($notaCores[$noteId]) ? $notaCores[$noteId] : '#FFF9C4';
+                            $cor = isset($notaCores[$noteId]) ? $notaCores[$noteId] : '#F6EAC2';
                     
                             $conteudo = file_get_contents($userDirectory . '/' . $filename);
                             $linhas = explode("\n", $conteudo);
@@ -423,14 +488,35 @@ $orderData['groups'] = $groupedFiles;
                         </div>
                         <div class="mb-3">
                             <label for="noteColor" class="form-label">Cor:</label>
-                            <div id="editColorPicker" class="d-flex">
-                                <div class="color-circle" style="background-color: #FFF9C4;" data-color="#FFF9C4"></div> <!-- Amarelo Pastel -->
-                                <div class="color-circle" style="background-color: #BBDEFB;" data-color="#BBDEFB"></div> <!-- Azul Claro -->
-                                <div class="color-circle" style="background-color: #C8E6C9;" data-color="#C8E6C9"></div> <!-- Verde Claro -->
-                                <div class="color-circle" style="background-color: #F8BBD0;" data-color="#F8BBD0"></div> <!-- Rosa Claro -->
-                                <div class="color-circle" style="background-color: #FFE0B2;" data-color="#FFE0B2"></div> <!-- Laranja Claro -->
+                            <div id="editColorPicker" class="d-flex flex-wrap gap-2">
+                                <div class="color-circle" style="background-color: #ABDEE6;" data-color="#ABDEE6"></div>
+                                <div class="color-circle" style="background-color: #CBAACB;" data-color="#CBAACB"></div>
+                                <div class="color-circle" style="background-color: #FFFFB5;" data-color="#FFFFB5"></div>
+                                <div class="color-circle" style="background-color: #FFCCB6;" data-color="#FFCCB6"></div>
+                                <div class="color-circle" style="background-color: #F3B0C3;" data-color="#F3B0C3"></div>
+                                <div class="color-circle" style="background-color: #C6DBDA;" data-color="#C6DBDA"></div>
+                                <div class="color-circle" style="background-color: #FEE1E8;" data-color="#FEE1E8"></div>
+                                <div class="color-circle" style="background-color: #FED7C3;" data-color="#FED7C3"></div>
+                                <div class="color-circle" style="background-color: #F6EAC2;" data-color="#F6EAC2"></div>
+                                <div class="color-circle" style="background-color: #ECD5E3;" data-color="#ECD5E3"></div>
+                                <div class="color-circle" style="background-color: #FF968A;" data-color="#FF968A"></div>
+                                <div class="color-circle" style="background-color: #FFAEA5;" data-color="#FFAEA5"></div>
+                                <div class="color-circle" style="background-color: #FFC5BF;" data-color="#FFC5BF"></div>
+                                <div class="color-circle" style="background-color: #FFD8BE;" data-color="#FFD8BE"></div>
+                                <div class="color-circle" style="background-color: #FFC8A2;" data-color="#FFC8A2"></div>
+                                <div class="color-circle" style="background-color: #D4F0F0;" data-color="#D4F0F0"></div>
+                                <div class="color-circle" style="background-color: #8FCACA;" data-color="#8FCACA"></div>
+                                <div class="color-circle" style="background-color: #CCE2CB;" data-color="#CCE2CB"></div>
+                                <div class="color-circle" style="background-color: #B6CFB6;" data-color="#B6CFB6"></div>
+                                <div class="color-circle" style="background-color: #97C1A9;" data-color="#97C1A9"></div>
+                                <div class="color-circle" style="background-color: #FCB9AA;" data-color="#FCB9AA"></div>
+                                <div class="color-circle" style="background-color: #FFDBCC;" data-color="#FFDBCC"></div>
+                                <div class="color-circle" style="background-color: #ECEAE4;" data-color="#ECEAE4"></div>
+                                <div class="color-circle" style="background-color: #A2E1DB;" data-color="#A2E1DB"></div>
+                                <div class="color-circle" style="background-color: #55CBCD;" data-color="#55CBCD"></div>
                             </div>
                         </div>
+
                         <input type="hidden" id="selectedEditColor" name="cor" value="">
                     </div>
                     <div class="modal-footer">
@@ -464,16 +550,36 @@ $orderData['groups'] = $groupedFiles;
                         </div>
                         <div class="mb-3">
                             <label for="noteColor" class="form-label">Cor:</label>
-                            <div id="colorPicker" class="d-flex">
-                                <div class="color-circle" style="background-color: #FFF9C4;" data-color="#FFF9C4"></div> <!-- Amarelo Pastel -->
-                                <div class="color-circle" style="background-color: #BBDEFB;" data-color="#BBDEFB"></div> <!-- Azul Claro -->
-                                <div class="color-circle" style="background-color: #C8E6C9;" data-color="#C8E6C9"></div> <!-- Verde Claro -->
-                                <div class="color-circle" style="background-color: #F8BBD0;" data-color="#F8BBD0"></div> <!-- Rosa Claro -->
-                                <div class="color-circle" style="background-color: #FFE0B2;" data-color="#FFE0B2"></div> <!-- Laranja Claro -->
+                            <div id="editColorPicker" class="d-flex flex-wrap gap-2">
+                                <div class="color-circle" style="background-color: #ABDEE6;" data-color="#ABDEE6"></div>
+                                <div class="color-circle" style="background-color: #CBAACB;" data-color="#CBAACB"></div>
+                                <div class="color-circle" style="background-color: #FFFFB5;" data-color="#FFFFB5"></div>
+                                <div class="color-circle" style="background-color: #FFCCB6;" data-color="#FFCCB6"></div>
+                                <div class="color-circle" style="background-color: #F3B0C3;" data-color="#F3B0C3"></div>
+                                <div class="color-circle" style="background-color: #C6DBDA;" data-color="#C6DBDA"></div>
+                                <div class="color-circle" style="background-color: #FEE1E8;" data-color="#FEE1E8"></div>
+                                <div class="color-circle" style="background-color: #FED7C3;" data-color="#FED7C3"></div>
+                                <div class="color-circle" style="background-color: #F6EAC2;" data-color="#F6EAC2"></div>
+                                <div class="color-circle" style="background-color: #ECD5E3;" data-color="#ECD5E3"></div>
+                                <div class="color-circle" style="background-color: #FF968A;" data-color="#FF968A"></div>
+                                <div class="color-circle" style="background-color: #FFAEA5;" data-color="#FFAEA5"></div>
+                                <div class="color-circle" style="background-color: #FFC5BF;" data-color="#FFC5BF"></div>
+                                <div class="color-circle" style="background-color: #FFD8BE;" data-color="#FFD8BE"></div>
+                                <div class="color-circle" style="background-color: #FFC8A2;" data-color="#FFC8A2"></div>
+                                <div class="color-circle" style="background-color: #D4F0F0;" data-color="#D4F0F0"></div>
+                                <div class="color-circle" style="background-color: #8FCACA;" data-color="#8FCACA"></div>
+                                <div class="color-circle" style="background-color: #CCE2CB;" data-color="#CCE2CB"></div>
+                                <div class="color-circle" style="background-color: #B6CFB6;" data-color="#B6CFB6"></div>
+                                <div class="color-circle" style="background-color: #97C1A9;" data-color="#97C1A9"></div>
+                                <div class="color-circle" style="background-color: #FCB9AA;" data-color="#FCB9AA"></div>
+                                <div class="color-circle" style="background-color: #FFDBCC;" data-color="#FFDBCC"></div>
+                                <div class="color-circle" style="background-color: #ECEAE4;" data-color="#ECEAE4"></div>
+                                <div class="color-circle" style="background-color: #A2E1DB;" data-color="#A2E1DB"></div>
+                                <div class="color-circle" style="background-color: #55CBCD;" data-color="#55CBCD"></div>
                             </div>
-
                         </div>
-                        <input type="hidden" id="selectedColor" name="cor" value="#FFF9C4">
+
+                        <input type="hidden" id="selectedColor" name="cor" value="#F6EAC2">
 
                     </div>
                     <div class="modal-footer">
