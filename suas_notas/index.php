@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     file_put_contents($arquivoNome, $conteudoLembrete);
 
     // Caminho do arquivo JSON específico para a nota
-    $noteId = basename($arquivoNome, '.txt'); // Usa o nome da nota (timestamp) como ID
+    $noteId = basename($arquivoNome, '.txt'); 
     $noteColorFile = $userDirectory . '/' . $noteId . '.json';
 
     // Dados a serem salvos no JSON específico
@@ -221,7 +221,7 @@ $orderData['groups'] = $groupedFiles;
             transition: border 0.3s ease;
         }
         .color-circle.selected {
-            border: 2px solid #000; /* Destaca a cor selecionada */
+            border: 2px solid #000;
         }
 
     </style>
@@ -256,27 +256,27 @@ $orderData['groups'] = $groupedFiles;
                     // Para cada arquivo de nota, busca a cor correspondente no arquivo JSON individual
                     $notaCores = [];
                     foreach ($arquivos as $arquivo) {
-                        $noteId = basename($arquivo, '.txt'); // Extrai o ID da nota
-                        $noteColorFile = $userDirectory . '/' . $noteId . '.json'; // Caminho do arquivo JSON da cor da nota
+                        $noteId = basename($arquivo, '.txt'); 
+                        $noteColorFile = $userDirectory . '/' . $noteId . '.json'; 
 
                         if (file_exists($noteColorFile)) {
                             $noteColorData = json_decode(file_get_contents($noteColorFile), true);
                             if (json_last_error() === JSON_ERROR_NONE && isset($noteColorData['cor'])) {
-                                $notaCores[$noteId] = $noteColorData['cor']; // Associa o ID da nota à cor
+                                $notaCores[$noteId] = $noteColorData['cor']; 
                             } else {
                                 // Log de erro se o JSON não for válido
                                 error_log("Erro ao interpretar o arquivo JSON: " . json_last_error_msg());
                             }
                         } else {
-                            $notaCores[$noteId] = '#FFF9C4'; // Define a cor padrão se o arquivo JSON não existir
+                            $notaCores[$noteId] = '#FFF9C4';
                         }
                     }
 
 
                     foreach ($groupedFiles['Novos'] as $filename) {
                         if (file_exists($userDirectory . '/' . $filename)) {
-                            $noteId = basename($filename, '.txt'); // ID da nota é o nome do arquivo sem extensão
-                            $cor = $notaCores[$noteId] ?? '#FFF9C4'; // Cor padrão (Amarelo Pastel) caso não esteja no JSON
+                            $noteId = basename($filename, '.txt'); 
+                            $cor = $notaCores[$noteId] ?? '#FFF9C4'; 
 
                             $conteudo = file_get_contents($userDirectory . '/' . $filename);
                             $linhas = explode("\n", $conteudo);
@@ -304,26 +304,26 @@ $orderData['groups'] = $groupedFiles;
                     }
 
 
-                    echo '</div>'; // Fecha .card-container
-                    echo '</div>'; // Fecha .group
+                    echo '</div>'; 
+                    echo '</div>'; 
                 }
 
                 // Carrega o arquivo JSON de cores e mapeia por ID
                 $notaCores = [];
                 foreach ($arquivos as $arquivo) {
-                    $noteId = basename($arquivo, '.txt'); // Extrai o ID da nota
-                    $noteColorFile = $userDirectory . '/' . $noteId . '.json'; // Caminho do arquivo JSON da cor da nota
+                    $noteId = basename($arquivo, '.txt');
+                    $noteColorFile = $userDirectory . '/' . $noteId . '.json'; 
 
                     if (file_exists($noteColorFile)) {
                         $noteColorData = json_decode(file_get_contents($noteColorFile), true);
                         if (json_last_error() === JSON_ERROR_NONE && isset($noteColorData['cor'])) {
-                            $notaCores[$noteId] = $noteColorData['cor']; // Associa o ID da nota à cor
+                            $notaCores[$noteId] = $noteColorData['cor']; 
                         } else {
                             // Log de erro se o JSON não for válido
                             error_log("Erro ao interpretar o arquivo JSON: " . json_last_error_msg());
                         }
                     } else {
-                        $notaCores[$noteId] = '#FFF9C4'; // Define a cor padrão se o arquivo JSON não existir
+                        $notaCores[$noteId] = '#FFF9C4'; 
                     }
                 }
 
@@ -335,7 +335,7 @@ $orderData['groups'] = $groupedFiles;
                     }
 
                     echo '<div class="group">';
-                    echo '<div class="group-header">'; // Removendo o onclick daqui para controle manual do ícone
+                    echo '<div class="group-header">'; 
 
                     // Adiciona o nome do grupo e a linha horizontal
                     echo '<span class="group-name" contenteditable="true" onblur="editGroupName(\'' . $groupName . '\', this.innerText)">' . htmlspecialchars($groupName) . '</span>';
@@ -356,7 +356,7 @@ $orderData['groups'] = $groupedFiles;
 
                     foreach ($group as $filename) {
                         if (file_exists($userDirectory . '/' . $filename)) {
-                            $noteId = basename($filename, '.txt'); // ID da nota é o nome do arquivo sem extensão
+                            $noteId = basename($filename, '.txt'); 
                             // Aplica a cor da nota ou a cor padrão
                             $cor = isset($notaCores[$noteId]) ? $notaCores[$noteId] : '#FFF9C4';
                     
@@ -386,16 +386,16 @@ $orderData['groups'] = $groupedFiles;
                     }
                     
 
-                    echo '</div>'; // Fecha .card-container
-                    echo '</div>'; // Fecha .group
+                    echo '</div>'; 
+                    echo '</div>'; 
                 }
                 ?>
             </div>
             <!-- Novo "Criar Novo Grupo" com linhas horizontais -->
             <div id="create-group-expansion" class="create-group-expansion">
-                <hr class="line"> <!-- Linha horizontal esquerda -->
+                <hr class="line">
                 <a href="javascript:void(0);" onclick="createGroup()">+ Criar Novo Grupo</a>
-                <hr class="line"> <!-- Linha horizontal direita -->
+                <hr class="line"> 
             </div>
 
         </div>
@@ -990,11 +990,6 @@ $orderData['groups'] = $groupedFiles;
             updateOrder();
         }
 
-        // // Recarrega a página ao fechar o modal "novaNotaModal"
-        // $('#novaNotaModal').on('hidden.bs.modal', function () {
-        //     location.reload();
-        // });
-
         // Recarrega a página ao fechar o modal "noteModal"
             $('#noteModal').on('hidden.bs.modal', function () {
             location.reload();
@@ -1064,8 +1059,6 @@ $orderData['groups'] = $groupedFiles;
                 document.getElementById('selectedEditColor').value = this.dataset.color;
             });
         });
-
-
 
     </script>
     <?php include(__DIR__ . '/../rodape.php'); ?>
