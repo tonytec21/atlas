@@ -12,6 +12,7 @@ $username = $_SESSION['username'];
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $titulo = $_POST['titulo'] ?? '';
     $conteudo = $_POST['conteudo'] ?? '';
+    $cor = $_POST['cor'] ?? '#FFF9C4'; // Cor padrão (Amarelo Pastel)
 
     // Cria o diretório para o usuário, se não existir
     $userDirectory = 'lembretes/' . $username;
@@ -23,11 +24,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $arquivoNome = $userDirectory . '/' . time() . '.txt';
     $conteudoLembrete = "Título: $titulo\n\nConteúdo:\n$conteudo";
     file_put_contents($arquivoNome, $conteudoLembrete);
-    
+
+    // Caminho do arquivo JSON específico para a nota
+    $noteId = basename($arquivoNome, '.txt'); // Usa o nome da nota (timestamp) como ID
+    $noteColorFile = $userDirectory . '/' . $noteId . '.json';
+
+    // Dados a serem salvos no JSON específico
+    $noteColorData = [
+        'id' => $noteId,
+        'cor' => $cor
+    ];
+
+    // Salva a cor em um arquivo JSON individual
+    file_put_contents($noteColorFile, json_encode($noteColorData, JSON_PRETTY_PRINT));
+
+
     // Retorna a notificação para exibição na página
     echo "<div class='notification'>Lembrete criado com sucesso!<button class='close-btn'>&times;</button></div>";
-    exit(); // Termina a execução para evitar que o HTML da página seja retornado
+    exit();
 }
+
 
 // Diretórios do usuário e da lixeira
 $userDirectory = 'lembretes/' . $username;
@@ -194,6 +210,20 @@ $orderData['groups'] = $groupedFiles;
         .search-bar {
             /* margin-bottom: 20px; */
         }
+
+        .color-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: border 0.3s ease;
+        }
+        .color-circle.selected {
+            border: 2px solid #000; /* Destaca a cor selecionada */
+        }
+
     </style>
 </head>
 <body>
@@ -223,8 +253,31 @@ $orderData['groups'] = $groupedFiles;
                     echo '</div>';
                     echo '<div class="card-container" data-group="Novos">';
 
+                    // Para cada arquivo de nota, busca a cor correspondente no arquivo JSON individual
+                    $notaCores = [];
+                    foreach ($arquivos as $arquivo) {
+                        $noteId = basename($arquivo, '.txt'); // Extrai o ID da nota
+                        $noteColorFile = $userDirectory . '/' . $noteId . '.json'; // Caminho do arquivo JSON da cor da nota
+
+                        if (file_exists($noteColorFile)) {
+                            $noteColorData = json_decode(file_get_contents($noteColorFile), true);
+                            if (json_last_error() === JSON_ERROR_NONE && isset($noteColorData['cor'])) {
+                                $notaCores[$noteId] = $noteColorData['cor']; // Associa o ID da nota à cor
+                            } else {
+                                // Log de erro se o JSON não for válido
+                                error_log("Erro ao interpretar o arquivo JSON: " . json_last_error_msg());
+                            }
+                        } else {
+                            $notaCores[$noteId] = '#FFF9C4'; // Define a cor padrão se o arquivo JSON não existir
+                        }
+                    }
+
+
                     foreach ($groupedFiles['Novos'] as $filename) {
                         if (file_exists($userDirectory . '/' . $filename)) {
+                            $noteId = basename($filename, '.txt'); // ID da nota é o nome do arquivo sem extensão
+                            $cor = $notaCores[$noteId] ?? '#FFF9C4'; // Cor padrão (Amarelo Pastel) caso não esteja no JSON
+
                             $conteudo = file_get_contents($userDirectory . '/' . $filename);
                             $linhas = explode("\n", $conteudo);
                             $titulo = '';
@@ -240,7 +293,7 @@ $orderData['groups'] = $groupedFiles;
                                 }
                             }
 
-                            echo '<div class="card" draggable="true" data-filename="' . $filename . '" onclick="openModal(\'' . $filename . '\')">';
+                            echo '<div class="card" draggable="true" style="background-color: ' . htmlspecialchars($cor) . ';" data-filename="' . $filename . '" onclick="openModal(\'' . $filename . '\')">';
                             echo '<h6><strong>' . htmlspecialchars($titulo) . '</strong></h6>';
                             echo '<div class="card-content">';
                             echo '<div>' . nl2br(htmlspecialchars($corpo)) . '</div>';
@@ -250,8 +303,28 @@ $orderData['groups'] = $groupedFiles;
                         }
                     }
 
+
                     echo '</div>'; // Fecha .card-container
                     echo '</div>'; // Fecha .group
+                }
+
+                // Carrega o arquivo JSON de cores e mapeia por ID
+                $notaCores = [];
+                foreach ($arquivos as $arquivo) {
+                    $noteId = basename($arquivo, '.txt'); // Extrai o ID da nota
+                    $noteColorFile = $userDirectory . '/' . $noteId . '.json'; // Caminho do arquivo JSON da cor da nota
+
+                    if (file_exists($noteColorFile)) {
+                        $noteColorData = json_decode(file_get_contents($noteColorFile), true);
+                        if (json_last_error() === JSON_ERROR_NONE && isset($noteColorData['cor'])) {
+                            $notaCores[$noteId] = $noteColorData['cor']; // Associa o ID da nota à cor
+                        } else {
+                            // Log de erro se o JSON não for válido
+                            error_log("Erro ao interpretar o arquivo JSON: " . json_last_error_msg());
+                        }
+                    } else {
+                        $notaCores[$noteId] = '#FFF9C4'; // Define a cor padrão se o arquivo JSON não existir
+                    }
                 }
 
                 // Renderiza os outros grupos
@@ -283,11 +356,15 @@ $orderData['groups'] = $groupedFiles;
 
                     foreach ($group as $filename) {
                         if (file_exists($userDirectory . '/' . $filename)) {
+                            $noteId = basename($filename, '.txt'); // ID da nota é o nome do arquivo sem extensão
+                            // Aplica a cor da nota ou a cor padrão
+                            $cor = isset($notaCores[$noteId]) ? $notaCores[$noteId] : '#FFF9C4';
+                    
                             $conteudo = file_get_contents($userDirectory . '/' . $filename);
                             $linhas = explode("\n", $conteudo);
                             $titulo = '';
                             $corpo = '';
-
+                    
                             foreach ($linhas as $linha) {
                                 if (stripos($linha, 'Título:') === 0) {
                                     $titulo = trim(substr($linha, strlen('Título:')));
@@ -297,8 +374,8 @@ $orderData['groups'] = $groupedFiles;
                                     $corpo .= $linha . "\n";
                                 }
                             }
-
-                            echo '<div class="card" draggable="true" data-filename="' . $filename . '" onclick="openModal(\'' . $filename . '\')">';
+                    
+                            echo '<div class="card" draggable="true" style="background-color: ' . htmlspecialchars($cor) . ';" data-filename="' . $filename . '" onclick="openModal(\'' . $filename . '\')">';
                             echo '<h6><strong>' . htmlspecialchars($titulo) . '</strong></h6>';
                             echo '<div class="card-content">';
                             echo '<div>' . nl2br(htmlspecialchars($corpo)) . '</div>';
@@ -307,6 +384,7 @@ $orderData['groups'] = $groupedFiles;
                             echo '</div>';
                         }
                     }
+                    
 
                     echo '</div>'; // Fecha .card-container
                     echo '</div>'; // Fecha .group
@@ -343,6 +421,17 @@ $orderData['groups'] = $groupedFiles;
                             <label for="noteContent" class="form-label">Conteúdo:</label>
                             <textarea id="noteContent" name="conteudo" rows="5" class="form-control" required></textarea>
                         </div>
+                        <div class="mb-3">
+                            <label for="noteColor" class="form-label">Cor:</label>
+                            <div id="editColorPicker" class="d-flex">
+                                <div class="color-circle" style="background-color: #FFF9C4;" data-color="#FFF9C4"></div> <!-- Amarelo Pastel -->
+                                <div class="color-circle" style="background-color: #BBDEFB;" data-color="#BBDEFB"></div> <!-- Azul Claro -->
+                                <div class="color-circle" style="background-color: #C8E6C9;" data-color="#C8E6C9"></div> <!-- Verde Claro -->
+                                <div class="color-circle" style="background-color: #F8BBD0;" data-color="#F8BBD0"></div> <!-- Rosa Claro -->
+                                <div class="color-circle" style="background-color: #FFE0B2;" data-color="#FFE0B2"></div> <!-- Laranja Claro -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="selectedEditColor" name="cor" value="">
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-success" onclick="saveNote()">Salvar</button>
@@ -373,6 +462,19 @@ $orderData['groups'] = $groupedFiles;
                             <label for="conteudo" class="form-label">Conteúdo:</label>
                             <textarea id="conteudo" name="conteudo" rows="5" class="form-control" required></textarea>
                         </div>
+                        <div class="mb-3">
+                            <label for="noteColor" class="form-label">Cor:</label>
+                            <div id="colorPicker" class="d-flex">
+                                <div class="color-circle" style="background-color: #FFF9C4;" data-color="#FFF9C4"></div> <!-- Amarelo Pastel -->
+                                <div class="color-circle" style="background-color: #BBDEFB;" data-color="#BBDEFB"></div> <!-- Azul Claro -->
+                                <div class="color-circle" style="background-color: #C8E6C9;" data-color="#C8E6C9"></div> <!-- Verde Claro -->
+                                <div class="color-circle" style="background-color: #F8BBD0;" data-color="#F8BBD0"></div> <!-- Rosa Claro -->
+                                <div class="color-circle" style="background-color: #FFE0B2;" data-color="#FFE0B2"></div> <!-- Laranja Claro -->
+                            </div>
+
+                        </div>
+                        <input type="hidden" id="selectedColor" name="cor" value="#FFF9C4">
+
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-success" id="salvarNotaBtn">Criar Nota</button>
@@ -453,24 +555,25 @@ $orderData['groups'] = $groupedFiles;
                 cancelButtonText: 'Não, cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Realiza a requisição AJAX para mover o arquivo para a lixeira
+                    // Realiza a requisição AJAX para mover o arquivo para a lixeira e remover do JSON
                     $.ajax({
-                        url: 'move_to_trash.php',
+                        url: 'delete_note.php',
                         method: 'POST',
                         data: { filename: filename },
                         success: function(response) {
-                            if (response === 'success') {
+                            const data = JSON.parse(response);
+                            if (data.status === 'success') {
                                 document.querySelector(`.card[data-filename='${filename}']`).remove();
                                 Swal.fire({
                                     icon: 'success',
                                     title: 'Excluído!',
-                                    text: 'A nota foi movida para a lixeira com sucesso.'
+                                    text: 'A nota foi movida para a lixeira e removida do arquivo de cores com sucesso.'
                                 });
                             } else {
                                 Swal.fire({
                                     icon: 'error',
                                     title: 'Erro',
-                                    text: 'Erro ao mover para a lixeira.'
+                                    text: data.message || 'Erro ao excluir a nota.'
                                 });
                             }
                         },
@@ -478,13 +581,14 @@ $orderData['groups'] = $groupedFiles;
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Erro',
-                                text: 'Erro ao mover para a lixeira.'
+                                text: 'Erro ao excluir a nota.'
                             });
                         }
                     });
                 }
             });
         }
+
 
 
         // Função para alternar a exibição dos grupos
@@ -657,20 +761,29 @@ $orderData['groups'] = $groupedFiles;
         // Função para salvar a nova ordem dos cards e grupos
         function updateOrder() {
             const order = { groups: {} };
+            const colors = {}; // Objeto para salvar cores associadas a cada nota
+
             document.querySelectorAll('.card-container').forEach(container => {
                 const groupName = container.getAttribute('data-group') || 'Novos';
                 order.groups[groupName] = [];
 
                 container.querySelectorAll('.card').forEach(card => {
                     const filename = card.getAttribute('data-filename');
+                    const color = card.style.backgroundColor; // Obtém a cor do card
                     order.groups[groupName].push(filename);
+
+                    // Adiciona a cor ao objeto colors
+                    colors[filename] = color;
                 });
             });
 
             $.ajax({
                 url: 'save_order.php',
                 method: 'POST',
-                data: { order: JSON.stringify(order) },
+                data: {
+                    order: JSON.stringify(order),
+                    colors: JSON.stringify(colors) // Envia as cores junto com a ordem
+                },
                 success: function(response) {
                     if (response !== 'success') {
                         alert('Erro ao salvar a nova ordem.');
@@ -682,13 +795,14 @@ $orderData['groups'] = $groupedFiles;
             });
         }
 
+
         let currentFilename = '';
 
         // Função para abrir o modal com o conteúdo do lembrete
         function openModal(filename) {
             currentFilename = filename;
 
-            // Solicitação AJAX para obter o conteúdo do arquivo .txt
+            // Solicitação AJAX para obter o conteúdo do arquivo .txt e a cor associada
             $.ajax({
                 url: 'read_note.php',
                 method: 'POST',
@@ -700,6 +814,17 @@ $orderData['groups'] = $groupedFiles;
                         if (data.status === 'success') {
                             document.getElementById('noteTitle').value = data.title;
                             document.getElementById('noteContent').value = data.content;
+
+                            // Atualiza a cor selecionada
+                            const colorCircles = document.querySelectorAll('#editColorPicker .color-circle');
+                            colorCircles.forEach(circle => {
+                                circle.classList.remove('selected');
+                                if (circle.dataset.color === data.color) {
+                                    circle.classList.add('selected');
+                                    document.getElementById('selectedEditColor').value = data.color;
+                                }
+                            });
+
                             $('#noteModal').modal('show');
                         } else {
                             alert('Erro ao ler o lembrete: ' + (data.message || 'Erro desconhecido.'));
@@ -714,6 +839,7 @@ $orderData['groups'] = $groupedFiles;
                 }
             });
         }
+
 
         // Função para salvar as alterações no lembrete
         function saveNote() {
@@ -730,26 +856,6 @@ $orderData['groups'] = $groupedFiles;
                 },
                 success: function(response) {
                     if (response === 'success') {
-                        // Seleciona o card correspondente
-                        const card = document.querySelector(`.card[data-filename='${currentFilename}']`);
-
-                        if (card) {
-                            // Atualiza o título e conteúdo do card se o elemento existir
-                            const titleElement = card.querySelector('h5');
-                            const contentElement = card.querySelector('.card-content pre');
-
-                            if (titleElement) {
-                                titleElement.innerText = newTitle;
-                            }
-
-                            if (contentElement) {
-                                contentElement.innerText = newContent;
-                            }
-                        } else {
-                            console.error('Erro: O card correspondente não foi encontrado no DOM.');
-                        }
-
-                        // Exibir mensagem de sucesso usando SweetAlert2
                         Swal.fire({
                             icon: 'success',
                             title: 'Sucesso!',
@@ -757,14 +863,14 @@ $orderData['groups'] = $groupedFiles;
                             showConfirmButton: false,
                             timer: 2000
                         }).then(() => {
-                            // Fechar o modal após salvar
                             $('#noteModal').modal('hide');
+                            location.reload();
                         });
                     } else {
                         Swal.fire({
                             icon: 'error',
                             title: 'Erro!',
-                            text: 'Erro ao salvar o nota.'
+                            text: 'Erro ao salvar a nota.'
                         });
                     }
                 },
@@ -772,8 +878,40 @@ $orderData['groups'] = $groupedFiles;
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro!',
-                        text: 'Erro ao salvar o nota.'
+                        text: 'Erro ao salvar a nota.'
                     });
+                }
+            });
+        }
+
+        function saveNote() {
+            const newTitle = document.getElementById('noteTitle').value;
+            const newContent = document.getElementById('noteContent').value;
+            const newColor = document.getElementById('selectedEditColor').value; // Obtém a cor selecionada
+
+            $.ajax({
+                url: 'update_color.php',
+                method: 'POST',
+                data: {
+                    note_id: currentFilename.replace('.txt', ''),
+                    color: newColor
+                },
+                success: function(response) {
+                    const data = JSON.parse(response);
+                    if (data.status === 'success') {
+                        // Atualiza a cor diretamente no card
+                        document.querySelector(`.card[data-filename='${currentFilename}']`).style.backgroundColor = newColor;
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Nota salva com sucesso!',
+                            timer: 2000,
+                            showConfirmButton: false
+                        }).then(() => {
+                            $('#noteModal').modal('hide'); // Fecha o modal sem recarregar a página
+                        });
+                    }
                 }
             });
         }
@@ -861,6 +999,73 @@ $orderData['groups'] = $groupedFiles;
             $('#noteModal').on('hidden.bs.modal', function () {
             location.reload();
         });
+
+        document.querySelectorAll('.color-circle').forEach((circle) => {
+            circle.addEventListener('click', function () {
+                // Remove a seleção anterior
+                document.querySelectorAll('.color-circle').forEach((c) => c.classList.remove('selected'));
+                
+                // Marca a cor selecionada
+                this.classList.add('selected');
+                
+                // Atualiza o valor do campo oculto
+                document.getElementById('selectedColor').value = this.dataset.color;
+            });
+        });
+
+        $('#salvarNotaBtn').on('click', function () {
+            var titulo = $('#titulo').val();
+            var conteudo = $('#conteudo').val();
+            var cor = $('#selectedColor').val(); // Obtém a cor selecionada
+
+            $.ajax({
+                url: '',
+                method: 'POST',
+                data: {
+                    titulo: titulo,
+                    conteudo: conteudo,
+                    cor: cor // Envia a cor junto com os dados
+                },
+                success: function (response) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Nota criada com sucesso!',
+                        showConfirmButton: false,
+                        timer: 2000
+                    }).then(() => {
+                        location.reload();
+                    });
+
+                    $('#novaNotaForm')[0].reset();
+                    $('#novaNotaModal').modal('hide');
+                },
+                error: function () {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao criar a nota.',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                }
+            });
+        });
+
+        document.querySelectorAll('#editColorPicker .color-circle').forEach((circle) => {
+            circle.addEventListener('click', function () {
+                // Remove a seleção anterior
+                document.querySelectorAll('#editColorPicker .color-circle').forEach((c) => c.classList.remove('selected'));
+
+                // Marca a cor selecionada
+                this.classList.add('selected');
+
+                // Atualiza o valor do campo oculto
+                document.getElementById('selectedEditColor').value = this.dataset.color;
+            });
+        });
+
+
 
     </script>
     <?php include(__DIR__ . '/../rodape.php'); ?>
