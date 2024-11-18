@@ -933,24 +933,45 @@ $orderData['groups'] = $groupedFiles;
 
                             $('#noteModal').modal('show');
                         } else {
-                            alert('Erro ao ler o lembrete: ' + (data.message || 'Erro desconhecido.'));
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro ao abrir o lembrete',
+                                text: data.message || 'Erro desconhecido.'
+                            });
                         }
                     } catch (e) {
                         console.error('Erro ao processar a resposta:', e);
-                        alert('Erro ao processar a resposta do servidor.');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro ao processar resposta',
+                            text: 'Erro ao processar a resposta do servidor.'
+                        });
                     }
                 },
                 error: function() {
-                    alert('Erro ao fazer a solicitação para ler o lembrete.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro na solicitação',
+                        text: 'Erro ao fazer a solicitação para ler o lembrete.'
+                    });
                 }
             });
         }
 
-
         // Função para salvar as alterações no lembrete
         function saveNote() {
-            const newTitle = document.getElementById('noteTitle').value;
-            const newContent = document.getElementById('noteContent').value;
+            const newTitle = document.getElementById('noteTitle').value.trim();
+            const newContent = document.getElementById('noteContent').value.trim();
+            const newColor = document.getElementById('selectedEditColor').value; // Obtém a cor selecionada
+
+            if (!newTitle || !newContent) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Aviso!',
+                    text: 'Preencha todos os campos antes de salvar.'
+                });
+                return;
+            }
 
             $.ajax({
                 url: 'save_note.php',
@@ -961,22 +982,32 @@ $orderData['groups'] = $groupedFiles;
                     content: newContent
                 },
                 success: function(response) {
-                    if (response === 'success') {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Sucesso!',
-                            text: 'Nota salva com sucesso!',
-                            showConfirmButton: false,
-                            timer: 2000
-                        }).then(() => {
-                            $('#noteModal').modal('hide');
-                            location.reload();
-                        });
-                    } else {
+                    try {
+                        const data = JSON.parse(response);
+                        if (data.status === 'success') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso!',
+                                text: data.message,
+                                showConfirmButton: false,
+                                timer: 2000
+                            }).then(() => {
+                                updateCardContent(newTitle, newContent); // Atualiza conteúdo na página
+                                $('#noteModal').modal('hide');
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erro!',
+                                text: data.message
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Erro ao processar a resposta:', e);
                         Swal.fire({
                             icon: 'error',
-                            title: 'Erro!',
-                            text: 'Erro ao salvar a nota.'
+                            title: 'Erro ao processar resposta',
+                            text: 'Erro ao processar a resposta do servidor.'
                         });
                     }
                 },
@@ -984,17 +1015,12 @@ $orderData['groups'] = $groupedFiles;
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro!',
-                        text: 'Erro ao salvar a nota.'
+                        text: 'Erro ao salvar a nota. Tente novamente.'
                     });
                 }
             });
-        }
 
-        function saveNote() {
-            const newTitle = document.getElementById('noteTitle').value;
-            const newContent = document.getElementById('noteContent').value;
-            const newColor = document.getElementById('selectedEditColor').value; // Obtém a cor selecionada
-
+            // Atualiza a cor da nota separadamente
             $.ajax({
                 url: 'update_color.php',
                 method: 'POST',
@@ -1007,20 +1033,28 @@ $orderData['groups'] = $groupedFiles;
                     if (data.status === 'success') {
                         // Atualiza a cor diretamente no card
                         document.querySelector(`.card[data-filename='${currentFilename}']`).style.backgroundColor = newColor;
-
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Sucesso!',
-                            text: 'Nota salva com sucesso!',
-                            timer: 2000,
-                            showConfirmButton: false
-                        }).then(() => {
-                            $('#noteModal').modal('hide'); // Fecha o modal sem recarregar a página
-                        });
                     }
+                },
+                error: function() {
+                    console.error('Erro ao atualizar a cor.');
                 }
             });
         }
+
+        // Função para atualizar o título e conteúdo do card na página
+        function updateCardContent(title, content) {
+            const card = document.querySelector(`.card[data-filename='${currentFilename}']`);
+            if (card) {
+                card.querySelector('h6 strong').innerText = title;
+                card.querySelector('.card-content div').innerHTML = nl2br(content);
+            }
+        }
+
+        // Função para converter quebra de linha em <br>
+        function nl2br(str) {
+            return str.replace(/\n/g, '<br>');
+        }
+
 
 
         // Função para excluir grupos vazios

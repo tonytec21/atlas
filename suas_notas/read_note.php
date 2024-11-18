@@ -14,24 +14,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Verifica se o arquivo da nota existe
     if (file_exists($filePath)) {
-        $content = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES); // Lê o arquivo em um array de linhas
+        // Lê todo o conteúdo do arquivo como uma string
+        $content = file_get_contents($filePath);
 
         if ($content !== false) {
             $title = '';
             $bodyContent = '';
 
-            // Processa cada linha do arquivo para encontrar "Título:" e "Conteúdo:"
-            foreach ($content as $line) {
+            // Processa o conteúdo para encontrar "Título:" e "Conteúdo:"
+            $lines = explode("\n", $content); // Divide o arquivo em linhas
+
+            foreach ($lines as $line) {
                 if (stripos($line, 'Título:') === 0) {
-                    // Extrai o texto após "Título:"
                     $title = trim(substr($line, strlen('Título:')));
                 } elseif (stripos($line, 'Conteúdo:') === 0) {
-                    // Extrai o texto após "Conteúdo:"
-                    $bodyContent .= trim(substr($line, strlen('Conteúdo:'))) . "\n";
-                } else {
-                    // Se for parte do conteúdo, adiciona à variável $bodyContent
-                    $bodyContent .= $line . "\n";
+                    // Tudo após "Conteúdo:" é parte do conteúdo
+                    $bodyContent = trim(implode("\n", array_slice($lines, array_search($line, $lines) + 1)));
+                    break;
                 }
+            }
+
+            // Verifica se título e conteúdo foram extraídos
+            if (empty($title) || empty($bodyContent)) {
+                echo json_encode(['status' => 'error', 'message' => 'Formato do arquivo inválido.']);
+                exit;
             }
 
             // Define o caminho do arquivo JSON da cor da nota
@@ -61,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode([
                 'status' => 'success',
                 'title' => $title,
-                'content' => trim($bodyContent),
+                'content' => $bodyContent,
                 'color' => $color // Retorna a cor associada ao lembrete
             ]);
         } else {

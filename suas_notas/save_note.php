@@ -9,32 +9,44 @@ $username = $_SESSION['username'];
 $userDirectory = 'lembretes/' . $username;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $filename = $_POST['filename'];
-    $title = $_POST['title'];
-    $content = $_POST['content'];
+    $filename = $_POST['filename'] ?? '';
+    $title = trim($_POST['title'] ?? '');
+    $content = trim($_POST['content'] ?? '');
+
+    // Validações iniciais
+    if (empty($filename)) {
+        echo json_encode(['status' => 'error', 'message' => 'O arquivo não foi especificado.']);
+        exit;
+    }
+
+    if (empty($title)) {
+        echo json_encode(['status' => 'error', 'message' => 'O título não pode estar vazio.']);
+        exit;
+    }
+
+    if (empty($content)) {
+        echo json_encode(['status' => 'error', 'message' => 'O conteúdo não pode estar vazio.']);
+        exit;
+    }
 
     // Caminho completo do arquivo
     $filePath = $userDirectory . '/' . basename($filename);
 
     // Verifica se o arquivo existe
     if (file_exists($filePath)) {
-        // Abre o arquivo para escrita e inclui "Título:" e "Conteúdo:"
-        $file = fopen($filePath, 'w');
+        // Prepara o conteúdo a ser salvo
+        $fileContent = "Título: " . $title . "\n\nConteúdo:\n" . $content;
 
-        if ($file) {
-            // Salva o título e o conteúdo com as quebras de linha adequadas
-            fwrite($file, "Título: " . $title . "\n\n"); // Título na mesma linha e depois duas quebras de linha
-            fwrite($file, "Conteúdo:\n" . $content); // Conteúdo em nova linha após "Conteúdo:"
-            fclose($file);
-
-            echo 'success';
+        // Salva o conteúdo no arquivo
+        if (file_put_contents($filePath, $fileContent) !== false) {
+            echo json_encode(['status' => 'success', 'message' => 'Nota salva com sucesso.']);
         } else {
-            echo 'error';
+            echo json_encode(['status' => 'error', 'message' => 'Erro ao salvar o arquivo.']);
         }
     } else {
-        echo 'error';
+        echo json_encode(['status' => 'error', 'message' => 'Arquivo não encontrado.']);
     }
 } else {
-    echo 'error';
+    echo json_encode(['status' => 'error', 'message' => 'Método de solicitação inválido.']);
 }
 ?>
