@@ -549,28 +549,32 @@ include(__DIR__ . '/menu.php');
                                         <a href="indexador/index.php" class="btn btn-indexador w-100">Acessar</a>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="col-md-4 mb-3" id="card-anotacoes">
-                                <div class="card shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fa fa-sticky-note-o fa-3x text-anotacoes mb-2"></i>
-                                        <h5 class="card-title">Anotações</h5>
-                                        <a href="suas_notas/index.php" class="btn btn-anotacoes w-100">Acessar</a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 mb-3" id="card-relatorios">
-                                <div class="card shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fa fa-line-chart fa-3x text-relatorios mb-2"></i>
-                                        <h5 class="card-title">Relatórios e Livros</h5>
-                                        <a href="relatorios/index.php" class="btn btn-relatorios w-100">Acessar</a>
-                                    </div>
-                                </div>
                             </div>';
                     }
                 }
             ?>
+
+            <!-- Anotações -->
+            <div class="col-md-4 mb-3" id="card-anotacoes">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-sticky-note-o fa-3x text-anotacoes mb-2"></i>
+                        <h5 class="card-title">Anotações</h5>
+                        <a href="suas_notas/index.php" class="btn btn-anotacoes w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Relatórios -->
+            <div class="col-md-4 mb-3" id="card-relatorios">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-line-chart fa-3x text-relatorios mb-2"></i>
+                        <h5 class="card-title">Relatórios e Livros</h5>
+                        <a href="relatorios/index.php" class="btn btn-relatorios w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
 
         </div>
     </div>
