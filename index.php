@@ -142,6 +142,20 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             color: #A7D676;
         }
 
+        .btn-reurb {
+            background: #FFC8A2;
+            color: #fff;
+        }
+
+        .btn-reurb:hover {
+            background: #f7b283;
+            color: #fff;
+        }
+        
+        .text-reurb {
+            color: #FFC8A2;
+        }
+
         .btn-relatorios {
             background: #4A90E2;
             color: #fff;
@@ -534,8 +548,8 @@ include(__DIR__ . '/menu.php');
                 </div>
             </div>
 
-             <!-- Indexador -->
-             <?php
+            <!-- Indexador -->
+            <?php
                 $configFile = __DIR__ . '/indexador/config_indexador.json';
                 if (file_exists($configFile)) {
                     $configData = json_decode(file_get_contents($configFile), true);
@@ -547,6 +561,26 @@ include(__DIR__ . '/menu.php');
                                         <i class="fa fa-file-text-o fa-3x text-indexador mb-2"></i>
                                         <h5 class="card-title">Indexador</h5>
                                         <a href="indexador/index.php" class="btn btn-indexador w-100">Acessar</a>
+                                    </div>
+                                </div>
+                            </div>';
+                    }
+                }
+            ?>
+
+            <!-- REURB -->
+            <?php
+                $configFile = __DIR__ . '/reurb/config_reurb.json';
+                if (file_exists($configFile)) {
+                    $configData = json_decode(file_get_contents($configFile), true);
+                    if (isset($configData['reurb_ativo']) && $configData['reurb_ativo'] === 'S') {
+                        echo '
+                            <div class="col-md-4 mb-3" id="card-reurb">
+                                <div class="card shadow-sm">
+                                    <div class="card-body text-center">
+                                        <i class="fa fa-map fa-3x text-reurb mb-2"></i>
+                                        <h5 class="card-title">REURB</h5>
+                                        <a href="reurb/index.php" class="btn btn-reurb w-100">Acessar</a>
                                     </div>
                                 </div>
                             </div>';

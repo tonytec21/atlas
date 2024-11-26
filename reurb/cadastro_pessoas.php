@@ -94,14 +94,14 @@ date_default_timezone_set('America/Sao_Paulo');
                 </div>
                 <div class="form-group col-md-4">
                     <label for="dataNascimento">Data de Nascimento</label>
-                    <input type="date" class="form-control" id="dataNascimento" name="dataNascimento" required>
+                    <input type="date" class="form-control" id="dataNascimento" name="dataNascimento">
                 </div>
             </div>
 
             <div class="form-row">
                 <div class="form-group col-md-6">
                     <label for="nacionalidade">Nacionalidade</label>
-                    <input type="text" class="form-control" id="nacionalidade" name="nacionalidade">
+                    <input type="text" class="form-control" id="nacionalidade" name="nacionalidade" value="brasileiro(a)">
                 </div>
                 <div class="form-group col-md-6">
                     <label for="naturalidade">Naturalidade</label>
@@ -111,7 +111,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             class="form-control" 
                             id="naturalidade" 
                             name="naturalidade" 
-                            placeholder="Clique na lupa para buscar..." 
+                            placeholder="Clique para buscar..." 
                             readonly 
                             required 
                             onclick="$('#modalNaturalidade').modal('show');"

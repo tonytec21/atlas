@@ -106,11 +106,11 @@ if (!$processo) {
                 </div>
                 <div class="form-group col-md-4">
                     <label for="representante">Representante</label>
-                    <input type="text" class="form-control" id="representante" name="representante" value="<?= htmlspecialchars($processo['representante']) ?>" required>
+                    <input type="text" class="form-control" id="representante" name="representante" value="<?= htmlspecialchars($processo['representante']) ?>">
                 </div>
                 <div class="form-group col-md-8">
                     <label for="qualificacao_representante">Qualificação do Representante</label>
-                    <input type="text" class="form-control" id="qualificacao_representante" name="qualificacao_representante" value="<?= htmlspecialchars($processo['qualificacao_representante']) ?>" required>
+                    <input type="text" class="form-control" id="qualificacao_representante" name="qualificacao_representante" value="<?= htmlspecialchars($processo['qualificacao_representante']) ?>">
                 </div>
                 <div class="form-group col-md-4">
                     <label for="responsavel_tecnico">Responsável Técnico</label>
@@ -122,11 +122,11 @@ if (!$processo) {
                 </div>
                 <div class="form-group col-md-2">
                     <label for="edital">Edital</label>
-                    <input type="text" class="form-control" id="edital" name="edital" value="<?= htmlspecialchars($processo['edital']) ?>" required>
+                    <input type="text" class="form-control" id="edital" name="edital" value="<?= htmlspecialchars($processo['edital']) ?>">
                 </div>
                 <div class="form-group col-md-2">
                     <label for="data_edital">Data do Edital</label>
-                    <input type="date" class="form-control" id="data_edital" name="data_edital" value="<?= htmlspecialchars($processo['data_edital']) ?>" required>
+                    <input type="date" class="form-control" id="data_edital" name="data_edital" value="<?= htmlspecialchars($processo['data_edital']) ?>">
                 </div>
                 <div class="form-group col-md-2">
                     <label for="matricula_mae">Matrícula Mãe</label>

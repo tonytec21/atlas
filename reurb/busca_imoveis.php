@@ -172,8 +172,8 @@ include(__DIR__ . '/db_connection.php');
                                     <button class="btn btn-primary btn-sm visualizar" title="Detalhes do Imóvel" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" data-id="${imovel.id}"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <button class="btn btn-warning btn-sm editar" title="Editar" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" data-id="${imovel.id}"> <i class="fa fa-pencil" aria-hidden="true"></i></button>
                                     <button class="btn btn-info btn-sm visualizar-matricula" title="Texto da Abertura de Matrícula" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" data-id="${imovel.id}"><i class="fa fa-file-text" aria-hidden="true"></i></button>
-                                    <button class="btn btn-success btn-sm visualizar-registro" title="Texto do Registro" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" data-id="${imovel.id}"><i class="fa fa-file-text" aria-hidden="true"></i>
-                                    </button>
+                                    <button class="btn btn-success btn-sm visualizar-registro" title="Texto do Registro" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" data-id="${imovel.id}"><i class="fa fa-file-text" aria-hidden="true"></i></button>
+                                    <button class="btn btn-secondary btn-sm exportar" title="Exportar para TXT" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" data-id="${imovel.id}"><i class="fa fa-download" aria-hidden="true"></i></button>
                                     `
                                 ]);
                             });
@@ -304,6 +304,50 @@ include(__DIR__ . '/db_connection.php');
                 });
             });
 
+            // Ação de Exportar
+            $(document).on('click', '.exportar', function () {
+                const id = $(this).data('id');
+                $.ajax({
+                    url: 'exportar_texto_imovel.php',
+                    method: 'GET',
+                    data: { id },
+                    success: function (response) {
+                        try {
+                            const data = typeof response === 'string' ? JSON.parse(response) : response;
+
+                            if (!data.success) {
+                                Swal.fire('Erro!', data.message || 'Erro ao gerar o arquivo.', 'error');
+                                return;
+                            }
+
+                            // Cria o arquivo TXT
+                            const fileContent = data.texto;
+                            const blob = new Blob([fileContent], { type: 'text/plain' });
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            // Função para aplicar a máscara no CPF
+                            function formatarCPF(cpf) {
+                                return cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+                            }
+
+                            // Gera o nome do arquivo com o padrão "NOME DO PROPRIETÁRIO - CPF" com máscara
+                            const nomeProprietario = data.nome_proprietario || `imovel_${id}`;
+                            const cpfProprietario = data.cpf_proprietario ? formatarCPF(data.cpf_proprietario) : '';
+                            const nomeArquivo = `${nomeProprietario} - ${cpfProprietario}.txt`.replace(/[<>:"/\\|?*]/g, ''); // Remove caracteres inválidos
+                            link.download = nomeArquivo;
+
+
+                            link.click();
+                        } catch (error) {
+                            console.error('Erro ao processar a resposta:', error);
+                            Swal.fire('Erro!', 'Erro ao gerar o arquivo.', 'error');
+                        }
+                    },
+                    error: function () {
+                        Swal.fire('Erro!', 'Erro ao buscar os dados do imóvel.', 'error');
+                    }
+                });
+            });
 
             // Ação de Editar
             $(document).on('click', '.editar', function () {
