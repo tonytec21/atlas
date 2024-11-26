@@ -94,7 +94,29 @@ $imovel = $result->fetch_assoc();
             <div class="form-row">
                 <div class="form-group col-md-2">
                     <label for="tipoLogradouro">Tipo de Logradouro</label>
-                    <input type="text" class="form-control" id="tipoLogradouro" name="tipoLogradouro" value="<?= $imovel['tipo_logradouro'] ?>" required>
+                    <select class="form-control" id="tipoLogradouro" name="tipoLogradouro" required>
+                        <option value="">Selecione</option>
+                        <?php
+                        $jsonFile = file_get_contents(__DIR__ . '/tipo_logradouro.json');
+                        $tiposLogradouro = json_decode($jsonFile, true);
+
+                        if ($tiposLogradouro && is_array($tiposLogradouro)) {
+                            foreach ($tiposLogradouro as $tipo) {
+                                if (!empty($tipo['ID']) && !empty($tipo['NOME'])) {
+                                    $selected = ($tipo['ID'] == $imovel['tipo_logradouro']) ? 'selected' : '';
+                                    echo '<option value="' . htmlspecialchars($tipo['ID'], ENT_QUOTES, 'UTF-8') . '" ' . $selected . '>' . htmlspecialchars($tipo['NOME'], ENT_QUOTES, 'UTF-8') . '</option>';
+                                }
+                            }
+                        } else {
+                            echo '<option value="">Erro ao carregar os tipos de logradouro</option>';
+                        }
+                        ?>
+                    </select>
+                </div>
+
+                <div class="form-group col-md-4">
+                    <label for="cep">CEP</label>
+                    <input type="text" class="form-control" id="cep" name="cep" value="<?= $imovel['cep'] ?>" maxlength="9" required>
                 </div>
                 <div class="form-group col-md-6">
                     <label for="logradouro">Logradouro</label>
@@ -116,10 +138,7 @@ $imovel = $result->fetch_assoc();
                     <label for="cidade">Cidade</label>
                     <input type="text" class="form-control" id="cidade" name="cidade" value="<?= $imovel['cidade'] ?>" required>
                 </div>
-                <div class="form-group col-md-4">
-                    <label for="cep">CEP</label>
-                    <input type="text" class="form-control" id="cep" name="cep" value="<?= $imovel['cep'] ?>" maxlength="9" required>
-                </div>
+                
             </div>
 
             <!-- Dados do Imóvel -->
@@ -139,7 +158,22 @@ $imovel = $result->fetch_assoc();
                 </div>
                 <div class="form-group col-md-3">
                     <label for="processoAdm">Processo Administrativo</label>
-                    <input type="text" class="form-control" id="processoAdm" name="processoAdm" value="<?= $imovel['processo_adm'] ?>">
+                    <select class="form-control" id="processoAdm" name="processoAdm" required>
+                        <option value="">Selecione um processo</option>
+                        <?php
+                        $query = "SELECT processo_adm FROM cadastro_de_processo_adm";
+                        $result = $conn->query($query);
+
+                        if ($result && $result->num_rows > 0) {
+                            while ($row = $result->fetch_assoc()) {
+                                $selected = ($row['processo_adm'] == $imovel['processo_adm']) ? 'selected' : '';
+                                echo '<option value="' . htmlspecialchars($row['processo_adm'], ENT_QUOTES, 'UTF-8') . '" ' . $selected . '>' . htmlspecialchars($row['processo_adm'], ENT_QUOTES, 'UTF-8') . '</option>';
+                            }
+                        } else {
+                            echo '<option value="">Nenhum processo encontrado</option>';
+                        }
+                        ?>
+                    </select>
                 </div>
                 <div class="form-group col-md-12">
                     <label for="memorialDescritivo">Memorial Descritivo</label>
@@ -150,23 +184,23 @@ $imovel = $result->fetch_assoc();
             <!-- Proprietário -->
             <h5>Proprietário</h5>
             <div class="form-row">
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-4">
                     <label for="proprietarioCpf">CPF do Proprietário</label>
                     <input type="text" class="form-control" id="proprietarioCpf" name="proprietarioCpf" maxlength="14" value="<?= $imovel['proprietario_cpf'] ?>" required>
                 </div>
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-8">
                     <label for="proprietarioNome">Nome do Proprietário</label>
                     <input type="text" class="form-control" id="proprietarioNome" name="proprietarioNome" value="<?= $imovel['proprietario_nome'] ?>" readonly>
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-4">
                     <label for="cpfConjuge">CPF do Cônjuge</label>
                     <input type="text" class="form-control" id="cpfConjuge" name="cpfConjuge" maxlength="14" value="<?= $imovel['cpf_conjuge'] ?>">
                 </div>
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-8">
                     <label for="nomeConjuge">Nome do Cônjuge</label>
-                    <input type="text" class="form-control" id="nomeConjuge" name="nomeConjuge" value="<?= $imovel['nome_conjuge'] ?>">
+                    <input type="text" class="form-control" id="nomeConjuge" name="nomeConjuge" value="<?= $imovel['nome_conjuge'] ?>" readonly>
                 </div>
             </div>
 
@@ -313,6 +347,38 @@ $imovel = $result->fetch_assoc();
                     Swal.fire('Erro!', 'Erro ao salvar os dados.', 'error');
                 }
             });
+        });
+    });
+
+    // Consulta CEP
+    $('#cep').on('blur', function () {
+        const cep = $(this).val().replace(/\D/g, '');
+        if (cep.length !== 8) {
+            $('#cepFeedback').removeClass('hidden').text('CEP inválido.');
+            limparCamposEndereco();
+            return;
+        }
+
+        $.ajax({
+            url: `https://viacep.com.br/ws/${cep}/json/`,
+            method: 'GET',
+            success: function (data) {
+                if (data.erro) {
+                    $('#cepFeedback').removeClass('hidden').text('CEP não encontrado.');
+                    limparCamposEndereco();
+                    return;
+                }
+
+                $('#logradouro').val(data.logradouro);
+                $('#bairro').val(data.bairro);
+                $('#cidade').val(`${data.localidade}/${data.uf}`);
+                $('#quadra').val('');
+                $('#cepFeedback').addClass('hidden');
+            },
+            error: function () {
+                $('#cepFeedback').removeClass('hidden').text('Erro ao consultar o CEP.');
+                limparCamposEndereco();
+            }
         });
     });
 </script>

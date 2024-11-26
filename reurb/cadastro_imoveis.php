@@ -70,7 +70,28 @@ date_default_timezone_set('America/Sao_Paulo');
             <div class="form-row">
                 <div class="form-group col-md-2">
                     <label for="tipoLogradouro">Tipo de Logradouro</label>
-                    <input type="text" class="form-control" id="tipoLogradouro" name="tipoLogradouro" required>
+                    <select class="form-control" id="tipoLogradouro" name="tipoLogradouro" required>
+                        <option value="">Selecione</option>
+                        <?php
+                        $jsonFile = file_get_contents(__DIR__ . '/tipo_logradouro.json');
+                        $tiposLogradouro = json_decode($jsonFile, true);
+
+                        if ($tiposLogradouro && is_array($tiposLogradouro)) {
+                            foreach ($tiposLogradouro as $tipo) {
+                                if (!empty($tipo['ID']) && !empty($tipo['NOME'])) {
+                                    echo '<option value="' . htmlspecialchars($tipo['ID'], ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($tipo['NOME'], ENT_QUOTES, 'UTF-8') . '</option>';
+                                }
+                            }
+                        } else {
+                            echo '<option value="">Erro ao carregar os tipos de logradouro</option>';
+                        }
+                        ?>
+                    </select>
+                </div>
+                <div class="form-group col-md-4">
+                    <label for="cep">CEP</label>
+                    <input type="text" class="form-control" id="cep" name="cep" maxlength="9" required>
+                    <small id="cepFeedback" class="form-text text-danger hidden">CEP inválido ou não encontrado.</small>
                 </div>
                 <div class="form-group col-md-6">
                     <label for="logradouro">Logradouro</label>
@@ -92,11 +113,6 @@ date_default_timezone_set('America/Sao_Paulo');
                     <label for="cidade">Cidade</label>
                     <input type="text" class="form-control" id="cidade" name="cidade" required>
                 </div>
-                <div class="form-group col-md-4">
-                    <label for="cep">CEP</label>
-                    <input type="text" class="form-control" id="cep" name="cep" maxlength="9" required>
-                    <small id="cepFeedback" class="form-text text-danger hidden">CEP inválido ou não encontrado.</small>
-                </div>
             </div>
 
             <!-- Dados do Imóvel -->
@@ -116,8 +132,25 @@ date_default_timezone_set('America/Sao_Paulo');
                 </div>
                 <div class="form-group col-md-3">
                     <label for="processoAdm">Processo Administrativo</label>
-                    <input type="text" class="form-control" id="processoAdm" name="processoAdm">
+                    <select class="form-control" id="processoAdm" name="processoAdm" required>
+                        <option value="">Selecione um processo</option>
+                        <?php
+                        $query = "SELECT processo_adm FROM cadastro_de_processo_adm ORDER BY processo_adm ASC";
+                        $result = $conn->query($query);
+
+                        if ($result->num_rows > 0) {
+                            while ($row = $result->fetch_assoc()) {
+                                echo '<option value="' . htmlspecialchars($row['processo_adm'], ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($row['processo_adm'], ENT_QUOTES, 'UTF-8') . '</option>';
+                            }
+                        } else {
+                            echo '<option value="">Nenhum processo encontrado</option>';
+                        }
+
+                        $conn->close();
+                        ?>
+                    </select>
                 </div>
+
                 <div class="form-group col-md-12">
                     <label for="memorialDescritivo">Memorial Descritivo</label>
                     <textarea class="form-control" id="memorialDescritivo" name="memorialDescritivo" rows="3"></textarea>
@@ -127,23 +160,23 @@ date_default_timezone_set('America/Sao_Paulo');
             <!-- Proprietário -->
             <h5>Proprietário</h5>
             <div class="form-row">
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-4">
                     <label for="proprietarioCpf">CPF do Proprietário</label>
                     <input type="text" class="form-control" id="proprietarioCpf" name="proprietarioCpf" maxlength="14" required>
                     <small id="cpfProprietarioFeedback" class="form-text text-danger hidden">CPF inválido ou não encontrado.</small>
                 </div>
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-8">
                     <label for="proprietarioNome">Nome do Proprietário</label>
                     <input type="text" class="form-control" id="proprietarioNome" name="proprietarioNome" readonly>
                 </div>
             </div>
             <div class="form-row hidden" id="conjugeFields">
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-4">
                     <label for="cpfConjuge">CPF do Cônjuge</label>
                     <input type="text" class="form-control" id="cpfConjuge" name="cpfConjuge" maxlength="14">
                     <small id="cpfConjugeFeedback" class="form-text text-danger hidden">CPF inválido ou não encontrado.</small>
                 </div>
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-8">
                     <label for="nomeConjuge">Nome do Cônjuge</label>
                     <input type="text" class="form-control" id="nomeConjuge" name="nomeConjuge" readonly>
                 </div>
@@ -300,6 +333,38 @@ date_default_timezone_set('America/Sao_Paulo');
                         Swal.fire('Erro!', 'Erro ao salvar os dados.', 'error');
                     }
                 });
+            });
+        });
+
+        // Consulta CEP
+        $('#cep').on('blur', function () {
+            const cep = $(this).val().replace(/\D/g, '');
+            if (cep.length !== 8) {
+                $('#cepFeedback').removeClass('hidden').text('CEP inválido.');
+                limparCamposEndereco();
+                return;
+            }
+
+            $.ajax({
+                url: `https://viacep.com.br/ws/${cep}/json/`,
+                method: 'GET',
+                success: function (data) {
+                    if (data.erro) {
+                        $('#cepFeedback').removeClass('hidden').text('CEP não encontrado.');
+                        limparCamposEndereco();
+                        return;
+                    }
+
+                    $('#logradouro').val(data.logradouro);
+                    $('#bairro').val(data.bairro);
+                    $('#cidade').val(`${data.localidade}/${data.uf}`);
+                    $('#quadra').val('');
+                    $('#cepFeedback').addClass('hidden');
+                },
+                error: function () {
+                    $('#cepFeedback').removeClass('hidden').text('Erro ao consultar o CEP.');
+                    limparCamposEndereco();
+                }
             });
         });
     </script>

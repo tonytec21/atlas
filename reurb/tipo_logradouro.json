@@ -1,0 +1,1250 @@
+[
+  {
+    "ID": 0,
+    "NOME": ""
+  },
+  {
+    "ID": 1,
+    "NOME": "Acampamento"
+  },
+  {
+    "ID": 2,
+    "NOME": "Acesso"
+  },
+  {
+    "ID": 3,
+    "NOME": "Açude"
+  },
+  {
+    "ID": 4,
+    "NOME": "Adro"
+  },
+  {
+    "ID": 5,
+    "NOME": "Aeroporto"
+  },
+  {
+    "ID": 6,
+    "NOME": "Afluente"
+  },
+  {
+    "ID": 7,
+    "NOME": "Aglomerado"
+  },
+  {
+    "ID": 8,
+    "NOME": "Agrovila"
+  },
+  {
+    "ID": 9,
+    "NOME": "Alagado"
+  },
+  {
+    "ID": 10,
+    "NOME": "Alameda"
+  },
+  {
+    "ID": 11,
+    "NOME": "Aldeia"
+  },
+  {
+    "ID": 12,
+    "NOME": "Aleia"
+  },
+  {
+    "ID": 13,
+    "NOME": "Alto"
+  },
+  {
+    "ID": 14,
+    "NOME": "Anel"
+  },
+  {
+    "ID": 15,
+    "NOME": "Antiga"
+  },
+  {
+    "ID": 16,
+    "NOME": "Antigo"
+  },
+  {
+    "ID": 17,
+    "NOME": "Área"
+  },
+  {
+    "ID": 18,
+    "NOME": "Areal"
+  },
+  {
+    "ID": 19,
+    "NOME": "Arraial"
+  },
+  {
+    "ID": 20,
+    "NOME": "Arroio"
+  },
+  {
+    "ID": 21,
+    "NOME": "Artéria"
+  },
+  {
+    "ID": 22,
+    "NOME": "Assentamento"
+  },
+  {
+    "ID": 23,
+    "NOME": "Atalho"
+  },
+  {
+    "ID": 24,
+    "NOME": "Aterro"
+  },
+  {
+    "ID": 25,
+    "NOME": "Autódromo"
+  },
+  {
+    "ID": 26,
+    "NOME": "Avenida"
+  },
+  {
+    "ID": 27,
+    "NOME": "Baia"
+  },
+  {
+    "ID": 28,
+    "NOME": "Bairro"
+  },
+  {
+    "ID": 29,
+    "NOME": "Baixa"
+  },
+  {
+    "ID": 30,
+    "NOME": "Baixada"
+  },
+  {
+    "ID": 31,
+    "NOME": "Baixadão"
+  },
+  {
+    "ID": 32,
+    "NOME": "Baixão"
+  },
+  {
+    "ID": 33,
+    "NOME": "Baixo"
+  },
+  {
+    "ID": 34,
+    "NOME": "Balão"
+  },
+  {
+    "ID": 35,
+    "NOME": "Balneário"
+  },
+  {
+    "ID": 36,
+    "NOME": "Barra"
+  },
+  {
+    "ID": 37,
+    "NOME": "Barragem"
+  },
+  {
+    "ID": 38,
+    "NOME": "Barranca"
+  },
+  {
+    "ID": 39,
+    "NOME": "Barranco"
+  },
+  {
+    "ID": 40,
+    "NOME": "Barreiro"
+  },
+  {
+    "ID": 41,
+    "NOME": "Barro"
+  },
+  {
+    "ID": 42,
+    "NOME": "Beco"
+  },
+  {
+    "ID": 43,
+    "NOME": "Beira"
+  },
+  {
+    "ID": 44,
+    "NOME": "Beirada"
+  },
+  {
+    "ID": 45,
+    "NOME": "Belvedere"
+  },
+  {
+    "ID": 46,
+    "NOME": "Bloco"
+  },
+  {
+    "ID": 47,
+    "NOME": "Bocaina"
+  },
+  {
+    "ID": 48,
+    "NOME": "Boqueirão"
+  },
+  {
+    "ID": 49,
+    "NOME": "Bosque"
+  },
+  {
+    "ID": 50,
+    "NOME": "Boulevard"
+  },
+  {
+    "ID": 51,
+    "NOME": "Brejo"
+  },
+  {
+    "ID": 52,
+    "NOME": "Buraco"
+  },
+  {
+    "ID": 53,
+    "NOME": "Cabeceira"
+  },
+  {
+    "ID": 54,
+    "NOME": "Cachoeira"
+  },
+  {
+    "ID": 55,
+    "NOME": "Cachoeirinha"
+  },
+  {
+    "ID": 56,
+    "NOME": "Cais"
+  },
+  {
+    "ID": 57,
+    "NOME": "Calcada"
+  },
+  {
+    "ID": 58,
+    "NOME": "Calçadão"
+  },
+  {
+    "ID": 59,
+    "NOME": "Caminho"
+  },
+  {
+    "ID": 60,
+    "NOME": "Campo"
+  },
+  {
+    "ID": 61,
+    "NOME": "Canal"
+  },
+  {
+    "ID": 62,
+    "NOME": "Canteiro"
+  },
+  {
+    "ID": 63,
+    "NOME": "Capão"
+  },
+  {
+    "ID": 64,
+    "NOME": "Capoeira"
+  },
+  {
+    "ID": 65,
+    "NOME": "Cartódromo"
+  },
+  {
+    "ID": 66,
+    "NOME": "Central"
+  },
+  {
+    "ID": 67,
+    "NOME": "Centro"
+  },
+  {
+    "ID": 68,
+    "NOME": "Cerca"
+  },
+  {
+    "ID": 69,
+    "NOME": "Cerrado"
+  },
+  {
+    "ID": 70,
+    "NOME": "Cerro"
+  },
+  {
+    "ID": 71,
+    "NOME": "Chácara"
+  },
+  {
+    "ID": 72,
+    "NOME": "Chapada"
+  },
+  {
+    "ID": 73,
+    "NOME": "Chapadão"
+  },
+  {
+    "ID": 74,
+    "NOME": "Charco"
+  },
+  {
+    "ID": 75,
+    "NOME": "Cidade"
+  },
+  {
+    "ID": 76,
+    "NOME": "Circular"
+  },
+  {
+    "ID": 77,
+    "NOME": "Cohab"
+  },
+  {
+    "ID": 78,
+    "NOME": "Colina"
+  },
+  {
+    "ID": 79,
+    "NOME": "Colônia"
+  },
+  {
+    "ID": 80,
+    "NOME": "Comunidade"
+  },
+  {
+    "ID": 81,
+    "NOME": "Condomínio"
+  },
+  {
+    "ID": 82,
+    "NOME": "Conjunto"
+  },
+  {
+    "ID": 83,
+    "NOME": "Continuação"
+  },
+  {
+    "ID": 84,
+    "NOME": "Contorno"
+  },
+  {
+    "ID": 85,
+    "NOME": "Corredor"
+  },
+  {
+    "ID": 86,
+    "NOME": "Córrego"
+  },
+  {
+    "ID": 87,
+    "NOME": "Costa"
+  },
+  {
+    "ID": 88,
+    "NOME": "Coxilha"
+  },
+  {
+    "ID": 89,
+    "NOME": "Cruzamento"
+  },
+  {
+    "ID": 90,
+    "NOME": "Descida"
+  },
+  {
+    "ID": 91,
+    "NOME": "Desvio"
+  },
+  {
+    "ID": 92,
+    "NOME": "Dique"
+  },
+  {
+    "ID": 93,
+    "NOME": "Distrito"
+  },
+  {
+    "ID": 94,
+    "NOME": "Divisa"
+  },
+  {
+    "ID": 95,
+    "NOME": "Divisão"
+  },
+  {
+    "ID": 96,
+    "NOME": "Divisor"
+  },
+  {
+    "ID": 97,
+    "NOME": "Edifício"
+  },
+  {
+    "ID": 98,
+    "NOME": "Eixo"
+  },
+  {
+    "ID": 99,
+    "NOME": "Elevado"
+  },
+  {
+    "ID": 100,
+    "NOME": "Encosta"
+  },
+  {
+    "ID": 101,
+    "NOME": "Engenho"
+  },
+  {
+    "ID": 102,
+    "NOME": "Enseada"
+  },
+  {
+    "ID": 103,
+    "NOME": "Entrada"
+  },
+  {
+    "ID": 104,
+    "NOME": "Entreposto"
+  },
+  {
+    "ID": 105,
+    "NOME": "Entroncamento"
+  },
+  {
+    "ID": 106,
+    "NOME": "Escada"
+  },
+  {
+    "ID": 107,
+    "NOME": "Escadão"
+  },
+  {
+    "ID": 108,
+    "NOME": "Escadaria"
+  },
+  {
+    "ID": 109,
+    "NOME": "Escadinha"
+  },
+  {
+    "ID": 110,
+    "NOME": "Espigão"
+  },
+  {
+    "ID": 111,
+    "NOME": "Esplanada"
+  },
+  {
+    "ID": 112,
+    "NOME": "Esquina"
+  },
+  {
+    "ID": 113,
+    "NOME": "Estação"
+  },
+  {
+    "ID": 114,
+    "NOME": "Estacionamento"
+  },
+  {
+    "ID": 115,
+    "NOME": "Estádio"
+  },
+  {
+    "ID": 116,
+    "NOME": "Estância"
+  },
+  {
+    "ID": 117,
+    "NOME": "Estrada"
+  },
+  {
+    "ID": 118,
+    "NOME": "Extensão"
+  },
+  {
+    "ID": 119,
+    "NOME": "Faixa"
+  },
+  {
+    "ID": 120,
+    "NOME": "Favela"
+  },
+  {
+    "ID": 121,
+    "NOME": "Fazenda"
+  },
+  {
+    "ID": 122,
+    "NOME": "Feira"
+  },
+  {
+    "ID": 123,
+    "NOME": "Ferrovia"
+  },
+  {
+    "ID": 124,
+    "NOME": "Final"
+  },
+  {
+    "ID": 125,
+    "NOME": "Floresta"
+  },
+  {
+    "ID": 126,
+    "NOME": "Folha"
+  },
+  {
+    "ID": 127,
+    "NOME": "Fonte"
+  },
+  {
+    "ID": 128,
+    "NOME": "Fortaleza"
+  },
+  {
+    "ID": 129,
+    "NOME": "Freguesia"
+  },
+  {
+    "ID": 130,
+    "NOME": "Fundos"
+  },
+  {
+    "ID": 131,
+    "NOME": "Furo"
+  },
+  {
+    "ID": 132,
+    "NOME": "Galeria"
+  },
+  {
+    "ID": 133,
+    "NOME": "Gameleira"
+  },
+  {
+    "ID": 134,
+    "NOME": "Garimpo"
+  },
+  {
+    "ID": 135,
+    "NOME": "Gleba"
+  },
+  {
+    "ID": 136,
+    "NOME": "Granja"
+  },
+  {
+    "ID": 137,
+    "NOME": "Grota"
+  },
+  {
+    "ID": 138,
+    "NOME": "Habitacional"
+  },
+  {
+    "ID": 139,
+    "NOME": "Haras"
+  },
+  {
+    "ID": 140,
+    "NOME": "Hipódromo"
+  },
+  {
+    "ID": 141,
+    "NOME": "Horto"
+  },
+  {
+    "ID": 142,
+    "NOME": "Igarapé"
+  },
+  {
+    "ID": 143,
+    "NOME": "Ilha"
+  },
+  {
+    "ID": 144,
+    "NOME": "Inaplicável"
+  },
+  {
+    "ID": 145,
+    "NOME": "Invasão"
+  },
+  {
+    "ID": 146,
+    "NOME": "Jardim"
+  },
+  {
+    "ID": 147,
+    "NOME": "Jardinete"
+  },
+  {
+    "ID": 148,
+    "NOME": "Ladeira"
+  },
+  {
+    "ID": 149,
+    "NOME": "Lado"
+  },
+  {
+    "ID": 150,
+    "NOME": "Lago"
+  },
+  {
+    "ID": 151,
+    "NOME": "Lagoa"
+  },
+  {
+    "ID": 152,
+    "NOME": "Lagoinha"
+  },
+  {
+    "ID": 153,
+    "NOME": "Largo"
+  },
+  {
+    "ID": 154,
+    "NOME": "Lateral"
+  },
+  {
+    "ID": 155,
+    "NOME": "Leito"
+  },
+  {
+    "ID": 156,
+    "NOME": "Ligação"
+  },
+  {
+    "ID": 157,
+    "NOME": "Limeira"
+  },
+  {
+    "ID": 158,
+    "NOME": "Limite"
+  },
+  {
+    "ID": 159,
+    "NOME": "Limites"
+  },
+  {
+    "ID": 160,
+    "NOME": "Linha"
+  },
+  {
+    "ID": 161,
+    "NOME": "Lote"
+  },
+  {
+    "ID": 162,
+    "NOME": "Loteamento"
+  },
+  {
+    "ID": 163,
+    "NOME": "Lugarejo"
+  },
+  {
+    "ID": 164,
+    "NOME": "Maloca"
+  },
+  {
+    "ID": 165,
+    "NOME": "Manancial"
+  },
+  {
+    "ID": 166,
+    "NOME": "Mangue"
+  },
+  {
+    "ID": 167,
+    "NOME": "Margem"
+  },
+  {
+    "ID": 168,
+    "NOME": "Margens"
+  },
+  {
+    "ID": 169,
+    "NOME": "Marginal"
+  },
+  {
+    "ID": 170,
+    "NOME": "Marina"
+  },
+  {
+    "ID": 171,
+    "NOME": "Mata"
+  },
+  {
+    "ID": 172,
+    "NOME": "Mato"
+  },
+  {
+    "ID": 173,
+    "NOME": "Módulo"
+  },
+  {
+    "ID": 174,
+    "NOME": "Monte"
+  },
+  {
+    "ID": 175,
+    "NOME": "Morro"
+  },
+  {
+    "ID": 176,
+    "NOME": "Muro"
+  },
+  {
+    "ID": 177,
+    "NOME": "Não Especificado"
+  },
+  {
+    "ID": 178,
+    "NOME": "Núcleo"
+  },
+  {
+    "ID": 179,
+    "NOME": "Oca"
+  },
+  {
+    "ID": 180,
+    "NOME": "Oleoduto"
+  },
+  {
+    "ID": 181,
+    "NOME": "Olho"
+  },
+  {
+    "ID": 182,
+    "NOME": "Olhos"
+  },
+  {
+    "ID": 183,
+    "NOME": "Orla"
+  },
+  {
+    "ID": 184,
+    "NOME": "Outros"
+  },
+  {
+    "ID": 185,
+    "NOME": "Paco"
+  },
+  {
+    "ID": 186,
+    "NOME": "Palafita"
+  },
+  {
+    "ID": 187,
+    "NOME": "Pântano"
+  },
+  {
+    "ID": 188,
+    "NOME": "Parada"
+  },
+  {
+    "ID": 189,
+    "NOME": "Paradouro"
+  },
+  {
+    "ID": 190,
+    "NOME": "Paralela"
+  },
+  {
+    "ID": 191,
+    "NOME": "Parque"
+  },
+  {
+    "ID": 192,
+    "NOME": "Particular"
+  },
+  {
+    "ID": 193,
+    "NOME": "Passagem"
+  },
+  {
+    "ID": 194,
+    "NOME": "Passarela"
+  },
+  {
+    "ID": 195,
+    "NOME": "Passeio"
+  },
+  {
+    "ID": 196,
+    "NOME": "Passo"
+  },
+  {
+    "ID": 197,
+    "NOME": "Pasto"
+  },
+  {
+    "ID": 198,
+    "NOME": "Pátio"
+  },
+  {
+    "ID": 199,
+    "NOME": "Pavilhão"
+  },
+  {
+    "ID": 200,
+    "NOME": "Pedra"
+  },
+  {
+    "ID": 201,
+    "NOME": "Pedras"
+  },
+  {
+    "ID": 202,
+    "NOME": "Pedreira"
+  },
+  {
+    "ID": 203,
+    "NOME": "Penhasco"
+  },
+  {
+    "ID": 204,
+    "NOME": "Perimetral"
+  },
+  {
+    "ID": 205,
+    "NOME": "Perímetro"
+  },
+  {
+    "ID": 206,
+    "NOME": "Perto"
+  },
+  {
+    "ID": 207,
+    "NOME": "Planalto"
+  },
+  {
+    "ID": 208,
+    "NOME": "Plataforma"
+  },
+  {
+    "ID": 209,
+    "NOME": "Ponta"
+  },
+  {
+    "ID": 210,
+    "NOME": "Ponte"
+  },
+  {
+    "ID": 211,
+    "NOME": "Ponto"
+  },
+  {
+    "ID": 212,
+    "NOME": "Porto"
+  },
+  {
+    "ID": 213,
+    "NOME": "Posto"
+  },
+  {
+    "ID": 214,
+    "NOME": "Povoado"
+  },
+  {
+    "ID": 215,
+    "NOME": "Praça"
+  },
+  {
+    "ID": 216,
+    "NOME": "Praia"
+  },
+  {
+    "ID": 217,
+    "NOME": "Projeção"
+  },
+  {
+    "ID": 218,
+    "NOME": "Projetada"
+  },
+  {
+    "ID": 219,
+    "NOME": "Projeto"
+  },
+  {
+    "ID": 220,
+    "NOME": "Prolongamento"
+  },
+  {
+    "ID": 221,
+    "NOME": "Propriedade"
+  },
+  {
+    "ID": 222,
+    "NOME": "Próximo"
+  },
+  {
+    "ID": 223,
+    "NOME": "Quadra"
+  },
+  {
+    "ID": 224,
+    "NOME": "Quarteirão"
+  },
+  {
+    "ID": 225,
+    "NOME": "Quilombo"
+  },
+  {
+    "ID": 226,
+    "NOME": "Quilometro"
+  },
+  {
+    "ID": 227,
+    "NOME": "Quinta"
+  },
+  {
+    "ID": 228,
+    "NOME": "Quintas"
+  },
+  {
+    "ID": 229,
+    "NOME": "Rachão"
+  },
+  {
+    "ID": 230,
+    "NOME": "Ramal"
+  },
+  {
+    "ID": 231,
+    "NOME": "Rampa"
+  },
+  {
+    "ID": 232,
+    "NOME": "Rancho"
+  },
+  {
+    "ID": 233,
+    "NOME": "Recanto"
+  },
+  {
+    "ID": 234,
+    "NOME": "Região"
+  },
+  {
+    "ID": 235,
+    "NOME": "Represa"
+  },
+  {
+    "ID": 236,
+    "NOME": "Residencial"
+  },
+  {
+    "ID": 237,
+    "NOME": "Reta"
+  },
+  {
+    "ID": 238,
+    "NOME": "Retiro"
+  },
+  {
+    "ID": 239,
+    "NOME": "Retorno"
+  },
+  {
+    "ID": 240,
+    "NOME": "Riacho"
+  },
+  {
+    "ID": 241,
+    "NOME": "Ribanceira"
+  },
+  {
+    "ID": 242,
+    "NOME": "Ribeirão"
+  },
+  {
+    "ID": 243,
+    "NOME": "Rincão"
+  },
+  {
+    "ID": 244,
+    "NOME": "Rio"
+  },
+  {
+    "ID": 245,
+    "NOME": "Rocha"
+  },
+  {
+    "ID": 246,
+    "NOME": "Rochedo"
+  },
+  {
+    "ID": 247,
+    "NOME": "Rodovia"
+  },
+  {
+    "ID": 248,
+    "NOME": "Rotatória"
+  },
+  {
+    "ID": 249,
+    "NOME": "Rotula"
+  },
+  {
+    "ID": 250,
+    "NOME": "Rua"
+  },
+  {
+    "ID": 251,
+    "NOME": "Ruela"
+  },
+  {
+    "ID": 252,
+    "NOME": "Saco"
+  },
+  {
+    "ID": 253,
+    "NOME": "Saída"
+  },
+  {
+    "ID": 254,
+    "NOME": "Sanga"
+  },
+  {
+    "ID": 255,
+    "NOME": "Sede"
+  },
+  {
+    "ID": 256,
+    "NOME": "Sem"
+  },
+  {
+    "ID": 257,
+    "NOME": "Seringal"
+  },
+  {
+    "ID": 258,
+    "NOME": "Serra"
+  },
+  {
+    "ID": 259,
+    "NOME": "Sertão"
+  },
+  {
+    "ID": 260,
+    "NOME": "Servidão"
+  },
+  {
+    "ID": 261,
+    "NOME": "Seta"
+  },
+  {
+    "ID": 262,
+    "NOME": "Setor"
+  },
+  {
+    "ID": 263,
+    "NOME": "Sitio"
+  },
+  {
+    "ID": 264,
+    "NOME": "Sopé"
+  },
+  {
+    "ID": 265,
+    "NOME": "Subida"
+  },
+  {
+    "ID": 266,
+    "NOME": "Superquadra"
+  },
+  {
+    "ID": 267,
+    "NOME": "Tapera"
+  },
+  {
+    "ID": 268,
+    "NOME": "Terminal"
+  },
+  {
+    "ID": 269,
+    "NOME": "Terra"
+  },
+  {
+    "ID": 270,
+    "NOME": "Terreno"
+  },
+  {
+    "ID": 271,
+    "NOME": "Terrenos"
+  },
+  {
+    "ID": 272,
+    "NOME": "Transversal"
+  },
+  {
+    "ID": 273,
+    "NOME": "Travessa"
+  },
+  {
+    "ID": 274,
+    "NOME": "Travessão"
+  },
+  {
+    "ID": 275,
+    "NOME": "Travessia"
+  },
+  {
+    "ID": 276,
+    "NOME": "Trecho"
+  },
+  {
+    "ID": 277,
+    "NOME": "Trevo"
+  },
+  {
+    "ID": 278,
+    "NOME": "Trilha"
+  },
+  {
+    "ID": 279,
+    "NOME": "Trilho"
+  },
+  {
+    "ID": 280,
+    "NOME": "Trilhos"
+  },
+  {
+    "ID": 281,
+    "NOME": "Trincheira"
+  },
+  {
+    "ID": 282,
+    "NOME": "Túnel"
+  },
+  {
+    "ID": 283,
+    "NOME": "Unidade"
+  },
+  {
+    "ID": 284,
+    "NOME": "Usina"
+  },
+  {
+    "ID": 285,
+    "NOME": "Vala"
+  },
+  {
+    "ID": 286,
+    "NOME": "Valão"
+  },
+  {
+    "ID": 287,
+    "NOME": "Vale"
+  },
+  {
+    "ID": 288,
+    "NOME": "Vargem"
+  },
+  {
+    "ID": 289,
+    "NOME": "Variante"
+  },
+  {
+    "ID": 290,
+    "NOME": "Várzea"
+  },
+  {
+    "ID": 291,
+    "NOME": "Velódromo"
+  },
+  {
+    "ID": 292,
+    "NOME": "Vereda"
+  },
+  {
+    "ID": 293,
+    "NOME": "Vertente"
+  },
+  {
+    "ID": 294,
+    "NOME": "Via"
+  },
+  {
+    "ID": 295,
+    "NOME": "Viaduto"
+  },
+  {
+    "ID": 296,
+    "NOME": "Vicinal"
+  },
+  {
+    "ID": 297,
+    "NOME": "Viela"
+  },
+  {
+    "ID": 298,
+    "NOME": "Vila"
+  },
+  {
+    "ID": 299,
+    "NOME": "Vilarejo"
+  },
+  {
+    "ID": 300,
+    "NOME": "Volta"
+  },
+  {
+    "ID": 301,
+    "NOME": "Zona"
+  },
+  {
+    "ID": 302,
+    "NOME": "1a Travessa da Avenida"
+  },
+  {
+    "ID": 303,
+    "NOME": "1a Travessa da Rua"
+  },
+  {
+    "ID": 304,
+    "NOME": "2a Travessa da Avenida"
+  },
+  {
+    "ID": 305,
+    "NOME": "2a Travessa da Rua"
+  },
+  {
+    "ID": 306,
+    "NOME": "3a Travessa da Avenida"
+  },
+  {
+    "ID": 307,
+    "NOME": "3a Travessa da Rua"
+  },
+  {
+    "ID": 308,
+    "NOME": "4a Travessa da Avenida"
+  },
+  {
+    "ID": 309,
+    "NOME": "4a Travessa da Rua"
+  },
+  {
+    "ID": 310,
+    "NOME": "5a Travessa da Avenida"
+  },
+  {
+    "ID": 311,
+    "NOME": "5a Travessa da Rua"
+  }
+]
