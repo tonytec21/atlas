@@ -82,9 +82,20 @@ date_default_timezone_set('America/Sao_Paulo');
                 </div>
                 <div class="form-group col-md-3">
                     <label for="orgaoEmissorRg">Órgão Emissor do RG</label>
-                    <input type="text" class="form-control" id="orgaoEmissorRg" name="orgaoEmissorRg" maxlength="100" placeholder="SSP, DETRAN, etc.">
+                    <select class="form-control" id="orgaoEmissorRg" name="orgaoEmissorRg">
+                        <option value="">Selecione o órgão emissor</option>
+                        <option value="SSP/MA">SSP - Secretaria de Segurança Pública</option>
+                        <option value="DETRAN/MA">DETRAN - Departamento Estadual de Trânsito</option>
+                        <option value="IFP/MA">IFP - Instituto Félix Pacheco</option>
+                        <option value="IGP/MA">IGP - Instituto Geral de Perícias</option>
+                        <option value="PC/MA">PC - Polícia Civil</option>
+                        <option value="MEX/MA">MEX - Ministério das Relações Exteriores (Consulados)</option>
+                        <option value="SDS/MA">SDS - Secretaria de Defesa Social</option>
+                        <option value="SEJUSP/MA">SEJUSP - Secretaria de Justiça e Segurança Pública</option>
+                        <option value="DPF/MA">DPF - Departamento de Polícia Federal</option>
+                        <option value="Outros">Outros</option>
+                    </select>
                 </div>
-
             </div>
 
             <div class="form-row">

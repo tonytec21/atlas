@@ -156,6 +156,19 @@ date_default_timezone_set('America/Sao_Paulo');
         .text-anotacoes {
             color: #A7D676;
         }
+        .btn-reurb {
+            background: #FFC8A2;
+            color: #fff;
+        }
+
+        .btn-reurb:hover {
+            background: #f7b283;
+            color: #fff;
+        }
+        
+        .text-reurb {
+            color: #FFC8A2;
+        }
     </style>
 </head>
 <body class="light-mode">
@@ -203,15 +216,15 @@ include(__DIR__ . '/../menu.php');
             </div>
 
             <!-- Tarefas -->
-            <!-- <div class="col-md-4 mb-3" id="card-tarefas">
+            <div class="col-md-4 mb-3" id="card-exportar">
                 <div class="card shadow-sm">
                     <div class="card-body text-center">
-                        <i class="fa fa-clock-o fa-3x text-secondary mb-2"></i>
-                        <h5 class="card-title">Tarefas</h5>
-                        <a href="tarefas/index.php" class="btn btn-secondary w-100">Acessar</a>
+                        <i class="fa fa-share-square-o fa-3x text-reurb mb-2"></i>
+                        <h5 class="card-title">Exportar Carga</h5>
+                        <a href="exportar_carga.php" class="btn btn-reurb w-100">Acessar</a>
                     </div>
                 </div>
-            </div> -->
+            </div>
 
             <!-- Ofícios -->
             <!-- <div class="col-md-4 mb-3" id="card-oficios">
