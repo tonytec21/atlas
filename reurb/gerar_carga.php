@@ -83,14 +83,20 @@ try {
         ];
     }
 
-    // Garante que o diretório existe
-    $diretorio = "cargas";
-    if (!is_dir($diretorio)) {
-        mkdir($diretorio, 0777, true);
+    
+    // Garante que o diretório completo existe
+    $diretorioBase = __DIR__ . "/cargas/" . date('Y') . "/" . date('m');
+    if (!is_dir($diretorioBase)) {
+        mkdir($diretorioBase, 0777, true);
     }
+    
+    // Sanitiza o nome do processo administrativo para evitar caracteres inválidos
+    $processoAdmSanitizado = preg_replace('/[^\w\s-]/', '', $processoAdm);
+    $processoAdmSanitizado = str_replace(' ', '_', $processoAdmSanitizado);
 
-    // Nome do arquivo JSON
-    $arquivoJson = "{$diretorio}/carga_{$processoAdm}.json";
+    // Define o caminho final do arquivo
+    $arquivoJson = "{$diretorioBase}/carga_{$processoAdmSanitizado}.json";
+
 
     // Salva o arquivo JSON
     file_put_contents($arquivoJson, json_encode($imoveis, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
