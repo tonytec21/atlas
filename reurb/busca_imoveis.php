@@ -29,7 +29,7 @@ include(__DIR__ . '/db_connection.php');
 
         table th,
         table td {
-            text-align: center;
+            text-align: left;
             vertical-align: middle;
         }
 

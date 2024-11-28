@@ -9,7 +9,13 @@ $filtros = [
     'cidade' => $_GET['cidade'] ?? ''
 ];
 
-$query = "SELECT id, CONCAT(logradouro, ', Qd. ', quadra, ', nº ', numero, ', ', bairro, ', ', cidade) AS endereco, proprietario_nome AS proprietario, conjuge AS conjuge 
+$query = "SELECT id, CONCAT(
+    logradouro,
+    IF(quadra IS NOT NULL AND quadra != '', CONCAT(', Qd. ', quadra), ''),
+    IF(numero IS NOT NULL AND numero != '', CONCAT(', nº ', numero), ''),
+    IF(bairro IS NOT NULL AND bairro != '', CONCAT(', ', bairro), ''),
+    IF(cidade IS NOT NULL AND cidade != '', CONCAT(', ', cidade), '')
+) AS endereco, proprietario_nome AS proprietario, nome_conjuge AS conjuge 
           FROM cadastro_de_imoveis 
           WHERE 1=1";
 
