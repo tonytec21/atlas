@@ -4,7 +4,7 @@ require_once 'db_connection.php';
 
 // Função para calcular os dígitos verificadores
 function calcularDigitoVerificador($matriculaBase) {
-    ######################## Cálculo do Primeiro Dígito ########################
+    # Cálculo do Primeiro Dígito #
     $multiplicadorFase1 = 32; // Peso inicial
     $soma = 0;
 
@@ -16,7 +16,7 @@ function calcularDigitoVerificador($matriculaBase) {
     $digito1 = ($soma * 10) % 11;
     $digito1 = ($digito1 == 10) ? 1 : $digito1;
 
-    ######################## Cálculo do Segundo Dígito ########################
+    # Cálculo do Segundo Dígito #
     $multiplicadorFase2 = 33; // Peso inicial
     $soma2 = 0;
 

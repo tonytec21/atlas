@@ -1,58 +1,43 @@
 <?php
 require_once __DIR__ . '/db_connection.php';
 
-$queryCNS = "SELECT cns FROM cadastro_serventia LIMIT 1";
-$resultCNS = $conn->query($queryCNS);
-$rowCNS = $resultCNS->fetch_assoc();
-$numeroCNS = $rowCNS['cns'] ?? '000000';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
+    $ids = implode(',', array_map('intval', $_POST['selected_ids']));
 
-function formatarData($data) {
-    return $data ? date('d/m/Y', strtotime($data)) : '';
-}
+    $query = "SELECT * FROM indexador_nascimento WHERE id IN ($ids) AND status = 'ativo'";
+    $result = $conn->query($query);
 
-$query = "SELECT * FROM indexador_nascimento WHERE status = 'ativo'";
-$result = $conn->query($query);
+    if ($result->num_rows > 0) {
+        $nomeArquivo = 'carga_nascimento.txt';
+        $arquivoCarga = fopen($nomeArquivo, 'w');
 
-// Verificação se há registros
-if ($result->num_rows > 0) {
-    $nomeArquivo = 'carga_nascimento.txt';
-    $arquivoCarga = fopen($nomeArquivo, 'w');
+        while ($row = $result->fetch_assoc()) {
+            $linha = implode(";", [
+                "N", // Tipo de registro
+                '000000', // Substitua pelo número CNS
+                $row['nome_registrado'], 
+                '', '', '', '', '', 
+                $row['matricula'] ?? '',
+                date('d/m/Y', strtotime($row['data_nascimento'])),
+                date('d/m/Y', strtotime($row['data_registro'])),
+                "I", '', ''
+            ]);
+            $linha .= ";*";
+            fwrite($arquivoCarga, $linha . PHP_EOL);
+        }
 
-    while ($row = $result->fetch_assoc()) {
-        $linha = implode(";", [
-            "N", // Tipo de registro
-            $numeroCNS, // Número do CNS
-            $row['nome_registrado'], // Nome do registrado
-            '', // CPF do registrado (não informado)
-            $row['nome_pai'] ?? '', // Nome do pai
-            $row['nome_mae'] ?? '', // Nome da mãe
-            '', // CPF do pai (não informado)
-            '', // CPF da mãe (não informado)
-            $row['matricula'] ?? '', // Matrícula
-            formatarData($row['data_nascimento']), // Data de nascimento
-            formatarData($row['data_registro']), // Data de registro
-            "I", // Código de ação (Inclusão)
-            '', // Código do motivo da modificação
-            '' // Data da averbação (não aplicável)
-        ]);
-        
-        // Delimitador de registro
-        $linha .= ";*";
-        
-        fwrite($arquivoCarga, $linha . PHP_EOL);
+        fclose($arquivoCarga);
+
+        header('Content-Type: text/plain');
+        header('Content-Disposition: attachment; filename="' . $nomeArquivo . '"');
+        readfile($nomeArquivo);
+        unlink($nomeArquivo);
+        exit;
+    } else {
+        echo "<script>alert('Nenhum registro selecionado foi encontrado.'); window.history.back();</script>";
     }
-
-    fclose($arquivoCarga);
-
-    header('Content-Type: text/plain');
-    header('Content-Disposition: attachment; filename="' . $nomeArquivo . '"');
-    readfile($nomeArquivo);
-
-    // Exclui o arquivo do servidor após download
-    unlink($nomeArquivo);
-    exit;
 } else {
-    echo "<script>alert('Nenhum registro encontrado para gerar a carga.'); window.history.back();</script>";
+    echo "<script>alert('Nenhum registro selecionado.'); window.history.back();</script>";
 }
 
 $conn->close();
