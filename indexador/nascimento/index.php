@@ -112,8 +112,14 @@ include(__DIR__ . '/../../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <h3>Indexador de Nascimento</h3>
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>Indexador de Nascimento</h3>
+            <a href="../carga_crc/exportar_carga.php" class="btn btn-secondary">
+                <i class="fa fa-file-export" aria-hidden="true"></i> Exportar carga CRC
+            </a>
+        </div>
         <hr>
+
         <!-- Formulário de Pesquisa e Filtros -->
         <div class="row mb-3">
             <div class="col-md-6 col-lg-6 mb-2">
@@ -411,6 +417,8 @@ include(__DIR__ . '/../../menu.php');
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
 <script src="../../script/jquery-3.5.1.min.js"></script>
 <script src="../../script/bootstrap.min.js"></script>
@@ -1036,6 +1044,8 @@ include(__DIR__ . '/../../menu.php');
     });
 
 </script>
-
+<?php
+    include(__DIR__ . '/../../rodape.php');
+    ?>
 </body>
 </html>
