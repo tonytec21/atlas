@@ -35,6 +35,7 @@ date_default_timezone_set('America/Sao_Paulo');
         <hr>
         <form method="post" action="" id="filterForm">
             <div class="row mb-4">
+                <!-- Filtros -->
                 <div class="col-md-3">
                     <label for="data_registro_inicio" class="form-label">Data de Registro (Início):</label>
                     <input type="date" id="data_registro_inicio" name="data_registro_inicio" class="form-control">
@@ -74,63 +75,67 @@ date_default_timezone_set('America/Sao_Paulo');
         </form>
         <hr>
 
-        <div class="table-responsive">
+        <div class="table-responsive" style="overflow-x: hidden;">
             <h5>Resultados da Pesquisa</h5>
-            <table id="tabelaResultados" class="table table-striped table-bordered">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" onclick="toggleSelectAll(this)"></th>
-                        <th>Termo</th>
-                        <th>Livro</th>
-                        <th>Folha</th>
-                        <th>Matrícula</th>
-                        <th>Nome Registrado</th>
-                        <th>Data de Nascimento</th>
-                        <th>Data de Registro</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search'])) {
-                        $where = [];
+            <form method="post" action="gerar_carga.php">
+                <table id="tabelaResultados" class="table table-striped table-bordered">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" onclick="toggleSelectAll(this)"></th>
+                            <th>Termo</th>
+                            <th>Livro</th>
+                            <th>Folha</th>
+                            <th>Matrícula</th>
+                            <th>Nome Registrado</th>
+                            <th>Data de Nascimento</th>
+                            <th>Data de Registro</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search'])) {
+                            $where = [];
+                            if (!empty($_POST['data_registro_inicio'])) $where[] = "data_registro >= '" . $_POST['data_registro_inicio'] . "'";
+                            if (!empty($_POST['data_registro_fim'])) $where[] = "data_registro <= '" . $_POST['data_registro_fim'] . "'";
+                            if (!empty($_POST['data_cadastro_inicio'])) $where[] = "data_cadastro >= '" . $_POST['data_cadastro_inicio'] . "'";
+                            if (!empty($_POST['data_cadastro_fim'])) $where[] = "data_cadastro <= '" . $_POST['data_cadastro_fim'] . "'";
+                            if (!empty($_POST['nome_registrado'])) $where[] = "nome_registrado LIKE '%" . $conn->real_escape_string($_POST['nome_registrado']) . "%'";
+                            if (!empty($_POST['termo'])) $where[] = "termo LIKE '%" . $conn->real_escape_string($_POST['termo']) . "%'";
+                            if (!empty($_POST['livro'])) $where[] = "livro LIKE '%" . $conn->real_escape_string($_POST['livro']) . "%'";
+                            if (!empty($_POST['matricula'])) $where[] = "matricula LIKE '%" . $conn->real_escape_string($_POST['matricula']) . "%'";
 
-                        if (!empty($_POST['data_registro_inicio'])) $where[] = "data_registro >= '" . $_POST['data_registro_inicio'] . "'";
-                        if (!empty($_POST['data_registro_fim'])) $where[] = "data_registro <= '" . $_POST['data_registro_fim'] . "'";
-                        if (!empty($_POST['data_cadastro_inicio'])) $where[] = "data_cadastro >= '" . $_POST['data_cadastro_inicio'] . "'";
-                        if (!empty($_POST['data_cadastro_fim'])) $where[] = "data_cadastro <= '" . $_POST['data_cadastro_fim'] . "'";
-                        if (!empty($_POST['nome_registrado'])) $where[] = "nome_registrado LIKE '%" . $conn->real_escape_string($_POST['nome_registrado']) . "%'";
-                        if (!empty($_POST['termo'])) $where[] = "termo LIKE '%" . $conn->real_escape_string($_POST['termo']) . "%'";
-                        if (!empty($_POST['livro'])) $where[] = "livro LIKE '%" . $conn->real_escape_string($_POST['livro']) . "%'";
-                        if (!empty($_POST['matricula'])) $where[] = "matricula LIKE '%" . $conn->real_escape_string($_POST['matricula']) . "%'";
+                            $whereSQL = count($where) > 0 ? 'WHERE ' . implode(' AND ', $where) . " AND status = 'ativo'" : "WHERE status = 'ativo'";
+                            $query = "SELECT * FROM indexador_nascimento $whereSQL";
+                            $result = $conn->query($query);
 
-                        $whereSQL = count($where) > 0 ? 'WHERE ' . implode(' AND ', $where) . " AND status = 'ativo'" : "WHERE status = 'ativo'";
-                        $query = "SELECT * FROM indexador_nascimento $whereSQL";
-                        $result = $conn->query($query);
-
-                        function formatarData($data) {
-                            return $data ? date('d/m/Y', strtotime($data)) : '';
-                        }
-
-                        if ($result->num_rows > 0) {
-                            while ($row = $result->fetch_assoc()) {
-                                echo '<tr>';
-                                echo '<td><input type="checkbox" name="selected_ids[]" value="' . $row['id'] . '"></td>';
-                                echo '<td>' . htmlspecialchars($row['termo']) . '</td>';
-                                echo '<td>' . htmlspecialchars($row['livro']) . '</td>';
-                                echo '<td>' . htmlspecialchars($row['folha']) . '</td>';
-                                echo '<td>' . htmlspecialchars($row['matricula'] ?? '') . '</td>';
-                                echo '<td>' . htmlspecialchars($row['nome_registrado']) . '</td>';
-                                echo '<td>' . htmlspecialchars(formatarData($row['data_nascimento'])) . '</td>';
-                                echo '<td>' . htmlspecialchars(formatarData($row['data_registro'])) . '</td>';
-                                echo '</tr>';
+                            function formatarData($data) {
+                                return $data ? date('d/m/Y', strtotime($data)) : '';
                             }
-                        } else {
-                            echo '<tr><td colspan="8" class="text-center text-danger">Nenhum registro encontrado.</td></tr>';
+
+                            if ($result->num_rows > 0) {
+                                while ($row = $result->fetch_assoc()) {
+                                    echo '<tr>';
+                                    echo '<td><input type="checkbox" name="selected_ids[]" value="' . $row['id'] . '"></td>';
+                                    echo '<td>' . htmlspecialchars($row['termo']) . '</td>';
+                                    echo '<td>' . htmlspecialchars($row['livro']) . '</td>';
+                                    echo '<td>' . htmlspecialchars($row['folha']) . '</td>';
+                                    echo '<td>' . htmlspecialchars($row['matricula'] ?? '') . '</td>';
+                                    echo '<td>' . htmlspecialchars($row['nome_registrado']) . '</td>';
+                                    echo '<td>' . htmlspecialchars(formatarData($row['data_nascimento'])) . '</td>';
+                                    echo '<td>' . htmlspecialchars(formatarData($row['data_registro'])) . '</td>';
+                                    echo '</tr>';
+                                }
+                            } else {
+                                echo '<tr><td colspan="8" class="text-center text-danger">Nenhum registro encontrado.</td></tr>';
+                            }
                         }
-                    }
-                    ?>
-                </tbody>
-            </table>
+                        ?>
+                    </tbody>
+                </table>
+                <div class="text-center mt-3">
+                    <button type="submit" class="btn btn-success w-100" style="margin-top: -5px" name="exportar"><i class="fa fa-download"></i> Exportar Carga</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -148,8 +153,6 @@ date_default_timezone_set('America/Sao_Paulo');
         checkboxes.forEach(checkbox => checkbox.checked = source.checked);
     }
 </script>
-<?php
-    include(__DIR__ . '/../../rodape.php');
-    ?>
+<?php include(__DIR__ . '/../../rodape.php'); ?>
 </body>
 </html>
