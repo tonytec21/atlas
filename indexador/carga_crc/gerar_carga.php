@@ -69,8 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
                 $pai->addChild('BAIRRO', $row['bairro_pai'] ?? '');
                 $pai->addChild('NACIONALIDADE', $row['nacionalidade_pai'] ?? '');
                 $pai->addChild('DOMICILIOESTRANGEIRO', $row['domicilio_estrangeiro_pai'] ?? '');
-                $pai->addChild('CODIGOIBGEMUNNATURALIDADE', htmlspecialchars($row['codigo_ibge_mun_naturalidade_pai'] ?? 'NAO INFORMADO'));
-                $pai->addChild('TEXTOLIVREMUNICIPIONAT', $row['texto_livre_municipio_nat_pai'] ?? '');
+                $pai->addChild('CODIGOIBGEMUNNATURALIDADE', htmlspecialchars($row['codigo_ibge_mun_naturalidade_pai'] ?? ''));
+                $pai->addChild('TEXTOLIVREMUNICIPIONAT', $row['texto_livre_municipio_nat_pai'] ?? 'NAO INFORMADO');
                 $pai->addChild('CODIGOOCUPACAOSDC', $row['codigo_ocupacao_sdc_pai'] ?? '');
             }
 
@@ -91,8 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $mae->addChild('BAIRRO', $row['bairro_mae'] ?? '');
             $mae->addChild('NACIONALIDADE', $row['nacionalidade_mae'] ?? '');
             $mae->addChild('DOMICILIOESTRANGEIRO', $row['domicilio_estrangeiro_mae'] ?? '');
-            $mae->addChild('CODIGOIBGEMUNNATURALIDADE', htmlspecialchars($row['codigo_ibge_mun_naturalidade_mae'] ?? 'NAO INFORMADO'));
-            $mae->addChild('TEXTOLIVREMUNICIPIONAT', $row['texto_livre_municipio_nat_mae'] ?? '');
+            $mae->addChild('CODIGOIBGEMUNNATURALIDADE', htmlspecialchars($row['codigo_ibge_mun_naturalidade_mae'] ?? ''));
+            $mae->addChild('TEXTOLIVREMUNICIPIONAT', $row['texto_livre_municipio_nat_mae'] ?? 'NAO INFORMADO');
             $mae->addChild('CODIGOOCUPACAOSDC', $row['codigo_ocupacao_sdc_mae'] ?? '');
 
             // Adiciona as tags opcionais vazias
