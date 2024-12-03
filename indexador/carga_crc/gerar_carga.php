@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('SEXO', htmlspecialchars($row['sexo'] ?? 'NAO INFORMADO'));
             $registro->addChild('POSSUIGEMEOS', $row['possui_gemeos'] ?? '');
             $registro->addChild('NUMEROGEMEOS', $row['numero_gemeos'] ?? '');
-            $registro->addChild('CODIGOIBGEMUNNASCIMENTO', htmlspecialchars($row['codigo_ibge_mun_nascimento'] ?? 'NAO INFORMADO'));
+            $registro->addChild('CODIGOIBGEMUNNASCIMENTO', htmlspecialchars($row['ibge_naturalidade'] ?? 'NAO INFORMADO'));
             $registro->addChild('PAISNASCIMENTO', $row['pais_nascimento'] ?? '');
             $registro->addChild('NACIONALIDADE', $row['nacionalidade'] ?? '');
             $registro->addChild('TEXTONACIONALIDADEESTRANGEIRO', $row['texto_nacionalidade_estrangeiro'] ?? '');
