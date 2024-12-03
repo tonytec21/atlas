@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+<!-- Este é o nosso nó principal -->
+<xs:element name="catalogo">
+    <!-- Define um tipo formado por outros elementos -->
+    <xs:complexType>
+        <!-- Determina que os elementos a seguir devem aparecer nesta mesma ordem -->
+        <xs:sequence>
+            <!-- Define que o tipo "livro" pode ocorrer N vezes (unbounded = sem limite)-->
+            <xs:element name="livro" maxOccurs="unbounded">
+                <!-- Define que "livro" é formado por outros elementos -->
+                <xs:complexType>
+                    <!-- Os componentes de "livro" devem aparecer nessa ordem -->
+                    <xs:sequence>
+                        <!-- Define o ISBN -->
+                        <xs:element name="isbn">
+                            <!-- Define como tipo simples por não ser formado por outros elementos -->
+                            <xs:simpleType>
+                                <!-- Define o tipo "string" para ISBN e informa que existem restrições -->
+                                <xs:restriction base="xs:string">
+                                    <!-- Determina como 10 o tamanho máximo -->
+                                    <xs:length value="10"/>
+                                </xs:restriction>
+                            </xs:simpleType>
+                        </xs:element>
+                        <!-- Define que o elemento "autor" é obrigatório mas pode aparecer N vezes -->
+                        <xs:element name="autor" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
+                        <!-- O valor-padrão para minOccurs e maxOccurs é 1 quando não forem definidos -->
+                        <xs:element name="titulo" type="xs:string"/>
+                        <xs:element name="paginas" type="xs:integer"/>
+                        <!-- Elemento editora não é obrigatório -->
+                        <xs:element name="editora" type="xs:string" minOccurs="0"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+</xs:element>
+</xs:schema>

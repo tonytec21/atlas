@@ -19,8 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
     // Verificação se há registros
     if ($result->num_rows > 0) {
         // Inicia o XML
-        $xml = new SimpleXMLElement('<?xml version="1.0" encoding="utf-8"?><CARGAREGISTROS></CARGAREGISTROS>');
-        $xml->addChild('VERSAO', '2.7');
+        $xml = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><CARGAREGISTROS></CARGAREGISTROS>');
+        $xml->addChild('VERSAO', '2.6');
         $xml->addChild('ACAO', 'CARGA');
         $xml->addChild('CNS', $numeroCNS);
 
@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('DNV', $row['dnv'] ?? '');
             $registro->addChild('DATANASCIMENTO', date('d/m/Y', strtotime($row['data_nascimento'] ?? 'NAO INFORMADO')));
             $registro->addChild('HORANASCIMENTO', $row['hora_nascimento'] ?? '');
-            $registro->addChild('LOCALNASCIMENTO', htmlspecialchars($row['local_nascimento'] ?? 'NAO INFORMADO'));
+            $registro->addChild('LOCALNASCIMENTO', htmlspecialchars($row['local_nascimento'] ?? 'IGNORADO'));
             $registro->addChild('SEXO', htmlspecialchars($row['sexo'] ?? 'NAO INFORMADO'));
             $registro->addChild('POSSUIGEMEOS', $row['possui_gemeos'] ?? '');
             $registro->addChild('NUMEROGEMEOS', $row['numero_gemeos'] ?? '');
@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
 
             // Dados do pai (apenas se existir nome do pai)
             if (!empty($row['nome_pai'])) {
-                $pai = $filiacao->addChild('FILIACAO');
+                $pai = $filiacao;
                 $pai->addChild('INDICEREGISTRO', $row['id'] ?? 'NAO INFORMADO');
                 $pai->addChild('INDICEFILIACAO', '1');
                 $pai->addChild('NOME', htmlspecialchars($row['nome_pai']));
@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             }
 
             // Dados da mãe (sempre adicionar, pois é obrigatório)
-            $mae = $filiacao->addChild('FILIACAO');
+            $mae = $filiacao;
             $mae->addChild('INDICEREGISTRO', $row['id'] ?? 'NAO INFORMADO');
             $mae->addChild('INDICEFILIACAO', '2');
             $mae->addChild('NOME', htmlspecialchars($row['nome_mae'] ?? 'NAO INFORMADO'));
@@ -96,9 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $mae->addChild('CODIGOOCUPACAOSDC', $row['codigo_ocupacao_sdc_mae'] ?? '');
 
             // Adiciona as tags opcionais vazias
-            $registro->addChild('DOCUMENTOS');
-            $registro->addChild('ORGAOEMISSOREXTERIOR');
-            $registro->addChild('INFORMACOESCONSULADO');
             $registro->addChild('OBSERVACOES');
         }
 

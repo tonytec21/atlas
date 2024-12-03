@@ -1,0 +1,131 @@
+@import url(http://fonts.googleapis.com/css?family=Roboto:100);
+body {
+	background-color:#475243;
+	margin:0;
+	padding:0;
+}
+
+#topo {
+	width:1024px;
+	height:80px;
+	text-align:center;
+	font-size:20px;
+	color:#fff;
+	background:#16a085;
+	line-height:80px;
+	margin-bottom:30px;
+	margin:0 auto;
+	text-decoration:none;
+	font-family: 'Roboto', sans-serif;
+}
+
+#configuracoes{
+	width:1024px;
+	height:80px;
+	text-align:center;
+	font-size:20px;
+	color:#fff;
+	background:#2980b9;
+	line-height:80px;
+	font-family: 'Roboto', sans-serif;
+}
+
+.area{
+	background-color:#FFF;
+	margin-top:20px;
+	margin-bottom:20px;
+	width:1024px;
+}
+
+#pagina {
+	width:1024px;
+	margin:0 auto;
+	margin-top:20px;
+	margin-bottom:20px;
+	border:#fff;
+	background:#fff;
+	-webkit-box-shadow: 0px -1px 16px 7px rgba(0,0,0,0.51);
+	-moz-box-shadow: 0px -1px 16px 7px rgba(0,0,0,0.51);
+	box-shadow: 0px -1px 16px 7px rgba(0,0,0,0.51);
+}
+#texto {
+	padding-left:12px;
+	padding-right:12px;
+	padding-top:20px;
+	padding-bottom:20px;
+	word-wrap:break-word;
+	width:1000px;
+}
+.textarea {
+	width:900px;
+	height:400px;
+	margin:0 auto;
+	max-height:400px;
+	max-width:900px;
+	font-family:Arial, Helvetica, sans-serif;
+	padding:10px;
+}
+.converter {
+	width:100px;
+	height:30px;
+	line-height:30px;
+	font-family: 'Roboto', sans-serif;
+	margin:0 auto;
+	color:#FFF;
+	background:#16a085;
+	border:0;
+	margin:10px;
+}
+#bt_imprimir {
+	width:1024px;
+	height:50px;
+	text-align:center;
+	font-size:20px;
+	color:#fff;
+	background:#2980b9;
+	line-height:50px;
+	margin-bottom:30px;
+	margin:0 auto;
+	text-decoration:none;
+	font-family: 'Roboto', sans-serif;
+}
+#bt_imprimir a:hover{
+	color:#2980b9;
+	background:#CCC;
+	text-decoration:none;
+}
+#bt_imprimir a:visited{
+	color:#2980b9;
+	background:#CCC;
+	text-decoration:none;
+}
+a:link {text-decoration: none;}
+a:active {text-decoration: none;}
+
+#bt_home {
+	width:1024px;
+	height:50px;
+	text-align:center;
+	font-size:20px;
+	color:#fff;
+	background:#c0392b;
+	line-height:50px;
+	margin-bottom:30px;
+	margin:0 auto;
+	text-decoration:none;
+	font-family: 'Roboto', sans-serif;
+}
+.bt_pdf {
+	width:1024px;
+	height:50px;
+	text-align:center;
+	font-size:20px;
+	color:#fff;
+	background:#f39c12;
+	line-height:50px;
+	margin-bottom:30px;
+	margin:0 auto;
+	text-decoration:none;
+	font-family: 'Roboto', sans-serif;
+	border:0;
+}
