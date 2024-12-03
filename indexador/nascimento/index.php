@@ -957,6 +957,13 @@ include(__DIR__ . '/../../menu.php');
                     $('#view-gender').val(registry.sexo);
                     $('#view-naturalidade').val(registry.naturalidade);
                     $('#view-name').val(registry.nome_registrado);
+                    if (registry.sexo === 'M') {
+                        $('#view-gender').val('Masculino');
+                    } else if (registry.sexo === 'F') {
+                        $('#view-gender').val('Feminino');
+                    } else {
+                        $('#view-gender').val('Não especificado');
+                    }
                     $('#view-father-name').val(registry.nome_pai);
                     $('#view-mother-name').val(registry.nome_mae);
 
