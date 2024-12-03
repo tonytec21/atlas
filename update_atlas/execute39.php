@@ -16,8 +16,8 @@ function criarTabelaSeNecessario($conn, $queryCriarTabela) {
 
 $tabelas = [
     "ALTER TABLE `indexador_nascimento`
-    ADD COLUMN `naturalidade` VARCHAR(50) NULL DEFAULT NULL AFTER `matricula`;
-    ALTER TABLE `indexador_nascimento`
+    ADD COLUMN `naturalidade` VARCHAR(50) NULL DEFAULT NULL AFTER `matricula`;",
+    "ALTER TABLE `indexador_nascimento`
     ADD COLUMN `ibge_naturalidade` VARCHAR(50) NULL DEFAULT NULL AFTER `naturalidade`;"
 ];
 
