@@ -103,6 +103,19 @@ date_default_timezone_set('America/Sao_Paulo');
         #confirmRemoveAttachmentModal .btn-confirm-remove {
             width: 100px;
         }
+
+        /* Cor de fundo modal naturalidade */
+        #searchCityModal .modal-content {
+            background-color: #d1d1d1; 
+            border: 2px solid #959595; 
+        }
+
+        .modal-backdrop.show {
+            z-index: 1039; 
+            backdrop-filter: blur(5px);
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
     </style>
 </head>
 <body class="light-mode">
@@ -240,10 +253,20 @@ include(__DIR__ . '/../../menu.php');
                                     <input type="date" class="form-control" id="birthdate" name="data_nascimento" required>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label for="name">Nome do Registrado</label>
-                                <input type="text" class="form-control" id="name" name="nome_registrado" required>
+                            <div class="form-row">
+                                <div class="form-group col-12 col-md-8">
+                                    <label for="name">Nome do Registrado</label>
+                                    <input type="text" class="form-control" id="name" name="nome_registrado" required>
+                                </div>
+                                <div class="form-group col-12 col-md-4">
+                                    <label for="naturalidade">Naturalidade</label>
+                                    <input type="text" class="form-control" id="selected-city" name="naturalidade" placeholder="Clique para selecionar a cidade" readonly required data-toggle="modal" data-target="#searchCityModal">
+                                    <input type="hidden" id="ibge_naturalidade" name="ibge_naturalidade">
+                                </div>
+
+
                             </div>
+
                             <div class="form-group">
                                 <label for="father-name">Nome do Pai</label>
                                 <input type="text" class="form-control" id="father-name" name="nome_pai">
@@ -275,6 +298,40 @@ include(__DIR__ . '/../../menu.php');
                             </div>
                             <button type="submit" style="width: 100%" class="btn btn-primary">Salvar</button>
                         </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade custom-modal" id="searchCityModal" tabindex="-1" role="dialog" aria-labelledby="searchCityModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-custom modal-dialog-centered" role="document" style="width: 50%">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="searchCityModalLabel">Pesquisar Naturalidade</h5>
+                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                            &times;
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="city-search">Digite o nome da cidade:</label>
+                            <input type="text" id="city-search" class="form-control" placeholder="Ex: São Luís">
+                        </div>
+                        <div class="table-responsive mt-3">
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Cidade</th>
+                                        <th>Estado</th>
+                                        <th>IBGE</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="city-results">
+                                    <!-- Resultados aparecerão aqui -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -313,6 +370,17 @@ include(__DIR__ . '/../../menu.php');
                                 <div class="form-group col-12 col-md-3">
                                     <label for="edit-birthdate">Data de Nascimento</label>
                                     <input type="date" class="form-control" id="edit-birthdate" name="data_nascimento" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-12 col-md-8">
+                                    <label for="edit-matricula">Matrícula</label>
+                                    <input type="text" class="form-control" id="edit-matricula" name="matricula" readonly>
+                                </div>
+                                <div class="form-group col-12 col-md-4">
+                                    <label for="edit-naturalidade">Naturalidade</label>
+                                    <input type="text" class="form-control" id="edit-selected-city" name="naturalidade" placeholder="Clique para selecionar a cidade" readonly required data-toggle="modal" data-target="#searchCityModal">
+                                    <input type="hidden" id="edit-ibge-naturalidade" name="ibge_naturalidade">
                                 </div>
                             </div>
                             <div class="form-group">
@@ -390,6 +458,16 @@ include(__DIR__ . '/../../menu.php');
                                 <div class="form-group col-12 col-md-3">
                                     <label for="view-birthdate">Data de Nascimento</label>
                                     <input type="text" class="form-control" id="view-birthdate" readonly>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-12 col-md-8">
+                                    <label for="view-matricula">Matrícula</label>
+                                    <input type="text" class="form-control" id="view-matricula" readonly>
+                                </div>
+                                <div class="form-group col-12 col-md-4">
+                                    <label for="view-naturalidade">Naturalidade</label>
+                                    <input type="text" class="form-control" id="view-naturalidade" readonly>
                                 </div>
                             </div>
                             <div class="form-group">
@@ -596,12 +674,12 @@ include(__DIR__ . '/../../menu.php');
                                         Swal.fire({
                                             icon: 'success',
                                             title: 'Sucesso!',
-                                            text: 'Registro adicionado com sucesso.',
+                                            html: 'Registro adicionado com sucesso.<br><strong>Matrícula:</strong> ' + result.matricula,
                                             confirmButtonText: 'Ok'
                                         }).then(() => {
                                             $('#addRegistryModal').modal('hide');
                                             loadFilteredRegistries();
-                                            addAttachments = []; 
+                                            addAttachments = [];
                                         });
                                     }
                                 });
@@ -611,12 +689,12 @@ include(__DIR__ . '/../../menu.php');
                         Swal.fire({
                             icon: 'success',
                             title: 'Sucesso!',
-                            text: 'Registro adicionado com sucesso.',
+                            html: 'Registro adicionado com sucesso.<br><strong>Matrícula:</strong> ' + result.matricula,
                             confirmButtonText: 'Ok'
                         }).then(() => {
                             $('#addRegistryModal').modal('hide');
-                            loadFilteredRegistries(); 
-                            addAttachments = []; 
+                            loadFilteredRegistries();
+                            addAttachments = [];
                         });
                     }
                 },
@@ -856,6 +934,8 @@ include(__DIR__ . '/../../menu.php');
                     $('#view-page').val(registry.folha);
                     $('#view-registry-date').val(formatDate(registry.data_registro));
                     $('#view-birthdate').val(formatDate(registry.data_nascimento));
+                    $('#view-matricula').val(registry.matricula);
+                    $('#view-naturalidade').val(registry.naturalidade);
                     $('#view-name').val(registry.nome_registrado);
                     $('#view-father-name').val(registry.nome_pai);
                     $('#view-mother-name').val(registry.nome_mae);
@@ -883,6 +963,9 @@ include(__DIR__ . '/../../menu.php');
                     $('#edit-book').val(registry.livro);
                     $('#edit-page').val(registry.folha);
                     $('#edit-name').val(registry.nome_registrado);
+                    $('#edit-matricula').val(registry.matricula);
+                    $('#edit-selected-city').val(registry.naturalidade);
+                    $('#edit-ibge-naturalidade').val(registry.ibge_naturalidade);
                     $('#edit-birthdate').val(registry.data_nascimento);
                     $('#edit-father-name').val(registry.nome_pai);
                     $('#edit-mother-name').val(registry.nome_mae);
@@ -1042,6 +1125,81 @@ include(__DIR__ . '/../../menu.php');
             }
         });
     });
+
+    $(document).ready(function () {
+        // Buscar cidades na API do IBGE
+        $('#city-search').on('input', function () {
+            var query = $(this).val();
+
+            if (query.length > 2) {
+                $.ajax({
+                    url: 'https://servicodados.ibge.gov.br/api/v1/localidades/municipios',
+                    method: 'GET',
+                    success: function (data) {
+                        var filteredCities = data.filter(function (city) {
+                            return city.nome.toLowerCase().includes(query.toLowerCase());
+                        });
+
+                        var cityResults = $('#city-results');
+                        cityResults.empty();
+
+                        filteredCities.forEach(function (city) {
+                            cityResults.append(
+                                '<tr>' +
+                                '<td>' + city.nome + '</td>' +
+                                '<td>' + city.microrregiao.mesorregiao.UF.nome + ' (' + city.microrregiao.mesorregiao.UF.sigla + ')</td>' +
+                                '<td>' + city.id + '</td>' +
+                                '<td><button class="btn btn-primary btn-select-city" data-id="' + city.id + '" data-name="' + city.nome + '/' + city.microrregiao.mesorregiao.UF.sigla + '">Selecionar</button></td>' +
+                                '</tr>'
+                            );
+                        });
+
+                        // Selecionar cidade e preencher o formulário
+                        $('.btn-select-city').on('click', function () {
+                            var cityName = $(this).data('name');
+                            var cityId = $(this).data('id');
+
+                            if ($('#editRegistryModal').hasClass('show')) {
+                                $('#edit-selected-city').val(cityName);
+                                $('#edit-ibge-naturalidade').val(cityId);
+                            } else {
+                                $('#selected-city').val(cityName);
+                                $('#ibge_naturalidade').val(cityId);
+                            }
+
+
+                            $('#searchCityModal').modal('hide'); // Fecha o modal
+                        });
+                    },
+                    error: function () {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Não foi possível carregar as cidades. Tente novamente mais tarde.',
+                        });
+                    }
+                });
+            }
+        });
+    });
+
+    $(document).on('show.bs.modal', '.modal', function () {
+        var zIndex = 1040 + (10 * $('.modal:visible').length);
+        $(this).css('z-index', zIndex);
+        setTimeout(function () {
+            $('.modal-backdrop').not('.modal-stack').css('z-index', zIndex - 1).addClass('modal-stack');
+        }, 0);
+    });
+
+    $('#searchCityModal').on('shown.bs.modal', function () {
+        $(this).css('z-index', 1050).focus();
+    });
+
+    // $('#searchCityModal').on('show.bs.modal', function () {
+    //     $('#editRegistryModal').modal('hide');
+    // }).on('hidden.bs.modal', function () {
+    //     $('#editRegistryModal').modal('show');
+    // });
 
 </script>
 <?php
