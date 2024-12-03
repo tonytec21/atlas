@@ -48,52 +48,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('NACIONALIDADE', $row['nacionalidade'] ?? '');
             $registro->addChild('TEXTONACIONALIDADEESTRANGEIRO', $row['texto_nacionalidade_estrangeiro'] ?? '');
 
-            // Adiciona os dados de filiação
-            $filiacao = $registro->addChild('FILIACAONASCIMENTO');
-
             // Dados do pai (apenas se existir nome do pai)
             if (!empty($row['nome_pai'])) {
-                $pai = $filiacao;
-                $pai->addChild('INDICEREGISTRO', $row['id'] ?? 'NAO INFORMADO');
-                $pai->addChild('INDICEFILIACAO', '1');
-                $pai->addChild('NOME', htmlspecialchars($row['nome_pai']));
-                $pai->addChild('SEXO', 'M');
-                $pai->addChild('CPF', $row['cpf_pai'] ?? '');
-                $pai->addChild('DATANASCIMENTO', $row['data_nascimento_pai'] ?? '');
-                $pai->addChild('IDADE', $row['idade_pai'] ?? '');
-                $pai->addChild('IDADE_DIAS_MESES_ANOS', $row['idade_dias_meses_anos_pai'] ?? '');
-                $pai->addChild('CODIGOIBGEMUNLOGRADOURO', $row['codigo_ibge_mun_logradouro_pai'] ?? '');
-                $pai->addChild('LOGRADOURO', $row['logradouro_pai'] ?? '');
-                $pai->addChild('NUMEROLOGRADOURO', $row['numero_logradouro_pai'] ?? '');
-                $pai->addChild('COMPLEMENTOLOGRADOURO', $row['complemento_logradouro_pai'] ?? '');
-                $pai->addChild('BAIRRO', $row['bairro_pai'] ?? '');
-                $pai->addChild('NACIONALIDADE', $row['nacionalidade_pai'] ?? '');
-                $pai->addChild('DOMICILIOESTRANGEIRO', $row['domicilio_estrangeiro_pai'] ?? '');
-                $pai->addChild('CODIGOIBGEMUNNATURALIDADE', htmlspecialchars($row['codigo_ibge_mun_naturalidade_pai'] ?? ''));
-                $pai->addChild('TEXTOLIVREMUNICIPIONAT', $row['texto_livre_municipio_nat_pai'] ?? 'NAO INFORMADO');
-                $pai->addChild('CODIGOOCUPACAOSDC', $row['codigo_ocupacao_sdc_pai'] ?? '');
+                $filiacaoPai = $registro->addChild('FILIACAONASCIMENTO');
+                $filiacaoPai->addChild('INDICEREGISTRO', $row['id'] ?? 'NAO INFORMADO');
+                $filiacaoPai->addChild('INDICEFILIACAO', '1');
+                $filiacaoPai->addChild('NOME', htmlspecialchars($row['nome_pai']));
+                $filiacaoPai->addChild('SEXO', 'M');
+                $filiacaoPai->addChild('CPF', $row['cpf_pai'] ?? '');
+                $filiacaoPai->addChild('DATANASCIMENTO', $row['data_nascimento_pai'] ?? '');
+                $filiacaoPai->addChild('IDADE', $row['idade_pai'] ?? '');
+                $filiacaoPai->addChild('IDADE_DIAS_MESES_ANOS', $row['idade_dias_meses_anos_pai'] ?? '');
+                $filiacaoPai->addChild('CODIGOIBGEMUNLOGRADOURO', $row['codigo_ibge_mun_logradouro_pai'] ?? '');
+                $filiacaoPai->addChild('LOGRADOURO', $row['logradouro_pai'] ?? '');
+                $filiacaoPai->addChild('NUMEROLOGRADOURO', $row['numero_logradouro_pai'] ?? '');
+                $filiacaoPai->addChild('COMPLEMENTOLOGRADOURO', $row['complemento_logradouro_pai'] ?? '');
+                $filiacaoPai->addChild('BAIRRO', $row['bairro_pai'] ?? '');
+                $filiacaoPai->addChild('NACIONALIDADE', $row['nacionalidade_pai'] ?? '');
+                $filiacaoPai->addChild('DOMICILIOESTRANGEIRO', $row['domicilio_estrangeiro_pai'] ?? '');
+                $filiacaoPai->addChild('CODIGOIBGEMUNNATURALIDADE', htmlspecialchars($row['codigo_ibge_mun_naturalidade_pai'] ?? ''));
+                $filiacaoPai->addChild('TEXTOLIVREMUNICIPIONAT', $row['texto_livre_municipio_nat_pai'] ?? 'NAO INFORMADO');
+                $filiacaoPai->addChild('CODIGOOCUPACAOSDC', $row['codigo_ocupacao_sdc_pai'] ?? '');
             }
 
             // Dados da mãe (sempre adicionar, pois é obrigatório)
-            $mae = $filiacao;
-            $mae->addChild('INDICEREGISTRO', $row['id'] ?? 'NAO INFORMADO');
-            $mae->addChild('INDICEFILIACAO', '2');
-            $mae->addChild('NOME', htmlspecialchars($row['nome_mae'] ?? 'NAO INFORMADO'));
-            $mae->addChild('SEXO', 'F');
-            $mae->addChild('CPF', $row['cpf_mae'] ?? '');
-            $mae->addChild('DATANASCIMENTO', $row['data_nascimento_mae'] ?? '');
-            $mae->addChild('IDADE', $row['idade_mae'] ?? '');
-            $mae->addChild('IDADE_DIAS_MESES_ANOS', $row['idade_dias_meses_anos_mae'] ?? '');
-            $mae->addChild('CODIGOIBGEMUNLOGRADOURO', $row['codigo_ibge_mun_logradouro_mae'] ?? '');
-            $mae->addChild('LOGRADOURO', $row['logradouro_mae'] ?? '');
-            $mae->addChild('NUMEROLOGRADOURO', $row['numero_logradouro_mae'] ?? '');
-            $mae->addChild('COMPLEMENTOLOGRADOURO', $row['complemento_logradouro_mae'] ?? '');
-            $mae->addChild('BAIRRO', $row['bairro_mae'] ?? '');
-            $mae->addChild('NACIONALIDADE', $row['nacionalidade_mae'] ?? '');
-            $mae->addChild('DOMICILIOESTRANGEIRO', $row['domicilio_estrangeiro_mae'] ?? '');
-            $mae->addChild('CODIGOIBGEMUNNATURALIDADE', htmlspecialchars($row['codigo_ibge_mun_naturalidade_mae'] ?? ''));
-            $mae->addChild('TEXTOLIVREMUNICIPIONAT', $row['texto_livre_municipio_nat_mae'] ?? 'NAO INFORMADO');
-            $mae->addChild('CODIGOOCUPACAOSDC', $row['codigo_ocupacao_sdc_mae'] ?? '');
+            $filiacaoMae = $registro->addChild('FILIACAONASCIMENTO');
+            $filiacaoMae->addChild('INDICEREGISTRO', $row['id'] ?? 'NAO INFORMADO');
+            $filiacaoMae->addChild('INDICEFILIACAO', '2');
+            $filiacaoMae->addChild('NOME', htmlspecialchars($row['nome_mae'] ?? 'NAO INFORMADO'));
+            $filiacaoMae->addChild('SEXO', 'F');
+            $filiacaoMae->addChild('CPF', $row['cpf_mae'] ?? '');
+            $filiacaoMae->addChild('DATANASCIMENTO', $row['data_nascimento_mae'] ?? '');
+            $filiacaoMae->addChild('IDADE', $row['idade_mae'] ?? '');
+            $filiacaoMae->addChild('IDADE_DIAS_MESES_ANOS', $row['idade_dias_meses_anos_mae'] ?? '');
+            $filiacaoMae->addChild('CODIGOIBGEMUNLOGRADOURO', $row['codigo_ibge_mun_logradouro_mae'] ?? '');
+            $filiacaoMae->addChild('LOGRADOURO', $row['logradouro_mae'] ?? '');
+            $filiacaoMae->addChild('NUMEROLOGRADOURO', $row['numero_logradouro_mae'] ?? '');
+            $filiacaoMae->addChild('COMPLEMENTOLOGRADOURO', $row['complemento_logradouro_mae'] ?? '');
+            $filiacaoMae->addChild('BAIRRO', $row['bairro_mae'] ?? '');
+            $filiacaoMae->addChild('NACIONALIDADE', $row['nacionalidade_mae'] ?? '');
+            $filiacaoMae->addChild('DOMICILIOESTRANGEIRO', $row['domicilio_estrangeiro_mae'] ?? '');
+            $filiacaoMae->addChild('CODIGOIBGEMUNNATURALIDADE', htmlspecialchars($row['codigo_ibge_mun_naturalidade_mae'] ?? ''));
+            $filiacaoMae->addChild('TEXTOLIVREMUNICIPIONAT', $row['texto_livre_municipio_nat_mae'] ?? 'NAO INFORMADO');
+            $filiacaoMae->addChild('CODIGOOCUPACAOSDC', $row['codigo_ocupacao_sdc_mae'] ?? '');
 
             // Adiciona as tags opcionais vazias
             $registro->addChild('OBSERVACOES');
