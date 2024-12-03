@@ -48,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nome_registrado = mb_strtoupper(trim($_POST['nome_registrado']), 'UTF-8');
     $naturalidade = $_POST['naturalidade'];
     $ibge_naturalidade = $_POST['ibge_naturalidade'];
+    $sexo = $_POST['sexo'];
     $nome_pai = mb_strtoupper(trim($_POST['nome_pai']), 'UTF-8');
     $nome_mae = mb_strtoupper(trim($_POST['nome_mae']), 'UTF-8');
     $status = 'ativo';
@@ -72,8 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->close();
 
     // Inserir registro no banco de dados
-    $stmt = $conn->prepare("INSERT INTO indexador_nascimento (termo, livro, folha, data_registro, data_nascimento, nome_registrado, nome_pai, nome_mae, naturalidade, ibge_naturalidade, funcionario, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssssssssssss", $termo, $livro, $folha, $data_registro, $data_nascimento, $nome_registrado, $nome_pai, $nome_mae, $naturalidade, $ibge_naturalidade, $funcionario, $status);
+    $stmt = $conn->prepare("INSERT INTO indexador_nascimento (termo, livro, folha, data_registro, data_nascimento, nome_registrado, nome_pai, nome_mae, naturalidade, ibge_naturalidade, funcionario, status, sexo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sssssssssssss", $termo, $livro, $folha, $data_registro, $data_nascimento, $nome_registrado, $nome_pai, $nome_mae, $naturalidade, $ibge_naturalidade, $funcionario, $status, $sexo);
 
     if ($stmt->execute()) {
         $last_id = $stmt->insert_id;

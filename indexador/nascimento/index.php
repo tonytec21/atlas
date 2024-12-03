@@ -254,7 +254,7 @@ include(__DIR__ . '/../../menu.php');
                                 </div>
                             </div>
                             <div class="form-row">
-                                <div class="form-group col-12 col-md-8">
+                                <div class="form-group col-12 col-md-6">
                                     <label for="name">Nome do Registrado</label>
                                     <input type="text" class="form-control" id="name" name="nome_registrado" required>
                                 </div>
@@ -263,8 +263,14 @@ include(__DIR__ . '/../../menu.php');
                                     <input type="text" class="form-control" id="selected-city" name="naturalidade" placeholder="Clique para selecionar a cidade" readonly required data-toggle="modal" data-target="#searchCityModal">
                                     <input type="hidden" id="ibge_naturalidade" name="ibge_naturalidade">
                                 </div>
-
-
+                                <div class="form-group col-12 col-md-2">
+                                    <label for="gender">Sexo</label>
+                                    <select class="form-control" id="gender" name="sexo" required>
+                                        <option value="" disabled selected>Selecione</option>
+                                        <option value="M">Masculino</option>
+                                        <option value="F">Feminino</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div class="form-group">
@@ -373,7 +379,7 @@ include(__DIR__ . '/../../menu.php');
                                 </div>
                             </div>
                             <div class="form-row">
-                                <div class="form-group col-12 col-md-8">
+                                <div class="form-group col-12 col-md-6">
                                     <label for="edit-matricula">Matrícula</label>
                                     <input type="text" class="form-control" id="edit-matricula" name="matricula" readonly>
                                 </div>
@@ -382,6 +388,15 @@ include(__DIR__ . '/../../menu.php');
                                     <input type="text" class="form-control" id="edit-selected-city" name="naturalidade" placeholder="Clique para selecionar a cidade" readonly required data-toggle="modal" data-target="#searchCityModal">
                                     <input type="hidden" id="edit-ibge-naturalidade" name="ibge_naturalidade">
                                 </div>
+                                <div class="form-group col-12 col-md-2">
+                                    <label for="edit-gender">Sexo</label>
+                                    <select class="form-control" id="edit-gender" name="sexo" required>
+                                        <option value="" disabled selected>Selecione</option>
+                                        <option value="M">Masculino</option>
+                                        <option value="F">Feminino</option>
+                                    </select>
+                                </div>
+
                             </div>
                             <div class="form-group">
                                 <label for="edit-name">Nome do Registrado</label>
@@ -461,13 +476,17 @@ include(__DIR__ . '/../../menu.php');
                                 </div>
                             </div>
                             <div class="form-row">
-                                <div class="form-group col-12 col-md-8">
+                                <div class="form-group col-12 col-md-6">
                                     <label for="view-matricula">Matrícula</label>
                                     <input type="text" class="form-control" id="view-matricula" readonly>
                                 </div>
                                 <div class="form-group col-12 col-md-4">
                                     <label for="view-naturalidade">Naturalidade</label>
                                     <input type="text" class="form-control" id="view-naturalidade" readonly>
+                                </div>
+                                <div class="form-group col-12 col-md-2">
+                                    <label for="view-gender">Sexo</label>
+                                    <input type="text" class="form-control" id="view-gender" readonly>
                                 </div>
                             </div>
                             <div class="form-group">
@@ -935,6 +954,7 @@ include(__DIR__ . '/../../menu.php');
                     $('#view-registry-date').val(formatDate(registry.data_registro));
                     $('#view-birthdate').val(formatDate(registry.data_nascimento));
                     $('#view-matricula').val(registry.matricula);
+                    $('#view-gender').val(registry.sexo);
                     $('#view-naturalidade').val(registry.naturalidade);
                     $('#view-name').val(registry.nome_registrado);
                     $('#view-father-name').val(registry.nome_pai);
@@ -964,6 +984,7 @@ include(__DIR__ . '/../../menu.php');
                     $('#edit-page').val(registry.folha);
                     $('#edit-name').val(registry.nome_registrado);
                     $('#edit-matricula').val(registry.matricula);
+                    $('#edit-gender').val(registry.sexo);
                     $('#edit-selected-city').val(registry.naturalidade);
                     $('#edit-ibge-naturalidade').val(registry.ibge_naturalidade);
                     $('#edit-birthdate').val(registry.data_nascimento);

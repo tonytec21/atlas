@@ -18,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data_registro = $_POST['data_registro'];
     $naturalidade = $_POST['naturalidade'];
     $ibge_naturalidade = $_POST['ibge_naturalidade'];
+    $sexo = $_POST['sexo'];
     $status = 'ativo';
 
     // Função para calcular os dígitos verificadores da matrícula
@@ -78,8 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Atualizar registro no banco de dados
-    $stmt = $conn->prepare("UPDATE indexador_nascimento SET termo = ?, livro = ?, folha = ?, nome_registrado = ?, data_nascimento = ?, nome_pai = ?, nome_mae = ?, data_registro = ?, naturalidade = ?, ibge_naturalidade = ?, matricula = ?, funcionario = ? WHERE id = ?");
-    $stmt->bind_param("ssssssssssssi", $termo, $livro, $folha, $nome_registrado, $data_nascimento, $nome_pai, $nome_mae, $data_registro, $naturalidade, $ibge_naturalidade, $matricula, $funcionario, $id);
+    $stmt = $conn->prepare("UPDATE indexador_nascimento SET termo = ?, livro = ?, folha = ?, nome_registrado = ?, data_nascimento = ?, nome_pai = ?, nome_mae = ?, data_registro = ?, naturalidade = ?, ibge_naturalidade = ?, matricula = ?, funcionario = ?, sexo = ? WHERE id = ?");
+    $stmt->bind_param("sssssssssssssi", $termo, $livro, $folha, $nome_registrado, $data_nascimento, $nome_pai, $nome_mae, $data_registro, $naturalidade, $ibge_naturalidade, $matricula, $funcionario, $sexo, $id);
 
     if ($stmt->execute()) {
         // Processar anexo se enviado
