@@ -193,17 +193,22 @@ include(__DIR__ . '/../../menu.php');
                 <tbody id="registry-table-body">
                     <!-- Linhas serão adicionadas dinamicamente -->
                     <?php
-                        // Verificar se há parâmetros de filtro definidos
-                        if (isset($_GET['searchTerm']) || isset($_GET['searchTermTerm']) || isset($_GET['searchTermBook']) ||
-                            isset($_GET['searchTermPage']) || isset($_GET['searchFather']) || isset($_GET['searchMother']) ||
-                            isset($_GET['birthDate']) || isset($_GET['registryDate'])) {
+                        // Checar se os parâmetros de filtro estão definidos
+                        $filtrosDefinidos = false;
+                        foreach (['searchTerm', 'searchTermTerm', 'searchTermBook', 'searchTermPage', 'searchFather', 'searchMother', 'birthDate', 'registryDate'] as $param) {
+                            if (!empty($_GET[$param])) {
+                                $filtrosDefinidos = true;
+                                break;
+                            }
+                        }
 
-                            // Carregar todos os registros (filtro acionado)
+                        // Se filtros forem definidos, carregue todos os registros. Caso contrário, limite a 20 registros.
+                        if ($filtrosDefinidos) {
                             $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo'");
                         } else {
-                            // Carregar apenas os últimos 20 registros (sem filtro)
                             $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo' ORDER BY id DESC LIMIT 20");
                         }
+
                         $stmt->execute();
                         $result = $stmt->get_result();
 
@@ -221,10 +226,10 @@ include(__DIR__ . '/../../menu.php');
                             '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
                             ($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
                             '</td>';
-
                             echo '</tr>';
                         }
                         ?>
+
                 </tbody>
             </table>
         </div>
@@ -658,10 +663,40 @@ include(__DIR__ . '/../../menu.php');
             });
         }
 
-        // Evento de clique do botão de filtro
+        // Evento de clique no botão de filtro
         $('#filter-button').on('click', function() {
-            filterRegistries();
+            var searchTerm = $('#search-term').val().trim();
+            var searchTermTerm = $('#search-term-term').val().trim();
+            var searchTermBook = $('#search-term-book').val().trim();
+            var searchTermPage = $('#search-term-page').val().trim();
+            var searchFather = $('#search-father').val().trim();
+            var searchMother = $('#search-mother').val().trim();
+            var birthDate = $('#search-birthdate').val();
+            var registryDate = $('#search-registry-date').val();
+
+            // Verificar se todos os campos estão vazios
+            if (!searchTerm && !searchTermTerm && !searchTermBook && !searchTermPage &&
+                !searchFather && !searchMother && !birthDate && !registryDate) {
+                // Recarregar a página sem parâmetros para carregar todos os registros
+                window.location.href = window.location.pathname;
+            } else {
+                // Criar a URL com os parâmetros de busca
+                var urlParams = new URLSearchParams();
+                if (searchTerm) urlParams.append('searchTerm', searchTerm);
+                if (searchTermTerm) urlParams.append('searchTermTerm', searchTermTerm);
+                if (searchTermBook) urlParams.append('searchTermBook', searchTermBook);
+                if (searchTermPage) urlParams.append('searchTermPage', searchTermPage);
+                if (searchFather) urlParams.append('searchFather', searchFather);
+                if (searchMother) urlParams.append('searchMother', searchMother);
+                if (birthDate) urlParams.append('birthDate', birthDate);
+                if (registryDate) urlParams.append('registryDate', registryDate);
+
+                // Atualizar a URL com os parâmetros de busca
+                window.location.search = urlParams.toString();
+            }
         });
+
+
 
         // Carregar registros filtrados ao carregar a página
         loadFilteredRegistries();
