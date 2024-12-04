@@ -193,20 +193,69 @@ include(__DIR__ . '/../../menu.php');
                 <tbody id="registry-table-body">
                     <!-- Linhas serão adicionadas dinamicamente -->
                     <?php
-                        // Verificar se há parâmetros de filtro definidos
-                        if (isset($_GET['searchTerm']) || isset($_GET['searchTermTerm']) || isset($_GET['searchTermBook']) ||
-                            isset($_GET['searchTermPage']) || isset($_GET['searchFather']) || isset($_GET['searchMother']) ||
-                            isset($_GET['birthDate']) || isset($_GET['registryDate'])) {
-
-                            // Carregar todos os registros (filtro acionado)
-                            $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo'");
-                        } else {
-                            // Carregar apenas os últimos 20 registros (sem filtro)
+                        if ($_SERVER['REQUEST_METHOD'] === 'GET' && empty($_GET['searchTerm']) && empty($_GET['searchTermTerm']) &&
+                            empty($_GET['searchTermBook']) && empty($_GET['searchTermPage']) && empty($_GET['searchFather']) &&
+                            empty($_GET['searchMother']) && empty($_GET['birthDate']) && empty($_GET['registryDate'])) {
+                            
+                            // Carregar os 20 últimos registros ao entrar na página
                             $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo' ORDER BY id DESC LIMIT 20");
+                        } else {
+                            // Carregar registros com base no filtro acionado
+                            $query = "SELECT * FROM indexador_nascimento WHERE status = 'ativo'";
+                            $params = [];
+                            $conditions = [];
+
+                            // Adicionar condições de filtro dinamicamente
+                            if (!empty($_GET['searchTerm'])) {
+                                $conditions[] = "nome_registrado LIKE ?";
+                                $params[] = "%" . $_GET['searchTerm'] . "%";
+                            }
+                            if (!empty($_GET['searchTermTerm'])) {
+                                $conditions[] = "termo = ?";
+                                $params[] = $_GET['searchTermTerm'];
+                            }
+                            if (!empty($_GET['searchTermBook'])) {
+                                $conditions[] = "livro = ?";
+                                $params[] = $_GET['searchTermBook'];
+                            }
+                            if (!empty($_GET['searchTermPage'])) {
+                                $conditions[] = "folha = ?";
+                                $params[] = $_GET['searchTermPage'];
+                            }
+                            if (!empty($_GET['searchFather'])) {
+                                $conditions[] = "nome_pai LIKE ?";
+                                $params[] = "%" . $_GET['searchFather'] . "%";
+                            }
+                            if (!empty($_GET['searchMother'])) {
+                                $conditions[] = "nome_mae LIKE ?";
+                                $params[] = "%" . $_GET['searchMother'] . "%";
+                            }
+                            if (!empty($_GET['birthDate'])) {
+                                $conditions[] = "data_nascimento = ?";
+                                $params[] = $_GET['birthDate'];
+                            }
+                            if (!empty($_GET['registryDate'])) {
+                                $conditions[] = "data_registro = ?";
+                                $params[] = $_GET['registryDate'];
+                            }
+
+                            // Montar a query final com as condições
+                            if (!empty($conditions)) {
+                                $query .= " AND " . implode(" AND ", $conditions);
+                            }
+
+                            $stmt = $conn->prepare($query);
+
+                            // Vincular os parâmetros dinamicamente
+                            if (!empty($params)) {
+                                $stmt->bind_param(str_repeat("s", count($params)), ...$params);
+                            }
                         }
+
                         $stmt->execute();
                         $result = $stmt->get_result();
 
+                        // Renderizar os registros na tabela
                         while ($row = $result->fetch_assoc()) {
                             echo '<tr>';
                             echo '<td>' . $row['termo'] . '</td>';
@@ -217,14 +266,14 @@ include(__DIR__ . '/../../menu.php');
                             echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
                             echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';
                             echo '<td>' .
-                            '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
-                            '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
-                            ($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
-                            '</td>';
-
+                                '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
+                                '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
+                                ($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
+                                '</td>';
                             echo '</tr>';
                         }
-                    ?>
+                        ?>
+
                 </tbody>
             </table>
         </div>
