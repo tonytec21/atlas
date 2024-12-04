@@ -193,42 +193,47 @@ include(__DIR__ . '/../../menu.php');
                 <tbody id="registry-table-body">
                     <!-- Linhas serão adicionadas dinamicamente -->
                     <?php
-                        // Checar se os parâmetros de filtro estão definidos
-                        $filtrosDefinidos = false;
-                        foreach (['searchTerm', 'searchTermTerm', 'searchTermBook', 'searchTermPage', 'searchFather', 'searchMother', 'birthDate', 'registryDate'] as $param) {
-                            if (!empty($_GET[$param])) {
-                                $filtrosDefinidos = true;
-                                break;
-                            }
+                    // Inicialmente, verificar se o botão de filtro foi acionado
+                    $isFilterActive = false;
+
+                    // Verificar se os parâmetros de filtro estão presentes
+                    foreach (['searchTerm', 'searchTermTerm', 'searchTermBook', 'searchTermPage', 'searchFather', 'searchMother', 'birthDate', 'registryDate'] as $param) {
+                        if (!empty($_GET[$param])) {
+                            $isFilterActive = true;
+                            break;
                         }
+                    }
 
-                        // Se filtros forem definidos, carregue todos os registros. Caso contrário, limite a 20 registros.
-                        if ($filtrosDefinidos) {
-                            $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo'");
-                        } else {
-                            $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo' ORDER BY id DESC LIMIT 20");
-                        }
+                    // Carregar registros com base na lógica
+                    if ($isFilterActive) {
+                        // Filtro acionado, carregar todos os registros
+                        $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo'");
+                    } else {
+                        // Sem filtro, carregar apenas os últimos 20 registros
+                        $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo' ORDER BY id DESC LIMIT 20");
+                    }
 
-                        $stmt->execute();
-                        $result = $stmt->get_result();
+                    $stmt->execute();
+                    $result = $stmt->get_result();
 
-                        while ($row = $result->fetch_assoc()) {
-                            echo '<tr>';
-                            echo '<td>' . $row['termo'] . '</td>';
-                            echo '<td>' . $row['livro'] . '</td>';
-                            echo '<td>' . $row['folha'] . '</td>';
-                            echo '<td>' . $row['nome_registrado'] . '</td>';
-                            echo '<td>' . ($row['nome_pai'] ? $row['nome_pai'] . ' e ' . $row['nome_mae'] : $row['nome_mae']) . '</td>';
-                            echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
-                            echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';
-                            echo '<td>' .
+                    // Renderizar os registros na tabela
+                    while ($row = $result->fetch_assoc()) {
+                        echo '<tr>';
+                        echo '<td>' . $row['termo'] . '</td>';
+                        echo '<td>' . $row['livro'] . '</td>';
+                        echo '<td>' . $row['folha'] . '</td>';
+                        echo '<td>' . $row['nome_registrado'] . '</td>';
+                        echo '<td>' . ($row['nome_pai'] ? $row['nome_pai'] . ' e ' . $row['nome_mae'] : $row['nome_mae']) . '</td>';
+                        echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
+                        echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';
+                        echo '<td>' .
                             '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
                             '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
                             ($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
                             '</td>';
-                            echo '</tr>';
-                        }
-                        ?>
+                        echo '</tr>';
+                    }
+                    ?>
 
                 </tbody>
             </table>
@@ -663,6 +668,7 @@ include(__DIR__ . '/../../menu.php');
             });
         }
 
+        // Evento de clique do botão de filtro
         // Evento de clique no botão de filtro
         $('#filter-button').on('click', function() {
             var searchTerm = $('#search-term').val().trim();
@@ -674,13 +680,12 @@ include(__DIR__ . '/../../menu.php');
             var birthDate = $('#search-birthdate').val();
             var registryDate = $('#search-registry-date').val();
 
-            // Verificar se todos os campos estão vazios
             if (!searchTerm && !searchTermTerm && !searchTermBook && !searchTermPage &&
                 !searchFather && !searchMother && !birthDate && !registryDate) {
-                // Recarregar a página sem parâmetros para carregar todos os registros
-                window.location.href = window.location.pathname;
+                // Recarregar página para mostrar todos os registros
+                window.location.search = '';
             } else {
-                // Criar a URL com os parâmetros de busca
+                // Executar filtro
                 var urlParams = new URLSearchParams();
                 if (searchTerm) urlParams.append('searchTerm', searchTerm);
                 if (searchTermTerm) urlParams.append('searchTermTerm', searchTermTerm);
@@ -691,11 +696,9 @@ include(__DIR__ . '/../../menu.php');
                 if (birthDate) urlParams.append('birthDate', birthDate);
                 if (registryDate) urlParams.append('registryDate', registryDate);
 
-                // Atualizar a URL com os parâmetros de busca
                 window.location.search = urlParams.toString();
             }
         });
-
 
 
         // Carregar registros filtrados ao carregar a página
