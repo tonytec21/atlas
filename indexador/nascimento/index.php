@@ -1231,6 +1231,23 @@ include(__DIR__ . '/../../menu.php');
     //     $('#editRegistryModal').modal('show');
     // });
 
+    $(document).on('show.bs.modal', function () {
+            // Desativa a rolagem do fundo
+            $('body').css('overflow', 'hidden');
+        });
+
+        $(document).on('hidden.bs.modal', function () {
+            // Restaura a rolagem do fundo apenas se não houver mais modais abertos
+            if ($('.modal.show').length === 0) {
+                $('body').css('overflow', 'auto');
+            }
+        });
+
+        // Adicionar rolagem ao modal principal após fechar o secundário
+        $('#searchCityModal').on('hidden.bs.modal', function () {
+            $('#editRegistryModal,#addRegistryModal').css('overflow-y', 'auto');
+        });
+
 </script>
 <?php
     include(__DIR__ . '/../../rodape.php');
