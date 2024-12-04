@@ -193,28 +193,38 @@ include(__DIR__ . '/../../menu.php');
                 <tbody id="registry-table-body">
                     <!-- Linhas serão adicionadas dinamicamente -->
                     <?php
-                    $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo'");
-                    $stmt->execute();
-                    $result = $stmt->get_result();
+                        // Verificar se há parâmetros de filtro definidos
+                        if (isset($_GET['searchTerm']) || isset($_GET['searchTermTerm']) || isset($_GET['searchTermBook']) ||
+                            isset($_GET['searchTermPage']) || isset($_GET['searchFather']) || isset($_GET['searchMother']) ||
+                            isset($_GET['birthDate']) || isset($_GET['registryDate'])) {
 
-                    while ($row = $result->fetch_assoc()) {
-                        echo '<tr>';
-                        echo '<td>' . $row['termo'] . '</td>';
-                        echo '<td>' . $row['livro'] . '</td>';
-                        echo '<td>' . $row['folha'] . '</td>';
-                        echo '<td>' . $row['nome_registrado'] . '</td>';
-                        echo '<td>' . ($row['nome_pai'] ? $row['nome_pai'] . ' e ' . $row['nome_mae'] : $row['nome_mae']) . '</td>';
-                        echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
-                        echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';                        
-                        echo '<td>' .
-                        '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
-                        '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
-                        ($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
-                        '</td>';
+                            // Carregar todos os registros (filtro acionado)
+                            $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo'");
+                        } else {
+                            // Carregar apenas os últimos 20 registros (sem filtro)
+                            $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo' ORDER BY id DESC LIMIT 20");
+                        }
+                        $stmt->execute();
+                        $result = $stmt->get_result();
 
-                        echo '</tr>';
-                    }
-                    ?>
+                        while ($row = $result->fetch_assoc()) {
+                            echo '<tr>';
+                            echo '<td>' . $row['termo'] . '</td>';
+                            echo '<td>' . $row['livro'] . '</td>';
+                            echo '<td>' . $row['folha'] . '</td>';
+                            echo '<td>' . $row['nome_registrado'] . '</td>';
+                            echo '<td>' . ($row['nome_pai'] ? $row['nome_pai'] . ' e ' . $row['nome_mae'] : $row['nome_mae']) . '</td>';
+                            echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
+                            echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';
+                            echo '<td>' .
+                            '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
+                            '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
+                            ($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
+                            '</td>';
+
+                            echo '</tr>';
+                        }
+                        ?>
                 </tbody>
             </table>
         </div>
@@ -647,11 +657,38 @@ include(__DIR__ . '/../../menu.php');
                 }
             });
         }
-
-        // Evento de clique do botão de filtro
+        
+        // Evento de clique no botão de filtro
         $('#filter-button').on('click', function() {
-            filterRegistries();
+            var searchTerm = $('#search-term').val().trim();
+            var searchTermTerm = $('#search-term-term').val().trim();
+            var searchTermBook = $('#search-term-book').val().trim();
+            var searchTermPage = $('#search-term-page').val().trim();
+            var searchFather = $('#search-father').val().trim();
+            var searchMother = $('#search-mother').val().trim();
+            var birthDate = $('#search-birthdate').val();
+            var registryDate = $('#search-registry-date').val();
+
+            if (!searchTerm && !searchTermTerm && !searchTermBook && !searchTermPage &&
+                !searchFather && !searchMother && !birthDate && !registryDate) {
+                // Recarregar página para mostrar todos os registros
+                window.location.search = '';
+            } else {
+                // Executar filtro
+                var urlParams = new URLSearchParams();
+                if (searchTerm) urlParams.append('searchTerm', searchTerm);
+                if (searchTermTerm) urlParams.append('searchTermTerm', searchTermTerm);
+                if (searchTermBook) urlParams.append('searchTermBook', searchTermBook);
+                if (searchTermPage) urlParams.append('searchTermPage', searchTermPage);
+                if (searchFather) urlParams.append('searchFather', searchFather);
+                if (searchMother) urlParams.append('searchMother', searchMother);
+                if (birthDate) urlParams.append('birthDate', birthDate);
+                if (registryDate) urlParams.append('registryDate', registryDate);
+
+                window.location.search = urlParams.toString();
+            }
         });
+
 
         // Carregar registros filtrados ao carregar a página
         loadFilteredRegistries();
