@@ -273,13 +273,15 @@ include(__DIR__ . '/../../menu.php');
                                 </div>
                             </div>
 
-                            <div class="form-group">
-                                <label for="father-name">Nome do Pai</label>
-                                <input type="text" class="form-control" id="father-name" name="nome_pai">
-                            </div>
-                            <div class="form-group">
-                                <label for="mother-name">Nome da Mãe</label>
-                                <input type="text" class="form-control" id="mother-name" name="nome_mae" required>
+                            <div class="form-row">
+                                <div class="form-group col-12 col-md-6">
+                                    <label for="father-name">Nome do Pai</label>
+                                    <input type="text" class="form-control" id="father-name" name="nome_pai">
+                                </div>
+                                <div class="form-group col-12 col-md-6">
+                                    <label for="mother-name">Nome da Mãe</label>
+                                    <input type="text" class="form-control" id="mother-name" name="nome_mae" required>
+                                </div>
                             </div>
 
                             <!-- Adicionar Anexo -->
