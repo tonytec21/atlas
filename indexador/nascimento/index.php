@@ -193,48 +193,38 @@ include(__DIR__ . '/../../menu.php');
                 <tbody id="registry-table-body">
                     <!-- Linhas serão adicionadas dinamicamente -->
                     <?php
-                    // Inicialmente, verificar se o botão de filtro foi acionado
-                    $isFilterActive = false;
+                        // Verificar se há parâmetros de filtro definidos
+                        if (isset($_GET['searchTerm']) || isset($_GET['searchTermTerm']) || isset($_GET['searchTermBook']) ||
+                            isset($_GET['searchTermPage']) || isset($_GET['searchFather']) || isset($_GET['searchMother']) ||
+                            isset($_GET['birthDate']) || isset($_GET['registryDate'])) {
 
-                    // Verificar se os parâmetros de filtro estão presentes
-                    foreach (['searchTerm', 'searchTermTerm', 'searchTermBook', 'searchTermPage', 'searchFather', 'searchMother', 'birthDate', 'registryDate'] as $param) {
-                        if (!empty($_GET[$param])) {
-                            $isFilterActive = true;
-                            break;
+                            // Carregar todos os registros (filtro acionado)
+                            $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo'");
+                        } else {
+                            // Carregar apenas os últimos 20 registros (sem filtro)
+                            $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo' ORDER BY id DESC LIMIT 20");
                         }
-                    }
+                        $stmt->execute();
+                        $result = $stmt->get_result();
 
-                    // Carregar registros com base na lógica
-                    if ($isFilterActive) {
-                        // Filtro acionado, carregar todos os registros
-                        $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo'");
-                    } else {
-                        // Sem filtro, carregar apenas os últimos 20 registros
-                        $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo' ORDER BY id DESC LIMIT 20");
-                    }
-
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-
-                    // Renderizar os registros na tabela
-                    while ($row = $result->fetch_assoc()) {
-                        echo '<tr>';
-                        echo '<td>' . $row['termo'] . '</td>';
-                        echo '<td>' . $row['livro'] . '</td>';
-                        echo '<td>' . $row['folha'] . '</td>';
-                        echo '<td>' . $row['nome_registrado'] . '</td>';
-                        echo '<td>' . ($row['nome_pai'] ? $row['nome_pai'] . ' e ' . $row['nome_mae'] : $row['nome_mae']) . '</td>';
-                        echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
-                        echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';
-                        echo '<td>' .
+                        while ($row = $result->fetch_assoc()) {
+                            echo '<tr>';
+                            echo '<td>' . $row['termo'] . '</td>';
+                            echo '<td>' . $row['livro'] . '</td>';
+                            echo '<td>' . $row['folha'] . '</td>';
+                            echo '<td>' . $row['nome_registrado'] . '</td>';
+                            echo '<td>' . ($row['nome_pai'] ? $row['nome_pai'] . ' e ' . $row['nome_mae'] : $row['nome_mae']) . '</td>';
+                            echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
+                            echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';
+                            echo '<td>' .
                             '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
                             '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
                             ($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
                             '</td>';
-                        echo '</tr>';
-                    }
-                    ?>
 
+                            echo '</tr>';
+                        }
+                    ?>
                 </tbody>
             </table>
         </div>
