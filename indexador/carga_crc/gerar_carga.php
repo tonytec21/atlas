@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('HORANASCIMENTO', $row['hora_nascimento'] ?? '');
             $registro->addChild('LOCALNASCIMENTO', htmlspecialchars($row['local_nascimento'] ?? 'IGNORADO'));
             $registro->addChild('SEXO', htmlspecialchars($row['sexo'] ?? 'NAO INFORMADO'));
-            $registro->addChild('POSSUIGEMEOS', $row['possui_gemeos'] ?? '');
+            $registro->addChild('POSSUIGEMEOS', $row['possui_gemeos'] ?? 'N');
             $registro->addChild('NUMEROGEMEOS', $row['numero_gemeos'] ?? '');
             $registro->addChild('CODIGOIBGEMUNNASCIMENTO', htmlspecialchars($row['ibge_naturalidade'] ?? 'NAO INFORMADO'));
             $registro->addChild('PAISNASCIMENTO', $row['pais_nascimento'] ?? '');
