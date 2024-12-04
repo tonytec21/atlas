@@ -657,38 +657,11 @@ include(__DIR__ . '/../../menu.php');
                 }
             });
         }
-        
-        // Evento de clique no botão de filtro
+
+        // Evento de clique do botão de filtro
         $('#filter-button').on('click', function() {
-            var searchTerm = $('#search-term').val().trim();
-            var searchTermTerm = $('#search-term-term').val().trim();
-            var searchTermBook = $('#search-term-book').val().trim();
-            var searchTermPage = $('#search-term-page').val().trim();
-            var searchFather = $('#search-father').val().trim();
-            var searchMother = $('#search-mother').val().trim();
-            var birthDate = $('#search-birthdate').val();
-            var registryDate = $('#search-registry-date').val();
-
-            if (!searchTerm && !searchTermTerm && !searchTermBook && !searchTermPage &&
-                !searchFather && !searchMother && !birthDate && !registryDate) {
-                // Recarregar página para mostrar todos os registros
-                window.location.search = '';
-            } else {
-                // Executar filtro
-                var urlParams = new URLSearchParams();
-                if (searchTerm) urlParams.append('searchTerm', searchTerm);
-                if (searchTermTerm) urlParams.append('searchTermTerm', searchTermTerm);
-                if (searchTermBook) urlParams.append('searchTermBook', searchTermBook);
-                if (searchTermPage) urlParams.append('searchTermPage', searchTermPage);
-                if (searchFather) urlParams.append('searchFather', searchFather);
-                if (searchMother) urlParams.append('searchMother', searchMother);
-                if (birthDate) urlParams.append('birthDate', birthDate);
-                if (registryDate) urlParams.append('registryDate', registryDate);
-
-                window.location.search = urlParams.toString();
-            }
+            filterRegistries();
         });
-
 
         // Carregar registros filtrados ao carregar a página
         loadFilteredRegistries();
