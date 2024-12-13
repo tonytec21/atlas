@@ -94,8 +94,85 @@ $orderData['groups'] = $groupedFiles;
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.css">  
     <link rel="stylesheet" href="../style/css/style.css">
     <style>
+
+        .sortable-ghost {  
+            opacity: 0.4;  
+            background-color: #f0f0f0;  
+            border: 2px dashed #ccc;  
+        }  
+
+        .sortable-drag {  
+            opacity: 0.8;  
+            transform: scale(1.05);  
+            background-color: #fff;  
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);  
+        }  
+
+        .sortable-chosen {  
+            background-color: #fff;  
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);  
+        }  
+
+        .card, .group {  
+            transition: all 0.3s ease;  
+        }  
+
+        .card-container > * {  
+            transition: transform 0.3s ease;  
+        }  
+
+        .group-header {  
+            cursor: grab;  
+        }  
+
+
+
+        /* Espaçamento e estilo dos cards */  
+.card {  
+    margin: 10px;  
+    transition: transform 0.2s ease, box-shadow 0.2s ease;  
+}  
+
+/* Estilo quando está arrastando */  
+.sortable-ghost {  
+    opacity: 0;  
+    background-color: #f8f9fa;  
+    border: 2px dashed #dee2e6;  
+    margin: 15px;  
+    height: 150px; /* ajuste conforme a altura dos seus post-its */  
+}  
+
+/* Efeito de hover nos cards */  
+.card:hover {  
+    transform: translateY(-2px);  
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);  
+}  
+
+/* Espaço para drop */  
+.card-container {  
+    min-height: 200px;  
+    padding: 15px;  
+    transition: background-color 0.2s ease;  
+}  
+
+/* Estilo quando está arrastando sobre o container */  
+.card-container.sortable-drag-container {  
+    background-color: rgba(0,0,0,0.02);  
+}  
+
+/* Espaço entre os cards */  
+.card-container > .card:not(:last-child) {  
+    margin-bottom: 15px;  
+}  
+
+/* Animação suave para todos os movimentos */  
+.card-container > * {  
+    transition: all 0.3s ease;  
+}
+
         
         .btn-close {
             outline: none;
@@ -594,7 +671,53 @@ $orderData['groups'] = $groupedFiles;
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/sweetalert2.js"></script>
-    <script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>  
+
+<script>  
+document.addEventListener('DOMContentLoaded', function() {  
+    // Para os cards dentro dos grupos  
+    // const containers = document.querySelectorAll('.card-container');  
+    // containers.forEach(container => {  
+    //     new Sortable(container, {  
+    //         group: 'shared',  
+    //         animation: 150,  
+    //         easing: "cubic-bezier(0.4, 0, 0.2, 1)",  
+    //         dragClass: "sortable-drag",  
+    //         ghostClass: "sortable-ghost",  
+    //         chosenClass: "sortable-chosen",  
+    //         onEnd: function(evt) {  
+    //             updateOrder();  
+    //         }  
+    //     });  
+    // });  
+
+    // Para os grupos  
+    new Sortable(document.getElementById('group-container'), {  
+        animation: 150,  
+        handle: '.group-header',  
+        onEnd: function() {  
+            updateOrder();  
+        }  
+    });  
+});  
+
+// Mantém a mesma função updateOrder que você já tem  
+function updateOrder() {  
+    const groups = {};  
+    document.querySelectorAll('.group').forEach(group => {  
+        const groupName = group.querySelector('.group-name').textContent.trim();  
+        const notes = Array.from(group.querySelectorAll('.card')).map(card => card.dataset.filename);  
+        groups[groupName] = notes;  
+    });  
+
+    fetch('save_order.php', {  
+        method: 'POST',  
+        headers: {  
+            'Content-Type': 'application/json',  
+        },  
+        body: JSON.stringify({ groups: groups })  
+    });  
+}  
 
         // Abrir o modal ao clicar no botão "Nova Nota"
         $('#novaNotaBtn').on('click', function() {
