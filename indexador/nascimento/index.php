@@ -430,7 +430,7 @@ include(__DIR__ . '/../../menu.php');
         <hr>
         <div class="table-responsive">
             <h5>Resultados da Pesquisa</h5>
-            <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
+            <table id="tabelaResultados" class="table table-striped table-bordered">
                 <thead>
                     <tr>
                         <th>Termo</th>
