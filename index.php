@@ -963,7 +963,7 @@ include(__DIR__ . '/menu.php');
                 <div id="novas-tarefas-section" class="task-section mb-4" style="display: none;">  
                     <div class="section-header d-flex align-items-center mb-3">  
                         <div class="section-icon me-2">  
-                            <i class="fas fa-plus-circle text-success"></i>  
+                            <i class="fas fa-plus-circle text-success" style="padding-right: 7px;"></i>  
                         </div>  
                         <h5 class="section-title text-success mb-0 fw-bold">Novas Tarefas</h5>  
                     </div>  
@@ -981,7 +981,7 @@ include(__DIR__ . '/menu.php');
                 <div class="task-section">  
                     <div class="section-header d-flex align-items-center mb-3">  
                         <div class="section-icon me-2">  
-                            <i class="fas fa-clock text-danger"></i>  
+                            <i class="fas fa-clock text-danger" style="padding-right: 7px;"></i>  
                         </div>  
                         <h5 class="section-title text-danger mb-0 fw-bold">Tarefas Pendentes</h5>  
                     </div>  
