@@ -21,6 +21,27 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/jquery-ui.css">
     <style>
 
+        .page-title {  
+            font-size: 2.0rem;  
+            font-weight: 700;  
+            color: #34495e;  
+            margin-bottom: 2rem;  
+            text-align: center;  
+            text-transform: uppercase;  
+            letter-spacing: 1px;  
+        }  
+
+        body.dark-mode .page-title {
+            font-size: 2.0rem;  
+            font-weight: 700;  
+            color: #fff;  
+            margin-bottom: 2rem;  
+            text-align: center;  
+            text-transform: uppercase;  
+            letter-spacing: 1px;  
+            
+        }
+
         #sortable-buttons .col-md-4 {
             cursor: move;
         }
@@ -169,6 +190,24 @@ date_default_timezone_set('America/Sao_Paulo');
         .text-reurb {
             color: #FFC8A2;
         }
+        #sortable-cards .card {  
+            border: none;  
+            border-radius: 15px;  
+            transition: all var(--transition-speed) ease;  
+            cursor: grab;  
+            background: var(--primary-bg);  
+            box-shadow: var(--card-shadow);  
+            overflow: hidden;  
+            height: 100%;  
+        }  
+
+        #sortable-cards .card:hover {  
+            transform: var(--card-hover-transform);  
+            box-shadow: 0 12px 20px rgba(0,0,0,0.15);  
+        }  
+        .btn {  
+            border-radius: 10px!important;  
+        }
     </style>
 </head>
 <body class="light-mode">
@@ -178,7 +217,7 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container mt-4">
-        <h2 class="text-center mb-4">Central de Acesso</h2>
+        <h2 class="page-title">Central de Acesso</h2>
 
         <!-- Cards de Módulos -->
         <div id="sortable-cards" class="row">

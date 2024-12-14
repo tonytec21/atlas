@@ -1,38 +1,6 @@
 .table-responsive {
     zoom: 90%;
 }
-.sidebar {
-    height: 100%;
-    width: 0;
-    position: fixed;
-    top: 0;
-    left: 0;
-    background-color: #343a40;
-    overflow-x: hidden;
-    transition: 0.5s;
-    padding-top: 60px;
-}
-
-.sidebar a {
-    padding: 10px 15px;
-    text-decoration: none;
-    font-size: 16px;
-    color: white;
-    display: block;
-    transition: 0.3s;
-}
-
-.sidebar a:hover {
-    background-color: #575d63;
-}
-
-.sidebar .closebtn {
-    position: absolute;
-    top: 0;
-    right: 25px;
-    font-size: 36px;
-}
-
 .openbtn {
     font-size: 20px;
     cursor: pointer;
@@ -78,7 +46,7 @@
     color: #fff;
 }
 
-.mode-switch {
+/* .mode-switch {
     background-color: #f0ad4e;
     color: #fff;
     border: none;
@@ -94,7 +62,7 @@
 
 .mode-switch:hover {
     background-color: #e09c39;
-}
+} */
 
 .dark-mode .mode-switch {
     background-color: #4e5d6c;

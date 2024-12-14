@@ -20,30 +20,35 @@ date_default_timezone_set('America/Sao_Paulo');
     <script src="../script/jquery-3.5.1.min.js"></script>
     <style>
 
-#compartilharAnexos {
-    margin-left: 10px;
-}
+        .form-check-input {
+            margin-top: 0.1rem;
+            margin-left: -1.80rem;
+        }
 
-.form-check-inline {
-    margin-left: 5px;
-}
+        div.dataTables_wrapper div.dataTables_filter label {
+            text-align: right;
+        }
 
-.form-group {
-    margin-bottom: 1rem;
-}
+        .form-check-inline {
+            margin-left: 5px;
+        }
 
-#subTaskAttachments {
-    margin-top: 8px; 
-}
+        .form-group {
+            margin-bottom: 1rem;
+        }
 
+        #subTaskAttachments {
+            margin-top: 8px; 
+        }
 
-.status-prestes-vencer {
-    background-color: #ffc107; 
-}
+        .status-prestes-vencer {
+            background-color: #ffc107; 
+        }
 
-.status-vencida {
-    background-color: #dc3545; 
-}
+        .status-vencida {
+            background-color: #dc3545; 
+        }
+
         .btn-close {
             outline: none; 
             border: none; 
@@ -129,7 +134,7 @@ date_default_timezone_set('America/Sao_Paulo');
         }
 
         body.dark-mode .row-vencida td {
-            background-color: #ffcccc!important;
+            background-color: #ffcccc!important; 
             color: #000!important;
         }
 
@@ -144,7 +149,7 @@ date_default_timezone_set('America/Sao_Paulo');
             white-space: nowrap;
             vertical-align: baseline;
             border-radius: 0.25em;
-            width: 100px;
+            width: 100%;
         }
 
         .status-iniciada {
@@ -172,58 +177,57 @@ date_default_timezone_set('America/Sao_Paulo');
         }
 
         .status-sub-iniciada {
-    background-color: #007bff;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    display: inline-block;
-}
-.status-sub-em-espera {
-    background-color: #ffa500;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    display: inline-block;
-}
-.status-sub-em-andamento {
-    background-color: #0056b3;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    display: inline-block;
-}
-.status-sub-concluida {
-    background-color: #28a745;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    display: inline-block;
-}
-.status-sub-cancelada {
-    background-color: #dc3545;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    display: inline-block;
-}
-.status-sub-pendente {
-    background-color: gray;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    display: inline-block;
-}
+            background-color: #007bff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .status-sub-em-espera {
+            background-color: #ffa500;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .status-sub-em-andamento {
+            background-color: #0056b3;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .status-sub-concluida {
+            background-color: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .status-sub-cancelada {
+            background-color: #dc3545;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .status-sub-pendente {
+            background-color: gray;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
 
-.priority-sub-medium {
-	 background-color: #fff9c4 !important; /* Amarelo claro */
-}
-.priority-sub-high {
-	background-color: #ffe082 !important; /* Laranja claro */
-}
-.priority-sub-critical {
-            background-color: #ff8a80 !important; /* Vermelho claro */
-}
-
+        .priority-sub-medium {
+            background-color: #fff9c4 !important; 
+        }
+        .priority-sub-high {
+            background-color: #ffe082 !important; 
+        }
+        .priority-sub-critical {
+                    background-color: #ff8a80 !important; 
+        }
 
         .timeline {
             position: relative;
@@ -324,7 +328,7 @@ date_default_timezone_set('America/Sao_Paulo');
         .timeline-item .timeline-badge.danger {
             background-color: #dc3545;
         }
-        /* Dark mode styles */
+
         body.dark-mode .timeline::before {
             background: #444;
         }
@@ -341,6 +345,1152 @@ date_default_timezone_set('America/Sao_Paulo');
 
         body.dark-mode .timeline-item .timeline-panel::after {
             border-left-color: #333;
+        }
+
+
+
+
+        /* Variáveis de Tema */  
+        :root {  
+            --background-primary: #ffffff;  
+            --background-secondary: #f8f9fa;  
+            --text-primary: #2c3e50;  
+            --text-secondary: #6c757d;  
+            --border-color: #dee2e6;  
+            --accent-color: #3498db;  
+            --success-color: #2ecc71;  
+            --warning-color: #f1c40f;  
+            --danger-color: #e74c3c;  
+            --header-gradient: linear-gradient(135deg, #3498db, #2980b9);  
+            --shadow-color: rgba(0, 0, 0, 0.1);  
+        }  
+
+        /* Tema Dark */  
+        body.dark-mode {  
+            --background-primary: #1a1a1a !important;  
+            --background-secondary: #2d2d2d !important;  
+            --text-primary: #ffffff !important;  
+            --text-secondary: #b3b3b3 !important;  
+            --border-color: #404040 !important;  
+            --header-gradient: linear-gradient(135deg, #2c3e50, #2c3e50) !important;  
+            --shadow-color: rgba(0, 0, 0, 0.3) !important;  
+        }  
+
+        /* Modal Base */  
+        .modal-content {  
+            background: var(--background-primary);  
+            border: none;  
+            border-radius: 15px;  
+            box-shadow: 0 10px 30px var(--shadow-color);  
+        }  
+
+        .modal-body > div:not(:last-child) {  
+            margin-bottom: 2rem;  
+        }  
+
+        .modal-body hr {  
+            margin: 2rem 0;  
+            border-color: var(--border-color);  
+            opacity: 0.5;  
+        }  
+
+        /* Header */  
+        .primary-header {  
+            background: var(--header-gradient);  
+            padding: 1.5rem;  
+            border: none;  
+            border-radius: 15px 15px 0 0;  
+        }  
+
+        .modal-header-content {  
+            width: 100%;  
+            text-align: center;  
+            position: relative;  
+        }  
+
+        .modal-title {  
+            color: #ffffff;  
+            font-size: 1.25rem;  
+            font-weight: 600;  
+        }  
+
+        .protocol-number {  
+            font-weight: 700;  
+        }  
+
+        /* Barra de Ações */  
+        .actions-toolbar {  
+            background: var(--background-secondary);  
+            padding: 1rem;  
+            border-bottom: 1px solid var(--border-color);  
+        }  
+
+        .action-buttons {  
+            display: flex;  
+            gap: 0.5rem;  
+            flex-wrap: wrap;  
+            justify-content: center;  
+        }  
+
+        /* Botões */  
+        .action-btn,  
+        .btn-save,  
+        .btn-add-comment,  
+        .create-subtask-btn,  
+        .btn-close-modal {  
+            display: flex;  
+            align-items: center;  
+            gap: 0.5rem;  
+            padding: 0.5rem 1rem;  
+            border: none;  
+            border-radius: 8px;  
+            font-size: 0.875rem;  
+            transition: all 0.2s;  
+        }  
+
+        .action-btn {  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+        }  
+
+        .action-btn.success,  
+        .btn-save {  
+            background: var(--success-color);  
+            color: white;  
+        }  
+
+        .action-btn.primary,  
+        .btn-add-comment,  
+        .create-subtask-btn {  
+            background: var(--accent-color);  
+            color: white;  
+        }  
+
+        /* Hover Estados para Botões */  
+        .action-btn:hover,  
+        .btn-save:hover,  
+        .btn-add-comment:hover,  
+        .create-subtask-btn:hover,  
+        .btn-close-modal:hover {  
+            transform: translateY(-2px);  
+            box-shadow: 0 4px 12px var(--shadow-color);  
+        }  
+
+        /* Grid e Layout */  
+        .info-grid {  
+            display: grid;  
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));  
+            gap: 1rem;  
+            margin-bottom: 1.5rem;  
+        }  
+
+        .info-item {  
+            display: flex;  
+            flex-direction: column;  
+            gap: 0.5rem;  
+        }  
+
+        /* Formulários */  
+        .form-control-modern,  
+        select,  
+        textarea {  
+            background: var(--background-secondary);  
+            border: 1px solid var(--border-color);  
+            color: var(--text-primary);  
+            border-radius: 8px;  
+            padding: 0.75rem;  
+            transition: all 0.2s;  
+        }  
+
+        .form-control-modern:focus {  
+            border-color: var(--accent-color);  
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);  
+        }  
+
+        .form-control-modern:disabled,  
+        .form-control-modern[readonly] {  
+            background-color: var(--background-secondary);  
+            opacity: 0.8;  
+            cursor: not-allowed;  
+        }  
+
+        /* Seções */  
+        .description-section,  
+        .status-section,  
+        .creation-info,  
+        .attachments-section,  
+        .tasks-tables,  
+        .timeline-section {  
+            margin: 1.5rem 0;  
+            padding: 1.5rem;  
+            background: var(--background-secondary);  
+            border-radius: 12px;  
+            box-shadow: 0 2px 8px var(--shadow-color);  
+        }  
+
+        /* Labels */  
+        label {  
+            display: block;  
+            font-weight: 600;  
+            color: var(--text-primary);  
+            margin-bottom: 0.75rem;  
+        }  
+
+        /* Status Control */  
+        .status-control {  
+            display: flex;  
+            gap: 1rem;  
+            align-items: center;  
+        }  
+
+        .status-control select {  
+            flex: 1;  
+            padding: 0.75rem;  
+            background: var(--background-primary);  
+            cursor: pointer;  
+        }  
+
+        /* Tabelas */  
+        .table-modern {  
+            width: 100%;  
+            border-collapse: separate;  
+            border-spacing: 0 0.5rem;  
+        }  
+
+        .table-modern th {  
+            background: var(--background-secondary);  
+            color: var(--text-primary);  
+            padding: 1rem;  
+            font-weight: 600;  
+        }  
+
+        .table-modern td {  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+            padding: 1rem;  
+        }  
+
+        /* Status Colors */  
+        #viewStatus option[value="Iniciada"] { color: var(--accent-color); }  
+        #viewStatus option[value="Em Espera"] { color: var(--warning-color); }  
+        #viewStatus option[value="Em Andamento"] { color: var(--accent-color); }  
+        #viewStatus option[value="Concluída"] { color: var(--success-color); }  
+        #viewStatus option[value="Cancelada"] { color: var(--danger-color); }  
+
+        /* Modal Footer */  
+        .modal-footer {  
+            border-top: 1px solid var(--border-color);  
+            padding: 1rem 1.5rem;  
+            display: flex;  
+            justify-content: flex-end;  
+        }  
+
+        /* Responsividade */  
+        @media (max-width: 768px) {  
+            .action-buttons {  
+                flex-direction: column;  
+            }  
+            
+            .action-btn {  
+                width: 100%;  
+            }  
+            
+            .info-grid {  
+                grid-template-columns: 1fr;  
+            }  
+            
+            .table-responsive {  
+                overflow-x: auto;  
+            }  
+        }  
+
+        /* Animações */  
+        .modal.fade .modal-dialog {  
+            transform: scale(0.95);  
+            transition: transform 0.2s ease-out;  
+        }  
+
+        .modal.show .modal-dialog {  
+            transform: scale(1);  
+        }  
+
+        /* Ajustes Dark Mode Específicos */  
+        body.dark-mode .modal-content,  
+        body.dark-mode .modal-body,  
+        body.dark-mode .modal-footer {  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+        }  
+
+        body.dark-mode .form-control-modern,  
+        body.dark-mode input,  
+        body.dark-mode select,  
+        body.dark-mode textarea {  
+            background: #333333;  
+            color: var(--text-primary);  
+            border-color: var(--border-color);  
+        }  
+
+        body.dark-mode .timeline-panel.subtask-panel .timeline-body {
+                    background-color: #495057;
+                    padding: 10px;
+                    border-radius: 4px;
+                    border: 1px solid #ffecb3;
+                }
+
+        body.dark-mode .action-btn:not(.success):not(.primary) {  
+            background: #333333;  
+            color: var(--text-primary);  
+        }
+
+        /* Ajustes específicos para textarea de descrição */  
+        .description-section textarea.form-control-modern {  
+            width: 100%;  
+            min-height: 120px;  
+            padding: 1rem;  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+            border: 1px solid var(--border-color);  
+            border-radius: 8px;  
+            resize: vertical;  
+            font-size: 0.95rem;  
+            line-height: 1.5;  
+        }  
+
+        /* Botão Criar Subtarefa */  
+        .create-subtask-btn {  
+            width: 100%;  
+            margin: 1.5rem 0;  
+            padding: 1rem;  
+            background: var(--accent-color);  
+            color: white;  
+            border: none;  
+            border-radius: 12px;  
+            font-weight: 500;  
+            font-size: 1rem;  
+            display: flex;  
+            align-items: center;  
+            justify-content: center;  
+            gap: 0.75rem;  
+            transition: all 0.2s ease;  
+            box-shadow: 0 2px 8px var(--shadow-color);  
+        }  
+
+        .create-subtask-btn i {  
+            font-size: 1.1rem;  
+        }  
+
+        .create-subtask-btn:hover {  
+            background: var(--accent-color);  
+            transform: translateY(-2px);  
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);  
+        }  
+
+        /* Seção de Subtarefas Vinculadas */  
+        .subtasks-section {  
+            margin: 1.5rem 0;  
+            padding: 1.5rem;  
+            background: var(--background-secondary);  
+            border-radius: 12px;  
+            box-shadow: 0 2px 8px var(--shadow-color);  
+        }  
+
+        .subtasks-list {  
+            margin-top: 1rem;  
+        }  
+
+        .subtask-item {  
+            display: flex;  
+            align-items: center;  
+            justify-content: space-between;  
+            padding: 1rem;  
+            background: var(--background-primary);  
+            border: 1px solid var(--border-color);  
+            border-radius: 8px;  
+            margin-bottom: 0.5rem;  
+        }  
+
+        .subtask-info {  
+            display: flex;  
+            flex-direction: column;  
+            gap: 0.25rem;  
+        }  
+
+        .subtask-title {  
+            font-weight: 500;  
+            color: var(--text-primary);  
+        }  
+
+        .subtask-status {  
+            font-size: 0.875rem;  
+            color: var(--text-secondary);  
+        }  
+
+        .subtask-actions {  
+            display: flex;  
+            gap: 0.5rem;  
+        }  
+
+        /* Ajustes Dark Mode para novos elementos */  
+        body.dark-mode .description-section textarea.form-control-modern {  
+            background: #333333;  
+            color: var(--text-primary);  
+            border-color: var(--border-color);  
+        }  
+
+        body.dark-mode .subtask-item {  
+            background: #333333;  
+        }  
+
+        body.dark-mode .subtask-title {  
+            color: var(--text-primary);  
+        }  
+
+        body.dark-mode .subtask-status {  
+            color: var(--text-secondary);  
+        }
+
+        .modal-xl {  
+            max-width: 95% !important; /* ou um valor específico como 1200px */  
+            width: 95%;  
+            margin: 1.75rem auto;  
+        }  
+
+        @media (min-width: 992px) {  
+            .modal-xl {  
+                max-width: 1200px !important; /* ou o tamanho que preferir */  
+            }  
+        }
+
+        /* Botões da Toolbar */  
+        .action-buttons {  
+            display: flex;  
+            gap: 0.5rem;  
+            flex-wrap: wrap;  
+            justify-content: center;  
+        }  
+
+        .action-btn {  
+            display: flex;  
+            align-items: center;  
+            gap: 0.5rem;  
+            padding: 0.5rem 1rem;  
+            border: none;  
+            border-radius: 6px;  
+            font-size: 0.875rem;  
+            transition: all 0.2s;  
+            font-weight: 500;  
+        }  
+
+        /* Botão Secondary (cinza) - para Protocolo Geral */  
+        #guiaProtocoloButton {  
+            background-color: #6c757d;  
+            color: white;  
+        }  
+
+        #guiaProtocoloButton:hover {  
+            background-color: #5a6268;  
+            transform: translateY(-1px);  
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.2);  
+        }  
+
+        /* Botão Info2 (azul claro) - para Guia Recebimento e Recibo Entrega */  
+        #guiaRecebimentoButton,  
+        #reciboEntregaButton {  
+            background-color: #17a2b8;  
+            color: white;  
+        }  
+
+        #guiaRecebimentoButton:hover,  
+        #reciboEntregaButton:hover {  
+            background-color: #138496;  
+            transform: translateY(-1px);  
+            box-shadow: 0 4px 8px rgba(23, 162, 184, 0.2);  
+        }  
+
+        /* Botão Success (verde) - para Criar Ofício */  
+        .action-btn.success {  
+            background-color: #28a745;  
+            color: white;  
+        }  
+
+        .action-btn.success:hover {  
+            background-color: #218838;  
+            transform: translateY(-1px);  
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);  
+        }  
+
+        /* Botão Primary (azul) - para Vincular Ofício */  
+        .action-btn.primary {  
+            background-color: #007bff;  
+            color: white;  
+        }  
+
+        .action-btn.primary:hover {  
+            background-color: #0056b3;  
+            transform: translateY(-1px);  
+            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);  
+        }  
+
+        /* Dark Mode */  
+        body.dark-mode .action-btn {  
+            border: 1px solid var(--border-color);  
+        }  
+
+        /* Responsividade */  
+        @media (max-width: 768px) {  
+            .action-buttons {  
+                flex-direction: column;  
+            }  
+            
+            .action-btn {  
+                width: 100%;  
+                justify-content: center;  
+            }  
+        }
+
+        /* Ajustes específicos para o Modal de Recibo */  
+        #reciboEntregaModal .info-grid {  
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));  
+            gap: 1.5rem;  
+            margin-bottom: 2rem;  
+        }  
+
+        #reciboEntregaModal .description-section {  
+            margin-bottom: 1.5rem;  
+        }  
+
+        #reciboEntregaModal .form-control-modern {  
+            width: 100%;  
+        }  
+
+        #reciboEntregaModal textarea.form-control-modern {  
+            min-height: 100px;  
+            resize: vertical;  
+        }  
+
+        #reciboEntregaModal .modal-footer {  
+            display: flex;  
+            justify-content: flex-end;  
+            gap: 1rem;  
+            padding: 1rem 1.5rem;  
+            background: var(--background-secondary);  
+            border-top: 1px solid var(--border-color);  
+        }  
+
+        #reciboEntregaModal .btn-close-modal {  
+            padding: 0.75rem 1.5rem;  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+            border: 1px solid var(--border-color);  
+            border-radius: 8px;  
+            display: flex;  
+            align-items: center;  
+            gap: 0.5rem;  
+            transition: all 0.2s;  
+        }  
+
+        #reciboEntregaModal .btn-close-modal:hover {  
+            background: var(--background-secondary);  
+            transform: translateY(-1px);  
+        }  
+
+        #reciboEntregaModal .action-btn.success {  
+            padding: 0.75rem 1.5rem;  
+        }  
+
+        /* Dark Mode */  
+        body.dark-mode #reciboEntregaModal .modal-content {  
+            background: var(--background-primary);  
+        }  
+
+        body.dark-mode #reciboEntregaModal .btn-close-modal {  
+            background: #333333;  
+            color: var(--text-primary);  
+            border-color: var(--border-color);  
+        }  
+
+        /* Responsividade */  
+        @media (max-width: 768px) {  
+            #reciboEntregaModal .modal-footer {  
+                flex-direction: column-reverse;  
+            }  
+
+            #reciboEntregaModal .modal-footer button {  
+                width: 100%;  
+            }  
+        }
+
+        /* Ajustes específicos para o Modal de Guia de Recebimento */  
+        #guiaRecebimentoModal .info-grid {  
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));  
+            gap: 1.5rem;  
+            margin-bottom: 2rem;  
+        }  
+
+        #guiaRecebimentoModal .description-section {  
+            margin-bottom: 1.5rem;  
+        }  
+
+        #guiaRecebimentoModal .form-control-modern {  
+            width: 100%;  
+        }  
+
+        #guiaRecebimentoModal textarea.form-control-modern {  
+            min-height: 100px;  
+            resize: vertical;  
+        }  
+
+        #guiaRecebimentoModal .modal-footer {  
+            display: flex;  
+            justify-content: flex-end;  
+            gap: 1rem;  
+            padding: 1rem 1.5rem;  
+            background: var(--background-secondary);  
+            border-top: 1px solid var(--border-color);  
+        }  
+
+        #guiaRecebimentoModal .btn-close-modal {  
+            padding: 0.75rem 1.5rem;  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+            border: 1px solid var(--border-color);  
+            border-radius: 8px;  
+            display: flex;  
+            align-items: center;  
+            gap: 0.5rem;  
+            transition: all 0.2s;  
+        }  
+
+        #guiaRecebimentoModal .btn-close-modal:hover {  
+            background: var(--background-secondary);  
+            transform: translateY(-1px);  
+        }  
+
+        #guiaRecebimentoModal .action-btn.success {  
+            padding: 0.75rem 1.5rem;  
+        }  
+
+        /* Dark Mode */  
+        body.dark-mode #guiaRecebimentoModal .modal-content {  
+            background: var(--background-primary);  
+        }  
+
+        body.dark-mode #guiaRecebimentoModal .btn-close-modal {  
+            background: #333333;  
+            color: var(--text-primary);  
+            border-color: var(--border-color);  
+        }  
+
+        /* Responsividade */  
+        @media (max-width: 768px) {  
+            #guiaRecebimentoModal .modal-footer {  
+                flex-direction: column-reverse;  
+            }  
+
+            #guiaRecebimentoModal .modal-footer button {  
+                width: 100%;  
+            }  
+        }  
+
+        /* Ajuste para inputs readonly */  
+        #guiaRecebimentoModal .form-control-modern[readonly] {  
+            background-color: var(--background-secondary);  
+            opacity: 0.8;  
+            cursor: not-allowed;  
+        }  
+
+        /* Hover states */  
+        #guiaRecebimentoModal .form-control-modern:hover:not([readonly]) {  
+            border-color: var(--accent-color);  
+        }  
+
+        #guiaRecebimentoModal .form-control-modern:focus:not([readonly]) {  
+            border-color: var(--accent-color);  
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);  
+        }
+
+        /* Ajustes específicos para o Modal de Vincular Ofício */  
+        #vincularOficioModal .link-section {  
+            background: var(--background-secondary);  
+            border-radius: 12px;  
+            padding: 2rem;  
+            margin: 1rem 0;  
+            box-shadow: 0 2px 8px var(--shadow-color);  
+        }  
+
+        #vincularOficioModal .info-item {  
+            max-width: 500px;  
+            margin: 0 auto;  
+        }  
+
+        /* Input Group com ícone */  
+        #vincularOficioModal .input-group {  
+            position: relative;  
+            display: flex;  
+            align-items: center;  
+        }  
+
+        #vincularOficioModal .input-icon {  
+            position: absolute;  
+            right: 1rem;  
+            color: var(--text-secondary);  
+            pointer-events: none;  
+        }  
+
+        #vincularOficioModal .form-control-modern {  
+            width: 100%;  
+            padding-right: 2.5rem;  
+            font-size: 1rem;  
+            height: 3rem;  
+        }  
+
+        /* Footer */  
+        #vincularOficioModal .modal-footer {  
+            display: flex;  
+            justify-content: flex-end;  
+            gap: 1rem;  
+            padding: 1rem 1.5rem;  
+            background: var(--background-secondary);  
+            border-top: 1px solid var(--border-color);  
+        }  
+
+        #vincularOficioModal .btn-close-modal {  
+            padding: 0.75rem 1.5rem;  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+            border: 1px solid var(--border-color);  
+            border-radius: 8px;  
+            display: flex;  
+            align-items: center;  
+            gap: 0.5rem;  
+            transition: all 0.2s;  
+        }  
+
+        #vincularOficioModal .action-btn.primary {  
+            padding: 0.75rem 1.5rem;  
+            background: var(--accent-color);  
+            color: white;  
+        }  
+
+        /* Hover States */  
+        #vincularOficioModal .form-control-modern:hover {  
+            border-color: var(--accent-color);  
+        }  
+
+        #vincularOficioModal .form-control-modern:focus {  
+            border-color: var(--accent-color);  
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);  
+        }  
+
+        #vincularOficioModal .btn-close-modal:hover {  
+            background: var(--background-secondary);  
+            transform: translateY(-1px);  
+        }  
+
+        #vincularOficioModal .action-btn.primary:hover {  
+            transform: translateY(-1px);  
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);  
+        }  
+
+        /* Dark Mode */  
+        body.dark-mode #vincularOficioModal .modal-content {  
+            background: var(--background-primary);  
+        }  
+
+        body.dark-mode #vincularOficioModal .link-section {  
+            background: var(--background-secondary);  
+        }  
+
+        body.dark-mode #vincularOficioModal .btn-close-modal {  
+            background: #333333;  
+            color: var(--text-primary);  
+            border-color: var(--border-color);  
+        }  
+
+        /* Responsividade */  
+        @media (max-width: 768px) {  
+            #vincularOficioModal .modal-footer {  
+                flex-direction: column-reverse;  
+            }  
+
+            #vincularOficioModal .modal-footer button {  
+                width: 100%;  
+            }  
+
+            #vincularOficioModal .link-section {  
+                padding: 1rem;  
+            }  
+        }  
+
+        /* Placeholder */  
+        #vincularOficioModal .form-control-modern::placeholder {  
+            color: var(--text-secondary);  
+            opacity: 0.7;  
+        }
+
+        /* Estilos específicos para o Modal de Criar Subtarefa */  
+        #createSubTaskModal .form-section {  
+            background: var(--background-secondary);  
+            border-radius: 12px;  
+            padding: 1.5rem;  
+            margin-bottom: 1.5rem;  
+        }  
+
+        #createSubTaskModal .info-grid {  
+            display: grid;  
+            gap: 1.5rem;  
+            margin-bottom: 1.5rem;  
+        }  
+
+        #createSubTaskModal .info-grid:not(.columns-4) {  
+            grid-template-columns: repeat(2, 1fr);  
+        }  
+
+        #createSubTaskModal .info-grid.columns-4 {  
+            grid-template-columns: repeat(4, 1fr);  
+        }  
+
+        /* Campos de formulário */  
+        #createSubTaskModal .form-control-modern {  
+            width: 100%;  
+            padding: 0.75rem 1rem;  
+            border: 1px solid var(--border-color);  
+            border-radius: 8px;  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+            transition: all 0.2s;  
+        }  
+
+        #createSubTaskModal select.form-control-modern {  
+            appearance: none;  
+            background-image: url("data:image/svg+xml,...");  
+            background-repeat: no-repeat;  
+            background-position: right 1rem center;  
+            padding-right: 2.5rem;  
+        }  
+
+        /* Seção de Anexos */  
+        .attachments-section {  
+            background: var(--background-secondary);  
+            border-radius: 12px;  
+            padding: 1.5rem;  
+            margin-top: 1.5rem;  
+        }  
+
+        .attachment-header {  
+            display: flex;  
+            justify-content: space-between;  
+            align-items: center;  
+            margin-bottom: 1rem;  
+        }  
+
+        .modern-checkbox {  
+            width: 1.2rem;  
+            height: 1.2rem;  
+            margin-right: 0.5rem;  
+        }  
+
+        .file-upload-wrapper {  
+            position: relative;  
+            margin-top: 1rem;  
+        }  
+
+        .modern-file-input {  
+            position: absolute;  
+            width: 100%;  
+            height: 100%;  
+            opacity: 0;  
+            cursor: pointer;  
+        }  
+
+        .file-upload-label {  
+            display: flex;  
+            flex-direction: column;  
+            align-items: center;  
+            justify-content: center;  
+            padding: 2rem;  
+            border: 2px dashed var(--border-color);  
+            border-radius: 8px;  
+            background: var(--background-primary);  
+            cursor: pointer;  
+            transition: all 0.2s;  
+        }  
+
+        .file-upload-label i {  
+            font-size: 2rem;  
+            margin-bottom: 0.5rem;  
+            color: var(--accent-color);  
+        }  
+
+        .file-upload-label:hover {  
+            border-color: var(--accent-color);  
+            background: var(--background-secondary);  
+        }  
+
+        /* Responsividade */  
+        @media (max-width: 992px) {  
+            #createSubTaskModal .info-grid.columns-4 {  
+                grid-template-columns: repeat(2, 1fr);  
+            }  
+        }  
+
+        @media (max-width: 768px) {  
+            #createSubTaskModal .info-grid,  
+            #createSubTaskModal .info-grid.columns-4 {  
+                grid-template-columns: 1fr;  
+            }  
+
+            .attachment-header {  
+                flex-direction: column;  
+                gap: 1rem;  
+            }  
+        }  
+
+        /* Dark Mode */  
+        body.dark-mode #createSubTaskModal .form-control-modern {  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+        }  
+
+        body.dark-mode #createSubTaskModal .file-upload-label {  
+            background: var(--background-primary);  
+        }  
+
+        /* Estilos para campos disabled */  
+        #createSubTaskModal .form-control-modern:disabled {  
+            background-color: var(--background-secondary);  
+            opacity: 0.7;  
+            cursor: not-allowed;  
+        }  
+
+        /* Estilos para a lista de arquivos selecionados */  
+        .selected-files {  
+            margin-top: 1rem;  
+            padding: 0.5rem;  
+            border-radius: 8px;  
+        }  
+
+        .file-item {  
+            display: flex;  
+            align-items: center;  
+            justify-content: space-between;  
+            padding: 0.5rem;  
+            background: var(--background-primary);  
+            border: 1px solid var(--border-color);  
+            border-radius: 6px;  
+            margin-bottom: 0.5rem;  
+        }  
+
+        .file-item:last-child {  
+            margin-bottom: 0;  
+        }  
+
+        .file-info {  
+            display: flex;  
+            align-items: center;  
+            gap: 0.5rem;  
+        }  
+
+        .file-name {  
+            font-size: 0.9rem;  
+            color: var(--text-primary);  
+        }  
+
+        .file-size {  
+            font-size: 0.8rem;  
+            color: var(--text-secondary);  
+        }  
+
+        .remove-file {  
+            background: none;  
+            border: none;  
+            color: var(--danger-color);  
+            cursor: pointer;  
+            padding: 0.25rem;  
+            font-size: 1rem;  
+            transition: all 0.2s;  
+        }  
+
+        .remove-file:hover {  
+            color: var(--danger-color-hover);  
+            transform: scale(1.1);  
+        }  
+
+        .files-counter {  
+            background: var(--accent-color);  
+            color: white;  
+            padding: 0.25rem 0.75rem;  
+            border-radius: 1rem;  
+            font-size: 0.8rem;  
+            margin-top: 0.5rem;  
+            display: inline-block;  
+        }
+
+        .file-upload-label.drag-hover {  
+            background: var(--background-secondary);  
+            border-color: var(--accent-color);  
+            transform: scale(1.02);  
+        }
+
+        /* Estilos específicos para o Modal de Comentário */  
+        #addCommentModal .comment-section {  
+            background: var(--background-secondary);  
+            border-radius: 12px;  
+            padding: 1.5rem;  
+            margin-bottom: 1.5rem;  
+        }  
+
+        #addCommentModal .form-control-modern {  
+            width: 100%;  
+            padding: 1rem;  
+            border: 1px solid var(--border-color);  
+            border-radius: 8px;  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+            transition: all 0.2s;  
+            font-family: inherit;  
+            resize: vertical;  
+            min-height: 120px;  
+        }  
+
+        #addCommentModal .form-control-modern:focus {  
+            border-color: var(--accent-color);  
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);  
+            outline: none;  
+        }  
+
+        #addCommentModal .attachments-section {  
+            background: var(--background-secondary);  
+            border-radius: 12px;  
+            padding: 1.5rem;  
+        }  
+
+        /* Upload de Arquivo */  
+        #addCommentModal .file-upload-wrapper {  
+            position: relative;  
+            margin-top: 1rem;  
+        }  
+
+        #addCommentModal .modern-file-input {  
+            position: absolute;  
+            width: 100%;  
+            height: 100%;  
+            opacity: 0;  
+            cursor: pointer;  
+        }  
+
+        #addCommentModal .file-upload-label {  
+            display: flex;  
+            flex-direction: column;  
+            align-items: center;  
+            justify-content: center;  
+            padding: 2rem;  
+            border: 2px dashed var(--border-color);  
+            border-radius: 8px;  
+            background: var(--background-primary);  
+            cursor: pointer;  
+            transition: all 0.2s;  
+        }  
+
+        #addCommentModal .file-upload-label i {  
+            font-size: 2rem;  
+            margin-bottom: 0.5rem;  
+            color: var(--accent-color);  
+        }  
+
+        #addCommentModal .file-upload-label:hover {  
+            border-color: var(--accent-color);  
+            background: var(--background-secondary);  
+        }  
+
+        /* Lista de Arquivos Selecionados */  
+        #addCommentModal .selected-files {  
+            margin-top: 1rem;  
+        }  
+
+        #addCommentModal .file-item {  
+            display: flex;  
+            align-items: center;  
+            justify-content: space-between;  
+            padding: 0.75rem;  
+            background: var(--background-primary);  
+            border: 1px solid var(--border-color);  
+            border-radius: 6px;  
+            margin-bottom: 0.5rem;  
+        }  
+
+        #addCommentModal .file-info {  
+            display: flex;  
+            align-items: center;  
+            gap: 0.5rem;  
+        }  
+
+        #addCommentModal .file-name {  
+            font-size: 0.9rem;  
+            color: var(--text-primary);  
+        }  
+
+        #addCommentModal .file-size {  
+            font-size: 0.8rem;  
+            color: var(--text-secondary);  
+        }  
+
+        #addCommentModal .files-counter {  
+            background: var(--accent-color);  
+            color: white;  
+            padding: 0.25rem 0.75rem;  
+            border-radius: 1rem;  
+            font-size: 0.8rem;  
+            margin-bottom: 1rem;  
+            display: inline-block;  
+        }  
+
+        /* Footer */  
+        #addCommentModal .modal-footer {  
+            display: flex;  
+            justify-content: flex-end;  
+            gap: 1rem;  
+            padding: 1rem 1.5rem;  
+            background: var(--background-secondary);  
+            border-top: 1px solid var(--border-color);  
+        }  
+
+        #addCommentModal .btn-close-modal {  
+            padding: 0.75rem 1.5rem;  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+            border: 1px solid var(--border-color);  
+            border-radius: 8px;  
+            display: flex;  
+            align-items: center;  
+            gap: 0.5rem;  
+            transition: all 0.2s;  
+        }  
+
+        #addCommentModal .action-btn.success {  
+            padding: 0.75rem 1.5rem;  
+        }  
+
+        /* Dark Mode */  
+        body.dark-mode #addCommentModal .modal-content {  
+            background: var(--background-primary);  
+        }  
+
+        body.dark-mode #addCommentModal .form-control-modern {  
+            background: var(--background-primary);  
+            color: var(--text-primary);  
+        }  
+
+        /* Responsividade */  
+        @media (max-width: 768px) {  
+            #addCommentModal .modal-footer {  
+                flex-direction: column-reverse;  
+            }  
+
+            #addCommentModal .modal-footer button {  
+                width: 100%;  
+            }  
         }
     </style>
 </head>
@@ -473,411 +1623,558 @@ date_default_timezone_set('America/Sao_Paulo');
     </div>
 
     <!-- Modal -->
-    <div class="modal fade" id="viewTaskModal" tabindex="-1" role="dialog" aria-labelledby="viewTaskModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header d-block text-center">
-                    <h5 class="modal-title" id="viewTaskModalLabel">Dados da Tarefa - Protocolo Geral nº.: <span id="taskNumber"></span></h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" style="position: absolute; top: 5px; right: 15px;">
-                        &times;
-                    </button>
-                </div>
+    <div class="modal fade" id="viewTaskModal" tabindex="-1" role="dialog" aria-labelledby="viewTaskModalLabel" aria-hidden="true">  
+    <div class="modal-dialog modal-xl" role="document" >  
+        <div class="modal-content">  
+            <!-- Header Principal -->  
+            <div class="modal-header primary-header">  
+                <div class="modal-header-content">  
+                    <h5 class="modal-title" id="viewTaskModalLabel">  
+                        <i class="fa fa-tasks"></i>  
+                        Protocolo Geral nº.: <span id="taskNumber" class="protocol-number"></span>  
+                    </h5>  
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>  
+                </div>  
+            </div>  
 
-                <div class="modal-header d-block text-center">
-                    <div class="btn-group" role="group" aria-label="Ações da Tarefa">
-                        <button style="font-size:12px" id="guiaProtocoloButton" type="button" class="btn btn-secondary mr-2">
-                            <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo Geral
-                        </button>
-                        <button style="font-size:12px" id="guiaRecebimentoButton" type="button" class="btn btn-info2 mr-2">
-                            <i class="fa fa-file-text" aria-hidden="true"></i> Guia de Recebimento
-                        </button>
-                        <button style="font-size:12px" id="add-button" type="button" class="btn btn-success mr-2" onclick="window.open('../oficios/cadastrar-oficio.php', '_blank')">
-                            <i class="fa fa-plus" aria-hidden="true"></i> Criar Ofício
-                        </button>
-                        <button style="font-size:12px" id="vincularOficioButton" type="button" class="btn btn-primary mr-2" data-toggle="modal" data-target="#vincularOficioModal">
-                            <i class="fa fa-link" aria-hidden="true"></i> Vincular Ofício
-                        </button>
-                        <button style="font-size:12px" id="reciboEntregaButton" type="button" class="btn btn-info2 mr-2">
-                            <i class="fa fa-file-text" aria-hidden="true"></i> Recibo de Entrega
-                        </button>
-                    </div>
-                </div>
+            <!-- Barra de Ações -->  
+            <div class="actions-toolbar">  
+                <div class="action-buttons">  
+                    <button id="guiaProtocoloButton" class="action-btn">  
+                        <i class="fa fa-print"></i>  
+                        <span>Protocolo Geral</span>  
+                    </button>  
+                    <button id="guiaRecebimentoButton" class="action-btn">  
+                        <i class="fa fa-file-text"></i>  
+                        <span>Guia Recebimento</span>  
+                    </button>  
+                    <button id="add-button" class="action-btn success" onclick="window.open('../oficios/cadastrar-oficio.php', '_blank')">  
+                        <i class="fa fa-plus"></i>  
+                        <span>Criar Ofício</span>  
+                    </button>  
+                    <button id="vincularOficioButton" class="action-btn primary" data-toggle="modal" data-target="#vincularOficioModal">  
+                        <i class="fa fa-link"></i>  
+                        <span>Vincular Ofício</span>  
+                    </button>  
+                    <button id="reciboEntregaButton" class="action-btn">  
+                        <i class="fa fa-file-text"></i>  
+                        <span>Recibo Entrega</span>  
+                    </button>  
+                </div>  
+            </div>  
 
-                <div class="modal-body">
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="viewTitle">Título:</label>
-                            <input type="text" class="form-control" id="viewTitle" readonly>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="viewCategory">Categoria:</label>
-                            <input type="text" class="form-control" id="viewCategory" readonly>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="viewOrigin">Origem:</label>
-                            <input type="text" class="form-control" id="viewOrigin" readonly>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="viewDeadline">Data Limite:</label>
-                            <input type="text" class="form-control" id="viewDeadline" readonly>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="viewEmployee">Funcionário Responsável:</label>
-                            <input type="text" class="form-control" id="viewEmployee" readonly>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="viewConclusionDate">Data de Conclusão:</label>
-                            <input type="text" class="form-control" id="viewConclusionDate" readonly>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="viewDescription">Descrição:</label>
-                        <textarea class="form-control" id="viewDescription" rows="5" readonly></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="viewStatus">Status:</label>
-                        <div class="input-group">
-                            <select id="viewStatus" class="form-control">
-                                <option value="Iniciada">Iniciada</option>
-                                <option value="Em Espera">Em Espera</option>
-                                <option value="Em Andamento">Em Andamento</option>
-                                <option value="Concluída">Concluída</option>
-                                <option value="Cancelada">Cancelada</option>
-                            </select>
-                            <div class="input-group-append">
-                                <button type="button" class="btn btn-success" id="saveStatusButton">Salvar Status</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="createdBy">Criado por:</label>
-                            <input type="text" class="form-control" id="createdBy" readonly>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="createdAt">Data de Criação:</label>
-                            <input type="text" class="form-control" id="createdAt" readonly>
-                        </div>
-                    </div>
-                    <h4>Anexos</h4>
-                    <div id="viewAttachments" class="list-group">
-                        <!-- Lista de anexos será inserida aqui -->
-                    </div>
-                    <hr>
-                    <button style="margin-bottom:20px; width: 100%; " id="createSubTaskButton" type="button" class="btn btn-primary" data-toggle="modal" data-target="#createSubTaskModal">
-                        <i class="fa fa-plus" aria-hidden="true"></i> Criar subtarefa
-                    </button>
-                    <!-- Tabela da Tarefa Principal -->
-                    <h4 id="mainTaskHeader" style="display: none;">Tarefa Principal</h4>
-                    <table style="zoom: 85%; display: none;" id="mainTaskTable" class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Protocolo</th>
-                                <th>Título da Tarefa Principal</th>
-                                <th>Funcionário Responsável</th>
-                                <th>Data de Criação</th>
-                                <th>Data Limite</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="mainTaskTableBody">
-                            <!-- Linha da tarefa principal será inserida aqui via JavaScript -->
-                        </tbody>
-                    </table>
+            <!-- Corpo do Modal -->  
+            <div class="modal-body">  
+                <!-- Grid de Informações -->  
+                <div class="info-grid">  
+                    <div class="info-item">  
+                        <label for="viewTitle">Título</label>  
+                        <input type="text" class="form-control-modern" id="viewTitle" readonly>  
+                    </div>  
+                    <div class="info-item">  
+                        <label for="viewCategory">Categoria</label>  
+                        <input type="text" class="form-control-modern" id="viewCategory" readonly>  
+                    </div>  
+                    <div class="info-item">  
+                        <label for="viewOrigin">Origem</label>  
+                        <input type="text" class="form-control-modern" id="viewOrigin" readonly>  
+                    </div>  
+                    <div class="info-item">  
+                        <label for="viewDeadline">Data Limite</label>  
+                        <input type="text" class="form-control-modern" id="viewDeadline" readonly>  
+                    </div>  
+                    <div class="info-item">  
+                        <label for="viewEmployee">Funcionário Responsável</label>  
+                        <input type="text" class="form-control-modern" id="viewEmployee" readonly>  
+                    </div>  
+                    <div class="info-item">  
+                        <label for="viewConclusionDate">Data de Conclusão</label>  
+                        <input type="text" class="form-control-modern" id="viewConclusionDate" readonly>  
+                    </div>  
+                </div>  
 
-                    <hr>
+                <!-- Descrição -->  
+                <div class="description-section">  
+                    <label for="viewDescription">Descrição</label>  
+                    <textarea class="form-control-modern" id="viewDescription" rows="4" readonly></textarea>  
+                </div>  
 
-                    <!-- Tabela de Subtarefas -->
-                    <h4 id="subTasksHeader" style="display: none;">Subtarefas</h4>
-                    <table style="zoom: 85%; display: none;" id="subTasksTable" class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Protocolo</th>
-                                <th>Título da Subtarefa</th>
-                                <th>Funcionário Responsável</th>
-                                <th>Data de Criação</th>
-                                <th>Data Limite</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="subTasksTableBody">
-                            <!-- Linhas de subtarefas serão inseridas aqui via JavaScript -->
-                        </tbody>
-                    </table>
-                    <hr>
-                    <h4>Timeline</h4>
-                    <div id="commentTimeline" class="timeline">
-                        <!-- Comentários serão inseridos aqui -->
-                    </div>
-                    <button type="button" class="btn btn-primary" id="addCommentButton" data-toggle="modal" data-target="#addCommentModal"><i class="fa fa-plus-circle" aria-hidden="true"></i> Comentário e Anexos</button>
+                <!-- Status -->  
+                <div class="status-section">  
+                    <label for="viewStatus">Status da Tarefa</label>  
+                    <div class="status-control">  
+                        <select id="viewStatus" class="form-control-modern">  
+                            <option value="Iniciada">Iniciada</option>  
+                            <option value="Em Espera">Em Espera</option>  
+                            <option value="Em Andamento">Em Andamento</option>  
+                            <option value="Concluída">Concluída</option>  
+                            <option value="Cancelada">Cancelada</option>  
+                        </select>  
+                        <button type="button" class="btn-save" id="saveStatusButton">  
+                            <i class="fa fa-check"></i> Atualizar Status  
+                        </button>  
+                    </div>  
+                </div>  
+
+                <!-- Informações de Criação -->  
+                <div class="creation-info">  
+                    <div class="info-item">  
+                        <label for="createdBy">Criado por</label>  
+                        <input type="text" class="form-control-modern" id="createdBy" readonly>  
+                    </div>  
+                    <div class="info-item">  
+                        <label for="createdAt">Data de Criação</label>  
+                        <input type="text" class="form-control-modern" id="createdAt" readonly>  
+                    </div>  
+                </div>  
+
+                <!-- Seção de Anexos -->  
+                <div class="attachments-section">  
+                    <h4><i class="fa fa-paperclip"></i> Anexos</h4>  
+                    <div id="viewAttachments" class="attachments-list"></div>  
+                </div>  
+
+                <!-- Botão Criar Subtarefa -->  
+                <button id="createSubTaskButton" class="create-subtask-btn" data-toggle="modal" data-target="#createSubTaskModal">  
+                    <i class="fa fa-plus"></i> Criar Subtarefa  
+                </button>  
+
+                <!-- Tabelas de Tarefas -->  
+                <div class="tasks-tables">  
+                    <!-- Tabela Principal -->  
+                    <div id="mainTaskSection" class="task-section">  
+                        <h4 id="mainTaskHeader" style="display: none;">  
+                            <i class="fa fa-project-diagram"></i> Tarefa Principal  
+                        </h4>  
+                        <div class="table-responsive">  
+                            <table id="mainTaskTable" class="table table-modern" style="display: none;zoom: 90%">  
+                                <thead>  
+                                    <tr>  
+                                        <th>Protocolo</th>  
+                                        <th>Título da Tarefa Principal</th>  
+                                        <th>Funcionário Responsável</th>  
+                                        <th>Data de Criação</th>  
+                                        <th>Data Limite</th>  
+                                        <th>Status</th>  
+                                        <th>Ações</th>  
+                                    </tr>  
+                                </thead>  
+                                <tbody id="mainTaskTableBody">  
+                                    <!-- Linha da tarefa principal será inserida aqui via JavaScript -->  
+                                </tbody>  
+                            </table>  
+                        </div>  
+                    </div>  
+
+                    <hr>  
+
+                    <!-- Tabela de Subtarefas -->  
+                    <div id="subTasksSection" class="task-section">  
+                        <h4 id="subTasksHeader" style="display: none;">  
+                            <i class="fa fa-tasks"></i> Subtarefas  
+                        </h4>  
+                        <div class="table-responsive">  
+                            <table id="subTasksTable" class="table table-modern" style="display: none;zoom: 90%">  
+                                <thead>  
+                                    <tr>  
+                                        <th>Protocolo</th>  
+                                        <th>Título da Subtarefa</th>  
+                                        <th>Funcionário Responsável</th>  
+                                        <th>Data de Criação</th>  
+                                        <th>Data Limite</th>  
+                                        <th>Status</th>  
+                                        <th>Ações</th>  
+                                    </tr>  
+                                </thead>  
+                                <tbody id="subTasksTableBody">  
+                                    <!-- Linhas de subtarefas serão inseridas aqui via JavaScript -->  
+                                </tbody>  
+                            </table>  
+                        </div>  
+                    </div>  
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                </div>
-            </div>
-        </div>
+                <!-- Timeline -->  
+                <div class="timeline-section">  
+                    <h4><i class="fa fa-history"></i> Timeline</h4>  
+                    <div id="commentTimeline" class="timeline-content"></div>  
+                    <button type="button" class="btn-add-comment" id="addCommentButton" data-toggle="modal" data-target="#addCommentModal">  
+                        <i class="fa fa-plus-circle"></i> Adicionar Comentário  
+                    </button>  
+                </div>  
+            </div>  
+
+            <!-- Footer -->  
+            <div class="modal-footer">  
+                <button type="button" class="btn-close-modal" data-dismiss="modal">  
+                    <i class="fa fa-times"></i> Fechar  
+                </button>  
+            </div>  
+        </div>  
+    </div>  
+</div>
+
+    <!-- Modal Adicionar Comentário -->  
+    <div class="modal fade" id="addCommentModal" tabindex="-1" role="dialog" aria-labelledby="addCommentModalLabel" aria-hidden="true">  
+        <div class="modal-dialog modal-gl" role="document">  
+            <div class="modal-content">  
+                <!-- Header -->  
+                <div class="primary-header">  
+                    <div class="modal-header-content">  
+                        <h5 class="modal-title" id="addCommentModalLabel">  
+                            <i class="fa fa-comment"></i> Adicionar Comentário e Anexos  
+                        </h5>  
+                    </div>  
+                </div>  
+
+                <!-- Body -->  
+                <div class="modal-body">  
+                    <form id="commentForm">  
+                        <!-- Seção de Comentário -->  
+                        <div class="comment-section">  
+                            <label for="commentDescription">Comentário</label>  
+                            <textarea class="form-control-modern" id="commentDescription" name="commentDescription" rows="5"   
+                                placeholder="Digite seu comentário aqui..."></textarea>  
+                        </div>  
+
+                        <!-- Seção de Anexos -->  
+                        <div class="attachments-section">  
+                            <label>Anexos</label>  
+                            <div class="file-upload-wrapper">  
+                                <input type="file" id="commentAttachments" name="commentAttachments[]" multiple class="modern-file-input">  
+                                <label for="commentAttachments" class="file-upload-label">  
+                                    <i class="fa fa-cloud-upload"></i>  
+                                    <span class="upload-text">Arraste os arquivos ou clique para selecionar</span>  
+                                </label>  
+                                <div class="selected-files" id="selectedFiles"></div>  
+                            </div>  
+                        </div>  
+                    </form>  
+                </div>  
+
+                <!-- Footer -->  
+                <div class="modal-footer">  
+                    <button type="button" class="btn-close-modal" data-dismiss="modal">  
+                        <i class="fa fa-times"></i> Cancelar  
+                    </button>  
+                    <button type="submit" form="commentForm" class="action-btn success">  
+                        <i class="fa fa-save"></i> Salvar Comentário  
+                    </button>  
+                </div>  
+            </div>  
+        </div>  
     </div>
 
-    <!-- Modal Adicionar Comentário -->
-    <div class="modal fade" id="addCommentModal" tabindex="-1" role="dialog" aria-labelledby="addCommentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document" style="max-width: 60%;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addCommentModalLabel">Adicionar Comentário e Anexos</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <form id="commentForm">
-                        <div class="form-group">
-                            <label for="commentDescription">Comentário:</label>
-                            <textarea class="form-control" id="commentDescription" name="commentDescription" rows="5"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="commentAttachments">Anexar arquivos:</label>
-                            <input type="file" id="commentAttachments" name="commentAttachments[]" multiple class="form-control-file">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Salvar Comentário</button>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                </div>
-            </div>
-        </div>
+    <!-- Modal Vincular Ofício -->  
+    <div class="modal fade" id="vincularOficioModal" tabindex="-1" role="dialog" aria-labelledby="vincularOficioModalLabel" aria-hidden="true">  
+        <div class="modal-dialog modal-gl" role="document">  
+            <div class="modal-content">  
+                <!-- Header -->  
+                <div class="primary-header">  
+                    <div class="modal-header-content">  
+                        <h5 class="modal-title" id="vincularOficioModalLabel">  
+                            <i class="fa fa-link"></i> Vincular Ofício  
+                        </h5>   
+                    </div>  
+                </div>  
+
+                <!-- Body -->  
+                <div class="modal-body">  
+                    <form id="vincularOficioForm">  
+                        <!-- Seção de Vínculo -->  
+                        <div class="link-section">  
+                            <div class="info-item">  
+                                <label for="numeroOficio">Número do Ofício</label>  
+                                <div class="input-group">  
+                                    <input type="text" class="form-control-modern" id="numeroOficio" name="numeroOficio" placeholder="Digite o número do ofício">  
+                                    <div class="input-icon">  
+                                        <i class="fa fa-file-text"></i>  
+                                    </div>  
+                                </div>  
+                            </div>  
+                        </div>  
+                    </form>  
+                </div>  
+
+                <!-- Footer -->  
+                <div class="modal-footer">  
+                    <button type="button" class="btn-close-modal" data-dismiss="modal">  
+                        <i class="fa fa-times"></i> Cancelar  
+                    </button>  
+                    <button type="submit" form="vincularOficioForm" class="action-btn primary">  
+                        <i class="fa fa-save"></i> Vincular  
+                    </button>  
+                </div>  
+            </div>  
+        </div>  
     </div>
 
-    <!-- Modal Vincular Ofício -->
-    <div class="modal fade" id="vincularOficioModal" tabindex="-1" role="dialog" aria-labelledby="vincularOficioModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="vincularOficioModalLabel">Vincular Ofício</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
+    <!-- Modal Recibo de Entrega -->  
+<div class="modal fade" id="reciboEntregaModal" tabindex="-1" role="dialog" aria-labelledby="reciboEntregaModalLabel" aria-hidden="true">  
+    <div class="modal-dialog modal-gl" role="document">  
+        <div class="modal-content">  
+            <!-- Header -->  
+            <div class="primary-header">  
+                <div class="modal-header-content">  
+                    <h5 class="modal-title" id="reciboEntregaModalLabel">  
+                        <i class="fa fa-file-text"></i> Recibo de Entrega  
+                    </h5>  
+                </div>  
+            </div>  
 
-                </div>
-                <div class="modal-body">
-                    <form id="vincularOficioForm">
-                        <div class="form-group">
-                            <label for="numeroOficio">Número do Ofício:</label>
-                            <input type="text" class="form-control" id="numeroOficio" name="numeroOficio">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Salvar</button>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                </div>
-            </div>
-        </div>
-    </div>
+            <!-- Body -->  
+            <div class="modal-body">  
+                <form id="reciboEntregaForm">  
+                    <!-- Grid de Informações -->  
+                    <div class="info-grid">  
+                        <div class="info-item">  
+                            <label for="receptor">Nome do Receptor</label>  
+                            <input type="text" class="form-control-modern" id="receptor" name="receptor" required>  
+                        </div>  
+                        
+                        <div class="info-item">  
+                            <label for="dataEntrega">Data da Entrega</label>  
+                            <input type="datetime-local" class="form-control-modern" id="dataEntrega" name="dataEntrega" required>  
+                        </div>  
+                        
+                        <div class="info-item">  
+                            <label for="entregador">Nome do Entregador</label>  
+                            <input type="text" class="form-control-modern" id="entregador" name="entregador" readonly>  
+                        </div>  
+                    </div>  
 
-    <!-- Modal Recibo de Entrega -->
-    <div class="modal fade" id="reciboEntregaModal" tabindex="-1" role="dialog" aria-labelledby="reciboEntregaModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="reciboEntregaModalLabel">Recibo de Entrega</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <form id="reciboEntregaForm">
-                        <div class="form-group">
-                            <label for="receptor">Nome do Receptor:</label>
-                            <input type="text" class="form-control" id="receptor" name="receptor" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="dataEntrega">Data da Entrega:</label>
-                            <input type="datetime-local" class="form-control" id="dataEntrega" name="dataEntrega" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="documentos">Documentos Entregues:</label>
-                            <textarea class="form-control" id="documentos" name="documentos" rows="3" required></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="observacoes">Observações:</label>
-                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="entregador">Nome do Entregador:</label>
-                            <input type="text" class="form-control" id="entregador" name="entregador" readonly>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Salvar Recibo</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+                    <!-- Seção de Documentos -->  
+                    <div class="description-section">  
+                        <label for="documentos">Documentos Entregues</label>  
+                        <textarea class="form-control-modern" id="documentos" name="documentos" rows="3" required></textarea>  
+                    </div>  
 
-    <!-- Modal Guia de Recebimento -->
-    <div class="modal fade" id="guiaRecebimentoModal" tabindex="-1" role="dialog" aria-labelledby="guiaRecebimentoModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="guiaRecebimentoModalLabel">Guia de Recebimento</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <form id="guiaRecebimentoForm">
-                        <div class="form-group">
-                            <label for="cliente">Apresentante:</label>
-                            <input type="text" class="form-control" id="cliente" name="cliente" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="dataRecebimento">Data de Recebimento:</label>
-                            <input type="datetime-local" class="form-control" id="dataRecebimento" name="dataRecebimento" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="documentosRecebidos">Documentos Recebidos:</label>
-                            <textarea class="form-control" id="documentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="observacoes">Observações:</label>
-                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="funcionario">Funcionário:</label>
-                            <input type="text" class="form-control" id="funcionario" name="funcionario" readonly>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Salvar Guia</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+                    <!-- Seção de Observações -->  
+                    <div class="description-section">  
+                        <label for="observacoes">Observações</label>  
+                        <textarea class="form-control-modern" id="observacoes" name="observacoes" rows="3"></textarea>  
+                    </div>  
+                </form>  
+            </div>  
+
+            <!-- Footer -->  
+            <div class="modal-footer">  
+                <button type="button" class="btn-close-modal" data-dismiss="modal">  
+                    <i class="fa fa-times"></i> Cancelar  
+                </button>  
+                <button type="submit" form="reciboEntregaForm" class="action-btn success">  
+                    <i class="fa fa-save"></i> Salvar Recibo  
+                </button>  
+            </div>  
+        </div>  
+    </div>  
+</div>
+
+    <!-- Modal Guia de Recebimento -->  
+<div class="modal fade" id="guiaRecebimentoModal" tabindex="-1" role="dialog" aria-labelledby="guiaRecebimentoModalLabel" aria-hidden="true">  
+    <div class="modal-dialog modal-gl" role="document">  
+        <div class="modal-content">  
+            <!-- Header -->  
+            <div class="primary-header">  
+                <div class="modal-header-content">  
+                    <h5 class="modal-title" id="guiaRecebimentoModalLabel">  
+                        <i class="fa fa-file-text"></i> Guia de Recebimento  
+                    </h5>    
+                </div>  
+            </div>  
+
+            <!-- Body -->  
+            <div class="modal-body">  
+                <form id="guiaRecebimentoForm">  
+                    <!-- Grid de Informações -->  
+                    <div class="info-grid">  
+                        <div class="info-item">  
+                            <label for="cliente">Apresentante</label>  
+                            <input type="text" class="form-control-modern" id="cliente" name="cliente" required>  
+                        </div>  
+                        
+                        <div class="info-item">  
+                            <label for="dataRecebimento">Data de Recebimento</label>  
+                            <input type="datetime-local" class="form-control-modern" id="dataRecebimento" name="dataRecebimento" required>  
+                        </div>  
+                        
+                        <div class="info-item">  
+                            <label for="funcionario">Funcionário</label>  
+                            <input type="text" class="form-control-modern" id="funcionario" name="funcionario" readonly>  
+                        </div>  
+                    </div>  
+
+                    <!-- Seção de Documentos -->  
+                    <div class="description-section">  
+                        <label for="documentosRecebidos">Documentos Recebidos</label>  
+                        <textarea class="form-control-modern" id="documentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>  
+                    </div>  
+
+                    <!-- Seção de Observações -->  
+                    <div class="description-section">  
+                        <label for="observacoes">Observações</label>  
+                        <textarea class="form-control-modern" id="observacoes" name="observacoes" rows="3"></textarea>  
+                    </div>  
+                </form>  
+            </div>  
+
+            <!-- Footer -->  
+            <div class="modal-footer">  
+                <button type="button" class="btn-close-modal" data-dismiss="modal">  
+                    <i class="fa fa-times"></i> Cancelar  
+                </button>  
+                <button type="submit" form="guiaRecebimentoForm" class="action-btn success">  
+                    <i class="fa fa-save"></i> Salvar Guia  
+                </button>  
+            </div>  
+        </div>  
+    </div>  
+</div>
 
 
-    <!-- Modal Criar Subtarefa -->
-<div class="modal fade" id="createSubTaskModal" tabindex="-1" role="dialog" aria-labelledby="createSubTaskModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document" style="max-width: 60%;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="createSubTaskModalLabel">Criar Subtarefa</h5>
-                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                    &times;
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="subTaskForm" enctype="multipart/form-data" method="POST" action="save_sub_task.php">
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="subTaskTitle">Título da Subtarefa:</label>
-                            <input type="text" class="form-control" id="subTaskTitle" name="title" required>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="subTaskCategory">Categoria:</label>
-                            <select id="subTaskCategory" name="category" class="form-control" required>
-                            <option value="">Selecione</option>
-                                <?php
-                                $sql = "SELECT id, titulo FROM categorias WHERE status = 'ativo'";
-                                $result = $conn->query($sql);
-                                if ($result->num_rows > 0) {
-                                    while($row = $result->fetch_assoc()) {
-                                        echo "<option value='" . $row['id'] . "'>" . htmlspecialchars($row['titulo'], ENT_QUOTES, 'UTF-8') . "</option>";
-                                    }
-                                }
-                                ?>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-3">
-                            <label for="subTaskDeadline">Data Limite:</label>
-                            <input type="datetime-local" class="form-control" id="subTaskDeadline" name="deadline" required>
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="subTaskPriority">Nível de Prioridade:</label>
-                            <select id="subTaskPriority" name="priority" class="form-control" required>
-                                <option value="">Selecione</option>
-                                <option value="Baixa">Baixa</option>
-                                <option value="Média">Média</option>
-                                <option value="Alta">Alta</option>
-                                <option value="Crítica">Crítica</option>
-                            </select>
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="subTaskEmployee">Funcionário Responsável:</label>
-                            <select id="subTaskEmployee" name="employee" class="form-control" required>
-                                <option value="">Selecione</option>
-                                    <?php
-                                    $sql = "SELECT id, nome_completo FROM funcionarios WHERE status = 'ativo'";
-                                    $result = $conn->query($sql);
-                                    $loggedInUser = $_SESSION['username'];
+    <!-- Modal Criar Subtarefa -->  
+<div class="modal fade" id="createSubTaskModal" tabindex="-1" role="dialog" aria-labelledby="createSubTaskModalLabel" aria-hidden="true">  
+    <div class="modal-dialog modal-xl" role="document">  
+        <div class="modal-content">  
+            <!-- Header -->  
+            <div class="primary-header">  
+                <div class="modal-header-content">  
+                    <h5 class="modal-title" id="createSubTaskModalLabel">  
+                        <i class="fa fa-tasks"></i> Criar Subtarefa  
+                    </h5>  
+                    
+                </div>  
+            </div>  
 
-                                    if ($result->num_rows > 0) {
-                                        while($row = $result->fetch_assoc()) {
-                                            $selected = ($row['nome_completo'] == $loggedInUser) ? 'selected' : '';
-                                            echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "' $selected>" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";
-                                        }
-                                    }
-                                    ?>
-                            </select>
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="subTaskOrigin">Origem:</label>
-                            <select id="subTaskOrigin" name="origin" class="form-control" required>
-                                <option value="">Selecione</option>
-                                    <?php
-                                    $sql = "SELECT id, titulo FROM origem WHERE status = 'ativo'";
-                                    $result = $conn->query($sql);
-                                    if ($result->num_rows > 0) {
-                                        while($row = $result->fetch_assoc()) {
-                                            echo "<option value='" . $row['id'] . "'>" . htmlspecialchars($row['titulo'], ENT_QUOTES, 'UTF-8') . "</option>";
-                                        }
-                                    }
-                                    ?>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="subTaskDescription">Descrição:</label>
-                        <textarea class="form-control" id="subTaskDescription" name="description" rows="5"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <div class="d-flex align-items-center">
-                            <label for="subTaskAttachments" class="mr-2">Anexos:</label>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="compartilharAnexos" name="compartilharAnexos">
-                                <label class="form-check-label" for="compartilharAnexos">Compartilhar anexos da tarefa principal</label>
-                            </div>
-                        </div>
-                    </div>
+            <!-- Body -->  
+            <div class="modal-body">  
+                <form id="subTaskForm" enctype="multipart/form-data" method="POST" action="save_sub_task.php">  
+                    <!-- Informações Principais -->  
+                    <div class="form-section">  
+                        <div class="info-grid">  
+                            <div class="info-item">  
+                                <label for="subTaskTitle">Título da Subtarefa</label>  
+                                <input type="text" class="form-control-modern" id="subTaskTitle" name="title" required>  
+                            </div>  
+                            
+                            <div class="info-item">  
+                                <label for="subTaskCategory">Categoria</label>  
+                                <select id="subTaskCategory" name="category" class="form-control-modern" required>  
+                                    <option value="">Selecione</option>  
+                                    <?php  
+                                    $sql = "SELECT id, titulo FROM categorias WHERE status = 'ativo'";  
+                                    $result = $conn->query($sql);  
+                                    if ($result->num_rows > 0) {  
+                                        while($row = $result->fetch_assoc()) {  
+                                            echo "<option value='" . $row['id'] . "'>" . htmlspecialchars($row['titulo'], ENT_QUOTES, 'UTF-8') . "</option>";  
+                                        }  
+                                    }  
+                                    ?>  
+                                </select>  
+                            </div>  
+                        </div>  
 
-                    <div class="form-group mt-2">
-                        <input type="file" id="subTaskAttachments" name="attachments[]" multiple class="form-control-file">
-                    </div>
+                        <!-- Segunda linha de campos -->  
+                        <div class="info-grid columns-4">  
+                            <div class="info-item">  
+                                <label for="subTaskDeadline">Data Limite</label>  
+                                <input type="datetime-local" class="form-control-modern" id="subTaskDeadline" name="deadline" required>  
+                            </div>  
 
-                    <script>
-                        $('#compartilharAnexos').change(function () {
-                            if ($(this).is(':checked')) {
-                                $('#subTaskAttachments').prop('disabled', true);
-                            } else {
-                                $('#subTaskAttachments').prop('disabled', false);
-                            }
-                        });
-                    </script>
+                            <div class="info-item">  
+                                <label for="subTaskPriority">Nível de Prioridade</label>  
+                                <select id="subTaskPriority" name="priority" class="form-control-modern" required>  
+                                    <option value="">Selecione</option>  
+                                    <option value="Baixa">Baixa</option>  
+                                    <option value="Média">Média</option>  
+                                    <option value="Alta">Alta</option>  
+                                    <option value="Crítica">Crítica</option>  
+                                </select>  
+                            </div>  
 
-                    <input type="hidden" id="subTaskCreatedBy" name="createdBy" value="<?php echo $_SESSION['username']; ?>">
-                    <input type="hidden" id="subTaskCreatedAt" name="createdAt" value="<?php echo date('Y-m-d H:i:s'); ?>">
-                    <input type="hidden" id="subTaskPrincipalId" name="id_tarefa_principal">
-                    <button type="submit" class="btn btn-primary w-100">Salvar Subtarefa</button>
-                </form>
-            </div>
-        </div>
-    </div>
+                            <div class="info-item">  
+                                <label for="subTaskEmployee">Funcionário Responsável</label>  
+                                <select id="subTaskEmployee" name="employee" class="form-control-modern" required>  
+                                    <option value="">Selecione</option>  
+                                    <?php  
+                                    $sql = "SELECT id, nome_completo FROM funcionarios WHERE status = 'ativo'";  
+                                    $result = $conn->query($sql);  
+                                    $loggedInUser = $_SESSION['username'];  
+
+                                    if ($result->num_rows > 0) {  
+                                        while($row = $result->fetch_assoc()) {  
+                                            $selected = ($row['nome_completo'] == $loggedInUser) ? 'selected' : '';  
+                                            echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "' $selected>" .   
+                                                htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";  
+                                        }  
+                                    }  
+                                    ?>  
+                                </select>  
+                            </div>  
+
+                            <div class="info-item">  
+                                <label for="subTaskOrigin">Origem</label>  
+                                <select id="subTaskOrigin" name="origin" class="form-control-modern" required>  
+                                    <option value="">Selecione</option>  
+                                    <?php  
+                                    $sql = "SELECT id, titulo FROM origem WHERE status = 'ativo'";  
+                                    $result = $conn->query($sql);  
+                                    if ($result->num_rows > 0) {  
+                                        while($row = $result->fetch_assoc()) {  
+                                            echo "<option value='" . $row['id'] . "'>" . htmlspecialchars($row['titulo'], ENT_QUOTES, 'UTF-8') . "</option>";  
+                                        }  
+                                    }  
+                                    ?>  
+                                </select>  
+                            </div>  
+                        </div>  
+                    </div>  
+
+                    <!-- Descrição -->  
+                    <div class="description-section">  
+                        <label for="subTaskDescription">Descrição</label>  
+                        <textarea class="form-control-modern" id="subTaskDescription" name="description" rows="5"></textarea>  
+                    </div>  
+
+                    <!-- Anexos -->  
+                    <div class="attachments-section">  
+                        <div class="attachment-header">  
+                            <label>Anexos</label>  
+                            <div class="form-check">  
+                                <input class="form-check-input modern-checkbox" type="checkbox" id="compartilharAnexos" name="compartilharAnexos">  
+                                <label class="form-check-label" for="compartilharAnexos">  
+                                    Compartilhar anexos da tarefa principal  
+                                </label>  
+                            </div>  
+                        </div>  
+                        
+                        <div class="file-upload-wrapper">  
+                            <input type="file" id="subTaskAttachments" name="attachments[]" multiple class="modern-file-input">  
+                            <label for="subTaskAttachments" class="file-upload-label">  
+                                <i class="fa fa-cloud-upload"></i>  
+                                <span class="upload-text">Arraste os arquivos ou clique para selecionar</span>  
+                            </label>  
+                            <div class="selected-files" id="selectedFiles"></div>  
+                        </div>
+                    </div>  
+
+                    <!-- Campos ocultos -->  
+                    <input type="hidden" id="subTaskCreatedBy" name="createdBy" value="<?php echo $_SESSION['username']; ?>">  
+                    <input type="hidden" id="subTaskCreatedAt" name="createdAt" value="<?php echo date('Y-m-d H:i:s'); ?>">  
+                    <input type="hidden" id="subTaskPrincipalId" name="id_tarefa_principal">  
+                </form>  
+            </div>  
+
+            <!-- Footer -->  
+            <div class="modal-footer">  
+                <button type="button" class="btn-close-modal" data-dismiss="modal">  
+                    <i class="fa fa-times"></i> Cancelar  
+                </button>  
+                <button type="submit" form="subTaskForm" class="action-btn success">  
+                    <i class="fa fa-save"></i> Criar Subtarefa  
+                </button>  
+            </div>  
+        </div>  
+    </div>  
 </div>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
@@ -885,6 +2182,21 @@ date_default_timezone_set('America/Sao_Paulo');
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script src="../script/sweetalert2.js"></script>
+    
+    <script>  
+        document.getElementById('compartilharAnexos').addEventListener('change', function() {  
+            const fileInput = document.getElementById('subTaskAttachments');  
+            const uploadWrapper = fileInput.closest('.file-upload-wrapper');  
+            
+            if (this.checked) {  
+                uploadWrapper.style.opacity = '0.5';  
+                fileInput.disabled = true;  
+            } else {  
+                uploadWrapper.style.opacity = '1';  
+                fileInput.disabled = false;  
+            }  
+        });  
+    </script>
     <script>
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -976,6 +2288,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             '<i class="fa fa-eye" aria-hidden="true"></i></button></td>' +
                             '</tr>';
                         mainTaskTableBody.append(row);
+
                     }
                 },
                 error: function() {
@@ -1012,7 +2325,6 @@ date_default_timezone_set('America/Sao_Paulo');
                         subTasks.forEach(function(subTask) {
                             var statusClass = getStatusClass(subTask.status);
                             var rowClass = getRowClass(subTask.status, subTask.data_limite);
-
                             var row = '<tr class="' + rowClass + '">' +
                                 '<td>' + subTask.id + '</td>' +
                                 '<td>' + subTask.titulo + '</td>' +
@@ -1879,23 +3191,6 @@ function viewTask(taskToken) {
             });
         }
 
-        $(document).on('show.bs.modal', function () {
-            // Desativa a rolagem do fundo
-            $('body').css('overflow', 'hidden');
-        });
-
-        $(document).on('hidden.bs.modal', function () {
-            // Restaura a rolagem do fundo apenas se não houver mais modais abertos
-            if ($('.modal.show').length === 0) {
-                $('body').css('overflow', 'auto');
-            }
-        });
-
-        // Adicionar rolagem ao modal principal após fechar o secundário
-        $('#vincularOficioModal, #reciboEntregaModal, #guiaRecebimentoModal, #createSubTaskModal, #addCommentModal').on('hidden.bs.modal', function () {
-            $('#viewTaskModal').css('overflow-y', 'auto');
-        });
-
         function abrirTarefaEmNovaGuia(tarefaId) {
             $.ajax({
                 url: 'get_token.php',
@@ -1924,6 +3219,256 @@ function viewTask(taskToken) {
             });
         }
 
+        $(document).on('show.bs.modal', function () {
+            // Desativa a rolagem do fundo
+            $('body').css('overflow', 'hidden');
+        });
+
+        $(document).on('hidden.bs.modal', function () {
+            // Restaura a rolagem do fundo apenas se não houver mais modais abertos
+            if ($('.modal.show').length === 0) {
+                $('body').css('overflow', 'auto');
+            }
+        });
+
+        // Adicionar rolagem ao modal principal após fechar o secundário
+        $('#vincularOficioModal, #reciboEntregaModal, #guiaRecebimentoModal, #createSubTaskModal, #addCommentModal').on('hidden.bs.modal', function () {
+            $('#viewTaskModal').css('overflow-y', 'auto');
+        });
+
+
+        document.addEventListener('DOMContentLoaded', function() {  
+            const fileInput = document.getElementById('subTaskAttachments');  
+            const selectedFilesDiv = document.getElementById('selectedFiles');  
+            const uploadText = document.querySelector('.upload-text');  
+            let filesArray = []; // Array para manter controle dos arquivos  
+
+            fileInput.addEventListener('change', function(e) {  
+                const files = Array.from(e.target.files);  
+                updateFileList(files);  
+            });  
+
+            function updateFileList(newFiles) {  
+                filesArray = newFiles; // Atualiza o array de arquivos  
+                selectedFilesDiv.innerHTML = ''; // Limpa a lista atual  
+
+                if (filesArray.length > 0) {  
+                    // Adiciona contador de arquivos  
+                    const counterDiv = document.createElement('div');  
+                    counterDiv.className = 'files-counter';  
+                    counterDiv.textContent = `${filesArray.length} arquivo(s) selecionado(s)`;  
+                    selectedFilesDiv.appendChild(counterDiv);  
+
+                    // Lista cada arquivo  
+                    filesArray.forEach((file, index) => {  
+                        const fileItem = document.createElement('div');  
+                        fileItem.className = 'file-item';  
+
+                        const fileInfo = document.createElement('div');  
+                        fileInfo.className = 'file-info';  
+                        
+                        // Escolhe o ícone baseado no tipo do arquivo  
+                        let fileIcon = 'fa-file-o';  
+                        if (file.type.includes('image')) fileIcon = 'fa-file-image-o';  
+                        else if (file.type.includes('pdf')) fileIcon = 'fa-file-pdf-o';  
+                        else if (file.type.includes('word')) fileIcon = 'fa-file-word-o';  
+                        else if (file.type.includes('excel')) fileIcon = 'fa-file-excel-o';  
+
+                        fileInfo.innerHTML = `  
+                            <i class="fa ${fileIcon}"></i>  
+                            <span class="file-name">${file.name}</span>  
+                            <span class="file-size">(${formatFileSize(file.size)})</span>  
+                        `;  
+
+                        const removeButton = document.createElement('button');  
+                        removeButton.className = 'remove-file';  
+                        removeButton.innerHTML = '<i class="fa fa-times"></i>';  
+                        removeButton.onclick = () => removeFile(index);  
+
+                        fileItem.appendChild(fileInfo);  
+                        fileItem.appendChild(removeButton);  
+                        selectedFilesDiv.appendChild(fileItem);  
+                    });  
+
+                    // Atualiza o texto do label  
+                    uploadText.textContent = 'Adicionar mais arquivos';  
+                } else {  
+                    // Reseta o texto se não houver arquivos  
+                    uploadText.textContent = 'Arraste os arquivos ou clique para selecionar';  
+                    selectedFilesDiv.innerHTML = '';  
+                }  
+            }  
+
+            function removeFile(index) {  
+                const dt = new DataTransfer();  
+                
+                // Recria o FileList sem o arquivo removido  
+                filesArray.forEach((file, i) => {  
+                    if (i !== index) dt.items.add(file);  
+                });  
+                
+                fileInput.files = dt.files; // Atualiza o input  
+                updateFileList(Array.from(dt.files)); // Atualiza a lista visual  
+            }  
+
+            function formatFileSize(bytes) {  
+                if (bytes === 0) return '0 Bytes';  
+                const k = 1024;  
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];  
+                const i = Math.floor(Math.log(bytes) / Math.log(k));  
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];  
+            }  
+
+            // Adiciona suporte para drag and drop  
+            const dropZone = document.querySelector('.file-upload-label');  
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {  
+                dropZone.addEventListener(eventName, preventDefaults, false);  
+            });  
+
+            function preventDefaults(e) {  
+                e.preventDefault();  
+                e.stopPropagation();  
+            }  
+
+            ['dragenter', 'dragover'].forEach(eventName => {  
+                dropZone.addEventListener(eventName, highlight, false);  
+            });  
+
+            ['dragleave', 'drop'].forEach(eventName => {  
+                dropZone.addEventListener(eventName, unhighlight, false);  
+            });  
+
+            function highlight(e) {  
+                dropZone.classList.add('drag-hover');  
+            }  
+
+            function unhighlight(e) {  
+                dropZone.classList.remove('drag-hover');  
+            }  
+
+            dropZone.addEventListener('drop', handleDrop, false);  
+
+            function handleDrop(e) {  
+                const dt = e.dataTransfer;  
+                const files = Array.from(dt.files);  
+                fileInput.files = dt.files;  
+                updateFileList(files);  
+            }  
+        });
+
+
+        document.addEventListener('DOMContentLoaded', function() {  
+            const fileInput = document.getElementById('commentAttachments');  
+            const selectedFilesDiv = document.getElementById('selectedFiles');  
+            const uploadText = document.querySelector('.upload-text');  
+            let filesArray = [];  
+
+            fileInput.addEventListener('change', function(e) {  
+                const files = Array.from(e.target.files);  
+                updateFileList(files);  
+            });  
+
+            function updateFileList(newFiles) {  
+                filesArray = newFiles;  
+                selectedFilesDiv.innerHTML = '';  
+
+                if (filesArray.length > 0) {  
+                    const counterDiv = document.createElement('div');  
+                    counterDiv.className = 'files-counter';  
+                    counterDiv.textContent = `${filesArray.length} arquivo(s) selecionado(s)`;  
+                    selectedFilesDiv.appendChild(counterDiv);  
+
+                    filesArray.forEach((file, index) => {  
+                        const fileItem = document.createElement('div');  
+                        fileItem.className = 'file-item';  
+
+                        const fileInfo = document.createElement('div');  
+                        fileInfo.className = 'file-info';  
+                        
+                        let fileIcon = 'fa-file-o';  
+                        if (file.type.includes('image')) fileIcon = 'fa-file-image-o';  
+                        else if (file.type.includes('pdf')) fileIcon = 'fa-file-pdf-o';  
+                        else if (file.type.includes('word')) fileIcon = 'fa-file-word-o';  
+                        else if (file.type.includes('excel')) fileIcon = 'fa-file-excel-o';  
+
+                        fileInfo.innerHTML = `  
+                            <i class="fa ${fileIcon}"></i>  
+                            <span class="file-name">${file.name}</span>  
+                            <span class="file-size">(${formatFileSize(file.size)})</span>  
+                        `;  
+
+                        const removeButton = document.createElement('button');  
+                        removeButton.className = 'remove-file';  
+                        removeButton.innerHTML = '<i class="fa fa-times"></i>';  
+                        removeButton.onclick = () => removeFile(index);  
+
+                        fileItem.appendChild(fileInfo);  
+                        fileItem.appendChild(removeButton);  
+                        selectedFilesDiv.appendChild(fileItem);  
+                    });  
+
+                    uploadText.textContent = 'Adicionar mais arquivos';  
+                } else {  
+                    uploadText.textContent = 'Arraste os arquivos ou clique para selecionar';  
+                }  
+            }  
+
+            function removeFile(index) {  
+                const dt = new DataTransfer();  
+                filesArray.forEach((file, i) => {  
+                    if (i !== index) dt.items.add(file);  
+                });  
+                fileInput.files = dt.files;  
+                updateFileList(Array.from(dt.files));  
+            }  
+
+            function formatFileSize(bytes) {  
+                if (bytes === 0) return '0 Bytes';  
+                const k = 1024;  
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];  
+                const i = Math.floor(Math.log(bytes) / Math.log(k));  
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];  
+            }  
+
+            // Drag and Drop  
+            const dropZone = document.querySelector('.file-upload-label');  
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {  
+                dropZone.addEventListener(eventName, preventDefaults, false);  
+            });  
+
+            function preventDefaults(e) {  
+                e.preventDefault();  
+                e.stopPropagation();  
+            }  
+
+            ['dragenter', 'dragover'].forEach(eventName => {  
+                dropZone.addEventListener(eventName, highlight, false);  
+            });  
+
+            ['dragleave', 'drop'].forEach(eventName => {  
+                dropZone.addEventListener(eventName, unhighlight, false);  
+            });  
+
+            function highlight(e) {  
+                dropZone.classList.add('drag-hover');  
+            }  
+
+            function unhighlight(e) {  
+                dropZone.classList.remove('drag-hover');  
+            }  
+
+            dropZone.addEventListener('drop', handleDrop, false);  
+
+            function handleDrop(e) {  
+                const dt = e.dataTransfer;  
+                const files = Array.from(dt.files);  
+                fileInput.files = dt.files;  
+                updateFileList(files);  
+            }  
+        });
+
         $(document).ready(function() {
             // Função para obter o valor do parâmetro da URL
             function getUrlParameter(name) {
@@ -1948,16 +3493,6 @@ function viewTask(taskToken) {
                 }
             });
         });
-
-        $('#compartilharAnexos').change(function () {
-            if ($(this).is(':checked')) {
-                $('#subTaskAttachments').prop('disabled', true); // Desabilita o botão "Escolher arquivos"
-            } else {
-                $('#subTaskAttachments').prop('disabled', false); // Habilita o botão novamente se desmarcado
-            }
-        });
-
-
     </script>
     <?php
     include(__DIR__ . '/../rodape.php');

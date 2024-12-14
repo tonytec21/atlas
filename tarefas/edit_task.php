@@ -180,7 +180,7 @@ include(__DIR__ . '/../menu.php');
                 <button style="width: 150px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important;" onclick="window.location.href='criar-tarefa.php'" class="btn btn-success">
                     <i class="fa fa-plus" aria-hidden="true"></i> Nova Tarefa
                 </button>
-                <button style="width: 150px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'">
+                <button style="width: 170px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'">
                     <i class="fa fa-search" aria-hidden="true"></i> Pesquisar Tarefas
                 </button>
             </div>

@@ -34,14 +34,327 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
     <link rel="stylesheet" href="style/css/font-awesome.min.css">
     <link rel="stylesheet" href="style/css/style.css">
     <link rel="icon" href="style/img/favicon.png" type="image/png">
-    <script src="script/jquery-3.6.0.min.js"></script>
-    <script src="script/jquery-ui.min.js"></script>
-    <link rel="stylesheet" href="style/css/jquery-ui.css">
+    <!-- <script src="script/jquery-3.6.0.min.js"></script>
+    <script src="script/jquery-ui.min.js"></script> -->
+    <!-- <link rel="stylesheet" href="style/css/jquery-ui.css"> -->
+   
     <style>
+
+/* Estilos base do Modal */  
+.modal-content {  
+    border: none;  
+    border-radius: 15px;  
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);  
+}  
+
+.modal-header {  
+    border-radius: 15px 15px 0 0;  
+    padding: 1.5rem;  
+    border-bottom: 1px solid #dee2e6;  
+    background-color: #f8f9fa;  
+}  
+
+.modal-title {  
+    letter-spacing: 0.5px;  
+    font-weight: 600;  
+    color: #333;  
+}  
+
+.modal-subtitle {  
+    font-size: 0.9rem;  
+    color: #6c757d;  
+    margin-top: 0.25rem;  
+}  
+
+/* Tabelas */  
+.modal-body table {  
+    width: 100%;  
+    margin-bottom: 1rem;  
+    background-color: #fff;  
+    border-collapse: collapse;  
+}  
+
+.modal-body table th,  
+.modal-body table td {  
+    padding: 0.75rem;  
+    border: 1px solid #dee2e6;  
+}  
+
+.modal-body table th {  
+    background-color: #f8f9fa;  
+    font-weight: 600;  
+}  
+
+.modal-body table tr:hover {  
+    background-color: #f8f9fa;  
+}  
+
+/* Badges e Status */  
+.badge {  
+    padding: 0.5em 0.8em;  
+    font-weight: 500;  
+    border-radius: 4px;  
+}  
+
+.status-em-espera {  
+    background-color: #ffc107;  
+    color: #000;  
+}  
+
+.status-prestes-vencer {  
+    background-color: #dc3545;  
+    color: #fff;  
+}  
+
+/* Botão de Visualizar */  
+.btn-visualizar {  
+    background-color: #0099cc;  
+    color: white;  
+    border: none;  
+    padding: 0.375rem 0.75rem;  
+    border-radius: 4px;  
+    cursor: pointer;  
+    transition: background-color 0.2s;  
+}  
+
+.btn-visualizar:hover {  
+    background-color: #007bff;  
+}  
+
+/* Botão Fechar */  
+.modal-footer .btn-secondary {  
+    background-color: #f8f9fa;  
+    border: 1px solid #dee2e6;  
+    color: #6c757d;  
+    font-weight: 500;  
+    padding: 0.5rem 1.5rem;  
+    border-radius: 6px;  
+    transition: all 0.2s;  
+}  
+
+.modal-footer .btn-secondary:hover {  
+    background-color: #e9ecef;  
+    color: #495057;  
+}  
+
+/* Seções de Tarefas */  
+.task-section {  
+    background: #fff;  
+    border-radius: 10px;  
+    padding: 1rem;  
+    margin-bottom: 1.5rem;  
+    border: 1px solid #dee2e6;  
+}  
+
+.section-header {  
+    padding-bottom: 0.5rem;  
+    margin-bottom: 1rem;  
+    border-bottom: 2px solid #dee2e6;  
+}  
+
+.section-title {  
+    font-size: 1.1rem;  
+    font-weight: 600;  
+}  
+
+/* Modo Dark */  
+.dark-mode .modal-content {  
+    background-color: #1e2124;  
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);  
+}  
+
+.dark-mode .modal-header {  
+    background-color: #2c2f33!important;  
+    border-color: #40444b;  
+}  
+
+.dark-mode .modal-footer {  
+    background-color: #2c2f33!important;  
+    border-color: #40444b;  
+}  
+
+.dark-mode .modal-title {  
+    color: #fff;  
+}  
+
+.dark-mode .modal-subtitle {  
+    color: #a0a0a0;  
+}  
+
+.dark-mode .task-section {  
+    background-color: #2c2f33;  
+    border-color: #40444b;  
+}  
+
+.dark-mode .section-header {  
+    border-bottom-color: #40444b;  
+}  
+
+.dark-mode .modal-body table {  
+    background-color: #2c2f33;  
+    color: #fff;  
+}  
+
+.dark-mode .modal-body table th {  
+    background-color: #40444b;  
+    color: #fff;  
+    border-color: #40444b;  
+}  
+
+.dark-mode .modal-body table td {  
+    border-color: #40444b;  
+}  
+
+.dark-mode .modal-body table tr:hover {  
+    background-color: #34373c;  
+}  
+
+.dark-mode .modal-footer .btn-secondary {  
+    background-color: #40444b;  
+    border-color: #40444b;  
+    color: #fff;  
+}  
+
+.dark-mode .modal-footer .btn-secondary:hover {  
+    background-color: #4a4f57;  
+}  
+
+/* Status no modo dark */  
+.dark-mode .status-em-espera {  
+    background-color: #faa61a;  
+    color: #000;  
+}  
+
+.dark-mode .status-prestes-vencer {  
+    background-color: #f04747;  
+    color: #fff;  
+}  
+
+.dark-mode .btn-visualizar {  
+    background-color: #006687;  
+}  
+
+.dark-mode .btn-visualizar:hover {  
+    background-color: #0088b3;  
+}  
+
+/* Scrollbar Personalizada */  
+.modal-body::-webkit-scrollbar {  
+    width: 8px;  
+}  
+
+.modal-body::-webkit-scrollbar-track {  
+    background: #f1f1f1;  
+    border-radius: 4px;  
+}  
+
+.modal-body::-webkit-scrollbar-thumb {  
+    background: #888;  
+    border-radius: 4px;  
+}  
+
+.modal-body::-webkit-scrollbar-thumb:hover {  
+    background: #555;  
+}  
+
+/* Scrollbar no modo dark */  
+.dark-mode .modal-body::-webkit-scrollbar-track {  
+    background: #2c2f33;  
+}  
+
+.dark-mode .modal-body::-webkit-scrollbar-thumb {  
+    background: #40444b;  
+}  
+
+.dark-mode .modal-body::-webkit-scrollbar-thumb:hover {  
+    background: #4a4f57;  
+}  
+
+/* Responsividade */  
+@media (max-width: 768px) {  
+    .modal-dialog {  
+        margin: 0.5rem;  
+    }  
+    
+    .modal-header {  
+        padding: 1rem;  
+    }  
+    
+    .modal-body {  
+        padding: 1rem;  
+    }  
+    
+    .section-title {  
+        font-size: 1rem;  
+    }  
+    
+    .modal-body table {  
+        font-size: 0.9rem;  
+    }  
+}  
+
+/* Cores específicas mantidas em ambos os modos */  
+.text-success {  
+    color: #28a745 !important;  
+}  
+
+.text-danger {  
+    color: #dc3545 !important;  
+}  
+
+/* Animações */  
+.modal.fade .modal-dialog {  
+    transform: scale(0.95);  
+    transition: transform 0.2s ease-out;  
+}  
+
+.modal.show .modal-dialog {  
+    transform: scale(1);  
+}  
+
+/* Botão close */  
+.btn-close {  
+    opacity: 0.7;  
+    transition: all 0.2s;  
+}  
+
+.btn-close:hover {  
+    opacity: 1;  
+    transform: rotate(90deg);  
+}  
+
+.dark-mode .btn-close {  
+    filter: invert(1) grayscale(100%) brightness(200%);  
+}
 
 /* Cursor para indicar que os elementos são arrastáveis */
 #sortable-buttons .col-md-4 {
             cursor: move;
+        }
+
+        .page-title {  
+            font-size: 2.0rem;  
+            font-weight: 700;  
+            color: #34495e;  
+            margin-bottom: 2rem;  
+            text-align: center;  
+            text-transform: uppercase;  
+            letter-spacing: 1px;  
+        }  
+
+        body.dark-mode .page-title {
+            font-size: 2.0rem;  
+            font-weight: 700;  
+            color: #fff;  
+            margin-bottom: 2rem;  
+            text-align: center;  
+            text-transform: uppercase;  
+            letter-spacing: 1px;  
+            
+        }
+    
+        .btn {  
+            border-radius: 10px!important;  
         }
 
         .btn-warning {
@@ -236,7 +549,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             white-space: nowrap;
             vertical-align: baseline;
             border-radius: 0.25em;
-            width: 100px;
+            width: 100%;
         }
 
         .status-iniciada {
@@ -436,6 +749,21 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
         .w-100 {
             margin-bottom: 5px;
         }
+        #sortable-cards .card {  
+            border: none;  
+            border-radius: 15px;  
+            transition: all var(--transition-speed) ease;  
+            cursor: grab;  
+            background: var(--primary-bg);  
+            box-shadow: var(--card-shadow);  
+            overflow: hidden;  
+            height: 100%;  
+        }  
+
+        #sortable-cards .card:hover {  
+            transform: var(--card-hover-transform);  
+            box-shadow: 0 12px 20px rgba(0,0,0,0.15);  
+        }  
     </style>
 </head>
 <body class="light-mode">
@@ -445,7 +773,7 @@ include(__DIR__ . '/menu.php');
 
 <div id="main" class="main-content">
     <div class="container mt-4">
-        <h2 class="text-center mb-4">Central de Acesso</h2>
+        <h2 class="page-title">Central de Acesso</h2>
 
         <!-- Cards de Módulos -->
         <div id="sortable-cards" class="row">
@@ -614,36 +942,62 @@ include(__DIR__ . '/menu.php');
     </div>
 </div>
 
-<div class="modal fade" id="tarefasModal" tabindex="-1" aria-labelledby="tarefasModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" style="max-width: 70%;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 style="text-align: center;width: 100%;" class="modal-title" id="tarefasModalLabel">RESUMO DAS TAREFAS</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-                    &times;
-                </button>
-            </div>
-            <div class="modal-body">
-                <!-- Seção para novas tarefas -->
-                <div id="novas-tarefas-section" style="display: none;">
-                    <h5 class="text-success">NOVAS TAREFAS:</h5>
-                    <div id="novas-tarefas-list">
-                        <!-- As novas tarefas serão carregadas aqui via AJAX e exibidas em tabelas -->
-                    </div>
-                    <hr>
-                </div>
+<div class="modal fade" id="tarefasModal" tabindex="-1" aria-labelledby="tarefasModalLabel" aria-hidden="true">  
+    <div class="modal-dialog modal-lg" style="max-width: 70%;">  
+        <div class="modal-content">  
+            <div class="modal-header border-0 bg-light">  
+                <div class="modal-title-wrapper w-100 text-center">  
+                    <h4 class="modal-title fw-bold" id="tarefasModalLabel">  
+                        <i class="fas fa-tasks me-2"></i>  
+                        Resumo das Tarefas  
+                    </h4>  
+                    <div class="modal-subtitle text-muted small mt-1">  
+                        Visualize e gerencie suas tarefas de forma eficiente  
+                    </div>  
+                </div>  
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>  
+            </div>  
+            
+            <div class="modal-body px-4 py-4">  
+                <!-- Seção para novas tarefas -->  
+                <div id="novas-tarefas-section" class="task-section mb-4" style="display: none;">  
+                    <div class="section-header d-flex align-items-center mb-3">  
+                        <div class="section-icon me-2">  
+                            <i class="fas fa-plus-circle text-success"></i>  
+                        </div>  
+                        <h5 class="section-title text-success mb-0 fw-bold">Novas Tarefas</h5>  
+                    </div>  
+                    <div id="novas-tarefas-list" class="task-list-container">  
+                        <!-- As novas tarefas serão carregadas aqui via AJAX -->  
+                    </div>  
+                </div>  
 
-                <!-- Seção para tarefas pendentes -->
-                <h5 class="text-danger">TAREFAS PENDENTES:</h5>
-                <div id="tarefas-list">
-                    <!-- As tarefas pendentes serão carregadas aqui via AJAX e exibidas em tabelas -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-            </div>
-        </div>
-    </div>
+                <!-- Divisor elegante -->  
+                <div class="task-divider my-4" style="display: none;">  
+                    <hr class="divider-line">  
+                </div>  
+
+                <!-- Seção para tarefas pendentes -->  
+                <div class="task-section">  
+                    <div class="section-header d-flex align-items-center mb-3">  
+                        <div class="section-icon me-2">  
+                            <i class="fas fa-clock text-danger"></i>  
+                        </div>  
+                        <h5 class="section-title text-danger mb-0 fw-bold">Tarefas Pendentes</h5>  
+                    </div>  
+                    <div id="tarefas-list" class="task-list-container">  
+                        <!-- As tarefas pendentes serão carregadas aqui via AJAX -->  
+                    </div>  
+                </div>  
+            </div>  
+
+            <div class="modal-footer border-0 bg-light">  
+                <button type="button" class="btn btn-secondary px-4 py-2" data-bs-dismiss="modal">  
+                    <i class="fas fa-times me-2"></i>Fechar  
+                </button>  
+            </div>  
+        </div>  
+    </div>  
 </div>
 
 <div class="modal fade modal-alerta" id="accessDeniedModal" tabindex="-1" aria-labelledby="accessDeniedLabel" aria-hidden="true">

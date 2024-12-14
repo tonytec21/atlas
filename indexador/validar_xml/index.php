@@ -27,7 +27,7 @@ function traduzirMensagemErro($mensagem) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Validação de XML</title>
+    <title>Atlas - Validação de XML CRC</title>
     <link rel="stylesheet" href="../../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../../style/css/style.css">
@@ -41,7 +41,7 @@ function traduzirMensagemErro($mensagem) {
 
 <div id="main" class="main-content">
     <div class="container">
-        <h3>Validação de Arquivo XML</h3>
+        <h3>Validação de Arquivo XML - CRC</h3>
         <hr>
         <form action="" method="post" enctype="multipart/form-data" id="formValidacao">
             <div class="row mb-4">
