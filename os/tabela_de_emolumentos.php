@@ -278,7 +278,7 @@ include(__DIR__ . '/db_connection.php');
 
     <div id="main" class="main-content">  
         <div class="container">  
-            <h3><i class="fa fa-table me-2"></i>Tabela de Emolumentos</h3>  
+            <h3><i class="fa fa-table me-2" style="margin-right: 7px;"></i>Tabela de Emolumentos</h3>  
             <hr>  
             
             <div class="card">  
