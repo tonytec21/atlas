@@ -208,7 +208,7 @@ body.dark-mode .form-control-modern:read-only {
     display: block;  
     width: 100%;  
     padding: 0.375rem 0.75rem;  
-    font-size: 0.875rem;  
+    font-size: 1rem;  
     font-weight: 400;  
     line-height: 1.5;  
     color: #333;  
