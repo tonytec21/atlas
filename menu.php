@@ -275,20 +275,20 @@ $mode_query->close();
 
 
         /* Header Styles */  
-        #system-name {  
-            position: fixed;  
-            top: 0;  
-            left: var(--mini-sidebar-width);  
-            right: 0;  
-            height: var(--header-height);  
-            background-color: var(--secondary-bg);  
-            display: flex;  
-            align-items: center;  
-            padding: 0 20px;  
-            z-index: 900;  
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);  
-            transition: var(--transition);  
-        }  
+        #system-name {
+            position: fixed !important;
+            top: 0 !important;
+            left: var(--mini-sidebar-width) !important;
+            right: 0 !important;
+            height: var(--header-height) !important;
+            background-color: var(--secondary-bg) !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 20px !important;
+            z-index: 900 !important;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+            transition: var(--transition) !important;
+        }
 
         .sidebar:hover ~ #system-name,  
         .sidebar.active ~ #system-name {  
@@ -313,17 +313,17 @@ $mode_query->close();
         }  
 
         /* Welcome Section Styles */  
-        #welcome-section {  
-            position: fixed;  
-            top: 0;  
-            right: 0;  
-            height: var(--header-height);  
-            display: flex;  
-            align-items: center;  
-            gap: 16px;  
-            padding: 0 20px;  
-            z-index: 901;  
-        }  
+        #welcome-section {
+            position: fixed !important;
+            top: 0 !important;
+            right: 0 !important;
+            height: var(--header-height) !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 16px !important;
+            padding: 0 20px !important;
+            z-index: 901 !important;
+        }
 
         .mode-switch {  
             background: none;  
@@ -431,29 +431,29 @@ $mode_query->close();
 
         /* Estilos base do header mobile */  
         @media screen and (max-width: 768px) {  
-            #system-name {  
-                display: flex;  
-                align-items: center;  
-                padding: 10px;  
-                position: fixed;  
-                top: 0;  
-                left: 0;  
-                right: 0;  
-                background-color: var(--secondary-bg);  
-                z-index: 1000;  
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);  
-            }  
+            #system-name {
+                display: flex !important;
+                align-items: center !important;
+                padding: 10px !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                background-color: var(--secondary-bg) !important;
+                z-index: 1000 !important;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+            }
 
-            #welcome-section {  
-                position: fixed;  
-                top: 0;  
-                right: 0;  
-                padding: 10px;  
-                z-index: 1001;  
-                display: flex;  
-                gap: 10px;  
-            }  
-
+            #welcome-section {
+                position: fixed !important;
+                top: 0 !important;
+                right: 0 !important;
+                padding: 10px !important;
+                z-index: 1001 !important;
+                display: flex !important;
+                gap: 10px !important;
+            }
+  
             .nav-toggle {  
                 display: flex;  
                 align-items: center;  
@@ -482,21 +482,20 @@ $mode_query->close();
                 display: none; 
             }  
 
-            .logout-button {  
-                background-color: #DC2626;  
-                color: white; 
-                padding: 8px;  
-                /* background: none;   */
-                border: none;  
-                /* color: var(--text-primary);   */
-                cursor: pointer;  
-                font-size: 0.87rem;  
-            }  
+            .logout-button {
+                background-color: #DC2626 !important;
+                color: white !important;
+                padding: 8px !important;
+                border: none !important;
+                cursor: pointer !important;
+                font-size: 0.87rem !important;
+            }
 
-            .logout-button:hover {  
-                color: white;
-                background-color: #B91C1C;  
-            }  
+            .logout-button:hover {
+                color: white !important;
+                background-color: #B91C1C !important;
+            }
+
 
             /* Overlay para quando o menu estiver aberto */  
             .sidebar-overlay {  
