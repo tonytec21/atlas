@@ -162,9 +162,6 @@ $mode_query->close();
         }  
 
 
-
-
-
         /* Estilos base do dropdown */  
         .dropdown-btn {  
             position: relative;  
@@ -269,10 +266,6 @@ $mode_query->close();
         .dropdown-container a:hover i {  
             opacity: 1;  
         }
-
-
-
-
 
         /* Header Styles */  
         #system-name {
@@ -742,7 +735,7 @@ $mode_query->close();
             <i class="fas fa-bars"></i>  
         </button>  
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>" style="text-decoration: none; margin-left: 20px;">  
-            <img id="logo-img" src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/' . ($mode === 'dark-mode' ? 'atlas2.png' : 'atlas1.png')?>" alt="Atlas" style="height: 40px;">  
+            <img id="logo-img" src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/' . ($mode === 'dark-mode' ? 'atlas1.png' : 'atlas2.png')?>" alt="Atlas" style="height: 40px;">  
         </a>  
     </div>
 
