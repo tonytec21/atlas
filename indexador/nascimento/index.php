@@ -545,16 +545,16 @@ include(__DIR__ . '/../../menu.php');
                         <form id="registry-form">
                             <div class="form-row">
                                 <div class="form-group col-12 col-md-2">
-                                    <label for="term">Termo</label>
-                                    <input type="number" class="form-control" id="term" name="termo" required min="0">
-                                </div>
-                                <div class="form-group col-12 col-md-2">
                                     <label for="book">Livro</label>
                                     <input type="number" class="form-control" id="book" name="livro" required min="0">
                                 </div>
                                 <div class="form-group col-12 col-md-2">
                                     <label for="page">Folha</label>
                                     <input type="number" class="form-control" id="page" name="folha" required min="0">
+                                </div>
+                                <div class="form-group col-12 col-md-2">
+                                    <label for="term">Termo</label>
+                                    <input type="number" class="form-control" id="term" name="termo" required min="0">
                                 </div>
                                 <div class="form-group col-12 col-md-3">
                                     <label for="registry-date">Data de Registro</label>
@@ -687,16 +687,16 @@ include(__DIR__ . '/../../menu.php');
                                 </div>  
                                 <div class="row g-3">  
                                     <div class="col-md-2">  
-                                        <label class="form-label">Termo</label>  
-                                        <input type="number" class="form-control-modern" id="edit-term" name="termo" required min="0">  
-                                    </div>  
-                                    <div class="col-md-2">  
                                         <label class="form-label">Livro</label>  
                                         <input type="number" class="form-control-modern" id="edit-book" name="livro" required min="0">  
                                     </div>  
                                     <div class="col-md-2">  
                                         <label class="form-label">Folha</label>  
                                         <input type="number" class="form-control-modern" id="edit-page" name="folha" required min="0">  
+                                    </div>  
+                                    <div class="col-md-2">  
+                                        <label class="form-label">Termo</label>  
+                                        <input type="number" class="form-control-modern" id="edit-term" name="termo" required min="0">  
                                     </div>  
                                     <div class="col-md-2">  
                                         <label class="form-label">Data de Registro</label>  
@@ -824,16 +824,16 @@ include(__DIR__ . '/../../menu.php');
                             </div>  
                             <div class="row g-3">  
                                 <div class="col-md-2">  
-                                    <label class="form-label">Termo</label>  
-                                    <input type="text" class="form-control-modern" id="view-term" readonly>  
-                                </div>  
-                                <div class="col-md-2">  
                                     <label class="form-label">Livro</label>  
                                     <input type="text" class="form-control-modern" id="view-book" readonly>  
                                 </div>  
                                 <div class="col-md-2">  
                                     <label class="form-label">Folha</label>  
                                     <input type="text" class="form-control-modern" id="view-page" readonly>  
+                                </div>  
+                                <div class="col-md-2">  
+                                    <label class="form-label">Termo</label>  
+                                    <input type="text" class="form-control-modern" id="view-term" readonly>  
                                 </div>  
                                 <div class="col-md-2">  
                                     <label class="form-label">Data de Registro</label>  
