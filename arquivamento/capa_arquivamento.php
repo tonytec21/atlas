@@ -133,7 +133,7 @@ if (isset($_GET['id'])) {
                             <tr>
                                 <td>
                                     <strong style="font-size: 10px;">Quantidade: ' . $selo['quantidade'] . '</strong><br>
-                                    <strong style="font-size: 10px;">Funcionário: ' . $selo['escrevente'] . '</strong>
+                                    <strong style="font-size: 10px;">Funcionário: ' . utf8_decode($selo['escrevente']) . '</strong>
                                 </td>
                             </tr>
                         </table>
