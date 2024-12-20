@@ -101,13 +101,13 @@ $selos_arquivamentos->close();
         <div class="title-buttons">
             <h4>Edição de Arquivamento</h4>
             <div class="buttons-right">
-                <button style="width: 190px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-primary" id="capaArquivamentoButton">
+                <button style="font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-primary" id="capaArquivamentoButton">
                     <i class="fa fa-print" aria-hidden="true"></i> Capa de Arquivamento
                 </button>
-                <button style="width: 190px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-success" onclick="window.location.href='cadastro.php'">
+                <button style="font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-success" onclick="window.location.href='cadastro.php'">
                     <i class="fa fa-plus" aria-hidden="true"></i> Criar Arquivamento
                 </button>
-                <button style="width: 200px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'">
+                <button style=" font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'">
                     <i class="fa fa-search" aria-hidden="true"></i> Pesquisar Arquivamentos
                 </button>
             </div>
