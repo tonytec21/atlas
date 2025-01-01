@@ -1,9 +1,9 @@
 <?php
 function getDatabaseConnection() {
-    $host = 'localhost'; // Substitua pelo seu host
-    $db   = 'atlas'; // Substitua pelo seu banco de dados
-    $user = 'root'; // Substitua pelo seu usuário do banco de dados
-    $pass = ''; // Substitua pela sua senha do banco de dados
+    $host = 'localhost';
+    $db   = 'atlas';
+    $user = 'root';
+    $pass = ''; 
     $charset = 'utf8mb4';
 
     $dsn = "mysql:host=$host;dbname=$db;charset=$charset";

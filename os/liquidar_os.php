@@ -6,7 +6,6 @@ include(__DIR__ . '/db_connection2.php');
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $os_id = $_POST['os_id'];
 
-    // Verifique se a conexão está definida
     if (!isset($conn)) {
         die(json_encode(['error' => 'Erro ao conectar ao banco de dados']));
     }
@@ -20,6 +19,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bind_param("i", $os_id);
         $stmt->execute();
         $itens = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        // Obter o ano de criação da OS
+        $os_query = $conn->prepare("SELECT data_criacao FROM ordens_de_servico WHERE id = ?");
+        $os_query->bind_param("i", $os_id);
+        $os_query->execute();
+        $os_result = $os_query->get_result();
+
+        if ($os_result->num_rows > 0) {
+            $os_data = $os_result->fetch_assoc();
+            $ano_criacao = date('Y', strtotime($os_data['data_criacao']));
+            $tabela_emolumentos = ($ano_criacao == 2024) ? 'tabela_emolumentos_2024' : 'tabela_emolumentos';
+        } else {
+            throw new Exception('Ordem de Serviço não encontrada.');
+        }
 
         foreach ($itens as $item) {
             $quantidadeRestante = $item['quantidade'] - $item['quantidade_liquidada'];
@@ -35,8 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $total_valor = 0;
 
                 if (!empty($item['ato']) && !in_array($item['ato'], ['0', '00', '9999'])) {
-                    // Buscar valores na tabela emolumentos
-                    $emol_query = $conn->prepare("SELECT * FROM tabela_emolumentos WHERE ato = ?");
+                    // Buscar valores na tabela de emolumentos
+                    $emol_query = $conn->prepare("SELECT * FROM $tabela_emolumentos WHERE ato = ?");
                     $emol_query->bind_param("s", $item['ato']);
                     $emol_query->execute();
                     $emol_result = $emol_query->get_result();
@@ -49,7 +62,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $femp_valor = floatval($emolumentos['FEMP']) * $quantidadeRestante;
                         $total_valor = floatval($emolumentos['TOTAL']) * $quantidadeRestante;
                     } else {
-                        // Usar valores do item como fallback
                         $emolumentos_valor = floatval($item['emolumentos']) * $quantidadeRestante;
                         $ferc_valor = floatval($item['ferc']) * $quantidadeRestante;
                         $fadep_valor = floatval($item['fadep']) * $quantidadeRestante;
@@ -57,7 +69,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $total_valor = floatval($item['total']) * $quantidadeRestante;
                     }
                 } else {
-                    // Ato inválido (0 ou 00), usar valores do item
                     $emolumentos_valor = floatval($item['emolumentos']) * $quantidadeRestante;
                     $ferc_valor = floatval($item['ferc']) * $quantidadeRestante;
                     $fadep_valor = floatval($item['fadep']) * $quantidadeRestante;
@@ -65,7 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $total_valor = floatval($item['total']) * $quantidadeRestante;
                 }
 
-                // Aplicar desconto legal
                 $desconto_legal = floatval($item['desconto_legal'] ?? 0);
                 if ($desconto_legal > 0) {
                     $factor = (1 - $desconto_legal / 100);
@@ -76,7 +86,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $total_valor *= $factor;
                 }
 
-                // Salvar na tabela correspondente
                 if (!in_array($item['ato'], ['0', '00', '9999'])) {
                     $stmt_insert = $conn->prepare(
                         "INSERT INTO atos_liquidados 
@@ -107,7 +116,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $stmt_insert->execute();
                 }
 
-                // Atualizar o item na tabela ordens_de_servico_itens
                 $stmt_update = $conn->prepare(
                     "UPDATE ordens_de_servico_itens 
                     SET quantidade_liquidada = ?, status = ? 
@@ -118,7 +126,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
 
-        // Confirmar transação
         $conn->commit();
         echo json_encode(['success' => true]);
     } catch (Exception $e) {

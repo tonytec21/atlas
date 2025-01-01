@@ -406,42 +406,70 @@ $(document).ready(function() {
 });
 
 function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
+    var os_id = $('#os_id').val();
+
+    // Buscar o ano de criação da OS
     $.ajax({
-        url: 'buscar_ato.php',
-        type: 'GET',
-        data: { ato: ato },
+        url: 'buscar_ano_os.php',
+        type: 'POST',
+        data: { os_id: os_id },
         success: function(response) {
+            console.log('Resposta do servidor (buscar_ano_os):', response);
+
+            // Remover JSON.parse, pois o objeto já é JSON
             if (response.error) {
                 showAlert(response.error, 'error');
             } else {
-                var emolumentos = response.EMOLUMENTOS * quantidade;
-                var ferc = response.FERC * quantidade;
-                var fadep = response.FADEP * quantidade;
-                var femp = response.FEMP * quantidade;
+                var tabela_emolumentos = (response.ano_criacao == 2024) ? 'tabela_emolumentos_2024' : 'tabela_emolumentos';
 
-                var desconto = descontoLegal / 100;
-                emolumentos = emolumentos * (1 - desconto);
-                ferc = ferc * (1 - desconto);
-                fadep = fadep * (1 - desconto);
-                femp = femp * (1 - desconto);
+                // Buscar dados do ato na tabela apropriada
+                $.ajax({
+                    url: 'buscar_ato_edit.php',
+                    type: 'GET',
+                    data: { ato: ato, tabela: tabela_emolumentos },
+                    success: function(response) {
+                        console.log('Resposta do servidor (buscar_ato):', response);
 
-                callback({
-                    descricao: response.DESCRICAO,
-                    emolumentos: emolumentos.toFixed(2).replace('.', ','),
-                    ferc: ferc.toFixed(2).replace('.', ','),
-                    fadep: fadep.toFixed(2).replace('.', ','),
-                    femp: femp.toFixed(2).replace('.', ','),
-                    total: (emolumentos + ferc + fadep + femp).toFixed(2).replace('.', ',')
+                        // Remover JSON.parse, pois o objeto já é JSON
+                        if (response.error) {
+                            showAlert(response.error, 'error');
+                        } else {
+                            var emolumentos = response.EMOLUMENTOS * quantidade;
+                            var ferc = response.FERC * quantidade;
+                            var fadep = response.FADEP * quantidade;
+                            var femp = response.FEMP * quantidade;
+
+                            var desconto = descontoLegal / 100;
+                            emolumentos *= (1 - desconto);
+                            ferc *= (1 - desconto);
+                            fadep *= (1 - desconto);
+                            femp *= (1 - desconto);
+
+                            callback({
+                                descricao: response.DESCRICAO,
+                                emolumentos: emolumentos.toFixed(2).replace('.', ','),
+                                ferc: ferc.toFixed(2).replace('.', ','),
+                                fadep: fadep.toFixed(2).replace('.', ','),
+                                femp: femp.toFixed(2).replace('.', ','),
+                                total: (emolumentos + ferc + fadep + femp).toFixed(2).replace('.', ',')
+                            });
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Erro ao buscar ato:', error, xhr.responseText);
+                        showAlert('Erro ao buscar o ato.', 'error');
+                    }
                 });
             }
         },
         error: function(xhr, status, error) {
-            console.log('Erro:', error);
-            console.log('Resposta do servidor:', xhr.responseText);
-            showAlert('Erro ao buscar o ato', 'error');
+            console.error('Erro ao buscar ano de criação:', error, xhr.responseText);
+            showAlert('Erro ao buscar o ano de criação da OS.', 'error');
         }
     });
 }
+
+
 
 function buscarAto() {
     var ato = $('#ato').val();
