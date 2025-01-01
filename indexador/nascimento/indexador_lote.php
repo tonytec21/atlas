@@ -78,6 +78,8 @@ date_default_timezone_set('America/Sao_Paulo');
         }
 
         .loading-spinner {
+            margin-top: 20%;
+            margin-left: 50%;
             width: 50px;
             height: 50px;
             border: 5px solid var(--bg-primary);
