@@ -78,6 +78,7 @@ date_default_timezone_set('America/Sao_Paulo');
         }
 
         .loading-spinner {
+            position: relative;
             margin-top: 20%;
             margin-left: 50%;
             width: 50px;
@@ -87,6 +88,18 @@ date_default_timezone_set('America/Sao_Paulo');
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
+
+        .loading-spinner span {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--text-primary); /* Ajuste conforme necessário */
+            animation: none; /* Garante que a contagem não gire */
+        }
+
 
         @keyframes spin {
             0% { transform: rotate(0deg); }
@@ -113,8 +126,11 @@ date_default_timezone_set('America/Sao_Paulo');
         </form>
 
         <div class="loading-overlay">
-            <div class="loading-spinner"></div>
+            <div class="loading-spinner">
+                <span>0%</span>
+            </div>
         </div>
+
     </div>
 </div>
 
@@ -126,52 +142,60 @@ $(document).ready(function() {
         const formData = new FormData(this);
         $('.loading-overlay').show();
 
-        $.ajax({
-            url: 'processar_lote.php',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                try {
-                    const result = JSON.parse(response);
-                    $('.loading-overlay').hide();
+        // Criar um novo XMLHttpRequest para monitorar o progresso
+        const xhr = new XMLHttpRequest();
 
-                    if (result.status === 'success') {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Sucesso',
-                            text: result.message,
-                            confirmButtonColor: '#28a745'
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro',
-                            text: result.message,
-                            confirmButtonColor: '#dc3545'
-                        });
-                    }
-                } catch (e) {
-                    console.error(e);
+        xhr.upload.addEventListener('progress', function(e) {
+            if (e.lengthComputable) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                $('.loading-overlay .loading-spinner').html(`<span>${percentComplete}%</span>`);
+            }
+        });
+
+        xhr.addEventListener('load', function() {
+            $('.loading-overlay').hide();
+
+            try {
+                const result = JSON.parse(xhr.responseText);
+
+                if (result.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso',
+                        text: result.message,
+                        confirmButtonColor: '#28a745'
+                    });
+                } else {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro',
-                        text: 'Resposta inválida do servidor.',
+                        text: result.message,
                         confirmButtonColor: '#dc3545'
                     });
                 }
-            },
-            error: function() {
-                $('.loading-overlay').hide();
+            } catch (e) {
+                console.error(e);
                 Swal.fire({
                     icon: 'error',
                     title: 'Erro',
-                    text: 'Erro ao processar os arquivos.',
+                    text: 'Resposta inválida do servidor.',
                     confirmButtonColor: '#dc3545'
                 });
             }
         });
+
+        xhr.addEventListener('error', function() {
+            $('.loading-overlay').hide();
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Erro ao processar os arquivos.',
+                confirmButtonColor: '#dc3545'
+            });
+        });
+
+        xhr.open('POST', 'processar_lote.php');
+        xhr.send(formData);
     });
 });
 </script>
