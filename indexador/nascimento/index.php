@@ -716,17 +716,22 @@ include(__DIR__ . '/../../menu.php');
                                     <h6 class="mb-0">Dados Pessoais</h6>  
                                 </div>  
                                 <div class="row g-3">  
-                                    <div class="col-6">  
+                                    <div class="col-5">  
                                         <label class="form-label">Nome do Registrado</label>  
                                         <input type="text" class="form-control-modern" id="edit-name" name="nome_registrado" required>  
                                     </div> 
-                                    <div class="col-md-2">  
+                                    <!-- <div class="col-md-2">  
                                         <label class="form-label">Naturalidade</label>  
                                         <input type="text" class="form-control-modern" id="edit-selected-city" name="naturalidade"   
                                             placeholder="Clique para selecionar a cidade" readonly required   
                                             data-toggle="modal" data-target="#searchCityModal">  
                                         <input type="hidden" id="edit-ibge-naturalidade" name="ibge_naturalidade">  
-                                    </div>  
+                                    </div>   -->
+                                    <div class="col-md-3">
+                                        <label for="naturalidade">Naturalidade</label>
+                                        <input type="text" class="form-control" id="edit-selected-city" name="naturalidade" placeholder="Clique para selecionar a cidade" readonly required data-toggle="modal" data-target="#searchCityModal">
+                                        <input type="hidden" id="ibge_naturalidade" name="ibge_naturalidade">
+                                    </div>
                                     <div class="col-md-2">  
                                         <label class="form-label">Sexo</label>  
                                         <select class="form-control-modern" id="edit-gender" name="sexo" required>  
@@ -749,7 +754,10 @@ include(__DIR__ . '/../../menu.php');
                                     </div>  
                                 </div>  
                             </div>  
-
+                            <div class="mt-4">
+                                <h6 class="mb-0">Visualização do Anexo</h6>
+                                <iframe id="edit-attachment-viewer" src="" width="100%" height="500px" style="border: none; display: none;"></iframe>
+                            </div>
                             <!-- Anexos -->  
                             <div class="section">  
                                 <div class="section-header d-flex align-items-center mb-3">  
@@ -762,7 +770,7 @@ include(__DIR__ . '/../../menu.php');
                                         <div class="input-group">  
                                             <input type="file" class="form-control-modern" id="edit-pdf-file">  
                                             <button type="button" id="edit-add-attachment-btn"   
-                                                    class="btn btn-secondary">Adicionar</button>  
+                                                    class="btn btn-secondary w-100" style="margin-top: 10px;">Adicionar anexo</button>  
                                         </div>  
                                     </div>  
                                     <div class="table-responsive">  
@@ -1193,13 +1201,10 @@ include(__DIR__ . '/../../menu.php');
 
                     if (isViewMode) {
                         $.each(attachments, function(index, attachment) {
-                            // Exibir o PDF em um iframe
                             var iframe = '<iframe src="' + attachment.caminho_anexo + '" width="100%" height="600px" style="border: none;"></iframe>';
                             container.append(iframe);
                         });
                     } else {
-                        // Código para editar e remover anexos, conforme sua implementação atual
-                        // Este bloco permanece inalterado
                         $.each(attachments, function(index, attachment) {
                             var formattedDate = formatDate(attachment.data.split(' ')[0]); // Formatar data sem hora
 
@@ -1208,6 +1213,7 @@ include(__DIR__ . '/../../menu.php');
                                 '<td>' + formattedDate + '</td>' +
                                 '<td>' +
                                     '<a href="' + attachment.caminho_anexo + '" target="_blank" title="Visualizar Anexo" style="width: 40px; height: 40px;margin-top: 5px; margin-right: 5px;" class="btn btn-info"><i class="fa fa-eye" aria-hidden="true"></i></a>' +
+                                    '<button type="button" style="width: 40px; height: 40px; margin-right: 5px;" title="Visualizar no Modal" class="btn btn-primary btn-preview-attachment" data-path="' + attachment.caminho_anexo + '"><i class="fa fa-file-pdf-o" aria-hidden="true"></i></button>' +
                                     (!isViewMode ? '<button type="button" style="width: 40px; height: 40px" title="Remover Anexo" class="btn btn-danger btn-delete-attachment" data-id="' + attachment.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') +
                                 '</td>' +
                                 '</tr>';
@@ -1217,6 +1223,13 @@ include(__DIR__ . '/../../menu.php');
                 }
             });
         }
+
+        // Visualizar PDF diretamente no modal de edição
+        $(document).on('click', '.btn-preview-attachment', function() {
+            var filePath = $(this).data('path');
+            $('#edit-attachment-viewer').attr('src', filePath).show();
+        });
+
 
         // Impedir o disparo da ação de "Salvar registro" ao clicar no botão de "Remover Anexo"
         $(document).on('click', '.btn-delete-attachment', function(event) {

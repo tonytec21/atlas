@@ -15,9 +15,16 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/style.css">  
     <link rel="icon" href="../style/img/favicon.png" type="image/png">  
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">  
-    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">  
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">  
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap4.min.css">  
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap4.min.css">  
     <style>  
+        .dt-buttons {  
+            margin-bottom: 15px;  
+        }  
+        .dt-buttons .btn {  
+            margin-right: 5px;  
+        }
         :root {  
             --primary-color: #2196F3;  
             --secondary-color: #6c757d;  
@@ -322,6 +329,10 @@ include(__DIR__ . '/db_connection.php');
             </div>  
 
             <div class="table-container mt-4">  
+                <div class="dt-buttons mb-3">  
+
+                </div>  
+
                 <div class="table-responsive">  
                     <table id="resultadosTabela" class="table table-hover">  
                         <thead>  
@@ -384,16 +395,22 @@ include(__DIR__ . '/db_connection.php');
                         </tbody>  
                     </table>  
                 </div>  
-            </div>  
+            </div>
         </div>  
     </div>  
 
-    <script src="../script/jquery-3.5.1.min.js"></script>  
     <script src="../script/bootstrap.min.js"></script>  
     <script src="../script/bootstrap.bundle.min.js"></script>  
     <script src="../script/jquery.mask.min.js"></script>  
-    <script src="../script/jquery.dataTables.min.js"></script>  
-    <script src="../script/dataTables.bootstrap4.min.js"></script>  
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.7.0.js"></script>  
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.5.1.min.js"></script>    
+    <script type="text/javascript" src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>  
+    <script type="text/javascript" src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap4.min.js"></script>  
+    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>  
+    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap4.min.js"></script>  
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>  
+    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>  
+
     <script>  
         $(document).ready(function() {  
             var table = $('#resultadosTabela').DataTable({  
@@ -403,30 +420,37 @@ include(__DIR__ . '/db_connection.php');
                 "order": [],  
                 "pageLength": 25,  
                 "lengthMenu": [[10, 25, 50, 100], [10, 25, 50, 100]],  
-                "columnDefs": [  
-                    { "width": "8%", "targets": 0 }, // Coluna Ato  
-                    { "width": "40%", "targets": 1 }, // Coluna Descrição  
-                    { "width": "10%", "className": "text-right", "targets": 2 }, // Coluna Emolumentos  
-                    { "width": "10%", "className": "text-right", "targets": 3 }, // Coluna FERC  
-                    { "width": "10%", "className": "text-right", "targets": 4 }, // Coluna FADEP  
-                    { "width": "10%", "className": "text-right", "targets": 5 }, // Coluna FEMP  
-                    { "width": "12%", "className": "text-right", "targets": 6 }  // Coluna Total  
-                ],  
-                "dom": "<'row'<'col-sm-6'l><'col-sm-6'f>>" +  
+                // Modificando o dom para incluir o botão  
+                "dom": "<'row'<'col-sm-12 col-md-6'B><'col-sm-12 col-md-6'f>>" +  
                     "<'row'<'col-sm-12'tr>>" +  
-                    "<'row'<'col-sm-5'i><'col-sm-7'p>>",  
-                "responsive": true,  
-                "initComplete": function() {  
-                    $('.dataTables_filter input').addClass('form-control');  
-                    $('.dataTables_length select').addClass('form-control');  
-                }  
-            }); 
+                    "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",  
+                "buttons": [  
+                    {  
+                        extend: 'excelHtml5',  
+                        text: '<i class="fas fa-file-excel"></i> Exportar Excel',  
+                        titleAttr: 'Exportar para Excel',  
+                        className: 'btn btn-success',  
+                        exportOptions: {  
+                            columns: ':visible'  
+                        }  
+                    }  
+                ],  
+                "columnDefs": [  
+                    { "width": "8%", "targets": 0 },  
+                    { "width": "40%", "targets": 1 },  
+                    { "width": "10%", "className": "text-right", "targets": 2 },  
+                    { "width": "10%", "className": "text-right", "targets": 3 },  
+                    { "width": "10%", "className": "text-right", "targets": 4 },  
+                    { "width": "10%", "className": "text-right", "targets": 5 },  
+                    { "width": "12%", "className": "text-right", "targets": 6 }  
+                ],  
+                "responsive": true  
+            });   
 
             $('#ato').on('input', function() {  
                 this.value = this.value.replace(/[^0-9.]/g, '');  
             });  
 
-            // Mantém os valores dos filtros após o submit  
             var urlParams = new URLSearchParams(window.location.search);  
             $('#ato').val(urlParams.get('ato'));  
             $('#descricao').val(urlParams.get('descricao'));  
