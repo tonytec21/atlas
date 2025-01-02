@@ -56,12 +56,12 @@ function getAccessToken($authUrl, $username, $password, $client_id, $grant_type)
 // Função para mapear código de ato para URL e obter código de tabela de custas
 function getAtoData($codAto) {
     $map = [
-        '13.30' => ['/selo/notas/atos-em-geral', '0520240101'],
-        '14.12' => ['/selo/civil/atos-em-geral', '0120240101'],
-        '15.22' => ['/selo/rtdpj/atos-em-geral', '0420240101'],
-        '16.39' => ['/selo/imovel/atos-em-geral', '0220240101'],
-        '17.9' => ['/selo/protesto/atos-em-geral', '0320240101'],
-        '18.13' => ['/selo/maritimo/atos-em-geral', '0620240101'],
+        '13.30' => ['/selo/notas/atos-em-geral', '0520250101'],
+        '14.12' => ['/selo/civil/atos-em-geral', '0120250101'],
+        '15.22' => ['/selo/rtdpj/atos-em-geral', '0420250101'],
+        '16.39' => ['/selo/imovel/atos-em-geral', '0220250101'],
+        '17.9' => ['/selo/protesto/atos-em-geral', '0320250101'],
+        '18.13' => ['/selo/maritimo/atos-em-geral', '0620250101'],
     ];
 
     return isset($map[$codAto]) ? $map[$codAto] : null;
