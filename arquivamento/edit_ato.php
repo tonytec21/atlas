@@ -205,12 +205,12 @@ $selos_arquivamentos->close();
     <div class="form-group col-md-7">
         <label for="ato">Ato:</label>
         <select id="ato" name="ato" class="form-control" required>
-            <option value="13.30">13.30 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,25</option>
-            <option value="14.12">14.12 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,25</option>
-            <option value="15.22">15.22 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,25</option>
-            <option value="16.39">16.39 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,25</option>
-            <option value="17.9">17.9 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,12</option>
-            <option value="18.13">18.13 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,25</option>
+            <option value="13.30">13.30 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
+            <option value="14.12">14.12 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
+            <option value="15.22">15.22 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
+            <option value="16.39">16.39 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
+            <option value="17.9">17.9 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,42</option>
+            <option value="18.13">18.13 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
         </select>
     </div>
 
