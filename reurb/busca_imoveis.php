@@ -15,12 +15,6 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
-    <script src="../script/jquery-3.6.0.min.js"></script>
-    <script src="../script/jquery.mask.min.js"></script>
-    <script src="../script/bootstrap.bundle.min.js"></script>
-    <script src="../script/sweetalert2.js"></script>
-    <script src="../script/jquery.dataTables.min.js"></script>
-    <script src="../script/dataTables.bootstrap4.min.js"></script>
     <style>
         .custom-container {
             max-width: 1000px;
@@ -122,6 +116,13 @@ include(__DIR__ . '/db_connection.php');
         </div>
     </div>
 
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <script src="../script/jquery.mask.min.js"></script>
+    <script src="../script/jquery.dataTables.min.js"></script>
+    <script src="../script/dataTables.bootstrap4.min.js"></script>
+    <script src="../script/bootstrap.bundle.min.js"></script>
+    <script src="../script/sweetalert2.js"></script>
+    
     <script>
         $(document).ready(function () {
             // Máscara para CPF
