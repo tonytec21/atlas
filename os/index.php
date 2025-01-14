@@ -186,29 +186,6 @@ include(__DIR__ . '/db_connection.php');
             color: #fff!important;
         }
 
-        #tabelaResultados th {
-    word-break: break-word; /* Garante que o conteúdo se ajuste */
-}
-
-#tabelaResultados th:nth-child(1) { width: 7%; }   /* Nº OS */
-#tabelaResultados th:nth-child(3) { width: 11%; }  /* Apresentante */
-#tabelaResultados th:nth-child(4) { width: 11%; }  /* CPF/CNPJ */
-#tabelaResultados th:nth-child(5) { width: 13%; }  /* Título da OS */
-#tabelaResultados th:nth-child(6) { width: 10%; }  /* Valor Total */
-#tabelaResultados th:nth-child(7) { width: 10%; }  /* Dep. Prévio */
-#tabelaResultados th:nth-child(8) { width: 10%; }  /* Liquidado */
-#tabelaResultados th:nth-child(9) { width: 12%; }  /* Observações */
-#tabelaResultados th:nth-child(12) { width: 5%; }  /* Situação */
-#tabelaResultados th:nth-child(13) { width: 9%; }  /* Ações */
-
-#tabelaResultados th:nth-child(2), /* Funcionário */
-#tabelaResultados th:nth-child(10), /* Data */
-#tabelaResultados th:nth-child(11) { /* Status */
-    min-width: 100px;
-    max-width: auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
 
     </style>
 </head>
