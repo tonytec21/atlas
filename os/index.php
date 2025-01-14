@@ -304,7 +304,7 @@ include(__DIR__ . '/db_connection.php');
                             <th>Data</th>
                             <th>Status</th>
                             <th style="width: 5%;">Situação</th>
-                            <th style="width: 9%;">Ações</th>
+                            <th style="width: 9%!important;">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
