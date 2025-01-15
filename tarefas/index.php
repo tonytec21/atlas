@@ -2787,37 +2787,58 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
 });
 
 
-            $('#reciboEntregaForm').on('submit', function(e) {
-                e.preventDefault();
+    $('#reciboEntregaForm').on('submit', function(e) {
+        e.preventDefault();
 
-                var formData = $(this).serialize() + '&task_id=' + $('#taskNumber').text();
+        var formData = $(this).serialize() + '&task_id=' + $('#taskNumber').text();
 
-                $.ajax({
-                    url: 'save_recibo_entrega.php',
-                    type: 'POST',
-                    data: formData,
-                    success: function(response) {
-                        try {
-                            var result = JSON.parse(response);
-                            if (result.success) {
-                                $('#reciboEntregaModal').modal('hide');
-                                alert('Recibo de entrega salvo com sucesso!');
-                                window.open('recibo-entrega.php?id=' + $('#taskNumber').text(), '_blank');
-                            } else {
-                                console.error(result.error);
-                                alert('Erro ao salvar o recibo de entrega: ' + result.error);
-                            }
-                        } catch (e) {
-                            console.error('Erro ao parsear JSON:', e, response);
-                            alert('Erro ao salvar o recibo de entrega');
-                        }
-                    },
-                    error: function() {
-                        alert('Erro ao salvar o recibo de entrega');
+        $.ajax({
+            url: 'save_recibo_entrega.php',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                try {
+                    var result = JSON.parse(response);
+                    if (result.success) {
+                        $('#reciboEntregaModal').modal('hide');
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Recibo de entrega salvo com sucesso!',
+                            confirmButtonText: 'OK'
+                        }).then(() => {
+                            window.open('recibo_entrega.php?id=' + $('#taskNumber').text(), '_blank');
+                        });
+                    } else {
+                        console.error(result.error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: 'Erro ao salvar o recibo de entrega: ' + result.error,
+                            confirmButtonText: 'OK'
+                        });
                     }
+                } catch (e) {
+                    console.error('Erro ao parsear JSON:', e, response);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Erro ao salvar o recibo de entrega',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            },
+            error: function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: 'Erro ao salvar o recibo de entrega',
+                    confirmButtonText: 'OK'
                 });
-            });
-        
+            }
+        });
+    });
+
 
 // Função para verificar se a guia de recebimento já foi gerada
 function verificarOuAbrirGuia(taskId) {

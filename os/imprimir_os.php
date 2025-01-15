@@ -59,7 +59,7 @@ class PDF extends TCPDF
         // Número da página no canto inferior direito, na cor branca
         $this->SetY(-14.5);
         $this->SetFont('arial', 'I', 8);
-        $this->SetTextColor(0, 0, 0); // Definir cor branca
+        $this->SetTextColor(255, 255, 255); 
 
         // Ajustar a posição horizontal com SetX para aproximar mais do canto
         $this->SetX(-23); // Ajusta o valor de -15 conforme necessário para alinhar melhor no canto
