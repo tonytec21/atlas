@@ -158,7 +158,7 @@ include(__DIR__ . '/../menu.php');
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="anexosModalLabel" style="flex-grow: 1;">Dados do Ato</h5>
-                    <button style="width: 190px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" id="generate-pdf-button" class="btn btn-primary" style="margin-left: auto;">
+                    <button type="button" id="generate-pdf-button" class="btn btn-primary" style="margin-left: auto;">
                         <i class="fa fa-print" aria-hidden="true"></i> Capa de arquivamento
                     </button>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
