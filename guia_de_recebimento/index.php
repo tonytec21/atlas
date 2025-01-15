@@ -441,9 +441,9 @@ date_default_timezone_set('America/Sao_Paulo');
                                         }
                                     } else {
                                         if (timbrado === 'S') {
-                                            window.open(`../tarefas/guia_recebimento.php?id=${taskId}`, '_blank');
+                                            window.open(`guia_recebimento.php?id=${guiaId}`, '_blank');
                                         } else if (timbrado === 'N') {
-                                            window.open(`../tarefas/guia-recebimento.php?id=${taskId}`, '_blank');
+                                            window.open(`guia-recebimento.php?id=${guiaId}`, '_blank');
                                         } else {
                                             alert('Erro: Não foi possível determinar o tipo de guia de recebimento.');
                                         }
