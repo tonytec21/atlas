@@ -82,7 +82,7 @@ $conn->close();
             outline: none;
         }
 
-        #viewOficioModal .modal-dialog {
+        /* #viewOficioModal .modal-dialog {
             height: 100vh; 
             display: flex; 
             flex-direction: column; 
@@ -101,6 +101,161 @@ $conn->close();
             width: 100%;
             height: 100%;
             border: none;
+        } */
+
+       /* Modal Styles */  
+        #viewOficioModal .modal-dialog {  
+            max-width: 80%;  
+            margin: auto;  
+            border-radius: 15px;  
+            overflow: hidden;  
+        }  
+
+        #viewOficioModal .modal-content {  
+            border: none;  
+            border-radius: 15px;  
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);  
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;  
+        }  
+
+        #viewOficioModal .modal-header {  
+            background-color: #ffffff; /* Light mode default */  
+            border-bottom: none;  
+            padding: 1.5rem;  
+            display: flex;  
+            justify-content: space-between;  
+            align-items: center;  
+        }  
+
+        #viewOficioModal .modal-header h5 {  
+            font-size: 1.75rem;  
+            font-weight: 700;  
+            color: #333; /* Light mode default */  
+            margin: 0;  
+        }  
+
+        #viewOficioModal .btn-close {  
+            font-size: 1.5rem;  
+            color: #6c757d; /* Light mode default */  
+            background: transparent;  
+            border: none;  
+            transition: color 0.3s ease;  
+        }  
+
+        #viewOficioModal .btn-close:hover {  
+            color: #ff4d4f; /* Hover color */  
+        }  
+
+        #viewOficioModal .modal-body {  
+            padding: 2rem;  
+            background-color: #f8f9fa; /* Light mode default */  
+            color: #333; /* Light mode default */  
+        }  
+
+        #viewOficioModal iframe {  
+            width: 100%;  
+            height: calc(100vh - 300px);  
+            border: none;  
+            border-radius: 10px;  
+            background-color: #f1f3f5; /* Light mode default */  
+        }  
+
+        #viewOficioModal .modal-footer {  
+            padding: 1.5rem;  
+            background-color: #f8f9fa; /* Light mode default */  
+            border-top: none;  
+            display: flex;  
+            justify-content: flex-end;  
+        }  
+
+        /* Button Styles */  
+        #viewOficioModal .modal-footer .btn {  
+            border-radius: 30px;  
+            padding: 10px 30px;  
+            font-weight: bold;  
+            font-size: 1rem;  
+            transition: background-color 0.2s ease, transform 0.2s ease;  
+            border: none;  
+        }  
+
+        .btn-primary {  
+            background-color: #007bff;  
+            color: #fff;  
+            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);  
+        }  
+
+        .btn-primary:hover {  
+            background-color: #0056b3;  
+            transform: translateY(-3px);  
+        }  
+
+        .btn-secondary {  
+            background-color: #6c757d;  
+            color: #fff;  
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.2);  
+        }  
+
+        .btn-secondary:hover {  
+            background-color: #5a6268;  
+            transform: translateY(-3px);  
+        }  
+
+        .btn-info {  
+            background-color: #17a2b8;  
+            color: #fff;  
+            box-shadow: 0 4px 8px rgba(23, 162, 184, 0.2);  
+        }  
+
+        .btn-info:hover {  
+            background-color: #138496;  
+            transform: translateY(-3px);  
+        }  
+
+        /* Dark Mode Styles */  
+        body.dark-mode #viewOficioModal .modal-header {  
+            background-color: #2c2f33;  
+            color: #ffffff;  
+        }  
+
+        body.dark-mode #viewOficioModal .modal-header h5 {  
+            color: #ffffff;  
+        }  
+
+        body.dark-mode #viewOficioModal .btn-close {  
+            color: #a9a9a9;  
+        }  
+
+        body.dark-mode #viewOficioModal .btn-close:hover {  
+            color: #ff4d4f; /* Hover color */  
+        }  
+
+        body.dark-mode #viewOficioModal .modal-body {  
+            background-color: #23272a;  
+            color: #ffffff;  
+        }  
+
+        body.dark-mode #viewOficioModal .modal-footer {  
+            background-color: #2c2f33;  
+        }  
+
+        body.dark-mode #viewOficioModal .modal-footer .btn {  
+            background-color: #007bff; /* Keep buttons same for both modes */  
+        }  
+
+        body.dark-mode #viewOficioModal .modal-footer .btn-primary {  
+            background-color: #007bff; /* Button primary color */  
+        }  
+
+        body.dark-mode #viewOficioModal .modal-footer .btn-secondary {  
+            background-color: #6c757d; /* Button secondary color */  
+        }  
+
+        body.dark-mode #viewOficioModal .modal-footer .btn-info {  
+            background-color: #17a2b8; /* Button info color */  
+        }  
+
+        body.dark-mode #viewOficioModal iframe {  
+            background-color: #343a40; /* Dark mode iframe background */  
         }
 
     </style>
