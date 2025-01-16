@@ -85,7 +85,7 @@ $lineHeight = 8 * 0.5;
 
 // Cabeçalho da Guia
 $pdf->SetFont('helvetica', 'B', 14);
-$pdf->Cell(0, $lineHeight, 'GUIA DE RECEBIMENTO DE DOCUMENTOS', 0, 1, 'C');
+$pdf->Cell(0, $lineHeight, 'GUIA DE RECEBIMENTO DE DOCUMENTOS Nº ' . convertToUtf8($guiaData['id']), 0, 1, 'C');
 $pdf->Ln(3);
 
 // Conteúdo da Guia
@@ -136,6 +136,7 @@ $pdf->Cell(0, $lineHeight, '----------------------------------------------------
 // Cabeçalho do Canhoto
 $pdf->SetFont('helvetica', 'B', 14);
 $pdf->Cell(0, $lineHeight, 'CANHOTO DE COMPROVANTE', 0, 1, 'C');
+$pdf->Cell(0, $lineHeight, 'GUIA DE RECEBIMENTO DE DOCUMENTOS Nº ' . convertToUtf8($guiaData['id']), 0, 1, 'C');
 $pdf->Ln(3);
 
 // Conteúdo do Canhoto
