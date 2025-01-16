@@ -110,7 +110,7 @@ $html = '
         <td class="header-cell" width="50%">Apresentante:</td>
     </tr>
     <tr>
-        <td class="data-cell" width="23%">' . convertToUtf8($tarefaData['id']) . '</td>
+        <td class="data-cell" width="23%">' . convertToUtf8($guiaData['id']) . '</td>
         <td class="data-cell" width="26%">' . convertToUtf8(formatDateToBrazilian($guiaData['data_recebimento'])) . '</td>
         <td class="data-cell" width="50%">' . convertToUtf8($guiaData['cliente']) . '</td>
     </tr><br>
@@ -160,7 +160,7 @@ $html = '
         <td class="header-cell" width="50%">Apresentante:</td>
     </tr>
     <tr>
-        <td class="data-cell" width="23%">' . convertToUtf8($tarefaData['id']) . '</td>
+        <td class="data-cell" width="23%">' . convertToUtf8($guiaData['id']) . '</td>
         <td class="data-cell" width="26%">' . convertToUtf8(formatDateToBrazilian($guiaData['data_recebimento'])) . '</td>
         <td class="data-cell" width="50%">' . convertToUtf8($guiaData['cliente']) . '</td>
     </tr><br>
