@@ -727,6 +727,10 @@ include(__DIR__ . '/../../menu.php');
                                             data-toggle="modal" data-target="#searchCityModal">  
                                         <input type="hidden" id="edit-ibge-naturalidade" name="ibge_naturalidade">  
                                     </div>   -->
+                                    <div class="col-md-2">  
+                                        <label class="form-label">Data de Nascimento</label>  
+                                        <input type="date" class="form-control-modern" id="edit-birthdate" name="data_nascimento" required>  
+                                    </div>  
                                     <div class="col-md-3">
                                         <label for="naturalidade">Naturalidade</label>
                                         <input type="text" class="form-control" id="edit-selected-city" name="naturalidade" placeholder="Clique para selecionar a cidade" readonly required data-toggle="modal" data-target="#searchCityModal">
@@ -739,10 +743,6 @@ include(__DIR__ . '/../../menu.php');
                                             <option value="M">Masculino</option>  
                                             <option value="F">Feminino</option>  
                                         </select>  
-                                    </div>  
-                                    <div class="col-md-2">  
-                                        <label class="form-label">Data de Nascimento</label>  
-                                        <input type="date" class="form-control-modern" id="edit-birthdate" name="data_nascimento" required>  
                                     </div>  
                                     <div class="col-6">  
                                         <label class="form-label">Nome do Pai</label>  
