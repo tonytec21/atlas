@@ -2913,7 +2913,7 @@ $('#guiaRecebimentoForm').on('submit', function(e) {
                 if (result.success) {
                     $('#guiaRecebimentoModal').modal('hide');
                     alert('Guia de recebimento salva com sucesso!');
-                    window.open('guia-recebimento.php?id=' + $('#taskNumber').text(), '_blank');
+                    window.open('guia_recebimento.php?id=' + $('#taskNumber').text(), '_blank');
                 } else {
                     console.error(result.error);
                     alert('Erro ao salvar a guia de recebimento: ' + result.error);
