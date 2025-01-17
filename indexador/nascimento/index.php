@@ -732,7 +732,7 @@ include(__DIR__ . '/../../menu.php');
                                         <input type="date" class="form-control-modern" id="edit-birthdate" name="data_nascimento" required>  
                                     </div>  
                                     <div class="col-md-3">
-                                        <label for="naturalidade">Naturalidade</label>
+                                        <label class="form-label">Naturalidade</label>
                                         <input type="text" class="form-control" id="edit-selected-city" name="naturalidade" placeholder="Clique para selecionar a cidade" readonly required data-toggle="modal" data-target="#searchCityModal">
                                         <input type="hidden" id="edit-ibge-naturalidade" name="ibge_naturalidade">
                                     </div>
