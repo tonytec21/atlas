@@ -369,6 +369,8 @@ body.dark-mode .btn-modern:hover {
         padding: 10px 20px;  
     }  
 }  
+
+    
     </style>
 </head>
 <body class="light-mode">
@@ -378,12 +380,18 @@ include(__DIR__ . '/../../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center">
-            <h3>Indexador de Nascimento</h3>
-            <a href="../carga_crc/exportar_carga.php" class="btn btn-secondary">
-                <i class="fa fa-file-export" aria-hidden="true"></i> Exportar carga CRC
-            </a>
-        </div>
+        <div class="d-flex justify-content-between align-items-center mb-4">  
+            <h3 class="me-auto">Indexador de Nascimento</h3>  
+            <div class="d-flex">  
+                <a style="margin: 3px;" href="../index.php" class="btn btn-outline-primary ms-3 rounded-pill shadow-sm">  
+                    <i class="fa fa-home" aria-hidden="true"></i> Central de Acesso  
+                </a>  
+                <a style="margin: 3px;" href="../carga_crc/exportar_carga.php" class="btn btn-outline-success ms-3 rounded-pill shadow-sm">  
+                    <i class="fa fa-file-export" aria-hidden="true"></i> Exportar carga CRC  
+                </a>  
+            </div>  
+        </div>   
+
         <hr>
 
         <!-- Formulário de Pesquisa e Filtros -->
