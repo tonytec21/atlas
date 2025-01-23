@@ -14,7 +14,10 @@ $nivel_de_acesso = $user['nivel_de_acesso'];
 $acesso_adicional = $user['acesso_adicional'];
 
 // Verifica se o usuário tem "Cadastro de Funcionários" no campo acesso_adicional
+// $temControleContas = in_array('Cadastro de Funcionários', explode(',', $acesso_adicional));
+$acesso_adicional = $user['acesso_adicional'] ?? ''; 
 $temControleContas = in_array('Cadastro de Funcionários', explode(',', $acesso_adicional));
+
 
 // Se o usuário não for administrador e não tiver o acesso adicional "Cadastro de Funcionários", redireciona
 if ($nivel_de_acesso !== 'administrador' && !$temControleContas) {
