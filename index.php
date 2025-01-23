@@ -19,14 +19,9 @@ $user = $result->fetch_assoc();
 $nivel_de_acesso = $user['nivel_de_acesso'];
 
 // Verificar se o usuário tem acesso adicional a "Controle de Tarefas"
-// $acesso_adicional = $user['acesso_adicional'];
-// $acessos = array_map('trim', explode(',', $acesso_adicional));
-// $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
-
-$acesso_adicional = $user['acesso_adicional'] ?? '';
+$acesso_adicional = $user['acesso_adicional'];
 $acessos = array_map('trim', explode(',', $acesso_adicional));
 $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
-
 
 ?>
 <!DOCTYPE html>

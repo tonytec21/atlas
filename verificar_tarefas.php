@@ -25,14 +25,9 @@ $nome_completo = $funcionario['nome_completo'];
 $nivel_de_acesso = $funcionario['nivel_de_acesso'];
 
 // Verificar se o usuário tem acesso adicional a "Controle de Tarefas"
-// $acesso_adicional = $funcionario['acesso_adicional'];
-// $acessos = array_map('trim', explode(',', $acesso_adicional));
-// $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
-
-$acesso_adicional = $funcionario['acesso_adicional'] ?? '';
+$acesso_adicional = $funcionario['acesso_adicional'];
 $acessos = array_map('trim', explode(',', $acesso_adicional));
 $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
-
 
 $response = [
     'tarefas' => [],
