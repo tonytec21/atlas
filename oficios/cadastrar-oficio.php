@@ -170,7 +170,7 @@ $loggedUser = $_SESSION['username'];
     color: #2c3e50;  
 }  
 
-.custom-close {  
+.close {  
     background: none;  
     border: none;  
     font-size: 1.5rem;  
@@ -180,7 +180,7 @@ $loggedUser = $_SESSION['username'];
     transition: color 0.2s;  
 }  
 
-.custom-close:hover {  
+.close:hover {  
     color: #dc3545;  
 }  
 
@@ -192,14 +192,14 @@ $loggedUser = $_SESSION['username'];
 }  
 
 /* Table */  
-.custom-table {  
+.table {  
     width: 100%;  
     border-collapse: collapse;  
     margin: 0;  
     white-space: nowrap;  
 }  
 
-.custom-table thead th {  
+.table thead th {  
     background: #f8f9fa;  
     padding: 1rem;  
     font-weight: 600;  
@@ -216,7 +216,7 @@ $loggedUser = $_SESSION['username'];
 .col-assinante { width: 12%; }  
 .col-acoes { width: 5%; text-align: center; }  
 
-.custom-table td {  
+.table td {  
     padding: 0.75rem 1rem;  
     border-bottom: 1px solid #e9ecef;  
     vertical-align: middle;  
@@ -282,7 +282,6 @@ $loggedUser = $_SESSION['username'];
 .btn-close:focus {
     outline: none;
 }
-
 
     </style>
 </head>
