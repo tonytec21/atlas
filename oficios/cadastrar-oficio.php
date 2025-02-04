@@ -191,6 +191,22 @@ $loggedUser = $_SESSION['username'];
     overflow: auto !important;  
 }  
 
+/* Table */  
+.table {  
+    width: 100% !important;  
+    border-collapse: collapse !important;  
+    margin: 0 !important;  
+    white-space: nowrap !important;  
+}  
+
+.table thead th {  
+    background: #f8f9fa !important;  
+    padding: 1rem !important;  
+    font-weight: 600 !important;  
+    color: #2c3e50 !important;  
+    text-align: left !important;  
+    border-bottom: 2px solid #dee2e6 !important;  
+}  
 
 /* Definição das larguras das colunas */  
 .col-numero { width: 8% !important; }  
@@ -357,7 +373,6 @@ include(__DIR__ . '/../menu.php');
                                 <col class="col-data">  
                                 <col class="col-destinatario">  
                                 <col class="col-assunto">  
-                                <col class="col-assinante">  
                                 <col class="col-acoes">  
                             </colgroup>  
                             <thead>  
@@ -366,7 +381,6 @@ include(__DIR__ . '/../menu.php');
                                     <th>Data</th>  
                                     <th>Destinatário</th>  
                                     <th>Assunto</th>  
-                                    <th>Assinante</th>  
                                     <th>Ações</th>  
                                 </tr>  
                             </thead>  
@@ -453,7 +467,7 @@ window.carregarOficios = function() {
     
     $('#oficiosTableBody').html(`  
         <tr>  
-            <td colspan="6" class="text-center">  
+            <td colspan="5" class="text-center">  
                 <div class="spinner-border text-primary" role="status">  
                     <span class="sr-only">Carregando...</span>  
                 </div>  
@@ -471,7 +485,7 @@ window.carregarOficios = function() {
             if (!response.data || !Array.isArray(response.data)) {  
                 $('#oficiosTableBody').html(`  
                     <tr>  
-                        <td colspan="6" class="text-center">Nenhum ofício encontrado</td>  
+                        <td colspan="5" class="text-center">Nenhum ofício encontrado</td>  
                     </tr>  
                 `);  
                 return;  
@@ -482,7 +496,6 @@ window.carregarOficios = function() {
                 const numero = $('<div>').text(oficio.numero).html();  
                 const destinatario = $('<div>').text(oficio.destinatario).html();  
                 const assunto = $('<div>').text(oficio.assunto).html();  
-                const assinante = $('<div>').text(oficio.assinante).html();  
                 
                 html += `  
                     <tr>  
@@ -490,7 +503,6 @@ window.carregarOficios = function() {
                         <td><div class="cell-content">${oficio.data}</div></td>  
                         <td><div class="cell-content" title="${destinatario}">${destinatario}</div></td>  
                         <td><div class="cell-content" title="${assunto}">${assunto}</div></td>  
-                        <td><div class="cell-content" title="${assinante}">${assinante}</div></td>  
                         <td>  
                             <div class="action-buttons">  
                                 <button class="btn-action btn-view" onclick="verCorpo('${numero}')" title="Visualizar ofício">  
@@ -512,7 +524,7 @@ window.carregarOficios = function() {
             console.error('Erro na requisição:', error);  
             $('#oficiosTableBody').html(`  
                 <tr>  
-                    <td colspan="6" class="text-center text-danger">  
+                    <td colspan="5" class="text-center text-danger">  
                         <i class="fas fa-exclamation-triangle me-2"></i>  
                         Erro ao carregar ofícios. Por favor, tente novamente.  
                     </td>  
@@ -531,7 +543,7 @@ function initializeDataTable() {
         pageLength: 15,  
         order: [[1, 'desc']],  
         columnDefs: [  
-            { orderable: false, targets: 5 }  
+            { orderable: false, targets: 4 }  
         ],  
         dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +  
              "<'row'<'col-sm-12'tr>>" +  
