@@ -27,11 +27,13 @@ if ($result->num_rows > 0) {
 
 // Verificar se os dados foram enviados via POST
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Capturar os dados do formulário
     $cliente = trim($_POST['cliente']);
-    $documentoApresentante = trim($_POST['documentoApresentante']); // Novo campo
+    $documentoApresentante = trim($_POST['documentoApresentante']);
     $documentosRecebidos = trim($_POST['documentosRecebidos']);
     $observacoes = isset($_POST['observacoes']) ? trim($_POST['observacoes']) : '';
+    $nomePortador = trim($_POST['nome_portador']);
+    $documentoPortador = trim($_POST['documento_portador']);
+
 
     // Verificar se os campos obrigatórios foram preenchidos
     if (empty($cliente) || empty($documentosRecebidos)) {
@@ -43,8 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $dataAtual = date('Y-m-d H:i:s');
 
     // Preparar a consulta SQL para inserção, agora com o campo documento_apresentante
-    $stmt = $conn->prepare("INSERT INTO guia_de_recebimento (cliente, documento_apresentante, funcionario, data_recebimento, documentos_recebidos, observacoes, data_cadastro) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sssssss", $cliente, $documentoApresentante, $nome_completo, $dataAtual, $documentosRecebidos, $observacoes, $dataAtual);
+    $stmt = $conn->prepare("INSERT INTO guia_de_recebimento (cliente, documento_apresentante, nome_portador, documento_portador, funcionario, data_recebimento, documentos_recebidos, observacoes, data_cadastro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sssssssss", $cliente, $documentoApresentante, $nomePortador, $documentoPortador, $nome_completo, $dataAtual, $documentosRecebidos, $observacoes, $dataAtual);
 
     // Executar a consulta e verificar se foi bem-sucedida
     if ($stmt->execute()) {

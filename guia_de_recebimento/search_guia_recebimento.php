@@ -13,21 +13,29 @@ $cliente = isset($_GET['cliente']) ? $_GET['cliente'] : '';
 $documentoApresentante = isset($_GET['documentoApresentante']) ? $_GET['documentoApresentante'] : '';
 $funcionario = isset($_GET['funcionario']) ? $_GET['funcionario'] : '';
 $dataRecebimento = isset($_GET['dataRecebimento']) ? $_GET['dataRecebimento'] : '';
+$nomePortador = isset($_GET['nomePortador']) ? $_GET['nomePortador'] : '';
+$documentoPortador = isset($_GET['documentoPortador']) ? $_GET['documentoPortador'] : '';
 $action = isset($_GET['action']) ? $_GET['action'] : 'task_id_zero'; // Define como 'task_id_zero' na primeira carga da página
 
-// 1. Quando entrar na página: carregar apenas task_id = 0
+// Quando entrar na página: carregar apenas task_id = 0
 if ($action === 'task_id_zero') {
     // Carregar somente registros com task_id = 0
-    $sql = "SELECT guia.id, guia.task_id, guia.cliente, guia.documento_apresentante, guia.funcionario, guia.data_recebimento, guia.documentos_recebidos, guia.observacoes, tarefa.token AS task_token 
+    $sql = "SELECT guia.id, guia.task_id, guia.cliente, guia.documento_apresentante, 
+                   guia.nome_portador, guia.documento_portador, guia.funcionario, 
+                   guia.data_recebimento, guia.documentos_recebidos, guia.observacoes, 
+                   tarefa.token AS task_token 
             FROM guia_de_recebimento AS guia
             LEFT JOIN tarefas AS tarefa ON guia.task_id = tarefa.id
-            WHERE guia.task_id = 0"; // Aqui carregamos somente task_id = 0
+            WHERE guia.task_id = 0";
 } else {
-    // 2. Se clicar em "Filtrar" sem definir filtros: carregar todos os dados presentes no banco
-    $sql = "SELECT guia.id, guia.task_id, guia.cliente, guia.documento_apresentante, guia.funcionario, guia.data_recebimento, guia.documentos_recebidos, guia.observacoes, tarefa.token AS task_token 
+    // Se clicar em "Filtrar" sem definir filtros: carregar todos os dados
+    $sql = "SELECT guia.id, guia.task_id, guia.cliente, guia.documento_apresentante, 
+                   guia.nome_portador, guia.documento_portador, guia.funcionario, 
+                   guia.data_recebimento, guia.documentos_recebidos, guia.observacoes, 
+                   tarefa.token AS task_token 
             FROM guia_de_recebimento AS guia
             LEFT JOIN tarefas AS tarefa ON guia.task_id = tarefa.id
-            WHERE 1=1"; // Iniciar com uma condição sempre verdadeira para aplicar os filtros abaixo
+            WHERE 1=1";
 
     // Adicionar condições de pesquisa com base nos filtros fornecidos pelo usuário
     if (!empty($numeroGuia)) {
@@ -52,6 +60,14 @@ if ($action === 'task_id_zero') {
 
     if (!empty($dataRecebimento)) {
         $sql .= " AND DATE(guia.data_recebimento) = '" . $conn->real_escape_string($dataRecebimento) . "'";
+    }
+
+    if (!empty($nomePortador)) {
+        $sql .= " AND guia.nome_portador LIKE '%" . $conn->real_escape_string($nomePortador) . "%'";
+    }
+
+    if (!empty($documentoPortador)) {
+        $sql .= " AND guia.documento_portador LIKE '%" . $conn->real_escape_string($documentoPortador) . "%'";
     }
 }
 

@@ -5,6 +5,8 @@ include(__DIR__ . '/db_connection.php');
 $guiaId = isset($_POST['guiaId']) ? trim($_POST['guiaId']) : '';
 $cliente = isset($_POST['cliente']) ? trim($_POST['cliente']) : '';
 $documentoApresentante = isset($_POST['documentoApresentante']) ? trim($_POST['documentoApresentante']) : '';
+$nomePortador = isset($_POST['nome_portador']) ? trim($_POST['nome_portador']) : '';
+$documentoPortador = isset($_POST['documento_portador']) ? trim($_POST['documento_portador']) : '';
 $documentosRecebidos = isset($_POST['documentosRecebidos']) ? trim($_POST['documentosRecebidos']) : '';
 $observacoes = isset($_POST['observacoes']) ? trim($_POST['observacoes']) : '';
 
@@ -21,9 +23,9 @@ if (empty($cliente) || empty($documentosRecebidos)) {
 }
 
 // Atualizar os dados da guia no banco de dados
-$sql = "UPDATE guia_de_recebimento SET cliente = ?, documento_apresentante = ?, documentos_recebidos = ?, observacoes = ? WHERE id = ?";
+$sql = "UPDATE guia_de_recebimento SET cliente = ?, documento_apresentante = ?, nome_portador = ?, documento_portador = ?, documentos_recebidos = ?, observacoes = ? WHERE id = ?";
 $stmt = $conn->prepare($sql);
-$stmt->bind_param('ssssi', $cliente, $documentoApresentante, $documentosRecebidos, $observacoes, $guiaId);
+$stmt->bind_param('ssssssi', $cliente, $documentoApresentante, $nomePortador, $documentoPortador, $documentosRecebidos, $observacoes, $guiaId);
 
 if ($stmt->execute()) {
     echo json_encode(['success' => true]);

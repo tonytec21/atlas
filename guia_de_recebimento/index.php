@@ -53,26 +53,21 @@ date_default_timezone_set('America/Sao_Paulo');
             <form id="searchForm">
     <div class="form-row">
         <!-- Campo para Número da Guia -->
-        <div class="form-group col-md-1">
+        <div class="form-group col-md-2">
             <label for="numeroGuia">Nº Guia:</label>
-            <input type="text" class="form-control" id="numeroGuia" name="numeroGuia" placeholder="Digite o Nº da Guia">
+            <input type="text" class="form-control" id="numeroGuia" name="numeroGuia" placeholder="Nº da Guia">
         </div>
 
         <!-- Campo para Número da Tarefa -->
-        <div class="form-group col-md-1">
-            <label for="numeroTarefa">Nº Tarefa:</label>
-            <input type="text" class="form-control" id="numeroTarefa" name="numeroTarefa" placeholder="Digite o Nº da Tarefa">
-        </div>
-        <div class="form-group col-md-3">
-            <label for="cliente">Apresentante:</label>
-            <input type="text" class="form-control" id="cliente" name="cliente" placeholder="Nome do Cliente">
-        </div>
         <div class="form-group col-md-2">
-            <label for="documentoApresentante">CPF/CNPJ:</label>
-            <input type="text" class="form-control" id="documentoApresentante" name="documentoApresentante" placeholder="Digite o CPF ou CNPJ">
+            <label for="numeroTarefa">Nº Tarefa:</label>
+            <input type="text" class="form-control" id="numeroTarefa" name="numeroTarefa" placeholder="Nº da Tarefa">
         </div>
-
         <div class="form-group col-md-3">
+            <label for="dataRecebimento">Data de Recebimento:</label>
+            <input type="date" class="form-control" id="dataRecebimento" name="dataRecebimento">
+        </div>
+        <div class="form-group col-md-5">
             <label for="funcionario">Funcionário:</label>
             <select class="form-control" id="funcionario" name="funcionario">
                 <option value="">Selecione o Funcionário</option>
@@ -93,9 +88,22 @@ date_default_timezone_set('America/Sao_Paulo');
                 ?>
             </select>
         </div>
-        <div class="form-group col-md-2">
-            <label for="dataRecebimento">Data de Recebimento:</label>
-            <input type="date" class="form-control" id="dataRecebimento" name="dataRecebimento">
+
+        <div class="form-group col-md-8">
+            <label for="cliente">Apresentante:</label>
+            <input type="text" class="form-control" id="cliente" name="cliente" placeholder="Nome do Cliente">
+        </div>
+        <div class="form-group col-md-4">
+            <label for="documentoApresentante">CPF/CNPJ:</label>
+            <input type="text" class="form-control" id="documentoApresentante" name="documentoApresentante" placeholder="Digite o CPF ou CNPJ">
+        </div>
+        <div class="form-group col-md-8">
+            <label for="nomePortador">Nome do Portador de Dados:</label>
+            <input type="text" class="form-control" id="nomePortador" name="nomePortador" placeholder="Nome do Portador de Dados">
+        </div>
+        <div class="form-group col-md-4">
+            <label for="documentoPortador">CPF/CNPJ do Portador de Dados:</label>
+            <input type="text" class="form-control" id="documentoPortador" name="documentoPortador" placeholder="Digite o CPF ou CNPJ">
         </div>
 
         <div class="form-group col-md-6">
@@ -120,6 +128,8 @@ date_default_timezone_set('America/Sao_Paulo');
                             <th style="width: 7%">Nº Tarefa</th>
                             <th style="width: 15%">Apresentante</th>
                             <th style="width: 11%">CPF/CNPJ</th>
+                            <th style="width: 15%">Portador de Dados</th>
+                            <th style="width: 11%">Documento do Portador</th>
                             <th style="width: 15%">Funcionário</th>
                             <th style="width: 12%">Data de Recebimento</th>
                             <th style="width: 16%">Documentos Recebidos</th>
@@ -127,6 +137,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             <th style="width: 8%">Ações</th>
                         </tr>
                     </thead>
+
                     <tbody id="resultados">
                         <!-- Resultados serão inseridos aqui -->
                     </tbody>
@@ -279,6 +290,18 @@ date_default_timezone_set('America/Sao_Paulo');
                             </div>
                         </div>
 
+                        <!-- Linha para Portador e CPF/CNPJ do Portador -->
+                        <div class="form-row">
+                            <div class="form-group col-md-8">
+                                <label for="nome_portador">Portador de Dados:</label>
+                                <input type="text" class="form-control" id="nome_portador" name="nome_portador" required>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="documento_portador">CPF/CNPJ:</label>
+                                <input type="text" class="form-control" id="documento_portador" name="documento_portador">
+                            </div>
+                        </div>
+
                         <!-- Campo para Documentos Recebidos -->
                         <div class="form-group">
                             <label for="documentosRecebidos">Documentos Recebidos:</label>
@@ -323,6 +346,19 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <input type="text" class="form-control" id="editarDocumentoApresentante" name="documentoApresentante">
                             </div>
                         </div>
+
+                        <!-- Linha para Nome e Documento do Portador -->
+                        <div class="form-row">
+                            <div class="form-group col-md-8">
+                                <label for="editarNomePortador">Portador de Dados:</label>
+                                <input type="text" class="form-control" id="editarNomePortador" name="nome_portador">
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="editarDocumentoPortador">CPF/CNPJ:</label>
+                                <input type="text" class="form-control" id="editarDocumentoPortador" name="documento_portador">
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label for="editarDocumentosRecebidos">Documentos Recebidos:</label>
                             <textarea class="form-control" id="editarDocumentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>
@@ -376,29 +412,33 @@ date_default_timezone_set('America/Sao_Paulo');
             // Quando o formulário de pesquisa for submetido
             $('#searchForm').on('submit', function(e) {
                 e.preventDefault();
-                var formData = $(this).serialize(); // Captura todos os campos, incluindo CPF/CNPJ
+                var formData = $(this).serialize(); // Captura todos os campos, incluindo CPF/CNPJ e Nome do Portador
 
-                console.log(formData); // Verifique no console se o CPF/CNPJ está sendo enviado corretamente
+                console.log(formData); // Verifique no console se todos os filtros estão sendo enviados corretamente
 
-                var hasFilters = $('#cliente').val() || $('#funcionario').val() || $('#dataRecebimento').val() || $('#documentoApresentante').val()|| $('#numeroGuia').val() || $('#numeroTarefa').val();
+                var hasFilters = $('#cliente').val() || $('#funcionario').val() || $('#dataRecebimento').val() || $('#documentoApresentante').val() || $('#numeroGuia').val() || $('#numeroTarefa').val() || $('#nomePortador').val() || $('#documentoPortador').val();
 
                 if (!hasFilters) {
                     loadGuias('all');  // Se nenhum filtro foi aplicado, carregar todos os dados
                 } else {
-                    loadGuias(null, formData);  // Se houver filtros, aplicar a pesquisa
+                    loadGuias(null, formData);  // Se houver filtros, aplicar a pesquisa corretamente
                 }
             });
 
             // Função para carregar guias de recebimento
             function loadGuias(action = 'task_id_zero', formData = '') {
-                $.ajax({
-                    url: 'search_guia_recebimento.php',
-                    type: 'GET',
-                    dataType: 'json',
-                    data: formData ? formData + '&action=' + action : 'action=' + action,
-                    success: function(response) {
-                        console.log(response);
-                        dataTable.clear().draw();
+            if (!formData) {
+                formData = $('#searchForm').serialize();
+            }
+
+            $.ajax({
+                url: 'search_guia_recebimento.php',
+                type: 'GET',
+                dataType: 'json',
+                data: formData + '&action=' + action,
+                success: function(response) {
+                    console.log(response);
+                    dataTable.clear().draw();
 
                         if (response.length > 0) {
                             response.forEach(function(guia) {
@@ -486,6 +526,8 @@ date_default_timezone_set('America/Sao_Paulo');
                                             guia.task_id || '-',
                                             guia.cliente,
                                             guia.documento_apresentante,
+                                            guia.nome_portador || '-',
+                                            guia.documento_portador || '-',
                                             guia.funcionario,
                                             formatarDataBrasileira(guia.data_recebimento),
                                             guia.documentos_recebidos,
@@ -646,6 +688,8 @@ date_default_timezone_set('America/Sao_Paulo');
                         $('#editarGuiaId').val(response.data.id);
                         $('#editarCliente').val(response.data.cliente);
                         $('#editarDocumentoApresentante').val(response.data.documento_apresentante);
+                        $('#editarNomePortador').val(response.data.nome_portador);
+                        $('#editarDocumentoPortador').val(response.data.documento_portador);
                         $('#editarDocumentosRecebidos').val(response.data.documentos_recebidos);
                         $('#editarObservacoes').val(response.data.observacoes);
 
@@ -753,9 +797,12 @@ date_default_timezone_set('America/Sao_Paulo');
 
         // Aplicar a máscara ao campo CPF/CNPJ no modal "Criar Guia"
         aplicarMascaraCPF_CNPJ('#documentoApresentante');
+        aplicarMascaraCPF_CNPJ('#documento_portador');
+        aplicarMascaraCPF_CNPJ('#documentoPortador')
 
         // Aplicar a máscara ao campo CPF/CNPJ no modal "Editar Guia"
         aplicarMascaraCPF_CNPJ('#editarDocumentoApresentante');
+        aplicarMascaraCPF_CNPJ('#editarDocumentoPortador');
     });
 
     // Botão Salvar Guia
