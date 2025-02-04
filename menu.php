@@ -79,7 +79,8 @@ $mode_query->close();
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
     <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script> 
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">  
-
+    <?php include(__DIR__ . '/style/style.php'); ?>
+    
     <style>  
         :root {  
             --primary-bg: #1e2835;  
@@ -581,6 +582,7 @@ $mode_query->close();
         }
 
     </style>  
+    
 </head>
 <body class="<?php echo $mode; ?>">  
 <div class="sidebar-overlay" onclick="toggleNav()"></div>
