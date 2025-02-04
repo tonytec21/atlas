@@ -541,7 +541,7 @@ function initializeDataTable() {
             url: '../style/Portuguese-Brasil.json'  
         },  
         pageLength: 15,  
-        order: [[1, 'desc']],  
+        order: [[1, 'asc']],  
         columnDefs: [  
             { orderable: false, targets: 4 }  
         ],  
