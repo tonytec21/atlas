@@ -265,24 +265,23 @@ $loggedUser = $_SESSION['username'];
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);  
 }  
 
-/* DataTables customização */  
-/* .modal .dataTables_wrapper .dataTables_filter input {  
-    border: 1px solid #dee2e6;  
-    border-radius: 4px;  
-    padding: 0.375rem 0.75rem;  
-    margin-left: 0.5rem;  
-}  
+.btn-close {
+    outline: none;
+    border: none; 
+    background: none;
+    padding: 0; 
+    font-size: 1.5rem;
+    cursor: pointer; 
+    transition: transform 0.2s ease;
+}
 
-.modal .dataTables_wrapper .dataTables_length select {  
-    border: 1px solid #dee2e6;  
-    border-radius: 4px;  
-    padding: 0.375rem 2rem 0.375rem 0.75rem;  
-}  
+.btn-close:hover {
+    transform: scale(2.10);
+}
 
-.modal .dataTables_wrapper .dataTables_info {  
-    padding-top: 0.5rem;  
-    color: #6c757d;  
-}  */
+.btn-close:focus {
+    outline: none;
+}
 
 
     </style>
@@ -354,7 +353,6 @@ include(__DIR__ . '/../menu.php');
     </div>
 
     <!-- Modal Ofícios Anteriores -->  
-    <!-- Modal Ofícios Anteriores -->  
     <div class="modal fade" id="oficiosAnterioresModal" tabindex="-1" aria-labelledby="oficiosAnterioresModalLabel" aria-hidden="true">  
         <div class="modal-dialog modal-xl">  
             <div class="modal-content">  
@@ -364,7 +362,7 @@ include(__DIR__ . '/../menu.php');
                         <i class="fas fa-file-alt"></i>  
                         Ofícios Anteriores  
                     </h5>  
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>  
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">&times;</button>  
                 </div>  
                 
                 <!-- Body -->  
