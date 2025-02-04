@@ -96,6 +96,8 @@ $loggedUser = $_SESSION['username'];
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap4.min.css"/>  
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap4.min.css"/>
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <script src="../ckeditor/ckeditor.js"></script>
     <script src="../script/jquery-3.5.1.min.js"></script>
@@ -103,6 +105,186 @@ $loggedUser = $_SESSION['username'];
     <script src="../script/sweetalert2.js"></script>
     <style>
         .cke_notification_warning { display: none !important; }
+        .btn-info {
+            width: 75px;
+        }
+        .btn-success {
+            width: 75px;
+            height: 40px;
+            border-radius: 5px;
+        }
+        /* Estilos adicionais para o modal */  
+/* Reset e configurações base */  
+.modal * {  
+    box-sizing: border-box;  
+}  
+
+/* Modal */  
+.modal {  
+    position: fixed;  
+    top: 0;  
+    left: 0;  
+    width: 100%;  
+    height: 100%;  
+    background: rgba(0, 0, 0, 0.5);  
+    z-index: 1055;  
+    display: none;  
+}  
+
+.modal.show {  
+    display: block;  
+}  
+
+.modal-dialog {  
+    position: relative;  
+    width: 85%;  
+    margin: 2rem auto;  
+    max-width: 1400px;  
+}  
+
+.modal-content {  
+    background: #fff;  
+    border-radius: 8px;  
+    box-shadow: 0 0 20px rgba(0,0,0,0.15);  
+    display: flex;  
+    flex-direction: column;  
+    height: calc(100vh - 4rem);  
+}  
+
+/* Header */  
+.modal-header {  
+    padding: 1rem 1.5rem;  
+    border-bottom: 1px solid #e9ecef;  
+    display: flex;  
+    align-items: center;  
+    justify-content: space-between;  
+}  
+
+.modal-title {  
+    font-size: 1.25rem;  
+    font-weight: 600;  
+    margin: 0;  
+    display: flex;  
+    align-items: center;  
+    gap: 0.5rem;  
+    color: #2c3e50;  
+}  
+
+.custom-close {  
+    background: none;  
+    border: none;  
+    font-size: 1.5rem;  
+    cursor: pointer;  
+    padding: 0.5rem;  
+    color: #6c757d;  
+    transition: color 0.2s;  
+}  
+
+.custom-close:hover {  
+    color: #dc3545;  
+}  
+
+/* Body */  
+.modal-body {  
+    flex: 1;  
+    padding: 1.5rem;  
+    overflow: auto;  
+}  
+
+/* Table */  
+.custom-table {  
+    width: 100%;  
+    border-collapse: collapse;  
+    margin: 0;  
+    white-space: nowrap;  
+}  
+
+.custom-table thead th {  
+    background: #f8f9fa;  
+    padding: 1rem;  
+    font-weight: 600;  
+    color: #2c3e50;  
+    text-align: left;  
+    border-bottom: 2px solid #dee2e6;  
+}  
+
+/* Definição das larguras das colunas */  
+.col-numero { width: 8%; }  
+.col-data { width: 10%; }  
+.col-destinatario { width: 30%; }  
+.col-assunto { width: 35%; }  
+.col-assinante { width: 12%; }  
+.col-acoes { width: 5%; text-align: center; }  
+
+.custom-table td {  
+    padding: 0.75rem 1rem;  
+    border-bottom: 1px solid #e9ecef;  
+    vertical-align: middle;  
+}  
+
+/* Células com texto longo */  
+.cell-content {  
+    max-width: 100%;  
+    overflow: hidden;  
+    text-overflow: ellipsis;  
+    white-space: nowrap;  
+}  
+
+/* Botões de ação */  
+.action-buttons {  
+    display: flex;  
+    gap: 0.5rem;  
+    justify-content: center;  
+}  
+
+.btn-action {  
+    width: 32px;  
+    height: 32px;  
+    padding: 0;  
+    border: none;  
+    border-radius: 4px;  
+    display: flex;  
+    align-items: center;  
+    justify-content: center;  
+    cursor: pointer;  
+    transition: all 0.2s;  
+}  
+
+.btn-view {  
+    background: #e3f2fd;  
+    color: #0d6efd;  
+}  
+
+.btn-use {  
+    background: #e8f5e9;  
+    color: #198754;  
+}  
+
+.btn-action:hover {  
+    transform: translateY(-1px);  
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);  
+}  
+
+/* DataTables customização */  
+/* .modal .dataTables_wrapper .dataTables_filter input {  
+    border: 1px solid #dee2e6;  
+    border-radius: 4px;  
+    padding: 0.375rem 0.75rem;  
+    margin-left: 0.5rem;  
+}  
+
+.modal .dataTables_wrapper .dataTables_length select {  
+    border: 1px solid #dee2e6;  
+    border-radius: 4px;  
+    padding: 0.375rem 2rem 0.375rem 0.75rem;  
+}  
+
+.modal .dataTables_wrapper .dataTables_info {  
+    padding-top: 0.5rem;  
+    color: #6c757d;  
+}  */
+
+
     </style>
 </head>
 <body class="light-mode">
@@ -112,7 +294,12 @@ include(__DIR__ . '/../menu.php');
 
     <div id="main" class="main-content">
         <div class="container">
-            <h3>Criar Ofício</h3>
+            <div class="d-flex justify-content-between align-items-center">  
+                <h3>Criar Ofício</h3>  
+                <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#oficiosAnterioresModal" onclick="carregarOficios()">  
+                    <i class="fa fa-history"></i> Ver Ofícios Anteriores  
+                </button> 
+            </div>
             <hr>
             <form method="POST" action="">
                 <div class="form-row">
@@ -165,6 +352,59 @@ include(__DIR__ . '/../menu.php');
             </form>
         </div>
     </div>
+
+    <!-- Modal Ofícios Anteriores -->  
+    <!-- Modal Ofícios Anteriores -->  
+    <div class="modal fade" id="oficiosAnterioresModal" tabindex="-1" aria-labelledby="oficiosAnterioresModalLabel" aria-hidden="true">  
+        <div class="modal-dialog modal-xl">  
+            <div class="modal-content">  
+                <!-- Header -->  
+                <div class="modal-header">  
+                    <h5 class="modal-title" id="oficiosAnterioresModalLabel">  
+                        <i class="fas fa-file-alt"></i>  
+                        Ofícios Anteriores  
+                    </h5>  
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>  
+                </div>  
+                
+                <!-- Body -->  
+                <div class="modal-body">  
+                    <div class="table-responsive">  
+                        <table class="table table-striped" id="oficiosTable" style="width: 100%; zoom: 90%">  
+                            <colgroup>  
+                                <col class="col-numero">  
+                                <col class="col-data">  
+                                <col class="col-destinatario">  
+                                <col class="col-assunto">  
+                                <col class="col-assinante">  
+                                <col class="col-acoes">  
+                            </colgroup>  
+                            <thead>  
+                                <tr>  
+                                    <th>Número</th>  
+                                    <th>Data</th>  
+                                    <th>Destinatário</th>  
+                                    <th>Assunto</th>  
+                                    <th>Assinante</th>  
+                                    <th>Ações</th>  
+                                </tr>  
+                            </thead>  
+                            <tbody id="oficiosTableBody"></tbody>  
+                        </table>  
+                    </div>  
+                </div>  
+            </div>  
+        </div>  
+    </div>
+ 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>  
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>  
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>  
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap4.min.js"></script>  
+    <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>  
+    <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap4.min.js"></script>
+
 
     <script>
         $(document).ready(function() {
@@ -219,6 +459,220 @@ include(__DIR__ . '/../menu.php');
             });
         });
     </script>
+
+<script>  
+let dataTable = null;  
+
+window.carregarOficios = function() {  
+    console.log('Iniciando carregamento de ofícios');  
+    
+    if (dataTable) {  
+        dataTable.destroy();  
+    }  
+    
+    $('#oficiosTableBody').html(`  
+        <tr>  
+            <td colspan="6" class="text-center">  
+                <div class="spinner-border text-primary" role="status">  
+                    <span class="sr-only">Carregando...</span>  
+                </div>  
+            </td>  
+        </tr>  
+    `);  
+    
+    $.ajax({  
+        url: 'listar_oficios.php',  
+        method: 'GET',  
+        dataType: 'json',  
+        success: function(response) {  
+            console.log('Dados recebidos:', response);  
+            
+            if (!response.data || !Array.isArray(response.data)) {  
+                $('#oficiosTableBody').html(`  
+                    <tr>  
+                        <td colspan="6" class="text-center">Nenhum ofício encontrado</td>  
+                    </tr>  
+                `);  
+                return;  
+            }  
+            
+            let html = '';  
+            response.data.forEach(function(oficio) {  
+                const numero = $('<div>').text(oficio.numero).html();  
+                const destinatario = $('<div>').text(oficio.destinatario).html();  
+                const assunto = $('<div>').text(oficio.assunto).html();  
+                const assinante = $('<div>').text(oficio.assinante).html();  
+                
+                html += `  
+                    <tr>  
+                        <td><div class="cell-content">${numero}</div></td>  
+                        <td><div class="cell-content">${oficio.data}</div></td>  
+                        <td><div class="cell-content" title="${destinatario}">${destinatario}</div></td>  
+                        <td><div class="cell-content" title="${assunto}">${assunto}</div></td>  
+                        <td><div class="cell-content" title="${assinante}">${assinante}</div></td>  
+                        <td>  
+                            <div class="action-buttons">  
+                                <button class="btn-action btn-view" onclick="verCorpo('${numero}')" title="Visualizar ofício">  
+                                    <i class="fa fa-eye"></i>  
+                                </button>  
+                                <button class="btn-action btn-use" onclick="usarModelo('${numero}')" title="Usar como modelo">  
+                                    <i class="fa fa-copy"></i>  
+                                </button>  
+                            </div>  
+                        </td>  
+                    </tr>  
+                `;  
+            });  
+            
+            $('#oficiosTableBody').html(html);  
+            initializeDataTable();  
+        },  
+        error: function(xhr, status, error) {  
+            console.error('Erro na requisição:', error);  
+            $('#oficiosTableBody').html(`  
+                <tr>  
+                    <td colspan="6" class="text-center text-danger">  
+                        <i class="fas fa-exclamation-triangle me-2"></i>  
+                        Erro ao carregar ofícios. Por favor, tente novamente.  
+                    </td>  
+                </tr>  
+            `);  
+        }  
+    });  
+};  
+
+function initializeDataTable() {  
+    dataTable = $('#oficiosTable').DataTable({  
+        responsive: true,  
+        language: {  
+            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'  
+        },  
+        pageLength: 15,  
+        order: [[1, 'desc']],  
+        columnDefs: [  
+            { orderable: false, targets: 5 }  
+        ],  
+        dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +  
+             "<'row'<'col-sm-12'tr>>" +  
+             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",  
+        lengthMenu: [[15, 25, 50, 100], [15, 25, 50, "Todos"]]  
+    });  
+}  
+
+window.verCorpo = function(numero) {  
+    $.ajax({  
+        url: 'get_oficio_details.php',  
+        method: 'GET',  
+        data: { numero: numero },  
+        dataType: 'json',  
+        beforeSend: function() {  
+            Swal.fire({  
+                title: 'Carregando...',  
+                html: '<div class="spinner-border text-primary" role="status"><span class="sr-only">Carregando...</span></div>',  
+                showConfirmButton: false,  
+                allowOutsideClick: false,  
+                didOpen: () => {  
+                    Swal.showLoading();  
+                }  
+            });  
+        },  
+        success: function(response) {  
+            Swal.fire({  
+                title: `Ofício ${numero}`,  
+                html: `<div class="text-start p-3">${response.corpo}</div>`,  
+                width: '80%',  
+                confirmButtonText: 'Fechar',  
+                customClass: {  
+                    container: 'swal-large-text'  
+                }  
+            });  
+        },  
+        error: function() {  
+            Swal.fire({  
+                icon: 'error',  
+                title: 'Erro',  
+                text: 'Não foi possível carregar os detalhes do ofício'  
+            });  
+        }  
+    });  
+};  
+
+window.usarModelo = function(numero) {  
+    $.ajax({  
+        url: 'get_oficio_details.php',  
+        method: 'GET',  
+        data: { numero: numero },  
+        dataType: 'json',  
+        beforeSend: function() {  
+            Swal.fire({  
+                title: 'Carregando modelo...',  
+                html: '<div class="spinner-border text-primary" role="status"><span class="sr-only">Carregando...</span></div>',  
+                showConfirmButton: false,  
+                allowOutsideClick: false,  
+                allowEscapeKey: false,  
+                didOpen: () => {  
+                    Swal.showLoading();  
+                }  
+            });  
+        },  
+        success: function(response) {  
+            try {  
+                $('#tratamento').val(response.tratamento || '');  
+                $('#destinatario').val(response.destinatario || '');  
+                $('#cargo').val(response.cargo || '');  
+                $('#assunto').val(response.assunto || '');  
+                
+                if (typeof CKEDITOR !== 'undefined' && CKEDITOR.instances.corpo) {  
+                    CKEDITOR.instances.corpo.setData(response.corpo || '');  
+                }  
+                
+                $('#dados_complementares').val(response.dados_complementares || '');  
+                
+                // Fecha o modal do bootstrap  
+                $('#oficiosAnterioresModal').modal('hide');  
+                
+                Swal.close();  
+                setTimeout(() => {  
+                    Swal.fire({  
+                        icon: 'success',  
+                        title: 'Modelo carregado!',  
+                        text: 'O conteúdo do ofício foi carregado com sucesso.',  
+                        timer: 1500,  
+                        showConfirmButton: false  
+                    });  
+                }, 200);  
+            } catch (error) {  
+                console.error('Erro ao preencher campos:', error);  
+                Swal.fire({  
+                    icon: 'error',  
+                    title: 'Erro',  
+                    text: 'Erro ao preencher os campos do formulário: ' + error.message  
+                });  
+            }  
+        },  
+        error: function(xhr, status, error) {  
+            console.error('Erro na requisição:', error);  
+            Swal.fire({  
+                icon: 'error',  
+                title: 'Erro',  
+                text: 'Não foi possível carregar o modelo do ofício: ' + error  
+            });  
+        }  
+    });  
+};  
+
+// Inicialização do CKEditor quando o documento estiver pronto  
+$(document).ready(function() {  
+    CKEDITOR.replace('corpo', {  
+        extraPlugins: 'htmlwriter',  
+        allowedContent: true,  
+        filebrowserUploadUrl: '/uploader/upload.php',  
+        filebrowserUploadMethod: 'form',  
+        scayt_autoStartup: true,  
+        scayt_sLang: 'pt_BR'  
+    });  
+});
+</script>
 <?php
 include(__DIR__ . '/../rodape.php');
 ?>
