@@ -538,7 +538,7 @@ function initializeDataTable() {
     dataTable = $('#oficiosTable').DataTable({  
         responsive: true,  
         language: {  
-            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'  
+            url: '../style/Portuguese-Brasil.json'  
         },  
         pageLength: 15,  
         order: [[1, 'desc']],  
