@@ -178,7 +178,7 @@ $conn->close();
             border: none;  
         }  
 
-        .btn-primary {  
+        /* .btn-primary {  
             background-color: #007bff;  
             color: #fff;  
             box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);  
@@ -187,7 +187,7 @@ $conn->close();
         .btn-primary:hover {  
             background-color: #0056b3;  
             transform: translateY(-3px);  
-        }  
+        }   */
 
         .btn-secondary {  
             background-color: #6c757d;  
@@ -200,7 +200,7 @@ $conn->close();
             transform: translateY(-3px);  
         }  
 
-        .btn-info {  
+        /* .btn-info {  
             background-color: #17a2b8;  
             color: #fff;  
             box-shadow: 0 4px 8px rgba(23, 162, 184, 0.2);  
@@ -209,7 +209,7 @@ $conn->close();
         .btn-info:hover {  
             background-color: #138496;  
             transform: translateY(-3px);  
-        }  
+        }   */
 
         /* Dark Mode Styles */  
         body.dark-mode #viewOficioModal .modal-header {  
