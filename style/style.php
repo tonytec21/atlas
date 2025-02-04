@@ -2,8 +2,9 @@
         .page-title {
             justify-content: space-around!important; 
             margin-bottom: 30px!important;
+            font-size: 2.0rem!important;
         }
-        
+
         :root {  
             /* Light Theme */  
             --bg-primary: #ffffff;  
