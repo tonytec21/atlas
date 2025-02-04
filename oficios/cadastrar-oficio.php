@@ -116,171 +116,171 @@ $loggedUser = $_SESSION['username'];
         /* Estilos adicionais para o modal */  
 /* Reset e configurações base */  
 .modal * {  
-    box-sizing: border-box;  
+    box-sizing: border-box !important;  
 }  
 
 /* Modal */  
 .modal {  
-    position: fixed;  
-    top: 0;  
-    left: 0;  
-    width: 100%;  
-    height: 100%;  
-    background: rgba(0, 0, 0, 0.5);  
-    z-index: 1055;  
-    display: none;  
+    position: fixed !important;  
+    top: 0 !important;  
+    left: 0 !important;  
+    width: 100% !important;  
+    height: 100% !important;  
+    background: rgba(0, 0, 0, 0.5) !important;  
+    z-index: 1055 !important;  
+    display: none !important;  
 }  
 
 .modal.show {  
-    display: block;  
+    display: block !important;  
 }  
 
 .modal-dialog {  
-    position: relative;  
-    width: 85%;  
-    margin: 2rem auto;  
-    max-width: 1400px;  
+    position: relative !important;  
+    width: 85% !important;  
+    margin: 2rem auto !important;  
+    max-width: 1400px !important;  
 }  
 
 .modal-content {  
-    background: #fff;  
-    border-radius: 8px;  
-    box-shadow: 0 0 20px rgba(0,0,0,0.15);  
-    display: flex;  
-    flex-direction: column;  
-    height: calc(100vh - 4rem);  
+    background: #fff !important;  
+    border-radius: 8px !important;  
+    box-shadow: 0 0 20px rgba(0,0,0,0.15) !important;  
+    display: flex !important;  
+    flex-direction: column !important;  
+    height: calc(100vh - 4rem) !important;  
 }  
 
 /* Header */  
 .modal-header {  
-    padding: 1rem 1.5rem;  
-    border-bottom: 1px solid #e9ecef;  
-    display: flex;  
-    align-items: center;  
-    justify-content: space-between;  
+    padding: 1rem 1.5rem !important;  
+    border-bottom: 1px solid #e9ecef !important;  
+    display: flex !important;  
+    align-items: center !important;  
+    justify-content: space-between !important;  
 }  
 
 .modal-title {  
-    font-size: 1.25rem;  
-    font-weight: 600;  
-    margin: 0;  
-    display: flex;  
-    align-items: center;  
-    gap: 0.5rem;  
-    color: #2c3e50;  
+    font-size: 1.25rem !important;  
+    font-weight: 600 !important;  
+    margin: 0 !important;  
+    display: flex !important;  
+    align-items: center !important;  
+    gap: 0.5rem !important;  
+    color: #2c3e50 !important;  
 }  
 
 .close {  
-    background: none;  
-    border: none;  
-    font-size: 1.5rem;  
-    cursor: pointer;  
-    padding: 0.5rem;  
-    color: #6c757d;  
-    transition: color 0.2s;  
+    background: none !important;  
+    border: none !important;  
+    font-size: 1.5rem !important;  
+    cursor: pointer !important;  
+    padding: 0.5rem !important;  
+    color: #6c757d !important;  
+    transition: color 0.2s !important;  
 }  
 
 .close:hover {  
-    color: #dc3545;  
+    color: #dc3545 !important;  
 }  
 
 /* Body */  
 .modal-body {  
-    flex: 1;  
-    padding: 1.5rem;  
-    overflow: auto;  
+    flex: 1 !important;  
+    padding: 1.5rem !important;  
+    overflow: auto !important;  
 }  
 
 /* Table */  
 .table {  
-    width: 100%;  
-    border-collapse: collapse;  
-    margin: 0;  
-    white-space: nowrap;  
+    width: 100% !important;  
+    border-collapse: collapse !important;  
+    margin: 0 !important;  
+    white-space: nowrap !important;  
 }  
 
 .table thead th {  
-    background: #f8f9fa;  
-    padding: 1rem;  
-    font-weight: 600;  
-    color: #2c3e50;  
-    text-align: left;  
-    border-bottom: 2px solid #dee2e6;  
+    background: #f8f9fa !important;  
+    padding: 1rem !important;  
+    font-weight: 600 !important;  
+    color: #2c3e50 !important;  
+    text-align: left !important;  
+    border-bottom: 2px solid #dee2e6 !important;  
 }  
 
 /* Definição das larguras das colunas */  
-.col-numero { width: 8%; }  
-.col-data { width: 10%; }  
-.col-destinatario { width: 30%; }  
-.col-assunto { width: 35%; }  
-.col-assinante { width: 12%; }  
-.col-acoes { width: 5%; text-align: center; }  
+.col-numero { width: 8% !important; }  
+.col-data { width: 10% !important; }  
+.col-destinatario { width: 30% !important; }  
+.col-assunto { width: 35% !important; }  
+.col-assinante { width: 12% !important; }  
+.col-acoes { width: 5% !important; text-align: center !important; }  
 
 .table td {  
-    padding: 0.75rem 1rem;  
-    border-bottom: 1px solid #e9ecef;  
-    vertical-align: middle;  
+    padding: 0.75rem 1rem !important;  
+    border-bottom: 1px solid #e9ecef !important;  
+    vertical-align: middle !important;  
 }  
 
 /* Células com texto longo */  
 .cell-content {  
-    max-width: 100%;  
-    overflow: hidden;  
-    text-overflow: ellipsis;  
-    white-space: nowrap;  
+    max-width: 100% !important;  
+    overflow: hidden !important;  
+    text-overflow: ellipsis !important;  
+    white-space: nowrap !important;  
 }  
 
 /* Botões de ação */  
 .action-buttons {  
-    display: flex;  
-    gap: 0.5rem;  
-    justify-content: center;  
+    display: flex !important;  
+    gap: 0.5rem !important;  
+    justify-content: center !important;  
 }  
 
 .btn-action {  
-    width: 32px;  
-    height: 32px;  
-    padding: 0;  
-    border: none;  
-    border-radius: 4px;  
-    display: flex;  
-    align-items: center;  
-    justify-content: center;  
-    cursor: pointer;  
-    transition: all 0.2s;  
+    width: 32px !important;  
+    height: 32px !important;  
+    padding: 0 !important;  
+    border: none !important;  
+    border-radius: 4px !important;  
+    display: flex !important;  
+    align-items: center !important;  
+    justify-content: center !important;  
+    cursor: pointer !important;  
+    transition: all 0.2s !important;  
 }  
 
 .btn-view {  
-    background: #e3f2fd;  
-    color: #0d6efd;  
+    background: #e3f2fd !important;  
+    color: #0d6efd !important;  
 }  
 
 .btn-use {  
-    background: #e8f5e9;  
-    color: #198754;  
+    background: #e8f5e9 !important;  
+    color: #198754 !important;  
 }  
 
 .btn-action:hover {  
-    transform: translateY(-1px);  
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);  
+    transform: translateY(-1px) !important;  
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;  
 }  
 
 .btn-close {
-    outline: none;
-    border: none; 
-    background: none;
-    padding: 0; 
-    font-size: 1.5rem;
-    cursor: pointer; 
-    transition: transform 0.2s ease;
+    outline: none !important;
+    border: none !important; 
+    background: none !important;
+    padding: 0 !important; 
+    font-size: 1.5rem !important;
+    cursor: pointer !important; 
+    transition: transform 0.2s ease !important;
 }
 
 .btn-close:hover {
-    transform: scale(2.10);
+    transform: scale(2.10) !important;
 }
 
 .btn-close:focus {
-    outline: none;
+    outline: none !important;
 }
 
     </style>
