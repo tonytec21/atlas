@@ -191,22 +191,6 @@ $loggedUser = $_SESSION['username'];
     overflow: auto !important;  
 }  
 
-/* Table */  
-.table {  
-    width: 100% !important;  
-    border-collapse: collapse !important;  
-    margin: 0 !important;  
-    white-space: nowrap !important;  
-}  
-
-.table thead th {  
-    background: #f8f9fa !important;  
-    padding: 1rem !important;  
-    font-weight: 600 !important;  
-    color: #2c3e50 !important;  
-    text-align: left !important;  
-    border-bottom: 2px solid #dee2e6 !important;  
-}  
 
 /* Definição das larguras das colunas */  
 .col-numero { width: 8% !important; }  
