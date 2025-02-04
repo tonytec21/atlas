@@ -392,26 +392,13 @@ include(__DIR__ . '/../menu.php');
         </div>  
     </div>
  
-<!-- jQuery deve vir primeiro -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>  
-
-<!-- Bootstrap depende do jQuery -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>  
-
-<!-- DataTables principal (depende do jQuery) -->
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>  
-
-<!-- Extensão Bootstrap 4 para DataTables (depende do DataTables) -->
-<script type="text/javascript" src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap4.min.js"></script>  
-
-<!-- DataTables Responsive (depende do DataTables) -->
-<script type="text/javascript" src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>  
-<script type="text/javascript" src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap4.min.js"></script>
-
-<!-- SweetAlert2 pode ser carregado em qualquer momento, mas geralmente no final -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>  
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>  
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>  
+    <script type="text/javascript" src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap4.min.js"></script>  
+    <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>  
+    <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
         $(document).ready(function() {
@@ -513,8 +500,8 @@ window.carregarOficios = function() {
                     <tr>  
                         <td><div class="cell-content">${numero}</div></td>  
                         <td><div class="cell-content">${oficio.data}</div></td>  
-                        <td><div class="cell-content" title="${destinatario}">${destinatario}</div></td>  
-                        <td><div class="cell-content" title="${assunto}">${assunto}</div></td>  
+                        <td><div class="cell-content" title="${destinatario}">${destinatario.length > 40 ? destinatario.substring(0, 37) + "..." : destinatario}</div></td>  
+                        <td><div class="cell-content" title="${assunto}">${assunto.length > 65 ? assunto.substring(0, 62) + "..." : assunto}</div></td>  
                         <td>  
                             <div class="action-buttons">  
                                 <button class="btn-action btn-view" onclick="verCorpo('${numero}')" title="Visualizar ofício">  
@@ -527,6 +514,7 @@ window.carregarOficios = function() {
                         </td>  
                     </tr>  
                 `;  
+ 
             });  
             
             $('#oficiosTableBody').html(html);  
