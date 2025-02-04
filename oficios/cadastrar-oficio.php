@@ -367,7 +367,7 @@ include(__DIR__ . '/../menu.php');
                 <!-- Body -->  
                 <div class="modal-body">  
                     <div class="table-responsive">  
-                        <table class="table table-striped" id="oficiosTable" style="width: 100%; zoom: 90%">  
+                        <table class="table table-striped" id="oficiosTable" style="width: 95%!important; zoom: 90%">  
                             <colgroup>  
                                 <col class="col-numero">  
                                 <col class="col-data">  
