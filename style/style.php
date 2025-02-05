@@ -1,4 +1,7 @@
 <style>  
+.form-control[readonly] {
+    background-color: #474747;
+}
         .page-title {
             justify-content: space-around!important; 
             margin-bottom: 30px!important;
