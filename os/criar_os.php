@@ -192,11 +192,12 @@ include(__DIR__ . '/../menu.php');
 </div>
 
 <script src="../script/jquery-3.5.1.min.js"></script>
-<script src="../script/bootstrap.min.js"></script>
-<script src="../script/bootstrap.bundle.min.js"></script>
-<script src="../script/jquery.mask.min.js"></script>
 <script src="../script/jquery-ui.min.js"></script>
+<script src="../script/jquery.mask.min.js"></script>
+<script src="../script/bootstrap.bundle.min.js"></script>
+<script src="../script/bootstrap.min.js"></script> 
 <script src="../script/sweetalert2.js"></script>
+
 <script>
     $(document).ready(function() {
     // Inicializa a funcionalidade de arrastar e soltar na tabela de itens
