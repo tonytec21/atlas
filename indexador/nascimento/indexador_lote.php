@@ -125,11 +125,11 @@ date_default_timezone_set('America/Sao_Paulo');
             </button>
         </form>
 
-        <div class="loading-overlay">
+        <!-- <div class="loading-overlay">
             <div class="loading-spinner">
                 <span>0%</span>
             </div>
-        </div>
+        </div> -->
 
     </div>
 </div>
