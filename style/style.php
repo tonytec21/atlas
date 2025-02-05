@@ -1,7 +1,7 @@
 <style>  
-body.dark-mode .form-control[readonly] {
-    background-color: #474747;
-}
+        body.dark-mode .form-control[readonly] {
+            background-color: #474747;
+        }
 
         .page-title {
             justify-content: space-around!important; 
