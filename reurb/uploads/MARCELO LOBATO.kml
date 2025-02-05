@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>MARCELO LOBATO.kml</name>
+	<Style id="COLOR7X">
+		<LineStyle>
+			<width>3</width>
+		</LineStyle>
+		<PolyStyle>
+			<color>00ffffff</color>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="COLOR7X0">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#COLOR7X</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#COLOR7X1</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="COLOR7X1">
+		<LineStyle>
+			<width>3</width>
+		</LineStyle>
+		<PolyStyle>
+			<color>00ffffff</color>
+		</PolyStyle>
+	</Style>
+	<Placemark>
+		<name>PLINHA-1</name>
+		<styleUrl>#COLOR7X0</styleUrl>
+		<Polygon>
+			<outerBoundaryIs>
+				<LinearRing>
+					<coordinates>
+						-44.047629455748,-2.531034810082,0 -44.047541264865,-2.530499353826,0 -44.0482007645044,-2.530367753397508,0 -44.04861021190413,-2.530304242226296,0 -44.04865768485958,-2.530588131980489,0 -44.04850169736866,-2.530616089475388,0 -44.04854814541685,-2.530846333161893,0 -44.048290548823,-2.530899892082,0 -44.047629455748,-2.531034810082,0 
+					</coordinates>
+				</LinearRing>
+			</outerBoundaryIs>
+		</Polygon>
+	</Placemark>
+</Document>
+</kml>

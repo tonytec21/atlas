@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>FRANCISCO DA SILVA PINHEIRO FILHO.kml</name>
+	<open>1</open>
+ 
+	<StyleMap id="inPlineX"><Pair><key>normal</key><styleUrl>#inline0x</styleUrl></Pair><Pair><key>highlight</key><styleUrl>#inline1x</styleUrl></Pair></StyleMap>
+	<Style id="inline0x"><LineStyle><width>2</width></LineStyle><PolyStyle></PolyStyle></Style>
+	<Style id="inline1x"><LineStyle><width>2</width></LineStyle><PolyStyle></PolyStyle></Style>
+	<StyleMap id="m_ylw-pushpin">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_ylw-pushpin</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#s_ylw-pushpin_hl0</styleUrl>
+		</Pair>
+	</StyleMap>
+ 
+	<StyleMap id="inPline">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#inline0</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#inline1</styleUrl>
+		</Pair>
+	</StyleMap>
+	<StyleMap id="inline">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#inline0</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#inline1</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="inline0">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<Style id="inline1">
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>2</width>
+		</LineStyle>
+		<PolyStyle>
+			<fill>0</fill>
+		</PolyStyle>
+	</Style>
+	<Style id="SH_INSERT">
+		<IconStyle>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle_highlight.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="SN_INSERT">
+		<IconStyle>
+			<scale>1.2</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="M_INSERT">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#SN_INSERT</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#SH_INSERT</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="IconStyle0">
+		<IconStyle>
+			<Icon>
+			</Icon>
+		</IconStyle>
+	</Style>
+   <Style id="COLOR7">
+      <LineStyle>
+      <color>FFFFFFFF</color>
+      <width>2</width>
+      </LineStyle>
+      <PolyStyle>
+         <fill>0</fill>
+      </PolyStyle>
+   </Style>
+   <Placemark>
+      <name>PLINHA-1</name>
+      <styleUrl>#COLOR7</styleUrl>
+		<Polygon>
+			<outerBoundaryIs>
+		        	<LinearRing>
+			          <coordinates>
+                    -44.033097260677,-2.523707672402,0
+                    -44.033027356177,-2.523262841618,0
+                    -44.032760841424,-2.523305211280,0
+                    -44.032831053729,-2.523751956775,0
+                    -44.033097260677,-2.523707672402,0
+			          </coordinates>
+                    </LinearRing>
+		        </outerBoundaryIs>
+		</Polygon>
+	</Placemark>
+ 
+</Document>
+</kml>
