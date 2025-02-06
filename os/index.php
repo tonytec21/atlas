@@ -289,7 +289,7 @@ include(__DIR__ . '/db_connection.php');
             <hr>
             <div class="table-responsive">
                 <h5>Resultados da Pesquisa</h5>
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 85%">
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
                     <thead>
                         <tr>
                             <th style="width: 7%;">Nº OS</th>
@@ -304,7 +304,7 @@ include(__DIR__ . '/db_connection.php');
                             <th>Data</th>
                             <th>Status</th>
                             <th style="width: 5%;">Situação</th>
-                            <th style="width: 9%;">Ações</th>
+                            <th style="width: 7%!important;">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -521,7 +521,7 @@ include(__DIR__ . '/db_connection.php');
                                     </span>
                                 </td>
 
-                                <td>
+                                <td style="width: 7%!important; zoom: 90%">
                                     <button class="btn btn-info2 btn-sm" title="Visualizar OS" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('visualizar_os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                     <button class="btn btn-success btn-sm" title="Pagamentos e Devoluções" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" 
                                         onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')" 
