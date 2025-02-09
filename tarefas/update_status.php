@@ -9,7 +9,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $status = $_POST['status'];
     $data_conclusao = null;
 
-    if ($status === 'Concluída') {
+    // Verificar se o status é "Concluída", "Finalizado sem prática do ato" ou "Aguardando Retirada"
+    if ($status === 'Concluída' || $status === 'Finalizado sem prática do ato' || $status === 'Aguardando Retirada') {
         $data_conclusao = date('Y-m-d H:i:s');
     }
 

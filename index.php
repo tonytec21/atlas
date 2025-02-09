@@ -705,6 +705,32 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             color: #fff;
         }
 
+        .status-aguardando-retirada {
+            background-color: #6c757d; /* Cinza escuro */
+            color: #fff;
+        }
+
+        .status-aguardando-pagamento {
+            background-color: #ffc107; /* Amarelo */
+            color: #000;
+        }
+
+        .status-prazo-de-edital {
+            background-color: #17a2b8; /* Azul claro */
+            color: #fff;
+        }
+
+        .status-exigencia-cumprida {
+            background-color: #20c997; /* Verde água */
+            color: #fff;
+        }
+
+        .status-finalizado-sem-pratica-do-ato {
+            background-color: #343a40; /* Preto acinzentado */
+            color: #fff;
+        }
+
+
         .chart-container {
             position: relative;
             height: 240px;
@@ -1086,6 +1112,16 @@ function getStatusClassLabel(status) {
             return 'status-cancelada';
         case 'pendente':
             return 'status-pendente';
+        case 'aguardando retirada':
+            return 'status-aguardando-retirada';
+        case 'aguardando pagamento':
+            return 'status-aguardando-pagamento';
+        case 'prazo de edital':
+            return 'status-prazo-de-edital';
+        case 'exigência cumprida':
+            return 'status-exigencia-cumprida';
+        case 'finalizado sem prática do ato':
+            return 'status-finalizado-sem-pratica-do-ato';
         default:
             return '';
     }
@@ -1095,9 +1131,9 @@ function getStatusClassLabel(status) {
 function getStatusClassBackground(status_data) {
     switch (status_data) {
         case 'Prestes a vencer':
-            return 'status-prestes-vencer';  // Classe para fundo e texto de "Prestes a vencer"
+            return 'status-prestes-vencer';
         case 'Vencida':
-            return 'status-vencida';  // Classe para fundo e texto de "Vencida"
+            return 'status-vencida';
         default:
             return '';
     }
@@ -1127,8 +1163,8 @@ function criarTabelaPorPrioridade(prioridade, tarefas) {
 
     // Adiciona as tarefas à tabela
     tarefas.forEach(tarefa => {
-        const statusClassLabel = getStatusClassLabel(tarefa.status); // Obter a classe correta para o status
-        const statusClassBackground = getStatusClassBackground(tarefa.status_data); // Classe para fundo e texto de situação
+        const statusClassLabel = getStatusClassLabel(tarefa.status); 
+        const statusClassBackground = getStatusClassBackground(tarefa.status_data); 
         
         tabela += `
             <tr class="${getPriorityClass(tarefa.nivel_de_prioridade)}">

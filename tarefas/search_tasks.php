@@ -66,7 +66,7 @@ if (!empty($status)) {
     $sql .= " AND tarefas.status = '" . $conn->real_escape_string($status) . "'";
 } else {
     // Se nenhum status foi selecionado, exclua as tarefas com status "Concluída" e "Cancelada"
-    $sql .= " AND tarefas.status NOT IN ('Concluída', 'Cancelada')";
+    $sql .= " AND tarefas.status NOT IN ('Concluída', 'Cancelada', 'Finalizado sem prática do ato', 'Aguardando Retirada')";
 }
 if (!empty($description)) {
     $sql .= " AND tarefas.descricao LIKE '%" . $conn->real_escape_string($description) . "%'";

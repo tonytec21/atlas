@@ -41,7 +41,7 @@ if ($nivel_de_acesso === 'administrador' || $tem_acesso_controle_tarefas) {
     $sql_tarefas = "
         SELECT id, titulo, descricao, data_limite, data_criacao, nivel_de_prioridade, status, funcionario_responsavel, token
         FROM tarefas 
-        WHERE status NOT IN ('Concluída', 'Cancelada')
+        WHERE status NOT IN ('Concluída', 'Cancelada', 'Finalizado sem prática do ato', 'Aguardando Retirada')
         ORDER BY funcionario_responsavel
     ";
     $stmt_tarefas = $conn->prepare($sql_tarefas);
@@ -51,7 +51,7 @@ if ($nivel_de_acesso === 'administrador' || $tem_acesso_controle_tarefas) {
         SELECT id, titulo, descricao, data_limite, data_criacao, nivel_de_prioridade, status, funcionario_responsavel, token
         FROM tarefas 
         WHERE funcionario_responsavel = ? 
-        AND status NOT IN ('Concluída', 'Cancelada')
+        AND status NOT IN ('Concluída', 'Cancelada', 'Finalizado sem prática do ato', 'Aguardando Retirada')
     ";
     $stmt_tarefas = $conn->prepare($sql_tarefas);
     $stmt_tarefas->bind_param("s", $nome_completo);

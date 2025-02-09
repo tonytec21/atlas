@@ -176,6 +176,52 @@ date_default_timezone_set('America/Sao_Paulo');
             background-color: gray;
         }
 
+        .status-aguardando-retirada {
+            background-color: #6c757d; /* Cinza escuro */
+        }
+
+        .status-aguardando-pagamento {
+            background-color: #ffc107; /* Amarelo */
+        }
+
+        .status-prazo-de-edital {
+            background-color: #17a2b8; /* Azul claro */
+        }
+
+        .status-exigencia-cumprida {
+            background-color: #20c997; /* Verde água */
+        }
+
+        .status-finalizado-sem-pratica-do-ato {
+            background-color: #343a40; /* Preto acinzentado */
+        }
+
+        body.dark-mode .status-aguardando-retirada {
+            background-color: #495057; /* Cinza mais escuro para o modo escuro */
+            color: #f8f9fa; /* Texto claro */
+        }
+
+        body.dark-mode .status-aguardando-pagamento {
+            background-color: #d39e00; /* Amarelo mais suave para modo escuro */
+            color: #212529; /* Texto escuro */
+        }
+
+        body.dark-mode .status-prazo-de-edital {
+            background-color: #0d6efd; /* Azul vivo para modo escuro */
+            color: #f8f9fa; /* Texto claro */
+        }
+
+        body.dark-mode .status-exigencia-cumprida {
+            background-color: #198754; /* Verde mais escuro para modo escuro */
+            color: #f8f9fa; /* Texto claro */
+        }
+
+        body.dark-mode .status-finalizado-sem-pratica-do-ato {
+            background-color: #212529; /* Cinza quase preto */
+            color: #f8f9fa; /* Texto claro */
+        }
+
+
         .status-sub-iniciada {
             background-color: #007bff;
             color: white;
@@ -218,6 +264,168 @@ date_default_timezone_set('America/Sao_Paulo');
             border-radius: 4px;
             display: inline-block;
         }
+
+        .status-aguardando-retirada {
+            background-color: #6c757d; /* Cinza escuro */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-aguardando-pagamento {
+            background-color: #ffc107; /* Amarelo */
+            color: black;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-prazo-de-edital {
+            background-color: #17a2b8; /* Azul claro */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-exigencia-cumprida {
+            background-color: #20c997; /* Verde água */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-finalizado-sem-pratica-do-ato {
+            background-color: #343a40; /* Preto acinzentado */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-sub-aguardando-retirada {
+            background-color: #6c757d; /* Cinza escuro */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-sub-aguardando-pagamento {
+            background-color: #ffc107; /* Amarelo */
+            color: black;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-sub-prazo-de-edital {
+            background-color: #17a2b8; /* Azul claro */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-sub-exigencia-cumprida {
+            background-color: #20c997; /* Verde água */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .status-sub-finalizado-sem-pratica-do-ato {
+            background-color: #343a40; /* Preto acinzentado */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+
+        body.dark-mode .status-aguardando-retirada {
+            background-color: #495057; /* Cinza mais escuro */
+            color: #f8f9fa; /* Texto claro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        body.dark-mode .status-aguardando-pagamento {
+            background-color: #d39e00; /* Amarelo mais suave */
+            color: #212529; /* Texto escuro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        body.dark-mode .status-prazo-de-edital {
+            background-color: #0d6efd; /* Azul vivo */
+            color: #f8f9fa; /* Texto claro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        body.dark-mode .status-exigencia-cumprida {
+            background-color: #198754; /* Verde mais escuro */
+            color: #f8f9fa; /* Texto claro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        body.dark-mode .status-finalizado-sem-pratica-do-ato {
+            background-color: #212529; /* Preto acinzentado */
+            color: #f8f9fa; /* Texto claro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        body.dark-mode .status-sub-aguardando-retirada {
+            background-color: #495057; /* Cinza mais escuro */
+            color: #f8f9fa; /* Texto claro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        body.dark-mode .status-sub-aguardando-pagamento {
+            background-color: #d39e00; /* Amarelo mais suave */
+            color: #212529; /* Texto escuro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        body.dark-mode .status-sub-prazo-de-edital {
+            background-color: #0d6efd; /* Azul vivo */
+            color: #f8f9fa; /* Texto claro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        body.dark-mode .status-sub-exigencia-cumprida {
+            background-color: #198754; /* Verde mais escuro */
+            color: #f8f9fa; /* Texto claro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        body.dark-mode .status-sub-finalizado-sem-pratica-do-ato {
+            background-color: #212529; /* Preto acinzentado */
+            color: #f8f9fa; /* Texto claro */
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
 
         .priority-sub-medium {
             background-color: #fff9c4 !important; 
@@ -576,6 +784,11 @@ date_default_timezone_set('America/Sao_Paulo');
         #viewStatus option[value="Em Andamento"] { color: var(--accent-color); }  
         #viewStatus option[value="Concluída"] { color: var(--success-color); }  
         #viewStatus option[value="Cancelada"] { color: var(--danger-color); }  
+        #viewStatus option[value="Aguardando Retirada"] { color: var(--secondary-color); }  
+        #viewStatus option[value="Aguardando Pagamento"] { color: var(--warning-color); }  
+        #viewStatus option[value="Prazo de Edital"] { color: var(--info-color); }  
+        #viewStatus option[value="Exigência Cumprida"] { color: var(--teal-color); }  
+        #viewStatus option[value="Finalizado sem prática do ato"] { color: var(--dark-color); }  
 
         /* Modal Footer */  
         .modal-footer {  
@@ -1554,6 +1767,11 @@ date_default_timezone_set('America/Sao_Paulo');
                             <option value="Concluída">Concluída</option>
                             <option value="Cancelada">Cancelada</option>
                             <option value="Pendente">Pendente</option>
+                            <option value="Aguardando Retirada">Aguardando Retirada</option>
+                            <option value="Aguardando Pagamento">Aguardando Pagamento</option>
+                            <option value="Prazo de Edital">Prazo de Edital</option>
+                            <option value="Exigência Cumprida">Exigência Cumprida</option>
+                            <option value="Finalizado sem prática do ato">Finalizado sem prática do ato</option>
                         </select>
                     </div>
                     <div class="form-group col-md-6">
@@ -1709,7 +1927,13 @@ date_default_timezone_set('America/Sao_Paulo');
                             <option value="Em Andamento">Em Andamento</option>  
                             <option value="Concluída">Concluída</option>  
                             <option value="Cancelada">Cancelada</option>  
-                        </select>  
+                            <option value="Aguardando Retirada">Aguardando Retirada</option>  
+                            <option value="Aguardando Pagamento">Aguardando Pagamento</option>  
+                            <option value="Prazo de Edital">Prazo de Edital</option>  
+                            <option value="Exigência Cumprida">Exigência Cumprida</option>  
+                            <option value="Finalizado sem prática do ato">Finalizado sem prática do ato</option>  
+                        </select>
+ 
                         <button type="button" class="btn-save" id="saveStatusButton">  
                             <i class="fa fa-check"></i> Atualizar Status  
                         </button>  
@@ -2367,6 +2591,16 @@ function getStatusClass(status) {
             return 'status-sub-cancelada';
         case 'pendente':
             return 'status-sub-pendente';
+        case 'Aguardando Retirada':
+            return 'status-sub-aguardando-retirada';
+        case 'Aguardando Pagamento':
+            return 'status-sub-aguardando-pagamento';
+        case 'Prazo de Edital':
+            return 'status-sub-prazo-de-edital';
+        case 'Exigência Cumprida':
+            return 'status-sub-exigencia-cumprida';
+        case 'Finalizado sem prática do ato':
+            return 'status-sub-finalizado-sem-pratica-do-ato';
         default:
             return '';
     }
@@ -2378,7 +2612,7 @@ function getRowClass(status, data_limite) {
     var currentDate = new Date();
     var oneDay = 24 * 60 * 60 * 1000;
 
-    if (status !== 'concluída' && status !== 'cancelada') {
+    if (status !== 'concluída' && status !== 'cancelada' && status !== 'Finalizado sem prática do ato' && status !== 'Aguardando Retirada') {
         if (deadlineDate < currentDate) {
             return 'row-sub-vencida';  // Tarefa já está vencida
         } else if ((deadlineDate - currentDate) <= oneDay) {
@@ -2454,8 +2688,13 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
 
                             var rowClass = '';
 
-                            // Aplicar regras de coloração apenas se o status não for "Concluída" ou "Cancelada"
-                            if (task.status.toLowerCase() !== 'concluída' && task.status.toLowerCase() !== 'cancelada') {
+                            // Aplicar regras de coloração apenas se o status não for "Concluída", "Cancelada", "Finalizado sem prática do ato" ou "Aguardando Retirada"
+                            if (
+                                task.status.toLowerCase() !== 'concluída' &&
+                                task.status.toLowerCase() !== 'cancelada' &&
+                                task.status.toLowerCase() !== 'finalizado sem prática do ato' &&
+                                task.status.toLowerCase() !== 'aguardando retirada'
+                            ) {
                                 // Verificar vencimento e definir classe de linha
                                 rowClass = getRowClass(task.status.toLowerCase(), task.data_limite);
 
@@ -2528,7 +2767,7 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
 
         // Função para retornar a classe de status
         function getStatusClass(status) {
-            switch (status) {
+            switch (status.toLowerCase()) { 
                 case 'iniciada':
                     return 'status-iniciada';
                 case 'em espera':
@@ -2541,10 +2780,21 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
                     return 'status-cancelada';
                 case 'pendente':
                     return 'status-pendente';
+                case 'aguardando retirada':
+                    return 'status-aguardando-retirada';
+                case 'aguardando pagamento':
+                    return 'status-aguardando-pagamento';
+                case 'prazo de edital':
+                    return 'status-prazo-de-edital';
+                case 'exigência cumprida':
+                    return 'status-exigencia-cumprida';
+                case 'finalizado sem prática do ato':
+                    return 'status-finalizado-sem-pratica-do-ato';
                 default:
                     return '';
             }
         }
+
 
         // Função para definir a classe de linha com base na data limite
         function getRowClass(status, data_limite) {
@@ -2552,7 +2802,7 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
             var currentDate = new Date();
             var oneDay = 24 * 60 * 60 * 1000;
 
-            if (status !== 'concluída' && status !== 'cancelada') {
+            if (status !== 'concluída' && status !== 'cancelada' && status !== 'Finalizado sem prática do ato' && status !== 'Aguardando Retirada') {
                 if (deadlineDate < currentDate) {
                     return 'row-vencida';  // Tarefa já está vencida
                 } else if ((deadlineDate - currentDate) <= oneDay) {
@@ -2838,7 +3088,7 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
             }
         });
     });
-           
+
 
 // Função para verificar se a guia de recebimento já foi gerada
 function verificarOuAbrirGuia(taskId) {
@@ -3489,6 +3739,7 @@ function viewTask(taskToken) {
                 updateFileList(files);  
             }  
         });
+        
 
         $(document).ready(function() {
             // Função para obter o valor do parâmetro da URL
