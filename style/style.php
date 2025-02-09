@@ -262,20 +262,6 @@
             }  
         }  
 
-        /* Loading Animation */  
-        .loading-overlay {  
-            position: fixed;  
-            top: 0;  
-            left: 0;  
-            right: 0;  
-            bottom: 0;  
-            background-color: rgba(0,0,0,0.5);  
-            display: flex;  
-            align-items: center;  
-            justify-content: center;  
-            z-index: 9999;  
-        }  
-
         .loading-spinner {  
             width: 50px;  
             height: 50px;  
@@ -291,7 +277,7 @@
         }  
 
         .table th {  
-        vertical-align: middle !important; /* Garante alinhamento vertical centralizado */  
+        vertical-align: middle !important;  
     }  
 
     .checkbox-column {  
