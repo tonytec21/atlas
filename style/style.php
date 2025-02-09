@@ -277,7 +277,7 @@
         }  
 
         .table th {  
-        vertical-align: middle !important;  
+        vertical-align: middle !important;
     }  
 
     .checkbox-column {  
