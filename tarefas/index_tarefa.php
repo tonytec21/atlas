@@ -779,7 +779,7 @@ date_default_timezone_set('America/Sao_Paulo');
         }  
 
         /* Status Colors */  
-        #viewStatus option[value="Iniciada"] { color: var(--accent-color); }  
+        /* #viewStatus option[value="Iniciada"] { color: var(--accent-color); }  
         #viewStatus option[value="Em Espera"] { color: var(--warning-color); }  
         #viewStatus option[value="Em Andamento"] { color: var(--accent-color); }  
         #viewStatus option[value="Concluída"] { color: var(--success-color); }  
@@ -788,7 +788,7 @@ date_default_timezone_set('America/Sao_Paulo');
         #viewStatus option[value="Aguardando Pagamento"] { color: var(--warning-color); }  
         #viewStatus option[value="Prazo de Edital"] { color: var(--info-color); }  
         #viewStatus option[value="Exigência Cumprida"] { color: var(--teal-color); }  
-        #viewStatus option[value="Finalizado sem prática do ato"] { color: var(--dark-color); }  
+        #viewStatus option[value="Finalizado sem prática do ato"] { color: var(--dark-color); }   */
 
         /* Modal Footer */  
         .modal-footer {  
@@ -1723,7 +1723,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         <label for="protocol">Protocolo Geral:</label>
                         <input type="text" class="form-control" id="protocol" name="protocol">
                     </div>
-                    <div class="form-group col-md-4">
+                    <div class="form-group col-md-3">
                         <label for="title">Título da Tarefa:</label>
                         <input type="text" class="form-control" id="title" name="title">
                     </div>
@@ -1757,7 +1757,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             ?>
                         </select>
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-3">
                         <label for="status">Status:</label>
                         <select id="status" name="status" class="form-control">
                             <option value="">Selecione</option>
@@ -3739,7 +3739,7 @@ function viewTask(taskToken) {
                 updateFileList(files);  
             }  
         });
-        
+
 
         $(document).ready(function() {
             // Função para obter o valor do parâmetro da URL
