@@ -154,7 +154,8 @@
 
         .table {  
             margin-bottom: 0;  
-            color: var(--text-primary);  
+            /* color: var(--text-primary);   */
+            color: #000;  
             border-collapse: separate;  
             border-spacing: 0;  
             width: 100%;  
