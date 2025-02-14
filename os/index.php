@@ -289,7 +289,7 @@ include(__DIR__ . '/db_connection.php');
             <hr>
             <div class="table-responsive">
                 <h5>Resultados da Pesquisa</h5>
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 88%">
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 87%">
                     <thead>
                         <tr>
                             <th style="width: 7%;">Nº OS</th>
