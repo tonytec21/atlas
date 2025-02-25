@@ -1774,7 +1774,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             <option value="Finalizado sem prática do ato">Finalizado sem prática do ato</option>
                         </select>
                     </div>
-                    <div class="form-group col-md-6">
+                    <div class="form-group col-md-4">
                         <label for="description">Descrição:</label>
                         <input type="text" class="form-control" id="description" name="description">
                     </div>
@@ -1788,9 +1788,24 @@ date_default_timezone_set('America/Sao_Paulo');
                             <option value="Crítica">Crítica</option>
                         </select>
                     </div>
-                    <div class="form-group col-md-4">
+                    <div class="form-group col-md-3">
                         <label for="employee">Funcionário Responsável:</label>
-                        <select id="employee" name="employee" class="form-control">
+                        <select id="revisor" name="employee" class="form-control">
+                            <option value="">Selecione</option>
+                            <?php
+                            $sql = "SELECT nome_completo FROM funcionarios WHERE status = 'ativo'";
+                            $result = $conn->query($sql);
+                            if ($result->num_rows > 0) {
+                                while ($row = $result->fetch_assoc()) {
+                                    echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "'>" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";
+                                }
+                            }
+                            ?>
+                        </select>
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label for="revisor">Revisor:</label>
+                        <select id="revisor" name="revisor" class="form-control">
                             <option value="">Selecione</option>
                             <?php
                             $sql = "SELECT nome_completo FROM funcionarios WHERE status = 'ativo'";
@@ -1904,6 +1919,10 @@ date_default_timezone_set('America/Sao_Paulo');
                     <div class="info-item">  
                         <label for="viewEmployee">Funcionário Responsável</label>  
                         <input type="text" class="form-control-modern" id="viewEmployee" readonly>  
+                    </div>
+                    <div class="info-item">  
+                        <label for="viewRevisor">Revisor</label>  
+                        <input type="text" class="form-control-modern" id="viewRevisor" readonly>  
                     </div>  
                     <div class="info-item">  
                         <label for="viewConclusionDate">Data de Conclusão</label>  
@@ -2274,7 +2293,7 @@ date_default_timezone_set('America/Sao_Paulo');
                 <form id="subTaskForm" enctype="multipart/form-data" method="POST" action="save_sub_task.php">  
                     <!-- Informações Principais -->  
                     <div class="form-section">  
-                        <div class="info-grid">  
+                        <div class="info-grid columns-4"> 
                             <div class="info-item">  
                                 <label for="subTaskTitle">Título da Subtarefa</label>  
                                 <input type="text" class="form-control-modern" id="subTaskTitle" name="title" required>  
@@ -2295,10 +2314,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                     ?>  
                                 </select>  
                             </div>  
-                        </div>  
-
-                        <!-- Segunda linha de campos -->  
-                        <div class="info-grid columns-4">  
+                          
                             <div class="info-item">  
                                 <label for="subTaskDeadline">Data Limite</label>  
                                 <input type="datetime-local" class="form-control-modern" id="subTaskDeadline" name="deadline" required>  
@@ -2333,7 +2349,24 @@ date_default_timezone_set('America/Sao_Paulo');
                                     }  
                                     ?>  
                                 </select>  
-                            </div>  
+                            </div>
+
+                            <div class="info-item">  
+                                <label class="subTaskEmployee">Revisor (Opcional):</label>
+                                <select class="form-control-modern" id="reviewer" name="reviewer">
+                                    <option value="">Selecione</option>
+                                    <?php  
+                                    $sql = "SELECT id, nome_completo FROM funcionarios WHERE status = 'ativo'";  
+                                    $result = $conn->query($sql);  
+                                    if ($result->num_rows > 0) {  
+                                        while($row = $result->fetch_assoc()) {  
+                                            echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "'>" .   
+                                                htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";  
+                                        }  
+                                    }  
+                                    ?>  
+                                </select>  
+                            </div>
 
                             <div class="info-item">  
                                 <label for="subTaskOrigin">Origem</label>  
@@ -3202,6 +3235,7 @@ function viewTask(taskToken) {
             $('#viewOrigin').val(task.origem_titulo);
             $('#viewDeadline').val(new Date(task.data_limite).toLocaleString("pt-BR"));
             $('#viewEmployee').val(task.funcionario_responsavel);
+            $('#viewRevisor').val(task.revisor);
             $('#viewDescription').val(task.descricao);
             $('#viewStatus').val(task.status).data('data-conclusao', task.data_conclusao);
             $('#createdBy').val(task.criado_por);

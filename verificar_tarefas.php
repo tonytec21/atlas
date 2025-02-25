@@ -46,15 +46,15 @@ if ($nivel_de_acesso === 'administrador' || $tem_acesso_controle_tarefas) {
     ";
     $stmt_tarefas = $conn->prepare($sql_tarefas);
 } else {
-    // Caso contrário, buscar as tarefas apenas do usuário logado
+    // Caso contrário, buscar as tarefas atribuídas ao usuário logado como responsável ou revisor
     $sql_tarefas = "
-        SELECT id, titulo, descricao, data_limite, data_criacao, nivel_de_prioridade, status, funcionario_responsavel, token
+        SELECT id, titulo, descricao, data_limite, data_criacao, nivel_de_prioridade, status, funcionario_responsavel, revisor, token
         FROM tarefas 
-        WHERE funcionario_responsavel = ? 
+        WHERE (funcionario_responsavel = ? OR revisor = ?) 
         AND status NOT IN ('Concluída', 'Cancelada', 'Finalizado sem prática do ato', 'Aguardando Retirada')
     ";
     $stmt_tarefas = $conn->prepare($sql_tarefas);
-    $stmt_tarefas->bind_param("s", $nome_completo);
+    $stmt_tarefas->bind_param("ss", $nome_completo, $nome_completo);
 }
 
 $stmt_tarefas->execute();

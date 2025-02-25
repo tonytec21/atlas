@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $updatedBy = $_POST['updatedBy'];
     $updatedAt = date('Y-m-d H:i:s'); 
     $nivel_de_prioridade = $_POST['priority'];
+    $reviewer = isset($_POST['reviewer']) ? $_POST['reviewer'] : null;
 
     // Convert deadline to the correct format
     $deadline = DateTime::createFromFormat('Y-m-d\TH:i', $deadline);
@@ -25,9 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     // Update task data
-    $sql = "UPDATE tarefas SET titulo = ?, categoria = ?, origem = ?, data_limite = ?, funcionario_responsavel = ?, descricao = ?, data_atualizacao = ?, atualizado_por = ?, nivel_de_prioridade = ? WHERE id = ?";
+    $sql = "UPDATE tarefas SET titulo = ?, categoria = ?, origem = ?, data_limite = ?, funcionario_responsavel = ?, descricao = ?, data_atualizacao = ?, atualizado_por = ?, nivel_de_prioridade = ?, revisor = ? WHERE id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param('sssssssssi', $title, $category, $origin, $deadline, $employee, $description, $updatedAt, $updatedBy, $nivel_de_prioridade, $taskId);
+    $stmt->bind_param('ssssssssssi', $title, $category, $origin, $deadline, $employee, $description, $updatedAt, $updatedBy, $nivel_de_prioridade, $reviewer, $taskId);
 
     if ($stmt->execute()) {
         // Retornar um JSON para sucesso

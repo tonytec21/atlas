@@ -16,6 +16,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $token = md5(uniqid(rand(), true));
     $caminho_anexo = '';
     $nivel_de_prioridade = $_POST['priority'];
+    $revisor = isset($_POST['reviewer']) ? $_POST['reviewer'] : null;
     
     // Aqui você captura o valor de id_tarefa_principal
     $id_tarefa_principal = $_POST['id_tarefa_principal'];
@@ -53,10 +54,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 
     // Inserir dados da tarefa no banco de dados
-    $sql = "INSERT INTO tarefas (token, titulo, categoria, origem, descricao, data_limite, funcionario_responsavel, criado_por, data_criacao, caminho_anexo, nivel_de_prioridade, sub_categoria, id_tarefa_principal) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Sim', ?)";
+    $sql = "INSERT INTO tarefas (token, titulo, categoria, origem, descricao, data_limite, funcionario_responsavel, criado_por, data_criacao, caminho_anexo, nivel_de_prioridade, sub_categoria, id_tarefa_principal, revisor) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Sim', ?, ?)";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sssssssssssi", $token, $titulo, $categoria, $origem, $descricao, $data_limite, $funcionario_responsavel, $criado_por, $data_criacao, $caminho_anexo, $nivel_de_prioridade, $id_tarefa_principal);
+    $stmt->bind_param("sssssssssssis", $token, $titulo, $categoria, $origem, $descricao, $data_limite, $funcionario_responsavel, $criado_por, $data_criacao, $caminho_anexo, $nivel_de_prioridade, $id_tarefa_principal, $revisor);
 
     if ($stmt->execute()) {
         // Capturar o ID da tarefa recém-inserida

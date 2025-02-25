@@ -244,7 +244,7 @@ include(__DIR__ . '/db_connection.php');
                             <label class="form-label">Título da Tarefa:</label>  
                             <input type="text" class="form-control-modern" id="title" name="title" required>  
                         </div>  
-                        <div class="form-group col-md-6">  
+                        <div class="form-group col-md-3">  
                             <label class="form-label">Categoria:</label>  
                             <select class="form-control-modern" id="category" name="category" required>  
                                 <option value="">Selecione</option>  
@@ -259,9 +259,7 @@ include(__DIR__ . '/db_connection.php');
                                 ?>  
                             </select>  
                         </div>  
-                    </div>  
-
-                    <div class="form-row">  
+                      
                         <div class="form-group col-md-3">  
                             <label class="form-label">Data Limite para Conclusão:</label>  
                             <input type="datetime-local" class="form-control-modern" id="deadline" name="deadline" required>  
@@ -293,7 +291,25 @@ include(__DIR__ . '/db_connection.php');
                                 }  
                                 ?>  
                             </select>  
-                        </div>  
+                        </div>
+
+                        <div class="form-group col-md-3">
+                            <label class="form-label">Revisor (Opcional):</label>
+                            <select class="form-control-modern" id="reviewer" name="reviewer">
+                                <option value="">Selecione</option>
+                                <?php  
+                                $sql = "SELECT id, nome_completo FROM funcionarios WHERE status = 'ativo'";  
+                                $result = $conn->query($sql);  
+                                if ($result->num_rows > 0) {  
+                                    while($row = $result->fetch_assoc()) {  
+                                        echo "<option value='" . htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "'>" .   
+                                            htmlspecialchars($row['nome_completo'], ENT_QUOTES, 'UTF-8') . "</option>";  
+                                    }  
+                                }  
+                                ?>  
+                            </select>
+                        </div>
+
                         <div class="form-group col-md-3">  
                             <label class="form-label">Origem:</label>  
                             <select class="form-control-modern" id="origin" name="origin" required>  

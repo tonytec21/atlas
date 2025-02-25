@@ -162,6 +162,16 @@ while ($row = $result->fetch_assoc()) {
             justify-content: flex-end;
             margin-bottom: 15px;
         }
+
+        .btn-container {
+                width: 100%;
+                max-width: 600px;
+            }
+
+            .btn {
+                min-width: 150px;
+                margin: 5px;
+            }
     </style>
 </head>
 <body class="light-mode">
@@ -171,16 +181,16 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center">
-            <h4>Edição de Tarefa - Protocolo Geral nº.: <?php echo $taskId; ?></h4>
-            <div class="btn-container">
-                <button style="width: 172px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" class="btn btn-primary mr-2" id="protocoloButton">
+        <div class="d-flex flex-column align-items-center text-center">
+            <h4 class="mb-3">Edição de Tarefa - Protocolo Geral nº.: <?php echo $taskId; ?></h4>
+            <div class="btn-container d-flex flex-wrap justify-content-center gap-2">
+                <button class="btn btn-primary px-3 py-2 flex-fill" id="protocoloButton">
                     <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo
                 </button>
-                <button style="width: 150px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important;" onclick="window.location.href='criar-tarefa.php'" class="btn btn-success">
+                <button class="btn btn-success px-3 py-2 flex-fill" onclick="window.location.href='criar-tarefa.php'">
                     <i class="fa fa-plus" aria-hidden="true"></i> Nova Tarefa
                 </button>
-                <button style="width: 170px; height: 40px!important; font-size: 14px; margin-bottom: 5px!important; margin-left: 10px;" type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='index.php'">
+                <button class="btn btn-secondary px-3 py-2 flex-fill" type="button" onclick="window.location.href='index.php'">
                     <i class="fa fa-search" aria-hidden="true"></i> Pesquisar Tarefas
                 </button>
             </div>
@@ -194,7 +204,7 @@ include(__DIR__ . '/../menu.php');
                     <label for="title">Título da Tarefa:</label>
                     <input type="text" class="form-control" id="title" name="title" value="<?php echo htmlspecialchars($taskData['titulo']); ?>" required>
                 </div>
-                <div class="form-group col-md-6">
+                <div class="form-group col-md-3">
                     <label for="category">Categoria:</label>
                     <select id="category" name="category" class="form-control" required>
                         <?php foreach ($categories as $category) : ?>
@@ -202,8 +212,6 @@ include(__DIR__ . '/../menu.php');
                         <?php endforeach; ?>
                     </select>
                 </div>
-            </div>
-            <div class="form-row">
                 <div class="form-group col-md-3">
                     <label for="origin">Origem:</label>
                     <select id="origin" name="origin" class="form-control" required>
@@ -230,6 +238,18 @@ include(__DIR__ . '/../menu.php');
                     <select id="employee" name="employee" class="form-control" required>
                         <?php foreach ($employees as $employee) : ?>
                             <option value="<?php echo htmlspecialchars($employee['nome_completo']); ?>" <?php echo $employee['nome_completo'] == $taskData['funcionario_responsavel'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($employee['nome_completo']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="reviewer">Revisor (Opcional):</label>
+                    <select id="reviewer" name="reviewer" class="form-control">
+                        <option value="">Selecione</option>
+                        <?php foreach ($employees as $employee) : ?>
+                            <option value="<?php echo htmlspecialchars($employee['nome_completo']); ?>"
+                                <?php echo $employee['nome_completo'] == $taskData['revisor'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($employee['nome_completo']); ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>

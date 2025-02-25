@@ -32,6 +32,7 @@ $protocol = isset($_GET['protocol']) ? trim($_GET['protocol']) : '';
 $title = isset($_GET['title']) ? trim($_GET['title']) : '';
 $category = isset($_GET['category']) ? trim($_GET['category']) : '';
 $employee = isset($_GET['employee']) ? trim($_GET['employee']) : '';
+$revisor = isset($_GET['revisor']) ? trim($_GET['revisor']) : '';
 $status = isset($_GET['status']) ? trim($_GET['status']) : '';
 $description = isset($_GET['description']) ? trim($_GET['description']) : '';
 $priority = isset($_GET['priority']) ? trim($_GET['priority']) : '';
@@ -46,7 +47,7 @@ $sql = "SELECT tarefas.*, categorias.titulo AS categoria_titulo, origem.titulo A
 
 // Se o nível de acesso for 'usuario', mas ele não tiver acesso total, filtrar apenas as tarefas atribuídas ao usuário logado
 if ($nivelAcesso === 'usuario' && !$temAcessoTotal) {
-    $sql .= " AND tarefas.funcionario_responsavel = '$nomeCompleto'";
+    $sql .= " AND (tarefas.funcionario_responsavel = '$nomeCompleto' OR tarefas.revisor = '$nomeCompleto')";
 }
 
 // Aplicar filtros de pesquisa
@@ -61,6 +62,9 @@ if (!empty($category)) {
 }
 if (!empty($employee)) {
     $sql .= " AND tarefas.funcionario_responsavel LIKE '%" . $conn->real_escape_string($employee) . "%'";
+}
+if (!empty($revisor)) {
+    $sql .= " AND tarefas.revisor LIKE '%" . $conn->real_escape_string($revisor) . "%'";
 }
 if (!empty($status)) {
     $sql .= " AND tarefas.status = '" . $conn->real_escape_string($status) . "'";
