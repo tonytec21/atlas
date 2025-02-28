@@ -227,6 +227,7 @@ $orderData['groups'] = $groupedFiles;
             height: 300px;
             padding: 15px;
             border-radius: 4px;
+            color: #000 !important;
             background-color: #f8f9fa;
             box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), 
                         0 0 5px rgba(0, 0, 0, 0.1), 
