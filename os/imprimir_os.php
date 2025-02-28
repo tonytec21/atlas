@@ -288,17 +288,17 @@ if (isset($_GET['id'])) {
 
     $pdf->SetFont('helvetica', '', 8);
     $pdf->SetLeftMargin(10); // Ajusta a margem esquerda se necessário
-    $pdf->SetRightMargin(58); // Define a margem direita de 5 cm (aproximadamente 50mm)
+    $pdf->SetRightMargin(60); // Define a margem direita de 5 cm (aproximadamente 50mm)
     $pdf->writeHTML('<div style="text-align: justify; margin-top: 20px;">Os valores apresentados são aproximados. Ao final do serviço, será realizado um levantamento detalhado de todos os atos praticados para confirmar o valor total. Caso haja um aumento, será necessário complementar o pagamento para a entrega do serviço. Se houver saldo remanescente, o valor será devolvido no ato da entrega. <b>É importante ter ciência de que o valor dos emolumentos é uma estimativa e pode sofrer alterações em função dos atos realizados.</b></div>', true, false, true, false, '');
     $pdf->Ln(-18);
 
     // Adicionar os valores totais abaixo da tabela
-    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->SetFont('helvetica', 'B', 10);
     $pdf->SetRightMargin(8);
     $pdf->writeHTML('<div style="text-align: right; margin-top: 20px;">Valor Total: R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.') . '</div>', true, false, true, false, '');
     $pdf->Ln(0);
 
-    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->SetFont('helvetica', 'B', 10);
     $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Dep. Prévio: R$ ' . number_format($total_pagamentos, 2, ',', '.') . '</div>', true, false, true, false, '');
     $pdf->Ln(0);
 
@@ -309,7 +309,7 @@ if (isset($_GET['id'])) {
     if ($saldo_a_restituir > 0) {
         $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Valor a Restituir: R$ ' . number_format($saldo_a_restituir, 2, ',', '.') . '</div>', true, false, true, false, '');
     } elseif ($saldo < 0) {
-        $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Valor a Pagar: R$ ' . number_format(abs($saldo), 2, ',', '.') . '</div>', true, false, true, false, '');
+        $pdf->writeHTML('<div style="text-align: right; color: red; margin-top: 10px;">Valor a Pagar: R$ ' . number_format(abs($saldo), 2, ',', '.') . '</div>', true, false, true, false, '');
     }
 
     // Adicionar valor devolvido se houver
@@ -324,28 +324,61 @@ if (isset($_GET['id'])) {
 
     $pdf->Ln(12);
 
-    // Função para adicionar o cabeçalho da tabela de contas bancárias
-    function adicionarCabecalhoTabelaContas(&$pdf, $numContas) {
-        $titulo = ($numContas > 1) ? 'CONTAS BANCÁRIAS' : 'CONTA BANCÁRIA';
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->writeHTML('<div style="text-align: left; margin-top: 20px;"><b>' . $titulo . '</b></div>', true, false, true, false, '');
-        $pdf->Ln(1);
+    $configFile = '../style/configuracao_contas.json';
+    if (file_exists($configFile)) {
+        $configData = json_decode(file_get_contents($configFile), true);
+        $exibircpf = $configData['exibircpf'] ?? 'S';
+    } else {
+        $exibircpf = 'S';
+    }
 
-        $html = '<table border="0.1" cellpadding="4">
-            <thead>
-                <tr>
-                    <th style="width: 12%; text-align: center; font-size: 7.5px;"><b>Banco</b></th>
-                    <th style="width: 7%; text-align: center; font-size: 7.5px;"><b>Agência</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>Tipo de Conta</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>Nº Conta</b></th>
-                    <th style="width: 18%; text-align: center; font-size: 7.5px;"><b>Titular da Conta</b></th>
-                    <th style="width: 15%; text-align: center; font-size: 7.5px;"><b>CPF/CNPJ do Titular</b></th>
-                    <th style="width: 20%; text-align: center; font-size: 7.5px;"><b>Chave PIX</b></th>
-                    <th style="width: 11%; text-align: center; font-size: 7.5px;"><b>QR Code PIX</b></th>
-                </tr>
-            </thead>
-            <tbody>';
-        return $html;
+    if ($exibircpf === 'S') {
+        // Função de cabeçalho COM a coluna CPF/CNPJ
+        function adicionarCabecalhoTabelaContas(&$pdf, $numContas) {
+            $titulo = ($numContas > 1) ? 'CONTAS BANCÁRIAS' : 'CONTA BANCÁRIA';
+            $pdf->SetFont('helvetica', '', 10);
+            $pdf->writeHTML('<div style="text-align: left; margin-top: 20px;"><b>' . $titulo . '</b></div>', true, false, true, false, '');
+            $pdf->Ln(1);
+
+            $html = '<table border="0.1" cellpadding="4">
+                <thead>
+                    <tr>
+                        <th style="width: 12%; text-align: center; font-size: 7.5px;"><b>Banco</b></th>
+                        <th style="width: 7%; text-align: center; font-size: 7.5px;"><b>Agência</b></th>
+                        <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>Tipo de Conta</b></th>
+                        <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>Nº Conta</b></th>
+                        <th style="width: 18%; text-align: center; font-size: 7.5px;"><b>Titular da Conta</b></th>
+                        <th style="width: 15%; text-align: center; font-size: 7.5px;"><b>CPF/CNPJ do Titular</b></th>
+                        <th style="width: 20%; text-align: center; font-size: 7.5px;"><b>Chave PIX</b></th>
+                        <th style="width: 11%; text-align: center; font-size: 7.5px;"><b>QR Code PIX</b></th>
+                    </tr>
+                </thead>
+                <tbody>';
+            return $html;
+        }
+    } else {
+        // Função de cabeçalho SEM a coluna CPF/CNPJ
+        function adicionarCabecalhoTabelaContas(&$pdf, $numContas) {
+            $titulo = ($numContas > 1) ? 'CONTAS BANCÁRIAS' : 'CONTA BANCÁRIA';
+            $pdf->SetFont('helvetica', '', 10);
+            $pdf->writeHTML('<div style="text-align: left; margin-top: 20px;"><b>' . $titulo . '</b></div>', true, false, true, false, '');
+            $pdf->Ln(1);
+
+            $html = '<table border="0.1" cellpadding="4">
+                <thead>
+                    <tr>
+                        <th style="width: 12%; text-align: center; font-size: 7.5px;"><b>Banco</b></th>
+                        <th style="width: 7%; text-align: center; font-size: 7.5px;"><b>Agência</b></th>
+                        <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>Tipo de Conta</b></th>
+                        <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>Nº Conta</b></th>
+                        <th style="width: 26%; text-align: center; font-size: 7.5px;"><b>Titular da Conta</b></th>
+                        <th style="width: 27%; text-align: center; font-size: 7.5px;"><b>Chave PIX</b></th>
+                        <th style="width: 11%; text-align: center; font-size: 7.5px;"><b>QR Code PIX</b></th>
+                    </tr>
+                </thead>
+                <tbody>';
+            return $html;
+        }
     }
 
     // Verificar se há contas bancárias ativas e adicionar ao PDF
@@ -354,16 +387,34 @@ if (isset($_GET['id'])) {
         $html = adicionarCabecalhoTabelaContas($pdf, $numContas);
 
         foreach ($contas as $index => $conta) {
-            $rowHtml = '<tr>
-                <td style="width: 12%; font-size: 7.5px;">' . $conta['banco'] . '</td>
-                <td style="width: 7%; font-size: 7.5px;">' . $conta['agencia'] . '</td>
-                <td style="width: 8%; font-size: 7.5px;">' . $conta['tipo_conta'] . '</td>
-                <td style="width: 8%; font-size: 7.5px;">' . $conta['numero_conta'] . '</td>
-                <td style="width: 18%; font-size: 7.5px;">' . $conta['titular_conta'] . '</td>
-                <td style="width: 15%; font-size: 7.5px;">' . $conta['cpf_cnpj_titular'] . '</td>
-                <td style="width: 20%; font-size: 7.5px;">' . $conta['chave_pix'] . '</td>
-                <td style="width: 11%; font-size: 7.5px; text-align: center;"><img src="@' . $conta['qr_code_pix'] . '" height="60" /></td>
-            </tr>';
+            $rowHtmlCPF = ($exibircpf === 'S')
+                ? '<td style="width: 15%; font-size: 7.5px;">' . $conta['cpf_cnpj_titular'] . '</td>'
+                : ''; 
+            
+            if ($exibircpf === 'S') {
+                // Montar a linha COM CPF/CNPJ
+                $rowHtml = '<tr>
+                    <td style="width: 12%; font-size: 7.5px;">' . $conta['banco'] . '</td>
+                    <td style="width: 7%; font-size: 7.5px;">' . $conta['agencia'] . '</td>
+                    <td style="width: 8%; font-size: 7.5px;">' . $conta['tipo_conta'] . '</td>
+                    <td style="width: 8%; font-size: 7.5px;">' . $conta['numero_conta'] . '</td>
+                    <td style="width: 18%; font-size: 7.5px;">' . $conta['titular_conta'] . '</td>
+                    ' . $rowHtmlCPF . '
+                    <td style="width: 20%; font-size: 7.5px;">' . $conta['chave_pix'] . '</td>
+                    <td style="width: 11%; font-size: 7.5px; text-align: center;"><img src="@' . $conta['qr_code_pix'] . '" height="60" /></td>
+                </tr>';
+            } else {
+                // Montar a linha SEM CPF/CNPJ
+                $rowHtml = '<tr>
+                    <td style="width: 12%; font-size: 7.5px;">' . $conta['banco'] . '</td>
+                    <td style="width: 7%; font-size: 7.5px;">' . $conta['agencia'] . '</td>
+                    <td style="width: 8%; font-size: 7.5px;">' . $conta['tipo_conta'] . '</td>
+                    <td style="width: 8%; font-size: 7.5px;">' . $conta['numero_conta'] . '</td>
+                    <td style="width: 26%; font-size: 7.5px;">' . $conta['titular_conta'] . '</td>
+                    <td style="width: 27%; font-size: 7.5px;">' . $conta['chave_pix'] . '</td>
+                    <td style="width: 11%; font-size: 7.5px; text-align: center;"><img src="@' . $conta['qr_code_pix'] . '" height="60" /></td>
+                </tr>';
+            }
 
             // Verificar a posição atual e adicionar uma nova página se necessário
             if ($index == 0 && $pdf->GetY() + 20 > $pdf->getPageHeight() - 30) {
@@ -382,7 +433,6 @@ if (isset($_GET['id'])) {
         $html .= '</tbody></table>';
         $pdf->writeHTML($html, true, false, true, false, '');
     }
-
     
     // Adicionar a imagem da assinatura
     if (!empty($assinatura_path)) {
