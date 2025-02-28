@@ -56,17 +56,34 @@ class PDF extends TCPDF
     // Rodapé do PDF
     public function Footer()
     {
-        // Número da página no canto inferior direito, na cor branca
+        // Caminho do arquivo de configuração
+        $configFile = "../style/configuracao_timbrado.json";
+
+        // Definir cor padrão (preta)
+        $textColor = [0, 0, 0];
+
+        // Verifica se o arquivo existe e lê a configuração
+        if (file_exists($configFile)) {
+            $configData = json_decode(file_get_contents($configFile), true);
+
+            // Se a chave "rodape" for "S", define a cor branca
+            if (isset($configData['rodape']) && $configData['rodape'] === "S") {
+                $textColor = [255, 255, 255];
+            }
+        }
+
+        // Número da página no canto inferior direito
         $this->SetY(-14.5);
         $this->SetFont('arial', 'I', 8);
-        $this->SetTextColor(255, 255, 255); 
+        $this->SetTextColor($textColor[0], $textColor[1], $textColor[2]); 
 
         // Ajustar a posição horizontal com SetX para aproximar mais do canto
-        $this->SetX(-23); // Ajusta o valor de -15 conforme necessário para alinhar melhor no canto
+        $this->SetX(-23);
 
+        // Exibir o número da página
         $this->Cell(0, 11, 'Página ' . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 0, false, 'L', 0, '', 0, false, 'T', 'M');
 
-        
+
         // Definir cor preta para o texto "Criado por"
         $this->SetTextColor(0, 0, 0); // Definir cor preta
         
