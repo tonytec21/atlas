@@ -223,7 +223,7 @@ $orderData['groups'] = $groupedFiles;
 
         .card {
             position: relative;
-            width: 300px;
+            width: 500px;
             height: 300px;
             padding: 15px;
             border-radius: 4px;
