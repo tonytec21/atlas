@@ -21,7 +21,7 @@ $tabelas = [
         descricao TEXT,
         criado_por VARCHAR(255),
         data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP
-    );"
+    );",
 
     "CREATE TABLE modelos_de_orcamento_itens (
         id INT AUTO_INCREMENT PRIMARY KEY,
