@@ -9,6 +9,24 @@
             font-size: 2.0rem!important;
         }
 
+        .btn-close {
+            outline: none; 
+            border: none; 
+            background: none;
+            padding: 0; 
+            font-size: 1.5rem;
+            cursor: pointer; 
+            transition: transform 0.2s ease;
+        }
+
+        .btn-close:hover {
+            transform: scale(2.10); 
+        }
+
+        .btn-close:focus {
+            outline: none; 
+        }
+
         :root {  
             /* Light Theme */  
             --bg-primary: #ffffff;  

@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $fadep = str_replace(',', '.', $item['fadep']);
             $femp = str_replace(',', '.', $item['femp']);
             $total = str_replace(',', '.', $item['total']);
-            $ordem_exibicao = $item['ordem_exibicao']; // Novo campo
+            $ordem_exibicao = $item['ordem_exibicao']; 
         
             $stmt->bindParam(':ordem_servico_id', $ordem_servico_id);
             $stmt->bindParam(':ato', $ato);
@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bindParam(':fadep', $fadep);
             $stmt->bindParam(':femp', $femp);
             $stmt->bindParam(':total', $total);
-            $stmt->bindParam(':ordem_exibicao', $ordem_exibicao); // Novo campo vinculado
+            $stmt->bindParam(':ordem_exibicao', $ordem_exibicao); 
             $stmt->execute();
         }
         // Confirma a transação

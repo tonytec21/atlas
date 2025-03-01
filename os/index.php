@@ -195,20 +195,57 @@ include(__DIR__ . '/db_connection.php');
     ?>
 
     <div id="main" class="main-content">
+
+        <hr> 
         <div class="container">
-            <h3>Pesquisar Ordens de Serviço</h3>
+            <div class="d-flex flex-wrap justify-content-center align-items-center text-center mb-3">
+                <div class="col-md-auto mb-2">
+                    <button id="add-button" type="button" class="btn btn-secondary text-white" 
+                            onclick="window.open('tabela_de_emolumentos.php')">
+                        <i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos
+                    </button>
+                </div>
+                <div class="col-md-auto mb-2">
+                    <button id="add-button" type="button" class="btn btn-info2 text-white" 
+                            onclick="window.location.href='criar_os.php'">
+                        <i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço
+                    </button>
+                </div>
+                <div class="col-md-auto mb-2">
+                    <button id="add-button" type="button" class="btn btn-success text-white" 
+                            onclick="window.open('../caixa/index.php')">
+                        <i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa
+                    </button>
+                </div>
+                <div class="col-md-auto mb-2">
+                    <a href="index.php" class="btn btn-secondary">
+                        <i class="fa fa-search" aria-hidden="true"></i> Ordens de Serviço
+                    </a>
+                </div>
+                <div class="col-md-auto mb-2">
+                    <a href="modelos_orcamento.php" class="btn btn-primary">
+                        <i class="fa fa-folder-open"></i> Modelos O.S
+                    </a>
+                </div>
+            </div>
+        <hr> 
+        
+            <div class="d-flex justify-content-center align-items-center text-center mb-3">
+                <h3>Pesquisar Ordens de Serviço</h3>
+               
+            </div>
             <hr>
             <form id="pesquisarForm" method="GET">
-                <div class="form-row">
+                <div class="form-row align-items-end">
                     <div class="form-group col-md-2">
                         <label for="os_id">Nº OS:</label>
                         <input type="number" class="form-control" id="os_id" name="os_id" min="1">
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-5">
                         <label for="cliente">Apresentante:</label>
                         <input type="text" class="form-control" id="cliente" name="cliente">
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-3">
                         <label for="cpf_cliente">CPF/CNPJ:</label>
                         <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente">
                     </div>
@@ -216,7 +253,7 @@ include(__DIR__ . '/db_connection.php');
                         <label for="total_os">Valor Total:</label>
                         <input type="text" class="form-control" id="total_os" name="total_os">
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-3">
                         <label for="funcionario">Funcionário:</label>
                         <select class="form-control" id="funcionario" name="funcionario">
                             <option value="">Selecione o Funcionário</option>
@@ -230,7 +267,7 @@ include(__DIR__ . '/db_connection.php');
                             ?>
                         </select>
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-3">
                         <label for="situacao">Situação:</label>
                         <select class="form-control" id="situacao" name="situacao">
                             <option value="">Selecione a Situação</option>
@@ -238,54 +275,32 @@ include(__DIR__ . '/db_connection.php');
                             <option value="Cancelado">Cancelado</option>
                         </select>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group col-md-2">
+
+                    <div class="form-group col-md-3">
                         <label for="data_inicial">Data Inicial:</label>
                         <input type="date" class="form-control" id="data_inicial" name="data_inicial">
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-3">
                         <label for="data_final">Data Final:</label>
                         <input type="date" class="form-control" id="data_final" name="data_final">
                     </div>
-                    <div class="form-group col-md-3">
-                        <label for="descricao_os">Título da OS:</label>
+                    <div class="form-group col-md-4">
+                        <label for="descricao_os">Título da O.S:</label>
                         <input type="text" class="form-control" id="descricao_os" name="descricao_os">
                     </div>
-                    <div class="form-group col-md-5">
+                    <div class="form-group col-md-6">
                         <label for="observacoes">Observações:</label>
                         <input type="text" class="form-control" id="observacoes" name="observacoes">
                     </div>
-                </div>
-                <div class="container">
-                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3">
-                        <div class="col">
-                            <button type="submit" class="btn btn-primary w-100 text-white">
-                                <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
-                            </button>
-                        </div>
-                        <div class="col">
-                            <button id="add-button" type="button" class="btn btn-secondary w-100 text-white" 
-                                    onclick="window.open('tabela_de_emolumentos.php')">
-                                <i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos
-                            </button>
-                        </div>
-                        <div class="col">
-                            <button id="add-button" type="button" class="btn btn-info2 w-100 text-white" 
-                                    onclick="window.location.href='criar_os.php'">
-                                <i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço
-                            </button>
-                        </div>
-                        <div class="col">
-                            <button id="add-button" type="button" class="btn btn-success w-100 text-white" 
-                                    onclick="window.open('../caixa/index.php')">
-                                <i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa
-                            </button>
-                        </div>
+
+                    <div class="form-group col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100 text-white">
+                            <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
+                        </button>
                     </div>
                 </div>
-
             </form>
+
             <hr>
             <div class="table-responsive">
                 <h5>Resultados da Pesquisa</h5>

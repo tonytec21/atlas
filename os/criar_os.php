@@ -17,7 +17,7 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/sweetalert2.min.css">
     <style>
         .btn-adicionar-manual {
-            height: 38px; /* mesma altura do botão Buscar Ato */
+            /* height: 38px; mesma altura do botão Buscar Ato */
             line-height: 24px; /* para alinhar o texto verticalmente */
             margin-left: 10px; /* espaço entre os botões */
         }
@@ -56,12 +56,30 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center">
-            <h3>Criar Ordem de Serviço</h3>
-            <button id="add-button" type="button" style="color: #fff!important" class="btn btn-secondary" onclick="window.open('tabela_de_emolumentos.php')">
+    
+        <!-- Centraliza os botões -->
+        <div class="d-flex justify-content-center align-items-center text-center mb-3">
+            <button id="add-button" type="button" class="btn btn-secondary mx-2" onclick="window.open('tabela_de_emolumentos.php')">
                 <i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos
             </button>
+
+            <a href="index.php" class="btn btn-secondary mx-2">
+                <i class="fa fa-search" aria-hidden="true"></i> Ordens de Serviço
+            </a>
         </div>
+        <hr> 
+
+        <!-- Centraliza o título e o select -->
+        <div class="text-center">
+            <h3 class="mb-3">Criar Ordem de Serviço</h3>
+            <div class="form-group">
+                <label for="modelo_orcamento">Carregar Modelo de O.S:</label>
+                <select id="modelo_orcamento" class="form-control w-50 mx-auto" onchange="carregarModeloSelecionado()">
+                    <option value="">Selecione um modelo...</option>
+                </select>
+            </div>
+        </div>
+
         <hr>
         <form id="osForm" method="POST">
             <div class="form-row">
@@ -177,7 +195,7 @@ include(__DIR__ . '/../menu.php');
         <div class="modal-content">
             <div class="modal-header" id="alertModalHeader">
                 <h5 class="modal-title" id="alertModalLabel">Alerta</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -238,6 +256,28 @@ include(__DIR__ . '/../menu.php');
             }
         });
     }
+
+// Carregar lista de modelos no select
+$.ajax({
+        url: 'listar_todos_modelos.php', // um novo script para retornar JSON
+        method: 'GET',
+        dataType: 'json',
+        success: function(response) {
+            if (response.modelos) {
+                response.modelos.forEach(function(modelo) {
+                    $('#modelo_orcamento').append(
+                        $('<option>', {
+                            value: modelo.id,
+                            text: modelo.nome_modelo
+                        })
+                    );
+                });
+            }
+        },
+        error: function() {
+            console.log('Erro ao carregar modelos');
+        }
+    });
 });
 
 // Função para exibir modal de alerta
@@ -372,7 +412,7 @@ $(document).ready(function() {
 
 
     $('#ato').on('input', function() {
-        this.value = this.value.replace(/[^0-9.]/g, '');
+        this.value = this.value.replace(/[^0-9a-ab-bc-cd-d.]/g, '');
     });
 
     $('#quantidade, #desconto_legal').on('input', function() {
@@ -600,6 +640,68 @@ function validarCNPJ(cnpj) {
     resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
     if (resultado !== parseInt(digitos.charAt(1))) return false;
     return true;
+}
+
+
+function carregarModeloSelecionado() {
+    var idModelo = $('#modelo_orcamento').val();
+    if (!idModelo) return;
+
+    $.ajax({
+        url: 'carregar_modelo_orcamento.php',
+        type: 'GET',
+        data: { id: idModelo },
+        dataType: 'json',
+        success: function(response) {
+            if (response.error) {
+                showAlert(response.error, 'error');
+            } else if (response.itens) {
+                // Para cada item, inserir na tabela de itens da OS
+                response.itens.forEach(function(item) {
+                    // Precisamos converter strings para formato numérico
+                    let emolumentos = parseFloat((item.emolumentos || "0").replace(',', '.'));
+                    let ferc       = parseFloat((item.ferc        || "0").replace(',', '.'));
+                    let fadep      = parseFloat((item.fadep       || "0").replace(',', '.'));
+                    let femp       = parseFloat((item.femp        || "0").replace(',', '.'));
+                    let total      = parseFloat((item.total       || "0").replace(',', '.'));
+
+                    // Descobrimos qual a ordem do próximo item
+                    var ordemExibicao = $('#itensTable tr').length + 1;
+
+                    // Montamos a linha
+                    var row = `
+                    <tr>
+                        <td>${ordemExibicao}</td>
+                        <td>${item.ato}</td>
+                        <td>${item.quantidade}</td>
+                        <td>${item.desconto_legal}%</td>
+                        <td>${item.descricao}</td>
+                        <td>${emolumentos.toFixed(2).replace('.', ',')}</td>
+                        <td>${ferc.toFixed(2).replace('.', ',')}</td>
+                        <td>${fadep.toFixed(2).replace('.', ',')}</td>
+                        <td>${femp.toFixed(2).replace('.', ',')}</td>
+                        <td>${total.toFixed(2).replace('.', ',')}</td>
+                        <td>
+                            <button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="removerItem(this)">
+                                <i class="fa fa-trash" aria-hidden="true"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    `;
+                    $('#itensTable').append(row);
+
+                    // Atualizar o total da OS
+                    var valorOS = parseFloat($('#total_os').val().replace(/\./g, '').replace(',', '.')) || 0;
+                    valorOS += total;
+                    $('#total_os').val(valorOS.toFixed(2).replace('.', ','));
+                });
+            }
+        },
+        error: function(xhr) {
+            console.log(xhr.responseText);
+            showAlert('Erro ao carregar o modelo selecionado.', 'error');
+        }
+    });
 }
 
 </script>
