@@ -3273,7 +3273,7 @@ function viewTask(taskToken) {
                 success: function(response) {
                     var result = JSON.parse(response);
                     if (result.token) {
-                        var url = 'consulta-tarefas-sub.php?token=' + result.token;
+                        var url = 'index_tarefa.php?token=' + result.token;
                         window.open(url, '_blank'); // Abre a nova aba com o token
                     } else {
                         Swal.fire({
@@ -3541,6 +3541,31 @@ function viewTask(taskToken) {
                 fileInput.files = dt.files;  
                 updateFileList(files);  
             }  
+        });
+
+        $(document).ready(function() {
+            // Função para obter o valor do parâmetro da URL
+            function getUrlParameter(name) {
+                name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+                var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+                var results = regex.exec(location.search);
+                return results === null ? null : decodeURIComponent(results[1].replace(/\+/g, ' '));
+            }
+
+            // Verifica se existe um token na URL
+            var taskToken = getUrlParameter('token');
+
+            if (taskToken) {
+                // Se houver um token, chama a função para visualizar a tarefa e abrir o modal
+                viewTask(taskToken);
+            }
+
+            // Adiciona um evento para voltar à página anterior quando o modal for fechado e se houver um token
+            $('#viewTaskModal').on('hidden.bs.modal', function () {
+                if (taskToken) { 
+                    window.history.back();
+                }
+            });
         });
     </script>
     <?php
