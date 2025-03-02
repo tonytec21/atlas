@@ -37,6 +37,16 @@ date_default_timezone_set('America/Sao_Paulo');
         .btn-close:focus {
             outline: none; 
         }
+
+        #checklistSelect {
+            max-width: 100%; /* Garante que o select não ultrapasse o modal */
+            overflow: hidden; /* Esconde o conteúdo extra */
+            text-overflow: ellipsis; /* Adiciona reticências (...) quando necessário */
+            white-space: nowrap; /* Mantém o texto em uma única linha */
+            display: block;
+        }
+
+
     </style>
 </head>
 
@@ -45,8 +55,27 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <div id="main" class="main-content">
         <div class="container">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0;">Pesquisa de Guias de Recebimento</h3>
+            <div class="d-flex flex-wrap justify-content-center align-items-center text-center mb-3">
+                <div class="col-md-auto mb-2">
+                    <button type="button" class="btn btn-success" data-toggle="modal" data-target="#modalCriarGuia">
+                        <i class="fa fa-plus"></i> Criar Guia de Recebimento</button>
+                </div>
+                <div class="col-md-auto mb-2">
+                    <a href="../checklist/checklist.php" class="btn btn-primary">
+                        <i class="fa fa-folder-open"></i> Checklists
+                    </a>
+                </div>
+
+                <div class="col-md-auto mb-2">
+                    <a href="../tarefas/consulta-tarefas.php" class="btn btn-secondary mx-2">
+                        <i class="fa fa-search" aria-hidden="true"></i> Pesquisar Tarefas
+                    </a>
+                </div>
+            </div>
+        <hr> 
+
+            <div class="d-flex justify-content-center align-items-center text-center mb-3">
+                <h3>Pesquisa de Guias de Recebimento</h3>
                 <button id="btnTriagemComunitario" style="display: none;" class="btn btn-secondary" onclick="abrirTriagem()">Triagem Comunitário</button>
             </div>
             <hr>
@@ -106,13 +135,9 @@ date_default_timezone_set('America/Sao_Paulo');
             <input type="text" class="form-control" id="documentoPortador" name="documentoPortador" placeholder="Digite o CPF ou CNPJ">
         </div>
 
-        <div class="form-group col-md-6">
+        <div class="form-group col-md-12">
             <!-- Botão de Filtrar (mantém o tipo submit) -->
             <button type="submit" class="btn btn-primary w-100" style="margin-top: 2px;"><i class="fa fa-filter"></i> Filtrar</button>
-        </div>
-        <div class="form-group col-md-6">
-            <!-- Botão Criar Guia de Recebimento com type="button" para evitar o envio do formulário -->
-            <button type="button" class="btn btn-success w-100" style="margin-top: 2px;" data-toggle="modal" data-target="#modalCriarGuia"><i class="fa fa-plus"></i> Criar Guia de Recebimento</button>
         </div>
     </div>
 </form>
@@ -132,7 +157,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             <th style="width: 11%">Documento do Portador</th>
                             <th style="width: 15%">Funcionário</th>
                             <th style="width: 12%">Data de Recebimento</th>
-                            <th style="width: 16%">Documentos Recebidos</th>
+                            <!-- <th style="width: 16%">Documentos Recebidos</th> -->
                             <th style="width: 10%">Observações</th>
                             <th style="width: 8%">Ações</th>
                         </tr>
@@ -266,62 +291,85 @@ date_default_timezone_set('America/Sao_Paulo');
         </div>
     </div>
 
-    <!-- Modal Criar Guia-->
-    <div class="modal fade" id="modalCriarGuia" tabindex="-1" role="dialog" aria-labelledby="modalCriarGuiaLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalCriarGuiaLabel">Criar Guia de Recebimento</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+    <!-- Modal Criar Guia -->
+    <div class="modal fade" id="modalCriarGuia" tabindex="-1" aria-labelledby="modalCriarGuiaLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xxl"> <!-- Aumentado para um tamanho extra grande -->
+            <div class="modal-content shadow-lg rounded">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="modalCriarGuiaLabel"><i class="fa fa-file-text"></i> Criar Guia de Recebimento</h5>
+                    <button type="button" class="btn-close text-white" data-dismiss="modal" aria-label="Close" style="font-size: 1.5rem;">
+                        &times;
                     </button>
                 </div>
                 <div class="modal-body">
                     <form id="formCriarGuia">
-                        <!-- Linha para Apresentante e CPF/CNPJ -->
+                        
+                        <!-- Seleção de Checklist -->
+                        <div class="form-group">
+                            <label for="checklistSelect"><i class="fa fa-list-alt"></i> Utilizar Checklist:</label>
+                            <select class="form-control custom-select" id="checklistSelect" name="checklistSelect">
+                                <option value="">Selecione um Checklist</option>
+                                <?php
+                                $sqlChecklists = "SELECT id, titulo FROM checklists WHERE status != 'removido' ORDER BY titulo ASC";
+                                $resultChecklists = $conn->query($sqlChecklists);
+                                if ($resultChecklists->num_rows > 0) {
+                                    while ($row = $resultChecklists->fetch_assoc()) {
+                                        echo "<option value='" . $row['id'] . "' title='" . htmlspecialchars($row['titulo'], ENT_QUOTES, 'UTF-8') . "'>" . 
+                                            htmlspecialchars($row['titulo'], ENT_QUOTES, 'UTF-8') . 
+                                            "</option>";
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </div>
+
+                        <!-- Informações do Apresentante -->
                         <div class="form-row">
                             <div class="form-group col-md-8">
-                                <label for="cliente">Apresentante:</label>
+                                <label for="cliente"><i class="fa fa-user"></i> Apresentante:</label>
                                 <input type="text" class="form-control" id="cliente" name="cliente" required>
                             </div>
                             <div class="form-group col-md-4">
-                                <label for="documentoApresentante">CPF/CNPJ:</label>
+                                <label for="documentoApresentante"><i class="fa fa-id-card"></i> CPF/CNPJ:</label>
                                 <input type="text" class="form-control" id="documentoApresentante" name="documentoApresentante">
                             </div>
                         </div>
 
-                        <!-- Linha para Portador e CPF/CNPJ do Portador -->
+                        <!-- Informações do Portador -->
                         <div class="form-row">
                             <div class="form-group col-md-8">
-                                <label for="nome_portador">Portador de Dados:</label>
+                                <label for="nome_portador"><i class="fa fa-user-circle"></i> Portador de Dados:</label>
                                 <input type="text" class="form-control" id="nome_portador" name="nome_portador" required>
                             </div>
                             <div class="form-group col-md-4">
-                                <label for="documento_portador">CPF/CNPJ:</label>
+                                <label for="documento_portador"><i class="fa fa-id-badge"></i> CPF/CNPJ:</label>
                                 <input type="text" class="form-control" id="documento_portador" name="documento_portador">
                             </div>
                         </div>
 
                         <!-- Campo para Documentos Recebidos -->
                         <div class="form-group">
-                            <label for="documentosRecebidos">Documentos Recebidos:</label>
+                            <label for="documentosRecebidos"><i class="fa fa-folder-open"></i> Documentos Recebidos:</label>
                             <textarea class="form-control" id="documentosRecebidos" name="documentosRecebidos" rows="3" required></textarea>
                         </div>
 
                         <!-- Campo para Observações -->
                         <div class="form-group">
-                            <label for="observacoes">Observações:</label>
+                            <label for="observacoes"><i class="fa fa-sticky-note"></i> Observações:</label>
                             <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
                         </div>
+
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" id="salvarGuiaBtn">Salvar Guia</button>
+                <div class="modal-footer d-flex justify-content-between">
+                    <button type="button" class="btn btn-secondary px-4" data-dismiss="modal"><i class="fa fa-times"></i> Cancelar</button>
+                    <button type="button" class="btn btn-primary px-4" id="salvarGuiaBtn"><i class="fa fa-save"></i> Salvar Guia</button>
                 </div>
             </div>
         </div>
     </div>
+
+
 
     <!-- Modal para Editar Guia -->
     <div class="modal fade" id="modalEditarGuia" tabindex="-1" role="dialog" aria-labelledby="modalEditarGuiaLabel" aria-hidden="true">
@@ -530,7 +578,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                             guia.documento_portador || '-',
                                             guia.funcionario,
                                             formatarDataBrasileira(guia.data_recebimento),
-                                            guia.documentos_recebidos,
+                                            // guia.documentos_recebidos,
                                             guia.observacoes,
                                             acoes
                                         ]).draw();
@@ -887,6 +935,43 @@ date_default_timezone_set('America/Sao_Paulo');
                 console.error('Erro ao abrir o diretório:', error);
             });
     }
+
+
+    $(document).ready(function () {
+        $('#checklistSelect').change(function () {
+            var checklistId = $(this).val();
+
+            if (checklistId !== '') {
+                $.ajax({
+                    url: '../checklist/carregar_checklist.php',
+                    type: 'GET',
+                    data: { id: checklistId },
+                    dataType: 'json',
+                    success: function (response) {
+                        if (response.itens && response.itens.length > 0) {
+                            // Formata os itens substituindo quebras de linha por ", "
+                            var documentosRecebidos = response.itens.join("; ");
+
+                            // Verifica se já há documentos inseridos manualmente
+                            var campoDocumentos = $('#documentosRecebidos').val().trim();
+                            if (campoDocumentos !== '') {
+                                // Se já houver conteúdo, adiciona os novos itens sem sobrescrever
+                                $('#documentosRecebidos').val(campoDocumentos + ", " + documentosRecebidos);
+                            } else {
+                                $('#documentosRecebidos').val(documentosRecebidos);
+                            }
+                        } else {
+                            Swal.fire('Atenção', 'Este checklist não possui itens cadastrados.', 'warning');
+                        }
+                    },
+                    error: function () {
+                        Swal.fire('Erro', 'Erro ao carregar os itens do checklist.', 'error');
+                    }
+                });
+            }
+        });
+    });
+
     </script>
 
     <?php include(__DIR__ . '/../rodape.php'); ?>

@@ -195,8 +195,6 @@ include(__DIR__ . '/db_connection.php');
     ?>
 
     <div id="main" class="main-content">
-
-        <hr> 
         <div class="container">
             <div class="d-flex flex-wrap justify-content-center align-items-center text-center mb-3">
                 <div class="col-md-auto mb-2">

@@ -49,7 +49,12 @@ include(__DIR__ . '/db_connection.php');
 
 <div id="main" class="main-content">
     <div class="container">
-    <h3>Gerenciar Checklists</h3>
+        <div class="d-flex justify-content-between align-items-center">
+        <h3>Gerenciar Checklists</h3>
+            <a href="../guia_de_recebimento/index.php" class="btn btn-secondary">
+                <i class="fa fa-search" aria-hidden="true"></i> Guias de Recebimento
+            </a>
+        </div>
     <hr>
 
     <!-- Formulário para Criar/Editar Checklist -->
@@ -65,11 +70,6 @@ include(__DIR__ . '/db_connection.php');
                 </div>
 
                 <div class="form-group">
-                    <label for="observacoes">Observações</label>
-                    <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
-                </div>
-
-                <div class="form-group">
                     <label for="novo_item">Adicionar Item</label>
                     <div class="input-group mb-3">
                         <textarea type="text" class="form-control" id="novo_item" placeholder="Separe os itens com ; (ex: RG; CPF; Certidão de Nascimento)"></textarea>
@@ -79,6 +79,11 @@ include(__DIR__ . '/db_connection.php');
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="observacoes">Observações</label>
+                    <textarea class="form-control" id="observacoes" name="observacoes" rows="2"></textarea>
                 </div>
 
                 <ul class="list-group mb-3" id="listaItens"></ul>
@@ -102,14 +107,14 @@ include(__DIR__ . '/db_connection.php');
 
 <!-- Modal para Visualizar Checklist -->
 <div class="modal fade" id="modalVisualizarChecklist" tabindex="-1" aria-labelledby="modalVisualizarChecklistLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg"> <!-- Aumentando um pouco o tamanho do modal -->
+    <div class="modal-dialog modal-xxl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalVisualizarChecklistLabel">
                     <i class="fa fa-eye"></i> Visualizar Checklist
                 </h5>
-                <button type="button" class="close" data-dismiss="modal">
-                    <span>&times;</span>
+                <button type="button" class="btn-close text-white" data-dismiss="modal" aria-label="Close" style="font-size: 1.5rem;">
+                    &times;
                 </button>
             </div>
             <div class="modal-body">
