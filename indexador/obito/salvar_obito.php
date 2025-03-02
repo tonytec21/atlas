@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }  
 
     session_start();  
-    $funcionario = $_SESSION['nome_funcionario'];  
+    $funcionario = $_SESSION['username'];  
 
     $termo = $_POST['termo'];  
     $livro = $_POST['livro'];  

@@ -249,7 +249,7 @@ include(__DIR__ . '/../menu.php');
                     <div class="card-body text-center">
                         <i class="fa fa-cross fa-3x text-secondary" aria-hidden="true"></i>
                         <h5 class="card-title">Óbito</h5>
-                        <a href="index.php" class="btn btn-secondary w-100">Acessar</a>
+                        <a href="obito/index.php" class="btn btn-secondary w-100">Acessar</a>
                     </div>
                 </div>
             </div>

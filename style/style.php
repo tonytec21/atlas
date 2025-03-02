@@ -20,7 +20,7 @@
         }
 
         .btn-close:hover {
-            transform: scale(2.10); 
+            transform: scale(1.50); 
         }
 
         .btn-close:focus {

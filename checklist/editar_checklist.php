@@ -7,7 +7,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $conn = getDatabaseConnection();
     $id = $_POST['id'];
     $titulo = $_POST['titulo'];
-    $observacoes = isset($_POST['observacoes']) ? $_POST['observacoes'] : null; // Verifica se a observação foi enviada
+    $observacoes = isset($_POST['observacoes']) ? $_POST['observacoes'] : null;
     $itens = json_decode($_POST['itens'], true);
 
     try {
