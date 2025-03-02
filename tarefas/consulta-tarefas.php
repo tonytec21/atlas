@@ -1715,7 +1715,12 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <div id="main" class="main-content">
         <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
             <h3>Pesquisa de Tarefas</h3>
+                    <a href="../guia_de_recebimento/index.php" class="btn btn-secondary">
+                        <i class="fa fa-search" aria-hidden="true"></i> Guia de Recebimento
+                    </a>
+                </div>
             <hr>
             <form id="searchForm">
                 <div class="form-row">
@@ -2506,9 +2511,6 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
 
                             // Definir os botões de ação
                             var actions = '<button class="btn btn-info btn-sm" onclick="viewTask(\'' + task.token + '\')"><i class="fa fa-eye" aria-hidden="true"></i></button>';
-                            if (task.status.toLowerCase() !== 'concluída') {
-                                actions += '<button class="btn btn-edit btn-sm" onclick="editTask(' + task.id + ')"><i class="fa fa-pencil" aria-hidden="true"></i></button>';
-                            }
 
                                 // Função para adicionar classes de status baseado no estado para o fundo e texto
                                 function getStatusClassBackground(situacao) {
