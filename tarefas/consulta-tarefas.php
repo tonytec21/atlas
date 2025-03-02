@@ -1820,11 +1820,8 @@ date_default_timezone_set('America/Sao_Paulo');
                     </div>
                 </div>
                 <div class="row mb-3">
-                    <div class="col-md-6">
-                        <button type="submit" style="width: 100%;" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
-                    </div>
-                    <div class="col-md-6 text-right">
-                        <button id="add-button" type="button" style="width: 100%;" class="btn btn-success" onclick="window.location.href='criar-tarefa.php'"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar</button>
+                    <div class="col-md-12">
+                        <button type="submit" style="margin-top: 0px;" class="btn btn-primary w-100"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
                     </div>
                 </div>
             </form>
