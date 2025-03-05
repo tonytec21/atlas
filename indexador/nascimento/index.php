@@ -26,11 +26,9 @@ date_default_timezone_set('America/Sao_Paulo');
             cursor: pointer; 
             transition: transform 0.2s ease;
         }
-
         .btn-close:hover {
             transform: scale(2.10);
         }
-
         .btn-close:focus {
             outline: none;
         }
@@ -38,17 +36,14 @@ date_default_timezone_set('America/Sao_Paulo');
         .btn-edit {
             margin-left: 5px;
         }
-
         .btn-delete {
             margin-left: 5px;
         }
-
         .btn-info {
             width: 40px;
             height: 40px;
             margin-left: 5px;
         }
-
         .alert-popup {
             position: fixed;
             top: 85%;
@@ -68,309 +63,255 @@ date_default_timezone_set('America/Sao_Paulo');
         .alert-warning {
             background-color: #f0ad4e;
         }
-
         .modal-dialog {
             max-width: 80%;
             margin: 1.75rem auto;
         }
-
-         /* Ajuste do tamanho do modal de visualização */
+        /* Ajuste do tamanho do modal de visualização */
         .modal-edicao {
             width: 80%;
             margin: 1.75rem auto;
         }
-
         .modal-cadastro {
             width: 80%;
             margin: 1.75rem auto;
         }
-
         .modal-visualizacao {
             width: 100%;
             margin: 1.75rem auto;
         }
-
         #confirmRemoveAttachmentModal .modal-header {
             border-bottom: none;
         }
-
         #confirmRemoveAttachmentModal .modal-footer {
             border-top: none;
             display: flex;
             justify-content: center;
         }
-
         #confirmRemoveAttachmentModal .btn-confirm-remove {
             width: 100px;
         }
-
         /* Cor de fundo modal naturalidade */
         #searchCityModal .modal-content {
             background-color: #d1d1d1; 
             border: 2px solid #959595; 
         }
-
         .modal-backdrop.show {
             z-index: 1039; 
             backdrop-filter: blur(5px);
             background-color: rgba(0, 0, 0, 0.5);
         }
-
-
         .modal-content {  
-    border: none;  
-    border-radius: 8px;  
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);  
-}  
-
-.modal-header {  
-    padding: 1.5rem 1.5rem 1rem;  
-}  
-
-.modal-body {  
-    padding: 1rem 1.5rem 1.5rem;  
-}  
-
-.modal-title {  
-    font-weight: 600;  
-    color: #333;  
-}  
-
-.section {  
-    background-color: transparent;  
-}  
-
-.section-header {  
-    margin-bottom: 1rem;  
-}  
-
-.section-header h6 {  
-    font-weight: 600;  
-    font-size: 0.9rem;  
-}  
-
-.form-label {  
-    font-size: 0.875rem;  
-    color: #666;  
-    margin-bottom: 0.25rem;  
-}  
-
-.form-control-modern {  
-    display: block;  
-    width: 100%;  
-    padding: 0.375rem 0.75rem;  
-    font-size: 1rem;  
-    font-weight: 400;  
-    line-height: 1.5;  
-    color: #333;  
-    background-color: #f8f9fa;  
-    border: 1px solid #dee2e6;  
-    border-radius: 4px;  
-    transition: border-color 0.15s ease-in-out;  
-}  
-
-.form-control-modern:read-only {  
-    background-color: #f8f9fa;  
-}  
-
-/* Dark Mode */  
-body.dark-mode .modal-content {  
-    background-color: #2c3034;  
-}  
-
-body.dark-mode .modal-title {  
-    color: #fff;  
-}  
-
-body.dark-mode .form-label {  
-    color: #adb5bd;  
-}  
-
-body.dark-mode .form-control-modern {  
-    background-color: #343a40;  
-    border-color: #495057;  
-    color: #e9ecef;  
-}  
-
-body.dark-mode .form-control-modern:read-only {  
-    background-color: #343a40;  
-}  
-
-/* Responsividade */  
-@media (max-width: 768px) {  
-    .modal-dialog {  
-        margin: 0.5rem;  
-        max-width: 100% !important;  
-    }  
-}  
-
-.form-control-modern {  
-    display: block;  
-    width: 100%;  
-    padding: 0.375rem 0.75rem;  
-    font-size: 1rem;  
-    font-weight: 400;  
-    line-height: 1.5;  
-    color: #333;  
-    background-color: #fff;  
-    border: 1px solid #dee2e6;  
-    border-radius: 4px;  
-    transition: border-color 0.15s ease-in-out;  
-}  
-
-.form-control-modern:focus {  
-    border-color: #86b7fe;  
-    outline: 0;  
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);  
-}  
-
-.form-control-modern[readonly] {  
-    background-color: #f8f9fa;  
-    pointer-events: none;  
-}  
-
-.section-header h6 {  
-    font-size: 0.9rem;  
-    font-weight: 600;  
-}  
-
-.table {  
-    font-size: 0.875rem;  
-}  
-
-.table th {  
-    font-weight: 600;  
-    background-color: #f8f9fa;  
-}  
-
-/* Dark Mode */  
-body.dark-mode .modal-content {  
-    background-color: #2c3034;  
-}  
-
-body.dark-mode .form-control-modern {  
-    background-color: #343a40;  
-    border-color: #495057;  
-    color: #e9ecef;  
-}  
-
-body.dark-mode .form-control-modern[readonly] {  
-    background-color: #2c3034;  
-}  
-
-body.dark-mode .table th {  
-    background-color: #343a40;  
-    color: #e9ecef;  
-}  
-
-body.dark-mode .table {  
-    color: #e9ecef;  
-    border-color: #495057;  
-}  
-
-body.dark-mode .section-header {  
-    color: #e9ecef;  
-}  
-
-/* Responsividade */  
-@media (max-width: 768px) {  
-    .modal-dialog {  
-        margin: 0.5rem;  
-        max-width: 100% !important;  
-    }  
-}  
-
-.btn-modern {  
-    width: 100%;  
-    position: relative;  
-    padding: 12px 24px;  
-    font-size: 0.9rem;  
-    font-weight: 500;  
-    color: #fff;  
-    background: linear-gradient(45deg, #2196F3, #1976D2);  
-    border: none;  
-    border-radius: 8px;  
-    cursor: pointer;  
-    overflow: hidden;  
-    transition: all 0.3s ease;  
-    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.2);  
-}  
-
-.btn-modern:hover {  
-    background: linear-gradient(45deg, #1976D2, #1565C0);  
-    box-shadow: 0 6px 20px rgba(33, 150, 243, 0.3);  
-    transform: translateY(-1px);  
-}  
-
-.btn-modern:active {  
-    transform: translateY(1px);  
-    box-shadow: 0 2px 10px rgba(33, 150, 243, 0.2);  
-}  
-
-.btn-content {  
-    display: flex;  
-    align-items: center;  
-    justify-content: center;  
-    gap: 8px;  
-}  
-
-.btn-text {  
-    font-weight: 500;  
-    letter-spacing: 0.3px;  
-}  
-
-/* Dark Mode */  
-body.dark-mode .btn-modern {  
-    background: linear-gradient(45deg, #3f51b5, #303f9f);  
-    box-shadow: 0 4px 15px rgba(63, 81, 181, 0.2);  
-}  
-
-body.dark-mode .btn-modern:hover {  
-    background: linear-gradient(45deg, #303f9f, #283593);  
-    box-shadow: 0 6px 20px rgba(63, 81, 181, 0.3);  
-}  
-
-/* Efeito de loading (opcional) */  
-.btn-modern.loading {  
-    pointer-events: none;  
-    opacity: 0.8;  
-}  
-
-.btn-modern.loading .btn-content {  
-    opacity: 0;  
-}  
-
-.btn-modern.loading::after {  
-    content: "";  
-    position: absolute;  
-    top: 50%;  
-    left: 50%;  
-    width: 20px;  
-    height: 20px;  
-    margin: -10px 0 0 -10px;  
-    border: 3px solid rgba(255,255,255,0.3);  
-    border-top-color: #fff;  
-    border-radius: 50%;  
-    animation: button-loading-spinner 1s ease infinite;  
-}  
-
-@keyframes button-loading-spinner {  
-    from {  
-        transform: rotate(0turn);  
-    }  
-    to {  
-        transform: rotate(1turn);  
-    }  
-}  
-
-/* Responsividade */  
-@media (max-width: 768px) {  
-    .btn-modern {  
-        padding: 10px 20px;  
-    }  
-}  
-
-    
+            border: none;  
+            border-radius: 8px;  
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);  
+        }  
+        .modal-header {  
+            padding: 1.5rem 1.5rem 1rem;  
+        }  
+        .modal-body {  
+            padding: 1rem 1.5rem 1.5rem;  
+        }  
+        .modal-title {  
+            font-weight: 600;  
+            color: #333;  
+        }  
+        .section {  
+            background-color: transparent;  
+        }  
+        .section-header {  
+            margin-bottom: 1rem;  
+        }  
+        .section-header h6 {  
+            font-weight: 600;  
+            font-size: 0.9rem;  
+        }  
+        .form-label {  
+            font-size: 0.875rem;  
+            color: #666;  
+            margin-bottom: 0.25rem;  
+        }  
+        .form-control-modern {  
+            display: block;  
+            width: 100%;  
+            padding: 0.375rem 0.75rem;  
+            font-size: 1rem;  
+            font-weight: 400;  
+            line-height: 1.5;  
+            color: #333;  
+            background-color: #f8f9fa;  
+            border: 1px solid #dee2e6;  
+            border-radius: 4px;  
+            transition: border-color 0.15s ease-in-out;  
+        }  
+        .form-control-modern:read-only {  
+            background-color: #f8f9fa;  
+        }  
+        /* Dark Mode */  
+        body.dark-mode .modal-content {  
+            background-color: #2c3034;  
+        }  
+        body.dark-mode .modal-title {  
+            color: #fff;  
+        }  
+        body.dark-mode .form-label {  
+            color: #adb5bd;  
+        }  
+        body.dark-mode .form-control-modern {  
+            background-color: #343a40;  
+            border-color: #495057;  
+            color: #e9ecef;  
+        }  
+        body.dark-mode .form-control-modern:read-only {  
+            background-color: #343a40;  
+        }  
+        /* Responsividade */  
+        @media (max-width: 768px) {  
+            .modal-dialog {  
+                margin: 0.5rem;  
+                max-width: 100% !important;  
+            }  
+        }  
+        .form-control-modern {  
+            display: block;  
+            width: 100%;  
+            padding: 0.375rem 0.75rem;  
+            font-size: 1rem;  
+            font-weight: 400;  
+            line-height: 1.5;  
+            color: #333;  
+            background-color: #fff;  
+            border: 1px solid #dee2e6;  
+            border-radius: 4px;  
+            transition: border-color 0.15s ease-in-out;  
+        }  
+        .form-control-modern:focus {  
+            border-color: #86b7fe;  
+            outline: 0;  
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);  
+        }  
+        .form-control-modern[readonly] {  
+            background-color: #f8f9fa;  
+            pointer-events: none;  
+        }  
+        .section-header h6 {  
+            font-size: 0.9rem;  
+            font-weight: 600;  
+        }  
+        .table {  
+            font-size: 0.875rem;  
+        }  
+        .table th {  
+            font-weight: 600;  
+            background-color: #f8f9fa;  
+        }  
+        /* Dark Mode */  
+        body.dark-mode .modal-content {  
+            background-color: #2c3034;  
+        }  
+        body.dark-mode .form-control-modern {  
+            background-color: #343a40;  
+            border-color: #495057;  
+            color: #e9ecef;  
+        }  
+        body.dark-mode .form-control-modern[readonly] {  
+            background-color: #2c3034;  
+        }  
+        body.dark-mode .table th {  
+            background-color: #343a40;  
+            color: #e9ecef;  
+        }  
+        body.dark-mode .table {  
+            color: #e9ecef;  
+            border-color: #495057;  
+        }  
+        body.dark-mode .section-header {  
+            color: #e9ecef;  
+        }  
+        /* Responsividade */  
+        @media (max-width: 768px) {  
+            .modal-dialog {  
+                margin: 0.5rem;  
+                max-width: 100% !important;  
+            }  
+        }  
+        .btn-modern {  
+            width: 100%;  
+            position: relative;  
+            padding: 12px 24px;  
+            font-size: 0.9rem;  
+            font-weight: 500;  
+            color: #fff;  
+            background: linear-gradient(45deg, #2196F3, #1976D2);  
+            border: none;  
+            border-radius: 8px;  
+            cursor: pointer;  
+            overflow: hidden;  
+            transition: all 0.3s ease;  
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.2);  
+        }  
+        .btn-modern:hover {  
+            background: linear-gradient(45deg, #1976D2, #1565C0);  
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.3);  
+            transform: translateY(-1px);  
+        }  
+        .btn-modern:active {  
+            transform: translateY(1px);  
+            box-shadow: 0 2px 10px rgba(33, 150, 243, 0.2);  
+        }  
+        .btn-content {  
+            display: flex;  
+            align-items: center;  
+            justify-content: center;  
+            gap: 8px;  
+        }  
+        .btn-text {  
+            font-weight: 500;  
+            letter-spacing: 0.3px;  
+        }  
+        /* Dark Mode */  
+        body.dark-mode .btn-modern {  
+            background: linear-gradient(45deg, #3f51b5, #303f9f);  
+            box-shadow: 0 4px 15px rgba(63, 81, 181, 0.2);  
+        }  
+        body.dark-mode .btn-modern:hover {  
+            background: linear-gradient(45deg, #303f9f, #283593);  
+            box-shadow: 0 6px 20px rgba(63, 81, 181, 0.3);  
+        }  
+        /* Efeito de loading (opcional) */  
+        .btn-modern.loading {  
+            pointer-events: none;  
+            opacity: 0.8;  
+        }  
+        .btn-modern.loading .btn-content {  
+            opacity: 0;  
+        }  
+        .btn-modern.loading::after {  
+            content: "";  
+            position: absolute;  
+            top: 50%;  
+            left: 50%;  
+            width: 20px;  
+            height: 20px;  
+            margin: -10px 0 0 -10px;  
+            border: 3px solid rgba(255,255,255,0.3);  
+            border-top-color: #fff;  
+            border-radius: 50%;  
+            animation: button-loading-spinner 1s ease infinite;  
+        }  
+        @keyframes button-loading-spinner {  
+            from {  
+                transform: rotate(0turn);  
+            }  
+            to {  
+                transform: rotate(1turn);  
+            }  
+        }  
+        @media (max-width: 768px) {  
+            .btn-modern {  
+                padding: 10px 20px;  
+            }  
+        }  
     </style>
 </head>
 <body class="light-mode">
@@ -453,88 +394,6 @@ include(__DIR__ . '/../../menu.php');
                 </thead>
                 <tbody id="registry-table-body">
                     <!-- Linhas serão adicionadas dinamicamente -->
-                    <?php
-                        if ($_SERVER['REQUEST_METHOD'] === 'GET' && empty($_GET['searchTerm']) && empty($_GET['searchTermTerm']) &&
-                            empty($_GET['searchTermBook']) && empty($_GET['searchTermPage']) && empty($_GET['searchFather']) &&
-                            empty($_GET['searchMother']) && empty($_GET['birthDate']) && empty($_GET['registryDate'])) {
-                            
-                            // Carregar os 20 últimos registros ao entrar na página
-                            $stmt = $conn->prepare("SELECT * FROM indexador_nascimento WHERE status = 'ativo' ORDER BY id DESC LIMIT 20");
-                        } else {
-                            // Carregar registros com base no filtro acionado
-                            $query = "SELECT * FROM indexador_nascimento WHERE status = 'ativo'";
-                            $params = [];
-                            $conditions = [];
-
-                            // Adicionar condições de filtro dinamicamente
-                            if (!empty($_GET['searchTerm'])) {
-                                $conditions[] = "nome_registrado LIKE ?";
-                                $params[] = "%" . $_GET['searchTerm'] . "%";
-                            }
-                            if (!empty($_GET['searchTermTerm'])) {
-                                $conditions[] = "termo = ?";
-                                $params[] = $_GET['searchTermTerm'];
-                            }
-                            if (!empty($_GET['searchTermBook'])) {
-                                $conditions[] = "livro = ?";
-                                $params[] = $_GET['searchTermBook'];
-                            }
-                            if (!empty($_GET['searchTermPage'])) {
-                                $conditions[] = "folha = ?";
-                                $params[] = $_GET['searchTermPage'];
-                            }
-                            if (!empty($_GET['searchFather'])) {
-                                $conditions[] = "nome_pai LIKE ?";
-                                $params[] = "%" . $_GET['searchFather'] . "%";
-                            }
-                            if (!empty($_GET['searchMother'])) {
-                                $conditions[] = "nome_mae LIKE ?";
-                                $params[] = "%" . $_GET['searchMother'] . "%";
-                            }
-                            if (!empty($_GET['birthDate'])) {
-                                $conditions[] = "data_nascimento = ?";
-                                $params[] = $_GET['birthDate'];
-                            }
-                            if (!empty($_GET['registryDate'])) {
-                                $conditions[] = "data_registro = ?";
-                                $params[] = $_GET['registryDate'];
-                            }
-
-                            // Montar a query final com as condições
-                            if (!empty($conditions)) {
-                                $query .= " AND " . implode(" AND ", $conditions);
-                            }
-
-                            $stmt = $conn->prepare($query);
-
-                            // Vincular os parâmetros dinamicamente
-                            if (!empty($params)) {
-                                $stmt->bind_param(str_repeat("s", count($params)), ...$params);
-                            }
-                        }
-
-                        $stmt->execute();
-                        $result = $stmt->get_result();
-
-                        // Renderizar os registros na tabela
-                        while ($row = $result->fetch_assoc()) {
-                            echo '<tr>';
-                            echo '<td>' . $row['termo'] . '</td>';
-                            echo '<td>' . $row['livro'] . '</td>';
-                            echo '<td>' . $row['folha'] . '</td>';
-                            echo '<td>' . $row['nome_registrado'] . '</td>';
-                            echo '<td>' . ($row['nome_pai'] ? $row['nome_pai'] . ' e ' . $row['nome_mae'] : $row['nome_mae']) . '</td>';
-                            echo '<td data-order="' . date("Y-m-d", strtotime($row['data_nascimento'])) . '">' . date("d/m/Y", strtotime($row['data_nascimento'])) . '</td>';
-                            echo '<td data-order="' . date("Y-m-d", strtotime($row['data_registro'])) . '">' . date("d/m/Y", strtotime($row['data_registro'])) . '</td>';
-                            echo '<td>' .
-                                '<button class="btn btn-info btn-view" data-id="' . $row['id'] . '"><i class="fa fa-eye" aria-hidden="true"></i></button>' .
-                                '<button class="btn btn-edit" data-id="' . $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ' .
-                                ($nivel_de_acesso === 'administrador' ? '<button class="btn btn-delete" data-id="' . $row['id'] . '"><i class="fa fa-trash" aria-hidden="true"></i></button>' : '') .
-                                '</td>';
-                            echo '</tr>';
-                        }
-                        ?>
-
                 </tbody>
             </table>
         </div>
@@ -728,13 +587,6 @@ include(__DIR__ . '/../../menu.php');
                                         <label class="form-label">Nome do Registrado</label>  
                                         <input type="text" class="form-control-modern" id="edit-name" name="nome_registrado" required>  
                                     </div> 
-                                    <!-- <div class="col-md-2">  
-                                        <label class="form-label">Naturalidade</label>  
-                                        <input type="text" class="form-control-modern" id="edit-selected-city" name="naturalidade"   
-                                            placeholder="Clique para selecionar a cidade" readonly required   
-                                            data-toggle="modal" data-target="#searchCityModal">  
-                                        <input type="hidden" id="edit-ibge-naturalidade" name="ibge_naturalidade">  
-                                    </div>   -->
                                     <div class="col-md-2">  
                                         <label class="form-label">Data de Nascimento</label>  
                                         <input type="date" class="form-control-modern" id="edit-birthdate" name="data_nascimento" required>  
@@ -777,8 +629,7 @@ include(__DIR__ . '/../../menu.php');
                                         <label class="form-label">Adicionar Anexo PDF</label>  
                                         <div class="input-group">  
                                             <input type="file" class="form-control-modern" id="edit-pdf-file">  
-                                            <button type="button" id="edit-add-attachment-btn"   
-                                                    class="btn btn-secondary w-100" style="margin-top: 10px;">Adicionar anexo</button>  
+                                            <button type="button" id="edit-add-attachment-btn" class="btn btn-secondary w-100" style="margin-top: 10px;">Adicionar anexo</button>  
                                         </div>  
                                     </div>  
                                     <div class="table-responsive">  
@@ -942,28 +793,28 @@ include(__DIR__ . '/../../menu.php');
                 var filiacao = registry.nome_pai ? `${registry.nome_pai} e ${registry.nome_mae}` : registry.nome_mae;
 
                 // Definindo uma variável de acesso no JavaScript com base no nível de acesso em PHP
-    var isAdmin = <?php echo ($nivel_de_acesso === 'administrador') ? 'true' : 'false'; ?>;
-    
-    // Gerando a linha da tabela com base no nível de acesso
-    var row = '<tr>' +
-                    '<td>' + registry.termo + '</td>' +
-                    '<td>' + registry.livro + '</td>' +
-                    '<td>' + registry.folha + '</td>' +
-                    '<td>' + registry.nome_registrado + '</td>' +
-                    '<td>' + filiacao + '</td>' +
-                    '<td data-order="' + registry.data_nascimento + '">' + formatDate(registry.data_nascimento) + '</td>' +
-                    '<td data-order="' + registry.data_registro + '">' + formatDate(registry.data_registro) + '</td>' +
-                    '<td>' +
-                        '<button title="Visualizar Registro" class="btn btn-info btn-view" data-id="' + registry.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
-                        '<button title="Editar Registro" class="btn btn-edit" data-id="' + registry.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ';
-                        
-    // Adiciona o botão "Remover Registro" somente se for administrador
-    if (isAdmin) {
-        row += '<button title="Remover Registro" class="btn btn-delete" data-id="' + registry.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>';
-    }
+                var isAdmin = <?php echo ($nivel_de_acesso === 'administrador') ? 'true' : 'false'; ?>;
+                
+                // Gerando a linha da tabela com base no nível de acesso
+                var row = '<tr>' +
+                                '<td>' + registry.termo + '</td>' +
+                                '<td>' + registry.livro + '</td>' +
+                                '<td>' + registry.folha + '</td>' +
+                                '<td>' + registry.nome_registrado + '</td>' +
+                                '<td>' + filiacao + '</td>' +
+                                '<td data-order="' + registry.data_nascimento + '">' + formatDate(registry.data_nascimento) + '</td>' +
+                                '<td data-order="' + registry.data_registro + '">' + formatDate(registry.data_registro) + '</td>' +
+                                '<td>' +
+                                    '<button title="Visualizar Registro" class="btn btn-info btn-view" data-id="' + registry.id + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
+                                    '<button title="Editar Registro" class="btn btn-edit" data-id="' + registry.id + '"><i class="fa fa-pencil" aria-hidden="true"></i></button> ';
+                                
+                // Adiciona o botão "Remover Registro" somente se for administrador
+                if (isAdmin) {
+                    row += '<button title="Remover Registro" class="btn btn-delete" data-id="' + registry.id + '"><i class="fa fa-trash" aria-hidden="true"></i></button>';
+                }
 
-    row += '</td>' +
-           '</tr>';
+                row += '</td>' +
+                       '</tr>';
                 tableBody.append(row);
             });
 
@@ -978,33 +829,10 @@ include(__DIR__ . '/../../menu.php');
             });
         }
 
-        // Função para filtrar registros
-        function filterRegistries() {
-            var searchTerm = $('#search-term').val().toLowerCase();
-            var searchTermTerm = $('#search-term-term').val().toLowerCase();
-            var searchTermBook = $('#search-term-book').val().toLowerCase();
-            var searchTermPage = $('#search-term-page').val().toLowerCase();
-            var searchFather = $('#search-father').val().toLowerCase();
-            var searchMother = $('#search-mother').val().toLowerCase();
-            var birthDate = $('#search-birthdate').val();
-            var registryDate = $('#search-registry-date').val();
-
-            var urlParams = new URLSearchParams();
-            if (searchTerm) urlParams.append('searchTerm', searchTerm);
-            if (searchTermTerm) urlParams.append('searchTermTerm', searchTermTerm);
-            if (searchTermBook) urlParams.append('searchTermBook', searchTermBook);
-            if (searchTermPage) urlParams.append('searchTermPage', searchTermPage);
-            if (searchFather) urlParams.append('searchFather', searchFather);
-            if (searchMother) urlParams.append('searchMother', searchMother);
-            if (birthDate) urlParams.append('birthDate', birthDate);
-            if (registryDate) urlParams.append('registryDate', registryDate);
-
-            window.location.search = urlParams.toString();
-        }
-
-        // Carregar registros filtrados com base na URL
+        // Função principal que carrega (ou filtra) os registros
         function loadFilteredRegistries() {
             var params = new URLSearchParams(window.location.search);
+
             var searchTerm = params.get('searchTerm') || '';
             var searchTermTerm = params.get('searchTermTerm') || '';
             var searchTermBook = params.get('searchTermBook') || '';
@@ -1014,6 +842,7 @@ include(__DIR__ . '/../../menu.php');
             var birthDate = params.get('birthDate') || '';
             var registryDate = params.get('registryDate') || '';
 
+            // Preenche os inputs com os valores da URL
             $('#search-term').val(searchTerm);
             $('#search-term-term').val(searchTermTerm);
             $('#search-term-book').val(searchTermBook);
@@ -1023,19 +852,32 @@ include(__DIR__ . '/../../menu.php');
             $('#search-birthdate').val(birthDate);
             $('#search-registry-date').val(registryDate);
 
+            // Monta o objeto de dados para enviar via GET
+            var requestData = {
+                searchTerm: searchTerm,
+                searchTermTerm: searchTermTerm,
+                searchTermBook: searchTermBook,
+                searchTermPage: searchTermPage,
+                searchFather: searchFather,
+                searchMother: searchMother,
+                birthDate: birthDate,
+                registryDate: registryDate
+            };
+
+            // Verifica se existem parâmetros de busca
+            var hasAnySearch =
+                searchTerm || searchTermTerm || searchTermBook || searchTermPage ||
+                searchFather || searchMother || birthDate || registryDate;
+            
+            // Se NÃO tiver busca, limitar a 20 resultados
+            if (!hasAnySearch) {
+                requestData.limit = 20;
+            }
+
             $.ajax({
                 type: 'GET',
                 url: 'carregar_registros.php',
-                data: {
-                    searchTerm: searchTerm,
-                    searchTermTerm: searchTermTerm,
-                    searchTermBook: searchTermBook,
-                    searchTermPage: searchTermPage,
-                    searchFather: searchFather,
-                    searchMother: searchMother,
-                    birthDate: birthDate,
-                    registryDate: registryDate
-                },
+                data: requestData,
                 success: function(response) {
                     var registries = JSON.parse(response);
                     displayRegistries(registries);
@@ -1043,8 +885,10 @@ include(__DIR__ . '/../../menu.php');
             });
         }
 
-        // Evento de clique do botão de filtro
-        // Evento de clique no botão de filtro
+        // Chama a função acima assim que a página carrega
+        loadFilteredRegistries();
+
+        // Botão Filtrar
         $('#filter-button').on('click', function() {
             var searchTerm = $('#search-term').val().trim();
             var searchTermTerm = $('#search-term-term').val().trim();
@@ -1055,12 +899,11 @@ include(__DIR__ . '/../../menu.php');
             var birthDate = $('#search-birthdate').val();
             var registryDate = $('#search-registry-date').val();
 
+            // Se todos os campos estiverem em branco, recarrega sem parâmetros
             if (!searchTerm && !searchTermTerm && !searchTermBook && !searchTermPage &&
                 !searchFather && !searchMother && !birthDate && !registryDate) {
-                // Recarregar página para mostrar todos os registros
                 window.location.search = '';
             } else {
-                // Executar filtro
                 var urlParams = new URLSearchParams();
                 if (searchTerm) urlParams.append('searchTerm', searchTerm);
                 if (searchTermTerm) urlParams.append('searchTermTerm', searchTermTerm);
@@ -1075,11 +918,7 @@ include(__DIR__ . '/../../menu.php');
             }
         });
 
-
-        // Carregar registros filtrados ao carregar a página
-        loadFilteredRegistries();
-
-        // Enviar formulário de registro
+        // Enviar formulário de registro (Adicionar)
         $('#registry-form').on('submit', function(e) {
             e.preventDefault();
             var formData = new FormData(this);
@@ -1238,14 +1077,12 @@ include(__DIR__ . '/../../menu.php');
             $('#edit-attachment-viewer').attr('src', filePath).show();
         });
 
-
-        // Impedir o disparo da ação de "Salvar registro" ao clicar no botão de "Remover Anexo"
+        // Remover Anexo no Modal de Edição
         $(document).on('click', '.btn-delete-attachment', function(event) {
             event.stopPropagation(); 
             event.preventDefault(); 
             attachmentIdToRemove = $(this).data('id');
             
-            // Substituir o modal pela confirmação via SweetAlert2
             Swal.fire({
                 title: 'Tem certeza?',
                 text: 'Você realmente deseja remover este anexo?',
@@ -1284,8 +1121,7 @@ include(__DIR__ . '/../../menu.php');
             });
         });
 
-
-        // Enviar formulário de edição
+        // Submeter formulário de edição
         $('#edit-registry-form').on('submit', function(e) {
             e.preventDefault();
             var formData = new FormData(this);
@@ -1318,13 +1154,11 @@ include(__DIR__ . '/../../menu.php');
             });
         });
 
-
         // Adicionar Anexo no Modal "Editar Registro"
         $('#edit-add-attachment-btn').on('click', function() {
             var fileInput = $('#edit-pdf-file')[0];
             if (fileInput.files.length > 0) {
                 var file = fileInput.files[0];
-                var fileName = file.name;
                 var registryId = $('#edit-id').val();
 
                 var formData = new FormData();
@@ -1344,8 +1178,8 @@ include(__DIR__ . '/../../menu.php');
                             text: 'Anexo adicionado com sucesso.',
                             confirmButtonText: 'Ok'
                         }).then(() => {
-                            loadAttachments(registryId); // Recarregar anexos após adicionar
-                            fileInput.value = ''; // Limpar o input de arquivo
+                            loadAttachments(registryId); 
+                            fileInput.value = '';
                         });
                     },
                     error: function(xhr, status, error) {
@@ -1387,6 +1221,7 @@ include(__DIR__ . '/../../menu.php');
                     $('#view-gender').val(registry.sexo);
                     $('#view-naturalidade').val(registry.naturalidade);
                     $('#view-name').val(registry.nome_registrado);
+
                     if (registry.sexo === 'M') {
                         $('#view-gender').val('Masculino');
                     } else if (registry.sexo === 'F') {
@@ -1414,7 +1249,6 @@ include(__DIR__ . '/../../menu.php');
                 success: function(response) {
                     var registry = JSON.parse(response);
 
-                    // Preencher os campos de edição
                     $('#edit-id').val(registry.id);
                     $('#edit-term').val(registry.termo);
                     $('#edit-book').val(registry.livro);
@@ -1429,9 +1263,7 @@ include(__DIR__ . '/../../menu.php');
                     $('#edit-mother-name').val(registry.nome_mae);
                     $('#edit-registry-date').val(registry.data_registro);
 
-                    // Carregar anexos
                     loadAttachments(registry.id);
-                    
                     $('#editRegistryModal').modal('show');
                 }
             });
@@ -1463,7 +1295,7 @@ include(__DIR__ . '/../../menu.php');
                                 text: 'Registro removido com sucesso.',
                                 confirmButtonText: 'Ok'
                             }).then(() => {
-                                loadFilteredRegistries(); // Carregar registros recentes após excluir
+                                loadFilteredRegistries();
                             });
                         },
                         error: function(xhr, status, error) {
@@ -1479,56 +1311,22 @@ include(__DIR__ . '/../../menu.php');
             });
         });
 
-        // Inicializar o modal de adicionar
-        $('#addRegistryModal').modal({
-            show: false
-        });
-
-        // Função para mostrar alertas personalizados com SweetAlert2
-        function showAlert(message, type) {
-            let iconType = '';
-            
-            // Definir o tipo de ícone com base no tipo de mensagem
-            switch (type) {
-                case 'success':
-                    iconType = 'success';
-                    break;
-                case 'error':
-                    iconType = 'error';
-                    break;
-                case 'warning':
-                    iconType = 'warning';
-                    break;
-                default:
-                    iconType = 'info'; // Padrão para qualquer outro caso
-            }
-
-            // Usando SweetAlert2 para exibir a mensagem
-            Swal.fire({
-                icon: iconType,
-                title: message,
-                confirmButtonText: 'Ok'
-            });
-        }
-
-        // Adicionar evento para recarregar a página ao fechar os modais
+        // Ao fechar modais, recarrega a página
         $('#editRegistryModal').on('hidden.bs.modal', function () {
             location.reload();
         });
-
         $('#viewRegistryModal').on('hidden.bs.modal', function () {
             location.reload();
         });
-
         $('#addRegistryModal').on('hidden.bs.modal', function () {
             location.reload();
         });
     });
 
+    // Validações de datas
     $(document).ready(function() {
         var currentYear = new Date().getFullYear();
 
-        // Validação de data no modal de Adição de Registro
         $('#registry-date, #birthdate').on('change', function() {
             var selectedDate = new Date($(this).val());
             if (selectedDate.getFullYear() > currentYear) {
@@ -1538,11 +1336,10 @@ include(__DIR__ . '/../../menu.php');
                     text: 'O ano não pode ser maior que o ano atual.',
                     confirmButtonText: 'Ok'
                 });
-                $(this).val(''); // Limpa o campo da data
+                $(this).val('');
             }
         });
 
-        // Validação de data no modal de Edição de Registro
         $('#edit-registry-date, #edit-birthdate').on('change', function() {
             var selectedDate = new Date($(this).val());
             if (selectedDate.getFullYear() > currentYear) {
@@ -1552,16 +1349,15 @@ include(__DIR__ . '/../../menu.php');
                     text: 'O ano não pode ser maior que o ano atual.',
                     confirmButtonText: 'Ok'
                 });
-                $(this).val(''); // Limpa o campo da data
+                $(this).val('');
             }
         });
-
     });
 
+    // Validações de datas nos campos de filtro
     $(document).ready(function() {
         var currentYear = new Date().getFullYear();
 
-        // Função de validação de data
         function validateDate(input) {
             var selectedDate = new Date($(input).val());
             if (selectedDate.getFullYear() > currentYear) {
@@ -1571,35 +1367,39 @@ include(__DIR__ . '/../../menu.php');
                     text: 'O ano não pode ser maior que o ano atual.',
                     confirmButtonText: 'Ok'
                 });
-                $(input).val(''); // Limpa o campo da data
+                $(input).val('');
             }
         }
 
-        // Aplicar a validação de data nos campos de filtro de pesquisa
         $('#search-birthdate, #search-registry-date').on('change', function() {
-            // Certifique-se de que há um valor antes de validar
             if ($(this).val()) {
                 validateDate(this);
             }
         });
     });
 
+    // Melhoria na busca da cidade: remover acentos e ignorar maiúsculas/minúsculas
+    function removeDiacritics(str) {
+        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
     $(document).ready(function () {
-        // Buscar cidades na API do IBGE
         $('#city-search').on('input', function () {
             var query = $(this).val();
-
             if (query.length > 2) {
                 $.ajax({
                     url: 'https://servicodados.ibge.gov.br/api/v1/localidades/municipios',
                     method: 'GET',
                     success: function (data) {
-                        var filteredCities = data.filter(function (city) {
-                            return city.nome.toLowerCase().includes(query.toLowerCase());
-                        });
-
                         var cityResults = $('#city-results');
                         cityResults.empty();
+
+                        var queryNormalized = removeDiacritics(query.toLowerCase());
+
+                        var filteredCities = data.filter(function (city) {
+                            var cityNameNormalized = removeDiacritics(city.nome.toLowerCase());
+                            return cityNameNormalized.includes(queryNormalized);
+                        });
 
                         filteredCities.forEach(function (city) {
                             cityResults.append(
@@ -1624,9 +1424,7 @@ include(__DIR__ . '/../../menu.php');
                                 $('#selected-city').val(cityName);
                                 $('#ibge_naturalidade').val(cityId);
                             }
-
-
-                            $('#searchCityModal').modal('hide'); // Fecha o modal
+                            $('#searchCityModal').modal('hide'); 
                         });
                     },
                     error: function () {
@@ -1641,6 +1439,7 @@ include(__DIR__ . '/../../menu.php');
         });
     });
 
+    // Ajuste de sobreposição de modais
     $(document).on('show.bs.modal', '.modal', function () {
         var zIndex = 1040 + (10 * $('.modal:visible').length);
         $(this).css('z-index', zIndex);
@@ -1653,32 +1452,22 @@ include(__DIR__ . '/../../menu.php');
         $(this).css('z-index', 1050).focus();
     });
 
-    // $('#searchCityModal').on('show.bs.modal', function () {
-    //     $('#editRegistryModal').modal('hide');
-    // }).on('hidden.bs.modal', function () {
-    //     $('#editRegistryModal').modal('show');
-    // });
-
     $(document).on('show.bs.modal', function () {
-            // Desativa a rolagem do fundo
-            $('body').css('overflow', 'hidden');
-        });
+        $('body').css('overflow', 'hidden');
+    });
 
-        $(document).on('hidden.bs.modal', function () {
-            // Restaura a rolagem do fundo apenas se não houver mais modais abertos
-            if ($('.modal.show').length === 0) {
-                $('body').css('overflow', 'auto');
-            }
-        });
+    $(document).on('hidden.bs.modal', function () {
+        if ($('.modal.show').length === 0) {
+            $('body').css('overflow', 'auto');
+        }
+    });
 
-        // Adicionar rolagem ao modal principal após fechar o secundário
-        $('#searchCityModal').on('hidden.bs.modal', function () {
-            $('#editRegistryModal,#addRegistryModal').css('overflow-y', 'auto');
-        });
-
+    $('#searchCityModal').on('hidden.bs.modal', function () {
+        $('#editRegistryModal,#addRegistryModal').css('overflow-y', 'auto');
+    });
 </script>
 <?php
     include(__DIR__ . '/../../rodape.php');
-    ?>
+?>
 </body>
 </html>

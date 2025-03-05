@@ -9,6 +9,7 @@ $searchFather = isset($_GET['searchFather']) ? $_GET['searchFather'] : '';
 $searchMother = isset($_GET['searchMother']) ? $_GET['searchMother'] : '';
 $birthDate = isset($_GET['birthDate']) ? $_GET['birthDate'] : '';
 $registryDate = isset($_GET['registryDate']) ? $_GET['registryDate'] : '';
+$limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 0;
 
 $query = "SELECT * FROM indexador_nascimento WHERE status = 'ativo'";
 
@@ -42,6 +43,11 @@ if ($registryDate) {
 // Se houver condições, adicione ao SQL
 if (count($conditions) > 0) {
     $query .= " AND " . implode(' AND ', $conditions);
+}
+
+// Aplica limite se existir
+if ($limit > 0) {
+    $query .= " LIMIT $limit";
 }
 
 $result = $conn->query($query);

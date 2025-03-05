@@ -1,7 +1,7 @@
 <?php
 $servername = "localhost";
-$username = "root"; // ou seu usuário do banco de dados
-$password = ""; // ou sua senha do banco de dados
+$username = "root"; 
+$password = ""; 
 $dbname = "oficios_db";
 
 // Criar conexão

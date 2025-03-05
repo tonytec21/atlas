@@ -1,0 +1,164 @@
+[2025-03-03 22:41:40] Iniciando processamento de atualização
+[2025-03-03 22:41:40] Dados recebidos: Array
+(
+    [id] => 5
+    [numero] => 5/2025
+    [apresentante] => ANTONIO JOSE MARTINS GARCIA
+    [cpf_cnpj] => 14.859.652/0001-90
+    [protocolo] => 7851
+    [data_protocolo] => 2025-03-02
+    [titulo] => Cédula de Crédito Bancário
+    [origem_titulo] => Banco do Brasil S/A
+    [corpo] => <p>Em atendimento &agrave; Lei de Registros P&uacute;blicos (Lei n&ordm; 6.015/73) e ao C&oacute;digo de Normas do Estado do Maranh&atilde;o (Provimento CGJ n&ordm; 11/2013), para a realiza&ccedil;&atilde;o do registro/averba&ccedil;&atilde;o do presente t&iacute;tulo, o qual segue anexo com esta nota, dever&atilde;o ser cumpridas as seguintes exig&ecirc;ncias no prazo de 30 (trinta) dias contados da data da prenota&ccedil;&atilde;o.</p>
+
+<p>I &ndash; Necess&aacute;rio apresentar termo de inventariante ou retificar o invent&aacute;rio pra que conste a nomea&ccedil;&atilde;o do inventariante. A escritura de nomea&ccedil;&atilde;o de invent&aacute;rio pode ser feito em qualquer cart&oacute;rio de notas.<br />
+II &ndash; Em rela&ccedil;&atilde;o ao requerimento &eacute; necess&aacute;rio:<br />
+a) que conste a real &aacute;rea anterior (542 ha) constante na matr&iacute;cula e n&atilde;o apenas a &aacute;rea nova (559 ha).<br />
+b) que conste a numera&ccedil;&atilde;o das matr&iacute;culas a serem retificadas individualizando as matr&iacute;culas com as correspondentes &aacute;rea<br />
+c) que conste assinatura do t&eacute;cnico agrimensor.<br />
+III &ndash; Na planta &eacute; necess&aacute;rio constar a assinatura do confrontantes haja vista a altera&ccedil;&atilde;o da &aacute;rea do im&oacute;vel de 542 para 559 hectare, bem como a assinatura do(s) propriet&aacute;rio(s) na planta.<br />
+VI &ndash; Necess&aacute;rio anexar as certid&otilde;es das matr&iacute;culas ou comprovantes de posse (caso n&atilde;o haja matr&iacute;cula) dos im&oacute;veis confrontantes.<br />
+VII &ndash; Em rela&ccedil;&atilde;o ao CFTA &ndash; Termo de responsabilidade t&eacute;cnica, &eacute; necess&aacute;rio que conste: preenchimento de todos os dados, bem como o reconhecimento de firma do t&eacute;cnico e do propriet&aacute;rio/inventariante.</p>
+
+<p>Satisfeitas as exig&ecirc;ncias legais, o registro ser&aacute; realizado dentro do prazo legal. Novas exig&ecirc;ncias poder&atilde;o ser formuladas em caso de apresenta&ccedil;&atilde;o de novos documentos. N&atilde;o se conformando o apresentante com a exig&ecirc;ncia, ou n&atilde;o a podendo satisfazer, poder&aacute; requerer que ao Oficial que suscite o Procedimento de D&uacute;vida nos termos do art. 198 e seguintes da Lei de Registros P&uacute;blicos (Lei n&ordm; 6.015/73).</p>
+
+    [prazo_cumprimento] => <p>O requerente tem o prazo de 15 (quinze) dias para sanar as exig&ecirc;ncias apontadas, sob pena de cancelamento do protocolo, conforme artigo 205 da Lei n&ordm; 6.015/1973.</p>
+
+<p><strong>OBSERVA&Ccedil;&Atilde;O:</strong> Caso n&atilde;o concorde com as exig&ecirc;ncias, o interessado pode requerer a suscita&ccedil;&atilde;o de d&uacute;vida ao Ju&iacute;zo competente, conforme o artigo 198 da mesma lei.</p>
+
+    [assinante] => Antonio José Martins Garcia
+    [cargo_assinante] => Tabelião e Registrador
+    [data] => 2025-03-03
+)
+
+[2025-03-03 22:41:40] Atualização executada com sucesso. Linhas afetadas: 1
+[2025-03-03 22:41:40] Processo concluído. Sucesso: Sim
+[2025-03-03 22:44:40] Iniciando processamento de atualização
+[2025-03-03 22:44:40] Dados recebidos: Array
+(
+    [id] => 5
+    [numero] => 5/2025
+    [apresentante] => ANTONIO JOSE MARTINS GARCIA
+    [cpf_cnpj] => 14.859.652/0001-90
+    [protocolo] => 7851
+    [data_protocolo] => 2025-03-02
+    [titulo] => Cédula de Crédito Bancário
+    [origem_titulo] => Banco do Brasil S/A
+    [corpo] => <p>Em atendimento &agrave; Lei de Registros P&uacute;blicos (Lei n&ordm; 6.015/73) e ao C&oacute;digo de Normas do Estado do Maranh&atilde;o (Provimento CGJ n&ordm; 11/2013), para a realiza&ccedil;&atilde;o do registro/averba&ccedil;&atilde;o do presente t&iacute;tulo, o qual segue anexo com esta nota, dever&atilde;o ser cumpridas as seguintes exig&ecirc;ncias no prazo de 30 (trinta) dias contados da data da prenota&ccedil;&atilde;o.</p>
+
+    [prazo_cumprimento] => <p>O requerente tem o prazo de 15 (quinze) dias para sanar as exig&ecirc;ncias apontadas, sob pena de cancelamento do protocolo, conforme artigo 205 da Lei n&ordm; 6.015/1973.</p>
+
+<p><strong>OBSERVA&Ccedil;&Atilde;O:</strong> Caso n&atilde;o concorde com as exig&ecirc;ncias, o interessado pode requerer a suscita&ccedil;&atilde;o de d&uacute;vida ao Ju&iacute;zo competente, conforme o artigo 198 da mesma lei.</p>
+
+    [assinante] => Antonio José Martins Garcia
+    [cargo_assinante] => Tabelião e Registrador
+    [data] => 2025-03-03
+)
+
+[2025-03-03 22:44:40] Atualização executada com sucesso. Linhas afetadas: 1
+[2025-03-03 22:44:40] Processo concluído. Sucesso: Sim
+[2025-03-03 22:44:49] Iniciando processamento de atualização
+[2025-03-03 22:44:49] Dados recebidos: Array
+(
+    [id] => 5
+    [numero] => 5/2025
+    [apresentante] => ANTONIO JOSE MARTINS GARCIA
+    [cpf_cnpj] => 14.859.652/0001-90
+    [protocolo] => 7851
+    [data_protocolo] => 2025-03-02
+    [titulo] => Cédula de Crédito Bancário
+    [origem_titulo] => Banco do Brasil S/A
+    [corpo] => <p>Em atendimento &agrave; Lei de Registros P&uacute;blicos (Lei n&ordm; 6.015/73) e ao C&oacute;digo de Normas do Estado do Maranh&atilde;o (Provimento CGJ n&ordm; 11/2013), para a realiza&ccedil;&atilde;o do registro/averba&ccedil;&atilde;o do presente t&iacute;tulo, o qual segue anexo com esta nota, dever&atilde;o ser cumpridas as seguintes exig&ecirc;ncias no prazo de 30 (trinta) dias contados da data da prenota&ccedil;&atilde;o.</p>
+
+<p>I &ndash; Necess&aacute;rio apresentar termo de inventariante ou retificar o invent&aacute;rio pra que conste a nomea&ccedil;&atilde;o do inventariante. A escritura de nomea&ccedil;&atilde;o de invent&aacute;rio pode ser feito em qualquer cart&oacute;rio de notas.<br />
+II &ndash; Em rela&ccedil;&atilde;o ao requerimento &eacute; necess&aacute;rio:<br />
+a) que conste a real &aacute;rea anterior (542 ha) constante na matr&iacute;cula e n&atilde;o apenas a &aacute;rea nova (559 ha).<br />
+b) que conste a numera&ccedil;&atilde;o das matr&iacute;culas a serem retificadas individualizando as matr&iacute;culas com as correspondentes &aacute;rea<br />
+c) que conste assinatura do t&eacute;cnico agrimensor.<br />
+III &ndash; Na planta &eacute; necess&aacute;rio constar a assinatura do confrontantes haja vista a altera&ccedil;&atilde;o da &aacute;rea do im&oacute;vel de 542 para 559 hectare, bem como a assinatura do(s) propriet&aacute;rio(s) na planta.<br />
+VI &ndash; Necess&aacute;rio anexar as certid&otilde;es das matr&iacute;culas ou comprovantes de posse (caso n&atilde;o haja matr&iacute;cula) dos im&oacute;veis confrontantes.<br />
+VII &ndash; Em rela&ccedil;&atilde;o ao CFTA &ndash; Termo de responsabilidade t&eacute;cnica, &eacute; necess&aacute;rio que conste: preenchimento de todos os dados, bem como o reconhecimento de firma do t&eacute;cnico e do propriet&aacute;rio/inventariante.</p>
+
+<p>Satisfeitas as exig&ecirc;ncias legais, o registro ser&aacute; realizado dentro do prazo legal. Novas exig&ecirc;ncias poder&atilde;o ser formuladas em caso de apresenta&ccedil;&atilde;o de novos documentos. N&atilde;o se conformando o apresentante com a exig&ecirc;ncia, ou n&atilde;o a podendo satisfazer, poder&aacute; requerer que ao Oficial que suscite o Procedimento de D&uacute;vida nos termos do art. 198 e seguintes da Lei de Registros P&uacute;blicos (Lei n&ordm; 6.015/73).</p>
+
+    [prazo_cumprimento] => <p>O requerente tem o prazo de 15 (quinze) dias para sanar as exig&ecirc;ncias apontadas, sob pena de cancelamento do protocolo, conforme artigo 205 da Lei n&ordm; 6.015/1973.</p>
+
+<p><strong>OBSERVA&Ccedil;&Atilde;O:</strong> Caso n&atilde;o concorde com as exig&ecirc;ncias, o interessado pode requerer a suscita&ccedil;&atilde;o de d&uacute;vida ao Ju&iacute;zo competente, conforme o artigo 198 da mesma lei.</p>
+
+    [assinante] => Antonio José Martins Garcia
+    [cargo_assinante] => Tabelião e Registrador
+    [data] => 2025-03-03
+)
+
+[2025-03-03 22:44:49] Atualização executada com sucesso. Linhas afetadas: 1
+[2025-03-03 22:44:49] Processo concluído. Sucesso: Sim
+[2025-03-03 23:11:01] Iniciando processamento de atualização
+[2025-03-03 23:11:01] Dados recebidos: Array
+(
+    [id] => 5
+    [numero] => 5/2025
+    [apresentante] => ANTONIO JOSE MARTINS GARCIA
+    [cpf_cnpj] => 14.859.652/0001-90
+    [protocolo] => 7851
+    [data_protocolo] => 2025-03-02
+    [titulo] => Cédula de Crédito Bancário
+    [origem_titulo] => Banco do Brasil S/A
+    [corpo] => <p>Em atendimento &agrave; Lei de Registros P&uacute;blicos (Lei n&ordm; 6.015/73) e ao C&oacute;digo de Normas do Estado do Maranh&atilde;o (Provimento CGJ n&ordm; 11/2013), para a realiza&ccedil;&atilde;o do registro/averba&ccedil;&atilde;o do presente t&iacute;tulo, o qual segue anexo com esta nota, dever&atilde;o ser cumpridas as seguintes exig&ecirc;ncias no prazo de 30 (trinta) dias contados da data da prenota&ccedil;&atilde;o.</p>
+
+<p>I &ndash; Necess&aacute;rio apresentar termo de inventariante ou retificar o invent&aacute;rio pra que conste a nomea&ccedil;&atilde;o do inventariante. A escritura de nomea&ccedil;&atilde;o de invent&aacute;rio pode ser feito em qualquer cart&oacute;rio de notas.<br />
+II &ndash; Em rela&ccedil;&atilde;o ao requerimento &eacute; necess&aacute;rio:<br />
+a) que conste a real &aacute;rea anterior (542 ha) constante na matr&iacute;cula e n&atilde;o apenas a &aacute;rea nova (559 ha).<br />
+b) que conste a numera&ccedil;&atilde;o das matr&iacute;culas a serem retificadas individualizando as matr&iacute;culas com as correspondentes &aacute;rea<br />
+c) que conste assinatura do t&eacute;cnico agrimensor.<br />
+III &ndash; Na planta &eacute; necess&aacute;rio constar a assinatura do confrontantes haja vista a altera&ccedil;&atilde;o da &aacute;rea do im&oacute;vel de 542 para 559 hectare, bem como a assinatura do(s) propriet&aacute;rio(s) na planta.<br />
+VI &ndash; Necess&aacute;rio anexar as certid&otilde;es das matr&iacute;culas ou comprovantes de posse (caso n&atilde;o haja matr&iacute;cula) dos im&oacute;veis confrontantes.<br />
+VII &ndash; Em rela&ccedil;&atilde;o ao CFTA &ndash; Termo de responsabilidade t&eacute;cnica, &eacute; necess&aacute;rio que conste: preenchimento de todos os dados, bem como o reconhecimento de firma do t&eacute;cnico e do propriet&aacute;rio/inventariante.</p>
+
+<p>Satisfeitas as exig&ecirc;ncias legais, o registro ser&aacute; realizado dentro do prazo legal. Novas exig&ecirc;ncias poder&atilde;o ser formuladas em caso de apresenta&ccedil;&atilde;o de novos documentos. N&atilde;o se conformando o apresentante com a exig&ecirc;ncia, ou n&atilde;o a podendo satisfazer, poder&aacute; requerer que ao Oficial que suscite o Procedimento de D&uacute;vida nos termos do art. 198 e seguintes da Lei de Registros P&uacute;blicos (Lei n&ordm; 6.015/73).</p>
+
+    [prazo_cumprimento] => <p>O requerente tem o prazo de 15 (quinze) dias para sanar as exig&ecirc;ncias apontadas, sob pena de cancelamento do protocolo, conforme artigo 205 da Lei n&ordm; 6.015/1973.</p>
+
+<p><strong>OBSERVA&Ccedil;&Atilde;O:</strong> Caso n&atilde;o concorde com as exig&ecirc;ncias, o interessado pode requerer a suscita&ccedil;&atilde;o de d&uacute;vida ao Ju&iacute;zo competente, conforme o artigo 198 da mesma lei.</p>
+
+    [assinante] => Antonio José Martins Garcia
+    [cargo_assinante] => Tabelião e Registrador
+    [data] => 2025-03-03
+)
+
+[2025-03-03 23:11:01] Atualização executada com sucesso. Linhas afetadas: 1
+[2025-03-03 23:11:01] Processo concluído. Sucesso: Sim
+[2025-03-03 23:12:04] Iniciando processamento de atualização
+[2025-03-03 23:12:04] Dados recebidos: Array
+(
+    [id] => 5
+    [numero] => 5/2025
+    [apresentante] => ANTONIO JOSE MARTINS GARCIA
+    [cpf_cnpj] => 14.859.652/0001-90
+    [protocolo] => 7851
+    [data_protocolo] => 2025-03-02
+    [titulo] => Cédula de Crédito Bancário
+    [origem_titulo] => Banco do Brasil S/A
+    [corpo] => <p>Em atendimento &agrave; Lei de Registros P&uacute;blicos (Lei n&ordm; 6.015/73) e ao C&oacute;digo de Normas do Estado do Maranh&atilde;o (Provimento CGJ n&ordm; 11/2013), para a realiza&ccedil;&atilde;o do registro/averba&ccedil;&atilde;o do presente t&iacute;tulo, o qual segue anexo com esta nota, dever&atilde;o ser cumpridas as seguintes exig&ecirc;ncias no prazo de 30 (trinta) dias contados da data da prenota&ccedil;&atilde;o.</p>
+
+<p>I &ndash; Necess&aacute;rio apresentar termo de inventariante ou retificar o invent&aacute;rio pra que conste a nomea&ccedil;&atilde;o do inventariante. A escritura de nomea&ccedil;&atilde;o de invent&aacute;rio pode ser feito em qualquer cart&oacute;rio de notas.<br />
+II &ndash; Em rela&ccedil;&atilde;o ao requerimento &eacute; necess&aacute;rio:<br />
+a) que conste a real &aacute;rea anterior (542 ha) constante na matr&iacute;cula e n&atilde;o apenas a &aacute;rea nova (559 ha).<br />
+b) que conste a numera&ccedil;&atilde;o das matr&iacute;culas a serem retificadas individualizando as matr&iacute;culas com as correspondentes &aacute;rea<br />
+c) que conste assinatura do t&eacute;cnico agrimensor.<br />
+III &ndash; Na planta &eacute; necess&aacute;rio constar a assinatura do confrontantes haja vista a altera&ccedil;&atilde;o da &aacute;rea do im&oacute;vel de 542 para 559 hectare, bem como a assinatura do(s) propriet&aacute;rio(s) na planta.<br />
+VI &ndash; Necess&aacute;rio anexar as certid&otilde;es das matr&iacute;culas ou comprovantes de posse (caso n&atilde;o haja matr&iacute;cula) dos im&oacute;veis confrontantes.<br />
+VII &ndash; Em rela&ccedil;&atilde;o ao CFTA &ndash; Termo de responsabilidade t&eacute;cnica, &eacute; necess&aacute;rio que conste: preenchimento de todos os dados, bem como o reconhecimento de firma do t&eacute;cnico e do propriet&aacute;rio/inventariante.</p>
+
+<p>Satisfeitas as exig&ecirc;ncias legais, o registro ser&aacute; realizado dentro do prazo legal. Novas exig&ecirc;ncias poder&atilde;o ser formuladas em caso de apresenta&ccedil;&atilde;o de novos documentos. N&atilde;o se conformando o apresentante com a exig&ecirc;ncia, ou n&atilde;o a podendo satisfazer, poder&aacute; requerer que ao Oficial que suscite o Procedimento de D&uacute;vida nos termos do art. 198 e seguintes da Lei de Registros P&uacute;blicos (Lei n&ordm; 6.015/73).</p>
+
+    [prazo_cumprimento] => <p>O requerente tem o prazo de 15 (quinze) dias para sanar as exig&ecirc;ncias apontadas, sob pena de cancelamento do protocolo, conforme artigo 205 da Lei n&ordm; 6.015/1973.</p>
+
+<p><strong>OBSERVA&Ccedil;&Atilde;O:</strong> Caso n&atilde;o concorde com as exig&ecirc;ncias, o interessado pode requerer a suscita&ccedil;&atilde;o de d&uacute;vida ao Ju&iacute;zo competente, conforme o artigo 198 da mesma lei.</p>
+
+    [assinante] => Antonio José Martins Garcia
+    [cargo_assinante] => Tabelião e Registrador
+    [data] => 2025-03-03
+)
+
+[2025-03-03 23:12:04] Atualização executada com sucesso. Linhas afetadas: 1
+[2025-03-03 23:12:04] Processo concluído. Sucesso: Sim
