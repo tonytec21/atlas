@@ -313,7 +313,7 @@ include(__DIR__ . '/db_connection.php');
                             <th style="width: 10%;">Valor Total</th>
                             <th style="width: 10%;">Dep. Prévio</th>
                             <th style="width: 10%;">Liquidado</th>
-                            <th style="width: 12%;">Observações</th>
+                            <!-- <th style="width: 12%;">Observações</th> -->
                             <th>Data</th>
                             <th>Status</th>
                             <th style="width: 5%;">Situação</th>
@@ -381,7 +381,6 @@ include(__DIR__ . '/db_connection.php');
                             $params[':observacoes'] = '%' . $_GET['observacoes'] . '%';
                             $filtered = true;
                         }
-
                         $sql = 'SELECT * FROM ordens_de_servico';
                         if ($conditions) {
                             $sql .= ' WHERE ' . implode(' AND ', $conditions);
@@ -509,7 +508,7 @@ include(__DIR__ . '/db_connection.php');
                                 <td><?php echo 'R$ ' . number_format($ordem['total_os'], 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($deposito_previo, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?></td>
-                                <td><?php echo strlen($ordem['observacoes']) > 100 ? substr($ordem['observacoes'], 0, 100) . '...' : $ordem['observacoes']; ?></td>
+                                <!-- <td><?php echo strlen($ordem['observacoes']) > 100 ? substr($ordem['observacoes'], 0, 100) . '...' : $ordem['observacoes']; ?></td> -->
                                 <td data-order="<?php echo date('Y-m-d', strtotime($ordem['data_criacao'])); ?>"><?php echo date('d/m/Y', strtotime($ordem['data_criacao'])); ?></td>
                                 <td><span style="font-size: 13px" class="status-label <?php echo $statusClasses[$statusOS]; ?>"><?php echo $statusOS; ?></span></td>
                                 <td>
