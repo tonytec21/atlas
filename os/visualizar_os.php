@@ -807,7 +807,7 @@ include(__DIR__ . '/../menu.php');
                     <div class="form-row">    
                         <div class="form-group col-md-8">
                             <label for="title">Título da Tarefa</label>
-                            <input type="text" class="form-control" id="title" name="title" value="<?php echo $ordem_servico['descricao_os'] . ' - ' . $ordem_servico['cliente']; ?>" required>
+                            <input type="text" class="form-control" id="title" name="title" value="<?php echo $ordem_servico['descricao_os'] . ' - OS nº. ' . $ordem_servico['id'] . ' - ' . $ordem_servico['cliente']; ?>" required>
                         </div>
 
                     <!-- Alinhando os campos na mesma linha -->
