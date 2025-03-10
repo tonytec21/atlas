@@ -334,7 +334,7 @@ foreach ($ordem_servico_itens as $item) {
             border-radius: .3rem;
         }
         .w-100 {
-            margin-top: 5px;
+            margin-top: 15px;
         }
     </style>
 </head>
