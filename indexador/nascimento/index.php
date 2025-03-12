@@ -345,9 +345,12 @@ include(__DIR__ . '/../../menu.php');
                 <label for="search-term-term">Termo</label>
                 <input type="number" id="search-term-term" class="form-control" placeholder="Termo" min="0">
             </div>
-            <div class="col-md-6 col-lg-2 mb-2">
-                <label for="search-term-book">Livro</label>
-                <input type="number" id="search-term-book" class="form-control" placeholder="Livro" min="0">
+            <div class="col-md-6 col-lg-2 mb-2">  
+                <label for="search-term-book">Livro</label>  
+                <select id="search-term-book" class="form-control">  
+                    <option value="">Selecione</option>  
+                    <!-- Opções serão carregadas via JavaScript -->  
+                </select>  
             </div>
             <div class="col-md-6 col-lg-2 mb-2">
                 <label for="search-term-page">Folha</label>
@@ -1437,6 +1440,34 @@ include(__DIR__ . '/../../menu.php');
                 });
             }
         });
+    });
+
+    // Função para carregar a lista de livros  
+    function carregarLivros() {  
+        $.ajax({  
+            url: 'carregar_livros.php',  
+            type: 'GET',  
+            dataType: 'json',  
+            success: function(data) {  
+                const selectLivro = $('#search-term-book');  
+                // Mantém a opção "Todos os livros"  
+                selectLivro.find('option:not(:first)').remove();  
+                
+                // Adiciona os livros encontrados  
+                $.each(data, function(index, livro) {  
+                    selectLivro.append($('<option></option>').attr('value', livro).text('Livro ' + livro));  
+                });  
+            },  
+            error: function(xhr, status, error) {  
+                console.error('Erro ao carregar livros:', error);  
+            }  
+        });  
+    }  
+
+    // Chama a função quando a página carrega  
+    $(document).ready(function() {  
+        carregarLivros();  
+
     });
 
     // Ajuste de sobreposição de modais
