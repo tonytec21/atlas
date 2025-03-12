@@ -1441,7 +1441,7 @@ include(__DIR__ . '/../../menu.php');
             }
         });
     });
-
+ 
     // Função para carregar a lista de livros  
     function carregarLivros() {  
         $.ajax({  
@@ -1455,7 +1455,9 @@ include(__DIR__ . '/../../menu.php');
                 
                 // Adiciona os livros encontrados  
                 $.each(data, function(index, livro) {  
-                    selectLivro.append($('<option></option>').attr('value', livro).text('Livro ' + livro));  
+                    // Converte para número para garantir que não há zeros à esquerda  
+                    const livroNum = parseInt(livro, 10);  
+                    selectLivro.append($('<option></option>').attr('value', livroNum).text('Livro ' + livroNum));  
                 });  
             },  
             error: function(xhr, status, error) {  
@@ -1466,8 +1468,7 @@ include(__DIR__ . '/../../menu.php');
 
     // Chama a função quando a página carrega  
     $(document).ready(function() {  
-        carregarLivros();  
-
+        carregarLivros();   
     });
 
     // Ajuste de sobreposição de modais
