@@ -22,6 +22,10 @@ function getUserIpAddr() {
 
 function saveAccessLog($username, $nomeCompleto) {
     $ip = getUserIpAddr();
+    
+    // Define o fuso horário para o local do servidor
+    date_default_timezone_set('America/Sao_Paulo');
+    
     $dataHora = date('Y-m-d H:i:s');
 
     // Conexão com o banco de dados "atlas"
