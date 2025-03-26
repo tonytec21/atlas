@@ -523,6 +523,9 @@ function removerItem(button) {
 }
 
 function salvarOS() {
+    // Desabilita o botão "SALVAR OS" para evitar clique duplo
+    $('button.btn-primary.btn-block').prop('disabled', true);
+
     var cliente = $('#cliente').val();
     var cpf_cliente = $('#cpf_cliente').val();
     var total_os = $('#total_os').val().replace(/\./g, '').replace(',', '.');
@@ -570,11 +573,13 @@ function salvarOS() {
             itens: itens
         },
         success: function(response) {
-            console.log(response); // Adicionando log de depuração para verificar a resposta do servidor
+            console.log(response); // Log de depuração
             try {
                 var res = JSON.parse(response);
                 if (res.error) {
                     showAlert(res.error, 'error');
+                    // Reabilita o botão em caso de erro lógico do servidor
+                    $('button.btn-primary.btn-block').prop('disabled', false);
                 } else {
                     showAlert('Ordem de Serviço salva com sucesso!', 'success');
                     setTimeout(function() {
@@ -584,15 +589,20 @@ function salvarOS() {
             } catch (e) {
                 console.log('Erro ao processar a resposta: ', e);
                 showAlert('Erro ao processar a resposta do servidor.', 'error');
+                // Reabilita o botão em caso de erro na resposta
+                $('button.btn-primary.btn-block').prop('disabled', false);
             }
         },
         error: function(xhr, status, error) {
             console.log('Erro:', error);
             console.log('Resposta do servidor:', xhr.responseText);
             showAlert('Erro ao salvar a Ordem de Serviço', 'error');
+            // Reabilita o botão em caso de erro na requisição AJAX
+            $('button.btn-primary.btn-block').prop('disabled', false);
         }
     });
 }
+
 
 
 // Funções para validar CPF e CNPJ
