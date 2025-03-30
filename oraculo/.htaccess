@@ -1,0 +1,32 @@
+# Configuração do Oráculo Atlas  
+<IfModule mod_rewrite.c>  
+    RewriteEngine On  
+    
+    # Se a solicitação for para um diretório ou arquivo existente, entregar diretamente  
+    RewriteCond %{REQUEST_FILENAME} -d [OR]  
+    RewriteCond %{REQUEST_FILENAME} -f  
+    RewriteRule ^ - [L]  
+    
+    # Redirecionar todas as solicitações para index.php  
+    RewriteRule ^ index.php [L]  
+</IfModule>  
+
+# Configurações de segurança  
+<IfModule mod_headers.c>  
+    Header set X-Content-Type-Options "nosniff"  
+    Header set X-XSS-Protection "1; mode=block"  
+    Header set X-Frame-Options "SAMEORIGIN"  
+</IfModule>  
+
+# Prevenir acesso direto a arquivos de configuração  
+<FilesMatch "^(config\.php|functions\.php|error\.log)$">  
+    Order deny,allow  
+    Deny from all  
+</FilesMatch>  
+
+# PHP configurações  
+<IfModule mod_php.c>  
+    php_flag display_errors Off  
+    php_flag log_errors On  
+    php_value error_log "error.log"  
+</IfModule>
