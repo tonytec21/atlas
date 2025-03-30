@@ -23,10 +23,10 @@ $tabelas = [
   `data_atualizacao` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `ativo` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;"
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;",
 
 "INSERT INTO `chave_api_oraculo` (`id`, `chave`, `data_criacao`, `data_atualizacao`, `ativo`) VALUES
-	(1, '', '2025-03-30 19:15:28', '2025-03-30 19:15:47', 1);"
+	(1, 'CHAVE API', '2025-03-30 19:15:28', '2025-03-30 19:15:47', 1);"
 
 ];
 
