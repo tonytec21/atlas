@@ -15,6 +15,7 @@ function criarTabelaSeNecessario($conn, $queryCriarTabela) {
 }
 
 $tabelas = [
+    
 "CREATE TABLE IF NOT EXISTS `chave_api_oraculo` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `chave` varchar(255) NOT NULL,
@@ -26,6 +27,7 @@ $tabelas = [
 
 "INSERT INTO `chave_api_oraculo` (`id`, `chave`, `data_criacao`, `data_atualizacao`, `ativo`) VALUES
 	(1, '', '2025-03-30 19:15:28', '2025-03-30 19:15:47', 1);"
+
 ];
 
 // Executa a criação de todas as tabelas
