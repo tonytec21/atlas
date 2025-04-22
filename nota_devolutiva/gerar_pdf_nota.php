@@ -76,8 +76,8 @@ function formatDateToBrazilian($date)
 
 // Carregar assinaturas  
 $signatures = [];  
-if (file_exists(__DIR__ . '../oficios/assinaturas/data.json')) {  
-    $signatures = json_decode(file_get_contents(__DIR__ . '../oficios/assinaturas/data.json'), true);  
+if (file_exists(__DIR__ . '/../oficios/assinaturas/data.json')) {  
+    $signatures = json_decode(file_get_contents(__DIR__ . '/../oficios/assinaturas/data.json'), true);  
 }  
 $signatureImage = '';  
 foreach ($signatures as $signature) {  
