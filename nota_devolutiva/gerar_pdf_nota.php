@@ -147,7 +147,7 @@ $lineHeight = 10 * 0.5;
 
 // Cidade e data  
 $pdf->SetFont('helvetica', '', 12);  
-$pdf->Cell(0, $lineHeight, $cidade . ', ' . formatDateToBrazilian($notaData['data']), 0, 1, 'R');  
+$pdf->Cell(0, $lineHeight, $cidade . ', ' . formatDateToBrazilian($notaData['data']) . '.', 0, 1, 'R');  
 $pdf->Ln(5);  
 
 // Protocolo  
