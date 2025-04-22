@@ -100,6 +100,17 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                 </div>
             </div>
 
+            <!-- Nota Devolutiva -->
+            <div class="col-md-4 mb-3" id="card-notas-devolutivas">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fa fa-reply-all fa-3x text-devolutivas mb-2"></i>
+                        <h5 class="card-title">Nota Devolutiva</h5>
+                        <a href="nota_devolutiva/index.php" class="btn btn-devolutivas w-100">Acessar</a>
+                    </div>
+                </div>
+            </div>
+
             <!-- Provimentos e Resoluções -->
             <div class="col-md-4 mb-3" id="card-provimento">
                 <div class="card shadow-sm">

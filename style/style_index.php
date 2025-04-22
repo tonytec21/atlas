@@ -750,4 +750,17 @@
             transform: var(--card-hover-transform);  
             box-shadow: 0 12px 20px rgba(0,0,0,0.15);  
         }  
+
+        .btn-devolutivas {
+            background-color: #9c27b0;
+            color: white;
+        }
+        .btn-devolutivas:hover {
+            background-color:rgb(115, 26, 131);
+            color: white;
+        }
+        .text-devolutivas {
+            color: #9c27b0;
+        }
+
     </style>

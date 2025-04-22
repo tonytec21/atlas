@@ -576,7 +576,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         </div>
                         <div class="col-md-4">
                             <label for="data_nascimento" class="form-label required-label">Data de Nascimento</label>
-                            <input type="date" class="form-control rounded-pill" id="data_nascimento" name="data_nascimento" required>
+                            <input type="date" class="form-control rounded-pill" id="data_nascimento" name="data_nascimento">
                         </div>
                     </div>
 
