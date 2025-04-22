@@ -30,22 +30,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('INDICEREGISTRO', $row['id']);
             $registro->addChild('FLAGDESCONHECIDO', 'N');
             $registro->addChild('NOMEFALECIDO', valorOuPadrao($row['nome_registrado']));
-            $registro->addChild('CPFFALECIDO', ''); // não há CPF no banco
+            $registro->addChild('CPFFALECIDO', '');
             $registro->addChild('MATRICULA', valorOuPadrao($row['matricula']));
             $registro->addChild('DATAREGISTRO', date('d/m/Y', strtotime($row['data_registro'])));
             $registro->addChild('NOMEPAI', valorOuPadrao($row['nome_pai'], 'IGNORADO'));
             $registro->addChild('CPFPAI', '');
             $registro->addChild('SEXOPAI', 'M');
-            $registro->addChild('NOMEMAE', valorOuPadrao($row['nome_mae'], 'IGNORADO'));
+            $registro->addChild('NOMEMAE', valorOuPadrao($row['nome_mae'], 'IGNORADA'));
             $registro->addChild('CPFMAE', '');
             $registro->addChild('SEXOMAE', 'F');
             $registro->addChild('DATAOBITO', date('d/m/Y', strtotime($row['data_obito'])));
-            $registro->addChild('HORAOBITO', valorOuPadrao($row['hora_obito'], '00:00'));
-            $registro->addChild('SEXO', 'I'); // Ignorado por padrão
+            $registro->addChild('HORAOBITO', substr(valorOuPadrao($row['hora_obito'], '00:00'), 0, 5));
+            $registro->addChild('SEXO', 'I');
             $registro->addChild('CORPELE', 'IGNORADA');
             $registro->addChild('ESTADOCIVIL', 'IGNORADO');
             $registro->addChild('DATANASCIMENTOFALECIDO', date('d/m/Y', strtotime($row['data_nascimento'])));
-            // Cálculo da idade do falecido
+
             try {
                 $dataNascimento = new DateTime($row['data_nascimento']);
                 $dataObito = new DateTime($row['data_obito']);
@@ -53,23 +53,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
 
                 if ($intervalo->y >= 1) {
                     $registro->addChild('IDADE', $intervalo->y);
-                    $registro->addChild('IDADE_DIAS_MESES_ANOS', 'ANOS');
+                    $registro->addChild('IDADE_DIAS_MESES_ANOS', 'A');
                 } elseif ($intervalo->m >= 1) {
                     $registro->addChild('IDADE', $intervalo->m);
-                    $registro->addChild('IDADE_DIAS_MESES_ANOS', 'MESES');
+                    $registro->addChild('IDADE_DIAS_MESES_ANOS', 'M');
                 } else {
-                    $dias = max($intervalo->d, 1); // pelo menos 1 dia
+                    $dias = max($intervalo->d, 1);
                     $registro->addChild('IDADE', $dias);
-                    $registro->addChild('IDADE_DIAS_MESES_ANOS', 'DIAS');
+                    $registro->addChild('IDADE_DIAS_MESES_ANOS', 'D');
                 }
             } catch (Exception $e) {
                 $registro->addChild('IDADE', '0');
-                $registro->addChild('IDADE_DIAS_MESES_ANOS', 'IGNORADO');
+                $registro->addChild('IDADE_DIAS_MESES_ANOS', 'I');
             }
-            $registro->addChild('ELEITOR', 'IGNORADO');
-            $registro->addChild('POSSUIBENS', 'IGNORADO');
+
+            $registro->addChild('ELEITOR', 'I');
+            $registro->addChild('POSSUIBENS', 'I');
             $registro->addChild('CODIGOOCUPACAOSDC', '');
-            $registro->addChild('PAISNASCIMENTO', '1058'); // Código Brasil
+            $registro->addChild('PAISNASCIMENTO', '076'); // Brasil ISO-3
             $registro->addChild('NACIONALIDADE', '076');
             $registro->addChild('CODIGOIBGEMUNNATURALIDADE', '');
             $registro->addChild('TEXTOLIVREMUNICIPIONAT', 'NAO DECLARADO');
@@ -80,12 +81,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('COMPLEMENTOLOGRADOURO', '');
             $registro->addChild('BAIRRO', '');
 
-            // BENEFÍCIOS PREVIDENCIÁRIOS
             $beneficio = $registro->addChild('BENEFICIOS_PREVIDENCIARIOS');
             $beneficio->addChild('INDICEREGISTRO', $row['id']);
             $beneficio->addChild('NUMEROBENEFICIO', '');
 
-            // DOCUMENTOS
             $documento = $registro->addChild('DOCUMENTOS');
             $documento->addChild('INDICEREGISTRO', $row['id']);
             $documento->addChild('DONO', 'FALECIDO');
@@ -97,12 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $documento->addChild('UF_EMISSAO', '');
             $documento->addChild('DATA_EMISSAO', '');
 
-            // Local do óbito
             $registro->addChild('TIPOLOCALOBITO', 'IGNORADO');
-            $registro->addChild('TIPOMORTE', 'IGNORADO');
+            $registro->addChild('TIPOMORTE', 'IGNORADA');
             $registro->addChild('NUMDECLARACAOOBITO', '');
             $registro->addChild('NUMDECLARACAOOBITOIGNORADA', 'S');
-            $registro->addChild('PAISOBITO', '1058'); // Brasil
+            $registro->addChild('PAISOBITO', '076');
             $registro->addChild('CODIGOIBGEMUNLOGRADOUROOBITO', valorOuPadrao($row['ibge_cidade_obito'], 'NAO DECLARADO'));
             $registro->addChild('ENDERECOLOCALOBITOESTRANGEIRO', '');
             $registro->addChild('LOGRADOUROOBITO', '');
@@ -110,7 +108,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('COMPLEMENTOLOGRADOUROOBITO', '');
             $registro->addChild('BAIRROOBITO', '');
 
-            // Causas da morte
             $registro->addChild('CAUSAMORTEANTECEDENTES_A', '');
             $registro->addChild('CAUSAMORTEANTECEDENTES_B', '');
             $registro->addChild('CAUSAMORTEANTECEDENTES_C', '');
@@ -132,7 +129,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('OBSERVACOES', '');
         }
 
-        // Salvar e servir o XML
         $dom = new DOMDocument('1.0', 'UTF-8');
         $dom->preserveWhiteSpace = false;
         $dom->formatOutput = true;
