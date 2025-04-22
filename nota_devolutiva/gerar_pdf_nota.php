@@ -347,5 +347,6 @@ $pdf->Cell(0, $lineHeight, ($notaData['cargo_assinante']), 0, 1, 'C');
 
 // Gerar o PDF  
 ob_clean(); // Limpar buffer de saída para evitar erros de envio de PDF  
-$pdf->Output('Nota_Devolutiva_' . $notaData['numero'] . '.pdf', 'I');  
+$nomeArquivo = str_replace('/', '_', $notaData['numero']);
+$pdf->Output('Nota_Devolutiva_' . $nomeArquivo . '.pdf', 'I');
 ?>
