@@ -317,7 +317,7 @@ $pdf->Ln(15);
 
 // Adicionar imagem da assinatura, se disponível  
 if ($signatureImage) {  
-    $signatureImagePath = __DIR__ . '/assinaturas/' . $signatureImage;  
+    $signatureImagePath = __DIR__ . '/../oficios/assinaturas/' . $signatureImage;  
     if (file_exists($signatureImagePath)) {  
         // Obter dimensões da imagem  
         list($imageWidth, $imageHeight) = getimagesize($signatureImagePath);  
