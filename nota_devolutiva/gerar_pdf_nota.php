@@ -150,11 +150,6 @@ $pdf->SetFont('helvetica', '', 12);
 $pdf->Cell(0, $lineHeight, $cidade . ', ' . formatDateToBrazilian($notaData['data']), 0, 1, 'R');  
 $pdf->Ln(8);  
 
-// Número da nota devolutiva  
-$pdf->SetFont('helvetica', 'B', 12);  
-$pdf->writeHTML('<div style="text-align: justify;">NOTA DEVOLUTIVA Nº.: ' . $notaData['numero'] . '</div>', true, false, true, false, '');  
-$pdf->Ln(5);  
-
 // Protocolo  
 $pdf->SetFont('helvetica', 'B', 12);  
 $pdf->writeHTML('<div style="text-align: justify;">Protocolo: ' . ($notaData['protocolo']) . '</div>', true, false, true, false, '');  
@@ -204,10 +199,15 @@ if (!empty($notaData['titulo'])) {
     $pdf->Ln(8);  
 }  
 
-// Adicionar o título "Motivos da Devolução" antes do conteúdo do corpo  
+// // Adicionar o título "Motivos da Devolução" antes do conteúdo do corpo  
+// $pdf->SetFont('helvetica', 'B', 12);  
+// $pdf->writeHTML('<div style="text-align: justify;">MOTIVO DA DEVOLUÇÃO:</div>', true, false, true, false, '');  
+// $pdf->Ln(2);  
+
+// Número da nota devolutiva  
 $pdf->SetFont('helvetica', 'B', 12);  
-$pdf->writeHTML('<div style="text-align: justify;">MOTIVO DA DEVOLUÇÃO:</div>', true, false, true, false, '');  
-$pdf->Ln(2);  
+$pdf->writeHTML('<div style="text-align: center;">NOTA DEVOLUTIVA Nº.: ' . $notaData['numero'] . '</div>', true, false, true, false, '');  
+$pdf->Ln(5);  
 
 // Processar o corpo da nota devolutiva  
 $pdf->SetFont('helvetica', '', 12);  
