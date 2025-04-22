@@ -288,7 +288,7 @@ date_default_timezone_set('America/Sao_Paulo');
                     </a>
                 </div>
                 <div class="col-md-auto mb-2">
-                    <a href="#" class="btn btn-info2 text-white">
+                    <a href="../carga_crc/exportar_carga_obito.php" class="btn btn-info2 text-white">
                         <i class="fa fa-file-export"></i> Exportar carga CRC
                     </a>
                 </div>
@@ -561,11 +561,11 @@ date_default_timezone_set('America/Sao_Paulo');
                         </div>
                         <div class="col-md-4">
                             <label for="data_obito" class="form-label required-label">Data do Óbito</label>
-                            <input type="date" class="form-control rounded-pill" id="data_obito" name="data_obito" required>
+                            <input type="date" class="form-control rounded-pill" id="data_obito" name="data_obito">
                         </div>
                         <div class="col-md-4">
                             <label for="hora_obito" class="form-label required-label">Hora do Óbito</label>
-                            <input type="time" class="form-control rounded-pill" id="hora_obito" name="hora_obito" required>
+                            <input type="time" class="form-control rounded-pill" id="hora_obito" name="hora_obito">
                         </div>
                     </div>
 
@@ -673,11 +673,11 @@ date_default_timezone_set('America/Sao_Paulo');
                         </div>
                         <div class="col-md-4">
                             <label for="edit-data_obito" class="form-label required-label">Data do Óbito</label>
-                            <input type="date" class="form-control rounded-pill" id="edit-data_obito" name="data_obito" required>
+                            <input type="date" class="form-control rounded-pill" id="edit-data_obito" name="data_obito">
                         </div>
                         <div class="col-md-4">
                             <label for="edit-hora_obito" class="form-label required-label">Hora do Óbito</label>
-                            <input type="time" class="form-control rounded-pill" id="edit-hora_obito" name="hora_obito" required>
+                            <input type="time" class="form-control rounded-pill" id="edit-hora_obito" name="hora_obito">
                         </div>
                     </div>
 
