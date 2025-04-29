@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');   
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -148,9 +149,9 @@ include(__DIR__ . '/db_connection.php');
             // Tratamento para remover quebras de linha, tabs e espaços duplos
             function limparTexto(texto) {
                 return texto
-                    .replace(/[\n\r\t]+/g, ' ') // substitui \n, \r, \t por espaço simples
-                    .replace(/\s{2,}/g, ' ')    // substitui múltiplos espaços por apenas um espaço
-                    .trim();                   // remove espaços no início e fim
+                    .replace(/[\n\r\t]+/g, ' ') 
+                    .replace(/\s{2,}/g, ' ')   
+                    .trim();                
             }
 
             // Limpar os campos antes de enviar
