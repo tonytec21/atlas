@@ -141,49 +141,51 @@ include(__DIR__ . '/db_connection.php');
     <script src="../script/jquery.mask.min.js"></script>
     <script src="../script/toastr.min.js"></script>
     <script>
-        $(document).ready(function() {
-            // Atualizar o nome do arquivo selecionado no input de anexo
-            $('.custom-file-input').on('change', function() {
-                var fileName = $(this).val().split('\\').pop();
-                $(this).siblings('.custom-file-label').addClass('selected').html(fileName);
-            });
+        // Validação e envio do formulário
+        $('#cadastroForm').on('submit', function(event) {
+            event.preventDefault();
 
-            // Restrição de entrada para apenas números no campo de número do provimento
-            $('#numero_provimento').on('input', function() {
-                this.value = this.value.replace(/[^0-9]/g, '');
-            });
+            // Tratamento para remover quebras de linha, tabs e espaços duplos
+            function limparTexto(texto) {
+                return texto
+                    .replace(/[\n\r\t]+/g, ' ') // substitui \n, \r, \t por espaço simples
+                    .replace(/\s{2,}/g, ' ')    // substitui múltiplos espaços por apenas um espaço
+                    .trim();                   // remove espaços no início e fim
+            }
 
-            // Validação e envio do formulário
-            $('#cadastroForm').on('submit', function(event) {
-                event.preventDefault();
+            // Limpar os campos antes de enviar
+            var descricao = $('#descricao').val();
+            var conteudoAnexo = $('#conteudo_anexo').val();
 
-                var formData = new FormData(this);
+            $('#descricao').val(limparTexto(descricao));
+            $('#conteudo_anexo').val(limparTexto(conteudoAnexo));
 
-                $.ajax({
-                    url: 'salvar_provimento.php',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        try {
-                            response = JSON.parse(response);
-                            if (response.success) {
-                                toastr.success(response.message, 'Sucesso');
-                                setTimeout(function() {
-                                    window.location.reload();
-                                }, 2000); // Aguarda 2 segundos antes de recarregar
-                            } else {
-                                toastr.error(response.message, 'Erro');
-                            }
-                        } catch (e) {
-                            toastr.error('Erro ao processar resposta do servidor.', 'Erro');
+            var formData = new FormData(this);
+
+            $.ajax({
+                url: 'salvar_provimento.php',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    try {
+                        response = JSON.parse(response);
+                        if (response.success) {
+                            toastr.success(response.message, 'Sucesso');
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 2000); // Aguarda 2 segundos antes de recarregar
+                        } else {
+                            toastr.error(response.message, 'Erro');
                         }
-                    },
-                    error: function() {
-                        toastr.error('Erro ao cadastrar provimento.', 'Erro');
+                    } catch (e) {
+                        toastr.error('Erro ao processar resposta do servidor.', 'Erro');
                     }
-                });
+                },
+                error: function() {
+                    toastr.error('Erro ao cadastrar provimento.', 'Erro');
+                }
             });
         });
     </script>

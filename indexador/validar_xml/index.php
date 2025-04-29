@@ -4,6 +4,9 @@ checkSession();
 include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
 
+/**
+ * Traduz mensagens de erro do libxml para português.
+ */
 function traduzirMensagemErro($mensagem) {
     $traducoes = [
         "/Element '(.*?)':/" => "Elemento '$1':",
@@ -20,6 +23,65 @@ function traduzirMensagemErro($mensagem) {
     }
 
     return $mensagem;
+}
+
+/**
+ * Lê o XML de $sourcePath e salva reformatado (indentado) em um arquivo temporário.
+ * Retorna o caminho do arquivo temporário.
+ */
+function reformatXml($sourcePath) {
+    $dom = new DOMDocument();
+    // Carrega o XML (caso o XML seja muito grande, avalie usar outras flags)
+    $dom->load($sourcePath, LIBXML_NOBLANKS);
+
+    // Remove espaços em branco e ativa a formatação
+    $dom->preserveWhiteSpace = false;
+    $dom->formatOutput = true;
+
+    // Cria um arquivo temporário
+    $tempPath = tempnam(sys_get_temp_dir(), 'xmlreindent_');
+    // Salva o XML reformatado nesse arquivo
+    $dom->save($tempPath);
+
+    return $tempPath;
+}
+
+/**
+ * Lê um arquivo XML (já reformatado) linha a linha
+ * e mapeia onde aparecem tags <NOMEREGISTRADO>...</NOMEREGISTRADO>.
+ * Retorna um array: [numero_da_linha => nome_registrado].
+ */
+function mapearNomesRegistrados($arquivoXml) {
+    $linhas = file($arquivoXml); // Lê cada linha do arquivo em um array
+    $mapeamento = [];
+
+    foreach ($linhas as $indice => $conteudo) {
+        // Se estiver algo como: <NOMEREGISTRADO>Fulano</NOMEREGISTRADO>
+        // (sem namespaces, sem quebra de linha no meio etc.)
+        if (preg_match('/<NOMEREGISTRADO>(.*?)<\/NOMEREGISTRADO>/', $conteudo, $matches)) {
+            $nome = trim($matches[1]);
+            // $indice começa em 0, mas a linha "real" é $indice+1
+            $mapeamento[$indice + 1] = $nome;
+        }
+    }
+
+    return $mapeamento;
+}
+
+/**
+ * Dado um array [linha => nome], encontra o "nome" mais recente
+ * para linha <= $linhaErro (ou string vazia se nada encontrado).
+ */
+function obterNomeRegistradoPorLinha($mapeamento, $linhaErro) {
+    $ultimoNome = '';
+    foreach ($mapeamento as $linha => $nome) {
+        if ($linha <= $linhaErro) {
+            $ultimoNome = $nome;
+        } else {
+            break;
+        }
+    }
+    return $ultimoNome;
 }
 ?>
 <!DOCTYPE html>
@@ -62,6 +124,7 @@ function traduzirMensagemErro($mensagem) {
                 $xmlFile = $_FILES['xmlFile']['tmp_name'];
                 $xsdFile = __DIR__ . '/catalogo-crc.xsd';
 
+                // Verifica se o XSD existe
                 if (!file_exists($xsdFile)) {
                     echo "<script>
                         Swal.fire({
@@ -72,10 +135,18 @@ function traduzirMensagemErro($mensagem) {
                         });
                     </script>";
                 } else {
+                    // 1) Reformatar e criar arquivo temporário indentado
+                    $xmlReformatado = reformatXml($xmlFile);
+
+                    // 2) Mapeia linhas do XML reformatado, procurando <NOMEREGISTRADO>
+                    $mapaNomes = mapearNomesRegistrados($xmlReformatado);
+
                     libxml_use_internal_errors(true);
                     $dom = new DomDocument();
 
-                    if ($dom->load($xmlFile)) {
+                    // 3) Carrega do arquivo temporário reformatado
+                    if ($dom->load($xmlReformatado)) {
+                        // 4) Valida
                         if ($dom->schemaValidate($xsdFile)) {
                             echo "<script>
                                 Swal.fire({
@@ -86,14 +157,24 @@ function traduzirMensagemErro($mensagem) {
                                 });
                             </script>";
                         } else {
+                            // 5) Tratar e exibir erros
                             $errors = libxml_get_errors();
-                            $mensagensTraduzidas = '';
-
-                            foreach ($errors as $error) {
-                                $mensagensTraduzidas .= traduzirMensagemErro($error->message) . "\\n";
-                            }
-
                             libxml_clear_errors();
+
+                            $mensagensTraduzidas = '';
+                            foreach ($errors as $error) {
+                                $linhaErro = $error->line;
+                                $nomeRegistro = obterNomeRegistradoPorLinha($mapaNomes, $linhaErro);
+
+                                // Traduz a mensagem de libxml
+                                $mensagemTraduzida = traduzirMensagemErro($error->message);
+
+                                if (!empty($nomeRegistro)) {
+                                    $mensagensTraduzidas .= "Registro: \"$nomeRegistro\" - Linha $linhaErro => $mensagemTraduzida\n";
+                                } else {
+                                    $mensagensTraduzidas .= "Linha $linhaErro => $mensagemTraduzida\n";
+                                }
+                            }
 
                             echo "<script>
                                 Swal.fire({
@@ -104,6 +185,11 @@ function traduzirMensagemErro($mensagem) {
                                     confirmButtonText: 'OK'
                                 });
                             </script>";
+                        }
+
+                        // Remove o arquivo temporário depois de usar (opcional)
+                        if (file_exists($xmlReformatado)) {
+                            unlink($xmlReformatado);
                         }
                     } else {
                         echo "<script>
