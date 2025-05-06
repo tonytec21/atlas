@@ -175,6 +175,27 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                 }
             ?>
 
+            <!-- Xuxuzinho -->
+            <?php
+                $configFile = __DIR__ . '/indexador/config_xuxuzinho.json';
+                if (file_exists($configFile)) {
+                    $configData = json_decode(file_get_contents($configFile), true);
+                    if (isset($configData['indexador_ativo']) && $configData['indexador_ativo'] === 'S') {
+                        echo '
+                              
+                            <div class="col-md-4 mb-3" id="card-xuxuzinho">  
+                                <div class="card shadow-sm">  
+                                    <div class="card-body text-center">  
+                                        <img src="../xuxuzinho/images/favicon.png" alt="Xuxuzinho" class="mb-2" style="height: 60px; width: auto;">  
+                                        <h5 class="card-title">Xuxuzinho</h5>  
+                                        <a href="../xuxuzinho/index.php" class="btn btn-success w-100">Acessar</a>  
+                                    </div>  
+                                </div>  
+                            </div>';
+                    }
+                }
+            ?>
+
             <!-- REURB -->
             <?php
                 $configFile = __DIR__ . '/reurb/config_reurb.json';
