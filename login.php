@@ -5,12 +5,6 @@ shell_exec('git config --global --add safe.directory C:/xampp/htdocs/atlas');
 // Executa o comando git pull
 $output = shell_exec('git pull 2>&1');
 
-// Configura o diretório como seguro para o Git
-shell_exec('git config --global --add safe.directory C:/xampp/htdocs/xuxuzinho');
-
-// Executa o comando git pull
-$output = shell_exec('git pull 2>&1');
-
 // Verifica o resultado da execução
 if (strpos($output, 'Already up to date.') !== false) {
     $mensagem = "Sistema atualizado. Nenhuma atualização pendente.";
