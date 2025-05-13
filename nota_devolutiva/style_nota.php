@@ -252,6 +252,10 @@
             border-radius: 8px;  
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);  
         }  
+
+        .dark-mode .nota-content {  
+            background-color: #2c2f33;    
+        }  
         
         .nota-metadata {  
             margin-bottom: 20px;  
@@ -290,7 +294,7 @@
         }  
 
         body.dark-mode #viewNotaModal .modal-header h5 {  
-            color: #ffffff;  
+            color: #ffffff!important;  
         }  
 
         body.dark-mode #viewNotaModal .btn-close {  
