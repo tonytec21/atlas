@@ -287,28 +287,33 @@ while($row = mysqli_fetch_assoc($result_livros)) {
     <div class="container">
 
         <div class="d-flex flex-wrap justify-content-center align-items-center text-center mb-3">  
-                <div class="col-md-auto mb-2">
-                    <button type="button" class="btn btn-success text-white" data-bs-toggle="modal" data-bs-target="#cadastroObitoModal">
-                        <i class="fa fa-plus" aria-hidden="true"></i> Novo Registro de Óbito
-                    </button>
-                </div>
-                <div class="col-md-auto mb-2">
-                    <a href="../index.php" class="btn btn-secondary text-white">
-                        <i class="fa fa-home"></i> Central de Acesso
-                    </a>
-                </div>
-                <div class="col-md-auto mb-2">
-                    <a href="../carga_crc/exportar_carga_obito.php" class="btn btn-info2 text-white">
-                        <i class="fa fa-file-export"></i> Exportar carga CRC
-                    </a>
-                </div>
+            <div class="col-md-auto mb-2">  
+                <button type="button" class="btn btn-success text-white" data-bs-toggle="modal" data-bs-target="#cadastroObitoModal">  
+                    <i class="fa fa-plus" aria-hidden="true"></i> Novo Registro de Óbito  
+                </button>  
+            </div>  
+            <div class="col-md-auto mb-2">  
+                <a href="../index.php" class="btn btn-secondary text-white">  
+                    <i class="fa fa-home"></i> Central de Acesso  
+                </a>  
+            </div>  
+            <div class="col-md-auto mb-2">  
+                <a href="../carga_crc/exportar_carga_obito.php" class="btn btn-info2 text-white">  
+                    <i class="fa fa-file-export"></i> Exportar carga CRC  
+                </a>  
+            </div>  
+            <div class="col-md-auto mb-2">  
+                <a href="indexador_xlsx_obito.php" class="btn btn-primary text-white">  
+                    <i class="fa fa-file-excel"></i> Indexar em Lote  
+                </a>  
+            </div>  
         </div> 
         <hr>
         
-            <div class="d-flex justify-content-center align-items-center text-center mb-3">
-                <h3>Indexador de Óbito</h3>
-            </div>
-            <hr>
+        <div class="d-flex justify-content-center align-items-center text-center mb-3">
+            <h3>Indexador de Óbito</h3>
+        </div>
+        <hr>
 
         <!-- Filtro de pesquisa -->
         <div class="filter-section">

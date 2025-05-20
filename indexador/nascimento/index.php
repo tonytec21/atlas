@@ -321,18 +321,28 @@ include(__DIR__ . '/../../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">  
-            <h3 class="me-auto">Indexador de Nascimento</h3>  
-            <div class="d-flex">  
-                <a style="margin: 3px;" href="../index.php" class="btn btn-outline-primary ms-3 rounded-pill shadow-sm">  
-                    <i class="fa fa-home" aria-hidden="true"></i> Central de Acesso  
+        <div class="d-flex flex-wrap justify-content-center align-items-center text-center mb-3">    
+            <div class="col-md-auto mb-2">  
+                <a href="../index.php" class="btn btn-secondary text-white">  
+                    <i class="fa fa-home"></i> Central de Acesso  
                 </a>  
-                <a style="margin: 3px;" href="../carga_crc/exportar_carga.php" class="btn btn-outline-success ms-3 rounded-pill shadow-sm">  
-                    <i class="fa fa-file-export" aria-hidden="true"></i> Exportar carga CRC  
+            </div>  
+            <div class="col-md-auto mb-2">  
+                <a href="../carga_crc/exportar_carga.php" class="btn btn-info2 text-white">  
+                    <i class="fa fa-file-export"></i> Exportar carga CRC  
+                </a>  
+            </div>  
+            <div class="col-md-auto mb-2">  
+                <a href="indexador_xlsx.php" class="btn btn-primary text-white">  
+                    <i class="fa fa-file-excel"></i> Indexar em Lote  
                 </a>  
             </div>  
         </div>   
+        <hr>  
 
+        <div class="d-flex justify-content-center align-items-center text-center mb-3">  
+            <h3>Indexador de Nascimento</h3>  
+        </div>  
         <hr>
 
         <!-- Formulário de Pesquisa e Filtros -->
@@ -376,7 +386,7 @@ include(__DIR__ . '/../../menu.php');
                 <button id="filter-button" class="btn btn-primary w-100"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
             </div>
             <div class="col-md-6 col-lg-3 mb-2">
-                <button class="btn btn-add w-100" data-toggle="modal" data-target="#addRegistryModal"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar</button>
+                <button class="btn btn-add w-100" data-toggle="modal" data-target="#addRegistryModal"><i class="fa fa-plus" aria-hidden="true"></i> Novo Registro de Nascimento</button>
             </div>
         </div>
         <hr>
