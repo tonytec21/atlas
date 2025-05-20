@@ -9,7 +9,7 @@ date_default_timezone_set('America/Sao_Paulo');
 <head>  
     <meta charset="UTF-8">  
     <meta name="viewport" content="width=device-width, initial-scale=1.0">  
-    <title>Atlas - Indexador TXT</title>  
+    <title>Atlas - Indexador XLSX</title>  
     <link rel="stylesheet" href="../../style/css/bootstrap.min.css">  
     <link rel="stylesheet" href="../../style/css/font-awesome.min.css">  
     <link rel="stylesheet" href="../../style/css/style.css">  
@@ -32,25 +32,25 @@ date_default_timezone_set('America/Sao_Paulo');
 <body>  
 <?php include(__DIR__ . '/../../menu.php'); ?>  
 <div id="main" class="main-content">  
-    <div class="container"> 
+    <div class="container">   
         <div class="d-flex flex-wrap justify-content-center align-items-center text-center mb-1">  
-                <div class="col-md-auto mb-2">
-                    <a href="index.php" class="btn btn-secondary text-white">
-                        <i class="fa fa-home"></i> Indexador
-                    </a>
-                </div>
-        </div> 
-        <hr>
+                <div class="col-md-auto mb-2">  
+                    <a href="index.php" class="btn btn-secondary text-white">  
+                        <i class="fa fa-home"></i> Indexador  
+                    </a>  
+                </div>  
+        </div>   
+        <hr>  
         <div class="d-flex justify-content-center align-items-center text-center mb-3">  
-            <h3>Indexador de Arquivos TXT - Nascimento</h3>  
+            <h3>Indexador de Arquivos XLSX - Nascimento</h3>  
         </div>  
-        <hr> 
+        <hr>   
 
         <div class="mb-4">  
             <div id="dropzoneForm" class="dropzone">  
                 <div class="dz-message needsclick">  
                     <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>  
-                    <div class="text">Arraste e solte arquivos TXT aqui<br><span class="file-info">ou clique para selecionar</span></div>  
+                    <div class="text">Arraste e solte arquivos XLSX aqui<br><span class="file-info">ou clique para selecionar</span></div>  
                 </div>  
             </div>  
         </div>  
@@ -83,13 +83,13 @@ $(document).ready(function() {
         url: "#", // Impedimos o upload automático  
         autoProcessQueue: false,  
         addRemoveLinks: true,  
-        acceptedFiles: "text/plain",  
+        acceptedFiles: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel",  
         maxFilesize: 10, // MB  
         parallelUploads: 10,  
         dictDefaultMessage: "Arraste e solte arquivos aqui para upload",  
         dictFallbackMessage: "Seu navegador não suporta arrastar e soltar arquivos para upload.",  
         dictFileTooBig: "Arquivo muito grande ({{filesize}}MB). Tamanho máximo: {{maxFilesize}}MB.",  
-        dictInvalidFileType: "Este tipo de arquivo não é permitido. Apenas arquivos TXT são aceitos.",  
+        dictInvalidFileType: "Este tipo de arquivo não é permitido. Apenas arquivos XLSX são aceitos.",  
         dictRemoveFile: "Remover",  
         dictMaxFilesExceeded: "Não é possível carregar mais arquivos.",  
         init: function() {  
@@ -183,7 +183,7 @@ $(document).ready(function() {
             $(".progress-text").text(progress + "%");  
             
             $.ajax({  
-                url: 'processar_txt.php',  
+                url: 'processar_xlsx.php',  
                 type: 'POST',  
                 data: formData,  
                 processData: false,  
