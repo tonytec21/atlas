@@ -428,6 +428,10 @@ include(__DIR__ . '/db_connection.php');
                             $sql .= ' GROUP BY funcionario, DATE(data)';
                         }
 
+                        $sql .= $filtered
+                            ? ' ORDER BY DATE(data) DESC'           
+                            : ' ORDER BY DATE(data) DESC LIMIT 50'; 
+
                         $stmt = $conn->prepare($sql);
                         foreach ($params as $key => $value) {
                             $stmt->bindValue($key, $value);
