@@ -106,20 +106,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('COMPLEMENTOLOGRADOURO', '');  
             $registro->addChild('BAIRRO', '');  
 
-            $beneficio = $registro->addChild('BENEFICIOS_PREVIDENCIARIOS');  
-            $beneficio->addChild('INDICEREGISTRO', $row['id']);  
-            $beneficio->addChild('NUMEROBENEFICIO', '');  
+            // $beneficio = $registro->addChild('BENEFICIOS_PREVIDENCIARIOS');  
+            // $beneficio->addChild('INDICEREGISTRO', $row['id']);  
+            // $beneficio->addChild('NUMEROBENEFICIO', '');  
 
-            $documento = $registro->addChild('DOCUMENTOS');  
-            $documento->addChild('INDICEREGISTRO', $row['id']);  
-            $documento->addChild('DONO', 'FALECIDO');  
-            $documento->addChild('TIPO_DOC', '');  
-            $documento->addChild('DESCRICAO', '');  
-            $documento->addChild('NUMERO', '');  
-            $documento->addChild('NUMERO_SERIE', '');  
-            $documento->addChild('CODIGOORGAOEMISSOR', '');  
-            $documento->addChild('UF_EMISSAO', '');  
-            $documento->addChild('DATA_EMISSAO', '');  
+            // $documento = $registro->addChild('DOCUMENTOS');  
+            // $documento->addChild('INDICEREGISTRO', $row['id']);  
+            // $documento->addChild('DONO', 'FALECIDO');  
+            // $documento->addChild('TIPO_DOC', '');  
+            // $documento->addChild('DESCRICAO', '');  
+            // $documento->addChild('NUMERO', '');  
+            // $documento->addChild('NUMERO_SERIE', '');  
+            // $documento->addChild('CODIGOORGAOEMISSOR', '');  
+            // $documento->addChild('UF_EMISSAO', '');  
+            // $documento->addChild('DATA_EMISSAO', '');  
 
             $registro->addChild('TIPOLOCALOBITO', 'IGNORADO');  
             $registro->addChild('TIPOMORTE', 'IGNORADA');  
