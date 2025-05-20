@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
                 }  
             } catch (Exception $e) {  
                 $registro->addChild('IDADE', '0');  
-                $registro->addChild('IDADE_DIAS_MESES_ANOS', 'I');  
+                $registro->addChild('IDADE_DIAS_MESES_ANOS', ''); // Trocado 'I' por '' (vazio)  
             }  
 
             $registro->addChild('ELEITOR', 'I');  
@@ -95,7 +95,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('NACIONALIDADE', '076');  
             $registro->addChild('CODIGOIBGEMUNNATURALIDADE', '');  
             $registro->addChild('TEXTOLIVREMUNICIPIONAT', 'NAO DECLARADO');  
-            $registro->addChild('CODIGOIBGEMUNLOGRADOURO', valorOuPadrao($row['ibge_cidade_endereco'], 'NAO DECLARADO'));  
+            
+            // Deixando vazio em vez de usar "NAO DECLARADO"  
+            $codigoIbge = !empty($row['ibge_cidade_endereco']) ? $row['ibge_cidade_endereco'] : '';  
+            $registro->addChild('CODIGOIBGEMUNLOGRADOURO', $codigoIbge);  
+            
             $registro->addChild('DOMICILIOESTRANGEIROFALECIDO', '');  
             $registro->addChild('LOGRADOURO', '');  
             $registro->addChild('NUMEROLOGRADOURO', '');  
@@ -122,7 +126,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('NUMDECLARACAOOBITO', '');  
             $registro->addChild('NUMDECLARACAOOBITOIGNORADA', 'S');  
             $registro->addChild('PAISOBITO', '076');  
-            $registro->addChild('CODIGOIBGEMUNLOGRADOUROOBITO', valorOuPadrao($row['ibge_cidade_obito'], 'NAO DECLARADO'));  
+            
+            // Deixando vazio em vez de usar "NAO DECLARADO"  
+            $codigoIbgeObito = !empty($row['ibge_cidade_obito']) ? $row['ibge_cidade_obito'] : '';  
+            $registro->addChild('CODIGOIBGEMUNLOGRADOUROOBITO', $codigoIbgeObito);  
+            
             $registro->addChild('ENDERECOLOCALOBITOESTRANGEIRO', '');  
             $registro->addChild('LOGRADOUROOBITO', '');  
             $registro->addChild('NUMEROLOGRADOUROOBITO', '');  
