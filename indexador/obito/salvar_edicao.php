@@ -85,7 +85,7 @@ if (!$stmt = $conn->prepare($sql)) {
 }
 
 $stmt->bind_param(
-    "sssssssssssssssssi",
+    "ssssssssssssssssi",
     $livro, $folha, $termo, $data_registro, $data_obito, $hora_obito,
     $nome_registrado, $data_nascimento, $nome_pai, $nome_mae, $cidade_endereco,
     $ibge_cidade_endereco, $cidade_obito, $ibge_cidade_obito, $funcionario,
