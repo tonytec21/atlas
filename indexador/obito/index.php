@@ -3,6 +3,16 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
+
+// Buscar todos os livros distintos  
+$query_livros = "SELECT DISTINCT livro FROM indexador_obito WHERE status = 'A' ORDER BY livro ASC";  
+$result_livros = mysqli_query($conn, $query_livros);  
+$livros = [];  
+while($row = mysqli_fetch_assoc($result_livros)) {  
+    if(!empty($row['livro'])) {  
+        $livros[] = $row['livro'];  
+    }  
+}  
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -322,9 +332,16 @@ date_default_timezone_set('America/Sao_Paulo');
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-md-2 mb-2">
-                        <label for="livro" class="form-label">Livro</label>
-                        <input type="text" id="livro" name="livro" class="form-control">
+                    <div class="col-md-2 mb-2">  
+                        <label for="livro" class="form-label">Livro</label>  
+                        <select id="livro" name="livro" class="form-control">  
+                            <option value="">Todos</option>  
+                            <?php foreach($livros as $livro): ?>  
+                                <option value="<?php echo htmlspecialchars($livro); ?>" <?php echo (isset($_POST['livro']) && $_POST['livro'] == $livro) ? 'selected' : ''; ?>>  
+                                    <?php echo htmlspecialchars($livro); ?>  
+                                </option>  
+                            <?php endforeach; ?>  
+                        </select>  
                     </div>
                     <div class="col-md-2 mb-2">
                         <label for="termo" class="form-label">Termo</label>
