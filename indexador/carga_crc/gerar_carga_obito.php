@@ -52,7 +52,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('SEXO', 'I');  
             $registro->addChild('CORPELE', 'IGNORADA');  
             $registro->addChild('ESTADOCIVIL', 'IGNORADO');  
-            $registro->addChild('DATANASCIMENTOFALECIDO', formatarData($row['data_nascimento']));  
+            
+            // Verifica se a data de nascimento é válida antes de adicionar ao XML  
+            if (!empty($row['data_nascimento']) && $row['data_nascimento'] != '0000-00-00' && strtotime($row['data_nascimento']) > 0) {  
+                $registro->addChild('DATANASCIMENTOFALECIDO', formatarData($row['data_nascimento']));  
+            } else {  
+                // Adiciona o elemento vazio  
+                $registro->addChild('DATANASCIMENTOFALECIDO');  
+            }  
 
             try {  
                 // Verificar se as datas são válidas antes de calcular a idade  
@@ -85,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
                 }  
             } catch (Exception $e) {  
                 $registro->addChild('IDADE', '0');  
-                $registro->addChild('IDADE_DIAS_MESES_ANOS', ''); // Trocado 'I' por '' (vazio)  
+                $registro->addChild('IDADE_DIAS_MESES_ANOS', '');  
             }  
 
             $registro->addChild('ELEITOR', 'I');  
@@ -105,21 +112,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('NUMEROLOGRADOURO', '');  
             $registro->addChild('COMPLEMENTOLOGRADOURO', '');  
             $registro->addChild('BAIRRO', '');  
-
-            // $beneficio = $registro->addChild('BENEFICIOS_PREVIDENCIARIOS');  
-            // $beneficio->addChild('INDICEREGISTRO', $row['id']);  
-            // $beneficio->addChild('NUMEROBENEFICIO', '');  
-
-            // $documento = $registro->addChild('DOCUMENTOS');  
-            // $documento->addChild('INDICEREGISTRO', $row['id']);  
-            // $documento->addChild('DONO', 'FALECIDO');  
-            // $documento->addChild('TIPO_DOC', '');  
-            // $documento->addChild('DESCRICAO', '');  
-            // $documento->addChild('NUMERO', '');  
-            // $documento->addChild('NUMERO_SERIE', '');  
-            // $documento->addChild('CODIGOORGAOEMISSOR', '');  
-            // $documento->addChild('UF_EMISSAO', '');  
-            // $documento->addChild('DATA_EMISSAO', '');  
 
             $registro->addChild('TIPOLOCALOBITO', 'IGNORADO');  
             $registro->addChild('TIPOMORTE', 'IGNORADA');  
