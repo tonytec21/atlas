@@ -120,7 +120,7 @@ $lineHeight = 10 * 0.5;
 
 // Cidade e data
 $pdf->SetFont('helvetica', '', 12);
-$pdf->Cell(0, $lineHeight, $serventiaData['cidade'] . ', ' . formatDateToBrazilian($oficioData['data']), 0, 1, 'R');
+$pdf->Cell(0, $lineHeight, $serventiaData['cidade'] . ', ' . formatDateToBrazilian($oficioData['data']).'.', 0, 1, 'R');
 $pdf->Ln(3);
 
 // Caminho para o arquivo configuracao.json
