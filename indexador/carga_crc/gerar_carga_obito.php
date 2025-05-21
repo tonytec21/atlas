@@ -41,12 +41,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('CPFFALECIDO', '');  
             $registro->addChild('MATRICULA', valorOuPadrao($row['matricula']));  
             $registro->addChild('DATAREGISTRO', formatarData($row['data_registro']));  
-            $registro->addChild('NOMEPAI', valorOuPadrao($row['nome_pai'], 'IGNORADO'));  
-            $registro->addChild('CPFPAI', '');  
-            $registro->addChild('SEXOPAI', 'M');  
-            $registro->addChild('NOMEMAE', valorOuPadrao($row['nome_mae'], 'IGNORADA'));  
-            $registro->addChild('CPFMAE', '');  
-            $registro->addChild('SEXOMAE', 'F');  
+            
+            // Adiciona informações do pai apenas se existirem  
+            if (!empty($row['nome_pai'])) {  
+                $registro->addChild('NOMEPAI', $row['nome_pai']);  
+                $registro->addChild('CPFPAI', '');  
+                $registro->addChild('SEXOPAI', 'M');  
+            }  
+            
+            // Adiciona informações da mãe apenas se existirem  
+            if (!empty($row['nome_mae'])) {  
+                $registro->addChild('NOMEMAE', $row['nome_mae']);  
+                $registro->addChild('CPFMAE', '');  
+                $registro->addChild('SEXOMAE', 'F');  
+            }  
+            
             $registro->addChild('DATAOBITO', formatarData($row['data_obito']));  
             $registro->addChild('HORAOBITO', substr(valorOuPadrao($row['hora_obito'], '00:00'), 0, 5));  
             $registro->addChild('SEXO', 'I');  
