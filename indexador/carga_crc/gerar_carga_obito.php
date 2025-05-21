@@ -20,6 +20,10 @@ function formatarData($data) {
     return date('d/m/Y', strtotime($data));  
 }  
 
+function valorOuVazio($valor) {  
+    return !empty($valor) ? htmlspecialchars($valor) : '';  
+}  
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {  
     $ids = implode(",", array_map('intval', $_POST['selected_ids']));  
     $query = "SELECT * FROM indexador_obito WHERE id IN ($ids) AND status = 'A'";  
@@ -42,19 +46,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('MATRICULA', valorOuPadrao($row['matricula']));  
             $registro->addChild('DATAREGISTRO', formatarData($row['data_registro']));  
             
-            // Adiciona as tags de pai apenas se existir informação  
-            if (!empty($row['nome_pai'])) {  
-                $registro->addChild('NOMEPAI', htmlspecialchars($row['nome_pai']));  
-                $registro->addChild('CPFPAI', '');  
-                $registro->addChild('SEXOPAI', 'M');  
-            }  
+            // Adiciona NOMEPAI com valor vazio se não existir  
+            $registro->addChild('NOMEPAI', valorOuVazio($row['nome_pai']));  
+            $registro->addChild('CPFPAI', '');  
+            $registro->addChild('SEXOPAI', 'M');  
             
-            // Adiciona as tags de mãe apenas se existir informação  
-            if (!empty($row['nome_mae'])) {  
-                $registro->addChild('NOMEMAE', htmlspecialchars($row['nome_mae']));  
-                $registro->addChild('CPFMAE', '');  
-                $registro->addChild('SEXOMAE', 'F');  
-            }  
+            // Adiciona NOMEMAE com valor vazio se não existir  
+            $registro->addChild('NOMEMAE', valorOuVazio($row['nome_mae']));  
+            $registro->addChild('CPFMAE', '');  
+            $registro->addChild('SEXOMAE', 'F');  
             
             $registro->addChild('DATAOBITO', formatarData($row['data_obito']));  
             $registro->addChild('HORAOBITO', substr(valorOuPadrao($row['hora_obito'], '00:00'), 0, 5));  
