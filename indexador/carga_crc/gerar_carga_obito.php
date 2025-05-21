@@ -46,15 +46,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('MATRICULA', valorOuPadrao($row['matricula']));  
             $registro->addChild('DATAREGISTRO', formatarData($row['data_registro']));  
             
-            // Adiciona NOMEPAI com valor vazio se não existir  
+            // Adiciona as tags de pai com valor vazio se não existir  
             $registro->addChild('NOMEPAI', valorOuVazio($row['nome_pai']));  
             $registro->addChild('CPFPAI', '');  
-            $registro->addChild('SEXOPAI', 'M');  
+            if (!empty($row['nome_pai'])) {  
+                $registro->addChild('SEXOPAI', 'M');  
+            } else {  
+                $registro->addChild('SEXOPAI', '');  
+            }  
             
-            // Adiciona NOMEMAE com valor vazio se não existir  
+            // Adiciona as tags de mãe com valor vazio se não existir  
             $registro->addChild('NOMEMAE', valorOuVazio($row['nome_mae']));  
             $registro->addChild('CPFMAE', '');  
-            $registro->addChild('SEXOMAE', 'F');  
+            if (!empty($row['nome_mae'])) {  
+                $registro->addChild('SEXOMAE', 'F');  
+            } else {  
+                $registro->addChild('SEXOMAE', '');  
+            }  
             
             $registro->addChild('DATAOBITO', formatarData($row['data_obito']));  
             $registro->addChild('HORAOBITO', substr(valorOuPadrao($row['hora_obito'], '00:00'), 0, 5));  
