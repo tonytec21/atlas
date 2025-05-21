@@ -42,16 +42,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_ids'])) {
             $registro->addChild('MATRICULA', valorOuPadrao($row['matricula']));  
             $registro->addChild('DATAREGISTRO', formatarData($row['data_registro']));  
             
-            // Adiciona informações do pai apenas se existirem  
+            // Adiciona as tags de pai apenas se existir informação  
             if (!empty($row['nome_pai'])) {  
-                $registro->addChild('NOMEPAI', $row['nome_pai']);  
+                $registro->addChild('NOMEPAI', htmlspecialchars($row['nome_pai']));  
                 $registro->addChild('CPFPAI', '');  
                 $registro->addChild('SEXOPAI', 'M');  
             }  
             
-            // Adiciona informações da mãe apenas se existirem  
+            // Adiciona as tags de mãe apenas se existir informação  
             if (!empty($row['nome_mae'])) {  
-                $registro->addChild('NOMEMAE', $row['nome_mae']);  
+                $registro->addChild('NOMEMAE', htmlspecialchars($row['nome_mae']));  
                 $registro->addChild('CPFMAE', '');  
                 $registro->addChild('SEXOMAE', 'F');  
             }  
