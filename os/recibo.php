@@ -95,18 +95,22 @@ if (isset($_GET['id'])) {
     $logged_in_user_cargo = $logged_in_user_info['cargo'];
 
     // Obter soma dos pagamentos da tabela pagamento_os e a data do último pagamento
-    $pagamentos_query = $conn->prepare("SELECT SUM(total_pagamento) as total_pagamentos, MAX(data_pagamento) as ultima_data_pagamento FROM pagamento_os WHERE ordem_de_servico_id = ?");
+    $pagamentos_query = $conn->prepare("SELECT * FROM pagamento_os WHERE ordem_de_servico_id = ?");
     $pagamentos_query->bind_param("i", $os_id);
     $pagamentos_query->execute();
     $pagamentos_result = $pagamentos_query->get_result();
-    $pagamentos_data = $pagamentos_result->fetch_assoc();
-    $total_pagamentos = $pagamentos_data['total_pagamentos'];
-    $ultima_data_pagamento = $pagamentos_data['ultima_data_pagamento'];
+    $pagamentos = $pagamentos_result->fetch_all(MYSQLI_ASSOC);
+
+    // Calcular total dos pagamentos
+    $total_pagamentos = 0;
+    foreach ($pagamentos as $pagamento) {
+        $total_pagamentos += $pagamento['total_pagamento'];
+    }
 
     // Calcular saldo
     $saldo = $total_pagamentos - $ordem_servico['total_os'];
 
-    // Obter soma dos valores devolvidos da tabela devolucao_os
+    // Obter total devoluções
     $devolucoes_query = $conn->prepare("SELECT SUM(total_devolucao) as total_devolucoes FROM devolucao_os WHERE ordem_de_servico_id = ?");
     $devolucoes_query->bind_param("i", $os_id);
     $devolucoes_query->execute();
@@ -120,12 +124,6 @@ if (isset($_GET['id'])) {
     $repasses_result = $repasses_query->get_result();
     $total_repasses = $repasses_result->fetch_assoc()['total_repasses'];
 
-    // Obter informações das contas bancárias
-    $contas_query = $conn->prepare("SELECT banco, agencia, tipo_conta, numero_conta, titular_conta, cpf_cnpj_titular, chave_pix, qr_code_pix FROM configuracao_os WHERE status = 'ativa'");
-    $contas_query->execute();
-    $contas_result = $contas_query->get_result();
-    $contas = $contas_result->fetch_all(MYSQLI_ASSOC);
-
     // Obter informações da serventia
     $serventia_query = $conn->prepare("SELECT razao_social FROM cadastro_serventia WHERE id = 1");
     $serventia_query->execute();
@@ -134,10 +132,10 @@ if (isset($_GET['id'])) {
 
     $pdf = new PDF('P', 'mm', array(80, 297));
     $pdf->SetMargins(1, 1, 10);
-    $pdf->setCriadoPor($criado_por_nome); // Define o nome do usuário que criou a OS
-    $pdf->setServentia($serventia); // Define o nome da serventia
+    $pdf->setCriadoPor($criado_por_nome);
+    $pdf->setServentia($serventia);
     $pdf->AddPage();
-    $pdf->SetFont('helvetica', '', 9); // Ajuste de fonte e tamanho
+    $pdf->SetFont('helvetica', '', 9);
 
     // Adicionar o cabeçalho apenas como início do conteúdo
     $pdf->addHeaderContent();
@@ -156,8 +154,8 @@ if (isset($_GET['id'])) {
     $pdf->Ln(0);
 
     $pdf->SetFont('helvetica', 'B', 8);
-    $data_pagamento = !empty($ultima_data_pagamento) ? date('d/m/Y - H:i', strtotime($ultima_data_pagamento)) : 'Data não disponível';
-    $pdf->writeHTML('<div style="text-align: left;">'.'DATA DO PAGAMENTO: '. $data_pagamento .'</div>', true, false, true, false, '');
+    $data_recibo = date('d/m/Y - H:i'); 
+    $pdf->writeHTML('<div style="text-align: left;">'.'DATA DO RECIBO: '. $data_recibo .'</div>', true, false, true, false, '');
     $pdf->Ln(0);
     
     $pdf->SetFont('helvetica', 'B', 8);
@@ -176,28 +174,66 @@ if (isset($_GET['id'])) {
         $pdf->Ln(2);
     }
 
+    // Adicionar informações sobre os pagamentos realizados
+    $pdf->Ln(2);
+    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->writeHTML('<div style="text-align: center; margin-top: 10px;"><b>PAGAMENTOS REALIZADOS</b></div>', true, false, true, false, '');
+    $pdf->Ln(1);
+
+    // Função para adicionar o cabeçalho da tabela de pagamentos
+    function adicionarCabecalhoTabelaPagamentos() {
+        return '<table border="0.1" cellpadding="4">
+            <thead>
+                <tr>
+                    <th style="width: 40%; text-align: center; font-size: 7.5px;"><b>DATA</b></th>
+                    <th style="width: 30%; text-align: center; font-size: 7.5px;"><b>FORMA DE PAGAMENTO</b></th>
+                    <th style="width: 30%; text-align: center; font-size: 7.5px;"><b>VALOR</b></th>
+                </tr>
+            </thead>
+            <tbody>';
+    }
+
+    $html_pagamentos = adicionarCabecalhoTabelaPagamentos();
+
+    foreach ($pagamentos as $pagamento) {
+        $data_pagamento = date('d/m/Y - H:i', strtotime($pagamento['data_pagamento']));
+        $rowHtmlPagamento = '<tr>
+            <td style="width: 40%; font-size: 7.5px;">' . $data_pagamento . '</td>
+            <td style="width: 30%; font-size: 7.5px;">' . $pagamento['forma_de_pagamento'] . '</td>
+            <td style="width: 30%; font-size: 7.5px;">R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.') . '</td>
+        </tr>';
+
+        // Verificar a posição atual e adicionar uma nova página se necessário
+        if ($pdf->GetY() + 30 > $pdf->getPageHeight() - 30) {
+            $html_pagamentos .= '</tbody></table>';
+            $pdf->writeHTML($html_pagamentos, true, false, true, false, '');
+            $pdf->AddPage();
+            $html_pagamentos = adicionarCabecalhoTabelaPagamentos() . $rowHtmlPagamento;
+        } else {
+            $html_pagamentos .= $rowHtmlPagamento;
+        }
+    }
+
+    $html_pagamentos .= '</tbody></table>';
+    $pdf->writeHTML($html_pagamentos, true, false, true, false, '');
+
     // Adicionar as informações dos itens da OS
     $pdf->SetFont('helvetica', 'B', 9);
     $pdf->writeHTML('<div style="text-align: center; margin-top: 10px;"><b>ITENS</b></div>', true, false, true, false, '');
     $pdf->Ln(1);
 
-    // Função para adicionar o cabeçalho da tabela de itens
-    function adicionarCabecalhoTabelaItens(&$pdf) {
-        $html = '<table border="0.1" cellpadding="2">
-            <thead>
-                <tr>
-                    <th style="width: 20%; text-align: center; font-size: 8px;"><b>ATO</b></th>
-                    <th style="width: 10%; text-align: center; font-size: 8px;"><b>QTD</b></th>
-                    <th style="width: 29%; text-align: center; font-size: 8px;"><b>DESCRIÇÃO</b></th>
-                    <th style="width: 20%; text-align: center; font-size: 8px;"><b>EMOL</b></th>
-                    <th style="width: 21%; text-align: center; font-size: 8px;"><b>TOTAL</b></th>
-                </tr>
-            </thead>
-            <tbody>';
-        return $html;
-    }
-
-    $html = adicionarCabecalhoTabelaItens($pdf);
+    // Adicionar o cabeçalho da tabela de itens apenas uma vez
+    $html = '<table border="0.1" cellpadding="2">
+        <thead>
+            <tr>
+                <th style="width: 20%; text-align: center; font-size: 8px;"><b>ATO</b></th>
+                <th style="width: 10%; text-align: center; font-size: 8px;"><b>QTD</b></th>
+                <th style="width: 29%; text-align: center; font-size: 8px;"><b>DESCRIÇÃO</b></th>
+                <th style="width: 20%; text-align: center; font-size: 8px;"><b>EMOL</b></th>
+                <th style="width: 21%; text-align: center; font-size: 8px;"><b>TOTAL</b></th>
+            </tr>
+        </thead>
+        <tbody>';
 
     $total_ferc = 0;
     $total_femp = 0;
@@ -221,8 +257,18 @@ if (isset($_GET['id'])) {
             $html .= '</tbody></table>';
             $pdf->writeHTML($html, true, false, true, false, '');
             $pdf->AddPage();
-            $pdf->SetY(10); // Redefine a margem superior para a segunda página e seguintes
-            $html = adicionarCabecalhoTabelaItens($pdf) . $rowHtml;
+            $pdf->SetY(10);
+            $html = '<table border="0.1" cellpadding="2">
+                <thead>
+                    <tr>
+                        <th style="width: 20%; text-align: center; font-size: 8px;"><b>ATO</b></th>
+                        <th style="width: 10%; text-align: center; font-size: 8px;"><b>QTD</b></th>
+                        <th style="width: 29%; text-align: center; font-size: 8px;"><b>DESCRIÇÃO</b></th>
+                        <th style="width: 20%; text-align: center; font-size: 8px;"><b>EMOL</b></th>
+                        <th style="width: 21%; text-align: center; font-size: 8px;"><b>TOTAL</b></th>
+                    </tr>
+                </thead>
+                <tbody>' . $rowHtml;
         } else {
             $html .= $rowHtml;
         }
@@ -247,7 +293,7 @@ if (isset($_GET['id'])) {
     $pdf->Ln(-13);
 
     $pdf->SetFont('helvetica', 'B', 9);
-    $pdf->SetRightMargin(7); // Define a margem direita de 5 cm (aproximadamente 50mm)
+    $pdf->SetRightMargin(7);
     $pdf->writeHTML('<div style="text-align: right;">Valor Total: R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.') . '</div>', true, false, true, false, '');
     $pdf->Ln(1);
 

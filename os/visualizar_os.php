@@ -336,6 +336,21 @@ foreach ($ordem_servico_itens as $item) {
         .w-100 {
             margin-top: 15px;
         }
+
+        .btn-receipt-a4 {
+            background-color:rgb(0, 109, 152); /* Azul claro */
+            color: #FFFFFF!important; /* Texto branco */
+            border: none; /* Sem borda */
+            border-radius: 5px; /* Bordas arredondadas */
+            padding: 10px 20px; /* Espaçamento interno */
+            font-size: 16px; /* Tamanho da fonte */
+            cursor: pointer; /* Aponta o cursor quando passa o mouse */
+            transition: background-color 0.3s; /* Animação de transição */
+        }
+
+        .btn-receipt-a4:hover {
+            background-color: #1C7BBE; /* Cor mais escura ao passar o mouse */
+        }
     </style>
 </head>
 <body>
@@ -355,6 +370,11 @@ include(__DIR__ . '/../menu.php');
                 <div class="col-auto">
                     <button type="button" class="btn btn-info2 btn-print btn-sm w-100" onclick="imprimirRecibo()">
                         <i class="fa fa-print" aria-hidden="true"></i> Recibo
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-receipt-a4 btn-print btn-sm w-100" onclick="imprimirReciboA4()">
+                        <i class="fa fa-print" aria-hidden="true"></i> Recibo A4
                     </button>
                 </div>
                 <div class="col-auto">
@@ -1017,6 +1037,11 @@ include(__DIR__ . '/../menu.php');
     function imprimirRecibo() {
         window.open('recibo.php?id=<?php echo $os_id; ?>', '_blank');
     }
+
+    function imprimirReciboA4() {
+        window.open('recibo_a4.php?id=<?php echo $os_id; ?>', '_blank');
+    }
+
 
     function editarOS() {
         window.location.href = 'editar_os.php?id=<?php echo $os_id; ?>';
