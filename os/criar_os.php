@@ -489,9 +489,6 @@ function buscarAto() {
 /* ===================================================================
    Cálculo automático do ISS – cria ou atualiza a linha fixa na tabela
    ===================================================================*/
-/* ===================================================================
-   Cálculo / atualização automática do ISS **e** do total da OS
-   ===================================================================*/
 function atualizarISS () {
 
     /* 1. Emolumentos de todos os itens que NÃO são ISS */
