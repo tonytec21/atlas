@@ -2,6 +2,9 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+$issCfg        = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);
+$issAtivo      = !empty($issCfg['ativo']);
+$issPercentual = isset($issCfg['percentual']) ? (float)$issCfg['percentual'] : 0;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $os_id = $_POST['os_id'];
@@ -28,6 +31,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bindParam(':base_calculo', $base_calculo);
         $stmt->bindParam(':id', $os_id);
         $stmt->execute();
+
+        /* ------------------------------------------------------------------
+        Se o ISS estiver ativado na configuração, recalcule e atualize
+        a linha correspondente (ato = 'ISS') sem criar linhas novas.
+        ------------------------------------------------------------------*/
+        if ($issAtivo) {
+            /* 1. Soma dos emolumentos dos demais itens (exclui 'ISS') */
+            $somaEmol = $conn->prepare("
+                SELECT COALESCE(SUM(emolumentos),0) AS total
+                FROM   ordens_de_servico_itens
+                WHERE  ordem_servico_id = :os_id
+                AND  ato <> 'ISS'
+            ");
+            $somaEmol->bindParam(':os_id', $os_id);
+            $somaEmol->execute();
+            $totalEmol = (float)$somaEmol->fetchColumn();
+
+            /* 2. Cálculo do ISS */
+            $baseISS  = $totalEmol * 0.88;
+            $valorISS = $baseISS * ($issPercentual / 100);
+
+            /* 3. Atualiza a linha existente (se houver)             */
+            $updISS = $conn->prepare("
+                UPDATE ordens_de_servico_itens
+                SET emolumentos = :valor_emol,
+                    total       = :valor_total
+                WHERE ordem_servico_id = :os_id
+                AND ato = 'ISS'
+                LIMIT 1
+            ");
+            $updISS->bindParam(':valor_emol',  $valorISS);
+            $updISS->bindParam(':valor_total', $valorISS);
+            $updISS->bindParam(':os_id',       $os_id);
+            $updISS->execute();
+        }
 
         // Confirma a transação
         $conn->commit();

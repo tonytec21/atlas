@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $total_valor *= $factor;
                 }
 
-                if (!in_array($item['ato'], ['0', '00', '9999'])) {
+                if (!in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
                     $stmt_insert = $conn->prepare(
                         "INSERT INTO atos_liquidados 
                         (ordem_servico_id, ato, quantidade_liquidada, desconto_legal, descricao, emolumentos, 

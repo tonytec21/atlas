@@ -2,6 +2,11 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+
+$issConfig     = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);
+$issAtivo      = !empty($issConfig['ativo']);
+$issPercentual = isset($issConfig['percentual']) ? (float)$issConfig['percentual'] : 0;
+$issDescricao  = isset($issConfig['descricao'])   ? $issConfig['descricao']         : 'ISS sobre Emolumentos';
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -179,7 +184,13 @@ include(__DIR__ . '/../menu.php');
                 </tbody>
             </table>
         </div>
-        <button type="button" style="width: 100%;" class="btn btn btn-secondary btn-block" onclick="adicionarISS()"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar ISS</button>
+        <!-- <?php if (!$issAtivo): ?>
+            <button type="button" style="width:100%;" class="btn btn-secondary btn-block"
+                    onclick="adicionarISS()">
+                <i class="fa fa-plus" aria-hidden="true"></i> Adicionar ISS
+            </button>
+        <?php endif; ?> -->
+
         <hr>
         <div class="form-group">
             <label for="observacoes">Observações:</label>
@@ -217,6 +228,12 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/sweetalert2.js"></script>
 
 <script>
+    const ISS_CONFIG = {
+        ativo: <?php echo $issAtivo ? 'true' : 'false'; ?>,
+        percentual: <?php echo $issPercentual; ?>,
+        descricao: "<?php echo addslashes($issDescricao); ?>"
+    };
+
     $(document).ready(function() {
     // Inicializa a funcionalidade de arrastar e soltar na tabela de itens
     $("#itensTable").sortable({
@@ -386,10 +403,11 @@ $(document).ready(function() {
             '</tr>';
             
         $('#itensTable').append(item);
+        atualizarISS(); 
         
-        var totalOS = parseFloat($('#total_os').val().replace(/\./g, '').replace(',', '.')) || 0;
-        totalOS += total;
-        $('#total_os').val(totalOS.toFixed(2).replace('.', ','));
+        // var totalOS = parseFloat($('#total_os').val().replace(/\./g, '').replace(',', '.')) || 0;
+        // totalOS += total;
+        // $('#total_os').val(totalOS.toFixed(2).replace('.', ','));
 
         $('#ato').val('');
         $('#quantidade').val('1');
@@ -428,10 +446,10 @@ function buscarAto() {
     $.ajax({
         url: 'buscar_ato.php',
         type: 'GET',
-        dataType: 'json', // Força a resposta a ser tratada como JSON
+        dataType: 'json', 
         data: { ato: ato },
         success: function(response) {
-            console.log('Resposta do servidor:', response); // Log da resposta do servidor
+            console.log('Resposta do servidor:', response);
 
             if (response.error) {
                 showAlert(response.error, 'error');
@@ -468,36 +486,58 @@ function buscarAto() {
     });
 }
 
-function adicionarISS() {
-    var totalEmolumentos = 0;
-    $('#itensTable tr').each(function() {
-        var emolumentos = parseFloat($(this).find('td').eq(5).text().replace(/\./g, '').replace(',', '.')) || 0;
-        totalEmolumentos += emolumentos;
+/* ===================================================================
+   Cálculo automático do ISS – cria ou atualiza a linha fixa na tabela
+   ===================================================================*/
+function atualizarISS () {
+    if (!ISS_CONFIG.ativo) return;        // se não estiver ativo, sai
+
+    // 1. Soma de emolumentos (coluna 5) – ignora a própria linha do ISS
+    let totalEmol = 0;
+    $('#itensTable tr').each(function () {
+        if ($(this).data('tipo') !== 'iss') {
+            totalEmol += parseFloat($(this).find('td').eq(5).text()
+                                    .replace(/\./g, '').replace(',', '.')) || 0;
+        }
     });
 
-    var baseISS = totalEmolumentos * 0.88; 
-    var valorISS = baseISS * 0.05;
+    // 2. Cálculo
+    const baseISS  = totalEmol * 0.88;
+    const valorISS = baseISS * (ISS_CONFIG.percentual / 100);
 
-    var item = '<tr>' +
-        '<td>#</td>' +
-        '<td>ISS</td>' +
-        '<td>1</td>' +
-        '<td>0%</td>' +
-        '<td>ISS sobre Emolumentos</td>' +
-        '<td>' + valorISS.toFixed(2).replace('.', ',') + '</td>' +
-        '<td>0,00</td>' +
-        '<td>0,00</td>' +
-        '<td>0,00</td>' +
-        '<td>' + valorISS.toFixed(2).replace('.', ',') + '</td>' +
-        '<td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="removerItem(this)"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +
-        '</tr>';
+    // 3. Cria ou atualiza a linha fixa
+    let $linhaISS = $('#ISS_ROW');
+    if ($linhaISS.length === 0) {
+        const ordem = $('#itensTable tr').length + 1;
+        $('#itensTable').append(`
+            <tr id="ISS_ROW" data-tipo="iss">
+                <td>${ordem}</td>
+                <td>ISS</td>
+                <td>1</td>
+                <td>0%</td>
+                <td>${ISS_CONFIG.descricao}</td>
+                <td>${valorISS.toFixed(2).replace('.', ',')}</td>
+                <td>0,00</td>
+                <td>0,00</td>
+                <td>0,00</td>
+                <td>${valorISS.toFixed(2).replace('.', ',')}</td>
+                <td><span class="text-muted" title="Item fixo">
+                        <i class="fa fa-lock"></i></span></td>
+            </tr>`);
+    } else {
+        $linhaISS.find('td').eq(5).text(valorISS.toFixed(2).replace('.', ','));
+        $linhaISS.find('td').eq(9).text(valorISS.toFixed(2).replace('.', ','));
+    }
 
-    $('#itensTable').append(item);
-
-    var totalOS = parseFloat($('#total_os').val().replace(/\./g, '').replace(',', '.')) || 0;
-    totalOS += valorISS;
+    // 4. Atualiza o total da OS
+    let totalOS = 0;
+    $('#itensTable tr').each(function () {
+        totalOS += parseFloat($(this).find('td').eq(9).text()
+                              .replace(/\./g, '').replace(',', '.')) || 0;
+    });
     $('#total_os').val(totalOS.toFixed(2).replace('.', ','));
 }
+
 
 function adicionarAtoManual() {
     $('#descricao').prop('readonly', false);
@@ -517,8 +557,7 @@ function removerItem(button) {
     $('#total_os').val(totalOS.toFixed(2).replace('.', ','));
 
     row.remove();
-
-    // Atualiza a ordem de exibição após a remoção de um item
+    atualizarISS();
     atualizarOrdemExibicao();
 }
 
@@ -654,7 +693,7 @@ function validarCNPJ(cnpj) {
 
 
 function carregarModeloSelecionado() {
-    var idModelo = $('#modelo_orcamento').val();
+    const idModelo = $('#modelo_orcamento').val();
     if (!idModelo) return;
 
     $.ajax({
@@ -662,52 +701,55 @@ function carregarModeloSelecionado() {
         type: 'GET',
         data: { id: idModelo },
         dataType: 'json',
-        success: function(response) {
+        success: function (response) {
             if (response.error) {
                 showAlert(response.error, 'error');
-            } else if (response.itens) {
-                // Para cada item, inserir na tabela de itens da OS
-                response.itens.forEach(function(item) {
-                    // Precisamos converter strings para formato numérico
-                    let emolumentos = parseFloat((item.emolumentos || "0").replace(',', '.'));
-                    let ferc       = parseFloat((item.ferc        || "0").replace(',', '.'));
-                    let fadep      = parseFloat((item.fadep       || "0").replace(',', '.'));
-                    let femp       = parseFloat((item.femp        || "0").replace(',', '.'));
-                    let total      = parseFloat((item.total       || "0").replace(',', '.'));
+                return;
+            }
 
-                    // Descobrimos qual a ordem do próximo item
-                    var ordemExibicao = $('#itensTable tr').length + 1;
+            if (response.itens) {
+                /* ----------------------------------------------------------
+                   Para cada item do modelo, acrescenta-o à tabela de itens
+                   ----------------------------------------------------------*/
+                response.itens.forEach(function (item) {
+                    const emolumentos = parseFloat((item.emolumentos || '0').replace(',', '.'));
+                    const ferc        = parseFloat((item.ferc        || '0').replace(',', '.'));
+                    const fadep       = parseFloat((item.fadep       || '0').replace(',', '.'));
+                    const femp        = parseFloat((item.femp        || '0').replace(',', '.'));
+                    const total       = parseFloat((item.total       || '0').replace(',', '.'));
 
-                    // Montamos a linha
-                    var row = `
-                    <tr>
-                        <td>${ordemExibicao}</td>
-                        <td>${item.ato}</td>
-                        <td>${item.quantidade}</td>
-                        <td>${item.desconto_legal}%</td>
-                        <td>${item.descricao}</td>
-                        <td>${emolumentos.toFixed(2).replace('.', ',')}</td>
-                        <td>${ferc.toFixed(2).replace('.', ',')}</td>
-                        <td>${fadep.toFixed(2).replace('.', ',')}</td>
-                        <td>${femp.toFixed(2).replace('.', ',')}</td>
-                        <td>${total.toFixed(2).replace('.', ',')}</td>
-                        <td>
-                            <button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="removerItem(this)">
-                                <i class="fa fa-trash" aria-hidden="true"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    `;
+                    const ordemExibicao = $('#itensTable tr').length + 1;
+
+                    const row = `
+                        <tr>
+                            <td>${ordemExibicao}</td>
+                            <td>${item.ato}</td>
+                            <td>${item.quantidade}</td>
+                            <td>${item.desconto_legal}%</td>
+                            <td>${item.descricao}</td>
+                            <td>${emolumentos.toFixed(2).replace('.', ',')}</td>
+                            <td>${ferc.toFixed(2).replace('.', ',')}</td>
+                            <td>${fadep.toFixed(2).replace('.', ',')}</td>
+                            <td>${femp.toFixed(2).replace('.', ',')}</td>
+                            <td>${total.toFixed(2).replace('.', ',')}</td>
+                            <td>
+                                <button type="button" title="Remover"
+                                        class="btn btn-delete btn-sm"
+                                        onclick="removerItem(this)">
+                                    <i class="fa fa-trash" aria-hidden="true"></i>
+                                </button>
+                            </td>
+                        </tr>`;
                     $('#itensTable').append(row);
-
-                    // Atualizar o total da OS
-                    var valorOS = parseFloat($('#total_os').val().replace(/\./g, '').replace(',', '.')) || 0;
-                    valorOS += total;
-                    $('#total_os').val(valorOS.toFixed(2).replace('.', ','));
                 });
+
+                /* ----------------------------------------------------------
+                   Recalcula (ou cria) a linha fixa do ISS e o total da OS
+                   ----------------------------------------------------------*/
+                atualizarISS();
             }
         },
-        error: function(xhr) {
+        error: function (xhr) {
             console.log(xhr.responseText);
             showAlert('Erro ao carregar o modelo selecionado.', 'error');
         }

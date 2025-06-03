@@ -3,6 +3,11 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 
+$issConfig     = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);
+$issAtivo      = !empty($issConfig['ativo']);
+$issPercentual = isset($issConfig['percentual']) ? (float)$issConfig['percentual'] : 0;
+$issDescricao  = isset($issConfig['descricao'])   ? $issConfig['descricao']         : 'ISS sobre Emolumentos';
+
 if (!isset($_GET['id'])) {
     die('ID da OS não fornecido');
 }
@@ -234,7 +239,9 @@ include(__DIR__ . '/../menu.php');
                 <tbody id="itensTable">
                     <!-- Itens existentes -->
                     <?php foreach ($itens as $item): ?>
-                        <tr data-item-id="<?php echo $item['id']; ?>" data-ordem-exibicao="<?php echo $item['ordem_exibicao']; ?>">
+                        <tr data-item-id="<?php echo $item['id']; ?>"
+                            data-ordem_exibicao="<?php echo $item['ordem_exibicao']; ?>"
+                            <?php if ($item['ato'] === 'ISS') echo 'id="ISS_ROW" data-tipo="iss"'; ?>>
                             <td class="ordem"><?php echo $item['ordem_exibicao']; ?></td>
                             <td><?php echo $item['ato']; ?></td>
                             <td><?php echo $item['quantidade']; ?></td>
@@ -263,7 +270,12 @@ include(__DIR__ . '/../menu.php');
                 </tbody>
             </table>
         </div>
-        <button type="button" style="width: 100%;" class="btn btn btn-secondary btn-block" onclick="adicionarISS()"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar ISS</button>
+        <!-- <?php if (!$issAtivo): ?>
+        <button type="button" style="width: 100%;" class="btn btn btn-secondary btn-block"
+                onclick="adicionarISS()">
+            <i class="fa fa-plus" aria-hidden="true"></i> Adicionar ISS
+        </button>
+        <?php endif; ?> -->
         <hr>
         <div class="form-group">
             <label for="observacoes">Observações:</label>
@@ -327,6 +339,12 @@ include(__DIR__ . '/../menu.php');
 <script src="../script/jquery-ui.min.js"></script>
 <script src="../script/sweetalert2.js"></script>
 <script>
+    const ISS_CONFIG = {
+        ativo: <?php echo $issAtivo ? 'true' : 'false'; ?>,
+        percentual: <?php echo $issPercentual; ?>,
+        descricao: "<?php echo addslashes($issDescricao); ?>"
+    };
+
     $(function() {
     // Tornar as linhas da tabela arrastáveis
     $("#itensTable").sortable({
@@ -356,6 +374,7 @@ function salvarOrdemExibicao() {
         data: { ordem: ordem },
         success: function(response) {
             console.log('Ordem de exibição salva com sucesso');
+            atualizarISS();
             calcularTotalOS(); // Recalcular o total após salvar a nova ordem
         },
         error: function(xhr, status, error) {
@@ -363,6 +382,43 @@ function salvarOrdemExibicao() {
         }
     });
 }
+
+/* ===================================================================
+   Cálculo / atualização automática do ISS
+   ===================================================================*/
+function atualizarISS () {
+    if (!ISS_CONFIG.ativo) return;   // ISS desligado → nada faz
+
+    // Soma dos EMOLUMENTOS (coluna 5), ignorando a própria linha do ISS
+    let totalEmol = 0;
+    $('#itensTable tr').each(function () {
+        if ($(this).data('tipo') !== 'iss') {
+            totalEmol += parseFloat($(this).find('td').eq(5).text()
+                                   .replace(/\./g, '').replace(',', '.')) || 0;
+        }
+    });
+
+    const baseISS  = totalEmol * 0.88;
+    const valorISS = baseISS * (ISS_CONFIG.percentual / 100);
+
+    // Cria ou atualiza a linha fixa
+    let $linhaISS = $('#ISS_ROW');
+
+    /*  ────────────────────────────────────────────────────────────
+        Se não existir ISS na tabela, não fazemos nada.  
+        Assim evitamos criar linhas novas ou duplicadas.
+    ────────────────────────────────────────────────────────────*/
+    if ($linhaISS.length === 0) return;
+
+    /* Atualiza valores da linha existente */
+    $linhaISS.find('td').eq(5).text(valorISS.toFixed(2).replace('.', ','));
+    $linhaISS.find('td').eq(9).text(valorISS.toFixed(2).replace('.', ','));
+
+    /* Recalcula o total geral depois da alteração */
+    calcularTotalOS();
+
+}
+
 
 // Função para exibir modal de alerta
 function showAlert(message, type, reload = false) {
@@ -403,6 +459,11 @@ $(document).ready(function() {
     }).blur(); // Chamar a função quando o campo perde o foco
 
     $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #total').mask('#.##0,00', {reverse: true});
+   
+    if (ISS_CONFIG.ativo) {
+        atualizarISS();
+        calcularTotalOS();
+    }
 });
 
 function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
@@ -500,7 +561,7 @@ function adicionarISS() {
     var ato = 'ISS';
     var quantidade = 1;
     var desconto_legal = 0;
-    var descricao = 'ISS sobre Emolumentos';
+    var descricao = ISS_CONFIG.descricao;
     var emolumentos = valorISS;
     var ferc = 0;
     var fadep = 0;
@@ -610,7 +671,8 @@ function adicionarItem() {
                     showAlert(res.error, 'error');
                 } else {
                     adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos.toFixed(2).replace('.', ','), ferc.toFixed(2).replace('.', ','), fadep.toFixed(2).replace('.', ','), femp.toFixed(2).replace('.', ','), total.toFixed(2).replace('.', ','));
-                    atualizarTotalOS(os_id); // Atualizar o total OS
+                    atualizarISS();          // recalcula ou cria o ISS
+                    calcularTotalOS();       // soma geral
                     showAlert('Item adicionado com sucesso!', 'success', true);
                 }
             } catch (e) {
@@ -708,6 +770,7 @@ function salvarNovaQuantidade() {
                         }
 
                         // Recalcular o total da OS
+                        atualizarISS();
                         calcularTotalOS();
 
                         $('#alterarQuantidadeModal').modal('hide');
@@ -776,6 +839,7 @@ function removerItem(button) {
                                 confirmButtonText: 'OK'
                             });
                             row.remove(); // Remove a linha da tabela
+                            atualizarISS();
                             calcularTotalOS(); // Recalcula o total da OS após remoção
                         }
                     } catch (e) {
@@ -875,6 +939,7 @@ function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, e
         '</tr>';
 
     $('#itensTable').append(item);
+    atualizarISS();
     calcularTotalOS(); // Recalcula o total após a adição
 }
 
@@ -1031,6 +1096,7 @@ function salvarNovaQuantidade() {
                         }
 
                         // Recalcular o total da OS
+                        atualizarISS();
                         calcularTotalOS();
 
                         $('#alterarQuantidadeModal').modal('hide');
