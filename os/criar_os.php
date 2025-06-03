@@ -489,10 +489,12 @@ function buscarAto() {
 /* ===================================================================
    Cálculo automático do ISS – cria ou atualiza a linha fixa na tabela
    ===================================================================*/
+/* ===================================================================
+   Cálculo / atualização automática do ISS **e** do total da OS
+   ===================================================================*/
 function atualizarISS () {
-    if (!ISS_CONFIG.ativo) return;        // se não estiver ativo, sai
 
-    // 1. Soma de emolumentos (coluna 5) – ignora a própria linha do ISS
+    /* 1. Emolumentos de todos os itens que NÃO são ISS */
     let totalEmol = 0;
     $('#itensTable tr').each(function () {
         if ($(this).data('tipo') !== 'iss') {
@@ -501,35 +503,39 @@ function atualizarISS () {
         }
     });
 
-    // 2. Cálculo
-    const baseISS  = totalEmol * 0.88;
-    const valorISS = baseISS * (ISS_CONFIG.percentual / 100);
+    /* 2. Se o ISS estiver ativado, cria / atualiza a linha fixa          */
+    if (ISS_CONFIG.ativo) {
+        const baseISS  = totalEmol * 0.88;
+        const valorISS = baseISS * (ISS_CONFIG.percentual / 100);
 
-    // 3. Cria ou atualiza a linha fixa
-    let $linhaISS = $('#ISS_ROW');
-    if ($linhaISS.length === 0) {
-        const ordem = $('#itensTable tr').length + 1;
-        $('#itensTable').append(`
-            <tr id="ISS_ROW" data-tipo="iss">
-                <td>${ordem}</td>
-                <td>ISS</td>
-                <td>1</td>
-                <td>0%</td>
-                <td>${ISS_CONFIG.descricao}</td>
-                <td>${valorISS.toFixed(2).replace('.', ',')}</td>
-                <td>0,00</td>
-                <td>0,00</td>
-                <td>0,00</td>
-                <td>${valorISS.toFixed(2).replace('.', ',')}</td>
-                <td><span class="text-muted" title="Item fixo">
-                        <i class="fa fa-lock"></i></span></td>
-            </tr>`);
+        let $linhaISS = $('#ISS_ROW');
+        if ($linhaISS.length === 0) {
+            const ordem = $('#itensTable tr').length + 1;
+            $('#itensTable').append(`
+                <tr id="ISS_ROW" data-tipo="iss">
+                    <td>${ordem}</td>
+                    <td>ISS</td>
+                    <td>1</td>
+                    <td>0%</td>
+                    <td>${ISS_CONFIG.descricao}</td>
+                    <td>${valorISS.toFixed(2).replace('.', ',')}</td>
+                    <td>0,00</td>
+                    <td>0,00</td>
+                    <td>0,00</td>
+                    <td>${valorISS.toFixed(2).replace('.', ',')}</td>
+                    <td><span class="text-muted" title="Item fixo">
+                            <i class="fa fa-lock"></i></span></td>
+                </tr>`);
+        } else {
+            $linhaISS.find('td').eq(5).text(valorISS.toFixed(2).replace('.', ','));
+            $linhaISS.find('td').eq(9).text(valorISS.toFixed(2).replace('.', ','));
+        }
     } else {
-        $linhaISS.find('td').eq(5).text(valorISS.toFixed(2).replace('.', ','));
-        $linhaISS.find('td').eq(9).text(valorISS.toFixed(2).replace('.', ','));
+        /* ISS desativado – se por acaso existir linha ISS, removê-la      */
+        $('#ISS_ROW').remove();
     }
 
-    // 4. Atualiza o total da OS
+    /* 3. Atualiza SEMPRE o total geral da OS (coluna “Total”, índice 9) */
     let totalOS = 0;
     $('#itensTable tr').each(function () {
         totalOS += parseFloat($(this).find('td').eq(9).text()
