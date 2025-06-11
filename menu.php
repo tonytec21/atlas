@@ -97,6 +97,10 @@ $mode_query->close();
             --transition: all 0.3s ease;  
         }  
 
+        .container, .container-lg, .container-md, .container-sm, .container-xl{
+                max-width: 100%!important;
+        }
+
         * {  
             margin: 0;  
             padding: 0;  
