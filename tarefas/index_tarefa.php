@@ -18,1694 +18,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <script src="../script/jquery-3.5.1.min.js"></script>
-    <style>
-
-        .form-check-input {
-            margin-top: 0.1rem;
-            margin-left: -1.80rem;
-        }
-
-        div.dataTables_wrapper div.dataTables_filter label {
-            text-align: right;
-        }
-
-        .form-check-inline {
-            margin-left: 5px;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        #subTaskAttachments {
-            margin-top: 8px; 
-        }
-
-        .status-prestes-vencer {
-            background-color: #ffc107; 
-        }
-
-        .status-vencida {
-            background-color: #dc3545; 
-        }
-
-        .btn-close {
-            outline: none; 
-            border: none; 
-            background: none;
-            padding: 0; 
-            font-size: 1.5rem;
-            cursor: pointer; 
-            transition: transform 0.2s ease;
-        }
-
-        .btn-close:hover {
-            transform: scale(2.10); 
-        }
-
-        .btn-close:focus {
-            outline: none; 
-        }
-        .timeline-badge.subtask {
-            background-color: #ffc107;
-        }
-
-        .timeline-panel.subtask-panel {
-            border-left: 4px solid #ffc107;
-            background-color: #fffbe6;
-        }
-
-        .subtask-title {
-            font-weight: bold;
-            color: #ffc107;
-            margin-bottom: 10px;
-        }
-
-        .timeline-panel.subtask-panel .timeline-body {
-            background-color: #fffde7;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #ffecb3;
-        }
-
-        .btn-edit {
-            margin-left: 5px;
-        }
-
-        .btn-info {
-            margin-left: 5px;
-        }
-
-        .priority-medium {
-            background-color: #fff9c4 !important; 
-        }
-
-        .priority-high {
-            background-color: #ffe082 !important; 
-        }
-
-        .priority-critical {
-            background-color: #ff8a80 !important; 
-        }
-        .row-quase-vencida {
-            background-color: #ffebcc!important; 
-        }
-
-        .row-vencida {
-            background-color: #ffcccc!important; 
-        }
-
-        body.dark-mode .priority-medium td {
-            background-color: #fff9c4 !important;
-            color: #000!important;
-        }
-
-        body.dark-mode .priority-high td {
-            background-color: #ffe082 !important; 
-            color: #000!important;
-        }
-
-        body.dark-mode .priority-critical td {
-            background-color: #ff8a80 !important; 
-        }
-        body.dark-mode .row-quase-vencida td {
-            background-color: #ffebcc!important; 
-            color: #000!important;
-        }
-
-        body.dark-mode .row-vencida td {
-            background-color: #ffcccc!important; 
-            color: #000!important;
-        }
-
-        .status-label {
-            display: inline-block;
-            padding: 0.2em 0.6em;
-            font-size: 75%;
-            font-weight: 700;
-            line-height: 2;
-            color: #fff;
-            text-align: center;
-            white-space: nowrap;
-            vertical-align: baseline;
-            border-radius: 0.25em;
-            width: 100%;
-        }
-
-        .status-iniciada {
-            background-color: #007bff;
-        }
-
-        .status-em-espera {
-            background-color: #ffa500;
-        }
-
-        .status-em-andamento {
-            background-color: #0056b3;
-        }
-
-        .status-concluida {
-            background-color: #28a745;
-        }
-
-        .status-cancelada {
-            background-color: #dc3545;
-        }
-
-        .status-pendente {
-            background-color: gray;
-        }
-
-        .status-aguardando-retirada {
-            background-color: #6c757d; /* Cinza escuro */
-        }
-
-        .status-aguardando-pagamento {
-            background-color: #ffc107; /* Amarelo */
-        }
-
-        .status-prazo-de-edital {
-            background-color: #17a2b8; /* Azul claro */
-        }
-
-        .status-exigencia-cumprida {
-            background-color: #20c997; /* Verde água */
-        }
-
-        .status-finalizado-sem-pratica-do-ato {
-            background-color: #343a40; /* Preto acinzentado */
-        }
-
-        body.dark-mode .status-aguardando-retirada {
-            background-color: #495057; /* Cinza mais escuro para o modo escuro */
-            color: #f8f9fa; /* Texto claro */
-        }
-
-        body.dark-mode .status-aguardando-pagamento {
-            background-color: #d39e00; /* Amarelo mais suave para modo escuro */
-            color: #212529; /* Texto escuro */
-        }
-
-        body.dark-mode .status-prazo-de-edital {
-            background-color: #0d6efd; /* Azul vivo para modo escuro */
-            color: #f8f9fa; /* Texto claro */
-        }
-
-        body.dark-mode .status-exigencia-cumprida {
-            background-color: #198754; /* Verde mais escuro para modo escuro */
-            color: #f8f9fa; /* Texto claro */
-        }
-
-        body.dark-mode .status-finalizado-sem-pratica-do-ato {
-            background-color: #212529; /* Cinza quase preto */
-            color: #f8f9fa; /* Texto claro */
-        }
-
-
-        .status-sub-iniciada {
-            background-color: #007bff;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-        .status-sub-em-espera {
-            background-color: #ffa500;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-        .status-sub-em-andamento {
-            background-color: #0056b3;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-        .status-sub-concluida {
-            background-color: #28a745;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-        .status-sub-cancelada {
-            background-color: #dc3545;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-        .status-sub-pendente {
-            background-color: gray;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-aguardando-retirada {
-            background-color: #6c757d; /* Cinza escuro */
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-aguardando-pagamento {
-            background-color: #ffc107; /* Amarelo */
-            color: black;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-prazo-de-edital {
-            background-color: #17a2b8; /* Azul claro */
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-exigencia-cumprida {
-            background-color: #20c997; /* Verde água */
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-finalizado-sem-pratica-do-ato {
-            background-color: #343a40; /* Preto acinzentado */
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-sub-aguardando-retirada {
-            background-color: #6c757d; /* Cinza escuro */
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-sub-aguardando-pagamento {
-            background-color: #ffc107; /* Amarelo */
-            color: black;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-sub-prazo-de-edital {
-            background-color: #17a2b8; /* Azul claro */
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-sub-exigencia-cumprida {
-            background-color: #20c997; /* Verde água */
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .status-sub-finalizado-sem-pratica-do-ato {
-            background-color: #343a40; /* Preto acinzentado */
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-
-        body.dark-mode .status-aguardando-retirada {
-            background-color: #495057; /* Cinza mais escuro */
-            color: #f8f9fa; /* Texto claro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        body.dark-mode .status-aguardando-pagamento {
-            background-color: #d39e00; /* Amarelo mais suave */
-            color: #212529; /* Texto escuro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        body.dark-mode .status-prazo-de-edital {
-            background-color: #0d6efd; /* Azul vivo */
-            color: #f8f9fa; /* Texto claro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        body.dark-mode .status-exigencia-cumprida {
-            background-color: #198754; /* Verde mais escuro */
-            color: #f8f9fa; /* Texto claro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        body.dark-mode .status-finalizado-sem-pratica-do-ato {
-            background-color: #212529; /* Preto acinzentado */
-            color: #f8f9fa; /* Texto claro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        body.dark-mode .status-sub-aguardando-retirada {
-            background-color: #495057; /* Cinza mais escuro */
-            color: #f8f9fa; /* Texto claro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        body.dark-mode .status-sub-aguardando-pagamento {
-            background-color: #d39e00; /* Amarelo mais suave */
-            color: #212529; /* Texto escuro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        body.dark-mode .status-sub-prazo-de-edital {
-            background-color: #0d6efd; /* Azul vivo */
-            color: #f8f9fa; /* Texto claro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        body.dark-mode .status-sub-exigencia-cumprida {
-            background-color: #198754; /* Verde mais escuro */
-            color: #f8f9fa; /* Texto claro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        body.dark-mode .status-sub-finalizado-sem-pratica-do-ato {
-            background-color: #212529; /* Preto acinzentado */
-            color: #f8f9fa; /* Texto claro */
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-
-        .priority-sub-medium {
-            background-color: #fff9c4 !important; 
-        }
-        .priority-sub-high {
-            background-color: #ffe082 !important; 
-        }
-        .priority-sub-critical {
-                    background-color: #ff8a80 !important; 
-        }
-
-        .timeline {
-            position: relative;
-            padding: 20px 0;
-            list-style: none;
-        }
-
-        .timeline::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: #e9ecef;
-            left: 30px;
-            margin-right: -1.5px;
-        }
-
-        .timeline-item {
-            margin: 0;
-            padding: 0 0 20px;
-            position: relative;
-        }
-
-        .timeline-item::before,
-        .timeline-item::after {
-            content: "";
-            display: table;
-        }
-
-        .timeline-item::after {
-            clear: both;
-        }
-
-        .timeline-item .timeline-panel {
-            position: relative;
-            width: calc(100% - 75px);
-            float: right;
-            border: 1px solid #d4d4d4;
-            background: #ffffff;
-            border-radius: 2px;
-            padding: 20px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        .timeline-item .timeline-panel::before {
-            position: absolute;
-            top: 10px;
-            right: -15px;
-            display: inline-block;
-            border-top: 15px solid transparent;
-            border-left: 15px solid #d4d4d4;
-            border-right: 0 solid #d4d4d4;
-            border-bottom: 15px solid transparent;
-            content: " ";
-        }
-
-        .timeline-item .timeline-panel::after {
-            position: absolute;
-            top: 11px;
-            right: -14px;
-            display: inline-block;
-            border-top: 14px solid transparent;
-            border-left: 14px solid #ffffff;
-            border-right: 0 solid #ffffff;
-            border-bottom: 14px solid transparent;
-            content: " ";
-        }
-
-        .timeline-item .timeline-badge {
-            color: #fff;
-            width: 48px;
-            height: 48px;
-            line-height: 52px;
-            font-size: 1.4em;
-            text-align: center;
-            position: absolute;
-            top: 0;
-            left: 0;
-            margin-right: -25px;
-            background-color: #7c7c7c;
-            z-index: 100;
-            border-radius: 50%;
-        }
-
-        .timeline-item .timeline-badge.primary {
-            background-color: #007bff;
-        }
-
-        .timeline-item .timeline-badge.success {
-            background-color: #28a745;
-        }
-
-        .timeline-item .timeline-badge.warning {
-            background-color: #ffc107;
-        }
-
-        .timeline-item .timeline-badge.danger {
-            background-color: #dc3545;
-        }
-
-        body.dark-mode .timeline::before {
-            background: #444;
-        }
-
-        body.dark-mode .timeline-item .timeline-panel {
-            background: #333;
-            border-color: #444;
-            color: #ddd;
-        }
-
-        body.dark-mode .timeline-item .timeline-panel::before {
-            border-left-color: #444;
-        }
-
-        body.dark-mode .timeline-item .timeline-panel::after {
-            border-left-color: #333;
-        }
-
-
-
-
-        /* Variáveis de Tema */  
-        :root {  
-            --background-primary: #ffffff;  
-            --background-secondary: #f8f9fa;  
-            --text-primary: #2c3e50;  
-            --text-secondary: #6c757d;  
-            --border-color: #dee2e6;  
-            --accent-color: #3498db;  
-            --success-color: #2ecc71;  
-            --warning-color: #f1c40f;  
-            --danger-color: #e74c3c;  
-            --header-gradient: linear-gradient(135deg, #3498db, #2980b9);  
-            --shadow-color: rgba(0, 0, 0, 0.1);  
-        }  
-
-        /* Tema Dark */  
-        body.dark-mode {  
-            --background-primary: #1a1a1a !important;  
-            --background-secondary: #2d2d2d !important;  
-            --text-primary: #ffffff !important;  
-            --text-secondary: #b3b3b3 !important;  
-            --border-color: #404040 !important;  
-            --header-gradient: linear-gradient(135deg, #2c3e50, #2c3e50) !important;  
-            --shadow-color: rgba(0, 0, 0, 0.3) !important;  
-        }  
-
-        /* Modal Base */  
-        .modal-content {  
-            background: var(--background-primary);  
-            border: none;  
-            border-radius: 15px;  
-            box-shadow: 0 10px 30px var(--shadow-color);  
-        }  
-
-        .modal-body > div:not(:last-child) {  
-            margin-bottom: 2rem;  
-        }  
-
-        .modal-body hr {  
-            margin: 2rem 0;  
-            border-color: var(--border-color);  
-            opacity: 0.5;  
-        }  
-
-        /* Header */  
-        .primary-header {  
-            background: var(--header-gradient);  
-            padding: 1.5rem;  
-            border: none;  
-            border-radius: 15px 15px 0 0;  
-        }  
-
-        .modal-header-content {  
-            width: 100%;  
-            text-align: center;  
-            position: relative;  
-        }  
-
-        .modal-title {  
-            color: #ffffff;  
-            font-size: 1.25rem;  
-            font-weight: 600;  
-        }  
-
-        .protocol-number {  
-            font-weight: 700;  
-        }  
-
-        /* Barra de Ações */  
-        .actions-toolbar {  
-            background: var(--background-secondary);  
-            padding: 1rem;  
-            border-bottom: 1px solid var(--border-color);  
-        }  
-
-        .action-buttons {  
-            display: flex;  
-            gap: 0.5rem;  
-            flex-wrap: wrap;  
-            justify-content: center;  
-        }  
-
-        /* Botões */  
-        .action-btn,  
-        .btn-save,  
-        .btn-add-comment,  
-        .create-subtask-btn,  
-        .btn-close-modal {  
-            display: flex;  
-            align-items: center;  
-            gap: 0.5rem;  
-            padding: 0.5rem 1rem;  
-            border: none;  
-            border-radius: 8px;  
-            font-size: 0.875rem;  
-            transition: all 0.2s;  
-        }  
-
-        .action-btn {  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-        }  
-
-        .action-btn.success,  
-        .btn-save {  
-            background: var(--success-color);  
-            color: white;  
-        }  
-
-        .action-btn.primary,  
-        .btn-add-comment,  
-        .create-subtask-btn {  
-            background: var(--accent-color);  
-            color: white;  
-        }  
-
-        /* Hover Estados para Botões */  
-        .action-btn:hover,  
-        .btn-save:hover,  
-        .btn-add-comment:hover,  
-        .create-subtask-btn:hover,  
-        .btn-close-modal:hover {  
-            transform: translateY(-2px);  
-            box-shadow: 0 4px 12px var(--shadow-color);  
-        }  
-
-        /* Grid e Layout */  
-        .info-grid {  
-            display: grid;  
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));  
-            gap: 1rem;  
-            margin-bottom: 1.5rem;  
-        }  
-
-        .info-item {  
-            display: flex;  
-            flex-direction: column;  
-            gap: 0.5rem;  
-        }  
-
-        /* Formulários */  
-        .form-control-modern,  
-        select,  
-        textarea {  
-            background: var(--background-secondary);  
-            border: 1px solid var(--border-color);  
-            color: var(--text-primary);  
-            border-radius: 8px;  
-            padding: 0.75rem;  
-            transition: all 0.2s;  
-        }  
-
-        .form-control-modern:focus {  
-            border-color: var(--accent-color);  
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);  
-        }  
-
-        .form-control-modern:disabled,  
-        .form-control-modern[readonly] {  
-            background-color: var(--background-secondary);  
-            opacity: 0.8;  
-            cursor: not-allowed;  
-        }  
-
-        /* Seções */  
-        .description-section,  
-        .status-section,  
-        .creation-info,  
-        .attachments-section,  
-        .tasks-tables,  
-        .timeline-section {  
-            margin: 1.5rem 0;  
-            padding: 1.5rem;  
-            background: var(--background-secondary);  
-            border-radius: 12px;  
-            box-shadow: 0 2px 8px var(--shadow-color);  
-        }  
-
-        /* Labels */  
-        label {  
-            display: block;  
-            font-weight: 600;  
-            color: var(--text-primary);  
-            margin-bottom: 0.75rem;  
-        }  
-
-        /* Status Control */  
-        .status-control {  
-            display: flex;  
-            gap: 1rem;  
-            align-items: center;  
-        }  
-
-        .status-control select {  
-            flex: 1;  
-            padding: 0.75rem;  
-            background: var(--background-primary);  
-            cursor: pointer;  
-        }  
-
-        /* Tabelas */  
-        .table-modern {  
-            width: 100%;  
-            border-collapse: separate;  
-            border-spacing: 0 0.5rem;  
-        }  
-
-        .table-modern th {  
-            background: var(--background-secondary);  
-            color: var(--text-primary);  
-            padding: 1rem;  
-            font-weight: 600;  
-        }  
-
-        .table-modern td {  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-            padding: 1rem;  
-        }  
-
-        /* Status Colors */  
-        /* #viewStatus option[value="Iniciada"] { color: var(--accent-color); }  
-        #viewStatus option[value="Em Espera"] { color: var(--warning-color); }  
-        #viewStatus option[value="Em Andamento"] { color: var(--accent-color); }  
-        #viewStatus option[value="Concluída"] { color: var(--success-color); }  
-        #viewStatus option[value="Cancelada"] { color: var(--danger-color); }  
-        #viewStatus option[value="Aguardando Retirada"] { color: var(--secondary-color); }  
-        #viewStatus option[value="Aguardando Pagamento"] { color: var(--warning-color); }  
-        #viewStatus option[value="Prazo de Edital"] { color: var(--info-color); }  
-        #viewStatus option[value="Exigência Cumprida"] { color: var(--teal-color); }  
-        #viewStatus option[value="Finalizado sem prática do ato"] { color: var(--dark-color); }   */
-
-        /* Modal Footer */  
-        .modal-footer {  
-            border-top: 1px solid var(--border-color);  
-            padding: 1rem 1.5rem;  
-            display: flex;  
-            justify-content: flex-end;  
-        }  
-
-        /* Responsividade */  
-        @media (max-width: 768px) {  
-            .action-buttons {  
-                flex-direction: column;  
-            }  
-            
-            .action-btn {  
-                width: 100%;  
-            }  
-            
-            .info-grid {  
-                grid-template-columns: 1fr;  
-            }  
-            
-            .table-responsive {  
-                overflow-x: auto;  
-            }  
-        }  
-
-        /* Animações */  
-        .modal.fade .modal-dialog {  
-            transform: scale(0.95);  
-            transition: transform 0.2s ease-out;  
-        }  
-
-        .modal.show .modal-dialog {  
-            transform: scale(1);  
-        }  
-
-        /* Ajustes Dark Mode Específicos */  
-        body.dark-mode .modal-content,  
-        body.dark-mode .modal-body,  
-        body.dark-mode .modal-footer {  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-        }  
-
-        body.dark-mode .form-control-modern,  
-        body.dark-mode input,  
-        body.dark-mode select,  
-        body.dark-mode textarea {  
-            background: #333333;  
-            color: var(--text-primary);  
-            border-color: var(--border-color);  
-        }  
-
-        body.dark-mode .timeline-panel.subtask-panel .timeline-body {
-                    background-color: #495057;
-                    padding: 10px;
-                    border-radius: 4px;
-                    border: 1px solid #ffecb3;
-                }
-
-        body.dark-mode .action-btn:not(.success):not(.primary) {  
-            background: #333333;  
-            color: var(--text-primary);  
-        }
-
-        /* Ajustes específicos para textarea de descrição */  
-        .description-section textarea.form-control-modern {  
-            width: 100%;  
-            min-height: 120px;  
-            padding: 1rem;  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-            border: 1px solid var(--border-color);  
-            border-radius: 8px;  
-            resize: vertical;  
-            font-size: 0.95rem;  
-            line-height: 1.5;  
-        }  
-
-        /* Botão Criar Subtarefa */  
-        .create-subtask-btn {  
-            width: 100%;  
-            margin: 1.5rem 0;  
-            padding: 1rem;  
-            background: var(--accent-color);  
-            color: white;  
-            border: none;  
-            border-radius: 12px;  
-            font-weight: 500;  
-            font-size: 1rem;  
-            display: flex;  
-            align-items: center;  
-            justify-content: center;  
-            gap: 0.75rem;  
-            transition: all 0.2s ease;  
-            box-shadow: 0 2px 8px var(--shadow-color);  
-        }  
-
-        .create-subtask-btn i {  
-            font-size: 1.1rem;  
-        }  
-
-        .create-subtask-btn:hover {  
-            background: var(--accent-color);  
-            transform: translateY(-2px);  
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);  
-        }  
-
-        /* Seção de Subtarefas Vinculadas */  
-        .subtasks-section {  
-            margin: 1.5rem 0;  
-            padding: 1.5rem;  
-            background: var(--background-secondary);  
-            border-radius: 12px;  
-            box-shadow: 0 2px 8px var(--shadow-color);  
-        }  
-
-        .subtasks-list {  
-            margin-top: 1rem;  
-        }  
-
-        .subtask-item {  
-            display: flex;  
-            align-items: center;  
-            justify-content: space-between;  
-            padding: 1rem;  
-            background: var(--background-primary);  
-            border: 1px solid var(--border-color);  
-            border-radius: 8px;  
-            margin-bottom: 0.5rem;  
-        }  
-
-        .subtask-info {  
-            display: flex;  
-            flex-direction: column;  
-            gap: 0.25rem;  
-        }  
-
-        .subtask-title {  
-            font-weight: 500;  
-            color: var(--text-primary);  
-        }  
-
-        .subtask-status {  
-            font-size: 0.875rem;  
-            color: var(--text-secondary);  
-        }  
-
-        .subtask-actions {  
-            display: flex;  
-            gap: 0.5rem;  
-        }  
-
-        /* Ajustes Dark Mode para novos elementos */  
-        body.dark-mode .description-section textarea.form-control-modern {  
-            background: #333333;  
-            color: var(--text-primary);  
-            border-color: var(--border-color);  
-        }  
-
-        body.dark-mode .subtask-item {  
-            background: #333333;  
-        }  
-
-        body.dark-mode .subtask-title {  
-            color: var(--text-primary);  
-        }  
-
-        body.dark-mode .subtask-status {  
-            color: var(--text-secondary);  
-        }
-
-        .modal-xl {  
-            max-width: 95% !important; /* ou um valor específico como 1200px */  
-            width: 95%;  
-            margin: 1.75rem auto;  
-        }  
-
-        @media (min-width: 992px) {  
-            .modal-xl {  
-                max-width: 1200px !important; /* ou o tamanho que preferir */  
-            }  
-        }
-
-        /* Botões da Toolbar */  
-        .action-buttons {  
-            display: flex;  
-            gap: 0.5rem;  
-            flex-wrap: wrap;  
-            justify-content: center;  
-        }  
-
-        .action-btn {  
-            display: flex;  
-            align-items: center;  
-            gap: 0.5rem;  
-            padding: 0.5rem 1rem;  
-            border: none;  
-            border-radius: 6px;  
-            font-size: 0.875rem;  
-            transition: all 0.2s;  
-            font-weight: 500;  
-        }  
-
-        /* Botão Secondary (cinza) - para Protocolo Geral */  
-        #guiaProtocoloButton {  
-            background-color: #6c757d;  
-            color: white;  
-        }  
-
-        #guiaProtocoloButton:hover {  
-            background-color: #5a6268;  
-            transform: translateY(-1px);  
-            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.2);  
-        }  
-
-        /* Botão Info2 (azul claro) - para Guia Recebimento e Recibo Entrega */  
-        #guiaRecebimentoButton,  
-        #reciboEntregaButton {  
-            background-color: #17a2b8;  
-            color: white;  
-        }  
-
-        #guiaRecebimentoButton:hover,  
-        #reciboEntregaButton:hover {  
-            background-color: #138496;  
-            transform: translateY(-1px);  
-            box-shadow: 0 4px 8px rgba(23, 162, 184, 0.2);  
-        }  
-
-        /* Botão Success (verde) - para Criar Ofício */  
-        .action-btn.success {  
-            background-color: #28a745;  
-            color: white;  
-        }  
-
-        .action-btn.success:hover {  
-            background-color: #218838;  
-            transform: translateY(-1px);  
-            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);  
-        }  
-
-        /* Botão Primary (azul) - para Vincular Ofício */  
-        .action-btn.primary {  
-            background-color: #007bff;  
-            color: white;  
-        }  
-
-        .action-btn.primary:hover {  
-            background-color: #0056b3;  
-            transform: translateY(-1px);  
-            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);  
-        }  
-
-        /* Dark Mode */  
-        body.dark-mode .action-btn {  
-            border: 1px solid var(--border-color);  
-        }  
-
-        /* Responsividade */  
-        @media (max-width: 768px) {  
-            .action-buttons {  
-                flex-direction: column;  
-            }  
-            
-            .action-btn {  
-                width: 100%;  
-                justify-content: center;  
-            }  
-        }
-
-        /* Ajustes específicos para o Modal de Recibo */  
-        #reciboEntregaModal .info-grid {  
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));  
-            gap: 1.5rem;  
-            margin-bottom: 2rem;  
-        }  
-
-        #reciboEntregaModal .description-section {  
-            margin-bottom: 1.5rem;  
-        }  
-
-        #reciboEntregaModal .form-control-modern {  
-            width: 100%;  
-        }  
-
-        #reciboEntregaModal textarea.form-control-modern {  
-            min-height: 100px;  
-            resize: vertical;  
-        }  
-
-        #reciboEntregaModal .modal-footer {  
-            display: flex;  
-            justify-content: flex-end;  
-            gap: 1rem;  
-            padding: 1rem 1.5rem;  
-            background: var(--background-secondary);  
-            border-top: 1px solid var(--border-color);  
-        }  
-
-        #reciboEntregaModal .btn-close-modal {  
-            padding: 0.75rem 1.5rem;  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-            border: 1px solid var(--border-color);  
-            border-radius: 8px;  
-            display: flex;  
-            align-items: center;  
-            gap: 0.5rem;  
-            transition: all 0.2s;  
-        }  
-
-        #reciboEntregaModal .btn-close-modal:hover {  
-            background: var(--background-secondary);  
-            transform: translateY(-1px);  
-        }  
-
-        #reciboEntregaModal .action-btn.success {  
-            padding: 0.75rem 1.5rem;  
-        }  
-
-        /* Dark Mode */  
-        body.dark-mode #reciboEntregaModal .modal-content {  
-            background: var(--background-primary);  
-        }  
-
-        body.dark-mode #reciboEntregaModal .btn-close-modal {  
-            background: #333333;  
-            color: var(--text-primary);  
-            border-color: var(--border-color);  
-        }  
-
-        /* Responsividade */  
-        @media (max-width: 768px) {  
-            #reciboEntregaModal .modal-footer {  
-                flex-direction: column-reverse;  
-            }  
-
-            #reciboEntregaModal .modal-footer button {  
-                width: 100%;  
-            }  
-        }
-
-        /* Ajustes específicos para o Modal de Guia de Recebimento */  
-        #guiaRecebimentoModal .info-grid {  
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));  
-            gap: 1.5rem;  
-            margin-bottom: 2rem;  
-        }  
-
-        #guiaRecebimentoModal .description-section {  
-            margin-bottom: 1.5rem;  
-        }  
-
-        #guiaRecebimentoModal .form-control-modern {  
-            width: 100%;  
-        }  
-
-        #guiaRecebimentoModal textarea.form-control-modern {  
-            min-height: 100px;  
-            resize: vertical;  
-        }  
-
-        #guiaRecebimentoModal .modal-footer {  
-            display: flex;  
-            justify-content: flex-end;  
-            gap: 1rem;  
-            padding: 1rem 1.5rem;  
-            background: var(--background-secondary);  
-            border-top: 1px solid var(--border-color);  
-        }  
-
-        #guiaRecebimentoModal .btn-close-modal {  
-            padding: 0.75rem 1.5rem;  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-            border: 1px solid var(--border-color);  
-            border-radius: 8px;  
-            display: flex;  
-            align-items: center;  
-            gap: 0.5rem;  
-            transition: all 0.2s;  
-        }  
-
-        #guiaRecebimentoModal .btn-close-modal:hover {  
-            background: var(--background-secondary);  
-            transform: translateY(-1px);  
-        }  
-
-        #guiaRecebimentoModal .action-btn.success {  
-            padding: 0.75rem 1.5rem;  
-        }  
-
-        /* Dark Mode */  
-        body.dark-mode #guiaRecebimentoModal .modal-content {  
-            background: var(--background-primary);  
-        }  
-
-        body.dark-mode #guiaRecebimentoModal .btn-close-modal {  
-            background: #333333;  
-            color: var(--text-primary);  
-            border-color: var(--border-color);  
-        }  
-
-        /* Responsividade */  
-        @media (max-width: 768px) {  
-            #guiaRecebimentoModal .modal-footer {  
-                flex-direction: column-reverse;  
-            }  
-
-            #guiaRecebimentoModal .modal-footer button {  
-                width: 100%;  
-            }  
-        }  
-
-        /* Ajuste para inputs readonly */  
-        #guiaRecebimentoModal .form-control-modern[readonly] {  
-            background-color: var(--background-secondary);  
-            opacity: 0.8;  
-            cursor: not-allowed;  
-        }  
-
-        /* Hover states */  
-        #guiaRecebimentoModal .form-control-modern:hover:not([readonly]) {  
-            border-color: var(--accent-color);  
-        }  
-
-        #guiaRecebimentoModal .form-control-modern:focus:not([readonly]) {  
-            border-color: var(--accent-color);  
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);  
-        }
-
-        /* Ajustes específicos para o Modal de Vincular Ofício */  
-        #vincularOficioModal .link-section {  
-            background: var(--background-secondary);  
-            border-radius: 12px;  
-            padding: 2rem;  
-            margin: 1rem 0;  
-            box-shadow: 0 2px 8px var(--shadow-color);  
-        }  
-
-        #vincularOficioModal .info-item {  
-            max-width: 500px;  
-            margin: 0 auto;  
-        }  
-
-        /* Input Group com ícone */  
-        #vincularOficioModal .input-group {  
-            position: relative;  
-            display: flex;  
-            align-items: center;  
-        }  
-
-        #vincularOficioModal .input-icon {  
-            position: absolute;  
-            right: 1rem;  
-            color: var(--text-secondary);  
-            pointer-events: none;  
-        }  
-
-        #vincularOficioModal .form-control-modern {  
-            width: 100%;  
-            padding-right: 2.5rem;  
-            font-size: 1rem;  
-            height: 3rem;  
-        }  
-
-        /* Footer */  
-        #vincularOficioModal .modal-footer {  
-            display: flex;  
-            justify-content: flex-end;  
-            gap: 1rem;  
-            padding: 1rem 1.5rem;  
-            background: var(--background-secondary);  
-            border-top: 1px solid var(--border-color);  
-        }  
-
-        #vincularOficioModal .btn-close-modal {  
-            padding: 0.75rem 1.5rem;  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-            border: 1px solid var(--border-color);  
-            border-radius: 8px;  
-            display: flex;  
-            align-items: center;  
-            gap: 0.5rem;  
-            transition: all 0.2s;  
-        }  
-
-        #vincularOficioModal .action-btn.primary {  
-            padding: 0.75rem 1.5rem;  
-            background: var(--accent-color);  
-            color: white;  
-        }  
-
-        /* Hover States */  
-        #vincularOficioModal .form-control-modern:hover {  
-            border-color: var(--accent-color);  
-        }  
-
-        #vincularOficioModal .form-control-modern:focus {  
-            border-color: var(--accent-color);  
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);  
-        }  
-
-        #vincularOficioModal .btn-close-modal:hover {  
-            background: var(--background-secondary);  
-            transform: translateY(-1px);  
-        }  
-
-        #vincularOficioModal .action-btn.primary:hover {  
-            transform: translateY(-1px);  
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);  
-        }  
-
-        /* Dark Mode */  
-        body.dark-mode #vincularOficioModal .modal-content {  
-            background: var(--background-primary);  
-        }  
-
-        body.dark-mode #vincularOficioModal .link-section {  
-            background: var(--background-secondary);  
-        }  
-
-        body.dark-mode #vincularOficioModal .btn-close-modal {  
-            background: #333333;  
-            color: var(--text-primary);  
-            border-color: var(--border-color);  
-        }  
-
-        /* Responsividade */  
-        @media (max-width: 768px) {  
-            #vincularOficioModal .modal-footer {  
-                flex-direction: column-reverse;  
-            }  
-
-            #vincularOficioModal .modal-footer button {  
-                width: 100%;  
-            }  
-
-            #vincularOficioModal .link-section {  
-                padding: 1rem;  
-            }  
-        }  
-
-        /* Placeholder */  
-        #vincularOficioModal .form-control-modern::placeholder {  
-            color: var(--text-secondary);  
-            opacity: 0.7;  
-        }
-
-        /* Estilos específicos para o Modal de Criar Subtarefa */  
-        #createSubTaskModal .form-section {  
-            background: var(--background-secondary);  
-            border-radius: 12px;  
-            padding: 1.5rem;  
-            margin-bottom: 1.5rem;  
-        }  
-
-        #createSubTaskModal .info-grid {  
-            display: grid;  
-            gap: 1.5rem;  
-            margin-bottom: 1.5rem;  
-        }  
-
-        #createSubTaskModal .info-grid:not(.columns-4) {  
-            grid-template-columns: repeat(2, 1fr);  
-        }  
-
-        #createSubTaskModal .info-grid.columns-4 {  
-            grid-template-columns: repeat(4, 1fr);  
-        }  
-
-        /* Campos de formulário */  
-        #createSubTaskModal .form-control-modern {  
-            width: 100%;  
-            padding: 0.75rem 1rem;  
-            border: 1px solid var(--border-color);  
-            border-radius: 8px;  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-            transition: all 0.2s;  
-        }  
-
-        #createSubTaskModal select.form-control-modern {  
-            appearance: none;  
-            background-image: url("data:image/svg+xml,...");  
-            background-repeat: no-repeat;  
-            background-position: right 1rem center;  
-            padding-right: 2.5rem;  
-        }  
-
-        /* Seção de Anexos */  
-        .attachments-section {  
-            background: var(--background-secondary);  
-            border-radius: 12px;  
-            padding: 1.5rem;  
-            margin-top: 1.5rem;  
-        }  
-
-        .attachment-header {  
-            display: flex;  
-            justify-content: space-between;  
-            align-items: center;  
-            margin-bottom: 1rem;  
-        }  
-
-        .modern-checkbox {  
-            width: 1.2rem;  
-            height: 1.2rem;  
-            margin-right: 0.5rem;  
-        }  
-
-        .file-upload-wrapper {  
-            position: relative;  
-            margin-top: 1rem;  
-        }  
-
-        .modern-file-input {  
-            position: absolute;  
-            width: 100%;  
-            height: 100%;  
-            opacity: 0;  
-            cursor: pointer;  
-        }  
-
-        .file-upload-label {  
-            display: flex;  
-            flex-direction: column;  
-            align-items: center;  
-            justify-content: center;  
-            padding: 2rem;  
-            border: 2px dashed var(--border-color);  
-            border-radius: 8px;  
-            background: var(--background-primary);  
-            cursor: pointer;  
-            transition: all 0.2s;  
-        }  
-
-        .file-upload-label i {  
-            font-size: 2rem;  
-            margin-bottom: 0.5rem;  
-            color: var(--accent-color);  
-        }  
-
-        .file-upload-label:hover {  
-            border-color: var(--accent-color);  
-            background: var(--background-secondary);  
-        }  
-
-        /* Responsividade */  
-        @media (max-width: 992px) {  
-            #createSubTaskModal .info-grid.columns-4 {  
-                grid-template-columns: repeat(2, 1fr);  
-            }  
-        }  
-
-        @media (max-width: 768px) {  
-            #createSubTaskModal .info-grid,  
-            #createSubTaskModal .info-grid.columns-4 {  
-                grid-template-columns: 1fr;  
-            }  
-
-            .attachment-header {  
-                flex-direction: column;  
-                gap: 1rem;  
-            }  
-        }  
-
-        /* Dark Mode */  
-        body.dark-mode #createSubTaskModal .form-control-modern {  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-        }  
-
-        body.dark-mode #createSubTaskModal .file-upload-label {  
-            background: var(--background-primary);  
-        }  
-
-        /* Estilos para campos disabled */  
-        #createSubTaskModal .form-control-modern:disabled {  
-            background-color: var(--background-secondary);  
-            opacity: 0.7;  
-            cursor: not-allowed;  
-        }  
-
-        /* Estilos para a lista de arquivos selecionados */  
-        .selected-files {  
-            margin-top: 1rem;  
-            padding: 0.5rem;  
-            border-radius: 8px;  
-        }  
-
-        .file-item {  
-            display: flex;  
-            align-items: center;  
-            justify-content: space-between;  
-            padding: 0.5rem;  
-            background: var(--background-primary);  
-            border: 1px solid var(--border-color);  
-            border-radius: 6px;  
-            margin-bottom: 0.5rem;  
-        }  
-
-        .file-item:last-child {  
-            margin-bottom: 0;  
-        }  
-
-        .file-info {  
-            display: flex;  
-            align-items: center;  
-            gap: 0.5rem;  
-        }  
-
-        .file-name {  
-            font-size: 0.9rem;  
-            color: var(--text-primary);  
-        }  
-
-        .file-size {  
-            font-size: 0.8rem;  
-            color: var(--text-secondary);  
-        }  
-
-        .remove-file {  
-            background: none;  
-            border: none;  
-            color: var(--danger-color);  
-            cursor: pointer;  
-            padding: 0.25rem;  
-            font-size: 1rem;  
-            transition: all 0.2s;  
-        }  
-
-        .remove-file:hover {  
-            color: var(--danger-color-hover);  
-            transform: scale(1.1);  
-        }  
-
-        .files-counter {  
-            background: var(--accent-color);  
-            color: white;  
-            padding: 0.25rem 0.75rem;  
-            border-radius: 1rem;  
-            font-size: 0.8rem;  
-            margin-top: 0.5rem;  
-            display: inline-block;  
-        }
-
-        .file-upload-label.drag-hover {  
-            background: var(--background-secondary);  
-            border-color: var(--accent-color);  
-            transform: scale(1.02);  
-        }
-
-        /* Estilos específicos para o Modal de Comentário */  
-        #addCommentModal .comment-section {  
-            background: var(--background-secondary);  
-            border-radius: 12px;  
-            padding: 1.5rem;  
-            margin-bottom: 1.5rem;  
-        }  
-
-        #addCommentModal .form-control-modern {  
-            width: 100%;  
-            padding: 1rem;  
-            border: 1px solid var(--border-color);  
-            border-radius: 8px;  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-            transition: all 0.2s;  
-            font-family: inherit;  
-            resize: vertical;  
-            min-height: 120px;  
-        }  
-
-        #addCommentModal .form-control-modern:focus {  
-            border-color: var(--accent-color);  
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);  
-            outline: none;  
-        }  
-
-        #addCommentModal .attachments-section {  
-            background: var(--background-secondary);  
-            border-radius: 12px;  
-            padding: 1.5rem;  
-        }  
-
-        /* Upload de Arquivo */  
-        #addCommentModal .file-upload-wrapper {  
-            position: relative;  
-            margin-top: 1rem;  
-        }  
-
-        #addCommentModal .modern-file-input {  
-            position: absolute;  
-            width: 100%;  
-            height: 100%;  
-            opacity: 0;  
-            cursor: pointer;  
-        }  
-
-        #addCommentModal .file-upload-label {  
-            display: flex;  
-            flex-direction: column;  
-            align-items: center;  
-            justify-content: center;  
-            padding: 2rem;  
-            border: 2px dashed var(--border-color);  
-            border-radius: 8px;  
-            background: var(--background-primary);  
-            cursor: pointer;  
-            transition: all 0.2s;  
-        }  
-
-        #addCommentModal .file-upload-label i {  
-            font-size: 2rem;  
-            margin-bottom: 0.5rem;  
-            color: var(--accent-color);  
-        }  
-
-        #addCommentModal .file-upload-label:hover {  
-            border-color: var(--accent-color);  
-            background: var(--background-secondary);  
-        }  
-
-        /* Lista de Arquivos Selecionados */  
-        #addCommentModal .selected-files {  
-            margin-top: 1rem;  
-        }  
-
-        #addCommentModal .file-item {  
-            display: flex;  
-            align-items: center;  
-            justify-content: space-between;  
-            padding: 0.75rem;  
-            background: var(--background-primary);  
-            border: 1px solid var(--border-color);  
-            border-radius: 6px;  
-            margin-bottom: 0.5rem;  
-        }  
-
-        #addCommentModal .file-info {  
-            display: flex;  
-            align-items: center;  
-            gap: 0.5rem;  
-        }  
-
-        #addCommentModal .file-name {  
-            font-size: 0.9rem;  
-            color: var(--text-primary);  
-        }  
-
-        #addCommentModal .file-size {  
-            font-size: 0.8rem;  
-            color: var(--text-secondary);  
-        }  
-
-        #addCommentModal .files-counter {  
-            background: var(--accent-color);  
-            color: white;  
-            padding: 0.25rem 0.75rem;  
-            border-radius: 1rem;  
-            font-size: 0.8rem;  
-            margin-bottom: 1rem;  
-            display: inline-block;  
-        }  
-
-        /* Footer */  
-        #addCommentModal .modal-footer {  
-            display: flex;  
-            justify-content: flex-end;  
-            gap: 1rem;  
-            padding: 1rem 1.5rem;  
-            background: var(--background-secondary);  
-            border-top: 1px solid var(--border-color);  
-        }  
-
-        #addCommentModal .btn-close-modal {  
-            padding: 0.75rem 1.5rem;  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-            border: 1px solid var(--border-color);  
-            border-radius: 8px;  
-            display: flex;  
-            align-items: center;  
-            gap: 0.5rem;  
-            transition: all 0.2s;  
-        }  
-
-        #addCommentModal .action-btn.success {  
-            padding: 0.75rem 1.5rem;  
-        }  
-
-        /* Dark Mode */  
-        body.dark-mode #addCommentModal .modal-content {  
-            background: var(--background-primary);  
-        }  
-
-        body.dark-mode #addCommentModal .form-control-modern {  
-            background: var(--background-primary);  
-            color: var(--text-primary);  
-        }  
-
-        /* Responsividade */  
-        @media (max-width: 768px) {  
-            #addCommentModal .modal-footer {  
-                flex-direction: column-reverse;  
-            }  
-
-            #addCommentModal .modal-footer button {  
-                width: 100%;  
-            }  
-        }
-    </style>
+    <?php include(__DIR__ . '/../style/style_tarefas.php');?>
 </head>
 
 <body class="light-mode">
@@ -1716,7 +29,6 @@ date_default_timezone_set('America/Sao_Paulo');
     <div id="main" class="main-content">
         <div class="container">
             <h3>Pesquisa de Tarefas</h3>
-            <hr>
             <form id="searchForm">
                 <div class="form-row">
                     <div class="form-group col-md-2">
@@ -1828,30 +140,36 @@ date_default_timezone_set('America/Sao_Paulo');
                     </div>
                 </div>
             </form>
-            <hr>
-            <div class="table-responsive">
-                <h5>Resultados da Pesquisa</h5>
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
-                    <thead>
-                        <tr>
-                            <th>Nº Protocolo</th>
-                            <th style="width: 15%">Título</th>
-                            <th style="width: 10%">Categoria</th>
-                            <th style="width: 9%">Origem</th>
-                            <th style="width: 20%">Descrição</th>
-                            <th style="width: 9%">Data Limite</th>
-                            <th style="width: 12%">Funcionário</th>
-                            <th>Prioridade</th>
-                            <th>Status</th>
-                            <th>Situação</th>
-                            <th style="width: 8%">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="taskTable">
-                        <!-- Dados das tarefas serão inseridos aqui -->
-                    </tbody>
-                </table>
+        </div>
+        <div class="result-block">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+                        <h5>Resultados da Pesquisa</h5>
+                        <div class="form-inline mb-2">
+                            <label class="mr-2">Ordenar por:</label>
+                            
+                            <select id="sortSelect" class="form-control mr-3">
+                                <option value="protocolo">Protocolo</option>
+                                <option value="data">Data Limite</option>
+                                <option value="funcionario">Funcionário</option>
+                                <option value="prioridade">Prioridade</option>
+                                <option value="titulo">Título</option>
+                                <option value="status">Status</option>
+                            </select>
+                            
+                            <select id="sortOrder" class="form-control mr-3">
+                                <option value="desc">Decrescente</option>
+                                <option value="asc">Crescente</option>
+                            </select>
+                            
+                            <input type="text" id="searchCardInput" class="form-control" placeholder="Pesquisar nos resultados...">
+                        </div>
+                </div>
+
+                <div id="cardsResultado" class="row">
+                    <!-- Cards das tarefas serão inseridos aqui -->
+                </div>
             </div>
+
         </div>
     </div>
 
@@ -1893,42 +211,60 @@ date_default_timezone_set('America/Sao_Paulo');
                         <i class="fa fa-file-text"></i>  
                         <span>Recibo Entrega</span>  
                     </button>  
+                    <button id="editTaskButton" class="action-btn editar">
+                        <i class="fa fa-pencil"></i>
+                        <span>Editar</span>
+                    </button>
                 </div>  
-            </div>  
+            </div>
 
             <!-- Corpo do Modal -->  
             <div class="modal-body">  
                 <!-- Grid de Informações -->  
-                <div class="info-grid">  
-                    <div class="info-item">  
-                        <label for="viewTitle">Título</label>  
-                        <input type="text" class="form-control-modern" id="viewTitle" readonly>  
-                    </div>  
-                    <div class="info-item">  
-                        <label for="viewCategory">Categoria</label>  
-                        <input type="text" class="form-control-modern" id="viewCategory" readonly>  
-                    </div>  
-                    <div class="info-item">  
-                        <label for="viewOrigin">Origem</label>  
-                        <input type="text" class="form-control-modern" id="viewOrigin" readonly>  
-                    </div>  
-                    <div class="info-item">  
-                        <label for="viewDeadline">Data Limite</label>  
-                        <input type="text" class="form-control-modern" id="viewDeadline" readonly>  
-                    </div>  
-                    <div class="info-item">  
-                        <label for="viewEmployee">Funcionário Responsável</label>  
-                        <input type="text" class="form-control-modern" id="viewEmployee" readonly>  
+                <div class="info-section">
+                    <div class="info-grid columns-4">
+                        <div class="info-item">
+                            <label for="viewTitle">Título</label>
+                            <input type="text" class="form-control-modern" id="viewTitle" readonly>
+                        </div>
+                        <div class="info-item">
+                            <label for="viewCategory">Categoria</label>
+                            <input type="text" class="form-control-modern" id="viewCategory" readonly>
+                        </div>
+                        <div class="info-item">
+                            <label for="viewOrigin">Origem</label>
+                            <input type="text" class="form-control-modern" id="viewOrigin" readonly>
+                        </div>
+                        <div class="info-item">
+                            <label for="viewDeadline">Data Limite</label>
+                            <input type="text" class="form-control-modern" id="viewDeadline" readonly>
+                        </div>
+                        <div class="info-item">
+                            <label for="viewEmployee">Funcionário Responsável</label>
+                            <input type="text" class="form-control-modern" id="viewEmployee" readonly>
+                        </div>
+                        <div class="info-item">
+                            <label for="viewRevisor">Revisor</label>
+                            <input type="text" class="form-control-modern" id="viewRevisor" readonly>
+                        </div>
+                        <div class="info-item">
+                            <label for="viewConclusionDate">Data de Conclusão</label>
+                            <input type="text" class="form-control-modern" id="viewConclusionDate" readonly>
+                        </div>
                     </div>
-                    <div class="info-item">  
-                        <label for="viewRevisor">Revisor</label>  
-                        <input type="text" class="form-control-modern" id="viewRevisor" readonly>  
-                    </div>  
-                    <div class="info-item">  
-                        <label for="viewConclusionDate">Data de Conclusão</label>  
-                        <input type="text" class="form-control-modern" id="viewConclusionDate" readonly>  
-                    </div>  
-                </div>  
+                </div>
+  
+                <!-- Informações de Criação -->  
+                <div class="creation-info info-grid columns-2">
+                    <div class="info-item">
+                        <label for="createdBy">Criado por</label>
+                        <input type="text" class="form-control-modern" id="createdBy" readonly>
+                    </div>
+                    <div class="info-item">
+                        <label for="createdAt">Data de Criação</label>
+                        <input type="text" class="form-control-modern" id="createdAt" readonly>
+                    </div>
+                </div>
 
                 <!-- Descrição -->  
                 <div class="description-section">  
@@ -1936,46 +272,33 @@ date_default_timezone_set('America/Sao_Paulo');
                     <textarea class="form-control-modern" id="viewDescription" rows="4" readonly></textarea>  
                 </div>  
 
-                <!-- Status -->  
-                <div class="status-section">  
-                    <label for="viewStatus">Status da Tarefa</label>  
-                    <div class="status-control">  
-                        <select id="viewStatus" class="form-control-modern">  
-                            <option value="Iniciada">Iniciada</option>  
-                            <option value="Em Espera">Em Espera</option>  
-                            <option value="Em Andamento">Em Andamento</option>  
-                            <option value="Concluída">Concluída</option>  
-                            <option value="Cancelada">Cancelada</option>  
-                            <option value="Aguardando Retirada">Aguardando Retirada</option>  
-                            <option value="Aguardando Pagamento">Aguardando Pagamento</option>  
-                            <option value="Prazo de Edital">Prazo de Edital</option>  
-                            <option value="Exigência Cumprida">Exigência Cumprida</option>  
-                            <option value="Finalizado sem prática do ato">Finalizado sem prática do ato</option>  
+                <!-- Status -->
+                <div class="status-section enhanced-block">
+                    <label for="viewStatus">Status da Tarefa</label>
+                    <div class="status-control">
+                        <select id="viewStatus" class="form-control-modern status-select">
+                            <option value="Iniciada">Iniciada</option>
+                            <option value="Em Espera">Em Espera</option>
+                            <option value="Em Andamento">Em Andamento</option>
+                            <option value="Concluída">Concluída</option>
+                            <option value="Cancelada">Cancelada</option>
+                            <option value="Pendente">Pendente</option>
+                            <option value="Aguardando Retirada">Aguardando Retirada</option>
+                            <option value="Aguardando Pagamento">Aguardando Pagamento</option>
+                            <option value="Prazo de Edital">Prazo de Edital</option>
+                            <option value="Exigência Cumprida">Exigência Cumprida</option>
+                            <option value="Finalizado sem prática do ato">Finalizado sem prática do ato</option>
                         </select>
+                    </div>
+                </div>
+
  
-                        <button type="button" class="btn-save" id="saveStatusButton">  
-                            <i class="fa fa-check"></i> Atualizar Status  
-                        </button>  
-                    </div>  
-                </div>  
+                <!-- Seção de Anexos -->
+                <div class="attachments-section enhanced-block">
+                    <h4 class="section-title"><i class="fa fa-paperclip"></i> Anexos</h4>
+                    <div id="viewAttachments" class="attachments-list"></div>
+                </div>
 
-                <!-- Informações de Criação -->  
-                <div class="creation-info">  
-                    <div class="info-item">  
-                        <label for="createdBy">Criado por</label>  
-                        <input type="text" class="form-control-modern" id="createdBy" readonly>  
-                    </div>  
-                    <div class="info-item">  
-                        <label for="createdAt">Data de Criação</label>  
-                        <input type="text" class="form-control-modern" id="createdAt" readonly>  
-                    </div>  
-                </div>  
-
-                <!-- Seção de Anexos -->  
-                <div class="attachments-section">  
-                    <h4><i class="fa fa-paperclip"></i> Anexos</h4>  
-                    <div id="viewAttachments" class="attachments-list"></div>  
-                </div>  
 
                 <!-- Botão Criar Subtarefa -->  
                 <button id="createSubTaskButton" class="create-subtask-btn" data-toggle="modal" data-target="#createSubTaskModal">  
@@ -2036,14 +359,17 @@ date_default_timezone_set('America/Sao_Paulo');
                         </div>  
                     </div>  
                 </div>
-                <!-- Timeline -->  
-                <div class="timeline-section">  
-                    <h4><i class="fa fa-history"></i> Timeline</h4>  
-                    <div id="commentTimeline" class="timeline-content"></div>  
-                    <button type="button" class="btn-add-comment" id="addCommentButton" data-toggle="modal" data-target="#addCommentModal">  
-                        <i class="fa fa-plus-circle"></i> Adicionar Comentário  
-                    </button>  
-                </div>  
+                <!-- Timeline -->
+                <div class="timeline-section enhanced-block">
+                    <div class="section-header">
+                        <h4 class="section-title"><i class="fa fa-history"></i> Timeline</h4>
+                        <button type="button" class="btn-add-comment" id="addCommentButton" data-toggle="modal" data-target="#addCommentModal">
+                            <i class="fa fa-plus-circle"></i> Adicionar Comentário
+                        </button>
+                    </div>
+                    <div id="commentTimeline" class="timeline-content"></div>
+                </div>
+
             </div>  
 
             <!-- Footer -->  
@@ -2658,18 +984,14 @@ function getRowClass(status, data_limite) {
 // Função para definir a classe de prioridade
 function getPriorityClass(priority) {
     switch (priority) {
-        case 'Baixa':
-            return 'priority-low';
-        case 'Média':
-            return 'priority-sub-medium';
-        case 'Alta':
-            return 'priority-sub-high';
-        case 'Crítica':
-            return 'priority-sub-critical';
-        default:
-            return '';
+        case 'Baixa': return ''; // Não adiciona cor para baixa
+        case 'Média': return 'priority-medium';
+        case 'Alta': return 'priority-high';
+        case 'Crítica': return 'priority-critical';
+        default: return '';
     }
 }
+
 
 $('#viewTaskModal').on('shown.bs.modal', function() {
     var taskId = $('#taskNumber').text(); // ID da tarefa principal
@@ -2708,88 +1030,35 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
                 data: formData,
                 success: function(response) {
                     var tasks = JSON.parse(response);
-                    
-                    // Limpar os dados da tabela DataTables sem destruir a instância
-                    dataTable.clear();
+                    var container = $('#cardsResultado');
+                    container.empty();
 
-                    // Verificar se há tarefas
                     if (tasks.length > 0) {
-                        // Popular a tabela com os novos dados
                         tasks.forEach(function(task) {
-                            // Definir classe de status
-                            var statusClass = getStatusClass(task.status.toLowerCase());
-
-                            var rowClass = '';
-
-                            // Aplicar regras de coloração apenas se o status não for "Concluída", "Cancelada", "Finalizado sem prática do ato" ou "Aguardando Retirada"
-                            if (
-                                task.status.toLowerCase() !== 'concluída' &&
-                                task.status.toLowerCase() !== 'cancelada' &&
-                                task.status.toLowerCase() !== 'finalizado sem prática do ato' &&
-                                task.status.toLowerCase() !== 'aguardando retirada'
-                            ) {
-                                // Verificar vencimento e definir classe de linha
-                                rowClass = getRowClass(task.status.toLowerCase(), task.data_limite);
-
-                                // Se a tarefa não estiver vencida, aplicar a classe de prioridade
-                                if (!rowClass) {
-                                    rowClass = getPriorityClass(task.nivel_de_prioridade);
-                                }
-                            }
-
-                            // Definir os botões de ação
-                            var actions = '<button class="btn btn-info btn-sm" onclick="viewTask(\'' + task.token + '\')"><i class="fa fa-eye" aria-hidden="true"></i></button>';
-                            if (task.status.toLowerCase() !== 'concluída') {
-                                actions += '<button class="btn btn-edit btn-sm" onclick="editTask(' + task.id + ')"><i class="fa fa-pencil" aria-hidden="true"></i></button>';
-                            }
-
-                                // Função para adicionar classes de status baseado no estado para o fundo e texto
-                                function getStatusClassBackground(situacao) {
-                                    switch (situacao) {
-                                        case 'Prestes a vencer':
-                                            return 'status-prestes-vencer';  // Classe para fundo e texto de "Prestes a vencer"
-                                        case 'Vencida':
-                                            return 'status-vencida';  // Classe para fundo e texto de "Vencida"
-                                        default:
-                                            return '';
-                                    }
-                                }
-
-                                var descricaoLimitada = task.descricao.length > 80 ? task.descricao.substring(0, 80) + '...' : task.descricao;
-
-                                var situacao = '';
-                                if (rowClass === 'row-vencida') {
-                                    situacao = 'Vencida';
-                                } else if (rowClass === 'row-quase-vencida') {
-                                    situacao = 'Prestes a vencer';
-                                } else {
-                                    situacao = '-';
-                                }
-
-                                // Adicionar a classe de fundo e texto para a situação
-                                var statusClassBackground = getStatusClassBackground(situacao);
-
-                                var row = dataTable.row.add([
-                                    task.id,
-                                    task.titulo,
-                                    task.categoria_titulo,
-                                    task.origem_titulo,
-                                    descricaoLimitada, // Limita a descrição a 80 caracteres
-                                    new Date(task.data_limite).toLocaleString("pt-BR"),
-                                    task.funcionario_responsavel,
-                                    task.nivel_de_prioridade,
-                                    '<span class="status-label ' + statusClass + '">' + capitalize(task.status) + '</span>',
-                                    '<span class="status-label ' + statusClassBackground + '">' + situacao + '</span>', // Coluna "Situação" com classe dinâmica
-                                    actions
-                                ]).draw().node();
-
-                                // Aplicar a classe de coloração na linha
-                                $(row).addClass(rowClass);
-
+                            const card = `
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="card-tarefa ${getPriorityClass(task.nivel_de_prioridade)} ${getSituacaoClass(task.data_limite, task.status)}" onclick="viewTask('${task.token}')" style="cursor: pointer;">
+                                        <div class="card-title">Protocolo #${task.id}</div>
+                                        <div class="card-info"><b>Título:</b> ${task.titulo}</div>
+                                        <div class="card-info"><b>Categoria:</b> ${task.categoria_titulo}</div>
+                                        <div class="card-info"><b>Origem:</b> ${task.origem_titulo}</div>
+                                        <div class="card-info"><b>Descrição:</b> ${task.descricao}</div>
+                                        <div class="card-info"><b>Data Limite:</b> ${new Date(task.data_limite).toLocaleString("pt-BR")}</div>
+                                        <div class="card-info"><b>Funcionário:</b> ${task.funcionario_responsavel}</div>
+                                        <div class="card-info"><b>Prioridade:</b> ${task.nivel_de_prioridade}</div>
+                                        <div class="card-info">
+                                            <b>Status:</b> <span class="badge ${getStatusClass(task.status.toLowerCase())}">${capitalize(task.status)}</span>
+                                        </div>
+                                        <div class="card-info">
+                                            <b>Situação:</b> <span class="badge ${getSituacaoClass(task.data_limite, task.status)}">${getSituacaoLabel(task.data_limite, task.status)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            container.append(card);
                         });
                     } else {
-                        // Exibir mensagem de "Nenhum resultado encontrado" se não houver tarefas
-                        $('#taskTable').html('<tr><td colspan="10" class="text-center">Nenhum resultado encontrado</td></tr>');
+                        container.html('<div class="col-12 text-center"><p>Nenhum resultado encontrado.</p></div>');
                     }
                 },
                 error: function() {
@@ -2797,6 +1066,106 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
                 }
             });
         }
+
+
+function getStatusClass(status) {
+    switch (status) {
+        case 'iniciada': return 'status-iniciada';
+        case 'em andamento': return 'status-em-andamento';
+        case 'concluída': return 'status-concluida';
+        case 'cancelada': return 'status-cancelada';
+        case 'pendente': return 'status-pendente';
+        default: return '';
+    }
+}
+
+function getSituacaoLabel(data_limite, status) {
+    const deadline = new Date(data_limite);
+    const now = new Date();
+    if (status.toLowerCase() === 'concluída' || status.toLowerCase() === 'cancelada') {
+        return '-';
+    }
+    if (deadline < now) return 'Vencida';
+    if ((deadline - now) / (1000 * 60 * 60 * 24) <= 1) return 'Prestes a Vencer';
+    return '-';
+}
+
+function getSituacaoClass(data_limite, status) {
+    const deadline = new Date(data_limite);
+    const now = new Date();
+    if (status.toLowerCase() === 'concluída' || status.toLowerCase() === 'cancelada') {
+        return '';
+    }
+    if (deadline < now) return 'situacao-vencida';
+    if ((deadline - now) / (1000 * 60 * 60 * 24) <= 1) return 'situacao-quase';
+    return '';
+}
+
+function capitalize(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+}
+
+$('#sortSelect, #sortOrder').on('change', function() {
+    var cards = $('#cardsResultado .col-md-6, #cardsResultado .col-lg-4').get();
+    var sortBy = $('#sortSelect').val();
+    var sortOrder = $('#sortOrder').val();
+
+    cards.sort(function(a, b) {
+        let aValue = '';
+        let bValue = '';
+
+        if (sortBy === 'protocolo') {
+            aValue = parseInt($(a).find('.card-title').text().replace(/\D/g, '')) || 0;
+            bValue = parseInt($(b).find('.card-title').text().replace(/\D/g, '')) || 0;
+        } else if (sortBy === 'data') {
+            aValue = new Date($(a).find('.card-info:contains("Data Limite")').text().replace('Data Limite:', '').trim());
+            bValue = new Date($(b).find('.card-info:contains("Data Limite")').text().replace('Data Limite:', '').trim());
+        } else if (sortBy === 'prioridade') {
+            const priorityMap = { 'baixa': 1, 'média': 2, 'media': 2, 'alta': 3, 'crítica': 4, 'critica': 4 };
+            aValue = priorityMap[$(a).find('.card-info:contains("Prioridade")').text().replace('Prioridade:', '').trim().toLowerCase()] || 0;
+            bValue = priorityMap[$(b).find('.card-info:contains("Prioridade")').text().replace('Prioridade:', '').trim().toLowerCase()] || 0;
+        } else {
+            aValue = $(a).find(`.card-info:contains(${sortByLabel(sortBy)})`).text().toLowerCase();
+            bValue = $(b).find(`.card-info:contains(${sortByLabel(sortBy)})`).text().toLowerCase();
+        }
+
+        if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    $.each(cards, function(idx, itm) {
+        $('#cardsResultado').append(itm);
+    });
+});
+
+
+function sortByLabel(key) {
+    switch (key) {
+        case 'protocolo': return 'Protocolo';
+        case 'data': return 'Data Limite';
+        case 'funcionario': return 'Funcionário';
+        case 'prioridade': return 'Prioridade';
+        case 'status': return 'Status';
+        default: return '';
+    }
+}
+
+// 🔍 Filtro de pesquisa dinâmica nos cards
+$('#searchCardInput').on('keyup', function() {
+    var value = $(this).val().toLowerCase();
+    $('#cardsResultado .card-tarefa').filter(function() {
+        $(this).toggle(
+            $(this).text().toLowerCase().indexOf(value) > -1
+        );
+    });
+});
+
+$('#editTaskButton').on('click', function() {
+    const taskId = $('#taskNumber').text();
+    window.location.href = 'edit_task.php?id=' + taskId;
+});
+
 
         // Função para retornar a classe de status
         function getStatusClass(status) {
@@ -2848,18 +1217,14 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
         // Função para definir a classe de prioridade
         function getPriorityClass(priority) {
             switch (priority) {
-                case 'Baixa':
-                    return 'priority-low';
-                case 'Média':
-                    return 'priority-medium';
-                case 'Alta':
-                    return 'priority-high';
-                case 'Crítica':
-                    return 'priority-critical';
-                default:
-                    return '';
+                case 'Baixa': return ''; // Não adiciona cor para baixa
+                case 'Média': return 'priority-medium';
+                case 'Alta': return 'priority-high';
+                case 'Crítica': return 'priority-critical';
+                default: return '';
             }
         }
+
 
         // Função para capitalizar a primeira letra
         function capitalize(text) {
@@ -2900,7 +1265,7 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
             e.preventDefault();
 
             var formData = new FormData(this);
-            var taskToken = $('#viewTitle').data('tasktoken'); // Assume que o token da tarefa está armazenado como atributo de dados
+            var taskToken = $('#viewTitle').data('tasktoken');
 
             formData.append('taskToken', taskToken);
 
@@ -2912,14 +1277,20 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
                 contentType: false,
                 success: function(response) {
                     $('#addCommentModal').modal('hide');
-                    $('body').removeClass('modal-open'); // Corrigir problema de rolagem
+                    $('body').removeClass('modal-open');
+
+                    // ✅ Limpar textarea e input file após salvar
+                    $('#commentDescription').val('');
+                    $('#commentAttachments').val('');
+                    $('#selectedFiles').html('');
+                    $('.upload-text').text('Arraste os arquivos ou clique para selecionar');
 
                     Swal.fire({
                         title: 'Sucesso!',
                         text: 'Comentário adicionado com sucesso!',
                         icon: 'success'
                     }).then(() => {
-                        viewTask(taskToken); // Atualizar a visualização da tarefa
+                        viewTask(taskToken);
                     });
                 },
                 error: function() {
@@ -2932,55 +1303,60 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
             });
         });
 
+        $('#addCommentModal').on('hidden.bs.modal', function () {
+            $('#commentDescription').val('');
+            $('#commentAttachments').val('');
+            $('#selectedFiles').html('');
+            $('.upload-text').text('Arraste os arquivos ou clique para selecionar');
+        });
 
-        $('#saveStatusButton').on('click', function() {
-            var taskToken = $('#viewTitle').data('tasktoken');
-            var status = $('#viewStatus').val();
-            var currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        $('#viewStatus').on('change', function() {
+            const taskToken = $('#viewTitle').data('tasktoken');
+            const status = $(this).val();
+            const currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
             Swal.fire({
-                title: 'Tem certeza?',
-                text: 'Deseja realmente atualizar o status da tarefa para "' + status + '"?',
-                icon: 'warning',
+                title: 'Confirmar alteração de status?',
+                text: 'Deseja atualizar o status para "' + status + '"?',
+                icon: 'question',
                 showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Sim, atualizar',
+                confirmButtonText: 'Sim',
                 cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Se o usuário confirmar, proceder com a atualização
-                    $.ajax({
-                        url: 'update_status.php',
-                        type: 'POST',
-                        data: {
-                            taskToken: taskToken,
-                            status: status,
-                            dataConclusao: status.toLowerCase() === 'concluída' ? currentDate : null
-                        },
-                        success: function(response) {
-                            // SweetAlert2 para sucesso, mas sem fechar o modal
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Sucesso!',
-                                text: 'Status atualizado com sucesso!'
-                            }).then(() => {
-                                $('#searchForm').submit(); // Atualizar a lista de tarefas, se necessário
-                                // O modal continuará aberto após a atualização
-                            });
-                        },
-                        error: function() {
-                            // SweetAlert2 para erro
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro',
-                                text: 'Ocorreu um erro ao atualizar o status.'
-                            });
-                        }
-                    });
+                    atualizarStatus(taskToken, status, currentDate);
                 }
             });
         });
+
+        // Função isolada para atualizar
+        function atualizarStatus(taskToken, status, currentDate) {
+            $.ajax({
+                url: 'update_status.php',
+                type: 'POST',
+                data: {
+                    taskToken: taskToken,
+                    status: status,
+                    dataConclusao: status.toLowerCase() === 'concluída' ? currentDate : null
+                },
+                success: function() {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Status atualizado para "' + status + '".'
+                    });
+                    $('#searchForm').submit(); // Atualiza a lista de tarefas se quiser
+                },
+                error: function() {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Não foi possível atualizar o status.'
+                    });
+                }
+            });
+        }
+
 
 // Resolver problema de rolagem com modais empilhados
 $('#addCommentModal, #createSubTaskModal, #guiaRecebimentoModal, #reciboEntregaModal, #vincularOficioModal').on('shown.bs.modal', function() {
@@ -3774,7 +2150,29 @@ function viewTask(taskToken) {
             }  
         });
 
-        
+
+        // Função para aplicar cor no select conforme o status selecionado
+        function aplicarCorStatusSelect() {
+            const select = document.getElementById('viewStatus');
+            const status = select.value.toLowerCase().replaceAll(' ', '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+            // Remove classes anteriores
+            select.className = 'form-control-modern status-select';
+
+            // Adiciona a classe correspondente
+            select.classList.add(`status-${status}`);
+        }
+
+        // Evento para quando o status for alterado manualmente
+        document.getElementById('viewStatus').addEventListener('change', aplicarCorStatusSelect);
+
+        // Evento para quando abrir o modal, já aplicar a cor correta
+        $('#viewTaskModal').on('shown.bs.modal', function() {
+            aplicarCorStatusSelect();
+        });
+
+
+
         $(document).ready(function() {
             // Função para obter o valor do parâmetro da URL
             function getUrlParameter(name) {
