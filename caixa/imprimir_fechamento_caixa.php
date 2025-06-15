@@ -182,27 +182,45 @@ $cardColors = [
     'Total em Caixa' => '#343a40'
 ];
 
-$html = '<table cellpadding="3" cellspacing="5">';
-foreach (array_chunk($cards, 3, true) as $linha) {
-    $html .= '<tr>';
-    foreach ($linha as $titulo => $valor) {
-        $cor = $cardColors[$titulo] ?? '#000';
-        $html .= '<td style="
-            border:0px solid #333;
-            text-align:center;
-            background-color:'.$cor.';
-            color:#fff;
-            border-radius:8px;
-            padding:2px 6px;
-            width:170px;">
-            <div style="font-size:10px; font-weight:bold;">'.$titulo.'</div>
-            <div style="font-size:16px; font-weight:bold;">R$ '.number_format($valor,2,',','.').'</div>
-        </td>';
+$html = '<table cellspacing="5" cellpadding="5" border="0" width="100%">';
+
+$count = 0;
+foreach ($cards as $titulo => $valor) {
+    $cor = $cardColors[$titulo] ?? '#000';
+
+    if ($count % 3 == 0) {
+        $html .= '<tr>'; // Começa uma nova linha a cada 3 cards
     }
-    $html .= '</tr>';
+
+    $html .= '
+    <td width="33%" style="
+        background-color: '.$cor.';
+        color: white;
+        border-radius: 12px;
+        padding: 2px;
+        text-align: center;
+    ">
+        <div style="font-size: 10px; font-weight: bold; letter-spacing: 0.2px;">
+            '.mb_strtoupper($titulo, 'UTF-8').'<br>
+            <span style="font-size: 16px;">R$ '.number_format($valor, 2, ',', '.').'</span><br>
+        </div>
+    </td>';
+
+    $count++;
+
+    if ($count % 3 == 0) {
+        $html .= '</tr>'; // Fecha a linha após 3 cards
+    }
 }
+
+if ($count % 3 != 0) {
+    $html .= str_repeat('<td></td>', 3 - ($count % 3)).'</tr>'; // Completa linha se não tiver 3 cards
+}
+
 $html .= '</table><br>';
+
 $pdf->writeHTML($html, true, false, true, false, '');
+
 
 function renderTable($pdf, $title, $headers, $dataRows, $columnWidths = [])
 {
@@ -219,14 +237,31 @@ function renderTable($pdf, $title, $headers, $dataRows, $columnWidths = [])
     }
     $html .= '</tr>';
 
+    $total = 0;
     foreach ($dataRows as $row) {
         $html .= '<tr>';
         foreach (array_values($row) as $i => $cell) {
             $header = $headers[$i];
             $style = isset($columnWidths[$header]) ? ' style="width:'.$columnWidths[$header].';"' : '';
             $html .= '<td'.$style.'>'.$cell.'</td>';
+
+            // Detecta coluna com "Total" ou "Valor"
+            if (preg_match('/total|valor/i', $header)) {
+                $valor = floatval(str_replace(['R$', '.', ','], ['', '', '.'], preg_replace('/[^\d,.-]/', '', $cell)));
+                $total += $valor;
+            }
         }
         $html .= '</tr>';
+    }
+
+    // Se houver coluna com "Total" ou "Valor", adiciona linha de rodapé mesclada
+    if (preg_grep('/total|valor/i', $headers) && strtolower($title) !== 'total por tipo de pagamento') {
+        $colspan = count($headers);
+        $html .= '<tr style="background-color:#f1f1f1; font-weight:bold;">
+            <td colspan="'.$colspan.'" style="text-align:center;">
+                 TOTAL '.mb_strtoupper($title, 'UTF-8').': R$ '.number_format($total, 2, ',', '.').'
+            </td>
+        </tr>';
     }
 
     $html .= '</table><br>';
