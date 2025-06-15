@@ -555,27 +555,43 @@ include(__DIR__ . '/db_connection.php');
                                     <button title="Depósito do Caixa" class="btn btn-success btn-sm" onclick="cadastrarDeposito('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')"><i class="fa fa-university" aria-hidden="true"></i></button>
                                     <?php
                                     // Buscar ID do caixa
-                                    $stmtId = $conn->prepare("SELECT id FROM caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario AND status = 'fechado'");
+                                    $stmtId = $conn->prepare("
+                                        SELECT id, status 
+                                        FROM caixa 
+                                        WHERE DATE(data_caixa) = :data 
+                                        AND funcionario = :funcionario
+                                    ");
                                     $stmtId->bindParam(':data', $data);
                                     $stmtId->bindParam(':funcionario', $funcionarios);
                                     $stmtId->execute();
                                     $caixaEncontrado = $stmtId->fetch(PDO::FETCH_ASSOC);
                                     $idCaixa = $caixaEncontrado ? $caixaEncontrado['id'] : null;
+                                    $statusCaixa = $caixaEncontrado ? $caixaEncontrado['status'] : null;
+
+                                    // Verificar se é data anterior ou atual
+                                    $dataAtual = date('Y-m-d');
+                                    $dataSelecionada = date('Y-m-d', strtotime($data));
+                                    $eDataAnterior = ($dataSelecionada < $dataAtual);
+                                    $eDataAtual = ($dataSelecionada === $dataAtual);
                                     ?>
                                     <?php if (!$isUnificado) { ?>
-                                    <button title="Depósito do Caixa" class="btn btn-success btn-sm" onclick="cadastrarDeposito('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')"><i class="fa fa-university" aria-hidden="true"></i></button>
 
-                                    <?php if ($idCaixa) { ?>
-                                    <a href="imprimir_fechamento_caixa.php?id=<?= urlencode($idCaixa) ?>" 
-                                    target="_blank"
-                                    title="Imprimir Fechamento"
-                                    class="btn btn-primary btn-sm">
-                                    <i class="fa fa-file-pdf-o"></i>
-                                    </a>
+                                        <?php
+                                        if ($eDataAnterior || ($eDataAtual && $statusCaixa === 'fechado')) {
+                                        ?>
+                                        <?php } ?>
+
+                                        <?php if ($idCaixa) { ?>
+                                        <a href="imprimir_fechamento_caixa.php?id=<?= urlencode($idCaixa) ?>"
+                                        target="_blank"
+                                        title="Imprimir Fechamento"
+                                        class="btn btn-primary btn-sm">
+                                            <i class="fa fa-file-pdf-o"></i>
+                                        </a>
+                                        <?php } ?>
+
                                     <?php } ?>
-                                    <?php } else { ?>
-                                  
-                                    <?php } ?>
+
 
                                     <?php } else { ?>
                                     <button title="Ver Depósitos do Caixa" class="btn btn-success btn-sm" onclick="verDepositosCaixa('<?php echo $data; ?>')"><i class="fa fa-list" aria-hidden="true"></i></button>
