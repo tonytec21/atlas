@@ -553,6 +553,30 @@ include(__DIR__ . '/db_connection.php');
                                     <?php if (!$isUnificado) { ?>
                                     <button title="Saídas e Despesas" class="btn btn-delete btn-sm" onclick="cadastrarSaida('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')"><i class="fa fa-sign-out" aria-hidden="true"></i></button>
                                     <button title="Depósito do Caixa" class="btn btn-success btn-sm" onclick="cadastrarDeposito('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')"><i class="fa fa-university" aria-hidden="true"></i></button>
+                                    <?php
+                                    // Buscar ID do caixa
+                                    $stmtId = $conn->prepare("SELECT id FROM caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario AND status = 'fechado'");
+                                    $stmtId->bindParam(':data', $data);
+                                    $stmtId->bindParam(':funcionario', $funcionarios);
+                                    $stmtId->execute();
+                                    $caixaEncontrado = $stmtId->fetch(PDO::FETCH_ASSOC);
+                                    $idCaixa = $caixaEncontrado ? $caixaEncontrado['id'] : null;
+                                    ?>
+                                    <?php if (!$isUnificado) { ?>
+                                    <button title="Depósito do Caixa" class="btn btn-success btn-sm" onclick="cadastrarDeposito('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')"><i class="fa fa-university" aria-hidden="true"></i></button>
+
+                                    <?php if ($idCaixa) { ?>
+                                    <a href="imprimir_fechamento_caixa.php?id=<?= urlencode($idCaixa) ?>" 
+                                    target="_blank"
+                                    title="Imprimir Fechamento"
+                                    class="btn btn-primary btn-sm">
+                                    <i class="fa fa-file-pdf-o"></i>
+                                    </a>
+                                    <?php } ?>
+                                    <?php } else { ?>
+                                  
+                                    <?php } ?>
+
                                     <?php } else { ?>
                                     <button title="Ver Depósitos do Caixa" class="btn btn-success btn-sm" onclick="verDepositosCaixa('<?php echo $data; ?>')"><i class="fa fa-list" aria-hidden="true"></i></button>
                                     <?php } ?>
@@ -834,45 +858,45 @@ include(__DIR__ . '/db_connection.php');
 
     <!-- Modal de Cadastro de Saídas -->
     <div class="modal fade" id="cadastroSaidaModal" tabindex="-1" role="dialog" aria-labelledby="cadastroSaidaModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 60%">
+        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
             <div class="modal-content modal-saidas">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="cadastroSaidaModalLabel">Cadastrar Saída/Despesa</h5>
-                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                            &times;
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="formCadastroSaida" enctype="multipart/form-data">
-                            <div class="form-row">
-                                <div class="form-group col-md-8">
-                                    <label for="titulo">Título</label>
-                                    <input type="text" class="form-control" id="titulo" name="titulo" required>
-                                </div>
-                                <div class="form-group col-md-4">
-                                    <label for="valor_saida">Valor da Saída</label>
-                                    <input type="text" class="form-control" id="valor_saida" name="valor_saida" required>
-                                </div>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cadastroSaidaModalLabel">Cadastrar Saída/Despesa</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                        &times;
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="formCadastroSaida" enctype="multipart/form-data">
+                        <div class="form-row">
+                            <div class="form-group col-md-8 col-12">
+                                <label for="titulo">Título</label>
+                                <input type="text" class="form-control" id="titulo" name="titulo" required>
                             </div>
-                            <div class="form-group" style="display: none;">
-                                <label for="forma_de_saida">Forma de Saída</label>
-                                <select class="form-control" id="forma_de_saida" name="forma_de_saida" required>
-                                    <option value="Espécie">Espécie</option>
-                                </select>
+                            <div class="form-group col-md-4 col-12">
+                                <label for="valor_saida">Valor da Saída</label>
+                                <input type="text" class="form-control" id="valor_saida" name="valor_saida" required>
                             </div>
-                            <div class="form-group">
-                                <label for="anexo">Anexo</label>
-                                <input type="file" class="form-control-file" id="anexo" name="anexo" required>
-                            </div>
-                            <input type="hidden" id="data_saida" name="data_saida">
-                            <input type="hidden" id="data_caixa_saida" name="data_caixa_saida">
-                            <input type="hidden" id="funcionario_saida" name="funcionario_saida">
-                            <button type="submit" style="width: 100%" class="btn btn-primary">Adicionar</button>
-                        </form>
-                        <hr>
-                        <h5>Saídas/Despesas Cadastradas</h5>
-                        <table id="tabelaSaidasCadastradas" class="table table-striped table-bordered" style="zoom: 80%">
+                        </div>
+                        <div class="form-group" style="display: none;">
+                            <label for="forma_de_saida">Forma de Saída</label>
+                            <select class="form-control" id="forma_de_saida" name="forma_de_saida" required>
+                                <option value="Espécie">Espécie</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="anexo">Anexo</label>
+                            <input type="file" class="form-control-file" id="anexo" name="anexo" required>
+                        </div>
+                        <input type="hidden" id="data_saida" name="data_saida">
+                        <input type="hidden" id="data_caixa_saida" name="data_caixa_saida">
+                        <input type="hidden" id="funcionario_saida" name="funcionario_saida">
+                        <button type="submit" style="width: 100%" class="btn btn-primary">Adicionar</button>
+                    </form>
+                    <hr>
+                    <h5>Saídas/Despesas Cadastradas</h5>
+                    <div class="table-responsive">
+                        <table id="tabelaSaidasCadastradas" class="table table-striped table-bordered">
                             <thead>
                                 <tr>
                                     <th>Funcionário</th>
@@ -895,7 +919,7 @@ include(__DIR__ . '/db_connection.php');
 
     <!-- Modal de Cadastro de Depósito -->
     <div class="modal fade" id="cadastroDepositoModal" tabindex="-1" role="dialog" aria-labelledby="cadastroDepositoModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
             <div class="modal-content modal-deposito-caixa">
                 <div class="modal-header">
                     <h5 class="modal-title" id="cadastroDepositoModalLabel">Cadastrar Depósito do Caixa</h5>
@@ -905,7 +929,7 @@ include(__DIR__ . '/db_connection.php');
                 </div>
                 <div class="modal-body">
                     <div class="row">
-                        <div class="col-md-4">
+                        <div class="col-md-4 col-12">
                             <div class="card mb-4">
                                 <div class="card-body">
                                     <h5 class="card-title2">Total em Caixa:</h5>
@@ -913,7 +937,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4 col-12">
                             <div class="card mb-4">
                                 <div class="card-body">
                                     <h5 class="card-title2">Depósitos:</h5>
@@ -921,7 +945,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4 col-12">
                             <div class="card mb-4">
                                 <div class="card-body">
                                     <h5 class="card-title2">Saldo Transportado:</h5>
@@ -930,14 +954,14 @@ include(__DIR__ . '/db_connection.php');
                             </div>
                         </div>
                     </div>
-<hr>
+                    <hr>
                     <form id="formCadastroDeposito" enctype="multipart/form-data">
                         <div class="form-row">
-                            <div class="form-group col-md-6">
+                            <div class="form-group col-md-6 col-12">
                                 <label for="valor_deposito">Valor do Depósito</label>
                                 <input type="text" class="form-control" id="valor_deposito" name="valor_deposito" required>
                             </div>
-                            <div class="form-group col-md-6">
+                            <div class="form-group col-md-6 col-12">
                                 <label for="tipo_deposito">Tipo de Depósito</label>
                                 <select class="form-control" id="tipo_deposito" name="tipo_deposito" required>
                                     <option value="" disabled selected>Selecione</option>
@@ -948,11 +972,11 @@ include(__DIR__ . '/db_connection.php');
                             </div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group col-md-6">
+                            <div class="form-group col-md-6 col-12">
                                 <label for="comprovante_deposito">Comprovante de Depósito</label>
                                 <input type="file" class="form-control-file" id="comprovante_deposito" name="comprovante_deposito" required>
                             </div>
-                            <div class="form-group col-md-6" id="sem-comprovante-group" style="display:none;">
+                            <div class="form-group col-md-6 col-12" id="sem-comprovante-group" style="display:none;">
                                 <input type="checkbox" id="sem_comprovante" name="sem_comprovante">
                                 <label for="sem_comprovante">Sem comprovante</label>
                             </div>
@@ -963,30 +987,31 @@ include(__DIR__ . '/db_connection.php');
                             <i class="fa fa-plus-circle" aria-hidden="true"></i> Adicionar
                         </button>
                     </form>
-
-
                     <hr>
                     <h5>Depósitos Registrados</h5>
-                    <table id="tabelaDepositosRegistrados" class="table table-striped table-bordered" style="zoom: 80%">
-                        <thead>
-                            <tr>
-                                <th>Funcionário</th>
-                                <th>Data do Caixa</th>
-                                <th>Data Cadastro</th>
-                                <th>Valor</th>
-                                <th>Tipo</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="detalhesDepositosRegistrados">
-                            <!-- Detalhes dos depósitos serão carregados aqui -->
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table id="tabelaDepositosRegistrados" class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Funcionário</th>
+                                    <th>Data do Caixa</th>
+                                    <th>Data Cadastro</th>
+                                    <th>Valor</th>
+                                    <th>Tipo</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detalhesDepositosRegistrados">
+                                <!-- Detalhes dos depósitos serão carregados aqui -->
+                            </tbody>
+                        </table>
+                    </div>
                     <hr>
                     <div class="form-group">
-                        <button type="button" id="btnTransportarSaldo" style="width: 100%" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()"><i class="fa fa-lock" aria-hidden="true"></i> Fechar Caixa e Transportar Saldo <i class="fa fa-share" aria-hidden="true"></i></button>
+                        <button type="button" id="btnTransportarSaldo" style="width: 100%" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()">
+                            <i class="fa fa-lock" aria-hidden="true"></i> Fechar Caixa e Transportar Saldo <i class="fa fa-share" aria-hidden="true"></i>
+                        </button>
                     </div>
-                    
                 </div>
             </div>
         </div>

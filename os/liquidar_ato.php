@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $total_valor = 0;
 
         // Verificar se o ato é válido
-        if (!empty($item['ato']) && !in_array($item['ato'], ['0', '00', '9999'])) {
+        if (!empty($item['ato']) && !in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
             // Buscar valores na tabela apropriada
             $emolumentos_query = $conn->prepare("SELECT * FROM $tabela_emolumentos WHERE ato = ?");
             $emolumentos_query->bind_param("s", $item['ato']);

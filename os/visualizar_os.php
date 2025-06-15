@@ -573,7 +573,13 @@ include(__DIR__ . '/../menu.php');
                         </td>
                         <td>
                             <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado'): ?>
-                                <button type="button" class="btn btn-primary btn-sm" onclick="liquidarAto(<?php echo $item['id']; ?>, <?php echo $item['quantidade']; ?>, <?php echo $item['quantidade_liquidada'] !== null ? $item['quantidade_liquidada'] : 0; ?>, '<?php echo $item['status'] !== null ? addslashes($item['status']) : ''; ?>')">Liquidar</button>
+                                <button type="button" class="btn btn-primary btn-sm"
+                                onclick="liquidarAto(
+                                    <?php echo $item['id']; ?>,
+                                    <?php echo $item['quantidade']; ?>,
+                                    <?php echo $item['quantidade_liquidada'] !== null ? $item['quantidade_liquidada'] : 0; ?>,
+                                    <?php echo floatval($item['total']); ?>
+                                )">Liquidar</button>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -586,7 +592,7 @@ include(__DIR__ . '/../menu.php');
 
 <!-- Modal de Pagamento -->
 <div class="modal fade" id="pagamentoModal" tabindex="-1" role="dialog" aria-labelledby="pagamentoModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document" style="max-width: 40%">
+    <div class="modal-dialog" role="document" style="max-width: 60%">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="pagamentoModalLabel">Efetuar Pagamento</h5>
@@ -1072,6 +1078,31 @@ include(__DIR__ . '/../menu.php');
             return;
         }
 
+        var existeDuplicado = pagamentos.some(function(p) {
+            return p.forma_de_pagamento === formaPagamento && parseFloat(p.total_pagamento) === valorPagamento;
+        });
+
+        if (existeDuplicado) {
+            Swal.fire({
+                title: 'Pagamento Duplicado',
+                text: 'Já existe um pagamento com essa forma e esse valor. Deseja adicionar mesmo assim?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, adicionar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    efetuarPagamento(formaPagamento, valorPagamento);
+                }
+            });
+        } else {
+            efetuarPagamento(formaPagamento, valorPagamento);
+        }
+    }
+
+    function efetuarPagamento(formaPagamento, valorPagamento) {
+        $('#btnAdicionarPagamento').prop('disabled', true);
+
         $.ajax({
             url: 'salvar_pagamento.php',
             type: 'POST',
@@ -1086,15 +1117,22 @@ include(__DIR__ . '/../menu.php');
             success: function(response) {
                 response = JSON.parse(response);
                 if (response.success) {
-                    pagamentos.push({ forma_de_pagamento: formaPagamento, total_pagamento: valorPagamento });
+                    pagamentos.push({ 
+                        forma_de_pagamento: formaPagamento, 
+                        total_pagamento: valorPagamento 
+                    });
                     atualizarTabelaPagamentos();
+                    atualizarSaldo();
+
                     $('#valor_pagamento').val('');
+                    $('#forma_pagamento').val('');
                     Swal.fire({
                         icon: 'success',
                         title: 'Sucesso!',
                         text: 'Pagamento adicionado com sucesso!',
                         confirmButtonText: 'OK'
                     });
+
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -1111,8 +1149,23 @@ include(__DIR__ . '/../menu.php');
                     text: 'Erro ao adicionar pagamento.',
                     confirmButtonText: 'OK'
                 });
+            },
+            complete: function() {
+                $('#btnAdicionarPagamento').prop('disabled', false);
             }
         });
+    }
+
+
+    function atualizarSaldo() {
+        var totalPagamentos = pagamentos.reduce((acc, pagamento) => acc + parseFloat(pagamento.total_pagamento), 0);
+        var totalDevolucoes = <?php echo $total_devolucoes; ?>;
+        var totalRepasses = <?php echo $total_repasses; ?>;
+        var totalOS = <?php echo $ordem_servico['total_os']; ?>;
+
+        var saldo = totalPagamentos - totalDevolucoes - totalOS - totalRepasses;
+
+        $('#saldo_modal').val('R$ ' + saldo.toFixed(2).replace('.', ','));
     }
 
 
@@ -1135,8 +1188,9 @@ include(__DIR__ . '/../menu.php');
             `);
         });
 
-        $('#total_pagamento').val('R$ ' + total.toFixed(2).replace('.', ','));
+        $('#total_pagamento_modal').val('R$ ' + total.toFixed(2).replace('.', ','));
     }
+
 
     // Função para remover pagamento
     function confirmarRemocaoPagamento(pagamentoId) {
@@ -1172,12 +1226,14 @@ include(__DIR__ . '/../menu.php');
                         if (response.success) {
                             pagamentos = pagamentos.filter(pagamento => pagamento.id !== pagamentoId);
                             atualizarTabelaPagamentos();
+                            atualizarSaldo(); // 🔥 <-- adiciona essa linha
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Sucesso!',
                                 text: 'Pagamento removido com sucesso!',
                                 confirmButtonText: 'OK'
                             });
+
                         } else {
                             Swal.fire({
                                 icon: 'error',
@@ -1200,27 +1256,15 @@ include(__DIR__ . '/../menu.php');
         });
     }
 
-    // // Função para liquidar ato
-    // function liquidarAto(itemId, quantidade, quantidadeLiquidada, status) {
-    //     liquidacaoItemId = itemId;
-    //     quantidadeTotal = quantidade;
-    //     quantidadeLiquidada = quantidadeLiquidada;
+    function liquidarAto(itemId, quantidade, quantidadeLiquidada, totalAto) {
+        const valorPago = parseFloat('<?php echo $valor_pago_liquido; ?>');
+        const valorLiquidado = parseFloat('<?php echo $total_liquidado; ?>');
+        const saldoDisponivel = valorPago - valorLiquidado;
 
-    //     var quantidadeRestante = quantidadeTotal - quantidadeLiquidada;
-    //     $('#quantidade_liquidar').val(quantidadeRestante);
+        const quantidadeRestante = quantidade - quantidadeLiquidada;
+        const valorAtoALiquidar = (totalAto / quantidade) * quantidadeRestante;
 
-    //     if (quantidadeRestante === 1) {
-    //         $('#quantidade_liquidar').prop('readonly', true);
-    //     } else {
-    //         $('#quantidade_liquidar').prop('readonly', false);
-    //     }
-
-    //     $('#liquidacaoModal').modal('show');
-    // }
-
-
-    function liquidarAto(itemId, quantidade, quantidadeLiquidada, status) {
-        if (<?php echo $total_pagamentos; ?> <= 0) {
+        if (valorPago <= 0) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Depósito Prévio ausente',
@@ -1232,7 +1276,24 @@ include(__DIR__ . '/../menu.php');
                 cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    $('#pagamentoModal').modal('show'); // Abrir o modal de pagamento
+                    $('#pagamentoModal').modal('show');
+                } else if (result.isDenied) {
+                    abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada);
+                }
+            });
+        } else if (saldoDisponivel < valorAtoALiquidar - 0.01) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Saldo insuficiente',
+                html: `O valor disponível em depósito (<b>R$ ${saldoDisponivel.toFixed(2).replace('.', ',')}</b>) não é suficiente para liquidar este ato que custa <b>R$ ${valorAtoALiquidar.toFixed(2).replace('.', ',')}</b>.<br><br>O que deseja fazer?`,
+                showDenyButton: true,
+                showCancelButton: true,
+                confirmButtonText: 'Adicionar Pagamento',
+                denyButtonText: 'Continuar assim mesmo',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $('#pagamentoModal').modal('show');
                 } else if (result.isDenied) {
                     abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada);
                 }
@@ -1241,6 +1302,8 @@ include(__DIR__ . '/../menu.php');
             abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada);
         }
     }
+
+
 
     function abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada) {
         liquidacaoItemId = itemId;
@@ -1784,7 +1847,12 @@ include(__DIR__ . '/../menu.php');
         });
 
         function liquidarTudo() {
-            if (<?php echo $total_pagamentos; ?> <= 0) {
+            const valorPago = parseFloat('<?php echo $valor_pago_liquido; ?>');
+            const valorLiquidado = parseFloat('<?php echo $total_liquidado; ?>');
+            const saldoDisponivel = valorPago - valorLiquidado;
+            const totalRestante = <?php echo $ordem_servico['total_os']; ?> - valorLiquidado;
+
+            if (valorPago <= 0) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Depósito Prévio ausente',
@@ -1796,7 +1864,24 @@ include(__DIR__ . '/../menu.php');
                     cancelButtonText: 'Cancelar'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        $('#pagamentoModal').modal('show'); // Abrir o modal de pagamento
+                        $('#pagamentoModal').modal('show');
+                    } else if (result.isDenied) {
+                        confirmarLiquidacaoTudo();
+                    }
+                });
+            } else if (saldoDisponivel < totalRestante - 0.01) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Saldo insuficiente',
+                    html: `O valor disponível em depósito (<b>R$ ${saldoDisponivel.toFixed(2).replace('.', ',')}</b>) não é suficiente para liquidar todos os atos restantes que somam <b>R$ ${totalRestante.toFixed(2).replace('.', ',')}</b>.<br><br>O que deseja fazer?`,
+                    showDenyButton: true,
+                    showCancelButton: true,
+                    confirmButtonText: 'Adicionar Pagamento',
+                    denyButtonText: 'Continuar assim mesmo',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $('#pagamentoModal').modal('show');
                     } else if (result.isDenied) {
                         confirmarLiquidacaoTudo();
                     }
@@ -1805,6 +1890,7 @@ include(__DIR__ . '/../menu.php');
                 confirmarLiquidacaoTudo();
             }
         }
+
 
         function confirmarLiquidacaoTudo() {
             Swal.fire({
