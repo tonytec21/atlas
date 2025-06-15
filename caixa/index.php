@@ -574,23 +574,30 @@ include(__DIR__ . '/db_connection.php');
                                     $eDataAnterior = ($dataSelecionada < $dataAtual);
                                     $eDataAtual = ($dataSelecionada === $dataAtual);
                                     ?>
+
                                     <?php if (!$isUnificado) { ?>
 
                                         <?php
+                                        // Mostrar botão SE:
+                                        // - Data anterior, OU
+                                        // - Se for hoje e status = fechado
                                         if ($eDataAnterior || ($eDataAtual && $statusCaixa === 'fechado')) {
                                         ?>
-                                        <?php } ?>
 
-                                        <?php if ($idCaixa) { ?>
-                                        <a href="imprimir_fechamento_caixa.php?id=<?= urlencode($idCaixa) ?>"
-                                        target="_blank"
-                                        title="Imprimir Fechamento"
-                                        class="btn btn-primary btn-sm">
-                                            <i class="fa fa-file-pdf-o"></i>
-                                        </a>
+                                            <!-- Botão Imprimir -->
+                                            <?php if ($idCaixa) { ?>
+                                            <a href="imprimir_fechamento_caixa.php?id=<?= urlencode($idCaixa) ?>"
+                                                target="_blank"
+                                                title="Imprimir Fechamento"
+                                                class="btn btn-primary btn-sm">
+                                                <i class="fa fa-file-pdf-o"></i>
+                                            </a>
+                                            <?php } ?>
+
                                         <?php } ?>
 
                                     <?php } ?>
+
 
 
                                     <?php } else { ?>
