@@ -363,7 +363,7 @@ renderTable($pdf, 'Saldo Transportado',
 // ================== Gerar Gráfico ==================
 $pdf->AddPage();
 $pdf->SetFont('helvetica', 'B', 14);
-$pdf->Cell(0, 10, 'Gráfico de Faturamento', 0, 1, 'C');
+$pdf->Cell(0, 10, 'Gráfico de Pagamentos', 0, 1, 'C');
 $pdf->Ln(5);
 
 $labelsGrafico = array_keys($totalPorForma);
