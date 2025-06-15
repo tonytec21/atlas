@@ -279,7 +279,7 @@ renderTable($pdf, 'Atos Liquidados',
         $a['quantidade_liquidada'],
         number_format($a['total'], 2, ',', '.')
     ], $atos),
-    ['OS'=>'8%', 'Cliente'=>'37%', 'Ato'=>'10%', 'Descrição'=>'28%', 'Qtd'=>'5%', 'Total (R$)'=>'12%']
+    ['OS'=>'8%', 'Cliente'=>'39%', 'Ato'=>'10%', 'Descrição'=>'28%', 'Qtd'=>'5%', 'Total (R$)'=>'10%']
 );
 
 renderTable($pdf, 'Atos Manuais',
@@ -292,7 +292,7 @@ renderTable($pdf, 'Atos Manuais',
         $a['quantidade_liquidada'],
         number_format($a['total'], 2, ',', '.')
     ], $atosManuais),
-    ['OS'=>'8%', 'Cliente'=>'37%', 'Ato'=>'10%', 'Descrição'=>'28%', 'Qtd'=>'5%', 'Total (R$)'=>'12%']
+    ['OS'=>'8%', 'Cliente'=>'39%', 'Ato'=>'10%', 'Descrição'=>'28%', 'Qtd'=>'5%', 'Total (R$)'=>'10%']
 );
 
 renderTable($pdf, 'Pagamentos',
@@ -303,7 +303,7 @@ renderTable($pdf, 'Pagamentos',
         $p['forma_de_pagamento'],
         number_format($p['total_pagamento'], 2, ',', '.')
     ], $pagamentos),
-    ['OS'=>'10%', 'Cliente'=>'38%', 'Forma de Pagamento'=>'40%', 'Total (R$)'=>'12%']
+    ['OS'=>'10%', 'Cliente'=>'40%', 'Forma de Pagamento'=>'40%', 'Total (R$)'=>'10%']
 );
 
 renderTable($pdf, 'Total por Tipo de Pagamento',
@@ -323,7 +323,7 @@ renderTable($pdf, 'Devoluções',
         $d['forma_devolucao'],
         number_format($d['total_devolucao'], 2, ',', '.')
     ], $devolucoes),
-    ['OS'=>'10%', 'Cliente'=>'38%', 'Forma de Pagamento'=>'40%', 'Total (R$)'=>'12%']
+    ['OS'=>'10%', 'Cliente'=>'40%', 'Forma de Pagamento'=>'40%', 'Total (R$)'=>'10%']
 );
 
 renderTable($pdf, 'Saídas e Despesas',
