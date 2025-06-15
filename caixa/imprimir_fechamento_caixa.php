@@ -104,20 +104,15 @@ foreach ($pagamentos as $p) {
     $totalPorForma[$forma] = ($totalPorForma[$forma] ?? 0) + $p['total_pagamento'];
 }
 
-// Soma do total de devoluções (para exibir no card normalmente)
 $totalDevolucoes = array_sum(array_column($devolucoes, 'total_devolucao'));
-
-// Soma do total de devoluções em espécie (para cálculo do total em caixa)
 $totalDevolucoesEspecie = array_sum(
     array_map(fn($d) => ($d['forma_devolucao'] === 'Espécie' ? $d['total_devolucao'] : 0), $devolucoes)
 );
 
-// Outras somas
 $totalSaidas = array_sum(array_column($saidas, 'valor_saida'));
 $totalDepositos = array_sum(array_column($depositos, 'valor_do_deposito'));
 $totalSaldoTransportado = array_sum(array_column($saldoTransportado, 'valor_transportado'));
 
-// Cálculo do Total em Caixa
 $totalRecebidoEmEspecie = $totalPorForma['Espécie'] ?? 0;
 
 $totalEmCaixa = $saldoInicial 
@@ -160,6 +155,7 @@ $pdf->SetFont('helvetica', '', 12);
 $pdf->Cell(0, 8, 'Funcionário: '.$funcionario, 0, 1, 'C');
 $pdf->Ln(2);
 
+// ================= CARDS =====================
 $cards = [
     'Saldo Inicial' => $saldoInicial,
     'Atos Liquidados' => $totalAtos,
@@ -198,12 +194,10 @@ foreach (array_chunk($cards, 3, true) as $linha) {
             color:#fff;
             border-radius:8px;
             padding:2px 6px;
-            width:170px; /* Aumenta a largura do card */
-            ">
+            width:170px;">
             <div style="font-size:10px; font-weight:bold;">'.$titulo.'</div>
             <div style="font-size:16px; font-weight:bold;">R$ '.number_format($valor,2,',','.').'</div>
         </td>';
-
     }
     $html .= '</tr>';
 }
@@ -225,7 +219,6 @@ function renderTable($pdf, $title, $headers, $dataRows, $columnWidths = [])
     }
     $html .= '</tr>';
 
-
     foreach ($dataRows as $row) {
         $html .= '<tr>';
         foreach (array_values($row) as $i => $cell) {
@@ -240,8 +233,7 @@ function renderTable($pdf, $title, $headers, $dataRows, $columnWidths = [])
     $pdf->writeHTML($html, true, false, true, false, '');
 }
 
-// ============== Renderizar tabelas ==============
-
+// ================= Renderizar tabelas =================
 renderTable($pdf, 'Atos Liquidados',
     ['OS', 'Cliente', 'Ato', 'Descrição', 'Qtd', 'Total (R$)'],
     array_map(fn($a) => [
@@ -277,6 +269,15 @@ renderTable($pdf, 'Pagamentos',
         number_format($p['total_pagamento'], 2, ',', '.')
     ], $pagamentos),
     ['OS'=>'10%', 'Cliente'=>'35%', 'Forma de Pagamento'=>'40%', 'Total (R$)'=>'15%']
+);
+
+renderTable($pdf, 'Total por Tipo de Pagamento',
+    ['Forma de Pagamento', 'Total (R$)'],
+    array_map(fn($forma) => [
+        $forma,
+        number_format($totalPorForma[$forma], 2, ',', '.')
+    ], array_keys($totalPorForma)),
+    ['Forma de Pagamento'=>'70%', 'Total (R$)'=>'30%']
 );
 
 renderTable($pdf, 'Devoluções',
@@ -323,6 +324,60 @@ renderTable($pdf, 'Saldo Transportado',
     ], $saldoTransportado),
     ['Data Caixa'=>'20%', 'Data Transporte'=>'20%', 'Valor (R$)'=>'20%', 'Funcionário'=>'20%', 'Status'=>'20%']
 );
+
+// ================== Gerar Gráfico ==================
+$pdf->AddPage();
+$pdf->SetFont('helvetica', 'B', 14);
+$pdf->Cell(0, 10, 'Gráfico de Faturamento', 0, 1, 'C');
+$pdf->Ln(5);
+
+$labelsGrafico = array_keys($totalPorForma);
+$valoresGrafico = array_values($totalPorForma);
+$coresGrafico = ["#28a745", "#fd7e14", "#007bff", "#6f42c1", "#17a2b8", "#dc3545", "#ffc107", "#20c997"];
+
+// ================== Corrigir imprecisão ==================
+foreach ($valoresGrafico as &$v) {
+    $v = round($v, 2);
+}
+unset($v);
+
+// ================== Gerar gráfico ==================
+$chartConfig = [
+    "type" => "bar",
+    "data" => [
+        "labels" => $labelsGrafico,
+        "datasets" => [[
+            "data" => $valoresGrafico,
+            "backgroundColor" => array_slice($coresGrafico, 0, count($valoresGrafico))
+        ]]
+    ],
+    "options" => [
+        "plugins" => [
+            "legend" => false,
+            "datalabels" => [
+                "color" => "#FFFFFF",
+                "font" => ["weight" => "bold", "size" => 14],
+                "formatter" => "(value) => {
+                    return 'R$ ' + value.toFixed(2);
+                }"
+            ]
+        ],
+        "title" => [
+            "display" => false
+        ]
+    ]
+];
+
+$chartUrl = "https://quickchart.io/chart?c=" . urlencode(json_encode($chartConfig)) . "&format=png&backgroundColor=white";
+
+$tempGraph = tempnam(sys_get_temp_dir(), 'chart_') . '.png';
+file_put_contents($tempGraph, file_get_contents($chartUrl));
+
+if (file_exists($tempGraph)) {
+    $pdf->Image($tempGraph, 30, 60, 150, 100);
+    unlink($tempGraph);
+}
+
 
 ob_clean();
 $pdf->Output('Fechamento_Caixa_'.$data.'_'.$funcionario.'.pdf', 'I');
