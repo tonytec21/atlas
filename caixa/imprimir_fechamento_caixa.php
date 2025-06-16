@@ -189,7 +189,7 @@ foreach ($cards as $titulo => $valor) {
     $cor = $cardColors[$titulo] ?? '#000';
 
     if ($count % 3 == 0) {
-        $html .= '<tr>'; // Começa uma nova linha a cada 3 cards
+        $html .= '<tr>'; 
     }
 
     $html .= '
@@ -209,12 +209,12 @@ foreach ($cards as $titulo => $valor) {
     $count++;
 
     if ($count % 3 == 0) {
-        $html .= '</tr>'; // Fecha a linha após 3 cards
+        $html .= '</tr>';
     }
 }
 
 if ($count % 3 != 0) {
-    $html .= str_repeat('<td></td>', 3 - ($count % 3)).'</tr>'; // Completa linha se não tiver 3 cards
+    $html .= str_repeat('<td></td>', 3 - ($count % 3)).'</tr>';
 }
 
 $html .= '</table><br>';
@@ -360,7 +360,7 @@ renderTable($pdf, 'Saldo Transportado',
     ['Data Caixa'=>'20%', 'Data Transporte'=>'20%', 'Valor (R$)'=>'20%', 'Funcionário'=>'20%', 'Status'=>'20%']
 );
 
-// ================== Gerar Gráfico ==================
+// ================== Gráfico ==================
 $pdf->AddPage();
 $pdf->SetFont('helvetica', 'B', 14);
 $pdf->Cell(0, 10, 'Gráfico de Pagamentos', 0, 1, 'C');
@@ -370,13 +370,11 @@ $labelsGrafico = array_keys($totalPorForma);
 $valoresGrafico = array_values($totalPorForma);
 $coresGrafico = ["#28a745", "#fd7e14", "#007bff", "#6f42c1", "#17a2b8", "#dc3545", "#ffc107", "#20c997"];
 
-// ================== Corrigir imprecisão ==================
 foreach ($valoresGrafico as &$v) {
     $v = round($v, 2);
 }
 unset($v);
 
-// ================== Gerar gráfico ==================
 $chartConfig = [
     "type" => "bar",
     "data" => [
