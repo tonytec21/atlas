@@ -1003,21 +1003,26 @@ $(document).ready(function() {
             `);
             return;
         }
+
         const termoPesquisa = removerAcentos(termo);
+
         const resultados = todasCidades.filter(cidade => {
             const nomeSemAcento = removerAcentos(cidade.nome);
-            const ufSemAcento = removerAcentos(cidade.microrregiao.mesorregiao.UF.sigla);
+            const uf = cidade.microrregiao?.mesorregiao?.UF?.sigla || '';
+            const ufSemAcento = removerAcentos(uf);
             return nomeSemAcento.includes(termoPesquisa) || ufSemAcento.includes(termoPesquisa);
         }).slice(0, 100);
 
         $('#resultadoCidades').empty();
+
         if (resultados.length > 0) {
             resultados.forEach(cidade => {
+                const uf = cidade.microrregiao?.mesorregiao?.UF?.sigla || '';
                 $('#resultadoCidades').append(`
                     <a href="#" class="list-group-item list-group-item-action cidade-item"
-                       data-nome="${cidade.nome}/${cidade.microrregiao.mesorregiao.UF.sigla}"
-                       data-ibge="${cidade.id}">
-                       ${cidade.nome}/${cidade.microrregiao.mesorregiao.UF.sigla}
+                    data-nome="${cidade.nome}/${uf}"
+                    data-ibge="${cidade.id}">
+                    ${cidade.nome}/${uf}
                     </a>
                 `);
             });
