@@ -686,16 +686,33 @@ include(__DIR__ . '/../menu.php');
                                 <tr>
                                     <th>Forma de Pagamento</th>
                                     <th>Valor</th>
+                                    <th>Data Pagamento</th>
+                                    <th>Funcionário</th>
                                     <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="pagamentosTable">
                                 <!-- Pagamentos adicionados serão listados aqui -->
-                                <?php foreach ($pagamentos as $pagamento): ?>
+                                <?php foreach ($pagamentos as $pagamento):
+                                    // transforma o DATETIME em formato brasileiro
+                                    $dataPagtoBr = date('d/m/Y H:i', strtotime($pagamento['data_pagamento']));
+                                    // só habilita exclusão se HOJE e se não há atos liquidados
+                                    $isToday   = (date('Y-m-d', strtotime($pagamento['data_pagamento'])) === date('Y-m-d'));
+                                    $canDelete = !$has_liquidated && $isToday;
+                                ?>
                                 <tr>
-                                    <td><?php echo $pagamento['forma_de_pagamento']; ?></td>
+                                    <td><?php echo htmlspecialchars($pagamento['forma_de_pagamento']); ?></td>
                                     <td><?php echo 'R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.'); ?></td>
-                                    <td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(<?php echo $pagamento['id']; ?>)" <?php echo $has_liquidated ? 'disabled' : ''; ?>><i class="fa fa-trash" aria-hidden="true"></i></button></td>
+                                    <td><?php echo $dataPagtoBr; ?></td>
+                                    <td><?php echo htmlspecialchars($pagamento['funcionario']); ?></td>
+                                    <td>
+                                        <?php if ($canDelete): ?>
+                                            <button type="button" title="Remover" class="btn btn-delete btn-sm"
+                                                onclick="confirmarRemocaoPagamento(<?php echo $pagamento['id']; ?>)">
+                                                <i class="fa fa-trash" aria-hidden="true"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -1022,7 +1039,7 @@ include(__DIR__ . '/../menu.php');
         fetch(`../style/configuracao.json?nocache=${timestamp}`)
             .then(response => response.json())
             .then(data => {
-                const osId = '<?php echo $os_id; ?>'; // Usando PHP para pegar o ID
+                const osId = '<?php echo $os_id; ?>';
                 let url = '';
                 
                 if (data.timbrado === 'S') {
@@ -1117,10 +1134,14 @@ include(__DIR__ . '/../menu.php');
             success: function(response) {
                 response = JSON.parse(response);
                 if (response.success) {
-                    pagamentos.push({ 
-                        forma_de_pagamento: formaPagamento, 
-                        total_pagamento: valorPagamento 
+                    pagamentos.push({
+                        id: response.pagamento_id,                          
+                        forma_de_pagamento: formaPagamento,
+                        total_pagamento: valorPagamento,
+                        data_pagamento:  response.data_pagamento || new Date().toISOString().slice(0,19).replace('T',' '),
+                        funcionario:     '<?php echo $_SESSION['username']; ?>'
                     });
+
                     atualizarTabelaPagamentos();
                     atualizarSaldo();
 
@@ -1176,16 +1197,35 @@ include(__DIR__ . '/../menu.php');
 
         var total = 0;
 
+         function formatarDataBr(datetimeSql) {
+                const d = new Date(datetimeSql.replace(' ', 'T'));
+                return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+            }
+
         pagamentos.forEach(function(pagamento, index) {
             total += parseFloat(pagamento.total_pagamento);
+           
+            const today      = new Date().toISOString().slice(0,10);         // AAAA-MM-DD
+            const dataLinha  = pagamento.data_pagamento.substr(0,10);        // AAAA-MM-DD
+            const canDelete  = !<?php echo $has_liquidated ? 'true':'false'; ?> && (dataLinha === today);
 
             pagamentosTable.append(`
                 <tr>
                     <td>${pagamento.forma_de_pagamento}</td>
                     <td>R$ ${parseFloat(pagamento.total_pagamento).toFixed(2).replace('.', ',')}</td>
-                    <td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(${pagamento.id})" <?php echo $has_liquidated ? 'disabled' : ''; ?>><i class="fa fa-trash" aria-hidden="true"></i></button></td>
+                    <td>${formatarDataBr(pagamento.data_pagamento)}</td>
+                    <td>${pagamento.funcionario}</td>
+                    <td>
+                        ${canDelete
+                            ? `<button type="button" title="Remover" class="btn btn-delete btn-sm"
+                                onclick="confirmarRemocaoPagamento(${pagamento.id})">
+                                <i class="fa fa-trash" aria-hidden="true"></i>
+                            </button>`
+                            : ''}
+                    </td>
                 </tr>
             `);
+
         });
 
         $('#total_pagamento_modal').val('R$ ' + total.toFixed(2).replace('.', ','));
