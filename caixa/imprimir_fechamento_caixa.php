@@ -160,7 +160,11 @@ $cards = [
     'Saldo Inicial' => $saldoInicial,
     'Atos Liquidados' => $totalAtos,
     'Atos Manuais' => $totalAtosManuais,
-    'Recebido em Conta' => ($totalPorForma['Débito'] ?? 0),
+    'Recebido em Conta' => array_sum(array_map(
+        fn($forma, $valor) => ($forma !== 'Espécie') ? $valor : 0,
+        array_keys($totalPorForma),
+        $totalPorForma
+    )),
     'Recebido em Espécie' => ($totalPorForma['Espécie'] ?? 0),
     'Devoluções' => $totalDevolucoes,
     'Saídas e Despesas' => $totalSaidas,
