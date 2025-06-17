@@ -3,6 +3,8 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 
+date_default_timezone_set('America/Sao_Paulo');
+
 // Verificar se o usuário está logado
 if (isset($_SESSION['username'])) {
     $usuarioLogado = $_SESSION['username'];
@@ -37,6 +39,8 @@ $status = isset($_GET['status']) ? trim($_GET['status']) : '';
 $description = isset($_GET['description']) ? trim($_GET['description']) : '';
 $priority = isset($_GET['priority']) ? trim($_GET['priority']) : '';
 $origin = isset($_GET['origin']) ? trim($_GET['origin']) : '';
+$dateStart = isset($_GET['dateStart']) ? trim($_GET['dateStart']) : '';
+$dateEnd = isset($_GET['dateEnd']) ? trim($_GET['dateEnd']) : '';
 
 // Início da query
 $sql = "SELECT tarefas.*, categorias.titulo AS categoria_titulo, origem.titulo AS origem_titulo 
@@ -76,7 +80,9 @@ if (!empty($status)) {
     empty($revisor) && 
     empty($description) && 
     empty($priority) && 
-    empty($origin)
+    empty($origin) && 
+    empty($dateStart) && 
+    empty($dateEnd)
 ) {
     // 🔥 Nenhum filtro aplicado — carregamento inicial
     $sql .= " AND tarefas.status NOT IN ('Concluída', 'Cancelada', 'Finalizado sem prática do ato', 'Aguardando Retirada')";
@@ -89,6 +95,15 @@ if (!empty($priority)) {
 }
 if (!empty($origin)) {
     $sql .= " AND tarefas.origem = '" . $conn->real_escape_string($origin) . "'";
+}
+
+// 🔍 Filtro por intervalo de datas da data limite
+if (!empty($dateStart) && !empty($dateEnd)) {
+    $sql .= " AND DATE(tarefas.data_limite) BETWEEN '" . $conn->real_escape_string($dateStart) . "' AND '" . $conn->real_escape_string($dateEnd) . "'";
+} elseif (!empty($dateStart)) {
+    $sql .= " AND DATE(tarefas.data_limite) >= '" . $conn->real_escape_string($dateStart) . "'";
+} elseif (!empty($dateEnd)) {
+    $sql .= " AND DATE(tarefas.data_limite) <= '" . $conn->real_escape_string($dateEnd) . "'";
 }
 
 // 🔄 Ordenar por ID decrescente

@@ -39,7 +39,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         <label for="title">Título da Tarefa:</label>
                         <input type="text" class="form-control" id="title" name="title">
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-3">
                         <label for="category">Categoria:</label>
                         <select id="category" name="category" class="form-control">
                             <option value="">Selecione</option>
@@ -54,6 +54,15 @@ date_default_timezone_set('America/Sao_Paulo');
                             ?>
                         </select>
                     </div>
+                    <div class="form-group col-md-4">
+                        <label>Data Limite:</label>
+                        <div class="d-flex gap-2">
+                            <input type="date" class="form-control" id="dateStart" name="dateStart">
+                            <span style="margin: 0 8px; align-self: center;">até</span>
+                            <input type="date" class="form-control" id="dateEnd" name="dateEnd">
+                        </div>
+                    </div>
+
                     <div class="form-group col-md-2">
                         <label for="origin">Origem:</label>
                         <select id="origin" name="origin" class="form-control">
@@ -86,7 +95,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             <option value="Finalizado sem prática do ato">Finalizado sem prática do ato</option>
                         </select>
                     </div>
-                    <div class="form-group col-md-4">
+                    <div class="form-group col-md-5">
                         <label for="description">Descrição:</label>
                         <input type="text" class="form-control" id="description" name="description">
                     </div>
@@ -130,15 +139,21 @@ date_default_timezone_set('America/Sao_Paulo');
                             ?>
                         </select>
                     </div>
+                
+                <div class="form-group col-md-3 align-self-end">
+                    <!-- <label style="visibility: hidden;">Filtrar</label> -->
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
+                    </button>
                 </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <button type="submit" style="width: 100%;" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
-                    </div>
-                    <div class="col-md-6 text-right">
-                        <button id="add-button" type="button" style="width: 100%;" class="btn btn-success" onclick="window.location.href='criar-tarefa.php'"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar</button>
-                    </div>
+
+                <div class="form-group col-md-3 align-self-end">
+                    <!-- <label style="visibility: hidden;">Adicionar</label> -->
+                    <button id="add-button" type="button" class="btn btn-success w-100" onclick="window.location.href='criar-tarefa.php'">
+                        <i class="fa fa-plus" aria-hidden="true"></i> Adicionar
+                    </button>
                 </div>
+
             </form>
         </div>
         <div class="result-block">
@@ -1118,8 +1133,12 @@ $('#sortSelect, #sortOrder').on('change', function() {
             aValue = parseInt($(a).find('.card-title').text().replace(/\D/g, '')) || 0;
             bValue = parseInt($(b).find('.card-title').text().replace(/\D/g, '')) || 0;
         } else if (sortBy === 'data') {
-            aValue = new Date($(a).find('.card-info:contains("Data Limite")').text().replace('Data Limite:', '').trim());
-            bValue = new Date($(b).find('.card-info:contains("Data Limite")').text().replace('Data Limite:', '').trim());
+            const regex = /Data Limite:\s*(.*)/i;
+            const aText = ($(a).find('.card-info:contains("Data Limite")').text().match(regex) || [])[1] || '';
+            const bText = ($(b).find('.card-info:contains("Data Limite")').text().match(regex) || [])[1] || '';
+            
+            aValue = new Date(aText.split('/').reverse().join('-')).getTime() || 0;
+            bValue = new Date(bText.split('/').reverse().join('-')).getTime() || 0;
         } else if (sortBy === 'prioridade') {
             const priorityMap = { 'baixa': 1, 'média': 2, 'media': 2, 'alta': 3, 'crítica': 4, 'critica': 4 };
             aValue = priorityMap[$(a).find('.card-info:contains("Prioridade")').text().replace('Prioridade:', '').trim().toLowerCase()] || 0;
