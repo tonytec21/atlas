@@ -76,17 +76,17 @@
             margin-left: 5px;
         }
 
-        .priority-medium {
+        /* .priority-medium {
             background-color: #fff9c4 !important; 
-        }
+        } */
 
-        .priority-high {
+        /* .priority-high {
             background-color: #ffe082 !important; 
-        }
+        } */
 
-        .priority-critical {
+        /* .priority-critical {
             background-color: #ff8a80 !important; 
-        }
+        } */
         .row-quase-vencida {
             background-color: #ffebcc!important; 
         }
@@ -95,7 +95,7 @@
             background-color: #ffcccc!important; 
         }
 
-        body.dark-mode .priority-medium td {
+        /* body.dark-mode .priority-medium td {
             background-color: #fff9c4 !important;
             color: #000!important;
         }
@@ -103,11 +103,11 @@
         body.dark-mode .priority-high td {
             background-color: #ffe082 !important; 
             color: #000!important;
-        }
+        } */
 
-        body.dark-mode .priority-critical td {
+        /* body.dark-mode .priority-critical td {
             background-color: #ff8a80 !important; 
-        }
+        } */
         body.dark-mode .row-quase-vencida td {
             background-color: #ffebcc!important; 
             color: #000!important;
