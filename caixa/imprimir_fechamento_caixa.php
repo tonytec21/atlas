@@ -282,7 +282,7 @@ function renderTable($pdf, $title, $headers, $dataRows, $columnWidths = [])
 }
 
 // ================= Renderizar tabelas =================
-renderTable($pdf, 'Origem do Saldo Inicial',
+renderTable($pdf, 'Saldo Inicial',
     ['DATA CAIXA DE ORIGEM', 'DATA TRANSPORTE', 'DATA DE USO', 'VALOR (R$)', 'FUNCIONÁRIO'],
     array_map(fn($s) => [
         date('d/m/Y', strtotime($s['data_caixa'])),
