@@ -95,6 +95,15 @@ $saldoTransportado = fetchData(
     $params
 );
 
+$origemSaldoInicial = fetchData(
+    'SELECT data_caixa, data_transporte, valor_transportado, funcionario, data_caixa_uso
+     FROM transporte_saldo_caixa
+     WHERE funcionario = :funcionario
+     AND DATE(data_caixa_uso) = :data
+     AND status = "usado"',
+    [':funcionario' => $funcionario, ':data' => $data]
+);
+
 $totalAtos = array_sum(array_column($atos, 'total'));
 $totalAtosManuais = array_sum(array_column($atosManuais, 'total'));
 
@@ -273,8 +282,20 @@ function renderTable($pdf, $title, $headers, $dataRows, $columnWidths = [])
 }
 
 // ================= Renderizar tabelas =================
+renderTable($pdf, 'Origem do Saldo Inicial',
+    ['DATA CAIXA DE ORIGEM', 'DATA TRANSPORTE', 'DATA DE USO', 'VALOR (R$)', 'FUNCIONÁRIO'],
+    array_map(fn($s) => [
+        date('d/m/Y', strtotime($s['data_caixa'])),
+        date('d/m/Y', strtotime($s['data_transporte'])),
+        date('d/m/Y', strtotime($s['data_caixa_uso'])),
+        number_format($s['valor_transportado'], 2, ',', '.'),
+        $s['funcionario']
+    ], $origemSaldoInicial),
+    ['DATA CAIXA DE ORIGEM'=>'25%', 'DATA TRANSPORTE'=>'20%', 'DATA DE USO'=>'15%', 'VALOR (R$)'=>'15%', 'FUNCIONÁRIO'=>'25%']
+);
+
 renderTable($pdf, 'Atos Liquidados',
-    ['OS', 'Cliente', 'Ato', 'Descrição', 'Qtd', 'Total (R$)'],
+    ['O.S', 'CLIENTE', 'ATO', 'DESCRIÇÃO', 'QTD', 'TOTAL (R$)'],
     array_map(fn($a) => [
         $a['ordem_servico_id'],
         $a['cliente'],
@@ -283,11 +304,11 @@ renderTable($pdf, 'Atos Liquidados',
         $a['quantidade_liquidada'],
         number_format($a['total'], 2, ',', '.')
     ], $atos),
-    ['OS'=>'8%', 'Cliente'=>'34%', 'Ato'=>'10%', 'Descrição'=>'28%', 'Qtd'=>'5%', 'Total (R$)'=>'15%']
+    ['O.S'=>'8%', 'CLIENTE'=>'34%', 'ATO'=>'10%', 'DESCRIÇÃO'=>'28%', 'QTD'=>'5%', 'TOTAL (R$)'=>'15%']
 );
 
 renderTable($pdf, 'Atos Manuais',
-    ['OS', 'Cliente', 'Ato', 'Descrição', 'Qtd', 'Total (R$)'],
+    ['O.S', 'CLIENTE', 'ATO', 'DESCRIÇÃO', 'QTD', 'TOTAL (R$)'],
     array_map(fn($a) => [
         $a['ordem_servico_id'],
         $a['cliente'],
@@ -296,78 +317,78 @@ renderTable($pdf, 'Atos Manuais',
         $a['quantidade_liquidada'],
         number_format($a['total'], 2, ',', '.')
     ], $atosManuais),
-    ['OS'=>'8%', 'Cliente'=>'34%', 'Ato'=>'10%', 'Descrição'=>'28%', 'Qtd'=>'5%', 'Total (R$)'=>'15%']
+    ['O.S'=>'8%', 'CLIENTE'=>'34%', 'ATO'=>'10%', 'DESCRIÇÃO'=>'28%', 'QTD'=>'5%', 'TOTAL (R$)'=>'15%']
 );
 
 renderTable($pdf, 'Pagamentos',
-    ['OS', 'Cliente', 'Forma de Pagamento', 'Total (R$)'],
+    ['O.S', 'CLIENTE', 'FORMA DE PAGAMENTO', 'TOTAL (R$)'],
     array_map(fn($p) => [
         $p['ordem_de_servico_id'],
         $p['cliente'],
         $p['forma_de_pagamento'],
         number_format($p['total_pagamento'], 2, ',', '.')
     ], $pagamentos),
-    ['OS'=>'10%', 'Cliente'=>'35%', 'Forma de Pagamento'=>'40%', 'Total (R$)'=>'15%']
+    ['O.S'=>'10%', 'CLIENTE'=>'35%', 'FORMA DE PAGAMENTO'=>'40%', 'TOTAL (R$)'=>'15%']
 );
 
 renderTable($pdf, 'Total por Tipo de Pagamento',
-    ['Forma de Pagamento', 'Total (R$)'],
+    ['FORMA DE PAGAMENTO', 'TOTAL (R$)'],
     array_map(fn($forma) => [
         $forma,
         number_format($totalPorForma[$forma], 2, ',', '.')
     ], array_keys($totalPorForma)),
-    ['Forma de Pagamento'=>'70%', 'Total (R$)'=>'30%']
+    ['FORMA DE PAGAMENTO'=>'70%', 'TOTAL (R$)'=>'30%']
 );
 
 renderTable($pdf, 'Devoluções',
-    ['OS', 'Cliente', 'Forma de Pagamento', 'Total (R$)'],
+    ['O.S', 'CLIENTE', 'FORMA DE PAGAMENTO', 'TOTAL (R$)'],
     array_map(fn($d) => [
         $d['ordem_de_servico_id'],
         $d['cliente'],
         $d['forma_devolucao'],
         number_format($d['total_devolucao'], 2, ',', '.')
     ], $devolucoes),
-    ['OS'=>'10%', 'Cliente'=>'35%', 'Forma de Pagamento'=>'40%', 'Total (R$)'=>'15%']
+    ['O.S'=>'10%', 'CLIENTE'=>'35%', 'FORMA DE PAGAMENTO'=>'40%', 'TOTAL (R$)'=>'15%']
 );
 
 renderTable($pdf, 'Saídas e Despesas',
-    ['Título', 'Valor (R$)', 'Forma de Pagamento', 'Data Caixa'],
+    ['TÍTULO', 'VALOR (R$)', 'FORMA DE PAGAMENTO', 'DATA CAIXA'],
     array_map(fn($s) => [
         $s['titulo'],
         number_format($s['valor_saida'], 2, ',', '.'),
         $s['forma_de_saida'],
         date('d/m/Y', strtotime($s['data']))
     ], $saidas),
-    ['Título'=>'40%', 'Valor (R$)'=>'15%', 'Forma de Pagamento'=>'30%', 'Data Caixa'=>'15%']
+    ['TÍTULO'=>'40%', 'VALOR (R$)'=>'15%', 'FORMA DE PAGAMENTO'=>'30%', 'DATA CAIXA'=>'15%']
 );
 
 renderTable($pdf, 'Depósitos',
-    ['Data Caixa', 'Data Cadastro', 'Valor (R$)', 'Tipo'],
+    ['DATA CAIXA', 'DATA CADASTRO', 'VALOR (R$)', 'TIPO'],
     array_map(fn($d) => [
         date('d/m/Y', strtotime($d['data_caixa'])),
         date('d/m/Y', strtotime($d['data_cadastro'])),
         number_format($d['valor_do_deposito'], 2, ',', '.'),
         $d['tipo_deposito']
     ], $depositos),
-    ['Data Caixa'=>'25%', 'Data Cadastro'=>'25%', 'Valor (R$)'=>'25%', 'Tipo'=>'25%']
+    ['DATA CAIXA'=>'25%', 'DATA CADASTRO'=>'25%', 'VALOR (R$)'=>'25%', 'TIPO'=>'25%']
 );
 
 renderTable($pdf, 'Saldo Transportado',
-    ['Data Caixa', 'Data Transporte', 'Valor (R$)', 'Funcionário', 'Status'],
+    ['DATA CAIXA', 'DATA TRANSPORTE', 'VALOR (R$)', 'FUNCIONÁRIO', 'STATUS'],
     array_map(fn($s) => [
         date('d/m/Y', strtotime($s['data_caixa'])),
         date('d/m/Y', strtotime($s['data_transporte'])),
         number_format($s['valor_transportado'], 2, ',', '.'),
         $s['funcionario'],
-        $s['status']
+        ucfirst(strtolower($s['status']))
     ], $saldoTransportado),
-    ['Data Caixa'=>'20%', 'Data Transporte'=>'20%', 'Valor (R$)'=>'20%', 'Funcionário'=>'20%', 'Status'=>'20%']
+    ['DATA CAIXA'=>'20%', 'DATA TRANSPORTE'=>'20%', 'VALOR (R$)'=>'20%', 'FUNCIONÁRIO'=>'20%', 'STATUS'=>'20%']
 );
 
 // ================== Gráfico ==================
 $pdf->AddPage();
 $pdf->SetFont('helvetica', 'B', 14);
-$pdf->Cell(0, 10, 'Gráfico de Pagamentos', 0, 1, 'C');
+$pdf->Cell(0, 10, 'GRÁFICO DE PAGAMENTOS', 0, 1, 'C');
 $pdf->Ln(5);
 
 $labelsGrafico = array_keys($totalPorForma);
