@@ -109,6 +109,13 @@ $totalDevolucoesEspecie = array_sum(array_map(
     fn($d) => ($d['forma_devolucao'] === 'Espécie' ? $d['total_devolucao'] : 0), $devolucoes
 ));
 
+$totalRecebidoEmConta = array_sum(array_map(
+    fn($forma, $valor) => ($forma !== 'Espécie') ? $valor : 0,
+    array_keys($totalPorForma), $totalPorForma
+));
+
+$totalDePagamentos = $totalRecebidoEmConta + $totalRecebidoEmEspecie;
+
 $totalSaidas = array_sum(array_column($saidas, 'valor_saida'));
 $totalDepositos = array_sum(array_column($depositos, 'valor_do_deposito'));
 $totalSaldoTransportado = array_sum(array_column($saldoTransportado, 'valor_transportado'));
@@ -155,15 +162,14 @@ $pdf->Cell(0, 10, 'Relatório de Fechamento do Caixa Unificado - '.date('d/m/Y',
 $pdf->Ln(2);
 
 // ================= Cards =================
+
 $cards = [
     'Saldo Inicial' => $totalSaldoInicial,
     'Atos Liquidados' => $totalAtos,
     'Atos Manuais' => $totalAtosManuais,
-    'Recebido em Conta' => array_sum(array_map(
-        fn($forma, $valor) => ($forma !== 'Espécie') ? $valor : 0,
-        array_keys($totalPorForma), $totalPorForma
-    )),
+    'Recebido em Conta' => $totalRecebidoEmConta,
     'Recebido em Espécie' => $totalRecebidoEmEspecie,
+    'Total de Pagamentos' => $totalDePagamentos, // <-- Card novo
     'Devoluções' => $totalDevolucoes,
     'Saídas e Despesas' => $totalSaidas,
     'Depósito do Caixa' => $totalDepositos,
@@ -177,6 +183,7 @@ $cardColors = [
     'Atos Manuais' => '#6f42c1',
     'Recebido em Conta' => '#fd7e14',
     'Recebido em Espécie' => '#218838',
+    'Total de Pagamentos' => '#0b7285',
     'Devoluções' => '#6c757d',
     'Saídas e Despesas' => '#dc3545',
     'Depósito do Caixa' => '#17a2b8',

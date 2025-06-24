@@ -175,6 +175,7 @@ $cards = [
         $totalPorForma
     )),
     'Recebido em Espécie' => ($totalPorForma['Espécie'] ?? 0),
+    'Total de Pagamentos' => array_sum($totalPorForma),
     'Devoluções' => $totalDevolucoes,
     'Saídas e Despesas' => $totalSaidas,
     'Depósito do Caixa' => $totalDepositos,
@@ -188,6 +189,7 @@ $cardColors = [
     'Atos Manuais' => '#6f42c1',
     'Recebido em Conta' => '#fd7e14',
     'Recebido em Espécie' => '#218838',
+    'Total de Pagamentos' => '#0b7285',
     'Devoluções' => '#6c757d',
     'Saídas e Despesas' => '#dc3545',
     'Depósito do Caixa' => '#17a2b8',
