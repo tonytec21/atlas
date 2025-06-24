@@ -109,12 +109,15 @@ $totalDevolucoesEspecie = array_sum(array_map(
     fn($d) => ($d['forma_devolucao'] === 'Espécie' ? $d['total_devolucao'] : 0), $devolucoes
 ));
 
+$totalRecebidoEmEspecie = $totalPorForma['Espécie'] ?? 0;
+
 $totalRecebidoEmConta = array_sum(array_map(
     fn($forma, $valor) => ($forma !== 'Espécie') ? $valor : 0,
     array_keys($totalPorForma), $totalPorForma
 ));
 
-$totalDePagamentos = $totalRecebidoEmConta + $totalRecebidoEmEspecie;
+$totalDePagamentos = array_sum($totalPorForma);
+
 
 $totalSaidas = array_sum(array_column($saidas, 'valor_saida'));
 $totalDepositos = array_sum(array_column($depositos, 'valor_do_deposito'));
@@ -169,7 +172,7 @@ $cards = [
     'Atos Manuais' => $totalAtosManuais,
     'Recebido em Conta' => $totalRecebidoEmConta,
     'Recebido em Espécie' => $totalRecebidoEmEspecie,
-    'Total de Pagamentos' => $totalDePagamentos, // <-- Card novo
+    'Total de Pagamentos' => $totalDePagamentos,
     'Devoluções' => $totalDevolucoes,
     'Saídas e Despesas' => $totalSaidas,
     'Depósito do Caixa' => $totalDepositos,
