@@ -1481,16 +1481,27 @@ include(__DIR__ . '/db_connection.php');
                     // Atualiza os cards no topo do modal
                     var dataFormatada = formatDateForDisplay(data); // Usando função já existente para formatar a data
                     $('#detalhesModalLabel').html(`CAIXA DO DIA ${dataFormatada} - FUNCIONÁRIO: ${funcionarios}`);
-                    $('#cardTotalAtos').text(formatCurrency(detalhes.totalAtos));
-                    $('#cardTotalAtosManuais').text(formatCurrency(detalhes.totalAtosManuais));
-                    $('#cardTotalRecebidoConta').text(formatCurrency(detalhes.totalRecebidoConta));
-                    $('#cardTotalRecebidoEspecie').text(formatCurrency(detalhes.totalRecebidoEspecie));
-                    $('#cardTotalDevolucoes').text(formatCurrency(detalhes.totalDevolucoes));
-                    $('#cardTotalEmCaixa').text(formatCurrency(detalhes.totalEmCaixa));
-                    $('#cardSaidasDespesas').text(formatCurrency(detalhes.totalSaidasDespesas));
-                    $('#cardDepositoCaixa').text(formatCurrency(detalhes.totalDepositoCaixa));
-                    $('#cardSaldoTransportado').text(formatCurrency(detalhes.totalSaldoTransportado));
-                    $('#cardSaldoInicial').text(formatCurrency(detalhes.saldoInicial));
+                    // $('#cardTotalAtos').text(formatCurrency(detalhes.totalAtos));
+                    // $('#cardTotalAtosManuais').text(formatCurrency(detalhes.totalAtosManuais));
+                    // $('#cardTotalRecebidoConta').text(formatCurrency(detalhes.totalRecebidoConta));
+                    // $('#cardTotalRecebidoEspecie').text(formatCurrency(detalhes.totalRecebidoEspecie));
+                    // $('#cardTotalDevolucoes').text(formatCurrency(detalhes.totalDevolucoes));
+                    // $('#cardTotalEmCaixa').text(formatCurrency(detalhes.totalEmCaixa));
+                    // $('#cardSaidasDespesas').text(formatCurrency(detalhes.totalSaidasDespesas));
+                    // $('#cardDepositoCaixa').text(formatCurrency(detalhes.totalDepositoCaixa));
+                    // $('#cardSaldoTransportado').text(formatCurrency(detalhes.totalSaldoTransportado));
+                    // $('#cardSaldoInicial').text(formatCurrency(detalhes.saldoInicial));
+                    toggleCard('#cardTotalAtos', detalhes.totalAtos);
+                    toggleCard('#cardTotalAtosManuais', detalhes.totalAtosManuais);
+                    toggleCard('#cardTotalRecebidoConta', detalhes.totalRecebidoConta);
+                    toggleCard('#cardTotalRecebidoEspecie', detalhes.totalRecebidoEspecie);
+                    toggleCard('#cardTotalDevolucoes', detalhes.totalDevolucoes);
+                    toggleCard('#cardTotalEmCaixa', detalhes.totalEmCaixa);
+                    toggleCard('#cardSaidasDespesas', detalhes.totalSaidasDespesas);
+                    toggleCard('#cardDepositoCaixa', detalhes.totalDepositoCaixa);
+                    toggleCard('#cardSaldoTransportado', detalhes.totalSaldoTransportado);
+                    toggleCard('#cardSaldoInicial', detalhes.saldoInicial);
+
 
                     // Debugging logs
                     console.log("Saldo Inicial: " + detalhes.saldoInicial);
@@ -1665,6 +1676,16 @@ include(__DIR__ . '/db_connection.php');
                         `);
                     });
                     $('#totalSaldoTransportado').text(formatCurrency(totalSaldoTransportado));
+
+                    function toggleCard(selector, value) {
+                        const cardElement = $(selector).closest('.col-md-3');
+                        if (parseFloat(value) > 0) {
+                            $(selector).text(formatCurrency(value));
+                            cardElement.show();
+                        } else {
+                            cardElement.hide();
+                        }
+                    }
 
                     $('#detalhesModal').modal('show');
 
