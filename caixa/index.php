@@ -203,6 +203,19 @@ include(__DIR__ . '/db_connection.php');
             color: #777 !important;
         }
 
+        /* Azul petróleo */
+        .bg-petroleo {
+            background-color: #004d61 !important; /* azul petróleo */
+            color: white;
+        }
+
+        /* Modo dark */
+        body.dark-mode .bg-petroleo {
+            background-color: #cfe9f1 !important; /* tom claro para contraste */
+            color: #212529 !important;
+        }
+
+
     </style>
 </head>
 
@@ -463,7 +476,7 @@ include(__DIR__ . '/db_connection.php');
                             $stmt->execute();
                             $pagamentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             foreach ($pagamentos as $pagamento) {
-                                if (in_array($pagamento['forma_de_pagamento'], ['PIX', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'])) {
+                                if (in_array($pagamento['forma_de_pagamento'], ['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'])) {
                                     $totalRecebidoConta += $pagamento['total_pagamento'];
                                 } else if ($pagamento['forma_de_pagamento'] === 'Espécie') {
                                     $totalRecebidoEspecie += $pagamento['total_pagamento'];
@@ -613,7 +626,7 @@ include(__DIR__ . '/db_connection.php');
                 </div>
                 <div class="modal-body">
                     <div class="row">
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="card text-white bg-primary mb-3" style="background-color: #005d15 !important">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Saldo Inicial</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -621,7 +634,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="card text-white bg-primary mb-3">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Atos Liquidados</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -629,7 +642,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="card text-white" style="background-color: #6f42c1;">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Atos Manuais</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -637,7 +650,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="card text-white bg-warning mb-3">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Recebido em Conta</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -645,7 +658,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="card text-white bg-success mb-3">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Recebido em Espécie</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -653,7 +666,15 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
+                            <div class="card text-white bg-petroleo mb-3">
+                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Total Recebido</div>
+                                <div class="card-body" style="padding: 0.90rem;">
+                                    <h5 class="card-title" id="cardTotalRecebido">R$ 0,00</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
                             <div class="card text-white bg-secondary mb-3">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Devoluções</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -661,7 +682,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="card text-white bg-danger mb-3">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Saídas e Despesas</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -669,7 +690,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="card text-white bg-info mb-3">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Depósito do Caixa</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -677,7 +698,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="card text-white btn-4 mb-3">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Saldo Transportado</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -685,7 +706,7 @@ include(__DIR__ . '/db_connection.php');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <div class="card text-white bg-dark mb-3">
                                 <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Total em Caixa</div>
                                 <div class="card-body" style="padding: 0.90rem;">
@@ -1550,7 +1571,7 @@ include(__DIR__ . '/db_connection.php');
                                 <td>${formatCurrency(totalPorTipo[tipo])}</td>
                             </tr>
                         `);
-                        if (['PIX', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'].includes(tipo)) {
+                        if (['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'].includes(tipo)) {
                             totalRecebidoConta += totalPorTipo[tipo];
                         } else if (tipo === 'Espécie') {
                         totalRecebidoEspecie += totalPorTipo[tipo];
@@ -1558,6 +1579,9 @@ include(__DIR__ . '/db_connection.php');
                     }
                     $('#cardTotalRecebidoConta').text(formatCurrency(totalRecebidoConta));
                     $('#cardTotalRecebidoEspecie').text(formatCurrency(totalRecebidoEspecie));
+                    // Total Recebido = Conta + Espécie
+                    let totalRecebido = totalRecebidoConta + totalRecebidoEspecie;
+                    $('#cardTotalRecebido').text(formatCurrency(totalRecebido));
 
                     // Devoluções
                     var totalDevolucoes = 0;

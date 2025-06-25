@@ -614,6 +614,7 @@ include(__DIR__ . '/../menu.php');
                             <option value="Crédito">Crédito</option>
                             <option value="Débito">Débito</option>
                             <option value="PIX">PIX</option>
+                            <option value="Centrais Eletrônicas">Centrais Eletrônicas</option>
                             <option value="Transferência Bancária">Transferência Bancária</option>
                             <option value="Boleto">Boleto</option>
                             <option value="Cheque">Cheque</option>
@@ -1093,6 +1094,20 @@ include(__DIR__ . '/../menu.php');
                 confirmButtonText: 'OK'
             });
             return;
+        }
+
+        // Validação específica para pagamento em espécie: apenas centavos terminando em 0 ou 5
+        if (formaPagamento === 'Espécie') {
+            const centavos = Math.round((valorPagamento * 100) % 100);
+            if (centavos % 5 !== 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Valor inválido',
+                    text: 'Para pagamentos em espécie, os centavos devem terminar em 0 ou 5. Ex: 174,70 ou 174,75.',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
         }
 
         var existeDuplicado = pagamentos.some(function(p) {
