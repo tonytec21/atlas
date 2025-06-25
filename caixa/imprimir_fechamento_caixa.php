@@ -201,6 +201,7 @@ $html = '<table cellspacing="5" cellpadding="5" border="0" width="100%">';
 
 $count = 0;
 foreach ($cards as $titulo => $valor) {
+    if (floatval($valor) <= 0) continue;
     $cor = $cardColors[$titulo] ?? '#000';
 
     if ($count % 3 == 0) {
