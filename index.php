@@ -807,9 +807,9 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                     <div id="tarefas-list" class="task-list-container"></div>  
                 </div>  
             </div>  
-            <div class="modal-footer">  
+            <!-- <div class="modal-footer">  
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>  
-            </div>  
+            </div>   -->
         </div>  
     </div>  
 </div>  
