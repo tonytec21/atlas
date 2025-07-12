@@ -741,7 +741,7 @@ $mode_query->close();
             <i class="fas fa-bars"></i>  
         </button>  
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>" style="text-decoration: none; margin-left: 20px;">  
-            <img id="logo-img" src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/' . ($mode === 'dark-mode' ? 'atlas1.png' : 'atlas2.png')?>" alt="Atlas" style="height: 40px;">  
+            <img id="logo-img" src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/' . ($mode === 'dark-mode' ? 'atlas_nova_logo2.png' : 'atlas_nova_logo1.png')?>" alt="Atlas" style="height: 40px;">  
         </a>  
     </div>
 
@@ -791,7 +791,7 @@ $mode_query->close();
 
             // Atualiza o logo baseado no modo  
             const baseUrl = '<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/'?>';  
-            logoImg.src = baseUrl + (newMode === 'dark-mode' ? 'atlas1.png' : 'atlas2.png');  
+            logoImg.src = baseUrl + (newMode === 'dark-mode' ? 'atlas_nova_logo2.png' : 'atlas_nova_logo1.png');  
 
             $.ajax({  
                 url: '<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/save_mode.php'?>',  
@@ -937,7 +937,7 @@ $mode_query->close();
                     body.classList.add(mode);  
                     
                     modeIcon.className = `fas ${mode === 'dark-mode' ? 'fa-moon' : 'fa-sun'}`;  
-                    logoImg.src = baseUrl + (mode === 'dark-mode' ? 'atlas1.png' : 'atlas2.png');  
+                    logoImg.src = baseUrl + (mode === 'dark-mode' ? 'atlas_nova_logo2.png' : 'atlas_nova_logo1.png');  
                 }  
             });     
         });

@@ -22,7 +22,7 @@ if (strpos($output, 'Already up to date.') !== false) {
     <title>ATLAS</title>
     <link rel="stylesheet" href="style/css/bootstrap.min.css">
     <link rel="stylesheet" href="style/css/custom.css">
-    <link rel="icon" href="style/img/favicon.png" type="image/png">
+    <link rel="icon" href="style/img/favicon_novo.png" type="image/png">
     <link href='https://fonts.googleapis.com/css?family=Poppins' rel='stylesheet'>
     <style>
         body {
@@ -33,9 +33,9 @@ if (strpos($output, 'Already up to date.') !== false) {
 <body>
     <div class="container mt-5">
         <div class="brand">
-            <img src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/atlas.png'?>" alt="Atlas" style="vertical-align: middle;width: 150px;">
+            <img src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/atlas_nova_logo_login.png'?>" alt="Atlas" style="vertical-align: middle;width: 150px;">
         </div>
-        <h2>Login</h2>
+        <!-- <h2>Login</h2> -->
         <?php if (isset($_GET['error'])): ?>
             <?php if ($_GET['error'] == 1): ?>
                 <div class="alert alert-danger">Usuário ou senha incorretos. Tente novamente.</div>

@@ -32,7 +32,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
     <link rel="stylesheet" href="style/css/bootstrap.min.css">  
     <link rel="stylesheet" href="style/css/font-awesome.min.css">  
     <link rel="stylesheet" href="style/css/style.css">  
-    <link rel="icon" href="style/img/favicon.png" type="image/png">  
+    <link rel="icon" href="style/img/favicon_novo.png" type="image/png">  
     <?php include(__DIR__ . '/style/style_index.php'); ?>  
     <style>  
         body {  
