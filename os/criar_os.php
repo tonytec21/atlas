@@ -132,7 +132,7 @@ include(__DIR__ . '/../menu.php');
             <div class="form-row">
                 <div class="form-group col-md-12">
                     <label for="descricao">Descrição:</label>
-                    <input type="text" class="form-control" id="descricao" name="descricao" readonly>
+                    <input type="text" class="form-control" id="descricao" name="descricao" required readonly>
                 </div>
             </div>
             <div class="form-row">
@@ -154,7 +154,7 @@ include(__DIR__ . '/../menu.php');
                 </div>
                 <div class="form-group col-md-2">
                     <label for="total">Total:</label>
-                    <input type="text" class="form-control" id="total" name="total" readonly>
+                    <input type="text" class="form-control" id="total" name="total" required readonly>
                 </div>
                 <div class="form-group col-md-2" style="margin-top: 32px;">
                     <button type="submit" style="width: 100%" class="btn btn-success"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar à OS</button>
