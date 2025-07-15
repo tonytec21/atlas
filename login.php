@@ -22,7 +22,7 @@ if (strpos($output, 'Already up to date.') !== false) {
     <title>ATLAS</title>
     <link rel="stylesheet" href="style/css/bootstrap.min.css">
     <link rel="stylesheet" href="style/css/custom.css">
-    <link rel="icon" href="style/img/favicon_novo.png" type="image/png">
+    <link rel="icon" href="style/img/favicon.png" type="image/png">
     <link href='https://fonts.googleapis.com/css?family=Poppins' rel='stylesheet'>
     <style>
         body {
