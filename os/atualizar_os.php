@@ -8,7 +8,7 @@ $issPercentual = isset($issCfg['percentual']) ? (float)$issCfg['percentual'] : 0
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $os_id = $_POST['os_id'];
-    $cliente = $_POST['cliente'];
+    $cliente = mb_strtoupper(trim($_POST['cliente']), 'UTF-8');
     $cpf_cliente = $_POST['cpf_cliente'];
     $total_os = str_replace(',', '.', $_POST['total_os']);
     $base_calculo = str_replace(',', '.', $_POST['base_calculo']);

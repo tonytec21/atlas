@@ -624,11 +624,12 @@ function adicionarISS() {
 }
 
 function adicionarAtoManual() {
-    $('#descricao').prop('readonly', false);
-    $('#emolumentos').prop('readonly', false);
-    $('#ferc').prop('readonly', false);
-    $('#fadep').prop('readonly', false);
-    $('#femp').prop('readonly', false);
+    $('#ato').val('0');                  
+    $('#descricao').val('').prop('readonly', false);
+    $('#emolumentos').val('0,00').prop('readonly', false);
+    $('#ferc').val('0,00').prop('readonly', false);
+    $('#fadep').val('0,00').prop('readonly', false);
+    $('#femp').val('0,00').prop('readonly', false);
     $('#total').prop('readonly', false);
 }
 
@@ -645,7 +646,7 @@ function adicionarItem() {
     var total = parseFloat($('#total').val().replace(/\./g, '').replace(',', '.')) || 0;
 
     if (isNaN(total) || total <= 0) {
-        showAlert("Por favor, clique em 'Buscar Ato' antes de adicionar à OS.", 'error');
+        showAlert("Por favor, preencha o Valor Total do ato antes de adicionar à O.S.", 'error');
         return;
     }
 
