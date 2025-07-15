@@ -16,9 +16,6 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../../style/css/style.css">
     <link rel="stylesheet" href="../../style/css/dataTables.bootstrap4.min.css">
-    <script src="../../script/jquery-3.6.0.min.js"></script>
-    <script src="../../script/bootstrap.bundle.min.js"></script>
-    <script src="../../script/sweetalert2.js"></script>
     <style>
         .modal-lg {
             max-width: 60%;
@@ -485,6 +482,9 @@ date_default_timezone_set('America/Sao_Paulo');
         </div>
     </div>
 
+    <script src="../../script/jquery-3.6.0.min.js"></script>
+    <script src="../../script/bootstrap.bundle.min.js"></script>
+    <script src="../../script/sweetalert2.js"></script>
     <script src="../../script/jquery.dataTables.min.js"></script>
     <script src="../../script/dataTables.bootstrap4.min.js"></script>
     <script>
