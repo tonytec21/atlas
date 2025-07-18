@@ -8,6 +8,14 @@ $issAtivo      = !empty($issConfig['ativo']);
 $issPercentual = isset($issConfig['percentual']) ? (float)$issConfig['percentual'] : 0;
 $issDescricao  = isset($issConfig['descricao'])   ? $issConfig['descricao']         : 'ISS sobre Emolumentos';
 
+/* -------------------------------------------------
+   Lista de atos que podem ter valor 0 (exceção)
+   -------------------------------------------------*/
+$atosSemValor = json_decode(
+    file_get_contents(__DIR__ . '/atos_valor_zero.json'),
+    true
+);
+
 if (!isset($_GET['id'])) {
     die('ID da OS não fornecido');
 }
@@ -345,6 +353,9 @@ include(__DIR__ . '/../menu.php');
         descricao: "<?php echo addslashes($issDescricao); ?>"
     };
 
+    /* ---------- lista de exceções (atos com valor 0) ---------- */
+    const ATOS_SEM_VALOR = <?php echo json_encode($atosSemValor, JSON_UNESCAPED_UNICODE); ?>;
+
     $(function() {
     // Tornar as linhas da tabela arrastáveis
     $("#itensTable").sortable({
@@ -506,6 +517,11 @@ function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
                             fadep *= (1 - desconto);
                             femp *= (1 - desconto);
 
+                            /* ───────── EXCEÇÃO: zerar valores se o ato estiver na lista ───────── */
+                            if (ATOS_SEM_VALOR.includes(ato.trim())) {
+                                emolumentos = ferc = fadep = femp = 0;
+                            }
+
                             callback({
                                 descricao: response.DESCRICAO,
                                 emolumentos: emolumentos.toFixed(2).replace('.', ','),
@@ -645,7 +661,10 @@ function adicionarItem() {
     var femp = parseFloat($('#femp').val().replace(/\./g, '').replace(',', '.')) || 0;
     var total = parseFloat($('#total').val().replace(/\./g, '').replace(',', '.')) || 0;
 
-    if (isNaN(total) || total <= 0) {
+    const codigoAto = ato.trim();
+    const isExcecao = ATOS_SEM_VALOR.includes(codigoAto);
+
+    if ((isNaN(total) || total <= 0) && !isExcecao) {
         showAlert("Por favor, preencha o Valor Total do ato antes de adicionar à O.S.", 'error');
         return;
     }

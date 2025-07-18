@@ -7,6 +7,13 @@ $issConfig     = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), tr
 $issAtivo      = !empty($issConfig['ativo']);
 $issPercentual = isset($issConfig['percentual']) ? (float)$issConfig['percentual'] : 0;
 $issDescricao  = isset($issConfig['descricao'])   ? $issConfig['descricao']         : 'ISS sobre Emolumentos';
+
+/* -------------------------------------------------
+   Lista de atos que PODEM ter valor 0 (exceção)   */
+$atosSemValor = json_decode(
+    file_get_contents(__DIR__ . '/atos_valor_zero.json'),
+    true
+);
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -234,6 +241,9 @@ include(__DIR__ . '/../menu.php');
         descricao: "<?php echo addslashes($issDescricao); ?>"
     };
 
+    /* ---------- lista de exceções ---------- */
+    const ATOS_SEM_VALOR = <?php echo json_encode($atosSemValor, JSON_UNESCAPED_UNICODE); ?>;
+
     $(document).ready(function() {
     // Inicializa a funcionalidade de arrastar e soltar na tabela de itens
     $("#itensTable").sortable({
@@ -383,7 +393,10 @@ $(document).ready(function() {
         // Contar quantos itens existem na tabela e usar esse valor como ordem
         var ordemExibicao = $('#itensTable tr').length + 1;
 
-        if (isNaN(total) || total <= 0) {
+        const codigoAto  = ato.trim();
+        const isExcecao  = ATOS_SEM_VALOR.includes(codigoAto);
+
+        if ((isNaN(total) || total <= 0) && !isExcecao) {
             showAlert("Por favor, preencha o Valor Total do ato antes de adicionar à O.S.", 'error');
             return;
         }
@@ -465,6 +478,11 @@ function buscarAto() {
                     ferc = ferc * (1 - desconto);
                     fadep = fadep * (1 - desconto);
                     femp = femp * (1 - desconto);
+
+                    /* ───────── EXCEÇÃO: zerar valores se o ato estiver na lista ───────── */
+                    if (ATOS_SEM_VALOR.includes(ato.trim())) {
+                        emolumentos = ferc = fadep = femp = 0;
+                    }
 
                     $('#descricao').val(response.DESCRICAO);
                     $('#emolumentos').val(emolumentos.toFixed(2).replace('.', ','));
