@@ -267,7 +267,7 @@ include(__DIR__ . '/../menu.php');
         // Aqui você pode enviar via AJAX a nova ordem para o servidor, se necessário
         var ordem = [];
         $('#itensTable tr').each(function(index) {
-            var itemId = $(this).data('item-id'); // Supondo que cada item tem um ID único
+            var itemId = $(this).data('item-id');
             ordem.push({ id: itemId, ordem: index + 1 });
         });
 
