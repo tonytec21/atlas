@@ -75,7 +75,7 @@ $connAtlas->close();
     <link rel="stylesheet" href="style/css/bootstrap.min.css">
     <link rel="stylesheet" href="style/css/font-awesome.min.css">
     <link rel="stylesheet" href="style/css/style.css">
-    <link rel="icon" href="style/img/favicon.png" type="image/png">
+    <link rel="icon" href="style/img/favicon_novo.png" type="image/png">
     <script src="script/chart.js"></script>
     <style>
         .chart-container {

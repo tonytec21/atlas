@@ -75,7 +75,7 @@ class LivroDepositoPDF extends TCPDF
 
 // Instanciar o PDF com otimizações  
 $pdf = new LivroDepositoPDF();  
-$pdf->SetCompression(true); // Comprimir para melhorar performance  
+$pdf->SetCompression(true);  
 $pdf->SetAutoPageBreak(true, 25);  
 $pdf->AddPage();  
 $pdf->SetFont('helvetica', 'B', 12);  
@@ -106,6 +106,8 @@ ob_start();
 
 // Contador para gerenciamento de memória  
 $contador = 0;  
+
+$numero_ordem = 1;
 
 while ($os = $os_query->fetch_assoc()) {  
     // Verificar se precisa de nova página antes de adicionar conteúdo  
@@ -206,15 +208,17 @@ while ($os = $os_query->fetch_assoc()) {
     // Tabela Principal da OS com a nova célula "OBSERVAÇÕES"  
     $pdf->SetFillColor(242, 242, 242);  
     $pdf->SetFont('helvetica', 'B', 8);  
+    $pdf->Cell(15, 6, 'ORDEM', 1, 0, 'C', true); 
     $pdf->Cell(15, 6, 'Nº OS', 1, 0, 'C', true);  
-    $pdf->Cell(95, 6, 'APRESENTANTE', 1, 0, 'C', true);  
+    $pdf->Cell(80, 6, 'APRESENTANTE', 1, 0, 'C', true);  
     $pdf->Cell(30, 6, 'CPF/CNPJ', 1, 0, 'C', true);  
     $pdf->Cell(30, 6, 'TOTAL OS (R$)', 1, 0, 'C', true);  
     $pdf->Cell(20, 6, 'DATA OS', 1, 1, 'C', true);  
 
     $pdf->SetFont('helvetica', '', 8);  
+    $pdf->Cell(15, 6, $numero_ordem, 1); 
     $pdf->Cell(15, 6, $os_id, 1);  
-    $pdf->Cell(95, 6, $cliente, 1);  
+    $pdf->Cell(80, 6, $cliente, 1);  
     $pdf->Cell(30, 6, $cpf_cnpj, 1);  
     $pdf->Cell(30, 6, $total_os, 1);  
     $pdf->Cell(20, 6, $data_os, 1, 1);  
@@ -243,6 +247,8 @@ while ($os = $os_query->fetch_assoc()) {
         unset($devolucoes);  
         gc_collect_cycles();  
     }  
+
+    $numero_ordem++;
 }  
 
 // Fechar statements  
