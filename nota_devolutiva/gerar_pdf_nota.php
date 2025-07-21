@@ -124,10 +124,10 @@ class PDF extends TCPDF
     // Adicionar parágrafo com recuo na primeira linha  
     public function AddParagraph($text, $lineHeight)  
     {  
-        $this->SetX(25); // Recuo da margem esquerda  
+        $this->SetX(15); // Recuo da margem esquerda  
         $paragraphs = explode("\n", $text);  
         foreach ($paragraphs as $paragraph) {  
-            $this->SetX(25);  
+            $this->SetX(15);  
             $paragraph = ltrim($paragraph, "\t"); // Remove o tab no início do parágrafo  
             $this->WriteHTML('<p style="text-align:justify; text-indent:2cm;">' . htmlspecialchars_decode($paragraph) . '</p>');  
         }  
@@ -138,7 +138,7 @@ class PDF extends TCPDF
 $pdf = new PDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);  
 $pdf->SetCreator(PDF_CREATOR);  
 $pdf->SetTitle('Nota Devolutiva ' . $notaData['numero']);  
-$pdf->SetMargins(25, 45, 25); // Definir as margens (em mm): esquerda, superior, direita  
+$pdf->SetMargins(15, 45, 15); // Definir as margens (em mm): esquerda, superior, direita  
 $pdf->SetAutoPageBreak(true, 25); // Definir a margem inferior  
 $pdf->AddPage();  
 
