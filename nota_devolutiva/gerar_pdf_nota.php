@@ -146,38 +146,38 @@ $pdf->AddPage();
 $lineHeight = 10 * 0.5;  
 
 // Cidade e data  
-$pdf->SetFont('helvetica', '', 12);  
+$pdf->SetFont('helvetica', '', 11);  
 $pdf->Cell(0, $lineHeight, $cidade . ', ' . formatDateToBrazilian($notaData['data']) . '.', 0, 1, 'R');  
 $pdf->Ln(5);  
 
 // Protocolo  
-$pdf->SetFont('helvetica', 'B', 12);  
+$pdf->SetFont('helvetica', 'B', 11);  
 $pdf->writeHTML('<div style="text-align: justify;">Protocolo: ' . ($notaData['protocolo']) . '</div>', true, false, true, false, '');  
 $pdf->Ln(1);  
 
 // Data do protocolo (se existir)  
 if (!empty($notaData['data_protocolo'])) {  
-    $pdf->SetFont('helvetica', '', 12);  
+    $pdf->SetFont('helvetica', '', 11);  
     $dataProtocolo = new DateTime($notaData['data_protocolo']);  
     $pdf->writeHTML('<div style="text-align: justify;">Data do Protocolo: ' . $dataProtocolo->format('d/m/Y') . '</div>', true, false, true, false, '');  
     $pdf->Ln(1);  
 }  
 
 // Apresentante  
-$pdf->SetFont('helvetica', '', 12);  
+$pdf->SetFont('helvetica', '', 11);  
 $pdf->writeHTML('<div style="text-align: justify;">' . 'Apresentante: '. ($notaData['apresentante']) .'</div>', true, false, true, false, '');  
 $pdf->Ln(1);  
 
 // CPF/CNPJ (se existir)  
 if (!empty($notaData['cpf_cnpj'])) {  
-    $pdf->SetFont('helvetica', '', 12);  
+    $pdf->SetFont('helvetica', '', 11);  
     $pdf->writeHTML('<div style="text-align: justify;">CPF/CNPJ: ' . $notaData['cpf_cnpj'] . '</div>', true, false, true, false, '');  
     $pdf->Ln(1);  
 }  
 
 // Processo de referência (se houver)  
 // if (!empty($notaData['processo_referencia'])) {  
-//     $pdf->SetFont('helvetica', '', 12);  
+//     $pdf->SetFont('helvetica', '', 11);  
 //     $pdf->writeHTML('<div style="text-align: justify;">Processo de Referência: ' . nl2br($notaData['processo_referencia']) . '</div>', true, false, true, false, '');   
 //     $pdf->Ln(2);  
 // }  
@@ -186,13 +186,13 @@ if (!empty($notaData['cpf_cnpj'])) {
 
 // Título  
 if (!empty($notaData['titulo'])) {   
-    $pdf->SetFont('helvetica', '', 12);  
+    $pdf->SetFont('helvetica', '', 11);  
     $pdf->writeHTML('<div style="text-align: justify;">Título Apresentado: ' . ($notaData['titulo']) . '</div>', true, false, true, false, '');  
     
     // Origem do título (se existir)  
     if (!empty($notaData['origem_titulo'])) {  
         $pdf->Ln(2);  
-        $pdf->SetFont('helvetica', '', 12);  
+        $pdf->SetFont('helvetica', '', 11);  
         $pdf->writeHTML('<div style="text-align: justify;">Origem do Título: ' . $notaData['origem_titulo'] . '</div>', true, false, true, false, '');  
     }  
     
@@ -200,17 +200,17 @@ if (!empty($notaData['titulo'])) {
 }  
 
 // // Adicionar o título "Motivos da Devolução" antes do conteúdo do corpo  
-// $pdf->SetFont('helvetica', 'B', 12);  
+// $pdf->SetFont('helvetica', 'B', 11);  
 // $pdf->writeHTML('<div style="text-align: justify;">MOTIVO DA DEVOLUÇÃO:</div>', true, false, true, false, '');  
 // $pdf->Ln(2);  
 
 // Número da nota devolutiva  
-$pdf->SetFont('helvetica', 'B', 12);  
+$pdf->SetFont('helvetica', 'B', 11);  
 $pdf->writeHTML('<div style="text-align: center;">NOTA DEVOLUTIVA Nº.: ' . $notaData['numero'] . '</div>', true, false, true, false, '');  
 $pdf->Ln(5);  
 
 // Processar o corpo da nota devolutiva  
-$pdf->SetFont('helvetica', '', 12);  
+$pdf->SetFont('helvetica', '', 11);  
 
 // Decodificar o conteúdo HTML do banco de dados  
 $conteudoNota = html_entity_decode($notaData['corpo']);  
@@ -233,7 +233,7 @@ foreach ($partes as $parte) {
     // Verificar se é uma <table>  
     elseif (preg_match('/<table.*?<\/table>/is', $parte)) {  
         // Renderizar a tabela diretamente com o HTML completo  
-        $pdf->SetFont('helvetica', '', 12);  
+        $pdf->SetFont('helvetica', '', 11);  
         $pdf->writeHTML($parte, true, false, true, false, '');  
         $pdf->Ln(5);  
     } else {  
@@ -253,11 +253,11 @@ foreach ($partes as $parte) {
 // Adicionar seção de Prazo Para Cumprimento (se houver)  
 if (!empty($notaData['prazo_cumprimento'])) {  
     $pdf->Ln(3);  
-    $pdf->SetFont('helvetica', 'B', 12);  
+    $pdf->SetFont('helvetica', 'B', 11);  
     $pdf->writeHTML('<div style="text-align: justify;">PRAZO PARA CUMPRIMENTO:</div>', true, false, true, false, '');  
     $pdf->Ln(2);  
     
-    $pdf->SetFont('helvetica', '', 12);  
+    $pdf->SetFont('helvetica', '', 11);  
     
     // Decodificar o conteúdo HTML do prazo  
     $conteudoPrazo = html_entity_decode($notaData['prazo_cumprimento']);  
@@ -280,7 +280,7 @@ if (!empty($notaData['prazo_cumprimento'])) {
         // Verificar se é uma <table>  
         elseif (preg_match('/<table.*?<\/table>/is', $parte)) {  
             // Renderizar a tabela diretamente com o HTML completo  
-            $pdf->SetFont('helvetica', '', 12);  
+            $pdf->SetFont('helvetica', '', 11);  
             $pdf->writeHTML($parte, true, false, true, false, '');  
             $pdf->Ln(5);  
         } else {  
@@ -301,17 +301,17 @@ if (!empty($notaData['prazo_cumprimento'])) {
 // // Dados complementares (se houver)  
 // if (!empty($notaData['dados_complementares'])) {  
 //     $pdf->Ln(5);  
-//     $pdf->SetFont('helvetica', 'B', 12);  
+//     $pdf->SetFont('helvetica', 'B', 11);  
 //     $pdf->Cell(0, $lineHeight, 'Dados Complementares:', 0, 1, 'L');  
 //     $pdf->Ln(2);  
     
-//     $pdf->SetFont('helvetica', '', 12);  
+//     $pdf->SetFont('helvetica', '', 11);  
 //     $pdf->writeHTML('<div style="text-align: justify;">' . nl2br($notaData['dados_complementares']) . '</div>', true, false, true, false, '');  
 //     $pdf->Ln(8);  
 // }  
 
 // Assinatura  
-$pdf->SetFont('helvetica', '', 12);  
+$pdf->SetFont('helvetica', '', 11);  
 $pdf->writeHTML('<p style="text-indent: 20mm; text-align: justify;">Atenciosamente,</p>', true, false, true, false);  
 $pdf->Ln(15);  
 
@@ -340,9 +340,9 @@ if ($signatureImage) {
 }  
 
 $pdf->Cell(0, $lineHeight, '__________________________________', 0, 1, 'C');  
-$pdf->SetFont('helvetica', 'B', 12);  
+$pdf->SetFont('helvetica', 'B', 11);  
 $pdf->Cell(0, $lineHeight, ($notaData['assinante']), 0, 1, 'C');  
-$pdf->SetFont('helvetica', '', 12);  
+$pdf->SetFont('helvetica', '', 11);  
 $pdf->Cell(0, $lineHeight, ($notaData['cargo_assinante']), 0, 1, 'C');  
 
 // Gerar o PDF  
