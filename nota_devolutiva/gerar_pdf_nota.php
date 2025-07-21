@@ -110,7 +110,7 @@ class PDF extends TCPDF
 
         // Restaurar as margens e o AutoPageBreak para o conteúdo subsequente  
         $this->SetAutoPageBreak(true, 25); // Restaurar o AutoPageBreak com a margem inferior de 2.5cm  
-        $this->SetMargins(25, 45, 25);  // Restaurar as margens para o conteúdo  
+        $this->SetMargins(15, 45, 15);  // Restaurar as margens para o conteúdo  
         $this->SetY(35); // Ajuste para garantir que o conteúdo não sobreponha a imagem  
     }  
 
