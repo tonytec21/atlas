@@ -164,7 +164,7 @@ if (!empty($notaData['data_protocolo'])) {
 }  
 
 // Apresentante  
-$pdf->SetFont('helvetica', '', 11);  
+$pdf->SetFont('helvetica', 'B', 11);  
 $pdf->writeHTML('<div style="text-align: justify;">' . 'Apresentante: '. ($notaData['apresentante']) .'</div>', true, false, true, false, '');  
 $pdf->Ln(1);  
 
