@@ -24,6 +24,7 @@
                 </div>  
             </div>  
             <div class="modal-footer">  
+                <button type="button" class="btn btn-secondary" id="btnEditNota"><i class="fa fa-pencil"></i> Editar</button>  
                 <button type="button" class="btn btn-primary" id="btnPrintNota"><i class="fa fa-print" aria-hidden="true"></i> Imprimir</button>  
             </div>  
         </div>  

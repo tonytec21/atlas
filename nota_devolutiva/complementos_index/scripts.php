@@ -296,6 +296,12 @@
         const numero = $('#viewNotaModalLabel').text().replace('Nota Devolutiva ', '');  
         window.open('gerar_pdf_nota.php?numero=' + numero, '_blank');  
     });  
+
+    // Função para redirecionar para edição da nota  
+    $(document).on('click', '#btnEditNota', function() {  
+        const numero = $('#viewNotaModalLabel').text().replace('Nota Devolutiva ', '');  
+        window.location.href = 'editar-nota-devolutiva.php?numero=' + numero;  
+    });
     
     // Função para aplicar a cor do status ao select  
     function applyStatusColor(status) {  
