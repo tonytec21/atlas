@@ -725,6 +725,10 @@ $mode_query->close();
                         <i class="fas fa-university"></i>  
                         <span>Configuração de Contas</span>  
                     </a>  
+                    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas_recorrentes.php'?>">  
+                        <i class="fas fa-tasks"></i>  
+                        <span>Tarefas Recorrentes</span>  
+                    </a>  
                 <?php endif; ?>  
                 <?php if ($nivel_de_acesso === 'administrador' || $tem_acesso_cadastro_funcionarios): ?>  
                     <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/cadastro-funcionario.php'?>">  

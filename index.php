@@ -32,7 +32,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
     <link rel="stylesheet" href="style/css/bootstrap.min.css">  
     <link rel="stylesheet" href="style/css/font-awesome.min.css">  
     <link rel="stylesheet" href="style/css/style.css">  
-    <link rel="icon" href="style/img/favicon_novo.png" type="image/png">  
+    <link rel="icon" href="style/img/favicon.png" type="image/png">  
     <?php include(__DIR__ . '/style/style_index.php'); ?>  
     <style>  
         body {  
@@ -518,6 +518,69 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             border-color: #333;  
             color: #e0e0e0;  
         }  
+
+        .modal-alert-recorrente {
+        background: #8B0000; /* vermelho escuro */
+        color: #fff;
+        border: none;
+        }
+
+        .modal-alert-recorrente .titulo-alerta {
+        font-weight: 800;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        }
+
+        .modal-alert-recorrente .icone-alerta {
+        font-size: 80px;
+        line-height: 1;
+        color: #fff;
+        animation: pulsar 1.2s infinite;
+        }
+
+        .modal-alert-recorrente .form-check-input:checked {
+        background-color: #fff;
+        border-color: #fff;
+        }
+        .modal-alert-recorrente .form-check-label {
+        color: #fff;
+        }
+
+        .modal-alert-recorrente textarea {
+        background: rgba(255,255,255,0.15);
+        color: #fff;
+        border: 2px solid #fff;
+        }
+        .modal-alert-recorrente textarea::placeholder {
+        color: #f1f1f1;
+        }
+
+        .modal-alert-recorrente .btn-light {
+        background:#fff;
+        color:#8B0000;
+        border:none;
+        box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
+        }
+        .modal-alert-recorrente .btn-light:hover {
+        filter: brightness(0.9);
+        }
+
+        .modal-alert-recorrente .texto-bloqueio {
+        opacity:0.85;
+        }
+
+        @keyframes pulsar {
+        0%,100% { transform: scale(1); }
+        50% { transform: scale(1.15); }
+        }
+
+        /* Blur no fundo enquanto o modal estiver aberto */
+        .modal-backdrop.show {
+        backdrop-filter: blur(6px);
+        background-color: rgba(0,0,0,0.4); /* escurece levemente */
+        }
+
+
     </style>  
 </head>  
 <body class="light-mode">  
@@ -832,6 +895,58 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
     </div>  
 </div>  
 
+
+<!-- Modal – Tarefa Recorrente Obrigatória (FULLSCREEN) -->
+<div class="modal fade" id="recorrenteModal"
+     tabindex="-1" aria-hidden="true"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-fullscreen">
+    <form id="formCumprirRecorrente" class="modal-content modal-alert-recorrente">
+      <div class="modal-body d-flex flex-column justify-content-center align-items-center text-center">
+        
+        <div class="icone-alerta mb-4">
+          <i class="fa fa-exclamation-triangle"></i>
+        </div>
+
+        <h2 class="titulo-alerta mb-3">ATENÇÃO! TAREFA OBRIGATÓRIA</h2>
+        <p id="recorrenteDescricao" class="lead mb-4"></p>
+
+        <div class="opcoes-status mb-3">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="status" id="optCumprida" value="cumprida" checked>
+            <label class="form-check-label fw-bold" for="optCumprida">Cumprida</label>
+          </div>
+          <div class="form-check form-check-inline ms-4">
+            <input class="form-check-input" type="radio" name="status" id="optNaoCumprida" value="nao_cumprida">
+            <label class="form-check-label fw-bold" for="optNaoCumprida">Não Cumprida</label>
+          </div>
+        </div>
+
+        <div class="w-100" style="max-width:600px;">
+          <textarea name="justificativa" id="campoJustificativa"
+                    class="form-control d-none"
+                    rows="4"
+                    placeholder="Explique o motivo de NÃO ter cumprido a tarefa (obrigatório)."></textarea>
+        </div>
+
+        <input type="hidden" name="exec_id" id="exec_id">
+
+        <div class="mt-5 d-flex gap-3">
+          <button type="submit" class="btn btn-light btn-lg fw-bold px-5">
+            CONFIRMAR
+          </button>
+        </div>
+
+        <small class="mt-4 texto-bloqueio">
+          Você não poderá acessar o sistema enquanto não confirmar esta tarefa.
+        </small>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+
 <script src="script/jquery-ui.min.js"></script>  
 <script src="script/bootstrap.min.js"></script>  
 <script src="script/jquery.mask.min.js"></script>  
@@ -1073,7 +1188,105 @@ $(document).ready(function() {
     $('.mode-switch').on('click', function() {  
         $('body').toggleClass('dark-mode light-mode');  
     });  
+
+
+/* ------------------------------------------------------------------
+   Verifica tarefas recorrentes que devem aparecer agora
+------------------------------------------------------------------*/
+$(function () {
+
+  const $modal              = $('#recorrenteModal');
+  const $form               = $('#formCumprirRecorrente');
+  const $btnAdiar           = $('#btnAdiar');        // botão “Adiar” (não-obrigatória)
+  const $campoJustificativa = $('#campoJustificativa');
+  const $optCumprida        = $('#optCumprida');
+  const $optNaoCumprida     = $('#optNaoCumprida');
+
+  /* --------- carrega uma tarefa pendente --------- */
+  $.getJSON('verificar_recorrentes.php', resp => {
+      if (!resp || !resp.length) return;
+
+      const t = resp[0];
+      $('#recorrenteDescricao').text(`${t.titulo} – ${t.descricao || ''}`);
+      $('#exec_id').val(t.exec_id);
+
+      /* mostra ou oculta botão ADIAR */
+      if (parseInt(t.obrigatoria, 10) === 0) {
+          $btnAdiar.removeClass('d-none');
+      } else {
+          $btnAdiar.addClass('d-none');
+      }
+
+      /* reseta campos */
+      $optCumprida.prop('checked', true).trigger('change');
+      $campoJustificativa.val('');
+      $('#inputStatusAdiar').remove();        // hidden que criamos ao adiar
+
+      /* abre modal (bloqueante) */
+      $modal.modal({ backdrop: 'static', keyboard: false }).modal('show');
+  });
+
+  /* ------------------------------------------------------------------
+     Mostrar / ocultar justificativa
+  ------------------------------------------------------------------*/
+  $optNaoCumprida.on('change', function () {
+      $campoJustificativa
+        .toggleClass('d-none', !this.checked)
+        .prop('required', this.checked);
+  });
+  $optCumprida.on('change', function () {
+      if (this.checked) {
+          $campoJustificativa.addClass('d-none')
+                             .prop('required', false)
+                             .val('');
+      }
+  });
+
+  /* ------------------------------------------------------------------
+     Botão ADIAR (só para tarefas não-obrigatórias)
+  ------------------------------------------------------------------*/
+  $btnAdiar.on('click', function () {
+      /* cria (ou atualiza) campo hidden com status = adiada */
+      let $hidden = $('#inputStatusAdiar');
+      if (!$hidden.length) {
+          $hidden = $('<input>', {
+              type: 'hidden',
+              id:   'inputStatusAdiar',
+              name: 'status'
+          }).appendTo($form);
+      }
+      $hidden.val('adiada');
+
+      /* desabilita rádios para não enviar valores duplicados */
+      $optCumprida.prop('disabled', true);
+      $optNaoCumprida.prop('disabled', true);
+
+      $form.submit();
+  });
+
+  /* ------------------------------------------------------------------
+     Enviar confirmação (cumprida / não cumprida / adiada)
+  ------------------------------------------------------------------*/
+  $form.on('submit', function (e) {
+      e.preventDefault();
+
+      $.post('cumprir_recorrente.php', $(this).serialize(), () => {
+          $modal.modal('hide');
+
+          /* limpa/rehabilita para próxima vez */
+          $('#inputStatusAdiar').remove();
+          $optCumprida.prop('disabled', false);
+          $optNaoCumprida.prop('disabled', false);
+      });
+  });
+
+});
+
+
+
 });  
+
+
 </script>  
 
 <?php include(__DIR__ . '/rodape.php'); ?>  
