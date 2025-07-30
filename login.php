@@ -213,7 +213,7 @@ body{
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill"></i> Aviso de Pendência</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <!-- <button type="button" class="btn-close" data-bs-dismiss="modal"></button> -->
       </div>
       <div class="modal-body">
         <p class="mb-0"><?= $modalMensagem ?></p>
