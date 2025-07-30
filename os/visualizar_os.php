@@ -625,7 +625,7 @@ include(__DIR__ . '/../menu.php');
                         <input type="text" class="form-control" id="valor_pagamento">
                     </div>
                 </div>
-                <button type="button" class="btn btn-primary w-100" onclick="adicionarPagamento()">Adicionar</button>
+                <button type="button" id="btnAdicionarPagamento" class="btn btn-primary w-100" onclick="adicionarPagamento()">Adicionar</button>
                 <hr>
                 <div class="form-row">
                     <?php if ($total_pagamentos > 0): ?>
@@ -1073,8 +1073,11 @@ include(__DIR__ . '/../menu.php');
 
     // Função para adicionar pagamento
     function adicionarPagamento() {
-        var formaPagamento = $('#forma_pagamento').val();
-        var valorPagamento = parseFloat($('#valor_pagamento').val().replace('.', '').replace(',', '.'));
+        const addBtn = $('#btnAdicionarPagamento');
+        addBtn.prop('disabled', true);            // desabilita assim que clicar
+
+        var formaPagamento  = $('#forma_pagamento').val();
+        var valorPagamento  = parseFloat($('#valor_pagamento').val().replace('.', '').replace(',', '.'));
 
         if (formaPagamento === "") {
             Swal.fire({
@@ -1082,7 +1085,7 @@ include(__DIR__ . '/../menu.php');
                 title: 'Erro!',
                 text: 'Por favor, selecione uma forma de pagamento.',
                 confirmButtonText: 'OK'
-            });
+            }).then(() => addBtn.prop('disabled', false));  // reativa
             return;
         }
 
