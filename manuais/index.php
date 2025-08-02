@@ -19,98 +19,168 @@ include(__DIR__ . '/db_connection.php');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
 
     <style>
+        /* =========================================================
+         *  Tema Light/Dark para os componentes desta página
+         *  Compatível com body.light-mode / body.dark-mode
+         *  e também com html[data-theme="dark"]
+         * =======================================================*/
+
+        /* ---------- valores padrão (herdados se não houver classe no body) ---------- */
         :root{
-            --card-bg: #ffffff;
-            --card-border:#e5e7eb;
-            --card-title:#0f172a;
-            --muted:#6b7280;
-            --chip-bg:#f1f5f9;
-            --chip-fg:#0f172a;
-            --accent:#2563eb;
-            --accent-hover:#1d4ed8;
-            --surface:#f8fafc;
-        }
-        body.dark-mode :root,
-        html[data-theme="dark"] :root{
-            --card-bg:#0b1220;
-            --card-border:#1f2937;
-            --card-title:#e5e7eb;
-            --muted:#9ca3af;
-            --chip-bg:#111827;
-            --chip-fg:#e5e7eb;
-            --accent:#60a5fa;
-            --accent-hover:#93c5fd;
-            --surface:#0b1220;
+            --bg:            #ffffff;
+            --surface:       #f8fafc;
+            --card-bg:       #ffffff;
+            --card-border:   #e5e7eb;
+            --text:          #0f172a;
+            --title:         #0b1324;
+            --muted:         #6b7280;
+            --chip-bg:       #f1f5f9;
+            --chip-fg:       #0f172a;
+            --accent:        #2563eb;
+            --accent-hover:  #1d4ed8;
+            --shadow:        0 1px 2px rgba(0,0,0,.08);
+
+            /* cabeçalho do card de vídeo */
+            --video-title-from:#1f2937;
+            --video-title-to:  #111827;
+
+            /* campos formulário */
+            --input-bg:       #ffffff;
+            --input-br:       #d1d5db;
+            --input-fg:       #0f172a;
+            --input-ph:       #6b7280;
+
+            /* separadores */
+            --divider:        #e5e7eb;
         }
 
-        /* ---------- layout ---------- */
+        /* ---------- LIGHT MODE ---------- */
+        body.light-mode{
+            --bg:            #ffffff;
+            --surface:       #f8fafc;
+            --card-bg:       #ffffff;
+            --card-border:   #e5e7eb;
+            --text:          #0f172a;
+            --title:         #0b1324;
+            --muted:         #6b7280;
+            --chip-bg:       #eef2f7;
+            --chip-fg:       #0f172a;
+            --accent:        #2563eb;
+            --accent-hover:  #1d4ed8;
+            --shadow:        0 1px 2px rgba(0,0,0,.06);
+            --video-title-from:#1f2937;
+            --video-title-to:  #111827;
+            --input-bg:       #ffffff;
+            --input-br:       #cbd5e1;
+            --input-fg:       #0f172a;
+            --input-ph:       #6b7280;
+            --divider:        #e5e7eb;
+        }
+
+        /* ---------- DARK MODE ---------- */
+        body.dark-mode,
+        html[data-theme="dark"] body{
+            --bg:            #0b1220;
+            --surface:       #0f172a; /* barra de busca / áreas pegajosas */
+            --card-bg:       #0b1220;
+            --card-border:   #1f2a3a;
+            --text:          #e5e7eb;
+            --title:         #f1f5f9;
+            --muted:         #9ca3af;
+            --chip-bg:       #111827;
+            --chip-fg:       #e5e7eb;
+            --accent:        #60a5fa;
+            --accent-hover:  #93c5fd;
+            --shadow:        0 1px 3px rgba(0,0,0,.35);
+
+            --video-title-from:#0f172a;
+            --video-title-to:  #0b1220;
+
+            --input-bg:       #0f172a;
+            --input-br:       #223146;
+            --input-fg:       #e5e7eb;
+            --input-ph:       #9aa7b8;
+
+            --divider:        #1f2a3a;
+        }
+
+        /* ---------- layout / tipografia ---------- */
         .page-header{
             display:flex; gap:.75rem; align-items:center; justify-content:space-between; flex-wrap:wrap;
+            color:var(--title);
         }
-        .page-header h3{margin:0; font-weight:600;}
-        .tools{
-            display:flex; gap:.5rem; flex-wrap:wrap;
-        }
+        .page-header h3{margin:0; font-weight:600; color:var(--title);}
 
-        /* ---------- search ---------- */
+        .tools{ display:flex; gap:.5rem; flex-wrap:wrap; }
+
+        /* ---------- barra de busca e ações ---------- */
         .search-wrap{
             position:sticky; top:0; z-index:3;
             background:var(--surface);
             padding:10px 0 6px;
+            border-bottom:1px solid var(--divider);
         }
-        .input-icon{
-            position:relative;
-        }
+        .input-icon{ position:relative; }
         .input-icon .mdi{
             position:absolute; left:.75rem; top:50%; transform:translateY(-50%);
             font-size:20px; color:var(--muted);
         }
         .input-icon input{
             padding-left:2.25rem;
+            background:var(--input-bg);
+            color:var(--input-fg);
+            border:1px solid var(--input-br);
+        }
+        .input-icon input::placeholder{ color:var(--input-ph); }
+        .input-icon input:focus{
+            border-color:var(--accent);
+            box-shadow:0 0 0 .2rem rgba(37,99,235,.15);
         }
 
-        /* ---------- category ---------- */
+        /* ---------- categorias ---------- */
         .category-section{
             margin-bottom:1.25rem;
             border:1px solid var(--card-border);
             border-radius:.75rem;
             overflow:hidden;
             background:var(--card-bg);
+            box-shadow:var(--shadow);
         }
         .category-title{
             margin:0; padding:.9rem 1rem;
             display:flex; align-items:center; justify-content:space-between;
             cursor:pointer; user-select:none;
-            font-weight:600; color:var(--card-title);
+            font-weight:600; color:var(--title);
+            background:linear-gradient(180deg, var(--card-bg), color-mix(in oklab, var(--card-bg) 85%, #000 15%));
+            border-bottom:1px solid var(--card-border);
         }
+        .category-title .fa{ color:var(--muted); }
         .category-meta{
             display:flex; align-items:center; gap:.65rem;
-            cursor:pointer;
-            outline: none;
+            cursor:pointer; outline: none;
+            color:var(--muted);
         }
         .category-meta:focus-visible{
-            box-shadow: 0 0 0 2px rgba(37,99,235,.35);
+            box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 35%, transparent 65%);
             border-radius:.5rem;
         }
         .badge-soft{
             background:var(--chip-bg); color:var(--chip-fg);
             border-radius:999px; padding:.2rem .6rem; font-size:.8rem;
         }
-        .category-body{
-            padding: 1rem;
-        }
+        .category-body{ padding: 1rem; }
 
-        /* ---------- video card ---------- */
+        /* ---------- cards de vídeo ---------- */
         .video-card{height:100%}
         .video-card .card{
             height:100%; border:1px solid var(--card-border);
             border-radius:.75rem; overflow:hidden;
             background:var(--card-bg);
             display:flex; flex-direction:column;
-            box-shadow:0 1px 2px rgba(0,0,0,.04);
+            box-shadow:var(--shadow);
         }
         .video-card-title{
-            background:linear-gradient(180deg, #1f2937, #111827);
+            background:linear-gradient(180deg, var(--video-title-from), var(--video-title-to));
             color:#fff; text-align:center;
             min-height:56px; display:flex; align-items:center; justify-content:center;
             padding:.65rem .75rem; font-size:16px; font-weight:600;
@@ -142,20 +212,23 @@ include(__DIR__ . '/db_connection.php');
             width:100%; height:100%; border:0; display:none; border-radius:0;
         }
         .video-description{
-            font-size:14px; line-height:1.35; text-align:justify;
-            padding:.75rem .9rem 1rem; margin:0;
-            color:var(--card-title);
+            font-size:14px; line-height:1.45; text-align:justify;
+            padding:.85rem 1rem 1.1rem; margin:0;
+            color:var(--text);
+            background:color-mix(in oklab, var(--card-bg) 92%, #000 8%);
+            border-top:1px solid var(--card-border);
         }
 
-        /* ---------- helpers ---------- */
+        /* ---------- estados auxiliares ---------- */
         .no-results{
             display:none; text-align:center; color:var(--muted);
             padding:1.25rem .5rem;
         }
 
-        /* ---------- responsive tweaks ---------- */
+        /* ---------- responsividade ---------- */
         @media (max-width: 575.98px){
             .video-card-title{ font-size:15px; }
+            .tools{ width:100%; justify-content:flex-start; }
         }
     </style>
 </head>
@@ -294,7 +367,7 @@ include(__DIR__ . '/db_connection.php');
         $(el).collapse('hide'); // BS4 fallback
     }
     function bsToggle(el){
-        const isShown = $(el).hasClass('show');
+        const isShown = $(el).classList ? el.classList.contains('show') : $(el).hasClass('show');
         isShown ? bsHide(el) : bsShow(el);
     }
 
