@@ -158,14 +158,14 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">  
     <title>Gerenciamento de Categorias</title>  
 
-    <!-- Bootstrap 5 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-
-    <!-- DataTables -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+    <!-- Bootstrap 5 (moderno) -->  
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">  
+    <!-- Font Awesome -->  
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">  
+    <!-- Quill Editor CSS -->  
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">  
+    <!-- SweetAlert2 -->  
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>  
 
     <style>
         /* =========================================================
