@@ -10,183 +10,416 @@ include(__DIR__ . '/db_connection.php');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vídeos Tutoriais</title>
+
+    <!-- Styles -->
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+
     <style>
-        .category-title {
-            margin-top: 20px;
-            margin-bottom: 10px;
-            cursor: pointer;
+        :root{
+            --card-bg: #ffffff;
+            --card-border:#e5e7eb;
+            --card-title:#0f172a;
+            --muted:#6b7280;
+            --chip-bg:#f1f5f9;
+            --chip-fg:#0f172a;
+            --accent:#2563eb;
+            --accent-hover:#1d4ed8;
+            --surface:#f8fafc;
+        }
+        body.dark-mode :root,
+        html[data-theme="dark"] :root{
+            --card-bg:#0b1220;
+            --card-border:#1f2937;
+            --card-title:#e5e7eb;
+            --muted:#9ca3af;
+            --chip-bg:#111827;
+            --chip-fg:#e5e7eb;
+            --accent:#60a5fa;
+            --accent-hover:#93c5fd;
+            --surface:#0b1220;
         }
 
-        .video-card {
-            margin-bottom: 20px;
-            position: relative;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
+        /* ---------- layout ---------- */
+        .page-header{
+            display:flex; gap:.75rem; align-items:center; justify-content:space-between; flex-wrap:wrap;
+        }
+        .page-header h3{margin:0; font-weight:600;}
+        .tools{
+            display:flex; gap:.5rem; flex-wrap:wrap;
         }
 
-        .video-card-title {
-            background-color: #313131;
-            color: white;
-            text-align: center;
-            height: 55px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            border-radius: 5px 5px 0 0;
-            padding: 10px;
+        /* ---------- search ---------- */
+        .search-wrap{
+            position:sticky; top:0; z-index:3;
+            background:var(--surface);
+            padding:10px 0 6px;
+        }
+        .input-icon{
+            position:relative;
+        }
+        .input-icon .mdi{
+            position:absolute; left:.75rem; top:50%; transform:translateY(-50%);
+            font-size:20px; color:var(--muted);
+        }
+        .input-icon input{
+            padding-left:2.25rem;
         }
 
-        .video-card iframe {
-            width: 100%;
-            height: 250px;
-            border-radius: 0 0 5px 5px;
-            display: none;
+        /* ---------- category ---------- */
+        .category-section{
+            margin-bottom:1.25rem;
+            border:1px solid var(--card-border);
+            border-radius:.75rem;
+            overflow:hidden;
+            background:var(--card-bg);
+        }
+        .category-title{
+            margin:0; padding:.9rem 1rem;
+            display:flex; align-items:center; justify-content:space-between;
+            cursor:pointer; user-select:none;
+            font-weight:600; color:var(--card-title);
+        }
+        .category-meta{
+            display:flex; align-items:center; gap:.65rem;
+            cursor:pointer;
+            outline: none;
+        }
+        .category-meta:focus-visible{
+            box-shadow: 0 0 0 2px rgba(37,99,235,.35);
+            border-radius:.5rem;
+        }
+        .badge-soft{
+            background:var(--chip-bg); color:var(--chip-fg);
+            border-radius:999px; padding:.2rem .6rem; font-size:.8rem;
+        }
+        .category-body{
+            padding: 1rem;
         }
 
-        .video-placeholder {
-            width: 100%;
-            height: 250px;
-            background: #000;
-            position: relative;
-            cursor: pointer;
-            border-radius: 0 0 5px 5px;
+        /* ---------- video card ---------- */
+        .video-card{height:100%}
+        .video-card .card{
+            height:100%; border:1px solid var(--card-border);
+            border-radius:.75rem; overflow:hidden;
+            background:var(--card-bg);
+            display:flex; flex-direction:column;
+            box-shadow:0 1px 2px rgba(0,0,0,.04);
+        }
+        .video-card-title{
+            background:linear-gradient(180deg, #1f2937, #111827);
+            color:#fff; text-align:center;
+            min-height:56px; display:flex; align-items:center; justify-content:center;
+            padding:.65rem .75rem; font-size:16px; font-weight:600;
+        }
+        .video-wrapper{
+            position:relative; width:100%;
+            aspect-ratio:16/9;
+            background:#000;
+        }
+        @supports not (aspect-ratio: 16/9) {
+            .video-wrapper{padding-top:56.25%;}
+            .video-wrapper > *{position:absolute; inset:0;}
+        }
+        .video-placeholder{
+            position:absolute; inset:0; cursor:pointer;
+            display:flex; align-items:center; justify-content:center;
+        }
+        .video-placeholder::after{
+            content:"";
+            position:absolute; inset:0;
+            background:linear-gradient(to bottom, rgba(0,0,0,.05), rgba(0,0,0,.35));
+        }
+        .video-placeholder i{
+            position:relative; z-index:1; font-size:64px; color:#fff; opacity:.95;
+            transition: transform .15s ease;
+        }
+        .video-placeholder:hover i{ transform:scale(1.06); }
+        .video-iframe{
+            width:100%; height:100%; border:0; display:none; border-radius:0;
+        }
+        .video-description{
+            font-size:14px; line-height:1.35; text-align:justify;
+            padding:.75rem .9rem 1rem; margin:0;
+            color:var(--card-title);
         }
 
-        .video-placeholder i {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 50px;
+        /* ---------- helpers ---------- */
+        .no-results{
+            display:none; text-align:center; color:var(--muted);
+            padding:1.25rem .5rem;
         }
 
-        .video-description {
-            font-size: 14px;
-            line-height: 1.2;
-            text-align: justify;
-            padding: 10px;
-            min-height: 60px;
-        }
-
-        .search-bar {
-            margin-bottom: 20px;
-        }
-
-        .category-section {
-            margin-bottom: 20px;
-        }
-
-        .card-body {
-            padding: 0;
-            border-radius: 5px;
+        /* ---------- responsive tweaks ---------- */
+        @media (max-width: 575.98px){
+            .video-card-title{ font-size:15px; }
         }
     </style>
 </head>
 
 <body class="light-mode">
-    <?php
-    include(__DIR__ . '/../menu.php');
-    ?>
+<?php include(__DIR__ . '/../menu.php'); ?>
 
-    <div id="main" class="main-content">
-        <div class="container">
-            <h3>Vídeos Tutoriais</h3>
-            <hr>
-            <div class="search-bar">
-                <input type="text" id="searchInput" class="form-control" placeholder="Pesquisar vídeos...">
+<div id="main" class="main-content">
+    <div class="container py-3">
+
+        <div class="page-header mb-3">
+            <h3 class="mb-2">Vídeos Tutoriais</h3>
+            <div class="tools">
+                <a href="manual-list.php" target="_blank" class="btn btn-primary d-flex align-items-center">
+                    <i class="mdi mdi-file-document-edit-outline me-2"></i>
+                    Criar / Editar Manuais & POPs
+                </a>
             </div>
-            <hr>
-            <?php
+        </div>
+
+        <div class="search-wrap">
+            <div class="row g-2 align-items-center">
+                <div class="col-12 col-md-8 col-lg-6">
+                    <div class="input-icon">
+                        <i class="mdi mdi-magnify"></i>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Pesquisar por título ou descrição…">
+                    </div>
+                </div>
+                <div class="col-12 col-md-4 col-lg-6 d-flex justify-content-md-end gap-2">
+                    <button id="btnExpandAll" class="btn btn-outline-secondary btn-sm">
+                        <i class="mdi mdi-unfold-more-horizontal me-1"></i>Expandir tudo
+                    </button>
+                    <button id="btnCollapseAll" class="btn btn-outline-secondary btn-sm">
+                        <i class="mdi mdi-unfold-less-horizontal me-1"></i>Recolher tudo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="noResults" class="no-results">
+            <i class="mdi mdi-information-outline me-1"></i> Nenhum vídeo encontrado para a pesquisa.
+        </div>
+
+        <div id="categoriesContainer">
+        <?php
             $conn = getDatabaseConnection();
+
+            // Lista de categorias ativas
             $stmt = $conn->query("SELECT DISTINCT categoria FROM manuais WHERE status = 'ativo' ORDER BY categoria ASC");
             $categorias = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($categorias as $categoria) {
-                echo '<div class="category-section">';
-                echo '<h5 class="category-title" data-toggle="collapse" data-target="#category-' . md5($categoria['categoria']) . '">' . htmlspecialchars($categoria['categoria']) . ' <i class="fa fa-chevron-down"></i></h5>';
-                
+                $categoriaNome = $categoria['categoria'];
+                $categoriaId = 'category-' . md5($categoriaNome);
+
+                // Vídeos da categoria
                 $stmtVideos = $conn->prepare("SELECT * FROM manuais WHERE categoria = :categoria AND status = 'ativo' ORDER BY ordem ASC");
-                $stmtVideos->bindParam(':categoria', $categoria['categoria']);
+                $stmtVideos->bindParam(':categoria', $categoriaNome);
                 $stmtVideos->execute();
                 $videos = $stmtVideos->fetchAll(PDO::FETCH_ASSOC);
+                $qtd = count($videos);
+        ?>
+            <section class="category-section" data-category="<?php echo htmlspecialchars($categoriaNome); ?>">
+                <h5 class="category-title" role="button" data-bs-toggle="collapse" data-bs-target="#<?php echo $categoriaId; ?>" aria-expanded="true" aria-controls="<?php echo $categoriaId; ?>">
+                    <span class="d-flex align-items-center gap-2">
+                        <i class="mdi mdi-playlist-play"></i>
+                        <?php echo htmlspecialchars($categoriaNome); ?>
+                    </span>
+                    <!-- Torna o meta focável e clicável para toggle -->
+                    <span class="category-meta" tabindex="0" aria-label="Expandir/Recolher categoria">
+                        <span class="badge-soft" title="Total de vídeos"><?php echo $qtd; ?> vídeo(s)</span>
+                        <i class="fa fa-chevron-down"></i>
+                    </span>
+                </h5>
 
-                echo '<div id="category-' . md5($categoria['categoria']) . '" class="collapse show">';
-                echo '<div class="row">';
-                foreach ($videos as $video) {
-                    echo '<div class="col-md-4 video-card">';
-                    echo '<div class="card">';
-                    echo '<div class="card-body">';
-                    echo '<div class="video-card-title">' . htmlspecialchars($video['titulo']) . '</div>';
-                    echo '<div class="video-placeholder" data-src="' . htmlspecialchars($video['caminho_video']) . '">';
-                    echo '<i class="fa fa-play-circle"></i>';
-                    echo '</div>';
-                    echo '<iframe allow="autoplay; encrypted-media" frameborder="0" allowfullscreen></iframe>';
-                    echo '<p class="video-description">' . htmlspecialchars($video['descricao']) . '</p>';
-                    echo '</div>';
-                    echo '</div>';
-                    echo '</div>';
-                }
-                echo '</div>'; // End of row
-                echo '</div>'; // End of collapse
-                echo '</div>'; // End of category-section
-            }
-            ?>
-        </div>
+                <div id="<?php echo $categoriaId; ?>" class="collapse show">
+                    <div class="category-body">
+                        <div class="row g-3">
+                            <?php foreach ($videos as $video): ?>
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <div class="video-card">
+                                        <div class="card">
+                                            <div class="video-card-title">
+                                                <?php echo htmlspecialchars($video['titulo']); ?>
+                                            </div>
+
+                                            <div class="video-wrapper">
+                                                <div class="video-placeholder" tabindex="0" role="button" aria-label="Reproduzir vídeo"
+                                                     data-src="<?php echo htmlspecialchars($video['caminho_video']); ?>">
+                                                    <i class="fa fa-play-circle"></i>
+                                                </div>
+                                                <iframe class="video-iframe"
+                                                        title="<?php echo htmlspecialchars($video['titulo']); ?>"
+                                                        allow="autoplay; encrypted-media"
+                                                        allowfullscreen></iframe>
+                                            </div>
+
+                                            <p class="video-description">
+                                                <?php echo htmlspecialchars($video['descricao']); ?>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div> <!-- /row -->
+                    </div> <!-- /category-body -->
+                </div> <!-- /collapse -->
+            </section>
+        <?php } ?>
+        </div><!-- /categoriesContainer -->
+
     </div>
+</div>
 
-    <script src="../script/jquery-3.5.1.min.js"></script>
-    <script src="../script/bootstrap.min.js"></script>
-    <script src="../script/bootstrap.bundle.min.js"></script>
-    <script>
-        $(document).ready(function() {
-            $('#searchInput').on('keyup', function() {
-                var value = $(this).val().toLowerCase();
-                $('.category-section').each(function() {
-                    var section = $(this);
-                    var found = false;
-                    section.find('.video-card').each(function() {
-                        var videoTitle = $(this).find('.video-card-title').text().toLowerCase();
-                        var videoDescription = $(this).find('.video-description').text().toLowerCase();
-                        if (videoTitle.includes(value) || videoDescription.includes(value)) {
-                            $(this).show();
-                            found = true;
-                        } else {
-                            $(this).hide();
-                        }
-                    });
-                    if (found) {
-                        section.show();
-                        section.find('.collapse').collapse('show');
-                    } else {
-                        section.hide();
-                    }
-                });
+<!-- Scripts -->
+<script src="../script/jquery-3.5.1.min.js"></script>
+<script src="../script/bootstrap.bundle.min.js"></script>
+
+<script>
+(function(){
+    const $doc = $(document);
+    const $search = $('#searchInput');
+    const $noResults = $('#noResults');
+
+    // --------- Helpers compatíveis com Bootstrap 4 e 5 ---------
+    function bsShow(el){
+        if (window.bootstrap && window.bootstrap.Collapse) {
+            try { new bootstrap.Collapse(el, { toggle:false }).show(); return; } catch(e){}
+        }
+        $(el).collapse('show'); // BS4 fallback
+    }
+    function bsHide(el){
+        if (window.bootstrap && window.bootstrap.Collapse) {
+            try { new bootstrap.Collapse(el, { toggle:false }).hide(); return; } catch(e){}
+        }
+        $(el).collapse('hide'); // BS4 fallback
+    }
+    function bsToggle(el){
+        const isShown = $(el).hasClass('show');
+        isShown ? bsHide(el) : bsShow(el);
+    }
+
+    // Debounce util
+    function debounce(fn, delay=180){
+        let t=null; return function(){
+            const ctx=this, args=arguments;
+            clearTimeout(t); t=setTimeout(()=>fn.apply(ctx,args),delay);
+        }
+    }
+
+    // Atualiza ícone de seta nas categorias
+    $doc.on('show.bs.collapse', '.collapse', function(){
+        $(this).closest('.category-section').find('.category-title .fa')
+            .removeClass('fa-chevron-down').addClass('fa-chevron-up');
+    });
+    $doc.on('hide.bs.collapse', '.collapse', function(){
+        $(this).closest('.category-section').find('.category-title .fa')
+            .removeClass('fa-chevron-up').addClass('fa-chevron-down');
+    });
+
+    // Clique/tecla no "category-meta" deve alternar a seção (sem duplo toggle)
+    $doc.on('click', '.category-meta', function(e){
+        e.preventDefault();
+        e.stopPropagation(); // evita disparar o data-bs-toggle do h5
+        toggleCategoryFromMeta($(this));
+    });
+    $doc.on('keydown', '.category-meta', function(e){
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleCategoryFromMeta($(this));
+        }
+    });
+    function toggleCategoryFromMeta($meta){
+        const $title = $meta.closest('.category-title');
+        const targetSel = $title.attr('data-bs-target');
+        if (!targetSel) return;
+        const el = document.querySelector(targetSel);
+        if (!el) return;
+        bsToggle(el);
+    }
+
+    // Botões Expandir/Recolher tudo
+    $('#btnExpandAll').on('click', function(){
+        $('.category-section .collapse').each(function(){ bsShow(this); });
+    });
+    $('#btnCollapseAll').on('click', function(){
+        $('.category-section .collapse').each(function(){ bsHide(this); });
+    });
+
+    // Pesquisa (título + descrição) com feedback quando vazio
+    const doFilter = debounce(function(){
+        const value = ($search.val() || '').toLowerCase().trim();
+        let anyFound = false;
+
+        $('.category-section').each(function(){
+            const $section = $(this);
+            let foundInSection = false;
+
+            $section.find('.col-12.col-md-6.col-lg-4').each(function(){
+                const $card = $(this);
+                const title = $card.find('.video-card-title').text().toLowerCase();
+                const desc  = $card.find('.video-description').text().toLowerCase();
+                const match = !value || title.includes(value) || desc.includes(value);
+
+                $card.toggle(match);
+                if (match) foundInSection = true;
             });
 
-            $('.category-title').on('click', function() {
-                var icon = $(this).find('i');
-                icon.toggleClass('fa-chevron-down fa-chevron-up');
-            });
-
-            $('.video-placeholder').on('click', function() {
-                var iframe = $(this).next('iframe');
-                var videoSrc = $(this).data('src');
-                iframe.attr('src', videoSrc).show();
-                $(this).hide();
-            });
+            // Se encontrou itens, mostra seção e garante expandida; senão, oculta
+            if (foundInSection){
+                $section.show();
+                const $collapse = $section.find('.collapse');
+                bsShow($collapse[0]);
+                anyFound = true;
+            }else{
+                $section.hide();
+            }
         });
-    </script>
-    <?php
-    include(__DIR__ . '/../rodape.php');
-    ?>
-</body>
 
+        $noResults.toggle(!anyFound);
+    }, 120);
+
+    $search.on('input', doFilter);
+
+    // Reproduzir vídeo ao clicar no placeholder (ou Enter/Espaço focado)
+    function playVideo($ph){
+        const $iframe = $ph.closest('.video-wrapper').find('.video-iframe');
+        const src = $ph.data('src');
+
+        if (!src) return;
+
+        // Pausa outros iframes abertos
+        $('.video-iframe').each(function(){
+            if (this !== $iframe[0]) {
+                $(this).attr('src','').hide();
+                $(this).closest('.video-wrapper').find('.video-placeholder').show();
+            }
+        });
+
+        // Define src e exibe
+        $iframe.attr('src', src).show();
+        $ph.hide().attr('aria-hidden','true');
+    }
+
+    $('.video-placeholder').on('click', function(){ playVideo($(this)); });
+    $('.video-placeholder').on('keydown', function(e){
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            playVideo($(this));
+        }
+    });
+
+    // Pausar vídeo ao recolher a categoria
+    $doc.on('hide.bs.collapse', '.category-section .collapse', function(){
+        $(this).find('.video-iframe').each(function(){
+            $(this).attr('src','').hide();
+        });
+        $(this).find('.video-placeholder').show().removeAttr('aria-hidden');
+    });
+
+})();
+</script>
+
+<?php include(__DIR__ . '/../rodape.php'); ?>
+</body>
 </html>
