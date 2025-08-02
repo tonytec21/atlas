@@ -26,7 +26,7 @@ function sanitize($input) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {  
     header('Content-Type: application/json');  
     $response = ['success' => false, 'message' => ''];  
-    
+      
     switch ($_POST['action']) {  
         case 'create':  
             if (empty($_POST['nome'])) {  
@@ -158,14 +158,14 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">  
     <title>Gerenciamento de Categorias</title>  
 
-    <!-- Bootstrap 5 (moderno) -->  
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">  
-    <!-- Font Awesome -->  
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">  
-    <!-- Quill Editor CSS -->  
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">  
-    <!-- SweetAlert2 -->  
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>  
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <!-- DataTables -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
 
     <style>
         /* =========================================================
@@ -495,7 +495,10 @@ try {
 
         /* -------- DataTables -------- */
         const dt = $('#tbl-categorias').DataTable({
-            language: { url: '//cdn.datatables.net/plug-ins/1.13.8/i18n/pt-BR.json' },
+            language: { 
+                url: '//cdn.datatables.net/plug-ins/1.13.8/i18n/pt-BR.json',
+                emptyTable: 'Nenhuma categoria encontrada.'
+            },
             responsive: true,
             order: [[1, 'asc']],
             columnDefs: [
@@ -509,36 +512,54 @@ try {
                 url: window.location.href,
                 type: 'GET',
                 success: function(data){
-                    const tbody = $(data).find('#categories-table-body').html();
-                    // Atualiza apenas o tbody para preservar a instância do DataTable
+                    const newTbodyHTML = $(data).find('#categories-table-body').html();
+
+                    // Limpa o DataTable
                     dt.clear();
-                    // Cria uma tabela temporária para extrair linhas
+
+                    // Monta linhas apenas se existir TR com 6 células
                     const temp = document.createElement('tbody');
-                    temp.innerHTML = tbody;
+                    temp.innerHTML = newTbodyHTML;
+
+                    let added = 0;
                     $(temp).find('tr').each(function(){
-                        const tds = $(this).children('td');
-                        if (tds.length){
+                        const $tr  = $(this);
+                        const tds  = $tr.children('td');
+                        const cols = tds.length;
+
+                        // Somente linhas "válidas" (6 colunas). Ignora a linha de "Nenhuma categoria..." (colspan)
+                        if (cols === 6){
+                            const id = ($tr.data('id') !== undefined) ? $tr.data('id') : parseInt(tds.eq(0).text().trim(), 10);
+
                             dt.row.add([
-                                tds.eq(0).html(),
-                                tds.eq(1).html(),
-                                tds.eq(2).html(),
-                                tds.eq(3).html(),
-                                tds.eq(4).html(),
+                                tds.eq(0).html(), // ID
+                                tds.eq(1).html(), // Nome
+                                tds.eq(2).html(), // Descrição
+                                tds.eq(3).html(), // Data de criação (mantém data-order no HTML)
+                                tds.eq(4).html(), // Última atualização
+                                // Ações (reconstroi com data-id)
                                 `<div class="actions text-center">
-                                    <button type="button" class="btn btn-outline-info btn-sm btn-edit" data-id="${$(this).data('id')}" title="Editar">
+                                    <button type="button" class="btn btn-outline-info btn-sm btn-edit" data-id="${id}" title="Editar">
                                         <i class="fa-solid fa-pen-to-square"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm btn-delete" data-id="${$(this).data('id')}" title="Excluir">
+                                    <button type="button" class="btn btn-outline-danger btn-sm btn-delete" data-id="${id}" title="Excluir">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
                                   </div>`
                             ]);
+                            added++;
                         }
                     });
+
+                    // Se não adicionou nenhuma linha válida, apenas desenha vazio para exibir "emptyTable"
                     dt.draw(false);
+
+                    // Reanexa handlers às novas linhas
                     setupRowHandlers();
                 },
-                error: function(){ showAlert('error', 'Erro ao atualizar a tabela de categorias.'); }
+                error: function(){
+                    showAlert('error', 'Erro ao atualizar a tabela de categorias.');
+                }
             });
         }
 
