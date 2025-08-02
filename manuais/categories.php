@@ -332,7 +332,7 @@ try {
                     </thead>
                     <tbody id="categories-table-body">
                         <?php if (empty($categorias)): ?>
-                            <tr><td colspan="6" class="text-center">Nenhuma categoria encontrada.</td></tr>
+                            <!-- Tbody intencionalmente vazio; DataTables mostrará 'emptyTable' -->
                         <?php else: ?>
                             <?php foreach ($categorias as $categoria): ?>
                                 <tr data-id="<?= (int)$categoria['id'] ?>">
@@ -514,30 +514,29 @@ try {
                 success: function(data){
                     const newTbodyHTML = $(data).find('#categories-table-body').html();
 
-                    // Limpa o DataTable
+                    // Limpa o DataTable atual
                     dt.clear();
 
                     // Monta linhas apenas se existir TR com 6 células
                     const temp = document.createElement('tbody');
-                    temp.innerHTML = newTbodyHTML;
+                    temp.innerHTML = newTbodyHTML || '';
 
-                    let added = 0;
                     $(temp).find('tr').each(function(){
                         const $tr  = $(this);
                         const tds  = $tr.children('td');
                         const cols = tds.length;
 
-                        // Somente linhas "válidas" (6 colunas). Ignora a linha de "Nenhuma categoria..." (colspan)
+                        // Somente linhas "válidas" (6 colunas). Ignora placeholders/colspans.
                         if (cols === 6){
-                            const id = ($tr.data('id') !== undefined) ? $tr.data('id') : parseInt(tds.eq(0).text().trim(), 10);
+                            const idAttr = $tr.data('id');
+                            const id = (idAttr !== undefined) ? idAttr : parseInt((tds.eq(0).text() || '').trim(), 10);
 
                             dt.row.add([
                                 tds.eq(0).html(), // ID
                                 tds.eq(1).html(), // Nome
                                 tds.eq(2).html(), // Descrição
-                                tds.eq(3).html(), // Data de criação (mantém data-order no HTML)
+                                tds.eq(3).html(), // Data de criação
                                 tds.eq(4).html(), // Última atualização
-                                // Ações (reconstroi com data-id)
                                 `<div class="actions text-center">
                                     <button type="button" class="btn btn-outline-info btn-sm btn-edit" data-id="${id}" title="Editar">
                                         <i class="fa-solid fa-pen-to-square"></i>
@@ -547,11 +546,10 @@ try {
                                     </button>
                                   </div>`
                             ]);
-                            added++;
                         }
                     });
 
-                    // Se não adicionou nenhuma linha válida, apenas desenha vazio para exibir "emptyTable"
+                    // Redesenha (se não houver linhas, DataTables mostra emptyTable)
                     dt.draw(false);
 
                     // Reanexa handlers às novas linhas
