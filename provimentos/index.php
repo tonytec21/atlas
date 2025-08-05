@@ -446,7 +446,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
           </div>
           <div class="pdf-search">
             <div class="input-group input-group-sm">
-              <input type="text" id="pdfSearchInput" class="form-control" placeholder="Buscar frase exata no PDF (Enter)">
+              <input type="text" id="pdfSearchInput" class="form-control" placeholder="Buscar frase no PDF">
               <div class="input-group-append">
                 <button class="btn theme-outline btn-sm" id="pdfSearchBtn" title="Buscar no PDF">
                   <i class="mdi mdi-magnify"></i><span>Buscar</span>
