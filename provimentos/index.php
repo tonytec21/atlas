@@ -69,10 +69,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             --card-hover:rgba(2,6,23,.06);
             --accent:#2563eb;
             --accent-2:#1e40af;
-            --popover-bg:#ffffff;
-            --popover-brd:#e5e7eb;
-            --popover-text:#0f172a;
-            --popover-shadow: 0 16px 36px rgba(2,6,23,.18);
         }
         body.dark-mode {
             --modal-bg: #0b1220;
@@ -104,10 +100,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             --card-hover:rgba(255,255,255,.06);
             --accent:#60a5fa;
             --accent-2:#3b82f6;
-            --popover-bg:#0b1324;
-            --popover-brd:rgba(255,255,255,.12);
-            --popover-text:#e5e7eb;
-            --popover-shadow: 0 16px 36px rgba(0,0,0,.45);
         }
 
         .btn-adicionar { height: 38px; line-height: 24px; margin-left: 10px; }
@@ -175,11 +167,10 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             font-weight:600; color:var(--card-text);
         }
         .results-toolbar .controls{
-            display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+            display:flex; gap:10px; align-items:center;
         }
         .results-toolbar .controls .form-control{
             background:var(--input-bg); color:var(--input-text); border:1px solid var(--input-brd);
-            /* height:36px; */
         }
         .cards-grid{
             display:grid; gap:14px;
@@ -193,6 +184,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             box-shadow:0 8px 24px rgba(0,0,0,.08);
             transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
             display:flex; flex-direction:column;
+            cursor:pointer; /* card clicável */
         }
         .prov-card:hover{ transform: translateY(-2px); box-shadow:0 10px 28px rgba(0,0,0,.12); border-color:var(--accent-2); }
         .prov-card__header{
@@ -206,21 +198,38 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             padding:6px 10px; border-radius:999px;
         }
         .prov-card__num{ font-weight:700; color:var(--accent); }
-        .prov-card__body{ padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+        .prov-card__body{ padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
         .prov-meta{ display:flex; gap:8px; flex-wrap:wrap; }
         .prov-meta .meta{
             display:inline-flex; align-items:center; gap:6px; font-size:.88rem; color:var(--card-muted);
             background:var(--chip-bg); border:1px solid var(--chip-brd); padding:6px 10px; border-radius:10px;
         }
+        /* -------- Descrição no card: mais linhas visíveis + expandir ao hover -------- */
         .prov-desc{
-            color:var(--card-text); line-height:1.35rem; max-height:4.2rem; overflow:hidden;
-            display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
+            color:var(--card-text);
+            line-height:1.45rem;
+            max-height:6.8rem;               /* ~5 linhas visíveis (altura dos cards levemente maior) */
+            overflow:hidden;
+            display:-webkit-box;
+            -webkit-line-clamp:5;            /* de 3 → 5 linhas */
+            -webkit-box-orient:vertical;
             position:relative;
+            transition:max-height .2s ease, padding .2s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease;
+            outline:none;
         }
-        .prov-desc:hover{ background:var(--card-hover); border-radius:8px; }
-
+        .prov-desc:hover,
+        .prov-desc:focus{
+            -webkit-line-clamp:unset;
+            max-height:50vh;                 /* mostra o conteúdo completo com rolagem se necessário */
+            overflow:auto;
+            background:var(--chip-bg);
+            border:1px solid var(--chip-brd);
+            padding:8px 10px;
+            border-radius:10px;
+            box-shadow:0 8px 20px rgba(0,0,0,.08) inset;
+        }
         .prov-actions{
-            display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;
+            display:flex; gap:8px; margin-top:2px; flex-wrap:wrap;
         }
         .btn-outline{
             border-radius:10px; border:1px solid var(--btn-outline); color:var(--btn-outline); background:transparent; height:34px;
@@ -231,22 +240,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             border-radius:12px; padding:28px; text-align:center;
         }
         .empty-state i{ font-size:32px; display:block; margin-bottom:10px; color:var(--accent); }
-
-        /* Preview flutuante da descrição */
-        #descPreview{
-            position:fixed;
-            display:none;
-            max-width:min(520px, 92vw);
-            max-height:50vh;
-            overflow:auto;
-            padding:12px 14px;
-            background:var(--popover-bg);
-            color:var(--popover-text);
-            border:1px solid var(--popover-brd);
-            border-radius:12px;
-            box-shadow: var(--popover-shadow);
-            z-index:1060;
-        }
 
         mark{ padding:0 2px; border-radius:4px; background:rgba(250,204,21,.35); }
         @media (max-width:576px){
@@ -343,29 +336,25 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 
         $sql='SELECT * FROM provimentos';
         if($conditions) $sql.=' WHERE '.implode(' AND ',$conditions);
+        // Ordenação padrão por data desc — mantém comportamento anterior quando não filtrado
         if(!$filtered)  $sql.=' ORDER BY data_provimento DESC';
 
         $stmt=$conn->prepare($sql);
         foreach($params as $k=>$v){ $stmt->bindValue($k,$v); }
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         $total = count($rows);
         ?>
 
         <div class="results-toolbar">
             <div class="count">
                 <i class="mdi mdi-format-list-bulleted-square"></i>
-                <span id="countSpan"><?= $total ?></span> de <span id="totalSpan"><?= $total ?></span> resultado<?= $total==1?'':'s' ?>
+                <?= $total ?> resultado<?= $total==1?'':'s' ?>
             </div>
             <div class="controls">
-                <div class="input-group">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text" style="background:var(--input-bg); color:var(--input-text); border:1px solid var(--input-brd); border-right:none;">
-                            <i class="mdi mdi-magnify"></i>
-                        </span>
-                    </div>
-                    <input id="quickSearch" type="text" class="form-control" placeholder="Busca rápida nos resultados (nº, tipo, origem, descrição)">
-                </div>
+                <!-- NOVO: campo para refinar a busca nos resultados já filtrados -->
+                <!-- <input type="text" id="refineInput" class="form-control" placeholder="Refinar resultados (busca nos cards)" style="min-width:240px"> -->
                 <select id="sortSelect" class="form-control">
                     <option value="date_desc">Ordenar: Data (mais recente)</option>
                     <option value="date_asc">Ordenar: Data (mais antiga)</option>
@@ -397,6 +386,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
                     $numAno   = trim($numero . '/' . $anoDoc, '/');
                     $desc     = $p['descricao']    ?? '';
                     $caminho  = $p['caminho_anexo'] ?? '';
+                    // Mantém URL relativa; JS tornará absoluta via APP_BASE_URL
                 ?>
                 <article class="prov-card"
                          data-date="<?= e($dataISO) ?>"
@@ -404,8 +394,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
                          data-tipo="<?= e($tipo) ?>"
                          data-origem="<?= e($origem) ?>"
                          data-url="<?= e($caminho) ?>"
-                         data-id="<?= $id ?>"
-                         data-desc="<?= e($desc) ?>">
+                         data-id="<?= $id ?>">
                     <div class="prov-card__header">
                         <span class="chip"><i class="mdi mdi-label-outline"></i><?= e($tipo ?: 'Documento') ?></span>
                         <div class="prov-card__num">nº <?= e($numAno ?: $numero) ?></div>
@@ -415,7 +404,8 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
                             <span class="meta" title="Origem"><i class="mdi mdi-source-branch"></i><?= e($origem ?: '—') ?></span>
                             <span class="meta" title="Data"><i class="mdi mdi-calendar-month-outline"></i><?= e($dataBR) ?></span>
                         </div>
-                        <div class="prov-desc js-desc"><?= e($desc ?: '—') ?></div>
+                        <!-- Removido o title para evitar 'legenda' poluída ao passar o mouse -->
+                        <div class="prov-desc js-desc" tabindex="0"><?= e($desc ?: '—') ?></div>
                         <div class="prov-actions">
                             <button class="btn btn-outline btn-sm js-visualizar"><i class="mdi mdi-eye-outline"></i> Visualizar</button>
                             <button class="btn btn-outline btn-sm js-abrir"><i class="mdi mdi-open-in-new"></i> Abrir</button>
@@ -456,7 +446,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
           </div>
           <div class="pdf-search">
             <div class="input-group input-group-sm">
-              <input type="text" id="pdfSearchInput" class="form-control" placeholder="Buscar frase no PDF">
+              <input type="text" id="pdfSearchInput" class="form-control" placeholder="Buscar frase exata no PDF (Enter)">
               <div class="input-group-append">
                 <button class="btn theme-outline btn-sm" id="pdfSearchBtn" title="Buscar no PDF">
                   <i class="mdi mdi-magnify"></i><span>Buscar</span>
@@ -480,9 +470,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
   </div>
 </div>
 
-<!-- Preview flutuante da descrição -->
-<div id="descPreview" role="tooltip" aria-hidden="true"></div>
-
 <!-- ================================ SCRIPTS ================================ -->
 <script>
 const APP_BASE_URL     = <?php echo json_encode($appBase,    JSON_UNESCAPED_SLASHES); ?>;
@@ -494,32 +481,36 @@ function toAbsoluteUrl(u){ return !u ? '' : (/^(https?:)?\/\//i.test(u) ? u : AP
 <script src="../script/sweetalert2.js"></script>
 
 <script>
-let __currentPdfUrl='';
-let __initialTerm = '';
-let __quickTerm   = '';
-
 $(document).ready(function(){
-  // termo inicial (vindo dos filtros de descrição/conteúdo)
-  __initialTerm = (document.getElementById('descricao')?.value || '').trim() || (document.getElementById('conteudo_anexo')?.value || '').trim();
-
   // Descrição expandir/contrair no modal
   $('#metaDescricaoWrapper').on('click',e=>$(e.currentTarget).toggleClass('expanded'))
                             .on('mouseleave blur',e=>$(e.currentTarget).removeClass('expanded'));
 
-  // Botões dos cards
-  $('#cardsContainer').on('click','.js-visualizar',function(){
+  // Clique em QUALQUER parte do card abre a visualização
+  $('#cardsContainer').on('click','.prov-card',function(e){
+    // Se o clique foi em um botão/ação, não abrir duas vezes
+    if($(e.target).closest('.js-abrir, .js-baixar, .js-copiar, .js-visualizar, .prov-actions button').length) return;
+    visualizarProvimento($(this).data('id'));
+  });
+
+  // Botões dos cards (com stopPropagation para não disparar o click do card)
+  $('#cardsContainer').on('click','.js-visualizar',function(e){
+    e.stopPropagation();
     const card = $(this).closest('.prov-card');
     visualizarProvimento(card.data('id'));
   });
-  $('#cardsContainer').on('click','.js-abrir',function(){
+  $('#cardsContainer').on('click','.js-abrir',function(e){
+    e.stopPropagation();
     const card = $(this).closest('.prov-card');
     const url  = toAbsoluteUrl(String(card.data('url')||''));
     if(url) window.open(url,'_blank');
   });
-  $('#cardsContainer').on('click','.js-baixar',async function(){
+  $('#cardsContainer').on('click','.js-baixar',async function(e){
+    e.stopPropagation();
     const card = $(this).closest('.prov-card');
     const url  = toAbsoluteUrl(String(card.data('url')||''));
     if(!url) return;
+    // Monta nome amigável com base nos atributos do card
     const nomeBase = composeDownloadName({
       numero_provimento: String(card.data('num')||''),
       data_provimento: String(card.data('date')||''),
@@ -528,7 +519,8 @@ $(document).ready(function(){
     });
     await baixarArquivo(url, nomeBase);
   });
-  $('#cardsContainer').on('click','.js-copiar',async function(){
+  $('#cardsContainer').on('click','.js-copiar',async function(e){
+    e.stopPropagation();
     const card = $(this).closest('.prov-card');
     const url  = toAbsoluteUrl(String(card.data('url')||''));
     if(!url) return;
@@ -540,21 +532,26 @@ $(document).ready(function(){
     }
   });
 
+  // NOVO: refinar resultados localmente (ignora acentos/maiúsculas)
+  const removeDiacritics = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const debounce = (fn, wait=200) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), wait); }; };
+  $('#refineInput').on('input', debounce(function(){
+    refineCards(this.value, removeDiacritics);
+  }, 200));
+
   // Ordenação client-side dos cards
-  $('#sortSelect').on('change', function(){ sortCards(this.value); });
-
-  // Busca rápida
-  $('#quickSearch').on('input', debounce(function(){
-    __quickTerm = this.value || '';
-    quickFilter(__quickTerm);
-  }, 120));
-
-  // Pré-visualização da descrição (hover)
-  setupDescPreview();
-
-  // Ordenação inicial e destaques
+  $('#sortSelect').on('change', function(){
+    sortCards(this.value);
+  });
+  // Ordenação inicial: Data desc
   sortCards('date_desc');
-  applyHighlights();
+
+  // Realce de termos buscados na descrição (da busca do formulário)
+  highlightSearch();
+  
+  // Busca no PDF dentro do modal (frase exata)
+  $('#pdfSearchBtn').on('click',triggerPdfSearch);
+  $('#pdfSearchInput').on('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); triggerPdfSearch(); }});
 
   // Validação leve da data do filtro
   const currentYear=new Date().getFullYear();
@@ -567,12 +564,7 @@ $(document).ready(function(){
   });
 });
 
-/* ---------- debounce ---------- */
-function debounce(fn, delay){
-  let t; return function(){ clearTimeout(t); t=setTimeout(()=>fn.apply(this, arguments), delay); };
-}
-
-/* ---------- compose nome p/ download ---------- */
+/* ---------- utilidades ---------- */
 function composeDownloadName(p){
   const numero=p.numero_provimento||'';
   const ano   =p.ano_provimento||(p.data_provimento?new Date(p.data_provimento+'T00:00:00').getFullYear():'');
@@ -583,8 +575,6 @@ function composeDownloadName(p){
           .replace(/[<>:"/\\|?*\x00-\x1F]/g,'')
           .replace(/\s+/g,' ').trim().replace(/\.+$/,'');
 }
-
-/* ---------- download ---------- */
 async function baixarArquivo(url,nomeBase){
   try{
     const r=await fetch(url,{credentials:'same-origin'});
@@ -604,7 +594,8 @@ async function baixarArquivo(url,nomeBase){
   }catch(e){ Swal.fire({icon:'error',title:'Falha ao baixar',text:e.message||'Erro desconhecido'}); }
 }
 
-/* ---------- visualização no modal ---------- */
+/* ---------- visualização ---------- */
+let __currentPdfUrl='';
 function visualizarProvimento(id){
   $('#docLoader').show(); $('#anexo_visualizacao').attr('src','about:blank');
   $.get('obter_provimento.php',{id},res=>{
@@ -629,7 +620,7 @@ function visualizarProvimento(id){
   }).fail(()=>alert('Erro ao obter os dados do provimento.'));
 }
 
-/* ---------- busca no PDF (frase exata) ---------- */
+/* ---------- busca no PDF: frase exata ---------- */
 function buildPdfJsViewerUrl(fileUrl,search){
   let u=PDFJS_VIEWER_URL+'?file='+encodeURIComponent(fileUrl);
   if(search&&search.trim()) u+='#search='+encodeURIComponent(search.trim())+'&phrase=true';
@@ -675,110 +666,53 @@ function sortCards(mode){
   cards.forEach(c=>container.appendChild(c));
 }
 
-/* ---------- Busca rápida (client-side) ---------- */
-function quickFilter(term){
-  const container = document.getElementById('cardsContainer');
-  if(!container) return;
-
-  const normalize = (s)=> (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const q = normalize(term);
-  let visible = 0;
-
-  Array.from(container.children).forEach(card=>{
-    const fields = [
-      card.getAttribute('data-num')||'',
-      card.getAttribute('data-tipo')||'',
-      card.getAttribute('data-origem')||'',
-      card.getAttribute('data-date')||'',
-      card.getAttribute('data-desc')||''
+/* ---------- Filtrar (refinar) os cards já exibidos ---------- */
+function refineCards(q, normalizer){
+  const norm = normalizer || (s => (s||'').toLowerCase());
+  const query = norm(q||'');
+  const cards = $('#cardsContainer .prov-card');
+  if(!query){
+    cards.show();
+    updateCount();
+    return;
+  }
+  cards.each(function(){
+    const el = $(this);
+    const txtRaw = [
+      el.find('.js-desc').text(),
+      String(el.data('num')||''),
+      String(el.data('tipo')||''),
+      String(el.data('origem')||''),
+      el.find('.prov-card__num').text()
     ].join(' ');
-    const hay = normalize(fields);
-    const show = !q || hay.includes(q);
-    card.style.display = show ? '' : 'none';
-    if(show) visible++;
+    const txt = norm(txtRaw);
+    el.toggle(txt.indexOf(query) > -1);
   });
-
-  updateCount(visible);
-  applyHighlights(); // atualiza o destaque combinando termo inicial e rápido
+  updateCount();
 }
 
-/* ---------- Contador dinâmico ---------- */
-function updateCount(visible){
-  const total = document.getElementById('totalSpan') ? parseInt(document.getElementById('totalSpan').textContent,10) : visible;
-  document.getElementById('countSpan').textContent = isNaN(visible)? total : visible;
+/* ---------- Atualiza a contagem exibida ---------- */
+function updateCount(){
+  const visible = $('#cardsContainer .prov-card:visible').length;
+  const label = `${visible} resultado${visible===1?'':'s'}`;
+  $('.results-toolbar .count').html(`<i class="mdi mdi-format-list-bulleted-square"></i> ${label}`);
 }
 
-/* ---------- Destaque de termos (filtros + busca rápida) ---------- */
-function getCombinedRegex(){
-  const terms = [];
-  if(__initialTerm) terms.push(__initialTerm);
-  if(__quickTerm)   terms.push(__quickTerm);
-  if(!terms.length) return null;
+/* ---------- Realce dos termos buscados ---------- */
+function highlightSearch(){
+  const term1 = (document.getElementById('descricao')?.value || '').trim();
+  const term2 = (document.getElementById('conteudo_anexo')?.value || '').trim();
+  const term  = term1 || term2;
+  if(!term) return;
+
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const pattern = terms.map(esc).join('|');
-  try{ return new RegExp(pattern,'gi'); }catch(e){ return null; }
-}
-function applyHighlights(){
-  const re = getCombinedRegex();
-  document.querySelectorAll('.prov-card').forEach(card=>{
-    const el   = card.querySelector('.js-desc');
-    const base = card.getAttribute('data-desc') || (el ? el.textContent : '');
-    if(!el) return;
-    if(re){
-      el.innerHTML = base.replace(re, m => `<mark>${m}</mark>`);
-    }else{
-      el.textContent = base;
-    }
+  const re  = new RegExp(esc(term), 'gi');
+
+  document.querySelectorAll('.prov-card .js-desc').forEach(el=>{
+    const txt = el.textContent;
+    if(!txt) return;
+    el.innerHTML = txt.replace(re, m => `<mark>${m}</mark>`);
   });
-}
-
-/* ---------- Preview da descrição (hover) ---------- */
-function setupDescPreview(){
-  const $preview = $('#descPreview');
-  let hoverFromDesc = false, hoverPreview = false;
-
-  function renderPreview(text){
-    const re = getCombinedRegex();
-    if(re){
-      // escapa e aplica destaque
-      const safe = (text||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-      $preview.html(safe.replace(re, m=> `<mark>${m}</mark>`));
-    }else{
-      $preview.text(text||'');
-    }
-  }
-
-  function positionPreview(target){
-    const rect = target.getBoundingClientRect();
-    const pw = $preview.outerWidth();
-    const ph = $preview.outerHeight();
-    let x = rect.right + 12;
-    let y = rect.top;
-
-    if(x + pw > window.innerWidth - 8){ x = Math.max(8, window.innerWidth - pw - 8); }
-    if(y + ph > window.innerHeight - 8){ y = Math.max(8, window.innerHeight - ph - 8); }
-
-    $preview.css({left: x+'px', top: y+'px'});
-  }
-
-  $(document).on('mouseenter', '.prov-desc', function(){
-    const card = this.closest('.prov-card');
-    const full = card ? card.getAttribute('data-desc') : this.textContent;
-    renderPreview(full);
-    $preview.attr('aria-hidden','false').show();
-    positionPreview(this);
-    hoverFromDesc = true;
-  }).on('mousemove', '.prov-desc', function(){
-    positionPreview(this);
-  }).on('mouseleave', '.prov-desc', function(){
-    hoverFromDesc = false;
-    setTimeout(()=>{ if(!hoverPreview) { $preview.hide().attr('aria-hidden','true'); } }, 80);
-  });
-
-  $preview.on('mouseenter', function(){ hoverPreview = true; })
-          .on('mouseleave', function(){ hoverPreview = false; if(!hoverFromDesc){ $preview.hide().attr('aria-hidden','true'); } });
-
-  $(window).on('scroll resize', ()=>{ if($preview.is(':visible')) $preview.hide().attr('aria-hidden','true'); });
 }
 </script>
 
