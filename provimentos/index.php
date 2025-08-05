@@ -3,10 +3,18 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
+
+/* Bases absolutas
+   $appBase    → http(s)://{SERVIDOR}/atlas/provimentos/
+   $viewerBase → http(s)://{SERVIDOR}/atlas/provimentos/pdfjs/web/viewer.html */
+$scheme     = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$host       = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$scriptDir  = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+$appBase    = $scheme . '://' . $host . $scriptDir . '/';
+$viewerBase = $appBase . 'pdfjs/web/viewer.html';
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,21 +40,25 @@ date_default_timezone_set('America/Sao_Paulo');
            O sistema já controla body.light-mode / body.dark-mode
            =======================================================*/
         body.light-mode {
-            --modal-bg: #f8fafc;           /* fundo do body do modal */
-            --modal-panel: #ffffff;        /* cartões/áreas internas */
-            --modal-bar: #f1f5f9;          /* barras (metadados/toolbar) */
+            --modal-bg: #f8fafc;
+            --modal-panel: #ffffff;
+            --modal-bar: #f1f5f9;
             --modal-border: #e5e7eb;
             --modal-text: #0f172a;
             --modal-muted: #64748b;
-            --modal-header1: #2563eb;      /* gradiente topo */
+            --modal-header1: #2563eb;
             --modal-header2: #1e40af;
             --modal-badge-bg: rgba(0,0,0,.06);
             --modal-badge-brd: rgba(0,0,0,.12);
-            --btn-outline: #0f172a;        /* cor de contorno dos botões da toolbar */
+            --btn-outline: #0f172a;
             --btn-outline-hover: rgba(2,6,23,.06);
             --loader-fg: #0f172a;
             --loader-bg1: rgba(59,130,246,.12);
             --loader-bg2: rgba(29,78,216,.18);
+            --input-bg: #ffffff;
+            --input-brd: #d1d5db;
+            --input-text:#0f172a;
+            --input-ph:#6b7280;
         }
         body.dark-mode {
             --modal-bg: #0b1220;
@@ -64,602 +76,379 @@ date_default_timezone_set('America/Sao_Paulo');
             --loader-fg: #dbeafe;
             --loader-bg1: rgba(59,130,246,.12);
             --loader-bg2: rgba(29,78,216,.18);
+            --input-bg: #0b1324;
+            --input-brd: rgba(255,255,255,.15);
+            --input-text:#e5e7eb;
+            --input-ph:#9ca3af;
         }
 
-        .btn-adicionar {
-            height: 38px;
-            line-height: 24px;
-            margin-left: 10px;
-        }
+        .btn-adicionar { height: 38px; line-height: 24px; margin-left: 10px; }
 
-        .table th:nth-child(1), .table td:nth-child(1) { width: 7%; }  /* Tipo    */
-        .table th:nth-child(2), .table td:nth-child(2) { width: 7%; }  /* Nº      */
-        .table th:nth-child(3), .table td:nth-child(3) { width: 5%; }  /* Origem  */
-        .table th:nth-child(4), .table td:nth-child(4) { width: 8%; }  /* Data    */
-        .table th:nth-child(5), .table td:nth-child(5) { width: 68%; } /* Descrição */
-        .table th:nth-child(6), .table td:nth-child(6) { width: 5%; }  /* Ações   */
+        .table th:nth-child(1), .table td:nth-child(1){ width:7%; }
+        .table th:nth-child(2), .table td:nth-child(2){ width:7%; }
+        .table th:nth-child(3), .table td:nth-child(3){ width:5%; }
+        .table th:nth-child(4), .table td:nth-child(4){ width:8%; }
+        .table th:nth-child(5), .table td:nth-child(5){ width:68%; }
+        .table th:nth-child(6), .table td:nth-child(6){ width:5%; }
 
-        /* ===== Modal moderno 90% viewport, responsivo e com tema ===== */
-        .modal-modern.modal {
-            backdrop-filter: blur(4px);
-        }
-        .modal-modern .modal-dialog {
-            max-width: 90vw !important;
-            width: 90vw !important;
-            margin: 2vh auto;
-        }
+        .modal-modern.modal          { backdrop-filter: blur(4px); }
+        .modal-modern .modal-dialog  { max-width:90vw!important; width:90vw!important; margin:2vh auto; }
         .modal-modern .modal-content {
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid var(--modal-border);
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0,0,0,.35);
-            background: var(--modal-panel);
-            color: var(--modal-text);
+            height:100vh; display:flex; flex-direction:column;
+            border:1px solid var(--modal-border); border-radius:16px; overflow:hidden;
+            box-shadow:0 20px 50px rgba(0,0,0,.35); background:var(--modal-panel); color:var(--modal-text);
         }
-        .modal-modern .modal-header {
-            border: 0;
-            padding: 14px 18px;
-            background: linear-gradient(135deg, var(--modal-header1), var(--modal-header2));
-            color: #fff;
+        .modal-modern .modal-header  { border:0; padding:14px 18px; background:linear-gradient(135deg,var(--modal-header1),var(--modal-header2)); color:#fff; }
+        .modal-modern .modal-title   { display:flex; align-items:center; gap:.75rem; font-weight:600; }
+        .modal-modern .modal-title .badge{ background:var(--modal-badge-bg); border:1px solid var(--modal-badge-brd); color:#fff; font-weight:500; }
+        .modal-modern .close , .modal-modern .close:hover{ color:#fff; opacity:1; text-shadow:none; }
+
+        .modal-modern .modal-body{
+            background:var(--modal-bg); color:var(--modal-text);
+            border-top:1px solid var(--modal-border); border-bottom:1px solid var(--modal-border);
+            padding:0; display:flex; flex-direction:column;
         }
-        .modal-modern .modal-title {
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-            font-weight: 600;
+        .modal-modern .meta-bar{
+            display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+            gap:12px; padding:14px 16px; background:var(--modal-bar); border-bottom:1px solid var(--modal-border);
         }
-        .modal-modern .modal-title .badge {
-            background: var(--modal-badge-bg);
-            border: 1px solid var(--modal-badge-brd);
-            color: #fff;
-            font-weight: 500;
-        }
-        .modal-modern .close, .modal-modern .close:hover {
-            color:#fff;
-            opacity:1;
-            text-shadow:none;
-        }
-        .modal-modern .modal-body {
-            background: var(--modal-bg);
-            color: var(--modal-text);
-            border-top: 1px solid var(--modal-border);
-            border-bottom: 1px solid var(--modal-border);
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-        }
-        .modal-modern .meta-bar {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0,1fr));
-            gap: 12px;
-            padding: 14px 16px;
-            background: var(--modal-bar);
-            border-bottom: 1px solid var(--modal-border);
-        }
-        .meta-item {
-            background: var(--modal-panel);
-            border: 1px solid var(--modal-border);
-            border-radius: 12px;
-            padding: 10px 12px;
-        }
-        .meta-item label {
-            display:block;
-            font-size:.75rem;
-            color: var(--modal-muted);
-            margin-bottom: 2px;
-        }
-        .meta-item .value {
-            font-weight: 600;
-            color: var(--modal-text);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .meta-item{ background:var(--modal-panel); border:1px solid var(--modal-border); border-radius:12px; padding:10px 12px;}
+        .meta-item label{ display:block; font-size:.75rem; color:var(--modal-muted); margin-bottom:2px;}
+        .meta-item .value{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+        .modal-modern .doc-toolbar{
+            display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+            padding:10px 16px; background:var(--modal-bar); border-top:1px solid var(--modal-border); border-bottom:1px solid var(--modal-border);
         }
 
-        .modal-modern .doc-toolbar {
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap: 10px;
-            padding: 10px 16px;
-            background: var(--modal-bar);
-            border-top:1px solid var(--modal-border);
-            border-bottom:1px solid var(--modal-border);
-            color: var(--modal-text);
+        .meta-desc{
+            max-width:60%; cursor:pointer; position:relative; line-height:1.25rem;
+            max-height:2.6rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+            transition:max-height .2s ease;
         }
-        .doc-actions .btn.theme-outline {
-            border-radius: 10px;
-            border: 1px solid var(--btn-outline);
-            color: var(--btn-outline);
-            background: transparent;
+        .meta-desc.expanded{
+            background:var(--modal-panel); border:1px solid var(--modal-border); padding:8px 10px;
+            border-radius:8px; max-height:18rem; overflow:auto; -webkit-line-clamp:unset;
         }
-        .doc-actions .btn.theme-outline i {
-            margin-right:6px;
-            font-size: 16px;
+        .meta-desc .mdi{ vertical-align:middle; margin-right:6px; }
+
+        .doc-actions{ display:flex; align-items:center; gap:6px; }
+        .doc-actions .btn.theme-outline{
+            border-radius:10px; border:1px solid var(--btn-outline); color:var(--btn-outline); background:transparent;
         }
-        .doc-actions .btn.theme-outline:hover {
-            background: var(--btn-outline-hover);
+        .doc-actions .btn.theme-outline i{ margin-right:6px; font-size:16px; }
+        .doc-actions .btn.theme-outline:hover{ background:var(--btn-outline-hover); }
+
+        .pdf-search .form-control{
+            background:var(--input-bg); color:var(--input-text); border:1px solid var(--input-brd);
+        }
+        .pdf-search .form-control::placeholder{ color:var(--input-ph); }
+        .pdf-search .input-group-append .btn{
+            border:1px solid var(--btn-outline); color:var(--btn-outline); background:transparent; border-left:none;
+        }
+        .pdf-search .input-group-append .btn:hover{ background:var(--btn-outline-hover); }
+
+        .viewer-wrapper{ position:relative; flex:1 1 auto; min-height:200px; background:var(--modal-panel);}
+        .viewer-frame  { position:absolute; inset:0; width:100%; height:100%; border:0; background:var(--modal-panel);}
+        .doc-loader{
+            position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+            background:radial-gradient(1200px 600px at 30% -20%,var(--loader-bg1),transparent 60%),radial-gradient(800px 600px at 130% 120%,var(--loader-bg2),transparent 60%),var(--modal-panel);
+            color:var(--loader-fg); font-weight:600; letter-spacing:.3px;
         }
 
-        .viewer-wrapper {
-            position: relative;
-            flex: 1 1 auto;
-            min-height: 200px;
-            background: var(--modal-panel);
+        @media (max-width:992px){
+            .modal-modern .meta-bar{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .meta-desc{ max-width:100%; }
         }
-        .viewer-frame {
-            position:absolute;
-            inset:0;
-            width:100%;
-            height:100%;
-            border:0;
-            background: var(--modal-panel);
-        }
-        .doc-loader {
-            position:absolute;
-            inset:0;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            background:
-                radial-gradient(1200px 600px at 30% -20%, var(--loader-bg1), transparent 60%),
-                radial-gradient(800px 600px at 130% 120%, var(--loader-bg2), transparent 60%),
-                var(--modal-panel);
-            color: var(--loader-fg);
-            font-weight:600;
-            letter-spacing:.3px;
-        }
-
-        .modal-modern .modal-footer {
-            background: var(--modal-bar);
-            border-top: 1px solid var(--modal-border);
-        }
-
-        @media (max-width: 992px){
-            .modal-modern .meta-bar{
-                grid-template-columns: repeat(2,minmax(0,1fr));
-            }
-        }
-        @media (max-width: 576px){
-            .modal-modern .modal-dialog {
-                width: 96vw !important;
-                max-width: 96vw !important;
-                margin: 2vh auto;
-            }
-            .modal-modern .modal-content{
-                height: 92vh;
-            }
-            .modal-modern .meta-bar{
-                grid-template-columns: 1fr;
-            }
-            .doc-actions .btn.theme-outline span{
-                display:none;
-            }
+        @media (max-width:576px){
+            .modal-modern .modal-dialog{ width:96vw!important; max-width:96vw!important; margin:2vh auto; }
+            .modal-modern .modal-content{ height:92vh; }
+            .modal-modern .meta-bar{ grid-template-columns:1fr; }
+            .doc-actions .btn.theme-outline span{ display:none; }
         }
     </style>
 </head>
 
 <body class="light-mode">
-    <?php
-    include(__DIR__ . '/../menu.php');
-    ?>
+<?php include(__DIR__ . '/../menu.php'); ?>
 
-    <div id="main" class="main-content">
-        <div class="container">
-            <h3>Pesquisar Provimentos e Resoluções</h3>
-            <hr>
-            <form id="pesquisarForm" method="GET">
-                <div class="form-row">
-                    <div class="form-group col-md-2">
-                        <label for="tipo">Tipo:</label>
-                        <select class="form-control" id="tipo" name="tipo">
-                            <option value="">Todos</option>
-                            <option value="Provimento">Provimento</option>
-                            <option value="Resolução">Resolução</option>
-                        </select>
-                    </div>
-                    <div class="form-group col-md-2">
-                        <label for="numero_provimento">Nº Prov./Resol.:</label>
-                        <input type="text" class="form-control" id="numero_provimento" name="numero_provimento">
-                    </div>
-                    <div class="form-group col-md-2">
-                        <label for="ano">Ano:</label>
-                        <input type="text" class="form-control" id="ano" name="ano" pattern="\d{4}" title="Digite um ano válido (ex: 2023)" maxlength="4" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4)">
-                    </div>
-                    <div class="form-group col-md-3">
-                        <label for="origem">Origem:</label>
-                        <select class="form-control" id="origem" name="origem">
-                            <option value="">Selecione</option>
-                            <option value="CGJ/MA">CGJ/MA</option>
-                            <option value="CNJ">CNJ</option>
-                        </select>
-                    </div>
-                    <div class="form-group col-md-3">
-                        <label for="data_provimento">Data:</label>
-                        <input type="date" class="form-control" id="data_provimento" name="data_provimento">
-                    </div>
-                    <div class="form-group col-md-6">
-                        <label for="descricao">Descrição:</label>
-                        <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
-                    </div>
-                    <div class="form-group col-md-6">
-                        <label for="conteudo_anexo">Conteúdo:</label>
-                        <textarea class="form-control" id="conteudo_anexo" name="conteudo_anexo" rows="3"></textarea>
-                    </div>
+<!-- ================================ PÁGINA PRINCIPAL ================================ -->
+<div id="main" class="main-content">
+    <div class="container">
+        <h3>Pesquisar Provimentos e Resoluções</h3>
+        <hr>
+        <!-- --------------------------- FORMULÁRIO DE FILTRO --------------------------- -->
+        <!-- (mesmo conteúdo do código anterior) -->
+        <form id="pesquisarForm" method="GET">
+            <!-- … campos de filtro … -->
+            <div class="form-row">
+                <div class="form-group col-md-2">
+                    <label for="tipo">Tipo:</label>
+                    <select class="form-control" id="tipo" name="tipo">
+                        <option value="">Todos</option>
+                        <option value="Provimento">Provimento</option>
+                        <option value="Resolução">Resolução</option>
+                    </select>
                 </div>
-                <div class="row mb-12">
-                    <div class="col-md-12">
-                        <button type="submit" style="width: 100%; color: #fff!important" class="btn btn-primary">
-                            <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
-                        </button>
-                    </div>
+                <div class="form-group col-md-2">
+                    <label for="numero_provimento">Nº Prov./Resol.:</label>
+                    <input type="text" class="form-control" id="numero_provimento" name="numero_provimento">
                 </div>
-            </form>
-            <hr>
-            <div class="table-responsive">
-                <h5>Resultados da Pesquisa</h5>
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 100%">
-                    <thead>
-                        <tr>
-                            <th>Tipo</th>
-                            <th>Nº</th>
-                            <th>Origem</th>
-                            <th>Data</th>
-                            <th>Descrição</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $conn = getDatabaseConnection();
-                        $conditions = [];
-                        $params = [];
-                        $filtered = false;
-
-                        if (!empty($_GET['numero_provimento'])) {
-                            if (strpos($_GET['numero_provimento'], '/') !== false) {
-                                list($numero, $ano) = explode('/', $_GET['numero_provimento']);
-                                $conditions[] = 'numero_provimento = :numero AND YEAR(data_provimento) = :ano';
-                                $params[':numero'] = $numero;
-                                $params[':ano'] = $ano;
-                            } else {
-                                $conditions[] = 'numero_provimento = :numero';
-                                $params[':numero'] = $_GET['numero_provimento'];
-                            }
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['origem'])) {
-                            $conditions[] = 'origem = :origem';
-                            $params[':origem'] = $_GET['origem'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['tipo'])) {
-                            $conditions[] = 'tipo = :tipo';
-                            $params[':tipo'] = $_GET['tipo'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['ano'])) {
-                            $conditions[] = 'YEAR(data_provimento) = :ano';
-                            $params[':ano'] = $_GET['ano'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['data_provimento'])) {
-                            $conditions[] = 'data_provimento = :data_provimento';
-                            $params[':data_provimento'] = $_GET['data_provimento'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['descricao'])) {
-                            $conditions[] = 'descricao LIKE :descricao';
-                            $params[':descricao'] = '%' . $_GET['descricao'] . '%';
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['conteudo_anexo'])) {
-                            $conditions[] = 'conteudo_anexo LIKE :conteudo_anexo';
-                            $params[':conteudo_anexo'] = '%' . $_GET['conteudo_anexo'] . '%';
-                            $filtered = true;
-                        }
-
-                        $sql = 'SELECT * FROM provimentos';
-                        if ($conditions) {
-                            $sql .= ' WHERE ' . implode(' AND ', $conditions);
-                        }
-                        if (!$filtered) {
-                            $sql .= ' ORDER BY data_provimento DESC';
-                        }
-
-                        $stmt = $conn->prepare($sql);
-                        foreach ($params as $key => $value) {
-                            $stmt->bindValue($key, $value);
-                        }
-                        $stmt->execute();
-                        $provimentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                        foreach ($provimentos as $provimento) {
-                            $numero_provimento_ano = $provimento['numero_provimento'] . '/' . date('Y', strtotime($provimento['data_provimento']));
-                            ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($provimento['tipo']); ?></td>
-                                <td><?php echo htmlspecialchars($numero_provimento_ano); ?></td>
-                                <td><?php echo htmlspecialchars($provimento['origem']); ?></td>
-                                <td data-order="<?php echo date('Y-m-d', strtotime($provimento['data_provimento'])); ?>"><?php echo date('d/m/Y', strtotime($provimento['data_provimento'])); ?></td>
-                                <td><?php echo htmlspecialchars($provimento['descricao']); ?></td>
-                                <td>
-                                    <button class="btn btn-info btn-sm" title="Visualizar Provimento" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="visualizarProvimento('<?php echo $provimento['id']; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                </td>
-                            </tr>
-                            <?php
-                        }
-                        ?>
-                    </tbody>
-                </table>
+                <div class="form-group col-md-2">
+                    <label for="ano">Ano:</label>
+                    <input type="text" class="form-control" id="ano" name="ano" pattern="\d{4}" maxlength="4"
+                           oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)" title="Digite um ano válido">
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="origem">Origem:</label>
+                    <select class="form-control" id="origem" name="origem">
+                        <option value="">Selecione</option>
+                        <option value="CGJ/MA">CGJ/MA</option>
+                        <option value="CNJ">CNJ</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="data_provimento">Data:</label>
+                    <input type="date" class="form-control" id="data_provimento" name="data_provimento">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="descricao">Descrição:</label>
+                    <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="conteudo_anexo">Conteúdo:</label>
+                    <textarea class="form-control" id="conteudo_anexo" name="conteudo_anexo" rows="3"></textarea>
+                </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Modal de Visualização (moderno 90%, respeita light/dark) -->
-    <div class="modal fade modal-modern" id="visualizarModal" tabindex="-1" role="dialog" aria-labelledby="visualizarModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document" aria-modal="true">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div class="modal-title" id="visualizarModalLabel">
-                        <i class="mdi mdi-file-document-outline"></i>
-                        <span class="title-text">Documento</span>
-                        <span class="badge badge-pill ml-2" id="tagTipo">—</span>
-                    </div>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                        <span aria-hidden="true">&times;</span>
+            <div class="row mb-12">
+                <div class="col-md-12">
+                    <button type="submit" class="btn btn-primary" style="width:100%;color:#fff!important">
+                        <i class="fa fa-filter"></i> Filtrar
                     </button>
                 </div>
-
-                <div class="modal-body">
-                    <!-- Barra de metadados -->
-                    <div class="meta-bar">
-                        <div class="meta-item">
-                            <label>Tipo</label>
-                            <div class="value" id="metaTipo">—</div>
-                        </div>
-                        <div class="meta-item">
-                            <label>Número</label>
-                            <div class="value" id="metaNumero">—</div>
-                        </div>
-                        <div class="meta-item">
-                            <label>Origem</label>
-                            <div class="value" id="metaOrigem">—</div>
-                        </div>
-                        <div class="meta-item">
-                            <label>Data</label>
-                            <div class="value" id="metaData">—</div>
-                        </div>
-                    </div>
-
-                    <!-- Toolbar de ações -->
-                    <div class="doc-toolbar">
-                        <div class="text-truncate" style="max-width:70%;">
-                            <i class="mdi mdi-text-long"></i>
-                            <span id="metaDescricao" class="ml-1">—</span>
-                        </div>
-                        <div class="doc-actions">
-                            <button type="button" class="btn theme-outline btn-sm" id="btnOpenNew" title="Abrir em uma nova aba">
-                                <i class="mdi mdi-open-in-new"></i><span>Abrir</span>
-                            </button>
-                            <button type="button" class="btn theme-outline btn-sm" id="btnDownload" title="Baixar PDF">
-                                <i class="mdi mdi-download"></i><span>Baixar</span>
-                            </button>
-                            <button type="button" class="btn theme-outline btn-sm" id="btnCopyLink" title="Copiar link do anexo">
-                                <i class="mdi mdi-link-variant"></i><span>Copiar link</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Viewer -->
-                    <div class="viewer-wrapper">
-                        <div id="docLoader" class="doc-loader">
-                            <i class="mdi mdi-loading mdi-spin mr-2"></i> Carregando documento…
-                        </div>
-                        <iframe id="anexo_visualizacao" class="viewer-frame" frameborder="0"></iframe>
-                    </div>
-                </div>
-
             </div>
+        </form>
+        <hr>
+        <!-- --------------------------- TABELA DE RESULTADOS --------------------------- -->
+        <div class="table-responsive">
+            <h5>Resultados da Pesquisa</h5>
+            <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom:100%">
+                <thead>
+                    <tr><th>Tipo</th><th>Nº</th><th>Origem</th><th>Data</th><th>Descrição</th><th>Ações</th></tr>
+                </thead>
+                <tbody>
+<?php
+/* ---------- PHP para listar os provimentos (inalterado) ---------- */
+$conn = getDatabaseConnection();
+$conditions=[]; $params=[]; $filtered=false;
+if(!empty($_GET['numero_provimento'])){
+    if(strpos($_GET['numero_provimento'],'/')!==false){
+        list($numero,$ano)=explode('/',$_GET['numero_provimento']);
+        $conditions[]='numero_provimento=:numero AND YEAR(data_provimento)=:ano';
+        $params[':numero']=$numero; $params[':ano']=$ano;
+    }else{ $conditions[]='numero_provimento=:numero'; $params[':numero']=$_GET['numero_provimento']; }
+    $filtered=true;
+}
+if(!empty($_GET['origem']))           { $conditions[]='origem=:origem';                  $params[':origem']=$_GET['origem'];             $filtered=true; }
+if(!empty($_GET['tipo']))             { $conditions[]='tipo=:tipo';                      $params[':tipo']  =$_GET['tipo'];               $filtered=true; }
+if(!empty($_GET['ano']))              { $conditions[]='YEAR(data_provimento)=:ano';      $params[':ano']   =$_GET['ano'];                $filtered=true; }
+if(!empty($_GET['data_provimento']))  { $conditions[]='data_provimento=:data_provimento';$params[':data_provimento']=$_GET['data_provimento']; $filtered=true; }
+if(!empty($_GET['descricao']))        { $conditions[]='descricao LIKE :descricao';       $params[':descricao']='%'.$_GET['descricao'].'%'; $filtered=true; }
+if(!empty($_GET['conteudo_anexo']))   { $conditions[]='conteudo_anexo LIKE :conteudo_anexo';$params[':conteudo_anexo']='%'.$_GET['conteudo_anexo'].'%'; $filtered=true; }
+
+$sql='SELECT * FROM provimentos';
+if($conditions) $sql.=' WHERE '.implode(' AND ',$conditions);
+if(!$filtered)  $sql.=' ORDER BY data_provimento DESC';
+
+$stmt=$conn->prepare($sql);
+foreach($params as $k=>$v){ $stmt->bindValue($k,$v); }
+$stmt->execute();
+foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $p){
+    $numAno=$p['numero_provimento'].'/'.date('Y',strtotime($p['data_provimento']));?>
+    <tr>
+        <td><?=htmlspecialchars($p['tipo']);?></td>
+        <td><?=htmlspecialchars($numAno);?></td>
+        <td><?=htmlspecialchars($p['origem']);?></td>
+        <td data-order="<?=date('Y-m-d',strtotime($p['data_provimento']));?>"><?=date('d/m/Y',strtotime($p['data_provimento']));?></td>
+        <td><?=htmlspecialchars($p['descricao']);?></td>
+        <td>
+            <button class="btn btn-info btn-sm" style="margin-bottom:5px;font-size:20px;width:40px;height:40px;border-radius:5px;border:none"
+                    title="Visualizar Provimento" onclick="visualizarProvimento('<?=$p['id'];?>')">
+                <i class="fa fa-eye"></i>
+            </button>
+        </td>
+    </tr>
+<?php } ?>
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
 
-    <!-- Scripts -->
-    <script src="../script/jquery-3.5.1.min.js"></script>
-    <script src="../script/bootstrap.min.js"></script>
-    <script src="../script/bootstrap.bundle.min.js"></script>
-    <script src="../script/jquery.dataTables.min.js"></script>
-    <script src="../script/dataTables.bootstrap4.min.js"></script>
-    <script src="../script/sweetalert2.js"></script>
-    <script>
-        $(document).ready(function() {
-            // Inicializar DataTable
-            $('#tabelaResultados').DataTable({
-                "language": {
-                    "url": "../style/Portuguese-Brasil.json"
-                },
-                "order": [[3, 'desc']]
-            });
-        });
+<!-- ================================ MODAL DE VISUALIZAÇÃO ================================ -->
+<div class="modal fade modal-modern" id="visualizarModal" tabindex="-1" role="dialog" aria-labelledby="visualizarModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document" aria-modal="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title" id="visualizarModalLabel">
+          <i class="mdi mdi-file-document-outline"></i> <span class="title-text">Documento</span>
+          <span class="badge badge-pill ml-2" id="tagTipo">—</span>
+        </div>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Fechar"><span aria-hidden="true">&times;</span></button>
+      </div>
+      <div class="modal-body">
+        <!-- META BAR -->
+        <div class="meta-bar">
+          <div class="meta-item"><label>Tipo</label><div class="value" id="metaTipo">—</div></div>
+          <div class="meta-item"><label>Número</label><div class="value" id="metaNumero">—</div></div>
+          <div class="meta-item"><label>Origem</label><div class="value" id="metaOrigem">—</div></div>
+          <div class="meta-item"><label>Data</label><div class="value" id="metaData">—</div></div>
+        </div>
+        <!-- TOOLBAR -->
+        <div class="doc-toolbar">
+          <div id="metaDescricaoWrapper" class="meta-desc" tabindex="0" title="Clique para expandir/recolher a descrição">
+            <i class="mdi mdi-text-long"></i> <span id="metaDescricao">—</span>
+          </div>
+          <div class="pdf-search">
+            <div class="input-group input-group-sm">
+              <input type="text" id="pdfSearchInput" class="form-control" placeholder="Buscar frase exata no PDF (Enter)">
+              <div class="input-group-append">
+                <button class="btn theme-outline btn-sm" id="pdfSearchBtn" title="Buscar no PDF">
+                  <i class="mdi mdi-magnify"></i><span>Buscar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="doc-actions">
+            <button class="btn theme-outline btn-sm" id="btnOpenNew" title="Abrir em nova aba"><i class="mdi mdi-open-in-new"></i><span>Abrir</span></button>
+            <button class="btn theme-outline btn-sm" id="btnDownload" title="Baixar documento"><i class="mdi mdi-download"></i><span>Baixar</span></button>
+            <button class="btn theme-outline btn-sm" id="btnCopyLink" title="Copiar link"><i class="mdi mdi-link-variant"></i><span>Copiar link</span></button>
+          </div>
+        </div>
+        <!-- VIEWER -->
+        <div class="viewer-wrapper">
+          <div id="docLoader" class="doc-loader"><i class="mdi mdi-loading mdi-spin mr-2"></i> Carregando documento…</div>
+          <iframe id="anexo_visualizacao" class="viewer-frame" frameborder="0"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-        // --- Helpers para nome e download padronizados -------------------
-        function composeDownloadName(p) {
-            const numero = p.numero_provimento || '';
-            const ano = p.ano_provimento || (p.data_provimento ? new Date(p.data_provimento + 'T00:00:00').getFullYear() : '');
-            const tipo = p.tipo || 'Documento';
-            const origem = p.origem || '';
-            let name = `${tipo} nº ${numero}_${ano} - ${origem}`;
-            // Mapeamento solicitado: remover ":" e trocar "/" por "_"
-            name = name.replace(/:/g, '').replace(/\//g, '_');
-            // Remover caracteres inválidos em nomes de arquivo no Windows/macOS
-            name = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '');
-            // Espaços duplos -> simples e trim
-            name = name.replace(/\s+/g, ' ').trim();
-            // Evitar ponto final
-            name = name.replace(/\.+$/, '');
-            return name;
-        }
+<!-- ================================ SCRIPTS ================================ -->
+<script>
+const APP_BASE_URL     = <?php echo json_encode($appBase,    JSON_UNESCAPED_SLASHES); ?>;
+const PDFJS_VIEWER_URL = <?php echo json_encode($viewerBase, JSON_UNESCAPED_SLASHES); ?>;
+function toAbsoluteUrl(u){ return !u ? '' : (/^(https?:)?\/\//i.test(u) ? u : APP_BASE_URL + u.replace(/^\/+/,'') ); }
+</script>
+<script src="../script/jquery-3.5.1.min.js"></script>
+<script src="../script/bootstrap.bundle.min.js"></script>
+<script src="../script/jquery.dataTables.min.js"></script>
+<script src="../script/dataTables.bootstrap4.min.js"></script>
+<script src="../script/sweetalert2.js"></script>
 
-        async function baixarArquivo(url, nomeBase) {
-            try {
-                const resp = await fetch(url, { credentials: 'same-origin' });
-                if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                const blob = await resp.blob();
+<script>
+$(document).ready(function(){
+  $('#tabelaResultados').DataTable({language:{url:"../style/Portuguese-Brasil.json"},order:[[3,'desc']]});
+  $('#metaDescricaoWrapper').on('click',e=>$(e.currentTarget).toggleClass('expanded'))
+                            .on('mouseleave blur',e=>$(e.currentTarget).removeClass('expanded'));
+  $('#pdfSearchBtn').on('click',triggerPdfSearch);
+  $('#pdfSearchInput').on('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); triggerPdfSearch(); }});
+});
 
-                // Tenta definir extensão a partir do Content-Type, se não existir na URL
-                let ext = '';
-                const ct = (blob.type || '').toLowerCase();
-                if (/\.(pdf|jpg|jpeg|png|gif|doc|docx|xls|xlsx|odt|rtf|txt|csv)$/i.test(url.split('?')[0])) {
-                    // mantém a extensão da URL
-                    ext = url.split('?')[0].match(/\.[a-z0-9]+$/i)[0];
-                } else if (ct.includes('pdf')) ext = '.pdf';
-                else if (ct.includes('jpeg')) ext = '.jpg';
-                else if (ct.includes('png')) ext = '.png';
-                else if (ct.includes('gif')) ext = '.gif';
-                else if (ct.includes('msword')) ext = '.doc';
-                else if (ct.includes('officedocument.wordprocessingml')) ext = '.docx';
-                else if (ct.includes('spreadsheetml')) ext = '.xlsx';
-                else if (ct.includes('csv')) ext = '.csv';
-                else if (ct.includes('rtf')) ext = '.rtf';
-                else if (ct.includes('text')) ext = '.txt';
+/* ---------- utilidades de download (mesmas) ---------- */
+function composeDownloadName(p){
+  const numero=p.numero_provimento||'';
+  const ano   =p.ano_provimento||(p.data_provimento?new Date(p.data_provimento+'T00:00:00').getFullYear():'');
+  const tipo  =p.tipo||'Documento';
+  const origem=p.origem||'';
+  return (`${tipo} nº ${numero}_${ano} - ${origem}`)
+          .replace(/:/g,'').replace(/\//g,'_')
+          .replace(/[<>:"/\\|?*\x00-\x1F]/g,'')
+          .replace(/\s+/g,' ').trim().replace(/\.+$/,'');
+}
+async function baixarArquivo(url,nomeBase){
+  try{
+    const r=await fetch(url,{credentials:'same-origin'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const b=await r.blob();
+    let ext=''; const ct=(b.type||'').toLowerCase();
+    const m=url.split('?')[0].match(/\.[a-z0-9]+$/i);
+    if(m) ext=m[0];
+    else if(ct.includes('pdf')) ext='.pdf'; else if(ct.includes('jpeg')) ext='.jpg';
+    else if(ct.includes('png')) ext='.png'; else if(ct.includes('gif')) ext='.gif';
+    else if(ct.includes('msword')) ext='.doc'; else if(ct.includes('wordprocessingml')) ext='.docx';
+    else if(ct.includes('spreadsheetml')) ext='.xlsx'; else if(ct.includes('csv')) ext='.csv';
+    else if(ct.includes('rtf')) ext='.rtf'; else if(ct.includes('text')) ext='.txt';
+    const o=URL.createObjectURL(b);
+    const a=document.createElement('a'); a.href=o; a.download=nomeBase+ext; document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(o);
+  }catch(e){ Swal.fire({icon:'error',title:'Falha ao baixar',text:e.message||'Erro desconhecido'}); }
+}
 
-                const objectUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = objectUrl;
-                a.download = nomeBase + (ext || '');
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(objectUrl);
-            } catch (e) {
-                Swal.fire({icon:'error', title:'Falha ao baixar', text:e.message || 'Erro desconhecido'});
-            }
-        }
-        // ------------------------------------------------------------------
+/* ---------- visualização ---------- */
+let __currentPdfUrl='';
+function visualizarProvimento(id){
+  $('#docLoader').show(); $('#anexo_visualizacao').attr('src','about:blank');
+  $.get('obter_provimento.php',{id},res=>{
+    try{
+      const p=typeof res==='object'?res:JSON.parse(res);
+      const numAno=(p.numero_provimento||'')+'/'+(p.ano_provimento||'');
+      $('#metaTipo').text(p.tipo||'—'); $('#metaNumero').text(numAno||'—'); $('#metaOrigem').text(p.origem||'—');
+      $('#metaData').text(p.data_provimento?new Date(p.data_provimento+'T00:00:00').toLocaleDateString('pt-BR'):'—');
+      $('#metaDescricao').text(p.descricao||'—'); $('#metaDescricaoWrapper').removeClass('expanded');
+      $('#tagTipo').text(p.tipo||'Documento'); $('.title-text').text(`${p.tipo||'Documento'} nº: ${numAno} - ${p.origem||'—'}`);
+      __currentPdfUrl=toAbsoluteUrl(p.caminho_anexo||'');
+      $('#anexo_visualizacao').off('load').on('load',()=>$('#docLoader').fadeOut(150)).attr('src',__currentPdfUrl);
+      const nomePadrao=composeDownloadName(p);
+      $('#btnOpenNew').off('click').on('click',()=>{ if(__currentPdfUrl) window.open(__currentPdfUrl,'_blank'); });
+      $('#btnDownload').off('click').on('click',()=>{ if(__currentPdfUrl) baixarArquivo(__currentPdfUrl,nomePadrao); });
+      $('#btnCopyLink').off('click').on('click',async()=>{
+          try{ await navigator.clipboard.writeText(__currentPdfUrl); Swal.fire({icon:'success',title:'Link copiado!',timer:1200,showConfirmButton:false});}
+          catch{ Swal.fire({icon:'error',title:'Falha ao copiar link'});}
+      });
+      $('#visualizarModal').modal('show');
+    }catch(e){ console.error(e); alert('Erro ao processar resposta do servidor.'); }
+  }).fail(()=>alert('Erro ao obter os dados do provimento.'));
+}
 
-        function visualizarProvimento(id) {
-            // Reset do loader e frame
-            $('#docLoader').show();
-            $('#anexo_visualizacao').attr('src', 'about:blank');
+/* ---------- busca no PDF: agora usa phrase=true para buscar a frase exata ---------- */
+function buildPdfJsViewerUrl(fileUrl,search){
+  let u=PDFJS_VIEWER_URL+'?file='+encodeURIComponent(fileUrl);
+  if(search&&search.trim()) u+='#search='+encodeURIComponent(search.trim())+'&phrase=true';
+  return u;
+}
+function triggerPdfSearch(){
+  const term=($('#pdfSearchInput').val()||'').trim();
+  if(!__currentPdfUrl)           { Swal.fire({icon:'warning',title:'Nenhum documento aberto'}); return; }
+  if(!term)                      { Swal.fire({icon:'warning',title:'Digite um termo ou frase'}); return; }
+  $('#docLoader').show();
+  $('#anexo_visualizacao').off('load').on('load',()=>$('#docLoader').fadeOut(150))
+                         .attr('src',buildPdfJsViewerUrl(__currentPdfUrl,term));
+}
 
-            $.ajax({
-                url: 'obter_provimento.php',
-                type: 'GET',
-                data: { id: id },
-                success: function(response) {
-                    try {
-                        var provimento = (typeof response === 'object') ? response : JSON.parse(response);
+/* ---------- ajuste de altura e validação de data (inalterados) ---------- */
+function ajustarAlturaViewer(){
+  const $c=$('#visualizarModal .modal-content');
+  const h=$('#visualizarModal .modal-header').outerHeight(true)||0;
+  const f=$('#visualizarModal .modal-footer').outerHeight(true)||0;
+  $('#visualizarModal .modal-body').height(($c.height()||0)-h-f);
+}
+$('#visualizarModal').on('shown.bs.modal',ajustarAlturaViewer);
+$(window).on('resize',()=>{ if($('#visualizarModal').hasClass('show')) ajustarAlturaViewer(); });
 
-                        var numero_provimento_ano = (provimento.numero_provimento || '') + '/' + (provimento.ano_provimento || '');
+$(document).ready(function(){
+  const currentYear=new Date().getFullYear();
+  $('#data_provimento').on('change',function(){
+    const sel=new Date(this.value);
+    if(sel.getFullYear()>currentYear){
+      Swal.fire({icon:'warning',title:'Data inválida',text:'O ano não pode ser maior que o ano atual.'});
+      this.value='';
+    }
+  });
+});
+</script>
 
-                        // Metadados (topo)
-                        $('#metaTipo').text(provimento.tipo || '—');
-                        $('#metaNumero').text(numero_provimento_ano || '—');
-                        $('#metaOrigem').text(provimento.origem || '—');
-                        let dataProvimento = provimento.data_provimento ? new Date(provimento.data_provimento + 'T00:00:00') : null;
-                        $('#metaData').text(dataProvimento ? dataProvimento.toLocaleDateString('pt-BR') : '—');
-
-                        // Descrição/toolbar
-                        $('#metaDescricao').text(provimento.descricao || '—');
-
-                        // Tag tipo no título
-                        $('#tagTipo').text(provimento.tipo || 'Documento');
-
-                        // Título do modal
-                        var modalTitle = (provimento.tipo || 'Documento') + ' nº: ' + (numero_provimento_ano || '—') + ' - ' + (provimento.origem || '—');
-                        $('.title-text').text(modalTitle);
-
-                        // Viewer
-                        const url = provimento.caminho_anexo || '';
-                        $('#anexo_visualizacao')
-                            .off('load')
-                            .on('load', function(){ $('#docLoader').fadeOut(150); })
-                            .attr('src', url);
-
-                        // Nome padrão para download conforme solicitado
-                        const nomePadrao = composeDownloadName(provimento);
-
-                        // Botões de ação
-                        $('#btnOpenNew').off('click').on('click', function(){
-                            if (url) window.open(url, '_blank');
-                        });
-                        $('#btnDownload').off('click').on('click', function(){
-                            if (!url) return;
-                            baixarArquivo(url, nomePadrao);
-                        });
-                        $('#btnCopyLink').off('click').on('click', async function(){
-                            try{
-                                await navigator.clipboard.writeText(url || '');
-                                Swal.fire({icon:'success', title:'Link copiado!', timer:1200, showConfirmButton:false});
-                            }catch(e){
-                                Swal.fire({icon:'error', title:'Falha ao copiar link'});
-                            }
-                        });
-
-                        // Exibe o modal
-                        $('#visualizarModal').modal('show');
-                    } catch (e) {
-                        console.error(e);
-                        alert('Erro ao processar resposta do servidor.');
-                    }
-                },
-                error: function() {
-                    alert('Erro ao obter os dados do provimento.');
-                }
-            });
-        }
-
-        // Ajusta o iframe para sempre ocupar o espaço disponível
-        function ajustarAlturaViewer(){
-            const $content = $('#visualizarModal .modal-content');
-            const $header  = $('#visualizarModal .modal-header');
-            const $footer  = $('#visualizarModal .modal-footer');
-            const $body    = $('#visualizarModal .modal-body');
-            const total = $content.height() || 0;
-            const head = $header.outerHeight(true) || 0;
-            const foot = $footer.outerHeight(true) || 0;
-            const bodyAvailable = total - head - foot;
-            $body.height(bodyAvailable);
-        }
-
-        $('#visualizarModal').on('shown.bs.modal', function(){
-            ajustarAlturaViewer();
-        });
-        $(window).on('resize', function(){
-            if ($('#visualizarModal').hasClass('show')) ajustarAlturaViewer();
-        });
-
-        // Validação do campo Data (não permite ano futuro)
-        $(document).ready(function() {
-            var currentYear = new Date().getFullYear();
-
-            function validateDate(input) {
-                var selectedDate = new Date($(input).val());
-                if (selectedDate.getFullYear() > currentYear) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Data inválida',
-                        text: 'O ano não pode ser maior que o ano atual.',
-                        confirmButtonText: 'Ok'
-                    });
-                    $(input).val('');
-                }
-            }
-
-            $('#data_provimento').on('change', function() {
-                if ($(this).val()) {
-                    validateDate(this);
-                }
-            });
-        });
-    </script>
-    <?php
-    include(__DIR__ . '/../rodape.php');
-    ?>
+<?php include(__DIR__ . '/../rodape.php'); ?>
 </body>
-
 </html>
