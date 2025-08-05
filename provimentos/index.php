@@ -12,6 +12,10 @@ $host       = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $scriptDir  = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
 $appBase    = $scheme . '://' . $host . $scriptDir . '/';
 $viewerBase = $appBase . 'pdfjs/web/viewer.html';
+
+/* Helper para preencher o formulário com os valores enviados */
+$g = $_GET ?? [];
+function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -178,46 +182,47 @@ $viewerBase = $appBase . 'pdfjs/web/viewer.html';
         <h3>Pesquisar Provimentos e Resoluções</h3>
         <hr>
         <!-- --------------------------- FORMULÁRIO DE FILTRO --------------------------- -->
-        <!-- (mesmo conteúdo do código anterior) -->
         <form id="pesquisarForm" method="GET">
-            <!-- … campos de filtro … -->
             <div class="form-row">
                 <div class="form-group col-md-2">
                     <label for="tipo">Tipo:</label>
                     <select class="form-control" id="tipo" name="tipo">
-                        <option value="">Todos</option>
-                        <option value="Provimento">Provimento</option>
-                        <option value="Resolução">Resolução</option>
+                        <option value="" <?= (($g['tipo'] ?? '')==='' ? 'selected' : '') ?>>Todos</option>
+                        <option value="Provimento" <?= (($g['tipo'] ?? '')==='Provimento' ? 'selected' : '') ?>>Provimento</option>
+                        <option value="Resolução"  <?= (($g['tipo'] ?? '')==='Resolução'  ? 'selected' : '') ?>>Resolução</option>
                     </select>
                 </div>
                 <div class="form-group col-md-2">
                     <label for="numero_provimento">Nº Prov./Resol.:</label>
-                    <input type="text" class="form-control" id="numero_provimento" name="numero_provimento">
+                    <input type="text" class="form-control" id="numero_provimento" name="numero_provimento"
+                           value="<?= e($g['numero_provimento'] ?? '') ?>">
                 </div>
                 <div class="form-group col-md-2">
                     <label for="ano">Ano:</label>
                     <input type="text" class="form-control" id="ano" name="ano" pattern="\d{4}" maxlength="4"
-                           oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)" title="Digite um ano válido">
+                           oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)" title="Digite um ano válido"
+                           value="<?= e($g['ano'] ?? '') ?>">
                 </div>
                 <div class="form-group col-md-3">
                     <label for="origem">Origem:</label>
                     <select class="form-control" id="origem" name="origem">
-                        <option value="">Selecione</option>
-                        <option value="CGJ/MA">CGJ/MA</option>
-                        <option value="CNJ">CNJ</option>
+                        <option value="" <?= (($g['origem'] ?? '')==='' ? 'selected' : '') ?>>Selecione</option>
+                        <option value="CGJ/MA" <?= (($g['origem'] ?? '')==='CGJ/MA' ? 'selected' : '') ?>>CGJ/MA</option>
+                        <option value="CNJ"    <?= (($g['origem'] ?? '')==='CNJ'    ? 'selected' : '') ?>>CNJ</option>
                     </select>
                 </div>
                 <div class="form-group col-md-3">
                     <label for="data_provimento">Data:</label>
-                    <input type="date" class="form-control" id="data_provimento" name="data_provimento">
+                    <input type="date" class="form-control" id="data_provimento" name="data_provimento"
+                           value="<?= e($g['data_provimento'] ?? '') ?>">
                 </div>
                 <div class="form-group col-md-6">
                     <label for="descricao">Descrição:</label>
-                    <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                    <textarea class="form-control" id="descricao" name="descricao" rows="3"><?= e($g['descricao'] ?? '') ?></textarea>
                 </div>
                 <div class="form-group col-md-6">
                     <label for="conteudo_anexo">Conteúdo:</label>
-                    <textarea class="form-control" id="conteudo_anexo" name="conteudo_anexo" rows="3"></textarea>
+                    <textarea class="form-control" id="conteudo_anexo" name="conteudo_anexo" rows="3"><?= e($g['conteudo_anexo'] ?? '') ?></textarea>
                 </div>
             </div>
             <div class="row mb-12">
