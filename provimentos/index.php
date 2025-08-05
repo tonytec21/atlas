@@ -37,7 +37,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 
     <style>
         /* =========================================================
-           Tema Light/Dark — variáveis do MODAL, CARDS e SEÇÕES
+           Tema Light/Dark — variáveis do MODAL e dos CARDS
            =======================================================*/
         body.light-mode {
             --modal-bg: #f8fafc;
@@ -69,12 +69,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             --card-hover:rgba(2,6,23,.06);
             --accent:#2563eb;
             --accent-2:#1e40af;
-
-            --section-bg:#ffffff;
-            --section-brd:#e5e7eb;
-            --section-title:#0f172a;
-            --section-sub:#6b7280;
-
             --popover-bg:#ffffff;
             --popover-brd:#e5e7eb;
             --popover-text:#0f172a;
@@ -110,12 +104,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             --card-hover:rgba(255,255,255,.06);
             --accent:#60a5fa;
             --accent-2:#3b82f6;
-
-            --section-bg:#0b1324;
-            --section-brd:rgba(255,255,255,.10);
-            --section-title:#e5e7eb;
-            --section-sub:#9ca3af;
-
             --popover-bg:#0b1324;
             --popover-brd:rgba(255,255,255,.12);
             --popover-text:#e5e7eb;
@@ -123,29 +111,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         }
 
         .btn-adicionar { height: 38px; line-height: 24px; margin-left: 10px; }
-
-        /* ======================= SEPARAÇÃO EM SEÇÕES ======================= */
-        .surface{
-            background:var(--section-bg);
-            border:1px solid var(--section-brd);
-            border-radius:16px;
-            box-shadow:0 10px 28px rgba(0,0,0,.08);
-            margin-bottom:22px;
-            overflow:hidden;
-        }
-        .surface__header{
-            display:flex; align-items:center; justify-content:space-between;
-            gap:10px; padding:14px 16px;
-            background:linear-gradient(135deg, rgba(37,99,235,.10), transparent);
-            border-bottom:1px solid var(--section-brd);
-        }
-        .surface__title{
-            display:flex; align-items:center; gap:10px; font-weight:700; color:var(--section-title);
-        }
-        .surface__subtitle{
-            font-size:.9rem; color:var(--section-sub);
-        }
-        .surface__body{ padding:14px 16px; }
 
         /* ======================= MODAL ======================= */
         .modal-modern.modal          { backdrop-filter: blur(4px); }
@@ -214,6 +179,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         }
         .results-toolbar .controls .form-control{
             background:var(--input-bg); color:var(--input-text); border:1px solid var(--input-brd);
+            /* height:36px; */
         }
         .cards-grid{
             display:grid; gap:14px;
@@ -296,74 +262,64 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 <div id="main" class="main-content">
     <div class="container">
         <h3>Pesquisar Provimentos e Resoluções</h3>
+        <hr>
 
-        <!-- ====================== SEÇÃO: FILTROS ====================== -->
-        <section id="filtros" class="surface" role="region" aria-labelledby="filtersTitle">
-            <div class="surface__header">
-                <div>
-                    <div class="surface__title" id="filtersTitle">
-                        <i class="mdi mdi-filter-variant"></i> Filtros de Pesquisa
-                    </div>
-                    <div class="surface__subtitle">Refine os critérios e clique em <strong>Filtrar</strong>.</div>
+        <!-- --------------------------- FORMULÁRIO DE FILTRO --------------------------- -->
+        <form id="pesquisarForm" method="GET">
+            <div class="form-row">
+                <div class="form-group col-md-2">
+                    <label for="tipo">Tipo:</label>
+                    <select class="form-control" id="tipo" name="tipo">
+                        <option value="" <?= (($g['tipo'] ?? '')==='' ? 'selected' : '') ?>>Todos</option>
+                        <option value="Provimento" <?= (($g['tipo'] ?? '')==='Provimento' ? 'selected' : '') ?>>Provimento</option>
+                        <option value="Resolução"  <?= (($g['tipo'] ?? '')==='Resolução'  ? 'selected' : '') ?>>Resolução</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-2">
+                    <label for="numero_provimento">Nº Prov./Resol.:</label>
+                    <input type="text" class="form-control" id="numero_provimento" name="numero_provimento"
+                           value="<?= e($g['numero_provimento'] ?? '') ?>">
+                </div>
+                <div class="form-group col-md-2">
+                    <label for="ano">Ano:</label>
+                    <input type="text" class="form-control" id="ano" name="ano" pattern="\d{4}" maxlength="4"
+                           oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)" title="Digite um ano válido"
+                           value="<?= e($g['ano'] ?? '') ?>">
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="origem">Origem:</label>
+                    <select class="form-control" id="origem" name="origem">
+                        <option value="" <?= (($g['origem'] ?? '')==='' ? 'selected' : '') ?>>Selecione</option>
+                        <option value="CGJ/MA" <?= (($g['origem'] ?? '')==='CGJ/MA' ? 'selected' : '') ?>>CGJ/MA</option>
+                        <option value="CNJ"    <?= (($g['origem'] ?? '')==='CNJ'    ? 'selected' : '') ?>>CNJ</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="data_provimento">Data:</label>
+                    <input type="date" class="form-control" id="data_provimento" name="data_provimento"
+                           value="<?= e($g['data_provimento'] ?? '') ?>">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="descricao">Descrição (contém):</label>
+                    <textarea class="form-control" id="descricao" name="descricao" rows="3"><?= e($g['descricao'] ?? '') ?></textarea>
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="conteudo_anexo">Conteúdo do anexo (contém):</label>
+                    <textarea class="form-control" id="conteudo_anexo" name="conteudo_anexo" rows="3"><?= e($g['conteudo_anexo'] ?? '') ?></textarea>
                 </div>
             </div>
-            <div class="surface__body">
-                <form id="pesquisarForm" method="GET">
-                    <div class="form-row">
-                        <div class="form-group col-md-2">
-                            <label for="tipo">Tipo:</label>
-                            <select class="form-control" id="tipo" name="tipo">
-                                <option value="" <?= (($g['tipo'] ?? '')==='' ? 'selected' : '') ?>>Todos</option>
-                                <option value="Provimento" <?= (($g['tipo'] ?? '')==='Provimento' ? 'selected' : '') ?>>Provimento</option>
-                                <option value="Resolução"  <?= (($g['tipo'] ?? '')==='Resolução'  ? 'selected' : '') ?>>Resolução</option>
-                            </select>
-                        </div>
-                        <div class="form-group col-md-2">
-                            <label for="numero_provimento">Nº Prov./Resol.:</label>
-                            <input type="text" class="form-control" id="numero_provimento" name="numero_provimento"
-                                   value="<?= e($g['numero_provimento'] ?? '') ?>">
-                        </div>
-                        <div class="form-group col-md-2">
-                            <label for="ano">Ano:</label>
-                            <input type="text" class="form-control" id="ano" name="ano" pattern="\d{4}" maxlength="4"
-                                   oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)" title="Digite um ano válido"
-                                   value="<?= e($g['ano'] ?? '') ?>">
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="origem">Origem:</label>
-                            <select class="form-control" id="origem" name="origem">
-                                <option value="" <?= (($g['origem'] ?? '')==='' ? 'selected' : '') ?>>Selecione</option>
-                                <option value="CGJ/MA" <?= (($g['origem'] ?? '')==='CGJ/MA' ? 'selected' : '') ?>>CGJ/MA</option>
-                                <option value="CNJ"    <?= (($g['origem'] ?? '')==='CNJ'    ? 'selected' : '') ?>>CNJ</option>
-                            </select>
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="data_provimento">Data:</label>
-                            <input type="date" class="form-control" id="data_provimento" name="data_provimento"
-                                   value="<?= e($g['data_provimento'] ?? '') ?>">
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="descricao">Descrição (contém):</label>
-                            <textarea class="form-control" id="descricao" name="descricao" rows="3"><?= e($g['descricao'] ?? '') ?></textarea>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="conteudo_anexo">Conteúdo do anexo (contém):</label>
-                            <textarea class="form-control" id="conteudo_anexo" name="conteudo_anexo" rows="3"><?= e($g['conteudo_anexo'] ?? '') ?></textarea>
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <button type="submit" class="btn btn-primary" style="min-width:160px;color:#fff!important">
-                            <i class="fa fa-filter"></i> Filtrar
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()" title="Limpar filtros">
-                            <i class="mdi mdi-broom"></i> Limpar
-                        </button>
-                    </div>
-                </form>
+            <div class="row mb-12">
+                <div class="col-md-12">
+                    <button type="submit" class="btn btn-primary" style="width:100%;color:#fff!important">
+                        <i class="fa fa-filter"></i> Filtrar
+                    </button>
+                </div>
             </div>
-        </section>
+        </form>
 
-        <!-- ====================== SEÇÃO: RESULTADOS ====================== -->
+        <hr>
+
+        <!-- --------------------------- RESULTADOS EM CARDS --------------------------- -->
         <?php
         $conn = getDatabaseConnection();
         $conditions=[]; $params=[]; $filtered=false;
@@ -396,97 +352,81 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         $total = count($rows);
         ?>
 
-        <section id="resultados" class="surface" role="region" aria-labelledby="resultsTitle">
-            <div class="surface__header">
-                <div>
-                    <div class="surface__title" id="resultsTitle">
-                        <i class="mdi mdi-file-document-outline"></i> Resultados da Pesquisa
-                    </div>
-                    <div class="surface__subtitle">Visualize, baixe ou copie o link do documento.</div>
-                </div>
-                <div class="surface__subtitle">
-                    <?= $filtered ? 'Exibindo resultados filtrados' : 'Exibindo mais recentes' ?>
-                </div>
+        <div class="results-toolbar">
+            <div class="count">
+                <i class="mdi mdi-format-list-bulleted-square"></i>
+                <span id="countSpan"><?= $total ?></span> de <span id="totalSpan"><?= $total ?></span> resultado<?= $total==1?'':'s' ?>
             </div>
-
-            <div class="surface__body">
-                <div class="results-toolbar">
-                    <div class="count">
-                        <i class="mdi mdi-format-list-bulleted-square"></i>
-                        <span id="countSpan"><?= $total ?></span> de <span id="totalSpan"><?= $total ?></span> resultado<?= $total==1?'':'s' ?>
+            <div class="controls">
+                <div class="input-group">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text" style="background:var(--input-bg); color:var(--input-text); border:1px solid var(--input-brd); border-right:none;">
+                            <i class="mdi mdi-magnify"></i>
+                        </span>
                     </div>
-                    <div class="controls">
-                        <div class="input-group">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text" style="background:var(--input-bg); color:var(--input-text); border:1px solid var(--input-brd); border-right:none;">
-                                    <i class="mdi mdi-magnify"></i>
-                                </span>
-                            </div>
-                            <input id="quickSearch" type="text" class="form-control" placeholder="Busca rápida nos resultados (nº, tipo, origem, descrição)">
+                    <input id="quickSearch" type="text" class="form-control" placeholder="Busca rápida nos resultados (nº, tipo, origem, descrição)">
+                </div>
+                <select id="sortSelect" class="form-control">
+                    <option value="date_desc">Ordenar: Data (mais recente)</option>
+                    <option value="date_asc">Ordenar: Data (mais antiga)</option>
+                    <option value="num_asc">Ordenar: Número (A→Z)</option>
+                    <option value="num_desc">Ordenar: Número (Z→A)</option>
+                    <option value="tipo_asc">Ordenar: Tipo (A→Z)</option>
+                    <option value="origem_asc">Ordenar: Origem (A→Z)</option>
+                </select>
+            </div>
+        </div>
+
+        <?php if ($total === 0): ?>
+            <div class="empty-state">
+                <i class="mdi mdi-file-search-outline"></i>
+                Nenhum documento encontrado com os filtros informados.
+                <div style="margin-top:6px;font-size:.9rem;">Tente remover algum filtro ou buscar por outros termos.</div>
+            </div>
+        <?php else: ?>
+            <div id="cardsContainer" class="cards-grid">
+                <?php foreach($rows as $p):
+                    $id       = (int)$p['id'];
+                    $tipo     = $p['tipo']         ?? '';
+                    $origem   = $p['origem']       ?? '';
+                    $numero   = $p['numero_provimento'] ?? '';
+                    $dataSQL  = $p['data_provimento'] ?? '';
+                    $dataISO  = $dataSQL ? date('Y-m-d', strtotime($dataSQL)) : '';
+                    $dataBR   = $dataSQL ? date('d/m/Y', strtotime($dataSQL)) : '—';
+                    $anoDoc   = $dataSQL ? date('Y', strtotime($dataSQL)) : '';
+                    $numAno   = trim($numero . '/' . $anoDoc, '/');
+                    $desc     = $p['descricao']    ?? '';
+                    $caminho  = $p['caminho_anexo'] ?? '';
+                ?>
+                <article class="prov-card"
+                         data-date="<?= e($dataISO) ?>"
+                         data-num="<?= e($numero) ?>"
+                         data-tipo="<?= e($tipo) ?>"
+                         data-origem="<?= e($origem) ?>"
+                         data-url="<?= e($caminho) ?>"
+                         data-id="<?= $id ?>"
+                         data-desc="<?= e($desc) ?>">
+                    <div class="prov-card__header">
+                        <span class="chip"><i class="mdi mdi-label-outline"></i><?= e($tipo ?: 'Documento') ?></span>
+                        <div class="prov-card__num">nº <?= e($numAno ?: $numero) ?></div>
+                    </div>
+                    <div class="prov-card__body">
+                        <div class="prov-meta">
+                            <span class="meta" title="Origem"><i class="mdi mdi-source-branch"></i><?= e($origem ?: '—') ?></span>
+                            <span class="meta" title="Data"><i class="mdi mdi-calendar-month-outline"></i><?= e($dataBR) ?></span>
                         </div>
-                        <select id="sortSelect" class="form-control">
-                            <option value="date_desc">Ordenar: Data (mais recente)</option>
-                            <option value="date_asc">Ordenar: Data (mais antiga)</option>
-                            <option value="num_asc">Ordenar: Número (A→Z)</option>
-                            <option value="num_desc">Ordenar: Número (Z→A)</option>
-                            <option value="tipo_asc">Ordenar: Tipo (A→Z)</option>
-                            <option value="origem_asc">Ordenar: Origem (A→Z)</option>
-                        </select>
+                        <div class="prov-desc js-desc"><?= e($desc ?: '—') ?></div>
+                        <div class="prov-actions">
+                            <button class="btn btn-outline btn-sm js-visualizar"><i class="mdi mdi-eye-outline"></i> Visualizar</button>
+                            <button class="btn btn-outline btn-sm js-abrir"><i class="mdi mdi-open-in-new"></i> Abrir</button>
+                            <button class="btn btn-outline btn-sm js-baixar"><i class="mdi mdi-download"></i> Baixar</button>
+                            <button class="btn btn-outline btn-sm js-copiar"><i class="mdi mdi-link-variant"></i> Copiar link</button>
+                        </div>
                     </div>
-                </div>
-
-                <?php if ($total === 0): ?>
-                    <div class="empty-state">
-                        <i class="mdi mdi-file-search-outline"></i>
-                        Nenhum documento encontrado com os filtros informados.
-                        <div style="margin-top:6px;font-size:.9rem;">Tente remover algum filtro ou buscar por outros termos.</div>
-                    </div>
-                <?php else: ?>
-                    <div id="cardsContainer" class="cards-grid">
-                        <?php foreach($rows as $p):
-                            $id       = (int)$p['id'];
-                            $tipo     = $p['tipo']         ?? '';
-                            $origem   = $p['origem']       ?? '';
-                            $numero   = $p['numero_provimento'] ?? '';
-                            $dataSQL  = $p['data_provimento'] ?? '';
-                            $dataISO  = $dataSQL ? date('Y-m-d', strtotime($dataSQL)) : '';
-                            $dataBR   = $dataSQL ? date('d/m/Y', strtotime($dataSQL)) : '—';
-                            $anoDoc   = $dataSQL ? date('Y', strtotime($dataSQL)) : '';
-                            $numAno   = trim($numero . '/' . $anoDoc, '/');
-                            $desc     = $p['descricao']    ?? '';
-                            $caminho  = $p['caminho_anexo'] ?? '';
-                        ?>
-                        <article class="prov-card"
-                                 data-date="<?= e($dataISO) ?>"
-                                 data-num="<?= e($numero) ?>"
-                                 data-tipo="<?= e($tipo) ?>"
-                                 data-origem="<?= e($origem) ?>"
-                                 data-url="<?= e($caminho) ?>"
-                                 data-id="<?= $id ?>"
-                                 data-desc="<?= e($desc) ?>">
-                            <div class="prov-card__header">
-                                <span class="chip"><i class="mdi mdi-label-outline"></i><?= e($tipo ?: 'Documento') ?></span>
-                                <div class="prov-card__num">nº <?= e($numAno ?: $numero) ?></div>
-                            </div>
-                            <div class="prov-card__body">
-                                <div class="prov-meta">
-                                    <span class="meta" title="Origem"><i class="mdi mdi-source-branch"></i><?= e($origem ?: '—') ?></span>
-                                    <span class="meta" title="Data"><i class="mdi mdi-calendar-month-outline"></i><?= e($dataBR) ?></span>
-                                </div>
-                                <div class="prov-desc js-desc"><?= e($desc ?: '—') ?></div>
-                                <div class="prov-actions">
-                                    <button class="btn btn-outline btn-sm js-visualizar"><i class="mdi mdi-eye-outline"></i> Visualizar</button>
-                                    <button class="btn btn-outline btn-sm js-abrir"><i class="mdi mdi-open-in-new"></i> Abrir</button>
-                                    <button class="btn btn-outline btn-sm js-baixar"><i class="mdi mdi-download"></i> Baixar</button>
-                                    <button class="btn btn-outline btn-sm js-copiar"><i class="mdi mdi-link-variant"></i> Copiar link</button>
-                                </div>
-                            </div>
-                        </article>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
+                </article>
+                <?php endforeach; ?>
             </div>
-        </section>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -627,12 +567,6 @@ $(document).ready(function(){
   });
 });
 
-/* ---------- limpar filtros ---------- */
-function clearFilters(){
-  const base = window.location.origin + window.location.pathname;
-  window.location.href = base;
-}
-
 /* ---------- debounce ---------- */
 function debounce(fn, delay){
   let t; return function(){ clearTimeout(t); t=setTimeout(()=>fn.apply(this, arguments), delay); };
@@ -719,7 +653,7 @@ function sortCards(mode){
 
   cards.sort((a,b)=>{
     const da = a.getAttribute('data-date') || '';
-       const db = b.getAttribute('data-date') || '';
+    const db = b.getAttribute('data-date') || '';
     const na = (a.getAttribute('data-num') || '').toString();
     const nb = (b.getAttribute('data-num') || '').toString();
     const ta = (a.getAttribute('data-tipo') || '');
