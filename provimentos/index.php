@@ -9,6 +9,7 @@ date_default_timezone_set('America/Sao_Paulo');
    $viewerBase → http(s)://{SERVIDOR}/atlas/provimentos/pdfjs/web/viewer.html */
 $scheme     = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $host       = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$host       = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $scriptDir  = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
 $appBase    = $scheme . '://' . $host . $scriptDir . '/';
 $viewerBase = $appBase . 'pdfjs/web/viewer.html';
@@ -108,33 +109,55 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         .modal-modern.modal          { backdrop-filter: blur(4px); }
         .modal-modern .modal-dialog  { max-width:90vw!important; width:90vw!important; margin:2vh auto; }
         .modal-modern .modal-content {
-            height:100vh; display:flex; flex-direction:column;
+            height:95vh; display:flex; flex-direction:column;
             border:1px solid var(--modal-border); border-radius:16px; overflow:hidden;
             box-shadow:0 20px 50px rgba(0,0,0,.35); background:var(--modal-panel); color:var(--modal-text);
         }
-        .modal-modern .modal-header  { border:0; padding:14px 18px; background:linear-gradient(135deg,var(--modal-header1),var(--modal-header2)); color:#fff; }
+        .modal-modern .modal-header  { border:0; padding:10px 12px; background:linear-gradient(135deg,var(--modal-header1),var(--modal-header2)); color:#fff; }
         .modal-modern .modal-title   { display:flex; align-items:center; gap:.75rem; font-weight:600; }
         .modal-modern .modal-title .badge{ background:var(--modal-badge-bg); border:1px solid var(--modal-badge-brd); color:#fff; font-weight:500; }
         .modal-modern .close , .modal-modern .close:hover{ color:#fff; opacity:1; text-shadow:none; }
+
+        /* Corpo do modal agora em layout de 2 colunas: esquerda infos, direita viewer */
         .modal-modern .modal-body{
             background:var(--modal-bg); color:var(--modal-text);
             border-top:1px solid var(--modal-border); border-bottom:1px solid var(--modal-border);
             padding:0; display:flex; flex-direction:column;
         }
+        .doc-layout{
+            display:grid; grid-template-columns: 380px 1fr; gap:0; flex:1 1 auto; min-height:0; height:100%;
+        }
+        .doc-sidebar{
+            display:flex; flex-direction:column; min-width:0;
+            background:var(--modal-bg); border-right:1px solid var(--modal-border);
+        }
+        .doc-sidebar .doc-title{
+            padding:14px 16px; border-bottom:1px solid var(--modal-border);
+            background: var(--modal-panel);
+        }
+        .doc-sidebar .doc-title .title-row{
+            display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;
+        }
+        .doc-sidebar .doc-title .title-left{
+            display:flex; align-items:center; gap:.75rem; font-weight:600;
+        }
+
         .modal-modern .meta-bar{
-            display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+            display:grid; grid-template-columns:1fr; /* empilhado na coluna esquerda */
             gap:12px; padding:14px 16px; background:var(--modal-bar); border-bottom:1px solid var(--modal-border);
         }
         .meta-item{ background:var(--modal-panel); border:1px solid var(--modal-border); border-radius:12px; padding:10px 12px;}
         .meta-item label{ display:block; font-size:.75rem; color:var(--modal-muted); margin-bottom:2px;}
         .meta-item .value{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .modal-modern .doc-toolbar{
-            display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
-            padding:10px 16px; background:var(--modal-bar); border-top:1px solid var(--modal-border); border-bottom:1px solid var(--modal-border);
+
+        .doc-toolbar{
+            display:flex; flex-direction:column; gap:10px;
+            padding:12px 16px; background:var(--modal-bar); border-top:1px solid var(--modal-border);
+            border-bottom:1px solid var(--modal-border);
         }
         .meta-desc{
-            max-width:60%; cursor:pointer; position:relative; line-height:1.25rem;
-            max-height:2.6rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+            max-width:100%; cursor:pointer; position:relative; line-height:1.25rem;
+            max-height:8.4rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical;
             transition:max-height .2s ease;
         }
         .meta-desc.expanded{
@@ -142,6 +165,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             border-radius:8px; max-height:18rem; overflow:auto; -webkit-line-clamp:unset;
         }
         .meta-desc .mdi{ vertical-align:middle; margin-right:6px; }
+
         .pdf-search .form-control{
             background:var(--input-bg); color:var(--input-text); border:1px solid var(--input-brd);
         }
@@ -150,7 +174,13 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             border:1px solid var(--btn-outline); color:var(--btn-outline); background:transparent; border-left:none;
         }
         .pdf-search .input-group-append .btn:hover{ background:var(--btn-outline-hover); }
-        .viewer-wrapper{ position:relative; flex:1 1 auto; min-height:200px; background:var(--modal-panel);}
+
+        .doc-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+        .doc-actions .btn{ border:1px solid var(--btn-outline); color:var(--btn-outline); background:transparent; border-radius:10px; }
+        .doc-actions .btn:hover{ background:var(--btn-outline-hover); }
+
+        .viewer-area{ position:relative; background:var(--modal-panel); }
+        .viewer-wrapper{ position:absolute; inset:0; width:100%; height:100%; background:var(--modal-panel);}
         .viewer-frame  { position:absolute; inset:0; width:100%; height:100%; border:0; background:var(--modal-panel);}
         .doc-loader{
             position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -204,14 +234,13 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             display:inline-flex; align-items:center; gap:6px; font-size:.88rem; color:var(--card-muted);
             background:var(--chip-bg); border:1px solid var(--chip-brd); padding:6px 10px; border-radius:10px;
         }
-        /* -------- Descrição no card: mais linhas visíveis + expandir ao hover -------- */
         .prov-desc{
             color:var(--card-text);
             line-height:1.45rem;
-            max-height:6.8rem;               /* ~5 linhas visíveis (altura dos cards levemente maior) */
+            max-height:6.8rem;
             overflow:hidden;
             display:-webkit-box;
-            -webkit-line-clamp:5;            /* de 3 → 5 linhas */
+            -webkit-line-clamp:5;
             -webkit-box-orient:vertical;
             position:relative;
             transition:max-height .2s ease, padding .2s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease;
@@ -220,7 +249,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         .prov-desc:hover,
         .prov-desc:focus{
             -webkit-line-clamp:unset;
-            max-height:50vh;                 /* mostra o conteúdo completo com rolagem se necessário */
+            max-height:50vh;
             overflow:auto;
             background:var(--chip-bg);
             border:1px solid var(--chip-brd);
@@ -353,8 +382,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
                 <?= $total ?> resultado<?= $total==1?'':'s' ?>
             </div>
             <div class="controls">
-                <!-- NOVO: campo para refinar a busca nos resultados já filtrados -->
-                <!-- <input type="text" id="refineInput" class="form-control" placeholder="Refinar resultados (busca nos cards)" style="min-width:240px"> -->
                 <select id="sortSelect" class="form-control">
                     <option value="date_desc">Ordenar: Data (mais recente)</option>
                     <option value="date_asc">Ordenar: Data (mais antiga)</option>
@@ -424,46 +451,67 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 <div class="modal fade modal-modern" id="visualizarModal" tabindex="-1" role="dialog" aria-labelledby="visualizarModalLabel" aria-hidden="true">
   <div class="modal-dialog" role="document" aria-modal="true">
     <div class="modal-content">
+      <!-- Header minimalista (somente o botão fechar); o título foi movido para a coluna esquerda -->
       <div class="modal-header">
-        <div class="modal-title" id="visualizarModalLabel">
-          <i class="mdi mdi-file-document-outline"></i> <span class="title-text">Documento</span>
-          <span class="badge badge-pill ml-2" id="tagTipo">—</span>
-        </div>
+        <div style="min-height:1px"></div>
         <button type="button" class="close" data-dismiss="modal" aria-label="Fechar"><span aria-hidden="true">&times;</span></button>
       </div>
+
       <div class="modal-body">
-        <!-- META BAR -->
-        <div class="meta-bar">
-          <div class="meta-item"><label>Tipo</label><div class="value" id="metaTipo">—</div></div>
-          <div class="meta-item"><label>Número</label><div class="value" id="metaNumero">—</div></div>
-          <div class="meta-item"><label>Origem</label><div class="value" id="metaOrigem">—</div></div>
-          <div class="meta-item"><label>Data</label><div class="value" id="metaData">—</div></div>
-        </div>
-        <!-- TOOLBAR -->
-        <div class="doc-toolbar">
-          <div id="metaDescricaoWrapper" class="meta-desc" tabindex="0" title="Clique para expandir/recolher a descrição">
-            <i class="mdi mdi-text-long"></i> <span id="metaDescricao">—</span>
-          </div>
-          <div class="pdf-search">
-            <div class="input-group input-group-sm">
-              <input type="text" id="pdfSearchInput" class="form-control" placeholder="Buscar frase no PDF">
-              <div class="input-group-append">
-                <button class="btn theme-outline btn-sm" id="pdfSearchBtn" title="Buscar no PDF">
-                  <i class="mdi mdi-magnify"></i><span>Buscar</span>
-                </button>
+        <div class="doc-layout">
+          <!-- COLUNA ESQUERDA (informações e controles) -->
+          <aside class="doc-sidebar">
+            <!-- Título e badge (antes no header) -->
+            <div class="doc-title">
+              <div class="title-row">
+                <div class="title-left" id="visualizarModalLabel">
+                  <i class="mdi mdi-file-document-outline"></i>
+                  <span class="title-text">Documento</span>
+                </div>
+                <span class="badge badge-pill ml-2" id="tagTipo">—</span>
               </div>
             </div>
-          </div>
-          <div class="doc-actions">
-            <button class="btn theme-outline btn-sm" id="btnOpenNew" title="Abrir em nova aba"><i class="mdi mdi-open-in-new"></i><span>Abrir</span></button>
-            <button class="btn theme-outline btn-sm" id="btnDownload" title="Baixar documento"><i class="mdi mdi-download"></i><span>Baixar</span></button>
-            <button class="btn theme-outline btn-sm" id="btnCopyLink" title="Copiar link"><i class="mdi mdi-link-variant"></i><span>Copiar link</span></button>
-          </div>
-        </div>
-        <!-- VIEWER -->
-        <div class="viewer-wrapper">
-          <div id="docLoader" class="doc-loader"><i class="mdi mdi-loading mdi-spin mr-2"></i> Carregando documento…</div>
-          <iframe id="anexo_visualizacao" class="viewer-frame" frameborder="0"></iframe>
+
+            <!-- META BAR -->
+            <div class="meta-bar">
+              <div class="meta-item"><label>Tipo</label><div class="value" id="metaTipo">—</div></div>
+              <div class="meta-item"><label>Número</label><div class="value" id="metaNumero">—</div></div>
+              <div class="meta-item"><label>Origem</label><div class="value" id="metaOrigem">—</div></div>
+              <div class="meta-item"><label>Data</label><div class="value" id="metaData">—</div></div>
+            </div>
+
+            <!-- TOOLBAR (descrição, busca no PDF e ações) -->
+            <div class="doc-toolbar">
+              <div id="metaDescricaoWrapper" class="meta-desc" tabindex="0" title="Clique para expandir/recolher a descrição">
+                <i class="mdi mdi-text-long"></i> <span id="metaDescricao">—</span>
+              </div>
+
+              <div class="pdf-search">
+                <div class="input-group input-group-sm">
+                  <input type="text" id="pdfSearchInput" class="form-control" placeholder="Buscar frase no PDF">
+                  <div class="input-group-append">
+                    <button class="btn theme-outline btn-sm" id="pdfSearchBtn" title="Buscar no PDF">
+                      <i class="mdi mdi-magnify"></i><span>Buscar</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="doc-actions">
+                <button class="btn theme-outline btn-sm" id="btnOpenNew" title="Abrir em nova aba"><i class="mdi mdi-open-in-new"></i><span>Abrir</span></button>
+                <button class="btn theme-outline btn-sm" id="btnDownload" title="Baixar documento"><i class="mdi mdi-download"></i><span>Baixar</span></button>
+                <button class="btn theme-outline btn-sm" id="btnCopyLink" title="Copiar link"><i class="mdi mdi-link-variant"></i><span>Copiar</span></button>
+              </div>
+            </div>
+          </aside>
+
+          <!-- COLUNA DIREITA (PDF / viewer) -->
+          <section class="viewer-area">
+            <div class="viewer-wrapper">
+              <div id="docLoader" class="doc-loader"><i class="mdi mdi-loading mdi-spin mr-2"></i> Carregando documento…</div>
+              <iframe id="anexo_visualizacao" class="viewer-frame" frameborder="0"></iframe>
+            </div>
+          </section>
         </div>
       </div>
     </div>
