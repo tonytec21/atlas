@@ -113,7 +113,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             border:1px solid var(--modal-border); border-radius:16px; overflow:hidden;
             box-shadow:0 20px 50px rgba(0,0,0,.35); background:var(--modal-panel); color:var(--modal-text);
         }
-        .modal-modern .modal-header  { border:0; padding:10px 12px; background:linear-gradient(135deg,var(--modal-header1),var(--modal-header2)); color:#fff; }
+        .modal-modern .modal-header  { border:0; padding:4px 12px; background:linear-gradient(135deg,var(--modal-header1),var(--modal-header2)); color:#fff; }
         .modal-modern .modal-title   { display:flex; align-items:center; gap:.75rem; font-weight:600; }
         .modal-modern .modal-title .badge{ background:var(--modal-badge-bg); border:1px solid var(--modal-badge-brd); color:#fff; font-weight:500; }
         .modal-modern .close , .modal-modern .close:hover{ color:#fff; opacity:1; text-shadow:none; }
