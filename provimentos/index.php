@@ -122,7 +122,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         .modal-modern .modal-body{
             background:var(--modal-bg); color:var(--modal-text);
             border-top:1px solid var(--modal-border); border-bottom:1px solid var(--modal-border);
-            padding:0; display:flex; flex-direction:column;
+            padding:0; display:flex; flex-direction:column; min-height:0; /* importante p/ scroll interno */
         }
         .doc-layout{
             display:grid; grid-template-columns: 380px 1fr; gap:0; flex:1 1 auto; min-height:0; height:100%;
@@ -130,8 +130,12 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         .doc-sidebar{
             display:flex; flex-direction:column; min-width:0;
             background:var(--modal-bg); border-right:1px solid var(--modal-border);
+            overflow:auto; /* rolagem independente da coluna esquerda */
+            -webkit-overflow-scrolling: touch; /* scroll suave em iOS */
         }
+        /* Título fixo no topo da coluna ao rolar (UX) */
         .doc-sidebar .doc-title{
+            position: sticky; top: 0; z-index: 2;
             padding:14px 16px; border-bottom:1px solid var(--modal-border);
             background: var(--modal-panel);
         }
@@ -167,7 +171,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         .meta-desc .mdi{ vertical-align:middle; margin-right:6px; }
 
         .pdf-search .form-control{
-            background:var(--input-bg); color:var(--input-text); border:1px solid var(--input-brd);
+            background:var(--input-bg); color:var(--input-text); border:1px solid var(--btn-outline);
         }
         .pdf-search .form-control::placeholder{ color:var(--input-ph); }
         .pdf-search .input-group-append .btn{
@@ -179,7 +183,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         .doc-actions .btn{ border:1px solid var(--btn-outline); color:var(--btn-outline); background:transparent; border-radius:10px; }
         .doc-actions .btn:hover{ background:var(--btn-outline-hover); }
 
-        .viewer-area{ position:relative; background:var(--modal-panel); }
+        .viewer-area{ position:relative; background:var(--modal-panel); min-height:0; }
         .viewer-wrapper{ position:absolute; inset:0; width:100%; height:100%; background:var(--modal-panel);}
         .viewer-frame  { position:absolute; inset:0; width:100%; height:100%; border:0; background:var(--modal-panel);}
         .doc-loader{
@@ -271,8 +275,33 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         .empty-state i{ font-size:32px; display:block; margin-bottom:10px; color:var(--accent); }
 
         mark{ padding:0 2px; border-radius:4px; background:rgba(250,204,21,.35); }
-        @media (max-width:576px){
-            .meta-desc{ max-width:100%; }
+
+        /* ============== RESPONSIVIDADE DO MODAL ================= */
+        @media (max-width: 1200px){
+            .doc-layout{ grid-template-columns: 330px 1fr; }
+        }
+        @media (max-width: 992px){
+            /* PDF no TOPO (ordem visual) e com mais altura */
+            .doc-layout{
+                grid-template-columns: 1fr;
+                grid-template-rows: 55vh minmax(0, 1fr);
+            }
+            .viewer-area{ order: 1; min-height: 0; }
+            .doc-sidebar{ order: 2; height: auto; overflow:auto; -webkit-overflow-scrolling: touch; }
+        }
+        @media (max-width: 576px){
+            /* Ocupa toda a viewport no mobile e prioriza o PDF */
+            .modal-modern .modal-dialog{ width: 100vw!important; max-width: 100vw!important; margin: 0; }
+            .modal-modern .modal-content{ height: 100vh; border-radius: 0; }
+            @supports (height: 100dvh){
+                .modal-modern .modal-content{ height: 100dvh; }
+            }
+            .doc-layout{
+                grid-template-columns: 1fr;
+                grid-template-rows: 60dvh minmax(0, 1fr);
+            }
+            .viewer-area{ order: 1; }
+            .doc-sidebar{ order: 2; height: auto; overflow:auto; -webkit-overflow-scrolling: touch; }
         }
     </style>
 </head>
@@ -413,7 +442,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
                     $numAno   = trim($numero . '/' . $anoDoc, '/');
                     $desc     = $p['descricao']    ?? '';
                     $caminho  = $p['caminho_anexo'] ?? '';
-                    // Mantém URL relativa; JS tornará absoluta via APP_BASE_URL
                 ?>
                 <article class="prov-card"
                          data-date="<?= e($dataISO) ?>"
@@ -431,7 +459,6 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
                             <span class="meta" title="Origem"><i class="mdi mdi-source-branch"></i><?= e($origem ?: '—') ?></span>
                             <span class="meta" title="Data"><i class="mdi mdi-calendar-month-outline"></i><?= e($dataBR) ?></span>
                         </div>
-                        <!-- Removido o title para evitar 'legenda' poluída ao passar o mouse -->
                         <div class="prov-desc js-desc" tabindex="0"><?= e($desc ?: '—') ?></div>
                         <div class="prov-actions">
                             <button class="btn btn-outline btn-sm js-visualizar"><i class="mdi mdi-eye-outline"></i> Visualizar</button>
@@ -468,7 +495,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
                   <i class="mdi mdi-file-document-outline"></i>
                   <span class="title-text">Documento</span>
                 </div>
-                <span class="badge badge-pill ml-2" id="tagTipo">—</span>
+                <!-- <span class="badge badge-pill ml-2" id="tagTipo">—</span> -->
               </div>
             </div>
 
@@ -488,7 +515,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 
               <div class="pdf-search">
                 <div class="input-group input-group-sm">
-                  <input type="text" id="pdfSearchInput" class="form-control" placeholder="Buscar frase no PDF">
+                  <input type="text" id="pdfSearchInput" class="form-control" placeholder="Buscar no PDF">
                   <div class="input-group-append">
                     <button class="btn theme-outline btn-sm" id="pdfSearchBtn" title="Buscar no PDF">
                       <i class="mdi mdi-magnify"></i><span>Buscar</span>
@@ -536,12 +563,11 @@ $(document).ready(function(){
 
   // Clique em QUALQUER parte do card abre a visualização
   $('#cardsContainer').on('click','.prov-card',function(e){
-    // Se o clique foi em um botão/ação, não abrir duas vezes
     if($(e.target).closest('.js-abrir, .js-baixar, .js-copiar, .js-visualizar, .prov-actions button').length) return;
     visualizarProvimento($(this).data('id'));
   });
 
-  // Botões dos cards (com stopPropagation para não disparar o click do card)
+  // Botões dos cards
   $('#cardsContainer').on('click','.js-visualizar',function(e){
     e.stopPropagation();
     const card = $(this).closest('.prov-card');
@@ -558,7 +584,6 @@ $(document).ready(function(){
     const card = $(this).closest('.prov-card');
     const url  = toAbsoluteUrl(String(card.data('url')||''));
     if(!url) return;
-    // Monta nome amigável com base nos atributos do card
     const nomeBase = composeDownloadName({
       numero_provimento: String(card.data('num')||''),
       data_provimento: String(card.data('date')||''),
@@ -580,7 +605,7 @@ $(document).ready(function(){
     }
   });
 
-  // NOVO: refinar resultados localmente (ignora acentos/maiúsculas)
+  // Refino local
   const removeDiacritics = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   const debounce = (fn, wait=200) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), wait); }; };
   $('#refineInput').on('input', debounce(function(){
@@ -591,17 +616,16 @@ $(document).ready(function(){
   $('#sortSelect').on('change', function(){
     sortCards(this.value);
   });
-  // Ordenação inicial: Data desc
   sortCards('date_desc');
 
-  // Realce de termos buscados na descrição (da busca do formulário)
+  // Realce de termos
   highlightSearch();
   
   // Busca no PDF dentro do modal (frase exata)
   $('#pdfSearchBtn').on('click',triggerPdfSearch);
   $('#pdfSearchInput').on('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); triggerPdfSearch(); }});
 
-  // Validação leve da data do filtro
+  // Validação leve da data
   const currentYear=new Date().getFullYear();
   $('#data_provimento').on('change',function(){
     const sel=new Date(this.value);
