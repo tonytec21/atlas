@@ -125,7 +125,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             padding:0; display:flex; flex-direction:column; min-height:0; /* importante p/ scroll interno */
         }
         .doc-layout{
-            display:grid; grid-template-columns: 380px 1fr; gap:0; flex:1 1 auto; min-height:0; height:100%;
+            display:grid; grid-template-columns: 340px 1fr; gap:0; flex:1 1 auto; min-height:0; height:100%;
         }
         .doc-sidebar{
             display:flex; flex-direction:column; min-width:0;
@@ -527,7 +527,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
               <div class="doc-actions">
                 <button class="btn theme-outline btn-sm" id="btnOpenNew" title="Abrir em nova aba"><i class="mdi mdi-open-in-new"></i><span>Abrir</span></button>
                 <button class="btn theme-outline btn-sm" id="btnDownload" title="Baixar documento"><i class="mdi mdi-download"></i><span>Baixar</span></button>
-                <button class="btn theme-outline btn-sm" id="btnCopyLink" title="Copiar link"><i class="mdi mdi-link-variant"></i><span>Copiar</span></button>
+                <button class="btn theme-outline btn-sm" id="btnCopyLink" title="Copiar link"><i class="mdi mdi-link-variant"></i><span>Copiar link</span></button>
               </div>
             </div>
           </aside>
