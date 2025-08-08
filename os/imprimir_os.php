@@ -306,7 +306,7 @@ if (isset($_GET['id'])) {
     $pdf->SetFont('helvetica', '', 8);
     $pdf->SetLeftMargin(10); // Ajusta a margem esquerda se necessário
     $pdf->SetRightMargin(60); // Define a margem direita de 5 cm (aproximadamente 50mm)
-    $pdf->writeHTML('<div style="text-align: justify; margin-top: 20px;">Os valores apresentados são aproximados. Ao final do serviço, será realizado um levantamento detalhado de todos os atos praticados para confirmar o valor total. Caso haja um aumento, será necessário complementar o pagamento para a entrega do serviço. Se houver saldo remanescente, o valor será devolvido no ato da entrega. <b>É importante ter ciência de que o valor dos emolumentos é uma estimativa e pode sofrer alterações em função dos atos realizados.</b></div>', true, false, true, false, '');
+    $pdf->writeHTML('<div style="text-align: justify; margin-top: 20px;">Os emolumentos apresentados estão corretos para os atos discriminados, conforme a Tabela vigente e normas da Corregedoria; se houver atos complementares ou serviços não previstos, serão acrescidos os valores legais correspondentes. Ao final do serviço, será realizado um levantamento detalhado de todos os atos praticados para confirmar o valor total. Caso haja um aumento, será necessário complementar o pagamento para a entrega do serviço. Se houver saldo remanescente, o valor será devolvido no ato da entrega.</div>', true, false, true, false, '');
     $pdf->Ln(-18);
 
     // Adicionar os valores totais abaixo da tabela
