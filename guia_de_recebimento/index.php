@@ -554,11 +554,11 @@ date_default_timezone_set('America/Sao_Paulo');
                                             `;
                                             if (temAcesso) {
                                                 acoes += `
-                                                    <button class="btn btn-success btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Criar Tarefa" onclick='abrirModalTarefa(${guia.id}, ${JSON.stringify(guia.cliente)}, ${JSON.stringify(guia.documentos_recebidos)})'><i class="fa fa-clock-o" aria-hidden="true"></i></button>
                                                     <button class="btn btn-secondary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Vincular Tarefa" onclick="abrirModalVincularTarefa(${guia.id})"><i class="fa fa-link" aria-hidden="true"></i></button>
                                                 `;
                                             }
                                             acoes += `
+                                                <button class="btn btn-success btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Criar Tarefa" onclick='abrirModalTarefa(${guia.id}, ${JSON.stringify(guia.cliente)}, ${JSON.stringify(guia.documentos_recebidos)})'><i class="fa fa-clock-o" aria-hidden="true"></i></button>
                                                 <button class="btn btn-warning btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" title="Editar Guia" onclick="abrirModalEditarGuia(${guia.id})"><i class="fa fa-edit" aria-hidden="true"></i></button>
                                             `;
                                         } else {
