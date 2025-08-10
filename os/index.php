@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -14,294 +15,392 @@ include(__DIR__ . '/db_connection.php');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
+    <!-- Tentativa local -->
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+    <!-- CDN oficial (corrige ícones MDI que não carregavam localmente) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <style>
-        .w-100 {
-            margin-top: 5px;
+        /* ==============================
+           Tema base (Light/Dark ready)
+        ===============================*/
+        body.light-mode{
+            --bg: #ffffff;
+            --fg: #0f172a;
+            --muted:#6b7280;
+            --panel:#ffffff;
+            --panel-brd:#e5e7eb;
+            --soft:#f8fafc;
+            --accent:#2563eb;
+            --accent-2:#1e40af;
+            --success:#28a745;
+            --warning:#ffa907;
+            --danger:#dc3545;
+
+            --chip-bg:#eef2ff;
+            --chip-fg:#1e3a8a;
         }
-        .situacao-pago {
-            background-color: #28a745;
-            color: white;
-            width: 80px;
+        body.dark-mode{
+            --bg:#0b1220;
+            --fg:#e5e7eb;
+            --muted:#9ca3af;
+            --panel:#0b1324;
+            --panel-brd:rgba(255,255,255,.12);
+            --soft:#0e1627;
+            --accent:#60a5fa;
+            --accent-2:#3b82f6;
+            --success:#19c37d;
+            --warning:#f4b740;
+            --danger:#ef4444;
+
+            --chip-bg:#0e1627;
+            --chip-fg:#c7d2fe;
+        }
+
+        /* ==============================
+           Barra de ações superior
+        ===============================*/
+        .top-actions .btn{ border-radius:10px; }
+        .btn-info2{ background:#17a2b8; color:#fff; }
+        .btn-info2:hover{ filter:brightness(0.95); color:#fff; }
+
+        /* ==============================
+           Formulário (card leve)
+        ===============================*/
+        .filter-card{
+            background:var(--panel);
+            border:1px solid var(--panel-brd);
+            border-radius:14px;
+            padding:16px;
+            box-shadow:0 8px 24px rgba(0,0,0,.06);
+        }
+        #pesquisarForm .form-group{ margin-bottom:12px; }
+        .w-100 { margin-top: 5px; }
+
+        /* ==============================
+           Tabela responsiva
+        ===============================*/
+        .table-wrap{
+            background:var(--panel);
+            border:1px solid var(--panel-brd);
+            border-radius:14px;
+            padding:16px;
+            box-shadow:0 8px 24px rgba(0,0,0,.06);
+        }
+        table.dataTable thead th{ white-space:nowrap; }
+
+        /* ==============================
+           Badges de situação
+        ===============================*/
+        .situacao-pago,
+        .situacao-ativo,
+        .situacao-cancelado{
+            color: #fff; width: 90px; text-align: center; padding: 6px 10px; border-radius: 8px; display:inline-block; font-size: 13px; font-weight:600;
+        }
+        .situacao-pago{ background-color: var(--success); }
+        .situacao-ativo{ background-color: var(--warning); }
+        .situacao-cancelado{ background-color: var(--danger); }
+
+        .status-label{
+            padding: 6px 10px; border-radius: 8px; color: #fff; display:inline-block; font-weight:600;
+        }
+        .status-pendente{ background-color: var(--danger); min-width:80px; text-align:center; }
+        .status-parcialmente{ background-color: var(--warning); min-width:80px; text-align:center; }
+        .status-liquidado{ background-color: var(--success); min-width:80px; text-align:center; }
+
+        /* ==============================
+           Botão fechar dos modais
+        ===============================*/
+        .btn-close { outline: none; border: none; background: none; padding: 0; font-size: 1.6rem; cursor: pointer; transition: transform .2s ease; color:#fff; }
+        .btn-close:hover { transform: scale(1.15); }
+        .btn-adicionar { height: 38px; line-height: 24px; margin-left: 10px; }
+
+        /* ==============================
+           Modais modernos e responsivos
+        ===============================*/
+        .modal-modern .modal-content{
+            border-radius: 14px;
+            border:1px solid var(--panel-brd);
+            background: var(--panel);
+            color: var(--fg);
+            box-shadow: 0 25px 60px rgba(0,0,0,.35);
+            /* Torna o conteúdo flexível e com rolagem interna em telas menores */
+            display: flex;
+            flex-direction: column;
+            max-height: min(90vh, 100dvh);
+        }
+        .modal-modern .modal-header{
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color:#fff; border-top-left-radius:14px; border-top-right-radius:14px; border-bottom:0;
+            display:flex; justify-content:space-between; align-items:center;
+            flex: 0 0 auto;
+        }
+        .modal-modern .modal-title{ font-weight:700; }
+        .modal-modern .modal-body{ overflow:auto; }
+        .modal-modern .modal-footer{ border-top:1px solid var(--panel-brd); flex: 0 0 auto; }
+
+        /* Larguras responsivas padrão (desktop e tablets) */
+        .modal-dialog{ margin: 1.25rem auto; }
+        #pagamentoModal .modal-dialog{ max-width: 900px; }
+        #devolucaoModal .modal-dialog{ max-width: 520px; }
+        #anexoModal .modal-dialog{ max-width: 700px; }
+        #mensagemModal .modal-dialog{ max-width: 520px; }
+
+        @media (max-width: 992px){
+            #pagamentoModal .modal-dialog{ max-width: 95vw; }
+            #anexoModal .modal-dialog{ max-width: 95vw; }
+        }
+
+        /* Mobile-first: ocupar 100% da tela com rolagem suave */
+        @media (max-width: 576px){
+            .modal-dialog{
+                max-width: 100vw !important;
+                width: 100vw !important;
+                margin: 0 !important;
+                height: 100dvh;
+            }
+            .modal-content{
+                border-radius: 0 !important;
+                height: 100dvh;
+                max-height: 100dvh;
+            }
+            .modal-modern .modal-body{
+                padding: 12px;
+            }
+            /* Evita "zoom/overflow" lateral em botões/ícones dentro da tabela */
+            .action-btn{ width: 36px; height: 36px; font-size: 18px; }
+        }
+
+        /* Cards/inputs finos nos modais */
+        .modal-modern .form-control{ border-radius: 10px; }
+
+        /* ==============================
+           Dropzone (Anexos)
+        ===============================*/
+        .dropzone{
+            border:2px dashed var(--panel-brd);
+            background: var(--soft);
+            border-radius: 14px;
+            padding: 18px;
             text-align: center;
-            padding: 5px 10px;
-            border-radius: 5px;
-            display: inline-block;
-            font-size: 13px;
-        }
-
-        .situacao-ativo {
-            background-color: #ffa907; 
-            color: white;
-            width: 80px;
-            text-align: center;
-            padding: 5px 10px;
-            border-radius: 5px;
-            display: inline-block;
-            font-size: 13px;
-        }
-
-        .situacao-cancelado {
-            background-color: #dc3545;
-            color: white;
-            width: 80px;
-            text-align: center;
-            padding: 5px 10px;
-            border-radius: 5px;
-            display: inline-block;
-            font-size: 13px;
-        }
-
-        /* Remover a borda de foco no botão de fechar */
-        .btn-close {
-            outline: none; /* Remove a borda ao clicar */
-            border: none; /* Remove qualquer borda padrão */
-            background: none; /* Remove o fundo padrão */
-            padding: 0; /* Remove o espaçamento extra */
-            font-size: 1.5rem; /* Ajuste o tamanho do ícone */
-            cursor: pointer; /* Mostra o ponteiro de clique */
-            transition: transform 0.2s ease; /* Suaviza a transição do hover */
-        }
-
-        /* Aumentar o tamanho do botão em 5% no hover */
-        .btn-close:hover {
-            transform: scale(2.10); /* Aumenta 5% */
-        }
-
-        /* Opcional: Adicionar foco suave sem borda visível */
-        .btn-close:focus {
-            outline: none; /* Remove a borda ao foco */
-        }
-        .btn-adicionar {
-            height: 38px;
-            line-height: 24px;
-            margin-left: 10px;
-        }
-
-        .modal-content {
-            border-radius: 10px;
-        }
-
-        .modal-dialog {
-            max-width: 30%;
-            margin: 1.75rem auto;
-        }
-
-        .modal-header {
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-        }
-
-        .modal-footer {
-            border-top: none;
-        }
-
-        .modal-header.error {
-            background-color: #dc3545;
-            color: white;
-        }
-
-        .modal-header.success {
-            background-color: #28a745;
-            color: white;
-        }
-
-        .custom-file-input ~ .custom-file-label::after {
-            content: "Escolher";
-        }
-
-        .custom-file-label {
-            border-radius: 0.25rem;
-            padding: 0.5rem 1rem;
-            background-color: #fff;
-            color: #777;
             cursor: pointer;
+            transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+        }
+        .dropzone:hover{ background: rgba(37,99,235,.06); }
+        .dropzone.dragover{
+            background: rgba(37,99,235,.10);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(37,99,235,.08) inset;
+        }
+        .dropzone .dz-icon{
+            width:46px;height:46px;border-radius:12px;
+            background:var(--chip-bg); color:var(--chip-fg);
+            display:inline-flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:8px;
+        }
+        .dropzone .dz-title{ font-weight:700; }
+        .dropzone .dz-sub{ color:var(--muted); font-size:.92rem; }
+
+        .file-list{ margin-top:12px; text-align:left; }
+        .file-list .file-item{
+            display:flex; align-items:center; justify-content:space-between; gap:10px;
+            padding:8px 10px; background:var(--panel); border:1px solid var(--panel-brd); border-radius:10px; margin-bottom:8px;
+            word-break:break-all;
+        }
+        .file-name{ color:var(--fg); }
+        .file-size{ color:var(--muted); font-size:.9rem; }
+
+        /* ==============================
+           Toasters (feedback)
+        ===============================*/
+        .toast { min-width: 250px; margin-top: 0px; }
+        .toast .toast-header{ color:#fff; }
+        .toast .bg-success{ background-color: var(--success)!important; }
+        .toast .bg-danger{ background-color: var(--danger)!important; }
+
+        /* Ícones grandes (ações tabela) */
+        .action-btn{
+            margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 8px; border: none;
+            display:inline-flex; align-items:center; justify-content:center;
         }
 
-        .custom-file-input:focus ~ .custom-file-label {
-            outline: -webkit-focus-ring-color auto 1px;
-            outline-offset: -2px;
-        }
+        /* Pequenos ajustes */
+        .btn-info:hover, .btn-success:hover, .btn-secondary:hover, .btn-primary:hover { color:#fff!important; }
 
-        .toast {
-            min-width: 250px;
-            margin-top: 0px;
+        /* ==============================
+           Modal de visualização (90% desktop; 100% mobile)
+        ===============================*/
+        #viewerModal{ z-index: 1060; }
+        #viewerModal .modal-dialog{
+            max-width: 90vw;
+            width: 90vw;
         }
-
-        .toast .toast-header {
-            color: #fff;
+        #viewerModal .modal-content{
+            height: 90vh;
+            max-height: min(90vh, 100dvh);
+            display: flex;
+            flex-direction: column;
         }
-
-        .toast .bg-success {
-            background-color: #28a745 !important;
+        #viewerModal .viewer-body{
+            flex: 1;
+            display: flex;
+            min-height: 0;
+            padding: 0;
+            background: var(--panel);
         }
-
-        .toast .bg-danger {
-            background-color: #dc3545 !important;
+        .viewer-frame{
+            border: 0;
+            width: 100%;
+            height: 100%;
         }
-
-        .btn-delete {
-            margin-bottom: 0px!important;
+        .viewer-img{
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
         }
-
-        .status-label {
-            padding: 5px 10px;
-            border-radius: 5px;
-            color: white;
-            display: inline-block;
+        .viewer-fallback{
+            padding: 16px;
         }
-
-        .status-pendente {
-            background-color: #dc3545;
-            width: 75px;
-            text-align: center;
+        @media (max-width: 768px){
+            #viewerModal .modal-dialog{
+                max-width: 100vw;
+                width: 100vw;
+                margin: 0;
+                height: 100dvh;
+            }
+            #viewerModal .modal-content{
+                height: 100dvh;
+                max-height: 100dvh;
+                border-radius: 0;
+            }
         }
-
-        .status-parcialmente {
-            background-color: #ffa907;
-            width: 75px;
-            text-align: center;
-        }
-
-        .status-liquidado {
-            background-color: #28a745;
-            width: 75px;
-            text-align: center;
-        }
-
-        .btn-info:hover {
-            color: #fff;
-        }
-
-        .btn-success:hover {
-            color: #fff!important;
-        }
-
-        .btn-secondary:hover {
-            color: #fff!important;
-        }
-
-        .btn-primary:hover {
-            color: #fff!important;
-        }
-
     </style>
 </head>
 
 <body class="light-mode">
-    <?php
-    include(__DIR__ . '/../menu.php');
-    ?>
+    <?php include(__DIR__ . '/../menu.php'); ?>
 
     <div id="main" class="main-content">
         <div class="container">
-            <div class="d-flex flex-wrap justify-content-center align-items-center text-center mb-3">
+
+            <!-- HERO / TÍTULO -->
+            <section class="page-hero">
+            <div class="title-row">
+                <div class="title-icon"><i class="mdi mdi-clipboard-list-outline" aria-hidden="true"></i></div>
+                <div>
+                <h1>Pesquisar Ordens de Serviço</h1>
+                <div class="subtitle muted">Filtre por número, apresentante, CPF/CNPJ, data, valores e status.</div>
+                </div>
+            </div>
+            </section>
+
+            <!-- Ações principais -->
+            <div class="d-flex flex-wrap justify-content-center justify-content-md-between align-items-center text-center mb-3 top-actions">
                 <div class="col-md-auto mb-2">
-                    <button id="add-button" type="button" class="btn btn-secondary text-white" 
-                            onclick="window.open('tabela_de_emolumentos.php')">
+                    <button id="add-button" type="button" class="btn btn-secondary text-white"
+                            onclick="window.location.href='tabela_de_emolumentos.php'">
                         <i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos
                     </button>
                 </div>
                 <div class="col-md-auto mb-2">
-                    <button id="add-button" type="button" class="btn btn-info2 text-white" 
+                    <button id="add-button" type="button" class="btn btn-info2 text-white"
                             onclick="window.location.href='criar_os.php'">
                         <i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço
                     </button>
                 </div>
                 <div class="col-md-auto mb-2">
-                    <button id="add-button" type="button" class="btn btn-success text-white" 
-                            onclick="window.open('../caixa/index.php')">
+                    <button id="add-button" type="button" class="btn btn-success text-white"
+                            onclick="window.location.href='../caixa/index.php'">
                         <i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa
                     </button>
                 </div>
-                <div class="col-md-auto mb-2">
+                <!-- <div class="col-md-auto mb-2">
                     <a href="index.php" class="btn btn-secondary">
                         <i class="fa fa-search" aria-hidden="true"></i> Ordens de Serviço
                     </a>
-                </div>
+                </div> -->
                 <div class="col-md-auto mb-2">
                     <a href="modelos_orcamento.php" class="btn btn-primary">
                         <i class="fa fa-folder-open"></i> Modelos O.S
                     </a>
                 </div>
             </div>
-        <hr> 
-        
-            <div class="d-flex justify-content-center align-items-center text-center mb-3">
-                <h3>Pesquisar Ordens de Serviço</h3>
-               
+
+            <!-- Formulário de filtro -->
+            <div class="filter-card">
+                <form id="pesquisarForm" method="GET">
+                    <div class="form-row align-items-end">
+                        <div class="form-group col-md-2">
+                            <label for="os_id">Nº OS:</label>
+                            <input type="number" class="form-control" id="os_id" name="os_id" min="1">
+                        </div>
+                        <div class="form-group col-md-5">
+                            <label for="cliente">Apresentante:</label>
+                            <input type="text" class="form-control" id="cliente" name="cliente">
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="cpf_cliente">CPF/CNPJ:</label>
+                            <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente">
+                        </div>
+                        <div class="form-group col-md-2">
+                            <label for="total_os">Valor Total:</label>
+                            <input type="text" class="form-control" id="total_os" name="total_os">
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="funcionario">Funcionário:</label>
+                            <select class="form-control" id="funcionario" name="funcionario">
+                                <option value="">Selecione o Funcionário</option>
+                                <?php
+                                $conn = getDatabaseConnection();
+                                $stmt = $conn->query("SELECT DISTINCT criado_por FROM ordens_de_servico");
+                                $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                                foreach ($funcionarios as $funcionario) {
+                                    echo '<option value="' . $funcionario['criado_por'] . '">' . $funcionario['criado_por'] . '</option>';
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="situacao">Situação:</label>
+                            <select class="form-control" id="situacao" name="situacao">
+                                <option value="">Selecione a Situação</option>
+                                <option value="Ativo">Ativo</option>
+                                <option value="Cancelado">Cancelado</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group col-md-3">
+                            <label for="data_inicial">Data Inicial:</label>
+                            <input type="date" class="form-control" id="data_inicial" name="data_inicial">
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="data_final">Data Final:</label>
+                            <input type="date" class="form-control" id="data_final" name="data_final">
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="descricao_os">Título da O.S:</label>
+                            <input type="text" class="form-control" id="descricao_os" name="descricao_os">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="observacoes">Observações:</label>
+                            <input type="text" class="form-control" id="observacoes" name="observacoes">
+                        </div>
+
+                        <div class="form-group col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100 text-white">
+                                <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
-            <hr>
-            <form id="pesquisarForm" method="GET">
-                <div class="form-row align-items-end">
-                    <div class="form-group col-md-2">
-                        <label for="os_id">Nº OS:</label>
-                        <input type="number" class="form-control" id="os_id" name="os_id" min="1">
-                    </div>
-                    <div class="form-group col-md-5">
-                        <label for="cliente">Apresentante:</label>
-                        <input type="text" class="form-control" id="cliente" name="cliente">
-                    </div>
-                    <div class="form-group col-md-3">
-                        <label for="cpf_cliente">CPF/CNPJ:</label>
-                        <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente">
-                    </div>
-                    <div class="form-group col-md-2">
-                        <label for="total_os">Valor Total:</label>
-                        <input type="text" class="form-control" id="total_os" name="total_os">
-                    </div>
-                    <div class="form-group col-md-3">
-                        <label for="funcionario">Funcionário:</label>
-                        <select class="form-control" id="funcionario" name="funcionario">
-                            <option value="">Selecione o Funcionário</option>
-                            <?php
-                            $conn = getDatabaseConnection();
-                            $stmt = $conn->query("SELECT DISTINCT criado_por FROM ordens_de_servico");
-                            $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                            foreach ($funcionarios as $funcionario) {
-                                echo '<option value="' . $funcionario['criado_por'] . '">' . $funcionario['criado_por'] . '</option>';
-                            }
-                            ?>
-                        </select>
-                    </div>
-                    <div class="form-group col-md-3">
-                        <label for="situacao">Situação:</label>
-                        <select class="form-control" id="situacao" name="situacao">
-                            <option value="">Selecione a Situação</option>
-                            <option value="Ativo">Ativo</option>
-                            <option value="Cancelado">Cancelado</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group col-md-3">
-                        <label for="data_inicial">Data Inicial:</label>
-                        <input type="date" class="form-control" id="data_inicial" name="data_inicial">
-                    </div>
-                    <div class="form-group col-md-3">
-                        <label for="data_final">Data Final:</label>
-                        <input type="date" class="form-control" id="data_final" name="data_final">
-                    </div>
-                    <div class="form-group col-md-4">
-                        <label for="descricao_os">Título da O.S:</label>
-                        <input type="text" class="form-control" id="descricao_os" name="descricao_os">
-                    </div>
-                    <div class="form-group col-md-6">
-                        <label for="observacoes">Observações:</label>
-                        <input type="text" class="form-control" id="observacoes" name="observacoes">
-                    </div>
-
-                    <div class="form-group col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100 text-white">
-                            <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
-                        </button>
-                    </div>
-                </div>
-            </form>
 
             <hr>
-            <div class="table-responsive">
-                <h5>Resultados da Pesquisa</h5>
+
+            <!-- Resultados -->
+            <div class="table-responsive table-wrap">
+                <h5 class="mb-3" style="font-weight:700;">Resultados da Pesquisa</h5>
+                <div class="table-responsive">
                 <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 85%">
                     <thead>
                         <tr>
@@ -370,7 +469,7 @@ include(__DIR__ . '/db_connection.php');
                             $conditions[] = 'status = :situacao';
                             $params[':situacao'] = $_GET['situacao'];
                             $filtered = true;
-                        }                        
+                        }
                         if (!empty($_GET['descricao_os'])) {
                             $conditions[] = 'descricao_os LIKE :descricao_os';
                             $params[':descricao_os'] = '%' . $_GET['descricao_os'] . '%';
@@ -429,7 +528,6 @@ include(__DIR__ . '/db_connection.php');
                             // Soma dos atos liquidados em ambas as tabelas
                             $total_liquidado = $total_liquidado_1 + $total_liquidado_2;
 
-
                             // Calcula o total devolvido
                             $stmt = $conn->prepare('SELECT SUM(total_devolucao) as total_devolvido FROM devolucao_os WHERE ordem_de_servico_id = :os_id');
                             $stmt->bindParam(':os_id', $ordem['id']);
@@ -444,13 +542,12 @@ include(__DIR__ . '/db_connection.php');
 
                             $statusOS = 'Pendente';
                             $statusClasses = [
-                                'Pendente' => 'status-pendente', 
-                                'Parcial' => 'status-parcialmente', 
+                                'Pendente' => 'status-pendente',
+                                'Parcial' => 'status-parcialmente',
                                 'Liquidado' => 'status-liquidado',
                                 'Cancelado' => 'situacao-cancelado'
                             ];
 
-                            // Verificar se a ordem está cancelada
                             if ($ordem['status'] === 'Cancelado') {
                                 $statusOS = 'Cancelado';
                             } else {
@@ -477,7 +574,7 @@ include(__DIR__ . '/db_connection.php');
                                 }
                             }
 
-                            // Verificar se há pagamentos em PIX, Transferência Bancária, Boleto, ou Cheque e nenhum anexo
+                            // Verificar pagamentos relevantes e anexos
                             $stmt = $conn->prepare("SELECT COUNT(*) FROM pagamento_os WHERE ordem_de_servico_id = :os_id AND forma_de_pagamento IN ('PIX', 'Transferência Bancária', 'Boleto', 'Cheque')");
                             $stmt->bindParam(':os_id', $ordem['id']);
                             $stmt->execute();
@@ -488,15 +585,14 @@ include(__DIR__ . '/db_connection.php');
                             $stmt->execute();
                             $temAnexos = $stmt->fetchColumn() > 0;
 
-                            // Definir a classe e ícone do botão com alerta se necessário
-                            $botaoAnexoClasses = "btn btn-secondary btn-sm";
+                            $botaoAnexoClasses = "btn btn-secondary btn-sm action-btn";
                             $botaoAnexoIcone = '<i class="fa fa-paperclip" aria-hidden="true"></i>';
                             if ($temPagamentoRelevante && !$temAnexos) {
-                                $botaoAnexoClasses .= " btn-danger"; // Adiciona uma classe de alerta (vermelha)
-                                $botaoAnexoIcone = '<i class="fa fa-exclamation-circle" aria-hidden="true"></i>'; // Exibe apenas o ícone de alerta
+                                $botaoAnexoClasses .= " btn-danger";
+                                $botaoAnexoIcone = '<i class="fa fa-exclamation-circle" aria-hidden="true"></i>';
                             }
 
-                            // Calcular saldo considerando devoluções
+                            // Saldo (considerando devoluções)
                             $saldo = ($deposito_previo - $total_devolvido) - $ordem['total_os'];
                             ?>
                             <tr>
@@ -513,7 +609,6 @@ include(__DIR__ . '/db_connection.php');
                                 <td><span style="font-size: 13px" class="status-label <?php echo $statusClasses[$statusOS]; ?>"><?php echo $statusOS; ?></span></td>
                                 <td>
                                     <?php
-                                    // Definir a classe e o texto do status da OS
                                     $statusClass = '';
                                     $statusText = '';
 
@@ -521,7 +616,7 @@ include(__DIR__ . '/db_connection.php');
                                         $statusClass = 'situacao-cancelado';
                                         $statusText = 'Cancelada';
                                     } elseif ($deposito_previo > 0) {
-                                        $statusClass = 'situacao-pago'; 
+                                        $statusClass = 'situacao-pago';
                                         $statusText = 'Pago';
                                     } elseif ($ordem['status'] === 'Ativo') {
                                         $statusClass = 'situacao-ativo';
@@ -534,17 +629,20 @@ include(__DIR__ . '/db_connection.php');
                                 </td>
 
                                 <td style="width: 7%!important; zoom: 88%">
-                                    <button class="btn btn-info2 btn-sm" title="Visualizar OS" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="window.open('visualizar_os.php?id=<?php echo $ordem['id']; ?>', '_blank')"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                    <button class="btn btn-success btn-sm" title="Pagamentos e Devoluções" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" 
-                                        onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')" 
-                                        <?php echo ($ordem['status'] === 'Cancelado') ? 'disabled' : ''; ?>>
+                                    <button type="button" class="btn btn-info2 btn-sm action-btn" title="Visualizar OS"
+                                        onclick="location.href='visualizar_os.php?id=<?php echo $ordem['id']; ?>'">
+                                        <i class="fa fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                    <?php if ($ordem['status'] !== 'Cancelado') : ?>
+                                    <button class="btn btn-success btn-sm action-btn" title="Pagamentos e Devoluções"
+                                        onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')">
                                         <i class="fa fa-money" aria-hidden="true"></i>
                                     </button>
-                                    <button type="button" title="Imprimir OS" class="btn btn-primary btn-sm" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="verificarTimbrado(<?php echo $ordem['id']; ?>)"><i class="fa fa-print" aria-hidden="true"></i></button>
-                                    <button class="<?php echo $botaoAnexoClasses; ?>" title="Anexos" style="margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 5px; border: none;" onclick="abrirAnexoModal(<?php echo $ordem['id']; ?>)">
+                                    <?php endif; ?>
+                                    <button type="button" title="Imprimir OS" class="btn btn-primary btn-sm action-btn" onclick="verificarTimbrado(<?php echo $ordem['id']; ?>)"><i class="fa fa-print" aria-hidden="true"></i></button>
+                                    <button class="<?php echo $botaoAnexoClasses; ?>" title="Anexos" onclick="abrirAnexoModal(<?php echo $ordem['id']; ?>)">
                                         <?php echo $botaoAnexoIcone; ?>
                                     </button>
-
                                 </td>
                             </tr>
                             <?php
@@ -552,19 +650,18 @@ include(__DIR__ . '/db_connection.php');
                         ?>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Modal de Pagamento -->
-    <div class="modal fade" id="pagamentoModal" tabindex="-1" role="dialog" aria-labelledby="pagamentoModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document" style="max-width: 50%">
+    <div class="modal fade modal-modern" id="pagamentoModal" tabindex="-1" role="dialog" aria-labelledby="pagamentoModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="pagamentoModalLabel">Efetuar Pagamento</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
+                    <h5 class="modal-title mb-0" id="pagamentoModalLabel">Efetuar Pagamento</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
@@ -611,11 +708,10 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                     </div>
 
-                        <?php if ($saldo > 0.001): ?>
-                            <button type="button" class="btn btn-warning" id="btnDevolver" onclick="abrirDevolucaoModal()">Devolver valores</button>
-                        <?php endif; ?>
-                    
-                    <div id="pagamentosAdicionados">
+                    <!-- Botão controlado por JS conforme saldo -->
+                    <button type="button" class="btn btn-warning" id="btnDevolver" onclick="abrirDevolucaoModal()">Devolver valores</button>
+
+                    <div id="pagamentosAdicionados" class="mt-3">
                         <h5>Pagamentos Adicionados</h5>
                         <table class="table">
                             <thead>
@@ -639,14 +735,12 @@ include(__DIR__ . '/db_connection.php');
     </div>
 
     <!-- Modal de Devolução -->
-    <div class="modal fade" id="devolucaoModal" tabindex="-1" role="dialog" aria-labelledby="devolucaoModalLabel" aria-hidden="true">
+    <div class="modal fade modal-modern" id="devolucaoModal" tabindex="-1" role="dialog" aria-labelledby="devolucaoModalLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="devolucaoModalLabel">Devolver Valores</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
+                    <h5 class="modal-title mb-0" id="devolucaoModalLabel">Devolver Valores</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
@@ -672,23 +766,30 @@ include(__DIR__ . '/db_connection.php');
     </div>
 
     <!-- Modal de Anexos -->
-    <div class="modal fade" id="anexoModal" tabindex="-1" role="dialog" aria-labelledby="anexoModalLabel" aria-hidden="true">
+    <div class="modal fade modal-modern" id="anexoModal" tabindex="-1" role="dialog" aria-labelledby="anexoModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="anexoModalLabel">Anexos</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
+                    <h5 class="modal-title mb-0" id="anexoModalLabel">Anexos</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>
                 </div>
                 <div class="modal-body">
-                <form id="formAnexos" enctype="multipart/form-data">
-                    <div class="custom-file mb-3">
-                        <input type="file" class="custom-file-input" id="novo_anexo" name="novo_anexo[]" multiple>
-                        <label class="custom-file-label" for="novo_anexo">Selecione os arquivos para anexar</label>
-                    </div>
-                    <button type="button" style="width: 100%" class="btn btn-success" onclick="salvarAnexo()"><i class="fa fa-paperclip" aria-hidden="true"></i> Anexar</button>
-                </form>
+                    <form id="formAnexos" enctype="multipart/form-data">
+                        <!-- Input original (oculto) para compatibilidade com backend -->
+                        <input type="file" id="novo_anexo" name="novo_anexo[]" multiple style="display:none">
+
+                        <!-- Dropzone elegante -->
+                        <div id="dropArea" class="dropzone" tabindex="0">
+                            <div class="dz-icon"><i class="mdi mdi-cloud-upload-outline"></i></div>
+                            <div class="dz-title">Arraste e solte os arquivos aqui</div>
+                            <div class="dz-sub">ou clique para selecionar</div>
+                        </div>
+                        <div id="fileList" class="file-list" aria-live="polite"></div>
+
+                        <button type="button" class="btn btn-success mt-3 w-100" onclick="salvarAnexo()">
+                            <i class="fa fa-paperclip" aria-hidden="true"></i> Anexar
+                        </button>
+                    </form>
 
                     <hr>
                     <div id="anexosAdicionados">
@@ -713,15 +814,35 @@ include(__DIR__ . '/db_connection.php');
         </div>
     </div>
 
+    <!-- Modal de Visualização do Anexo (90% / 100% mobile) -->
+    <div class="modal fade modal-modern" id="viewerModal" tabindex="-1" role="dialog" aria-labelledby="viewerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title mb-0" id="viewerModalLabel">Visualização do Anexo</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body viewer-body">
+                    <div id="viewerContainer" style="flex:1; width:100%; height:100%; display:flex;"></div>
+                </div>
+                <div class="modal-footer">
+                    <a id="viewerDownload" class="btn btn-secondary" href="#" download target="_blank">
+                        <i class="fa fa-download" aria-hidden="true"></i> Baixar arquivo
+                    </a>
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Mensagem -->
-    <div class="modal fade" id="mensagemModal" tabindex="-1" role="dialog" aria-labelledby="mensagemModalLabel" aria-hidden="true">
+    <div class="modal fade modal-modern" id="mensagemModal" tabindex="-1" role="dialog" aria-labelledby="mensagemModalLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
-                <div class="modal-header error">
-                    <h5 class="modal-title" id="mensagemModalLabel">Erro</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
+                <!-- Mantém classes .error/.success para compatibilidade -->
+                <div class="modal-header error" style="background:var(--danger);">
+                    <h5 class="modal-title mb-0" id="mensagemModalLabel">Erro</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>
                 </div>
                 <div class="modal-body">
                     <p id="mensagemTexto"></p>
@@ -733,8 +854,9 @@ include(__DIR__ . '/db_connection.php');
         </div>
     </div>
 
+    <!-- Toasters -->
     <div aria-live="polite" aria-atomic="true" style="position: relative; z-index: 1050;">
-        <div id="toastContainer" style="position: absolute; top: -20px; right: 0;"></div>
+        <div id="toastContainer" style="position: absolute; top: 16px; right: 0;"></div>
     </div>
 
     <script src="../script/jquery-3.6.0.min.js"></script>
@@ -746,6 +868,7 @@ include(__DIR__ . '/db_connection.php');
     <script src="../script/sweetalert2.js"></script>
     <script>
         $(document).ready(function() {
+            // Máscaras
             $('#cpf_cliente').mask('000.000.000-00', { reverse: true }).on('blur', function() {
                 var cpfCnpj = $(this).val().replace(/\D/g, '');
                 if (cpfCnpj.length === 11) {
@@ -754,27 +877,23 @@ include(__DIR__ . '/db_connection.php');
                     $(this).mask('00.000.000/0000-00', { reverse: true });
                 }
             });
-
             $('#total_os').mask('#.##0,00', { reverse: true });
             $('#valor_pagamento').mask('#.##0,00', { reverse: true });
             $('#valor_devolucao').mask('#.##0,00', { reverse: true });
 
-        // Inicializar DataTable
+            // DataTable
             $('#tabelaResultados').DataTable({
-                "language": {
-                    "url": "../style/Portuguese-Brasil.json"
-                },
+                "language": { "url": "../style/Portuguese-Brasil.json" },
                 "order": [[0, 'desc']],
-                "pageLength": 10 // Define o número de registros por página
+                "pageLength": 10
             });
-
         });
 
         function verificarTimbrado(id) {
             $.ajax({
                 url: '../style/configuracao.json',
                 dataType: 'json',
-                cache: false, // Desabilita o cache
+                cache: false,
                 success: function(data) {
                     var url = '';
                     if (data.timbrado === 'S') {
@@ -791,6 +910,12 @@ include(__DIR__ . '/db_connection.php');
         }
 
         function abrirPagamentoModal(osId, cliente, totalOs, totalPagamentos, totalLiquidado, totalDevolvido, saldo, statusOS) {
+            // Guarda de segurança extra: bloquear se cancelado
+            if (statusOS === 'Cancelado') {
+                Swal.fire({ icon:'warning', title:'Operação não permitida', text:'Esta OS está cancelada.' });
+                return;
+            }
+
             $('#total_os_modal').val('R$ ' + totalOs.toFixed(2).replace('.', ','));
             $('#valor_liquidado_modal').val('R$ ' + totalLiquidado.toFixed(2).replace('.', ','));
             $('#valor_devolvido_modal').val('R$ ' + totalDevolvido.toFixed(2).replace('.', ','));
@@ -800,16 +925,12 @@ include(__DIR__ . '/db_connection.php');
             $('#total_pagamento').val('R$ ' + totalPagamentos.toFixed(2).replace('.', ','));
             $('#saldo_modal').val('R$ ' + saldo.toFixed(2).replace('.', ','));
 
-            // Esconder o botão "Devolver Valores" se o saldo for menor ou igual a 0
-            if (saldo <= 0) {
-                $('#btnDevolver').hide();
-            } else {
-                $('#btnDevolver').show();
-            }
+            // Controla o botão "Devolver Valores"
+            if (saldo <= 0) { $('#btnDevolver').hide(); } else { $('#btnDevolver').show(); }
 
             $('#pagamentoModal').modal('show');
 
-            // Save the OS ID and client for later use
+            // Persistir informações
             window.currentOsId = osId;
             window.currentClient = cliente;
             window.statusOS = statusOS;
@@ -818,30 +939,33 @@ include(__DIR__ . '/db_connection.php');
             atualizarTabelaPagamentos();
         }
 
-
         function adicionarPagamento() {
             var formaPagamento = $('#forma_pagamento').val();
-            var valorPagamento = parseFloat($('#valor_pagamento').val().replace('.', '').replace(',', '.'));
+            var valorPagamento = parseFloat($('#valor_pagamento').val().replace(/\./g, '').replace(',', '.'));
 
             if (formaPagamento === "") {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: 'Por favor, selecione uma forma de pagamento.'
-                });
+                Swal.fire({ icon: 'error', title: 'Erro', text: 'Por favor, selecione uma forma de pagamento.' });
                 return;
             }
-
             if (isNaN(valorPagamento) || valorPagamento <= 0) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: 'Por favor, insira um valor válido para o pagamento.'
-                });
+                Swal.fire({ icon: 'error', title: 'Erro', text: 'Por favor, insira um valor válido para o pagamento.' });
                 return;
             }
 
-            // Solicita a confirmação do usuário antes de adicionar o pagamento
+            // Regra para "Espécie": somente valores terminados em 0 ou 5 centavos (múltiplos de R$ 0,05)
+            if (formaPagamento === 'Espécie') {
+                // Evita problemas de ponto flutuante
+                var cents = Math.round((valorPagamento + Number.EPSILON) * 100);
+                if (cents % 5 !== 0) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Valor inválido para espécie',
+                        text: 'Para pagamentos em espécie, o valor deve terminar em 0 ou 5 centavos (ex.: 2,05 • 10,50 • 10,55).'
+                    });
+                    return;
+                }
+            }
+
             Swal.fire({
                 title: 'Confirmar Pagamento',
                 text: `Deseja realmente adicionar o pagamento de R$ ${valorPagamento.toFixed(2).replace('.', ',')} na forma de ${formaPagamento}?`,
@@ -851,14 +975,13 @@ include(__DIR__ . '/db_connection.php');
                 cancelButtonText: 'Não'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Se o usuário confirmar, realiza a requisição AJAX
                     $.ajax({
                         url: 'salvar_pagamento.php',
                         type: 'POST',
                         data: {
                             os_id: window.currentOsId,
                             cliente: window.currentClient,
-                            total_os: parseFloat($('#total_os_modal').val().replace('R$ ', '').replace('.', '').replace(',', '.')),
+                            total_os: parseFloat($('#total_os_modal').val().replace('R$ ', '').replace(/\./g, '').replace(',', '.')),
                             funcionario: '<?php echo $_SESSION['username']; ?>',
                             forma_pagamento: formaPagamento,
                             valor_pagamento: valorPagamento
@@ -869,38 +992,21 @@ include(__DIR__ . '/db_connection.php');
                                 if (response.success) {
                                     atualizarTabelaPagamentos();
                                     $('#valor_pagamento').val('');
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Sucesso',
-                                        text: 'Pagamento adicionado com sucesso!'
-                                    });
+                                    Swal.fire({ icon: 'success', title: 'Sucesso', text: 'Pagamento adicionado com sucesso!' });
                                 } else {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Erro',
-                                        text: 'Erro ao adicionar pagamento.'
-                                    });
+                                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao adicionar pagamento.' });
                                 }
                             } catch (e) {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Erro',
-                                    text: 'Erro ao processar resposta do servidor.'
-                                });
+                                Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao processar resposta do servidor.' });
                             }
                         },
                         error: function() {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro',
-                                text: 'Erro ao adicionar pagamento.'
-                            });
+                            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao adicionar pagamento.' });
                         }
                     });
                 }
             });
         }
-
 
         function atualizarTabelaPagamentos() {
             var pagamentosTable = $('#pagamentosTable');
@@ -909,35 +1015,31 @@ include(__DIR__ . '/db_connection.php');
             $.ajax({
                 url: 'obter_pagamentos.php',
                 type: 'POST',
-                data: {
-                    os_id: window.currentOsId
-                },
+                data: { os_id: window.currentOsId },
                 success: function(response) {
                     try {
                         response = JSON.parse(response);
                         var total = 0;
+                        var canDelete = (window.statusOS === 'Pendente');
 
-                        response.pagamentos.forEach(function(pagamento, index) {
+                        response.pagamentos.forEach(function(pagamento) {
                             total += parseFloat(pagamento.total_pagamento);
-
                             pagamentosTable.append(`
                                 <tr>
                                     <td>${pagamento.forma_de_pagamento}</td>
                                     <td>R$ ${parseFloat(pagamento.total_pagamento).toFixed(2).replace('.', ',')}</td>
-                                    <td><button type="button" class="btn btn-delete btn-sm" onclick="removerPagamento(${pagamento.id})" ${window.statusOS !== 'Pendente' ? 'disabled' : ''}><i class="fa fa-trash-o" aria-hidden="true"></i></button></td>
+                                    <td>
+                                        ${canDelete ? `<button type="button" class="btn btn-delete btn-sm" onclick="removerPagamento(${pagamento.id})"><i class="fa fa-trash-o" aria-hidden="true"></i></button>` : ''}
+                                    </td>
                                 </tr>
                             `);
                         });
 
                         $('#total_pagamento').val('R$ ' + total.toFixed(2).replace('.', ','));
-                        var saldo = total - parseFloat($('#total_os_modal').val().replace('R$ ', '').replace('.', '').replace(',', '.')) - parseFloat($('#valor_devolvido_modal').val().replace('R$ ', '').replace('.', '').replace(',', '.'));
+                        var saldo = total - parseFloat($('#total_os_modal').val().replace('R$ ', '').replace(/\./g, '').replace(',', '.')) - parseFloat($('#valor_devolvido_modal').val().replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
                         $('#saldo_modal').val('R$ ' + saldo.toFixed(2).replace('.', ','));
 
-                        if (saldo <= 0) {
-                            $('#btnDevolver').hide();
-                        } else {
-                            $('#btnDevolver').show();
-                        }
+                        if (saldo <= 0) { $('#btnDevolver').hide(); } else { $('#btnDevolver').show(); }
                     } catch (e) {
                         exibirMensagem('Erro ao processar resposta do servidor.', 'error');
                     }
@@ -952,9 +1054,7 @@ include(__DIR__ . '/db_connection.php');
             $.ajax({
                 url: 'remover_pagamento.php',
                 type: 'POST',
-                data: {
-                    pagamento_id: pagamentoId
-                },
+                data: { pagamento_id: pagamentoId },
                 success: function(response) {
                     try {
                         response = JSON.parse(response);
@@ -981,7 +1081,7 @@ include(__DIR__ . '/db_connection.php');
                 <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="3000">
                     <div class="toast-header ${tipo === 'success' ? 'bg-success text-white' : 'bg-danger text-white'}">
                         <strong class="mr-auto">${tipo === 'success' ? 'Sucesso' : 'Erro'}</strong>
-                        <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
+                        <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Fechar">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -1002,16 +1102,15 @@ include(__DIR__ . '/db_connection.php');
 
         function salvarDevolucao() {
             var formaDevolucao = $('#forma_devolucao').val();
-            var valorDevolucao = parseFloat($('#valor_devolucao').val().replace('.', '').replace(',', '.'));
-            var saldoAtual = parseFloat($('#saldo_modal').val().replace('R$ ', '').replace('.', '').replace(',', '.'));
+            var valorDevolucao = parseFloat($('#valor_devolucao').val().replace(/\./g, '').replace(',', '.'));
+            var saldoAtual = parseFloat($('#saldo_modal').val().replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
 
             if (formaDevolucao === "") {
                 exibirMensagem('Por favor, selecione uma forma de devolução.', 'error');
                 return;
             }
-
             if (isNaN(valorDevolucao) || valorDevolucao <= 0 || valorDevolucao > saldoAtual) {
-                exibirMensagem('Por favor, insira um valor válido para a devolução que não seja maior que o saldo disponível.', 'error');
+                exibirMensagem('Insira um valor válido que não seja maior que o saldo disponível.', 'error');
                 return;
             }
 
@@ -1021,7 +1120,7 @@ include(__DIR__ . '/db_connection.php');
                 data: {
                     os_id: window.currentOsId,
                     cliente: window.currentClient,
-                    total_os: parseFloat($('#total_os_modal').val().replace('R$ ', '').replace('.', '').replace(',', '.')),
+                    total_os: parseFloat($('#total_os_modal').val().replace('R$ ', '').replace(/\./g, '').replace(',', '.')),
                     total_devolucao: valorDevolucao,
                     forma_devolucao: formaDevolucao,
                     funcionario: '<?php echo $_SESSION['username']; ?>'
@@ -1052,6 +1151,50 @@ include(__DIR__ . '/db_connection.php');
             atualizarTabelaAnexos();
         }
 
+        // DROPZONE: arrastar/soltar + clique
+        (function initDropzone(){
+            const dropArea = document.getElementById('dropArea');
+            const fileInput = document.getElementById('novo_anexo');
+            const fileList = document.getElementById('fileList');
+
+            function humanSize(bytes){
+                if(bytes === 0) return '0 B';
+                const k = 1024, sizes = ['B','KB','MB','GB','TB'];
+                const i = Math.floor(Math.log(bytes)/Math.log(k));
+                return (bytes/Math.pow(k,i)).toFixed(1)+' '+sizes[i];
+            }
+
+            function renderList(files){
+                fileList.innerHTML = '';
+                Array.from(files).forEach(f=>{
+                    const row = document.createElement('div');
+                    row.className = 'file-item';
+                    row.innerHTML = `<span class="file-name"><i class="mdi mdi-file-outline"></i> ${f.name}</span><span class="file-size">${humanSize(f.size)}</span>`;
+                    fileList.appendChild(row);
+                });
+            }
+
+            function setFiles(files){
+                const dt = new DataTransfer();
+                Array.from(files).forEach(f => dt.items.add(f));
+                fileInput.files = dt.files;
+                renderList(fileInput.files);
+            }
+
+            dropArea.addEventListener('click', ()=> fileInput.click());
+            dropArea.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }});
+            dropArea.addEventListener('dragover', (e)=>{ e.preventDefault(); dropArea.classList.add('dragover'); });
+            dropArea.addEventListener('dragleave', ()=> dropArea.classList.remove('dragover'));
+            dropArea.addEventListener('drop', (e)=>{
+                e.preventDefault();
+                dropArea.classList.remove('dragover');
+                if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+                    setFiles(e.dataTransfer.files);
+                }
+            });
+            fileInput.addEventListener('change', ()=> renderList(fileInput.files));
+        })();
+
         function salvarAnexo() {
             var formData = new FormData($('#formAnexos')[0]);
             formData.append('os_id', window.currentOsId);
@@ -1068,37 +1211,21 @@ include(__DIR__ . '/db_connection.php');
                         response = JSON.parse(response);
                         if (response.success) {
                             $('#novo_anexo').val('');
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Sucesso',
-                                text: 'Anexo salvo com sucesso!'
-                            });
+                            $('#fileList').empty();
+                            Swal.fire({ icon: 'success', title: 'Sucesso', text: 'Anexo salvo com sucesso!' });
                             atualizarTabelaAnexos();
                         } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro',
-                                text: 'Erro ao salvar anexo.'
-                            });
+                            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao salvar anexo.' });
                         }
                     } catch (e) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro',
-                            text: 'Erro ao processar resposta do servidor.'
-                        });
+                        Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao processar resposta do servidor.' });
                     }
                 },
                 error: function() {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro',
-                        text: 'Erro ao salvar anexo.'
-                    });
+                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao salvar anexo.' });
                 }
             });
         }
-
 
         function atualizarTabelaAnexos() {
             var anexosTable = $('#anexosTable');
@@ -1107,20 +1234,17 @@ include(__DIR__ . '/db_connection.php');
             $.ajax({
                 url: 'obter_anexos.php',
                 type: 'POST',
-                data: {
-                    os_id: window.currentOsId
-                },
+                data: { os_id: window.currentOsId },
                 success: function(response) {
                     try {
                         response = JSON.parse(response);
-
-                        response.anexos.forEach(function(anexo, index) {
+                        response.anexos.forEach(function(anexo) {
                             var caminhoCompleto = 'anexos/' + window.currentOsId + '/' + anexo.caminho_anexo;
                             anexosTable.append(`
                                 <tr>
                                     <td>${anexo.caminho_anexo}</td>
                                     <td>
-                                        <button type="button" class="bbtn btn-info btn-sm" onclick="visualizarAnexo('${caminhoCompleto}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-info btn-sm" onclick="visualizarAnexo('${caminhoCompleto}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
                                         <button type="button" class="btn btn-delete btn-sm" onclick="removerAnexo(${anexo.id})"><i class="fa fa-trash-o" aria-hidden="true"></i></button>
                                     </td>
                                 </tr>
@@ -1136,9 +1260,72 @@ include(__DIR__ . '/db_connection.php');
             });
         }
 
-        function visualizarAnexo(caminho) {
-            window.open(caminho, '_blank');
+        // Utilitário para obter URL absoluta (mesmo domínio)
+        function absoluteUrl(path){
+            try{
+                return new URL(path, window.location.origin + window.location.pathname).href;
+            }catch(e){
+                return path;
+            }
         }
+
+        // Visualizar anexo dentro de modal (PDF com PDF.js; imagens; outros via iframe)
+        function visualizarAnexo(caminho) {
+            const abs = absoluteUrl(caminho);
+            const name = caminho.split('/').pop();
+            const ext = (name.split('.').pop() || '').toLowerCase();
+            const container = document.getElementById('viewerContainer');
+            const downloadBtn = document.getElementById('viewerDownload');
+            const title = document.getElementById('viewerModalLabel');
+
+            title.textContent = 'Visualizando: ' + name;
+            downloadBtn.href = abs;
+            container.innerHTML = '';
+
+            if (ext === 'pdf') {
+                const viewerUrl = absoluteUrl('../provimentos/pdfjs/web/viewer.html') + '?file=' + encodeURIComponent(abs);
+                const iframe = document.createElement('iframe');
+                iframe.className = 'viewer-frame';
+                iframe.src = viewerUrl;
+                iframe.setAttribute('title','Visualizador PDF');
+                container.appendChild(iframe);
+            } else if (['png','jpg','jpeg','gif','webp','bmp','svg'].includes(ext)) {
+                const img = document.createElement('img');
+                img.className = 'viewer-img';
+                img.src = abs;
+                img.alt = name;
+                container.appendChild(img);
+            } else {
+                const iframe = document.createElement('iframe');
+                iframe.className = 'viewer-frame';
+                iframe.src = abs;
+                iframe.setAttribute('title','Visualização do arquivo');
+                container.appendChild(iframe);
+
+                const fallback = document.createElement('div');
+                fallback.className = 'viewer-fallback';
+                fallback.innerHTML = '<small>Se a visualização não carregar, utilize o botão "Baixar arquivo".</small>';
+                container.appendChild(fallback);
+            }
+
+            // Mostrar modal do visualizador
+            $('#viewerModal').modal('show');
+        }
+
+        // Ajuste de z-index/backdrop para modal aninhado + restaurar rolagem do modal anterior
+        $('#viewerModal').on('shown.bs.modal', function () {
+            const backdrops = $('.modal-backdrop');
+            backdrops.last().css('z-index', 1055);
+            $(this).css('z-index', 1060);
+        });
+        $('#viewerModal').on('hidden.bs.modal', function () {
+            // Se o modal de anexos ainda estiver aberto, mantém o body com overflow escondido
+            if ($('#anexoModal').hasClass('show')) {
+                $('body').addClass('modal-open');
+            }
+            // Limpa o viewer para liberar memória
+            $('#viewerContainer').empty();
+        });
 
         function removerAnexo(anexoId) {
             Swal.fire({
@@ -1153,72 +1340,48 @@ include(__DIR__ . '/db_connection.php');
                     $.ajax({
                         url: 'remover_anexo.php',
                         type: 'POST',
-                        data: {
-                            anexo_id: anexoId
-                        },
+                        data: { anexo_id: anexoId },
                         success: function(response) {
                             try {
                                 response = JSON.parse(response);
                                 if (response.success) {
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Sucesso',
-                                        text: 'Anexo removido com sucesso!'
-                                    });
+                                    Swal.fire({ icon: 'success', title: 'Sucesso', text: 'Anexo removido com sucesso!' });
                                     atualizarTabelaAnexos();
                                 } else {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Erro',
-                                        text: 'Erro ao remover anexo.'
-                                    });
+                                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao remover anexo.' });
                                 }
                             } catch (e) {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Erro',
-                                    text: 'Erro ao processar resposta do servidor.'
-                                });
+                                Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao processar resposta do servidor.' });
                             }
                         },
                         error: function() {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro',
-                                text: 'Erro ao remover anexo.'
-                            });
+                            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao remover anexo.' });
                         }
                     });
                 }
             });
         }
 
-        document.getElementById('novo_anexo').addEventListener('change', function() {
-            var input = this;
-            var label = input.nextElementSibling;
-            var files = input.files;
-
-            if (files.length === 1) {
-                // Exibir o nome do arquivo selecionado
-                label.textContent = files[0].name;
-            } else if (files.length > 1) {
-                // Exibir a quantidade de arquivos selecionados
-                label.textContent = files.length + ' arquivos selecionados';
-            } else {
-                // Voltar ao texto padrão
-                label.textContent = 'Selecione os arquivos para anexar';
+        // Atualiza label do input (fallback se usar input visível por algum motivo)
+        document.addEventListener('change', function(e){
+            if(e.target && e.target.id === 'novo_anexo'){
+                const lbl = document.querySelector('label[for="novo_anexo"]');
+                if(!lbl) return;
+                const files = e.target.files || [];
+                if (files.length === 1) { lbl.textContent = files[0].name; }
+                else if (files.length > 1) { lbl.textContent = files.length + ' arquivos selecionados'; }
+                else { lbl.textContent = 'Selecione os arquivos para anexar'; }
             }
         });
 
-
+        // Recarrega a página ao fechar modal de anexos (mantido do original)
         $('#anexoModal').on('hidden.bs.modal', function () {
-            location.reload(); // Recarrega a página quando o modal for fechado
+            location.reload();
         });
 
+        // Validação de datas (não permite ano futuro)
         $(document).ready(function() {
             var currentYear = new Date().getFullYear();
-
-            // Função de validação de data
             function validateDate(input) {
                 var selectedDate = new Date($(input).val());
                 if (selectedDate.getFullYear() > currentYear) {
@@ -1228,23 +1391,15 @@ include(__DIR__ . '/db_connection.php');
                         text: 'O ano não pode ser maior que o ano atual.',
                         confirmButtonText: 'Ok'
                     });
-                    $(input).val(''); // Limpa o campo da data
+                    $(input).val('');
                 }
             }
-
-            // Aplicar a validação de data nos campos de filtro de pesquisa
             $('#data_inicial, #data_final').on('change', function() {
-                // Certifique-se de que há um valor antes de validar
-                if ($(this).val()) {
-                    validateDate(this);
-                }
+                if ($(this).val()) { validateDate(this); }
             });
         });
-
     </script>
-    <?php
-        include(__DIR__ . '/../rodape.php');
-    ?>
-</body>
 
+    <?php include(__DIR__ . '/../rodape.php'); ?>
+</body>
 </html>

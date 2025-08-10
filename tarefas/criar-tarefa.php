@@ -235,9 +235,19 @@ include(__DIR__ . '/db_connection.php');
 
     <div id="main" class="main-content">  
         <div class="container">  
-            <div class="task-form">  
-                <h3>Cadastro de Tarefas</h3>  
-                
+            <!-- HERO / TÍTULO -->
+                <section class="page-hero">
+                <div class="title-row">
+                    <div class="title-icon"><i class="fa fa-tasks"></i></div>
+                    <div class="title-texts">
+                    <h1>Cadastro de Tarefas</h1>
+                    <div class="subtitle muted">Crie, atribua e acompanhe tarefas com filtros rápidos e status em tempo real.</div>
+                    </div>
+                </div>
+                </section>
+                <hr>
+
+            <div class="task-form">                  
                 <form id="taskForm" enctype="multipart/form-data" method="POST" action="save_task.php">  
                     <div class="form-row">  
                         <div class="form-group col-md-6">  

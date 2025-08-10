@@ -48,15 +48,36 @@ class PDF extends TCPDF
     }
 }
 
-function getSeal($arquivo_id) {
+/**
+ * Retorna TODOS os selos vinculados ao arquivo (arquivamento)
+ */
+function getSelos($arquivo_id) {
     include 'db_connection.php';
-    $stmt = $conn->prepare("SELECT selos.* FROM selos_arquivamentos INNER JOIN selos ON selos_arquivamentos.selo_id = selos.id WHERE selos_arquivamentos.arquivo_id = ?");
+    $stmt = $conn->prepare("SELECT selos.* 
+                              FROM selos_arquivamentos 
+                              INNER JOIN selos ON selos_arquivamentos.selo_id = selos.id 
+                             WHERE selos_arquivamentos.arquivo_id = ?
+                          ORDER BY selos.id ASC");
     $stmt->bind_param("i", $arquivo_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    $selo = $result->fetch_assoc();
+    $selos = [];
+    while ($row = $result->fetch_assoc()) {
+        $selos[] = $row;
+    }
     $stmt->close();
-    return $selo;
+    return $selos;
+}
+
+/** Helpers seguros */
+function val(array $arr, string $key): string {
+    return isset($arr[$key]) ? trim((string)$arr[$key]) : '';
+}
+function has($v): bool {
+    return isset($v) && trim((string)$v) !== '';
+}
+function esc($v): string {
+    return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 }
 
 if (isset($_GET['id'])) {
@@ -66,79 +87,113 @@ if (isset($_GET['id'])) {
     if (file_exists($filePath)) {
         $ato = json_decode(file_get_contents($filePath), true);
 
-        $selo = getSeal($id);
+        // Busca TODOS os selos
+        $selos = getSelos($id);
+
+        // Soma das quantidades
+        $quantidade_total = 0;
+        foreach ($selos as $s) {
+            $quantidade_total += (int)($s['quantidade'] ?? 0);
+        }
+
+        // Monta string de partes
+        $partesNomes = [];
+        if (isset($ato['partes_envolvidas']) && is_array($ato['partes_envolvidas'])) {
+            foreach ($ato['partes_envolvidas'] as $parte) {
+                if (!empty($parte['nome'])) {
+                    $partesNomes[] = $parte['nome'];
+                }
+            }
+        }
+        $partesStr = implode('; ', $partesNomes);
+
+        // Campos do ato (já saneados)
+        $atribuicao = val($ato, 'atribuicao');
+        $termo      = val($ato, 'termo');
+        $protocolo  = val($ato, 'protocolo');
+        $matricula  = val($ato, 'matricula');
+        $categoria  = val($ato, 'categoria');
+        $dataAtoRaw = val($ato, 'data_ato');
+        $livro      = val($ato, 'livro');
+        $folha      = val($ato, 'folha');
+        $descricao  = val($ato, 'descricao');
+
+        // Formata data se válida (Y-m-d)
+        $dataAtoFmt = '';
+        if ($dataAtoRaw !== '' && $dataAtoRaw !== '0000-00-00') {
+            $dt = DateTime::createFromFormat('Y-m-d', $dataAtoRaw);
+            if ($dt instanceof DateTime) {
+                $dataAtoFmt = $dt->format('d/m/Y');
+            }
+        }
+
+        // Monta as linhas da tabela condicionalmente
+        $rows = '';
+        if (has($termo))     { $rows .= '  <tr><td>ATO / TERMO Nº:</td><td>' . esc($termo) . '</td></tr>'; }
+        if (has($protocolo)) { $rows .= '  <tr><td>PROTOCOLO Nº:</td><td>' . esc($protocolo) . '</td></tr>'; }
+        if (has($matricula)) { $rows .= '  <tr><td>MATRICULA Nº:</td><td>' . esc($matricula) . '</td></tr>'; }
+        if (has($categoria)) { $rows .= '  <tr><td>NATUREZA DO ATO:</td><td>' . esc($categoria) . '</td></tr>'; }
+        if (has($dataAtoFmt)){ $rows .= '  <tr><td>DATA DO ATO:</td><td>' . esc($dataAtoFmt) . '</td></tr>'; }
+        if (has($livro))     { $rows .= '  <tr><td>LIVRO Nº:</td><td>' . esc($livro) . '</td></tr>'; }
+        if (has($folha))     { $rows .= '  <tr><td>FOLHA Nº:</td><td>' . esc($folha) . '</td></tr>'; }
+        if (has($partesStr)) { $rows .= '  <tr><td>PARTES ENVOLVIDAS:</td><td>' . esc($partesStr) . '</td></tr>'; }
+        if (has($descricao)) { $rows .= '  <tr><td>DESCRIÇÃO E DETALHES:</td><td>' . esc($descricao) . '</td></tr>'; }
 
         $pdf = new PDF();
         $pdf->SetMargins(25, 50, 25); // Definir as margens: esquerda, superior (ajustada), direita
         $pdf->AddPage();
         $pdf->SetFont('arial', '', 10);
 
-        $html = '
-        <h1 style="text-align: center;">ARQUIVAMENTO</h1>
-        <br>
-        <h3>ATRIBUIÇÃO: ' . mb_strtoupper($ato['atribuicao']) . '</h3>
-        <table border="1" cellpadding="4">
-            <tr>
-                <td>ATO / TERMO Nº:</td>
-                <td>' . $ato['termo'] .'</td>
-            </tr>
-            <tr>
-                <td>PROTOCOLO Nº:</td>
-                <td>' . $ato['protocolo'] .'</td>
-            </tr>
-            <tr>
-                <td>MATRICULA Nº:</td>
-                <td>' . $ato['matricula'] .'</td>
-            </tr>
-            <tr>
-                <td>NATUREZA DO ATO:</td>
-                <td>' . $ato['categoria'] . '</td>
-            </tr>
-            <tr>
-                <td>DATA DO ATO:</td>
-                <td>' . date('d/m/Y', strtotime($ato['data_ato'])) . '</td>
-            </tr>
-            <tr>
-                <td>LIVRO Nº:</td>
-                <td>' . $ato['livro'] . '</td>
-            </tr>
-            <tr>
-                <td>FOLHA Nº:</td>
-                <td>' . $ato['folha'] . '</td>
-            </tr>
-            <tr>
-                <td>PARTES ENVOLVIDAS:</td>
-                <td>' . implode('; ', array_map(function($parte) { return $parte['nome']; }, $ato['partes_envolvidas'])) . '</td>
-            </tr>
-            <tr>
-                <td>DESCRIÇÃO E DETALHES:</td>
-                <td>' . $ato['descricao'] . '</td>
-            </tr>
-        </table>
-        <br><br>
-        <h3>SELO DE ARQUIVAMENTO:</h3>';
+        $html  = '';
+        $html .= '<h1 style="text-align: center;">ARQUIVAMENTO</h1>';
+        $html .= '<br>';
 
-        if ($selo) {
-            $html .= '<div style="border: 1px solid black; width: 100mm;">
-                        <table>
-                            <tr>
-                                <td style="width: 19%; vertical-align: middle;"><p></p><img style="width: 90px;" src="data:image/png;base64,' . $selo['qr_code'] . '" alt="QR Code"></td>
-                                <td style="width: 77%; padding-left: 10px;">
-                                    <p style="text-align: justify;font-size: 9px;"><strong style="text-align: center!important;font-size: 10px;">Poder Judiciário – TJMA<br>Selo: ' . $selo['numero_selo'] . '</strong>
-                                    <br>' . $selo['texto_selo'] . '</p>
-                                </td>
-                            </tr>
-                        </table>
-                        <table>
-                            <tr>
-                                <td>
-                                    <strong style="font-size: 10px;">Quantidade: ' . $selo['quantidade'] . '</strong><br>
-                                    <strong style="font-size: 10px;">Funcionário: ' . utf8_decode($selo['escrevente']) . '</strong>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>';
+        // ATRIBUIÇÃO só aparece se houver valor
+        if (has($atribuicao)) {
+            $html .= '<h3>ATRIBUIÇÃO: ' . esc(mb_strtoupper($atribuicao)) . '</h3>';
+        }
+
+        // Tabela só aparece se houver ao menos uma linha
+        if ($rows !== '') {
+            $html .= '<table border="1" cellpadding="4">';
+            $html .= $rows;
+            $html .= '</table>';
+        }
+
+        $html .= '<br><br>';
+        $html .= '<h3>SELOS DE ARQUIVAMENTO:</h3>';
+
+        if (!empty($selos)) {
+            // Exibe a QUANTIDADE TOTAL (soma de todas as quantidades)
+            $html .= '<p><strong>Quantidade total:</strong> ' . $quantidade_total . '</p>';
+
+            // Renderiza cada selo, um abaixo do outro
+            foreach ($selos as $selo) {
+                $qr   = $selo['qr_code'];
+                $num  = $selo['numero_selo'];
+                $txt  = $selo['texto_selo'];
+                $func = $selo['escrevente'];
+
+                $html .= '<div style="border: 1px solid black; width: 100mm; margin-bottom: 6mm;">';
+                $html .= '  <table>';
+                $html .= '    <tr>';
+                $html .= '      <td style="width: 19%; vertical-align: middle;"><p></p><img style="width: 90px;" src="data:image/png;base64,' . $qr . '" alt="QR Code"></td>';
+                $html .= '      <td style="width: 77%; padding-left: 10px;">';
+                $html .= '        <p style="text-align: justify;font-size: 9px;"><strong style="text-align: center!important;font-size: 10px;">Poder Judiciário – TJMA<br>Selo: ' . esc($num) . '</strong><br>' . $txt . '</p>';
+                $html .= '      </td>';
+                $html .= '    </tr>';
+                $html .= '  </table>';
+                $html .= '  <table>';
+                $html .= '    <tr>';
+                $html .= '      <td>';
+                $html .= '        <strong style="font-size: 10px;">Funcionário: ' . utf8_decode($func) . '</strong>';
+                $html .= '      </td>';
+                $html .= '    </tr>';
+                $html .= '  </table>';
+                $html .= '</div>';
+            }
         } else {
+            // Sem selos: reserva um espaço
             $html .= '<div style="border: 1px solid black; width: 100mm; height: 50mm;"><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p></div>';
         }
 

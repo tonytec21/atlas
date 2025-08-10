@@ -6,6 +6,7 @@ error_reporting(E_ALL);
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 // Verifica se todos os campos necessários foram enviados
 if (isset($_POST['task_id'], $_POST['receptor'], $_POST['dataEntrega'], $_POST['documentos'], $_POST['entregador'])) {

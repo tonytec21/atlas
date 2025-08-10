@@ -38,7 +38,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 
     <style>
         /* =========================================================
-           Tema Light/Dark — variáveis do MODAL e dos CARDS
+           Tema Light/Dark — variáveis do MODAL, CARDS e HERO
            =======================================================*/
         body.light-mode {
             --modal-bg: #f8fafc;
@@ -70,6 +70,9 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             --card-hover:rgba(2,6,23,.06);
             --accent:#2563eb;
             --accent-2:#1e40af;
+
+            --hero-chip-bg:#eef2ff;
+            --hero-chip-fg:#1e3a8a;
         }
         body.dark-mode {
             --modal-bg: #0b1220;
@@ -101,9 +104,50 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             --card-hover:rgba(255,255,255,.06);
             --accent:#60a5fa;
             --accent-2:#3b82f6;
+
+            --hero-chip-bg:#0e1627;
+            --hero-chip-fg:#c7d2fe;
         }
 
         .btn-adicionar { height: 38px; line-height: 24px; margin-left: 10px; }
+
+        /* ========= HERO / TÍTULO RESPONSIVO ========= */
+        .page-hero{
+            background: linear-gradient(180deg, rgba(37,99,235,.10), rgba(37,99,235,0));
+            border:1px solid var(--modal-border);
+            border-radius:16px;
+            padding:16px;
+            margin:12px 0 14px;
+            box-shadow:0 10px 25px rgba(16,24,40,.06);
+        }
+        .page-hero .row-top{
+            display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+        }
+        .hero-left{ display:flex; align-items:center; gap:12px; min-width:0; }
+        .title-icon{
+            width:46px;height:46px;border-radius:12px;
+            background:var(--hero-chip-bg); color:var(--hero-chip-fg);
+            display:flex;align-items:center;justify-content:center;font-size:22px; flex:0 0 auto;
+        }
+        .page-title{
+            font-size: clamp(1.2rem, 0.9rem + 2.1vw, 1.9rem);
+            font-weight:800; margin:0; letter-spacing:.2px; line-height:1.2;
+        }
+        .subtitle{
+            color:var(--card-muted);
+            font-size: clamp(.85rem, .8rem + .3vw, .95rem);
+            margin-top:2px;
+        }
+        .hero-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+        .muted{ color:var(--card-muted); }
+
+        /* ========= Melhorias gerais de responsividade ========= */
+        /* Espaçamento mais confortável entre campos do filtro */
+        #pesquisarForm .form-group{ margin-bottom:12px; }
+        /* Em telas muito estreitas, garante melhor uso do espaço */
+        @media (max-width: 480px){
+            #pesquisarForm textarea{ min-height: 110px; }
+        }
 
         /* ======================= MODAL ======================= */
         .modal-modern.modal          { backdrop-filter: blur(4px); }
@@ -208,7 +252,7 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         }
         .cards-grid{
             display:grid; gap:14px;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); /* min reduzido p/ telas menores */
         }
         .prov-card{
             background:var(--card-bg);
@@ -312,8 +356,21 @@ function e($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 <!-- ================================ PÁGINA PRINCIPAL ================================ -->
 <div id="main" class="main-content">
     <div class="container">
-        <h3>Pesquisar Provimentos e Resoluções</h3>
-        <hr>
+
+        <!-- HERO: título responsivo da página -->
+        <section class="page-hero" aria-label="Cabeçalho da página">
+          <div class="row-top">
+            <div class="hero-left">
+              <div class="title-icon"><i class="mdi mdi-file-search-outline" aria-hidden="true"></i></div>
+              <div class="title-block">
+                <h1 class="page-title">Pesquisar Provimentos e Resoluções</h1>
+                <div class="subtitle">Busque por número, ano, origem, data, descrição ou conteúdo do anexo.</div>
+              </div>
+            </div>
+            <!-- Espaço reservado para ações futuras (exportar, ajuda, etc.) -->
+            <div class="hero-actions"></div>
+          </div>
+        </section>
 
         <!-- --------------------------- FORMULÁRIO DE FILTRO --------------------------- -->
         <form id="pesquisarForm" method="GET">
@@ -679,7 +736,11 @@ function visualizarProvimento(id){
       $('#metaDescricao').text(p.descricao||'—'); $('#metaDescricaoWrapper').removeClass('expanded');
       $('#tagTipo').text(p.tipo||'Documento'); $('.title-text').text(`${p.tipo||'Documento'} nº: ${numAno} - ${p.origem||'—'}`);
       __currentPdfUrl=toAbsoluteUrl(p.caminho_anexo||'');
-      $('#anexo_visualizacao').off('load').on('load',()=>$('#docLoader').fadeOut(150)).attr('src',__currentPdfUrl);
+
+      // Já abrir usando PDF.js viewer
+      const viewerSrc = buildPdfJsViewerUrl(__currentPdfUrl);
+      $('#anexo_visualizacao').off('load').on('load',()=>$('#docLoader').fadeOut(150)).attr('src',viewerSrc);
+
       const nomePadrao=composeDownloadName(p);
       $('#btnOpenNew').off('click').on('click',()=>{ if(__currentPdfUrl) window.open(__currentPdfUrl,'_blank'); });
       $('#btnDownload').off('click').on('click',()=>{ if(__currentPdfUrl) baixarArquivo(__currentPdfUrl,nomePadrao); });

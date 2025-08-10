@@ -6,16 +6,22 @@ include(__DIR__ . '/db_connection.php');
 header('Content-Type: application/json');
 
 try {
-    $funcionarios = $_GET['funcionarios'];
-    $data = $_GET['data'];
-    $tipo = isset($_GET['tipo']) ? $_GET['tipo'] : 'individual';
+    $funcionarios = isset($_GET['funcionarios']) ? $_GET['funcionarios'] : null; // funcionario específico
+    $data         = isset($_GET['data']) ? $_GET['data'] : null;
+    $tipo         = isset($_GET['tipo']) ? $_GET['tipo'] : 'individual'; // padrão individual
+
+    if (!$data || ($tipo !== 'unificado' && !$funcionarios)) {
+        echo json_encode(['error' => 'Parâmetros inválidos.']);
+        exit;
+    }
 
     $conn = getDatabaseConnection();
 
     // Seleciona os depósitos
     $sql = 'SELECT id, funcionario, data_caixa, data_cadastro, valor_do_deposito, tipo_deposito, caminho_anexo
-        FROM deposito_caixa
-        WHERE ' . ($tipo === 'unificado' ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_caixa) = :data AND status = "ativo"';
+            FROM deposito_caixa
+            WHERE ' . ($tipo === 'unificado' ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_caixa) = :data AND status = "ativo"
+            ORDER BY id DESC';
 
     $stmt = $conn->prepare($sql);
     if ($tipo !== 'unificado') {
@@ -29,21 +35,27 @@ try {
         return $carry + floatval($item['valor_do_deposito']);
     }, 0.0);
 
-    // Seleciona o saldo inicial
-    $stmt = $conn->prepare('SELECT saldo_inicial, status FROM caixa WHERE DATE(data_caixa) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
+    // Seleciona o saldo inicial e status do caixa (para saber se pode excluir)
+    $stmt = $conn->prepare('SELECT saldo_inicial, status 
+                            FROM caixa 
+                            WHERE DATE(data_caixa) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario') . '
+                            ORDER BY id DESC LIMIT 1');
     if ($tipo !== 'unificado') {
         $stmt->bindParam(':funcionario', $funcionarios);
     }
     $stmt->bindParam(':data', $data);
     $stmt->execute();
     $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
+
     $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
-    $caixaFechado = $caixa && $caixa['status'] === 'fechado';
+    $caixaFechado = ($caixa && $caixa['status'] === 'fechado') ? true : false;
+    $podeExcluir  = ($caixa && $caixa['status'] === 'aberto') ? 1 : 0;
 
     // Seleciona o total recebido em espécie
     $stmt = $conn->prepare('SELECT SUM(total_pagamento) as total_recebido_especie
                             FROM pagamento_os
-                            WHERE forma_de_pagamento = "Espécie" AND DATE(data_pagamento) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
+                            WHERE forma_de_pagamento = "Espécie" 
+                              AND DATE(data_pagamento) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
     if ($tipo !== 'unificado') {
         $stmt->bindParam(':funcionario', $funcionarios);
     }
@@ -55,7 +67,8 @@ try {
     // Seleciona o total devolvido em espécie
     $stmt = $conn->prepare('SELECT SUM(total_devolucao) as total_devolvido_especie
                             FROM devolucao_os
-                            WHERE forma_devolucao = "Espécie" AND DATE(data_devolucao) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
+                            WHERE forma_devolucao = "Espécie" 
+                              AND DATE(data_devolucao) = :data' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
     if ($tipo !== 'unificado') {
         $stmt->bindParam(':funcionario', $funcionarios);
     }
@@ -67,7 +80,8 @@ try {
     // Seleciona o total de saídas e despesas
     $stmt = $conn->prepare('SELECT SUM(valor_saida) as total_saidas_despesas
                             FROM saidas_despesas
-                            WHERE DATE(data) = :data AND status = "ativo"' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
+                            WHERE DATE(data) = :data 
+                              AND status = "ativo"' . ($tipo === 'unificado' ? '' : ' AND funcionario = :funcionario'));
     if ($tipo !== 'unificado') {
         $stmt->bindParam(':funcionario', $funcionarios);
     }
@@ -88,24 +102,35 @@ try {
     $totalSaldoTransportado = $stmt->fetchColumn();
     $totalSaldoTransportado = $totalSaldoTransportado ? floatval($totalSaldoTransportado) : 0.0;
 
-    // Se o caixa estiver fechado, o total em caixa é zero
+    // Se o caixa estiver fechado, o total em caixa é zero; caso contrário, calcula normalmente
     if ($caixaFechado) {
         $totalEmCaixa = 0.0;
     } else {
-        $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $totalSaidasDespesas - $totalDepositoCaixa - $totalSaldoTransportado;
+        $totalEmCaixa = $saldoInicial 
+                        + $totalRecebidoEspecie 
+                        - $totalDevolvidoEspecie 
+                        - $totalSaidasDespesas 
+                        - $totalDepositoCaixa 
+                        - $totalSaldoTransportado;
     }
 
+    // Anexa a flag pode_excluir a cada depósito retornado
+    $depositos = array_map(function ($item) use ($podeExcluir) {
+        $item['pode_excluir'] = $podeExcluir;
+        return $item;
+    }, $depositos);
+
     echo json_encode([
-        'depositos' => $depositos,
-        'saldoInicial' => $saldoInicial,
-        'totalRecebidoEspecie' => $totalRecebidoEspecie,
+        'depositos'             => $depositos,
+        'saldoInicial'          => $saldoInicial,
+        'totalRecebidoEspecie'  => $totalRecebidoEspecie,
         'totalDevolvidoEspecie' => $totalDevolvidoEspecie,
-        'totalSaidasDespesas' => $totalSaidasDespesas,
-        'totalDepositoCaixa' => $totalDepositoCaixa,
-        'totalSaldoTransportado' => $totalSaldoTransportado,
-        'totalEmCaixa' => $totalEmCaixa,
-        'data_caixa' => $data, 
-        'funcionario' => $funcionarios
+        'totalSaidasDespesas'   => $totalSaidasDespesas,
+        'totalDepositoCaixa'    => $totalDepositoCaixa,
+        'totalSaldoTransportado'=> $totalSaldoTransportado,
+        'totalEmCaixa'          => $totalEmCaixa,
+        'data_caixa'            => $data, 
+        'funcionario'           => $funcionarios
     ]);
 } catch (Exception $e) {
     echo json_encode(['error' => $e->getMessage()]);

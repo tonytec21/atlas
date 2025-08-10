@@ -2,7 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
-
+date_default_timezone_set('America/Sao_Paulo');
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -55,13 +55,22 @@ include(__DIR__ . '/db_connection.php');
 
 <div id="main" class="main-content">
     <div class="container">
-    <div class="d-flex justify-content-between align-items-center">
-        <h3>Modelos de O.S</h3>
-            <a href="index.php" class="btn btn-secondary">
-                <i class="fa fa-search" aria-hidden="true"></i> Ordens de Serviço
-            </a>
+    <!-- HERO / TÍTULO -->
+    <section class="page-hero">
+    <div class="title-row">
+        <div class="title-icon"><i class="fa fa-file-text-o"></i></div>
+        <div class="title-texts">
+        <h1>Modelos de O.S</h1>
+        <div class="subtitle muted">Catálogo e gestão dos modelos de ordem de serviço.</div>
         </div>
-    <hr>
+        <div class="title-actions ml-auto">
+        <a href="index.php" class="btn btn-secondary">
+            <i class="fa fa-search" aria-hidden="true"></i> Ordens de Serviço
+        </a>
+        </div>
+    </div>
+    </section>
+
 
     <!-- Formulário para criar/editar modelo -->
     <div class="card mb-4">

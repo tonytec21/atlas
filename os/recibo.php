@@ -10,6 +10,35 @@ error_reporting(E_ERROR | E_PARSE);
 // Função para definir o fuso horário corretamente como sendo brasileiro
 date_default_timezone_set('America/Sao_Paulo');
 
+function maskCpfCnpj($valor){
+    $s = (string)$valor;
+    $digitsOnly = preg_replace('/\D/', '', $s);
+    $len = strlen($digitsOnly);
+
+    if ($len <= 5) return preg_replace('/\d/', '*', $s);
+
+    $keepPrefix = 3;
+    $keepSuffix = 2; 
+
+    $result = '';
+    $digitIndex = 0;
+
+    for ($i = 0; $i < strlen($s); $i++){
+        $ch = $s[$i];
+        if (ctype_digit($ch)){
+            $digitIndex++;
+            if ($digitIndex <= $keepPrefix || $digitIndex > $len - $keepSuffix){
+                $result .= $ch;
+            } else {
+                $result .= '*';
+            }
+        } else {
+            $result .= $ch;
+        }
+    }
+    return $result;
+}
+
 // Configurar a classe PDF
 class PDF extends TCPDF
 {
@@ -149,7 +178,7 @@ if (isset($_GET['id'])) {
     $pdf->Ln(1);
 
     $pdf->SetFont('helvetica', 'B', 8);
-    $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? '<br>CPF/CNPJ: ' . $ordem_servico['cpf_cliente'] : '';
+    $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? '<br>CPF/CNPJ: ' . maskCpfCnpj($ordem_servico['cpf_cliente']) : '';
     $pdf->writeHTML('<div style="text-align: left;">APRESENTANTE: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
     $pdf->Ln(0);
 

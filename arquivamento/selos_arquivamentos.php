@@ -38,8 +38,8 @@ function getAccessToken($authUrl, $username, $password, $client_id, $grant_type)
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Desativar verificação do certificado SSL
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); // Desativar verificação do host SSL
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
     $response = curl_exec($ch);
 
@@ -60,7 +60,7 @@ function getAtoData($codAto) {
         '14.12' => ['/selo/civil/atos-em-geral', '0120250101'],
         '15.22' => ['/selo/rtdpj/atos-em-geral', '0420250101'],
         '16.39' => ['/selo/imovel/atos-em-geral', '0220250101'],
-        '17.9' => ['/selo/protesto/atos-em-geral', '0320250101'],
+        '17.9'  => ['/selo/protesto/atos-em-geral', '0320250101'],
         '18.13' => ['/selo/maritimo/atos-em-geral', '0620250101'],
     ];
 
@@ -81,10 +81,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $escrevente = ($_POST["escrevente"]);
     $partes = $_POST["partes"];
     $quantidade = $_POST["quantidade"];
-    $numeroControle = $_POST["numeroControle"] ?? ''; // Adicionando a variável numeroControle
-    $livro = $_POST["livro"]; // Livro do formulário
-    $folha = $_POST["folha"]; // Folha do formulário
-    $termo = $_POST["termo"]; // Termo do formulário
+    $numeroControle = $_POST["numeroControle"] ?? '';
+    $livro = $_POST["livro"] ?? '';
+    $folha = $_POST["folha"] ?? '';
+    $termo = $_POST["termo"] ?? '';
+
+    // Isenção
+    $isentoValue = !empty($_POST['isento']); // checkbox
+    $motivoIsencao = trim($_POST['motivo_isencao'] ?? '');
 
     // Obter URL específica do ato e código de tabela de custas
     $atoData = getAtoData($ato);
@@ -98,42 +102,54 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Obter as partes envolvidas do banco de dados
     $partesEnvolvidas = json_decode($partes, true);
-    $parteDocumento = isset($partesEnvolvidas[0]['cpf']) ? $partesEnvolvidas[0]['cpf'] : '06151320301'; // Usar o CPF da primeira parte
+    $parteDocumento = isset($partesEnvolvidas[0]['cpf']) ? $partesEnvolvidas[0]['cpf'] : '06151320301';
 
-    $data = [
-        'ato' => [
-            'codigo' => $ato,
-            'codigoTabelaCusta' => $codigoTabelaCusta
-        ],
-        'escrevente' => $escrevente,
-        'isento' => [
-            'motivo' => null,
-            'value' => false
-        ],
-        'partes' => [
-            'parteAto' => [
-                [
-                    'nome' => $partes,
-                    'documento' => $parteDocumento // Documento da Parte (11 a 14 caracteres)
-                ]
-            ]
-        ],
-        'quantidade' => (int) $quantidade,
-        'numeroControle' => $numeroControle // Incluindo numeroControle na requisição
-    ];
-
-    // Adicionar campos específicos para o ato 14.12
+    // Montagem do payload
     if ($ato === '14.12') {
-        $data['dadosSelo'] = [
-            'versaoTabelaDeCustas' => $codigoTabelaCusta,
-            'escrevente' => $escrevente,
-            'isento' => false,
-            'folha' => $folha, // Pegando valor do formulário
-            'livro' => $livro, // Pegando valor do formulário
-            'termo' => $termo, // Pegando valor do formulário
+        // ROTA /selo/civil/atos-em-geral (DadosAtosEmGeral + DadosRCPNSelo)
+        $data = [
+            'codigoAto' => $ato,
+            'dadosSelo' => [
+                'escrevente' => $escrevente,
+                'isento' => (bool)$isentoValue,
+                'versaoTabelaDeCustas' => $codigoTabelaCusta,
+                'livro' => $livro,
+                'folha' => $folha,
+                'termo' => $termo,
+            ],
+            // Esta rota aceita nomes simples; manter como antes (funcionando)
+            'nomesPartes' => [$partes],
+            'quantidade' => (int)$quantidade,
+            'numeroControle' => $numeroControle
         ];
-        $data['nomesPartes'] = [$partes];
-        $data['codigoAto'] = $ato;
+
+        // Envia o motivo correto SOMENTE quando isento
+        if ($isentoValue && $motivoIsencao !== '') {
+            $data['dadosSelo']['motivoIsentoGratuito'] = $motivoIsencao;
+        }
+    } else {
+        // Demais rotas continuam com o contrato que você já usa
+        $data = [
+            'ato' => [
+                'codigo' => $ato,
+                'codigoTabelaCusta' => $codigoTabelaCusta
+            ],
+            'escrevente' => $escrevente,
+            'isento' => [
+                'motivo' => $isentoValue ? $motivoIsencao : null,
+                'value'  => (bool)$isentoValue
+            ],
+            'partes' => [
+                'parteAto' => [
+                    [
+                        'nome' => $partes,
+                        'documento' => $parteDocumento
+                    ]
+                ]
+            ],
+            'quantidade' => (int) $quantidade,
+            'numeroControle' => $numeroControle
+        ];
     }
 
     $ch = curl_init();
@@ -146,8 +162,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         "Authorization: Bearer $token",
         "Content-Type: application/json"
     ]);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Desativar verificação do certificado SSL
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); // Desativar verificação do host SSL
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
     $response = curl_exec($ch);
 
@@ -170,14 +186,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $valor_qr_code = $selo['valorQrCode'];
             $retorno_selo = json_encode($selo);
 
+            // Valor de isento a salvar (igual ao checkbox)
+            $isentoParaSalvar = $isentoValue ? '1' : '0';
+
             // Salvar no banco de dados
             $stmt = $conn->prepare("INSERT INTO selos (ato, escrevente, isento, partes, quantidade, numero_selo, texto_selo, qr_code, data_geracao, valor_qr_code, retorno_selo, numero_controle) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssssisssssss", $ato, $escrevente, $data['isento']['value'], $partes, $quantidade, $numero_selo, $texto_selo, $qr_code, $data_geracao, $valor_qr_code, $retorno_selo, $numeroControle);
+            $stmt->bind_param("ssssisssssss", $ato, $escrevente, $isentoParaSalvar, $partes, $quantidade, $numero_selo, $texto_selo, $qr_code, $data_geracao, $valor_qr_code, $retorno_selo, $numeroControle);
             $stmt->execute();
             $seloId = $stmt->insert_id;
             $stmt->close();
 
-            // Save the seal in the selos_arquivamentos table
+            // Vincula o selo ao arquivamento
             $stmt = $conn->prepare("INSERT INTO selos_arquivamentos (arquivo_id, selo_id) VALUES (?, ?)");
             $stmt->bind_param("ii", $numeroControle, $seloId);
             $stmt->execute();

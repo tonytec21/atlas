@@ -181,20 +181,37 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="d-flex flex-column align-items-center text-center">
-            <h4 class="mb-3">Edição de Tarefa - Protocolo Geral nº.: <?php echo $taskId; ?></h4>
-            <div class="btn-container d-flex flex-wrap justify-content-center gap-2">
-                <button class="btn btn-primary px-3 py-2 flex-fill" id="protocoloButton">
-                    <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo
-                </button>
-                <button class="btn btn-success px-3 py-2 flex-fill" onclick="window.location.href='criar-tarefa.php'">
-                    <i class="fa fa-plus" aria-hidden="true"></i> Nova Tarefa
-                </button>
-                <button class="btn btn-secondary px-3 py-2 flex-fill" type="button" onclick="window.location.href='index.php'">
-                    <i class="fa fa-search" aria-hidden="true"></i> Pesquisar Tarefas
-                </button>
+        <!-- HERO / TÍTULO -->
+        <section class="page-hero">
+        <div class="title-row">
+            <div class="title-icon"><i class="fa fa-edit"></i></div>
+            <div class="title-texts">
+            <h1>Edição de Tarefa</h1>
+            <div class="subtitle muted">Protocolo Geral nº.: <?php echo $taskId; ?> — edite, gere a guia e acesse ações rápidas.</div>
             </div>
         </div>
+        </section>
+        <hr>
+
+        <!-- AÇÕES (100% responsivo) -->
+        <div class="row">
+        <div class="col-12 col-md-auto mb-2">
+            <button class="btn btn-primary btn-block" id="protocoloButton">
+            <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo
+            </button>
+        </div>
+        <div class="col-12 col-md-auto mb-2">
+            <button class="btn btn-success btn-block" onclick="window.location.href='criar-tarefa.php'">
+            <i class="fa fa-plus" aria-hidden="true"></i> Nova Tarefa
+            </button>
+        </div>
+        <div class="col-12 col-md-auto mb-2">
+            <button class="btn btn-secondary btn-block" type="button" onclick="window.location.href='index.php'">
+            <i class="fa fa-search" aria-hidden="true"></i> Pesquisar Tarefas
+            </button>
+        </div>
+        </div>
+
         <hr>
         <form id="editTaskForm" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="taskId" value="<?php echo htmlspecialchars($taskId); ?>">

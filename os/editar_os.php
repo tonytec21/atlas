@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 $issConfig     = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);
 $issAtivo      = !empty($issConfig['ativo']);
@@ -142,11 +143,26 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center">
-            <h3>Editar Ordem de Serviço nº: <?php echo $id; ?></h3>
-            <button id="add-button" type="button" style="color: #fff!important" class="btn btn-secondary" onclick="window.open('tabela_de_emolumentos.php')">
+
+        <!-- HERO / TÍTULO -->
+        <section class="page-hero">
+        <div class="title-row">
+            <div class="title-icon"><i class="fa fa-money" aria-hidden="true"></i></div>
+            <div>
+            <h1>Editar Ordem de Serviço nº: <?php echo $id; ?></h1>
+            </div>
+        </div>
+        </section>
+    
+        <!-- Centraliza os botões -->
+        <div class="d-flex justify-content-center align-items-center text-center mb-3">
+            <button id="add-button" type="button" class="btn btn-secondary mx-2" onclick="window.open('tabela_de_emolumentos.php')">
                 <i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos
             </button>
+
+            <a href="index.php" class="btn btn-secondary mx-2">
+                <i class="fa fa-search" aria-hidden="true"></i> Ordens de Serviço
+            </a>
         </div>
         <hr>
         <form id="osForm" method="POST">

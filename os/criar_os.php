@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 $issConfig     = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);
 $issAtivo      = !empty($issConfig['ativo']);
@@ -68,6 +69,16 @@ include(__DIR__ . '/../menu.php');
 
 <div id="main" class="main-content">
     <div class="container">
+
+     <!-- HERO / TÍTULO -->
+            <section class="page-hero">
+            <div class="title-row">
+                <div class="title-icon"><i class="fa fa-money" aria-hidden="true"></i></div>
+                <div>
+                <h1>Criar Ordem de Serviço</h1>
+                </div>
+            </div>
+            </section>
     
         <!-- Centraliza os botões -->
         <div class="d-flex justify-content-center align-items-center text-center mb-3">
@@ -83,7 +94,6 @@ include(__DIR__ . '/../menu.php');
 
         <!-- Centraliza o título e o select -->
         <div class="text-center">
-            <h3 class="mb-3">Criar Ordem de Serviço</h3>
             <div class="form-group">
                 <label for="modelo_orcamento">Carregar Modelo de O.S:</label>
                 <select id="modelo_orcamento" class="form-control w-50 mx-auto" onchange="carregarModeloSelecionado()">
@@ -170,6 +180,7 @@ include(__DIR__ . '/../menu.php');
         </form>
         <div id="osItens" class="mt-4">
             <h4>Itens da Ordem de Serviço</h4>
+            
             <table class="table">
                 <thead>
                     <tr>
@@ -190,14 +201,8 @@ include(__DIR__ . '/../menu.php');
                     <!-- Itens adicionados vão aqui -->
                 </tbody>
             </table>
+            
         </div>
-        <!-- <?php if (!$issAtivo): ?>
-            <button type="button" style="width:100%;" class="btn btn-secondary btn-block"
-                    onclick="adicionarISS()">
-                <i class="fa fa-plus" aria-hidden="true"></i> Adicionar ISS
-            </button>
-        <?php endif; ?> -->
-
         <hr>
         <div class="form-group">
             <label for="observacoes">Observações:</label>

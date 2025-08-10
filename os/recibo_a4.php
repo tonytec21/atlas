@@ -7,8 +7,37 @@ include(__DIR__ . '/db_connection2.php');
 // Suprimir avisos de erros
 error_reporting(E_ERROR | E_PARSE);
 
-// Função para definir o fuso horário corretamente como sendo brasileiro
+// Fuso horário BR
 date_default_timezone_set('America/Sao_Paulo');
+
+function maskCpfCnpj($valor){
+    $s = (string)$valor;
+    $digitsOnly = preg_replace('/\D/', '', $s);
+    $len = strlen($digitsOnly);
+
+    if ($len <= 5) return preg_replace('/\d/', '*', $s);
+
+    $keepPrefix = 3;
+    $keepSuffix = 2;
+
+    $result = '';
+    $digitIndex = 0;
+
+    for ($i = 0; $i < strlen($s); $i++){
+        $ch = $s[$i];
+        if (ctype_digit($ch)){
+            $digitIndex++;
+            if ($digitIndex <= $keepPrefix || $digitIndex > $len - $keepSuffix){
+                $result .= $ch;
+            } else {
+                $result .= '*';
+            }
+        } else {
+            $result .= $ch;
+        }
+    }
+    return $result;
+}
 
 // Configurar a classe PDF
 class PDF extends TCPDF
@@ -18,94 +47,76 @@ class PDF extends TCPDF
     // Cabeçalho do PDF
     public function Header()
     {
-        $image_file = '../style/img/timbrado.png'; // Verifique se o caminho está correto
+        $image_file = '../style/img/timbrado.png';
 
-        // Salva as margens atuais
+        // Salva margens atuais
         $currentMargins = $this->getMargins();
 
-        // Desativa temporariamente as margens e AutoPageBreak
-        $this->SetAutoPageBreak(false, 0); // Desativa o AutoPageBreak para permitir a imagem cobrir toda a página
+        // Desativa margens e AutoPageBreak p/ imagem de fundo
+        $this->SetAutoPageBreak(false, 0);
         $this->SetMargins(0, 0, 0);
 
-        // Inserir a imagem ocupando toda a página
+        // Fundo
         @$this->Image($image_file, 0, 0, 210, 297, 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);
 
-        // Adicionar a marca d'água se necessário
+        // Marca d'água se cancelado
         global $isCanceled;
         if ($isCanceled) {
             $this->SetAlpha(0.2);
             $this->StartTransform();
-
-            // Rotaciona e adiciona a marca d'água
             $this->Rotate(45, $this->getPageWidth() / 2, $this->getPageHeight() / 2);
             $this->SetFont('helvetica', 'B', 60);
             $this->SetTextColor(255, 0, 0);
-
-            // Adiciona o texto da marca d'água no centro da página
             $this->Text($this->getPageWidth() / 7, $this->getPageHeight() / 2.5, 'O.S. CANCELADA');
             $this->StopTransform();
             $this->SetAlpha(1);
         }
 
-        // Restaura o AutoPageBreak e as margens para o conteúdo subsequente
-        $this->SetAutoPageBreak(true, 25); // Ativa novamente o AutoPageBreak com a margem inferior padrão
+        // Restaura AutoPageBreak e margens
+        $this->SetAutoPageBreak(true, 25);
         $this->SetMargins($currentMargins['left'], $currentMargins['top'], $currentMargins['right']);
-        $this->SetY(25); // Define o ponto Y após a imagem para o conteúdo
+        $this->SetY(25);
     }
 
     // Rodapé do PDF
     public function Footer()
     {
-        // Caminho do arquivo de configuração
         $configFile = "../style/configuracao_timbrado.json";
-
-        // Definir cor padrão (preta)
         $textColor = [0, 0, 0];
 
-        // Verifica se o arquivo existe e lê a configuração
         if (file_exists($configFile)) {
             $configData = json_decode(file_get_contents($configFile), true);
-            // Se a chave "rodape" for "S", define a cor branca
             if (isset($configData['rodape']) && $configData['rodape'] === "S") {
                 $textColor = [255, 255, 255];
             }
         }
 
-        // Número da página no canto inferior direito
         $this->SetY(-14.5);
         $this->SetFont('arial', 'I', 8);
         $this->SetTextColor($textColor[0], $textColor[1], $textColor[2]);
-
-        // Ajustar a posição horizontal com SetX para aproximar mais do canto
         $this->SetX(-23);
-
-        // Exibir o número da página
         $this->Cell(0, 11, 'Página ' . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 0, false, 'L', 0, '', 0, false, 'T', 'M');
 
-        // Definir cor preta para o texto "Criado por"
-        $this->SetTextColor(0, 0, 0); // Definir cor preta
-
-        // Posicionar o texto na lateral direita, com rotação para orientação vertical
-        $this->SetXY(-10, ($this->getPageHeight() / 2)); // Posição X na margem direita, Y centralizada verticalmente
-        $this->StartTransform(); // Iniciar transformação
-        $this->Rotate(90); // Rotacionar 90 graus
-        $this->Cell(0, 10, 'Criado por: ' . $this->criado_por, 0, false, 'C', 0, '', 0, false, 'T', 'M'); // Texto centralizado verticalmente
-        $this->StopTransform(); // Parar transformação
+        // “Criado por” na vertical
+        $this->SetTextColor(0, 0, 0);
+        $this->SetXY(-10, ($this->getPageHeight() / 2));
+        $this->StartTransform();
+        $this->Rotate(90);
+        $this->Cell(0, 10, 'Criado por: ' . $this->criado_por, 0, false, 'C', 0, '', 0, false, 'T', 'M');
+        $this->StopTransform();
     }
 
-    // Método para definir o nome do criador
     public function setCriadoPor($criado_por)
     {
-        $this->criado_por = $criado_por; // Atribui o valor à propriedade privado
+        $this->criado_por = $criado_por;
     }
 
-    // Função para adicionar a chancela da assinatura
     public function addSignature($assinatura_path)
     {
         if (file_exists($assinatura_path)) {
-            $signatureWidth = 80; // Largura da imagem da assinatura
+            $signatureWidth = 80;
             $pageWidth = $this->getPageWidth();
-            $marginLeft = $this->getMargins()['left'];
+            $marginLeft  = $this->getMargins()['left'];
             $marginRight = $this->getMargins()['right'];
             $centerX = ($pageWidth - $marginLeft - $marginRight - $signatureWidth) / 2 + $marginLeft;
 
@@ -117,25 +128,34 @@ class PDF extends TCPDF
 if (isset($_GET['id'])) {
     $os_id = $_GET['id'];
 
-    // Obter dados da SO
+    // Ordem de Serviço
     $os_query = $conn->prepare("SELECT * FROM ordens_de_servico WHERE id = ?");
     $os_query->bind_param("i", $os_id);
     $os_query->execute();
     $os_result = $os_query->get_result();
     $ordem_servico = $os_result->fetch_assoc();
 
-    // Verificar o status da OS
+    // Status
     $status_os = $ordem_servico['status'];
     $isCanceled = ($status_os === 'Cancelado');
 
-    // Obter dados de itens da OS ordenados pela coluna ordem_exibicao
+    // Itens
     $os_items_query = $conn->prepare("SELECT * FROM ordens_de_servico_itens WHERE ordem_servico_id = ? ORDER BY ordem_exibicao ASC");
     $os_items_query->bind_param("i", $os_id);
     $os_items_query->execute();
     $os_items_result = $os_items_query->get_result();
     $ordem_servico_itens = $os_items_result->fetch_all(MYSQLI_ASSOC);
 
-    // Obter informações do criador
+    // mostrar "DESC. LEGAL %" somente se existir algum valor > 0
+    $show_desc_legal = false;
+    foreach ($ordem_servico_itens as $it) {
+        $v = str_replace(',', '.', (string)($it['desconto_legal'] ?? ''));
+        if ($v !== '' && floatval($v) > 0) { $show_desc_legal = true; break; }
+    }
+    // largura da coluna DESCRIÇÃO (absorve os 8% se esconder o desconto)
+    $descricaoWidth = $show_desc_legal ? '35%' : '43%';
+
+    // Criador
     $criado_por = $ordem_servico['criado_por'];
     $user_query = $conn->prepare("SELECT nome_completo, cargo FROM funcionarios WHERE usuario = ?");
     $user_query->bind_param("s", $criado_por);
@@ -145,7 +165,7 @@ if (isset($_GET['id'])) {
     $criado_por_nome = $user_info['nome_completo'];
     $criado_por_cargo = $user_info['cargo'];
 
-    // Obter informações do usuário logado
+    // Usuário logado
     $logged_in_user = $_SESSION['username'];
     $logged_in_user_query = $conn->prepare("SELECT nome_completo, cargo FROM funcionarios WHERE usuario = ?");
     $logged_in_user_query->bind_param("s", $logged_in_user);
@@ -155,30 +175,27 @@ if (isset($_GET['id'])) {
     $logged_in_user_nome = $logged_in_user_info['nome_completo'];
     $logged_in_user_cargo = $logged_in_user_info['cargo'];
 
-    // Obter soma dos pagamentos da tabela pagamento_os
+    // Pagamentos
     $pagamentos_query = $conn->prepare("SELECT * FROM pagamento_os WHERE ordem_de_servico_id = ?");
     $pagamentos_query->bind_param("i", $os_id);
     $pagamentos_query->execute();
     $pagamentos_result = $pagamentos_query->get_result();
     $pagamentos = $pagamentos_result->fetch_all(MYSQLI_ASSOC);
 
-    // Obter total de pagamentos
     $total_pagamentos = 0;
     foreach ($pagamentos as $pagamento) {
         $total_pagamentos += $pagamento['total_pagamento'];
     }
 
-    // Calcular saldo
+    // Saldos / repasses / devoluções
     $saldo = $total_pagamentos - $ordem_servico['total_os'];
 
-    // Obter soma dos valores devolvidos da tabela devolucao_os
     $devolucoes_query = $conn->prepare("SELECT SUM(total_devolucao) as total_devolucoes FROM devolucao_os WHERE ordem_de_servico_id = ?");
     $devolucoes_query->bind_param("i", $os_id);
     $devolucoes_query->execute();
     $devolucoes_result = $devolucoes_query->get_result();
     $total_devolucoes = $devolucoes_result->fetch_assoc()['total_devolucoes'];
 
-    // Obter soma dos valores de repasse credor da tabela repasse_credor
     $repasses_query = $conn->prepare("SELECT SUM(total_repasse) as total_repasses FROM repasse_credor WHERE ordem_de_servico_id = ?");
     $repasses_query->bind_param("i", $os_id);
     $repasses_query->execute();
@@ -188,11 +205,11 @@ if (isset($_GET['id'])) {
     // Início do PDF
     $pdf = new PDF();
     $pdf->SetMargins(12, 40, 10);
-    $pdf->setCriadoPor($criado_por_nome); // Define o nome do usuário que criou a OS
+    $pdf->setCriadoPor($criado_por_nome);
     $pdf->AddPage();
     $pdf->SetFont('arial', '', 10);
 
-    // Verificar e carregar a assinatura
+    // Assinatura
     $assinatura_path = '';
     $json_file = '../oficios/assinaturas/data.json';
     if (file_exists($json_file)) {
@@ -215,7 +232,7 @@ if (isset($_GET['id'])) {
 
     $pdf->SetFont('helvetica', '', 9);
     $pdf->SetMargins(10, 40, 10);
-    $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? ' - CPF/CNPJ: ' . $ordem_servico['cpf_cliente'] : '';
+    $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? ' - CPF/CNPJ: ' . maskCpfCnpj($ordem_servico['cpf_cliente']) : '';
     $pdf->writeHTML('<div style="text-align: left;">Apresentante: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
     $pdf->Ln(1);
 
@@ -236,56 +253,87 @@ if (isset($_GET['id'])) {
         $pdf->Ln(2);
     }
 
-    // Adicionar as informações dos itens da OS
+    // ITENS
     $pdf->SetFont('helvetica', '', 10);
     $pdf->writeHTML('<div style="text-align: center; margin-top: 20px;"><b>ITENS DA ORDEM DE SERVIÇO</b></div>', true, false, true, false, '');
     $pdf->Ln(0);
 
-    $pdf->SetFont('helvetica', '', 8);
-    $pdf->writeHTML('<div style="text-align: center; margin-top: 20px;">Valores válidos até 31/12/'. date('Y', strtotime($ordem_servico['data_criacao'])) . ' </b></div>', true, false, true, false, '');
-    $pdf->Ln(1);
+    function adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth) {
+        $descTh = $show_desc_legal
+            ? '<th style="width: 8%; text-align: center; font-size: 8px;"><b>DESC. LEGAL %</b></th>'
+            : '';
 
-    // Função para adicionar o cabeçalho da tabela de itens
-    function adicionarCabecalhoTabelaItens(&$pdf) {
         $html = '<table border="0.1" cellpadding="4">
             <thead>
                 <tr>
-                    <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>ATO</b></th>
-                    <th style="width: 5%; text-align: center; font-size: 7.5px;"><b>QTD</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 7px;"><b>DESC. LEGAL %</b></th>
-                    <th style="width: 35%; text-align: center; font-size: 7.5px;"><b>DESCRIÇÃO</b></th>
-                    <th style="width: 10%; text-align: center; font-size: 7.5px;"><b>EMOL</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>FERC</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>FADEP</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>FEMP</b></th>
-                    <th style="width: 10%; text-align: center; font-size: 7.5px;"><b>TOTAL</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>ATO</b></th>
+                    <th style="width: 5%; text-align: center; font-size: 8.5px;"><b>QTD</b></th>'
+                    . $descTh .
+                '<th style="width: '.$descricaoWidth.'; text-align: center; font-size: 8.5px;"><b>DESCRIÇÃO</b></th>
+                    <th style="width: 10%; text-align: center; font-size: 8.5px;"><b>EMOL</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>FERC</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>FADEP</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>FEMP</b></th>
+                    <th style="width: 10%; text-align: center; font-size: 8.5px;"><b>TOTAL</b></th>
                 </tr>
             </thead>
             <tbody>';
         return $html;
     }
 
-    $html = adicionarCabecalhoTabelaItens($pdf);
+    $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth);
+
+    // Acumuladores
+    $total_emolumentos = 0.0; // será exibido na coluna FERJ
+    $total_ferc = 0.0;
+    $total_fadep = 0.0;
+    $total_femp = 0.0;
+    $total_geral = 0.0;
+    $total_outros = 0.0; // TOTAL apenas dos itens com ATO = 0
+    $total_iss = 0.0;    // TOTAL apenas dos itens com ATO = 'ISS'
 
     foreach ($ordem_servico_itens as $index => $item) {
+        $descTd = $show_desc_legal
+            ? '<td style="width: 8%; font-size: 8.5px;">' . $item['desconto_legal'] . '</td>'
+            : '';
+
         $rowHtml = '<tr>
-            <td style="width: 8%; font-size: 7.5px;">' . $item['ato'] . '</td>
-            <td style="width: 5%; font-size: 7.5px;">' . $item['quantidade'] . '</td>
-            <td style="width: 8%; font-size: 7.5px;">' . $item['desconto_legal'] . '</td>
-            <td style="width: 35%; font-size: 7px;">' . $item['descricao'] . '</td>
-            <td style="width: 10%; font-size: 7.5px;">R$ ' . number_format($item['emolumentos'], 2, ',', '.') . '</td>
-            <td style="width: 8%; font-size: 7.5px;">R$ ' . number_format($item['ferc'], 2, ',', '.') . '</td>
-            <td style="width: 8%; font-size: 7.5px;">R$ ' . number_format($item['fadep'], 2, ',', '.') . '</td>
-            <td style="width: 8%; font-size: 7.5px;">R$ ' . number_format($item['femp'], 2, ',', '.') . '</td>
-            <td style="width: 10%; font-size: 7.5px;">R$ ' . number_format($item['total'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8.5px;">' . $item['ato'] . '</td>
+            <td style="width: 5%; font-size: 8.5px;">' . $item['quantidade'] . '</td>'
+            . $descTd .
+        '<td style="width: '.$descricaoWidth.'; font-size: 8px;">' . $item['descricao'] . '</td>
+            <td style="width: 10%; font-size: 8.5px;">R$ ' . number_format($item['emolumentos'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8.5px;">R$ ' . number_format($item['ferc'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8.5px;">R$ ' . number_format($item['fadep'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8.5px;">R$ ' . number_format($item['femp'], 2, ',', '.') . '</td>
+            <td style="width: 10%; font-size: 8.5px;">R$ ' . number_format($item['total'], 2, ',', '.') . '</td>
         </tr>';
 
-        // Verificar a posição atual e adicionar uma nova página se necessário
+        // Somatórios
+        $total_emolumentos += (float)$item['emolumentos']; // FERJ
+        $total_ferc  += (float)$item['ferc'];
+        $total_fadep += (float)$item['fadep'];
+        $total_femp  += (float)$item['femp'];
+        $total_geral += (float)$item['total'];
+
+        // OUTROS = somente atos com ATO == 0
+        $ato_raw = isset($item['ato']) ? (string)$item['ato'] : '';
+        $isAtoZero = preg_match('/^\s*0+(?:[.,]0+)?\s*$/', $ato_raw) === 1;
+        if ($isAtoZero) {
+            $total_outros += (float)$item['total'];
+        }
+
+        // ISS = somente atos cujo ATO é "ISS" (case-insensitive)
+        if (strcasecmp(trim($ato_raw), 'ISS') === 0) {
+            $total_iss += (float)$item['total'];
+        }
+
+        // Quebra de página, se necessário
         if ($pdf->GetY() + 30 > $pdf->getPageHeight() - 30) {
-            $html .= '</tbody></table>';
-            $pdf->writeHTML($html, true, false, true, false, '');
-            $pdf->AddPage();
-            $html = adicionarCabecalhoTabelaItens($pdf) . $rowHtml;
+        $html .= '</tbody></table>';
+        $pdf->writeHTML($html, true, false, true, false, '');
+        $pdf->AddPage();
+        $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth) . $rowHtml;
         } else {
             $html .= $rowHtml;
         }
@@ -294,23 +342,64 @@ if (isset($_GET['id'])) {
     $html .= '</tbody></table>';
     $pdf->writeHTML($html, true, false, true, false, '');
 
-    $pdf->Ln(-5);
+    // ===== TÍTULO + TABELA DE SOMATÓRIOS (colunas dinâmicas) =====
+    $pdf->Ln(0);
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->writeHTML('<div style="text-align:center; margin-top: 6px;"><b>SOMATÓRIO DOS VALORES (ITENS)</b></div>', true, false, true, false, '');
 
-    // Adicionar os valores dos pagamentos
+    // Monta colunas dinamicamente
+    $columns = [
+        ['label' => 'FERJ',  'value' => $total_emolumentos],
+        ['label' => 'FERC',  'value' => $total_ferc],
+        ['label' => 'FEMP',  'value' => $total_femp],
+        ['label' => 'FADEP', 'value' => $total_fadep],
+    ];
+    if ($total_iss > 0) {
+        $columns[] = ['label' => 'ISS', 'value' => $total_iss];
+    }
+    if ($total_outros > 0) {
+        $columns[] = ['label' => 'OUTROS', 'value' => $total_outros];
+    }
+    // TOTAL sempre
+    $columns[] = ['label' => 'TOTAL', 'value' => $total_geral];
+
+    $colCount = count($columns);
+    $colWidth = 100.0 / max(1, $colCount);
+
+    // Constrói HTML da tabela
+    $thead = '';
+    $tbody = '';
+    foreach ($columns as $col) {
+        $thead .= '<th style="width: '.sprintf('%.2f', $colWidth).'%; text-align:center; font-size:8.5px;">'.$col['label'].'</th>';
+        $tbody .= '<td style="width: '.sprintf('%.2f', $colWidth).'%; text-align:center; font-size:8.5px;font-weight:normal;">R$ '.number_format((float)$col['value'], 2, ',', '.').'</td>';
+    }
+
+    $sumTableHtml = '
+    <table border="0.1" cellpadding="4">
+        <thead>
+            <tr>'.$thead.'</tr>
+        </thead>
+        <tbody>
+            <tr>'.$tbody.'</tr>
+        </tbody>
+    </table>';
+    $pdf->writeHTML($sumTableHtml, true, false, true, false, '');
+
+    $pdf->Ln(3);
+
+    // PAGAMENTOS
     $pdf->SetFont('helvetica', '', 10);
-    $pdf->writeHTML('<div style="text-align: center; margin-top: 20px;"><b>PAGAMENTOS REALIZADOS</b></div>', true, false, true, false, '');
+    $pdf->writeHTML('<div style="text-align: center; margin-top: 10px;"><b>PAGAMENTOS REALIZADOS</b></div>', true, false, true, false, '');
     $pdf->Ln(1);
 
-    // Função para adicionar o cabeçalho da tabela de pagamentos
     function adicionarCabecalhoTabelaPagamentos() {
         return '<table border="0.1" cellpadding="4">
             <thead>
                 <tr>
-                    <th style="width: 15%; text-align: center; font-size: 7.5px;"><b>DATA</b></th>
-                    <th style="width: 30%; text-align: center; font-size: 7.5px;"><b>CLIENTE</b></th>
-                    <th style="width: 15%; text-align: center; font-size: 7.5px;"><b>FORMA DE PAGAMENTO</b></th>
-                    <th style="width: 20%; text-align: center; font-size: 7.5px;"><b>VALOR</b></th>
-                    <th style="width: 20%; text-align: center; font-size: 7.5px;"><b>STATUS</b></th>
+                    <th style="width: 15%; text-align: center; font-size: 8.5px;"><b>DATA</b></th>
+                    <th style="width: 40%; text-align: center; font-size: 8.5px;"><b>CLIENTE</b></th>
+                    <th style="width: 25%; text-align: center; font-size: 8.5px;"><b>FORMA DE PAGAMENTO</b></th>
+                    <th style="width: 20%; text-align: center; font-size: 8.5px;"><b>VALOR</b></th>
                 </tr>
             </thead>
             <tbody>';
@@ -321,14 +410,12 @@ if (isset($_GET['id'])) {
     foreach ($pagamentos as $pagamento) {
         $data_pagamento = date('d/m/Y - H:i', strtotime($pagamento['data_pagamento']));
         $rowHtmlPagamento = '<tr>
-            <td style="width: 15%; font-size: 7.5px;">' . $data_pagamento . '</td>
-            <td style="width: 30%; font-size: 7.5px;">' . $pagamento['cliente'] . '</td>
-            <td style="width: 15%; font-size: 7.5px;">' . $pagamento['forma_de_pagamento'] . '</td>
-            <td style="width: 20%; font-size: 7.5px;">R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.') . '</td>
-            <td style="width: 20%; font-size: 7.5px;">' . $pagamento['status'] . '</td>
+            <td style="width: 15%; font-size: 8.5px;">' . $data_pagamento . '</td>
+            <td style="width: 40%; font-size: 8.5px;">' . $pagamento['cliente'] . '</td>
+            <td style="width: 25%; font-size: 8.5px;">' . $pagamento['forma_de_pagamento'] . '</td>
+            <td style="width: 20%; font-size: 8.5px;">R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.') . '</td>
         </tr>';
 
-        // Verificar a posição atual e adicionar uma nova página se necessário
         if ($pdf->GetY() + 30 > $pdf->getPageHeight() - 30) {
             $html_pagamentos .= '</tbody></table>';
             $pdf->writeHTML($html_pagamentos, true, false, true, false, '');
@@ -342,7 +429,7 @@ if (isset($_GET['id'])) {
     $html_pagamentos .= '</tbody></table>';
     $pdf->writeHTML($html_pagamentos, true, false, true, false, '');
 
-    // Adicionar a linha de assinatura
+    // Assinatura
     $pdf->Ln(5);
     $pdf->Cell(0, 4, '__________________________________', 0, 1, 'C');
     $pdf->SetFont('helvetica', 'B', 9);

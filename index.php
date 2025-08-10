@@ -34,554 +34,6 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
     <link rel="stylesheet" href="style/css/style.css">  
     <link rel="icon" href="style/img/favicon.png" type="image/png">  
     <?php include(__DIR__ . '/style/style_index.php'); ?>  
-    <style>  
-        body {  
-            background-color: #f8f9fa;  
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;  
-        }  
-        
-        .main-container {  
-            max-width: 1400px;  
-            margin: 30px auto;  
-            padding: 0 20px;  
-        }  
-        
-        .page-title {  
-            font-size: 28px;  
-            font-weight: 600;  
-            color: #212529;  
-            margin-bottom: 10px;  
-        }  
-        
-        .title-divider {  
-            height: 4px;  
-            width: 120px;  
-            background-color: #0d6efd;  
-            margin-bottom: 30px;  
-            border-radius: 2px;  
-        }  
-        
-        .search-container {  
-            margin-bottom: 30px;  
-        }  
-        
-        .search-box {  
-            width: 100%;  
-            max-width: 800px;  
-            padding: 12px 20px;  
-            border-radius: 100px;  
-            border: 1px solid #e0e0e0;  
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);  
-            font-size: 16px;  
-            background-image: url('style/img/search-icon.png');  
-            background-repeat: no-repeat;  
-            background-position: 15px center;  
-            background-size: 16px;  
-            padding-left: 45px;  
-        }  
-        
-        .search-box:focus {  
-            outline: none;  
-            border-color: #0d6efd;  
-            box-shadow: 0 2px 8px rgba(13,110,253,0.15);  
-        }  
-        
-        #sortable-cards {  
-            display: grid;  
-            grid-template-columns: repeat(3, 1fr);  
-            gap: 20px;  
-        }  
-        
-        .module-card {  
-            background: white;  
-            border-radius: 12px;  
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);  
-            padding: 20px;  
-            transition: all 0.3s ease;  
-            height: 100%;  
-            display: flex;  
-            flex-direction: column;  
-            border: none;  
-        }  
-        
-        .module-card:hover {  
-            transform: translateY(-5px);  
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);  
-        }  
-        
-        .card-header {  
-            display: flex;  
-            align-items: flex-start;  
-            margin-bottom: 15px;  
-        }  
-        
-        .card-badge {  
-            font-size: 12px;  
-            font-weight: 500;  
-            padding: 5px 12px;  
-            border-radius: 100px;  
-            margin-right: 10px;  
-        }  
-        
-        .card-icon {  
-            width: 40px;  
-            height: 40px;  
-            border-radius: 8px;  
-            display: flex;  
-            align-items: center;  
-            justify-content: center;  
-            margin-left: auto;  
-        }  
-        
-        .card-title {  
-            font-size: 18px;  
-            font-weight: 600;  
-            margin-bottom: 10px;  
-            color: #333;  
-        }  
-        
-        .card-description {  
-            font-size: 14px;  
-            color: #6c757d;  
-            margin-bottom: 20px;  
-            flex-grow: 1;  
-            line-height: 1.5;  
-        }  
-        
-        .card-button {  
-            border: none;  
-            border-radius: 8px;  
-            padding: 10px 15px;  
-            font-weight: 500;  
-            font-size: 14px;  
-            display: flex;  
-            align-items: center;  
-            justify-content: center;  
-            width: 100%;  
-            cursor: pointer;  
-            transition: all 0.2s;  
-            color: white;  
-        }  
-        
-        .card-button:hover {  
-            transform: translateY(-2px);  
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);  
-        }  
-        
-        .card-button i {  
-            margin-right: 8px;  
-        }  
-        
-        /* Estilos de categorias */  
-        .badge-operacional {  
-            background-color: #e1f5fe;  
-            color: #0288d1;  
-        }  
-        
-        .badge-financeiro {  
-            background-color: #ffebee;  
-            color: #e53935;  
-        }  
-        
-        .badge-administrativo {  
-            background-color: #e8f5e9;  
-            color: #388e3c;  
-        }  
-        
-        .badge-juridico {  
-            background-color: #fff8e1;  
-            color: #ffa000;  
-        }  
-        
-        .badge-documental {  
-            background-color: #f3e5f5;  
-            color: #8e24aa;  
-        }  
-        
-        /* PRESERVANDO CORES ORIGINAIS DOS ÍCONES */  
-        .icon-arquivamento {  
-            background-color: #4169E1;  
-            color: white;  
-        }  
-        
-        .icon-os {  
-            background-color: #17a2b8;  
-            color: white;  
-        }  
-        
-        .icon-caixa {  
-            background-color: #006400;  
-            color: white;  
-        }  
-        
-        .icon-tarefas {  
-            background-color: #708090;  
-            color: white;  
-        }  
-
-        .icon-devolutivas {  
-            background-color: #9c27b0;  
-            color: white;  
-        }  
-        
-        .icon-oficios {  
-            background-color: #ffc107;  
-            color: white;  
-        }  
-
-        .icon-provimentos {  
-            background-color: #8B0000;  
-            color: white;  
-        }  
-        
-        .icon-guia {  
-            background-color: #34495e;  
-            color: white;  
-        }  
-
-        .icon-agenda {  
-            background-color:#A7D676;  
-            color: white;  
-        }  
-        
-        .icon-contas {  
-            background-color: #ff8a80;  
-            color: white;  
-        }  
-        
-        .icon-manuais {  
-            background-color: #008B8B;  
-            color: white;  
-        }  
-        
-        .icon-indexador {  
-            background-color: #FF7043;  
-            color: white;  
-        }  
-        
-        .icon-xuxuzinho {  
-            background-color: #2c3e50;  
-            color: white;  
-        }  
-        
-        .icon-anotacao {  
-            background-color: #2F4F4F;  
-            color: white;  
-        }  
-        
-        .icon-relatorios {  
-            background-color: #4A90E2;  
-            color: white;  
-        }  
-        
-        /* PRESERVANDO CORES ORIGINAIS DOS BOTÕES */  
-        .btn-arquivamento {  
-            background-color: #4169E1;  
-        }  
-        
-        .btn-os {  
-            background-color: #17a2b8;  
-        }  
-        
-        .btn-caixa {  
-            background-color: #006400;  
-        }  
-        
-        .btn-tarefas {  
-            background-color: #708090;  
-        }  
-        
-        .btn-oficios {  
-            background-color: #FF69B4;  
-        }  
-        
-        .btn-provimentos {  
-            background-color: #8B0000;  
-        }  
-        
-        .btn-guia {  
-            background-color: #34495e;  
-        }  
-        
-        .btn-agenda {  
-            background-color: #A7D676;  
-        }  
-
-        .btn-contas {  
-            background-color: #ff8a80;  
-        }  
-        
-        .btn-manuais {  
-            background-color: #008B8B;  
-        }  
-        
-        .btn-indexador {  
-            background-color: #FF7043;  
-        }  
-        
-        .btn-xuxuzinho {  
-            background-color: #2c3e50;  
-        }  
-        
-        .btn-anotacao {  
-            background-color: #2F4F4F;  
-        }  
-        
-        .btn-relatorios {  
-            background-color: #4A90E2;  
-        }  
-        
-        /* Estilos para o modal de tarefas */  
-        .modal-content {  
-            border-radius: 12px;  
-            border: none;  
-            overflow: hidden;  
-        }  
-        
-        .modal-header {  
-            background-color: #f8f9fa;  
-            border-bottom: 1px solid #f0f0f0;  
-            padding: 20px 25px;  
-        }  
-        
-        .modal-title {  
-            font-weight: 600;  
-            font-size: 20px;  
-        }  
-        
-        .modal-body {  
-            padding: 25px;  
-        }  
-        
-        .section-title {  
-            font-size: 18px;  
-            font-weight: 600;  
-            margin-bottom: 15px;  
-            display: flex;  
-            align-items: center;  
-        }  
-        
-        .section-title i {  
-            margin-right: 8px;  
-        }  
-        
-        .task-list-container {  
-            background-color: #f9f9f9;  
-            border-radius: 10px;  
-            padding: 20px;  
-            margin-bottom: 20px;  
-        }  
-        
-        .status-label {  
-            padding: 4px 10px;  
-            border-radius: 4px;  
-            font-size: 13px;  
-            font-weight: 500;  
-        }  
-        
-        /* Estilos para status */  
-        .status-iniciada {  
-            background-color: #e1f5fe;  
-            color: #0288d1;  
-        }  
-        
-        .status-em-espera {  
-            background-color: #e8f5e9;  
-            color: #388e3c;  
-        }  
-        
-        .status-em-andamento {  
-            background-color: #fff8e1;  
-            color: #ffa000;  
-        }  
-        
-        .status-concluida {  
-            background-color: #e0f2f1;  
-            color: #00897b;  
-        }  
-        
-        .status-cancelada {  
-            background-color: #ffebee;  
-            color: #d32f2f;  
-        }  
-        
-        .status-pendente {  
-            background-color: #f3e5f5;  
-            color: #7b1fa2;  
-        }  
-        
-        .status-prestes-vencer {  
-            background-color: #fff3e0;  
-            color: #e65100;  
-        }  
-        
-        .status-vencida {  
-            background-color: #ffebee;  
-            color: #b71c1c;  
-        }  
-        
-        /* Estilos para as tabelas */  
-        .table {  
-            font-size: 14px;  
-        }  
-        
-        .table th {  
-            font-weight: 600;  
-            color: #495057;  
-        }  
-        
-        /* Placeholder para dragging */  
-        .ui-state-highlight {  
-            height: 240px;  
-            background-color: #f8f9fa;  
-            border: 2px dashed #dee2e6;  
-            border-radius: 12px;  
-        }  
-        
-        /* Melhorias de responsividade */  
-        @media (max-width: 1200px) {  
-            #sortable-cards {  
-                grid-template-columns: repeat(3, 1fr);  
-            }  
-        }  
-        
-        @media (max-width: 992px) {  
-            #sortable-cards {  
-                grid-template-columns: repeat(2, 1fr);  
-            }  
-        }  
-        
-        @media (max-width: 768px) {  
-            #sortable-cards {  
-                grid-template-columns: 1fr;  
-            }  
-            
-            .main-container {  
-                padding: 0 15px;  
-                margin: 20px auto;  
-            }  
-            
-            .page-title {  
-                font-size: 24px;  
-            }  
-            
-            .card-title {  
-                font-size: 16px;  
-            }  
-            
-            .card-description {  
-                font-size: 13px;  
-            }  
-        }  
-
-        /* Modo escuro */  
-        body.dark-mode {  
-            background-color: #121212;  
-        }  
-        
-        body.dark-mode .page-title {  
-            color: #e0e0e0;  
-        }  
-        
-        body.dark-mode .module-card {  
-            background-color: #1e1e1e;  
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);  
-        }  
-        
-        body.dark-mode .card-title {  
-            color: #e0e0e0;  
-        }  
-        
-        body.dark-mode .card-description {  
-            color: #b0b0b0;  
-        }  
-        
-        body.dark-mode .modal-content {  
-            background-color: #1e1e1e;  
-        }  
-        
-        body.dark-mode .modal-header {  
-            background-color: #252525;  
-            border-bottom: 1px solid #333;  
-        }  
-        
-        body.dark-mode .task-list-container {  
-            background-color: #252525;  
-        }  
-        
-        body.dark-mode .table {  
-            color: #e0e0e0;  
-        }  
-        
-        body.dark-mode .search-box {  
-            background-color: #252525;  
-            border-color: #333;  
-            color: #e0e0e0;  
-        }  
-
-        .modal-alert-recorrente {
-        background: #8B0000; /* vermelho escuro */
-        color: #fff;
-        border: none;
-        }
-
-        .modal-alert-recorrente .titulo-alerta {
-        font-weight: 800;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        }
-
-        .modal-alert-recorrente .icone-alerta {
-        font-size: 80px;
-        line-height: 1;
-        color: #fff;
-        animation: pulsar 1.2s infinite;
-        }
-
-        .modal-alert-recorrente .form-check-input:checked {
-        background-color: #fff;
-        border-color: #fff;
-        }
-        .modal-alert-recorrente .form-check-label {
-        color: #fff;
-        }
-
-        .modal-alert-recorrente textarea {
-        background: rgba(255,255,255,0.15);
-        color: #fff;
-        border: 2px solid #fff;
-        }
-        .modal-alert-recorrente textarea::placeholder {
-        color: #f1f1f1;
-        }
-
-        .modal-alert-recorrente .btn-light {
-        background:#fff;
-        color:#8B0000;
-        border:none;
-        box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
-        }
-        .modal-alert-recorrente .btn-light:hover {
-        filter: brightness(0.9);
-        }
-
-        .modal-alert-recorrente .texto-bloqueio {
-        opacity:0.85;
-        }
-
-        @keyframes pulsar {
-        0%,100% { transform: scale(1); }
-        50% { transform: scale(1.15); }
-        }
-
-        /* Blur no fundo enquanto o modal estiver aberto */
-        .modal-backdrop.show {
-        backdrop-filter: blur(6px);
-        background-color: rgba(0,0,0,0.4); /* escurece levemente */
-        }
-
-
-    </style>  
 </head>  
 <body class="light-mode">  
 <?php include(__DIR__ . '/menu.php'); ?>  
@@ -589,11 +41,11 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
 <div class="main-container">  
     <h1 class="page-title"></h1>  
     <div class="title-divider"></div>  
-    
+        
     <div class="search-container">  
         <input type="text" class="search-box" id="searchModules" placeholder="Buscar módulos...">  
     </div>  
-    
+        
     <div id="sortable-cards">  
         <!-- Arquivamentos -->  
         <div class="module-card" id="card-arquivamento">  
@@ -803,7 +255,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                             <button class="card-button btn-xuxuzinho" onclick="window.open(\'../xuxuzinho/index.php\', \'_blank\')">  
                                 <i class="fa fa-arrow-right"></i> Acessar  
                             </button>
- 
+  
                         </div>';  
                 }  
             }  
@@ -844,7 +296,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
 
 <!-- Modal de Tarefas -->  
 <div class="modal fade" id="tarefasModal" tabindex="-1" aria-labelledby="tarefasModalLabel" aria-hidden="true">  
-    <div class="modal-dialog modal-lg" style="max-width: 70%;">  
+    <div class="modal-dialog modal-lg">  
         <div class="modal-content">  
             <div class="modal-header">  
                 <h5 class="modal-title" id="tarefasModalLabel">Resumo de Tarefas</h5>  
@@ -870,9 +322,6 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                     <div id="tarefas-list" class="task-list-container"></div>  
                 </div>  
             </div>  
-            <!-- <div class="modal-footer">  
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>  
-            </div>   -->
         </div>  
     </div>  
 </div>  
@@ -979,34 +428,44 @@ $(document).ready(function() {
         return text.charAt(0).toUpperCase() + text.slice(1);  
     }  
 
-    // Função para retornar a classe de status  
-    function getStatusClassLabel(status) {  
-        switch (status.toLowerCase()) {  
-            case 'iniciada': return 'status-iniciada';  
-            case 'em espera': return 'status-em-espera';  
-            case 'em andamento': return 'status-em-andamento';  
-            case 'concluída': return 'status-concluida';  
-            case 'cancelada': return 'status-cancelada';  
-            case 'pendente': return 'status-pendente';  
-            default: return '';  
-        }  
-    }  
+    // Mapeia status para classes de badge (pastéis)
+    function getStatusBadgeClass(status) {
+        switch ((status || '').toLowerCase()) {
+            case 'iniciada':      return 'soft-badge soft-blue';
+            case 'em espera':     return 'soft-badge soft-amber';
+            case 'em andamento':  return 'soft-badge soft-indigo';
+            case 'concluída':
+            case 'concluida':     return 'soft-badge soft-green';
+            case 'cancelada':     return 'soft-badge soft-rose';
+            case 'pendente':      return 'soft-badge soft-slate';
+            default:              return 'soft-badge soft-slate';
+        }
+    }
 
-    // Função para retornar a classe de status para o fundo  
-    function getStatusClassBackground(status_data) {  
-        switch (status_data) {  
-            case 'Prestes a vencer': return 'status-prestes-vencer';  
-            case 'Vencida': return 'status-vencida';  
-            default: return '';  
-        }  
-    }  
+    // Mapeia situação (prazo) para classes de badge (pastéis)
+    function getSituacaoBadgeClass(situacao) {
+        switch ((situacao || '').toLowerCase()) {
+            case 'prestes a vencer': return 'soft-badge soft-orange';
+            case 'vencida':          return 'soft-badge soft-red';
+            default:                 return 'soft-badge soft-slate';
+        }
+    }
 
-    // Função para criar tabelas HTML com as tarefas  
+    // Classe da linha para destaque de situação
+    function getRowClassBySituacao(situacao) {
+        switch ((situacao || '').toLowerCase()) {
+            case 'prestes a vencer': return 'row-quase-vencida';
+            case 'vencida':          return 'row-vencida';
+            default:                 return '';
+        }
+    }
+
+    // Função para criar tabelas HTML com as tarefas (usada em Novas e Pendentes)  
     function criarTabelaPorPrioridade(prioridade, tarefas) {  
         let tabela = `  
             <h6 class="mb-3 mt-4">Prioridade: ${prioridade}</h6>  
             <div class="table-responsive">  
-                <table class="table table-hover">  
+                <table class="table table-hover align-middle">  
                     <thead>  
                         <tr>  
                             <th>ID</th>  
@@ -1022,18 +481,21 @@ $(document).ready(function() {
 
         // Adiciona as tarefas à tabela  
         tarefas.forEach(tarefa => {  
-            const statusClassLabel = getStatusClassLabel(tarefa.status);  
-            const statusClassBackground = getStatusClassBackground(tarefa.status_data);  
-            
+            const statusClass = getStatusBadgeClass(tarefa.status);  
+            // Aceita 'status_data' OU 'situacao' (alguns endpoints podem enviar um dos dois)
+            const situacaoTexto = (tarefa.status_data || tarefa.situacao || '').trim();
+            const situacaoClass = situacaoTexto ? getSituacaoBadgeClass(situacaoTexto) : '';
+            const rowHighlight  = getRowClassBySituacao(situacaoTexto);
+
             tabela += `  
-                <tr>  
+                <tr class="${rowHighlight}">  
                     <td>${tarefa.id}</td>  
-                    <td>${limitarTexto(tarefa.titulo, 50)}</td>  
+                    <td>${limitarTexto(tarefa.titulo, 70)}</td>  
                     <td>${formatarDataBrasileira(tarefa.data_limite)}</td>  
-                    <td><span class="status-label ${statusClassLabel}">${capitalize(tarefa.status)}</span></td>  
-                    <td>${tarefa.status_data ? `<span class="status-label ${statusClassBackground}">${tarefa.status_data}</span>` : ''}</td>  
-                    <td>  
-                        <button class="btn btn-sm btn-info" onclick="window.location.href='tarefas/index_tarefa.php?token=${tarefa.token}'">  
+                    <td><span class="${statusClass}">${capitalize(tarefa.status || '') || '-'}</span></td>  
+                    <td>${situacaoTexto ? `<span class="${situacaoClass}">${situacaoTexto}</span>` : '-'}</td>  
+                    <td class="text-end">  
+                        <button class="btn btn-sm btn-info" title="Ver tarefa" onclick="window.location.href='tarefas/index_tarefa.php?token=${tarefa.token}'">  
                             <i class="fa fa-eye"></i>  
                         </button>  
                     </td>  
@@ -1110,7 +572,7 @@ $(document).ready(function() {
     // Carrega a ordem ao iniciar a página  
     loadCardOrder();  
 
-    // Carregar as tarefas pendentes  
+    // Carregar as tarefas pendentes e novas  
     $.ajax({  
         url: 'verificar_tarefas.php',  
         method: 'GET',  
@@ -1123,7 +585,7 @@ $(document).ready(function() {
 
             var totalTarefas = 0;  
 
-            // Exibir as novas tarefas  
+            // Exibir as novas tarefas (com situação corrigida)  
             $.each(response.novas_tarefas, function(funcionario, tarefasFuncionario) {  
                 $('#novas-tarefas-section').show();  
                 novasTarefasList.append(`<h6 class="fw-bold">${funcionario}</h6>`);  
@@ -1184,7 +646,7 @@ $(document).ready(function() {
         }  
     });  
 
-    // Alternar modo claro/escuro  
+    // Alternar modo claro/escuro (a classe no <body> é atualizada pelo menu também)
     $('.mode-switch').on('click', function() {  
         $('body').toggleClass('dark-mode light-mode');  
     });  
@@ -1283,10 +745,7 @@ $(function () {
 });
 
 
-
 });  
-
-
 </script>  
 
 <?php include(__DIR__ . '/rodape.php'); ?>  

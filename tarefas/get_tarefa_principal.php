@@ -1,5 +1,6 @@
 <?php
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 $id_tarefa_sub = $_GET['id_tarefa_sub']; // Recebe o ID da subtarefa
 

@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection2.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 // Verifique se a conexão está definida
 if (!isset($conn)) {
@@ -351,6 +352,75 @@ foreach ($ordem_servico_itens as $item) {
         .btn-receipt-a4:hover {
             background-color: #1C7BBE; /* Cor mais escura ao passar o mouse */
         }
+
+        /* ====== MODAIS MODERNOS (Pagamento & Anexos) ====== */
+.modal-modern .modal-content{
+  border-radius:16px;
+  border:1px solid #e5e7eb;
+  box-shadow:0 10px 25px rgba(16,24,40,.12);
+}
+.modal-modern .modal-header.modern{
+  background:linear-gradient(135deg, rgba(79,70,229,.08), rgba(99,102,241,.08));
+  border-bottom:1px solid #e5e7eb;
+  padding:14px 16px;
+}
+.modal-modern .md-title-icon{
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  background:#EEF2FF; color:#3730A3;
+}
+.modal-modern .btn-close.modern{
+  font-size:1.6rem; line-height:1; opacity:.65; border:0; background:transparent;
+}
+.modal-modern .btn-close.modern:hover{ opacity:1; transform:scale(1.04); }
+
+/* Largura responsiva dos diálogos */
+#pagamentoModal .modal-dialog{ max-width:min(900px,95vw); }
+#anexoModal     .modal-dialog{ max-width:min(800px,92vw); }
+
+/* Grid e cartões de resumo */
+.stats-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px; margin-bottom:10px;
+}
+.stat-card{
+  border:1px solid #e5e7eb; border-radius:12px;
+  padding:10px 12px; background:linear-gradient(180deg, rgba(148,163,184,.06), rgba(148,163,184,0));
+}
+.stat-label{
+  font-size:.78rem; color:#6b7280; font-weight:700; letter-spacing:.04em; text-transform:uppercase; margin-bottom:4px;
+}
+.stat-card .form-control{
+  border:0; background:transparent; padding:0; height:auto; font-weight:800; font-size:1.05rem;
+}
+
+/* Form grid */
+.form-grid{ display:grid; grid-template-columns:1fr; gap:12px; }
+@media(min-width:768px){ .form-grid{ grid-template-columns:1fr 1fr; } .grid-span-2{ grid-column:span 2; } }
+.input-group-text{ background:#f3f4f6; }
+
+/* Títulos internos */
+.section-title{ font-weight:800; margin:14px 0 8px; }
+
+/* Botões */
+.btn-modern{ border-radius:10px; }
+
+/* Tabela */
+.table-modern thead th{ background:#f9fafb; border-bottom:1px solid #e5e7eb; }
+
+/* Upload card (Anexos) */
+.upload-card{
+  display:flex; align-items:center; gap:12px;
+  border:1px dashed #c7d2fe; background:#f8fafc; border-radius:12px; padding:14px;
+}
+.upload-card i{ font-size:22px; color:#3730A3; }
+
+/* Custom file (Anexos) */
+#anexoModal .custom-file-label{
+  border:1px solid #c7d2fe; background:#eef2ff; color:#3730A3; border-radius:8px;
+}
+#anexoModal .custom-file-input{ cursor:pointer; }
+
     </style>
 </head>
 <body>
@@ -368,12 +438,16 @@ include(__DIR__ . '/../menu.php');
                     </button>
                 </div>
                 <div class="col-auto">
-                    <button type="button" class="btn btn-info2 btn-print btn-sm w-100" onclick="imprimirRecibo()">
+                    <button type="button" class="btn btn-info2 btn-print btn-sm w-100"
+                            onclick="imprimirRecibo()"
+                            <?php echo ($total_pagamentos <= 0) ? 'disabled' : ''; ?>>
                         <i class="fa fa-print" aria-hidden="true"></i> Recibo
                     </button>
                 </div>
                 <div class="col-auto">
-                    <button type="button" class="btn btn-receipt-a4 btn-print btn-sm w-100" onclick="imprimirReciboA4()">
+                    <button type="button" class="btn btn-receipt-a4 btn-print btn-sm w-100"
+                            onclick="imprimirReciboA4()"
+                            <?php echo ($total_pagamentos <= 0) ? 'disabled' : ''; ?>>
                         <i class="fa fa-print" aria-hidden="true"></i> Recibo A4
                     </button>
                 </div>
@@ -527,8 +601,8 @@ include(__DIR__ . '/../menu.php');
                     Liquidar Tudo
                 </button>
             </div>
-
-            <table id="tabelaItensOS" class="table table-striped table-bordered" style="zoom: 80%">
+            <div class="table-responsive">
+            <table id="tabelaItensOS" class="table table-striped table-bordered" style="zoom: 90%">
                 <thead>
                     <tr>
                         <th>#</th>
@@ -586,145 +660,152 @@ include(__DIR__ . '/../menu.php');
                     <?php endforeach; ?>
                 </tbody>
             </table>
-        </div>
+        </div></div>
     </div>
 </div>
 
-<!-- Modal de Pagamento -->
+<!-- Modal de Pagamento (UI/UX moderno) -->
 <div class="modal fade" id="pagamentoModal" tabindex="-1" role="dialog" aria-labelledby="pagamentoModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document" style="max-width: 60%">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="pagamentoModalLabel">Efetuar Pagamento</h5>
-                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                    &times;
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="total_os_modal">Valor Total da OS</label>
-                    <input type="text" class="form-control" id="total_os_modal" value="<?php echo 'R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.'); ?>" readonly>
-                </div>
-                <div class="form-row">
-                    <div class="form-group col-md-6">
-                        <label for="forma_pagamento">Forma de Pagamento</label>
-                        <select class="form-control" id="forma_pagamento">
-                            <option value="">Selecione</option>
-                            <option value="Espécie">Espécie</option>
-                            <option value="Crédito">Crédito</option>
-                            <option value="Débito">Débito</option>
-                            <option value="PIX">PIX</option>
-                            <option value="Centrais Eletrônicas">Centrais Eletrônicas</option>
-                            <option value="Transferência Bancária">Transferência Bancária</option>
-                            <option value="Boleto">Boleto</option>
-                            <option value="Cheque">Cheque</option>
-                        </select>
-                    </div>
-                    <div class="form-group col-md-6">
-                        <label for="valor_pagamento">Valor do Pagamento</label>
-                        <input type="text" class="form-control" id="valor_pagamento">
-                    </div>
-                </div>
-                <button type="button" id="btnAdicionarPagamento" class="btn btn-primary w-100" onclick="adicionarPagamento()">Adicionar</button>
-                <hr>
-                <div class="form-row">
-                    <?php if ($total_pagamentos > 0): ?>
-                        <div class="form-group col-md-3">
-                            <label for="total_pagamento_modal">Valor Pago</label>
-                            <input type="text" class="form-control" id="total_pagamento_modal" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if ($total_liquidado > 0): ?>
-                        <div class="form-group col-md-3">
-                            <label for="valor_liquidado_modal">Valor Liquidado</label>
-                            <input type="text" class="form-control" id="valor_liquidado_modal" value="<?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?>" readonly>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if ($saldo != 0): ?>
-                        <div class="form-group col-md-3">
-                            <label for="saldo_modal">Saldo</label>
-                            <input type="text" class="form-control" id="saldo_modal" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if ($total_devolucoes > 0): ?>
-                        <div class="form-group col-md-3">
-                            <label for="valor_devolvido_modal">Valor Devolvido</label>
-                            <input type="text" class="form-control" id="valor_devolvido_modal" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if ($total_repasses > 0): ?>
-                        <div class="form-group col-md-3">
-                            <label for="total_repasses_modal">Repasse Credor</label>
-                            <input type="text" class="form-control" id="total_repasses_modal" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-                
-                <div class="form-row">
-                    <?php if ($saldo > 0.01 && $has_ato_17): ?>
-                        <div class="<?php echo ($saldo > 0.01) ? 'col-md-6' : 'col-12'; ?>">
-                            <button type="button" class="btn btn-warning w-100" onclick="abrirRepasseModal()">Repasse Credor</button>
-                        </div>
-                    <?php endif; ?>
-
-                    <?php if ($saldo > 0.01): ?>
-                        <div class="<?php echo ($has_ato_17) ? 'col-md-6' : 'col-12'; ?>">
-                            <button type="button" class="btn btn-warning w-100" onclick="abrirDevolucaoModal()">Devolver valores</button>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-                    <hr>
-                <div class="table-responsive">
-                    <h5>Pagamentos Adicionados</h5>
-                    <table id="tabelaIPagamentoOS" class="table table-striped table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Forma de Pagamento</th>
-                                    <th>Valor</th>
-                                    <th>Data Pagamento</th>
-                                    <th>Funcionário</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pagamentosTable">
-                                <!-- Pagamentos adicionados serão listados aqui -->
-                                <?php foreach ($pagamentos as $pagamento):
-                                    // transforma o DATETIME em formato brasileiro
-                                    $dataPagtoBr = date('d/m/Y H:i', strtotime($pagamento['data_pagamento']));
-                                    // só habilita exclusão se HOJE e se não há atos liquidados
-                                    $isToday   = (date('Y-m-d', strtotime($pagamento['data_pagamento'])) === date('Y-m-d'));
-                                    $canDelete = !$has_liquidated && $isToday;
-                                ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($pagamento['forma_de_pagamento']); ?></td>
-                                    <td><?php echo 'R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.'); ?></td>
-                                    <td><?php echo $dataPagtoBr; ?></td>
-                                    <td><?php echo htmlspecialchars($pagamento['funcionario']); ?></td>
-                                    <td>
-                                        <?php if ($canDelete): ?>
-                                            <button type="button" title="Remover" class="btn btn-delete btn-sm"
-                                                onclick="confirmarRemocaoPagamento(<?php echo $pagamento['id']; ?>)">
-                                                <i class="fa fa-trash" aria-hidden="true"></i>
-                                            </button>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-            </div>
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-modern" role="document">
+    <div class="modal-content">
+      <div class="modal-header modern">
+        <div class="d-flex align-items-center">
+          <span class="md-title-icon mr-2"><i class="fa fa-money"></i></span>
+          <h5 class="modal-title m-0" id="pagamentoModalLabel">Efetuar Pagamento</h5>
         </div>
+        <button type="button" class="btn-close modern" data-dismiss="modal" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- KPIs / Resumo -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Valor Total da OS</div>
+            <input type="text" class="form-control" id="total_os_modal" value="<?php echo 'R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.'); ?>" readonly>
+          </div>
+
+          <?php if ($total_pagamentos > 0): ?>
+          <div class="stat-card">
+            <div class="stat-label">Valor Pago</div>
+            <input type="text" class="form-control" id="total_pagamento_modal" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
+          </div>
+          <?php endif; ?>
+
+          <?php if ($total_liquidado > 0): ?>
+          <div class="stat-card">
+            <div class="stat-label">Valor Liquidado</div>
+            <input type="text" class="form-control" id="valor_liquidado_modal" value="<?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?>" readonly>
+          </div>
+          <?php endif; ?>
+
+          <?php if ($saldo != 0): ?>
+          <div class="stat-card">
+            <div class="stat-label">Saldo</div>
+            <input type="text" class="form-control" id="saldo_modal" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>
+          </div>
+          <?php endif; ?>
+
+          <?php if ($total_devolucoes > 0): ?>
+          <div class="stat-card">
+            <div class="stat-label">Valor Devolvido</div>
+            <input type="text" class="form-control" id="valor_devolvido_modal" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
+          </div>
+          <?php endif; ?>
+
+          <?php if ($total_repasses > 0): ?>
+          <div class="stat-card">
+            <div class="stat-label">Repasse Credor</div>
+            <input type="text" class="form-control" id="total_repasses_modal" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>
+          </div>
+          <?php endif; ?>
+        </div>
+
+        <h6 class="section-title">Adicionar pagamento</h6>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="forma_pagamento">Forma de Pagamento</label>
+            <select class="form-control" id="forma_pagamento">
+              <option value="">Selecione</option>
+              <option value="Espécie">Espécie</option>
+              <option value="Crédito">Crédito</option>
+              <option value="Débito">Débito</option>
+              <option value="PIX">PIX</option>
+              <option value="Centrais Eletrônicas">Centrais Eletrônicas</option>
+              <option value="Transferência Bancária">Transferência Bancária</option>
+              <option value="Boleto">Boleto</option>
+              <option value="Cheque">Cheque</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="valor_pagamento">Valor do Pagamento</label>
+            <div class="input-group">
+              <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+              <input type="text" class="form-control" id="valor_pagamento">
+            </div>
+          </div>
+
+          <div class="grid-span-2">
+            <button type="button" id="btnAdicionarPagamento" class="btn btn-primary btn-modern w-100" onclick="adicionarPagamento()">
+              <i class="fa fa-plus"></i> Adicionar
+            </button>
+          </div>
+        </div>
+
+        <?php if ($saldo > 0.01 || $has_ato_17): ?>
+        <h6 class="section-title">Ações rápidas</h6>
+        <div class="form-grid">
+          <?php if ($saldo > 0.01 && $has_ato_17): ?>
+            <button type="button" class="btn btn-warning w-100" onclick="abrirRepasseModal()">Repasse Credor</button>
+          <?php endif; ?>
+          <?php if ($saldo > 0.01): ?>
+            <button type="button" class="btn btn-warning w-100" onclick="abrirDevolucaoModal()">Devolver valores</button>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <h6 class="section-title">Pagamentos adicionados</h6>
+        <div class="table-responsive">
+          <table id="tabelaIPagamentoOS" class="table table-striped table-bordered table-modern">
+            <thead>
+              <tr>
+                <th>Forma de Pagamento</th>
+                <th>Valor</th>
+                <th>Data Pagamento</th>
+                <th>Funcionário</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="pagamentosTable">
+              <?php foreach ($pagamentos as $pagamento):
+                $dataPagtoBr = date('d/m/Y H:i', strtotime($pagamento['data_pagamento']));
+                $isToday   = (date('Y-m-d', strtotime($pagamento['data_pagamento'])) === date('Y-m-d'));
+                $canDelete = !$has_liquidated && $isToday;
+              ?>
+              <tr>
+                <td><?php echo htmlspecialchars($pagamento['forma_de_pagamento']); ?></td>
+                <td><?php echo 'R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.'); ?></td>
+                <td><?php echo $dataPagtoBr; ?></td>
+                <td><?php echo htmlspecialchars($pagamento['funcionario']); ?></td>
+                <td>
+                  <?php if ($canDelete): ?>
+                    <button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(<?php echo $pagamento['id']; ?>)">
+                      <i class="fa fa-trash" aria-hidden="true"></i>
+                    </button>
+                  <?php endif; ?>
+                </td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+      </div>
     </div>
+  </div>
 </div>
 
 <!-- Modal de Repasse -->
@@ -929,46 +1010,59 @@ include(__DIR__ . '/../menu.php');
     </div>
 </div>
 
-<!-- Modal de Anexos -->
+<!-- Modal de Anexos (UI/UX moderno) -->
 <div class="modal fade" id="anexoModal" tabindex="-1" role="dialog" aria-labelledby="anexoModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 30%">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="anexoModalLabel">Anexos</h5>
-                <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                    &times;
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="formAnexos" enctype="multipart/form-data">
-                    <div class="custom-file mb-3">
-                        <input type="file" class="custom-file-input" id="novo_anexo" name="novo_anexo[]" multiple>
-                        <label class="custom-file-label" for="novo_anexo">Selecione os arquivos para anexar</label>
-                    </div>
-                    <button type="button" style="width: 100%" class="btn btn-success" onclick="salvarAnexo()"><i class="fa fa-paperclip" aria-hidden="true"></i> Anexar</button>
-                </form>
-                <hr>
-                <div class="table-responsive">
-                    <h5>Anexos Adicionados</h5>
-                    <table id="anexosTable" class="table table-striped table-bordered">
-                        <thead>
-                            <tr>
-                                <th style="width: 85%">Anexo</th>
-                                <th style="width: 15%">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- O conteúdo será preenchido pelo JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-            </div>
+  <div class="modal-dialog modal-dialog-centered modal-modern" role="document">
+    <div class="modal-content">
+      <div class="modal-header modern">
+        <div class="d-flex align-items-center">
+          <span class="md-title-icon mr-2"><i class="fa fa-paperclip"></i></span>
+          <h5 class="modal-title m-0" id="anexoModalLabel">Anexos</h5>
         </div>
+        <button type="button" class="btn-close modern" data-dismiss="modal" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formAnexos" enctype="multipart/form-data">
+          <div class="upload-card mb-2">
+            <i class="fa fa-cloud-upload" aria-hidden="true"></i>
+            <div>
+              <strong>Enviar anexos</strong><br>
+              <small class="text-muted">Selecione um ou mais arquivos para anexar à OS.</small>
+            </div>
+          </div>
+
+          <div class="custom-file mb-2">
+            <input type="file" class="custom-file-input" id="novo_anexo" name="novo_anexo[]" multiple>
+            <label class="custom-file-label" for="novo_anexo">Clique para escolher os arquivos</label>
+          </div>
+
+          <button type="button" class="btn btn-success btn-modern w-100" onclick="salvarAnexo()">
+            <i class="fa fa-paperclip" aria-hidden="true"></i> Anexar
+          </button>
+        </form>
+
+        <hr class="my-3">
+
+        <h6 class="section-title">Anexos adicionados</h6>
+        <div class="table-responsive">
+          <table id="anexosTable" class="table table-striped table-bordered table-modern">
+            <thead>
+              <tr>
+                <th style="width:85%">Anexo</th>
+                <th style="width:15%">Ações</th>
+              </tr>
+            </thead>
+            <tbody><!-- preenchido via JS --></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+      </div>
     </div>
+  </div>
 </div>
 
 <script src="../script/jquery-3.5.1.min.js"></script>
@@ -1059,13 +1153,14 @@ include(__DIR__ . '/../menu.php');
 
 
     function imprimirRecibo() {
+        if (<?php echo (float)$total_pagamentos; ?> <= 0) return; 
         window.open('recibo.php?id=<?php echo $os_id; ?>', '_blank');
     }
 
     function imprimirReciboA4() {
+        if (<?php echo (float)$total_pagamentos; ?> <= 0) return; 
         window.open('recibo_a4.php?id=<?php echo $os_id; ?>', '_blank');
     }
-
 
     function editarOS() {
         window.location.href = 'editar_os.php?id=<?php echo $os_id; ?>';
@@ -1074,7 +1169,7 @@ include(__DIR__ . '/../menu.php');
     // Função para adicionar pagamento
     function adicionarPagamento() {
         const addBtn = $('#btnAdicionarPagamento');
-        addBtn.prop('disabled', true);            // desabilita assim que clicar
+        addBtn.prop('disabled', true);           
 
         var formaPagamento  = $('#forma_pagamento').val();
         var valorPagamento  = parseFloat($('#valor_pagamento').val().replace('.', '').replace(',', '.'));

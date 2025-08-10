@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -16,207 +17,7 @@ include(__DIR__ . '/db_connection.php');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
-    <style>
-        .btn-4 {
-            background: #34495e;
-            color: #fff;
-        }
-        
-        .btn-close {
-            outline: none; 
-            border: none; 
-            background: none;
-            padding: 0; 
-            font-size: 1.5rem;
-            cursor: pointer; 
-            transition: transform 0.2s ease;
-        }
-
-        .btn-close:hover {
-            transform: scale(2.10); 
-        }
-
-        .btn-close:focus {
-            outline: none;
-        }
-        .btn-adicionar {
-            height: 38px;
-            line-height: 24px;
-            margin-left: 10px;
-        }
-
-        .modal-content {
-            border-radius: 10px;
-        }
-        body.light-mode .modal-content {
-            background-color: #e3f6ff!important;
-        }
-
-        .modal-dialog {
-            max-width: 80%;
-            margin: 1.75rem auto;
-        }
-
-        .modal-header {
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-        }
-
-        .modal-footer {
-            border-top: none;
-        }
-
-        .modal-header.error {
-            background-color: #dc3545;
-            color: white;
-        }
-
-        .modal-header.success {
-            background-color: #28a745;
-            color: white;
-        }
-
-        .custom-file-input ~ .custom-file-label::after {
-            content: "Escolher";
-        }
-
-        .custom-file-label {
-            border-radius: 0.25rem;
-            padding: 0.5rem 1rem;
-            background-color: #fff;
-            color: #777;
-            cursor: pointer;
-        }
-
-        .custom-file-input:focus ~ .custom-file-label {
-            outline: -webkit-focus-ring-color auto 1px;
-            outline-offset: -2px;
-        }
-
-        .toast {
-            min-width: 250px;
-            margin-top: 0px;
-        }
-
-        .toast .toast-header {
-            color: #fff;
-        }
-
-        .toast .bg-success {
-            background-color: #28a745 !important;
-        }
-
-        .toast .bg-danger {
-            background-color: #dc3545 !important;
-        }
-
-        .btn-delete {
-            margin-bottom: 5px!important;
-        }
-
-        .status-label {
-            padding: 5px 10px;
-            border-radius: 5px;
-            color: white;
-            display: inline-block;
-        }
-
-        .status-pendente {
-            background-color: #dc3545;
-            width: 75px;
-            text-align: center;
-        }
-
-        .status-parcialmente {
-            background-color: #ffc107;
-            width: 75px;
-            text-align: center;
-        }
-
-        .status-liquidado {
-            background-color: #28a745;
-            width: 75px;
-            text-align: center;
-        }
-
-        .total-label {
-            font-weight: bold;
-            text-align: center;
-        }
-
-        .table-title {
-            /* text-align: center;
-            font-weight: bold; */
-        }
-
-        .card-title {
-            font-size: 1.25rem;
-        }
-
-        .card-title2 {
-            font-size: 1.1rem;
-        }
-
-        .bg-warning {
-            background-color: #ff8e07 !important;
-        }
-
-        .modal-deposito-caixa {
-            max-width: 60%;
-            margin: auto;
-        }
-
-        .modal-deposito-caixa-unificado {
-            max-width: 60%;
-            margin: auto;
-        }
-        
-        .modal-abrir-caixa {
-            max-width: 25%;
-            margin: auto;
-        }
-
-        .modal-saidas {
-            max-width: 60%;
-            margin: auto;
-        }
-
-        .btn-success {
-            width: 40px;
-            height: 40px;
-            margin-bottom: 5px;  
-        }
-        
-        .btn-success:hover {
-            color: #212529;
-        } 
-        
-        /* Estilo para o modo dark */
-        body.dark-mode .card.bg-dark {
-            background-color: #f8f9fa !important;
-            color: #777 !important;
-        }
-
-        body.dark-mode .card.bg-dark .card-header,
-        body.dark-mode .card.bg-dark .card-body,
-        body.dark-mode .card.bg-dark .card-title {
-            color: #777 !important;
-        }
-
-        /* Azul petróleo */
-        .bg-petroleo {
-            background-color: #004d61 !important; /* azul petróleo */
-            color: white;
-        }
-
-        /* Modo dark */
-        body.dark-mode .bg-petroleo {
-            background-color: #cfe9f1 !important; /* tom claro para contraste */
-            color: #212529 !important;
-        }
-
-
-    </style>
+    <?php include(__DIR__ . '/../style/style_caixa.php'); ?>  
 </head>
 
 <body class="light-mode">
@@ -245,16 +46,31 @@ include(__DIR__ . '/db_connection.php');
     // Verifica se o nível de acesso é "usuario" e se tem o acesso adicional "Fluxo de Caixa"
     if ($user['nivel_de_acesso'] === 'usuario' && !empty($user['acesso_adicional'])) {
         $acessosAdicionais = explode(',', $user['acesso_adicional']);
-        $acessosAdicionais = array_map('trim', $acessosAdicionais); // Remove espaços extras
+        $acessosAdicionais = array_map('trim', $acessosAdicionais); 
         if (in_array('Fluxo de Caixa', $acessosAdicionais)) {
             $temAcessoFluxoDeCaixa = true;
         }
     }
+
+    // ===== NOVO: Período rápido (default: hoje) =====
+    $selectedPeriodo = isset($_GET['periodo']) ? $_GET['periodo'] : 'hoje';
+    $hoje = date('Y-m-d');
+    $ultimo7 = date('Y-m-d', strtotime('-6 days')); 
+    $ultimo30 = date('Y-m-d', strtotime('-30 days')); 
     ?>
 
     <div id="main" class="main-content">
         <div class="container">
-            <h3>Pesquisar Controle de Caixa</h3>
+            <section class="page-hero">
+                <div class="title-row">
+                    <div class="title-icon"><i class="fa fa-university" aria-hidden="true"></i></div>
+                    <div class="title-texts">
+                        <h1>Pesquisar Fluxo de Caixa</h1>
+                        <div class="subtitle muted">Consulta do fluxo diário com filtros por funcionário, período rápido e intervalo de datas — e ações rápidas.</div>
+                    </div>
+                </div>
+            </section>
+
             <hr>
             <form id="pesquisarForm" method="GET">
                 <div class="form-row">
@@ -262,8 +78,8 @@ include(__DIR__ . '/db_connection.php');
                         <label for="funcionario">Funcionário:</label>
                         <select class="form-control" id="funcionario" name="funcionario" <?php echo $user['nivel_de_acesso'] === 'usuario' && !$temAcessoFluxoDeCaixa ? 'disabled' : ''; ?>>
                             <?php if ($user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxoDeCaixa) { ?>
-                                <option value="todos">Todos</option>
-                                <option value="caixa_unificado">Caixa Unificado</option>
+                                <option value="todos" <?php echo (isset($_GET['funcionario']) && $_GET['funcionario']=='todos') ? 'selected' : '' ?>>Todos</option>
+                                <option value="caixa_unificado" <?php echo (isset($_GET['funcionario']) && $_GET['funcionario']=='caixa_unificado') ? 'selected' : '' ?>>Caixa Unificado</option>
                             <?php } ?>
                             <?php
                             // Definir a query de acordo com o nível de acesso ou o acesso adicional
@@ -281,460 +97,475 @@ include(__DIR__ . '/db_connection.php');
                             $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             
                             foreach ($funcionarios as $funcionario) {
-                                echo '<option value="' . $funcionario['usuario'] . '">' . $funcionario['nome_completo'] . '</option>';
+                                $sel = (isset($_GET['funcionario']) && $_GET['funcionario']==$funcionario['usuario']) ? 'selected' : '';
+                                echo '<option value="' . $funcionario['usuario'] . '" '.$sel.'>' . $funcionario['nome_completo'] . '</option>';
                             }
                             ?>
                         </select>
                     </div>
+
+                    <!-- NOVO: Filtro secundário de período -->
                     <div class="form-group col-md-4">
-                        <label for="data_inicial">Data Inicial:</label>
-                        <input type="date" class="form-control" id="data_inicial" name="data_inicial">
+                        <label for="periodo">Período Rápido:</label>
+                        <select class="form-control" id="periodo" name="periodo">
+                            <option value="hoje" <?php echo $selectedPeriodo==='hoje'?'selected':''; ?>>Hoje</option>
+                            <option value="ultimos7" <?php echo $selectedPeriodo==='ultimos7'?'selected':''; ?>>Últimos 7 dias</option>
+                            <option value="ultimoMes" <?php echo $selectedPeriodo==='ultimoMes'?'selected':''; ?>>Último mês (30 dias)</option>
+                            <option value="todos" <?php echo $selectedPeriodo==='todos'?'selected':''; ?>>Todos</option>
+                        </select>
+                        <small class="text-muted">Dica: escolher um período aqui preenche as datas abaixo.</small>
                     </div>
-                    <div class="form-group col-md-4">
+
+                    <div class="form-group col-md-2">
+                        <label for="data_inicial">Data Inicial:</label>
+                        <input type="date" class="form-control" id="data_inicial" name="data_inicial" value="<?php echo isset($_GET['data_inicial'])?htmlspecialchars($_GET['data_inicial']):''; ?>">
+                    </div>
+                    <div class="form-group col-md-2">
                         <label for="data_final">Data Final:</label>
-                        <input type="date" class="form-control" id="data_final" name="data_final">
+                        <input type="date" class="form-control" id="data_final" name="data_final" value="<?php echo isset($_GET['data_final'])?htmlspecialchars($_GET['data_final']):''; ?>">
                     </div>
                 </div>
+
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <button type="submit" style="width: 100%;" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
+                        <button type="submit" style="width: 100%;" class="btn btn-primary">
+                            <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
+                        </button>
                     </div>
                     <div class="col-md-6">
-                        <button type="button" style="width: 100%;" class="btn btn-secondary" onclick="window.location.href='../os/index.php'"><i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS</button>
+                        <button type="button" style="width: 100%;" class="btn btn-secondary" onclick="window.location.href='../os/index.php'">
+                            <i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS
+                        </button>
                     </div>
                 </div>
             </form>
             <hr>
-            <div class="table-responsive">
-                <h5>Resultados da Pesquisa</h5>
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
-                    <thead>
-                        <tr>
-                            <th>Funcionário</th>
-                            <th>Data</th>
-                            <th class="saldoInicialColumn">Saldo Inicial</th>
-                            <th>Atos Liquidados</th>
-                            <th>Recebido em Conta</th>
-                            <th>Recebido em Espécie</th>
-                            <th>Devoluções</th>
-                            <th>Saídas e Despesas</th>
-                            <th>Depósito do Caixa</th>
-                            <th class="totalEmCaixaColumn">Total em Caixa</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $conditions = [];
-                        $params = [];
-                        $filtered = false;
-                        $isUnificado = false;
 
-                        // Verifica se o usuário é "administrador" ou se tem acesso adicional para "Fluxo de Caixa"
-                        $temAcessoCompleto = ($user['nivel_de_acesso'] === 'administrador' || in_array('Fluxo de Caixa', explode(',', $user['acesso_adicional'])));
+            <h5>Resultados da Pesquisa</h5>
+            <div id="cardsResultados" class="row cards-wrap">
+                <?php
+                $conditions = [];
+                $params = [];
+                $filtered = false;
+                $isUnificado = false;
 
-                        if (isset($_GET['funcionario']) && $_GET['funcionario'] !== 'todos' && $_GET['funcionario'] !== 'caixa_unificado') {
-                            // Se um funcionário específico foi selecionado
-                            $conditions[] = 'funcionario = :funcionario';
-                            $params[':funcionario'] = $_GET['funcionario'];
-                            $filtered = true;
-                        } elseif ($temAcessoCompleto) {
-                            // Se o usuário tem acesso completo (administrador ou Fluxo de Caixa), ele pode ver todos os caixas
-                            // Não há filtro de funcionário, o usuário pode visualizar todos os funcionários
-                            if (isset($_GET['funcionario']) && $_GET['funcionario'] === 'caixa_unificado') {
-                                $isUnificado = true;
-                            }
-                        } else {
-                            $conditions[] = 'funcionario = :funcionario';
-                            $params[':funcionario'] = $user['usuario'];
-                            $filtered = true;
+                // Verifica se o usuário é "administrador" ou se tem acesso adicional para "Fluxo de Caixa"
+                $temAcessoCompleto = ($user['nivel_de_acesso'] === 'administrador' || in_array('Fluxo de Caixa', explode(',', $user['acesso_adicional'])));
+
+                if (isset($_GET['funcionario']) && $_GET['funcionario'] !== 'todos' && $_GET['funcionario'] !== 'caixa_unificado') {
+                    // Funcionário específico
+                    $conditions[] = 'funcionario = :funcionario';
+                    $params[':funcionario'] = $_GET['funcionario'];
+                    $filtered = true;
+                } elseif ($temAcessoCompleto) {
+                    // Pode ver todos (inclui opção unificado)
+                    if (isset($_GET['funcionario']) && $_GET['funcionario'] === 'caixa_unificado') {
+                        $isUnificado = true;
+                    }
+                } else {
+                    $conditions[] = 'funcionario = :funcionario';
+                    $params[':funcionario'] = $user['usuario'];
+                    $filtered = true;
+                }
+
+                // ===== Datas: se o usuário informou intervalo manual, usa-o; caso contrário, aplica o "período" rápido
+                $temIntervaloManual = (!empty($_GET['data_inicial']) || !empty($_GET['data_final']));
+
+                if ($temIntervaloManual) {
+                    if (!empty($_GET['data_inicial']) && !empty($_GET['data_final'])) {
+                        $conditions[] = 'DATE(data) BETWEEN :data_inicial AND :data_final';
+                        $params[':data_inicial'] = $_GET['data_inicial'];
+                        $params[':data_final'] = $_GET['data_final'];
+                        $filtered = true;
+                    } elseif (!empty($_GET['data_inicial'])) {
+                        $conditions[] = 'DATE(data) >= :data_inicial';
+                        $params[':data_inicial'] = $_GET['data_inicial'];
+                        $filtered = true;
+                    } elseif (!empty($_GET['data_final'])) {
+                        $conditions[] = 'DATE(data) <= :data_final';
+                        $params[':data_final'] = $_GET['data_final'];
+                        $filtered = true;
+                    }
+                } else {
+                    // Aplica período rápido (default hoje)
+                    if ($selectedPeriodo === 'hoje') {
+                        $conditions[] = 'DATE(data) = :hoje';
+                        $params[':hoje'] = $hoje;
+                        $filtered = true;
+                    } elseif ($selectedPeriodo === 'ultimos7') {
+                        $conditions[] = 'DATE(data) BETWEEN :ini7 AND :fim7';
+                        $params[':ini7'] = $ultimo7;
+                        $params[':fim7'] = $hoje;
+                        $filtered = true;
+                    } elseif ($selectedPeriodo === 'ultimoMes') {
+                        $conditions[] = 'DATE(data) BETWEEN :ini30 AND :fim30';
+                        $params[':ini30'] = $ultimo30;
+                        $params[':fim30'] = $hoje;
+                        $filtered = true;
+                    } else {
+                        // "todos": sem restrição adicional de data
+                    }
+                }
+
+                if ($isUnificado) {
+                    $sql = 'SELECT 
+                                GROUP_CONCAT(DISTINCT funcionario SEPARATOR ", ") as funcionarios, 
+                                DATE(data) as data,
+                                SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
+                                SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
+                                SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
+                                SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
+                                SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos
+                            FROM (
+                                SELECT funcionario, data, "ato" as tipo, total 
+                                FROM atos_liquidados
+                                UNION ALL
+                                SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
+                                FROM pagamento_os
+                                UNION ALL
+                                SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
+                                FROM devolucao_os
+                                UNION ALL
+                                SELECT funcionario, data, "saida" as tipo, valor_saida as total
+                                FROM saidas_despesas WHERE status = "ativo"
+                                UNION ALL
+                                SELECT funcionario, data_caixa as data, "deposito" as tipo, valor_do_deposito as total
+                                FROM deposito_caixa WHERE status = "ativo"
+                                UNION ALL
+                                SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
+                                FROM caixa WHERE status = "aberto"
+                            ) as fluxos';
+                    if ($conditions) {
+                        $sql .= ' WHERE ' . implode(' AND ', $conditions);
+                    }
+                    $sql .= ' GROUP BY DATE(data)';
+                } else {
+                    $sql = 'SELECT 
+                                funcionario, 
+                                DATE(data) as data,
+                                SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
+                                SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
+                                SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
+                                SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
+                                SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos,
+                                SUM(CASE WHEN tipo = "caixa" THEN total ELSE 0 END) as saldo_inicial
+                            FROM (
+                                SELECT funcionario, data, "ato" as tipo, total 
+                                FROM atos_liquidados
+                                UNION ALL
+                                SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
+                                FROM pagamento_os
+                                UNION ALL
+                                SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
+                                FROM devolucao_os
+                                UNION ALL
+                                SELECT funcionario, data, "saida" as tipo, valor_saida as total
+                                FROM saidas_despesas WHERE status = "ativo"
+                                UNION ALL
+                                SELECT funcionario, data_caixa as data, "deposito" as tipo, valor_do_deposito as total
+                                FROM deposito_caixa WHERE status = "ativo"
+                                UNION ALL
+                                SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
+                                FROM caixa WHERE status = "aberto"
+                            ) as fluxos';
+                    if ($conditions) {
+                        $sql .= ' WHERE ' . implode(' AND ', $conditions);
+                    }
+                    $sql .= ' GROUP BY funcionario, DATE(data)';
+                }
+
+                $sql .= $filtered ? ' ORDER BY DATE(data) DESC' : ' ORDER BY DATE(data) DESC LIMIT 50';
+
+                $stmt = $conn->prepare($sql);
+                foreach ($params as $key => $value) {
+                    $stmt->bindValue($key, $value);
+                }
+                $stmt->execute();
+                $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($resultados as $resultado) {
+                    $funcionariosList = $isUnificado ? $resultado['funcionarios'] : $resultado['funcionario'];
+                    $data = $resultado['data'];
+                    $total_atos = $resultado['total_atos'];
+                    $total_pagamentos = $resultado['total_pagamentos'];
+                    $total_devolucoes = $resultado['total_devolucoes'];
+                    $total_saidas = $resultado['total_saidas'];
+                    $total_depositos = $resultado['total_depositos'];
+                    $saldo_inicial_sum = isset($resultado['saldo_inicial']) ? $resultado['saldo_inicial'] : 0.0;
+
+                    // Calcula Conta/Espécie/Devolvido em espécie
+                    $stmtInner = $conn->prepare('SELECT forma_de_pagamento, total_pagamento FROM pagamento_os WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_pagamento) = :data');
+                    if (!$isUnificado) { $stmtInner->bindParam(':funcionario', $funcionariosList); }
+                    $stmtInner->bindParam(':data', $data);
+                    $stmtInner->execute();
+                    $pagamentos = $stmtInner->fetchAll(PDO::FETCH_ASSOC);
+
+                    $totalRecebidoConta = 0;
+                    $totalRecebidoEspecie = 0;
+                    foreach ($pagamentos as $pg) {
+                        if (in_array($pg['forma_de_pagamento'], ['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'])) {
+                            $totalRecebidoConta += $pg['total_pagamento'];
+                        } else if ($pg['forma_de_pagamento'] === 'Espécie') {
+                            $totalRecebidoEspecie += $pg['total_pagamento'];
                         }
-                        
+                    }
 
-                        if (!empty($_GET['data_inicial']) && !empty($_GET['data_final'])) {
-                            $conditions[] = 'DATE(data) BETWEEN :data_inicial AND :data_final';
-                            $params[':data_inicial'] = $_GET['data_inicial'];
-                            $params[':data_final'] = $_GET['data_final'];
-                            $filtered = true;
-                        } elseif (!empty($_GET['data_inicial'])) {
-                            $conditions[] = 'DATE(data) >= :data_inicial';
-                            $params[':data_inicial'] = $_GET['data_inicial'];
-                            $filtered = true;
-                        } elseif (!empty($_GET['data_final'])) {
-                            $conditions[] = 'DATE(data) <= :data_final';
-                            $params[':data_final'] = $_GET['data_final'];
-                            $filtered = true;
+                    $stmtInner = $conn->prepare('SELECT forma_devolucao, total_devolucao FROM devolucao_os WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_devolucao) = :data');
+                    if (!$isUnificado) { $stmtInner->bindParam(':funcionario', $funcionariosList); }
+                    $stmtInner->bindParam(':data', $data);
+                    $stmtInner->execute();
+                    $devolucoes = $stmtInner->fetchAll(PDO::FETCH_ASSOC);
+
+                    $totalDevolvidoEspecie = 0;
+                    foreach ($devolucoes as $dv) {
+                        if ($dv['forma_devolucao'] === 'Espécie') {
+                            $totalDevolvidoEspecie += $dv['total_devolucao'];
                         }
+                    }
 
-                        // Condição adicional para incluir caixas abertos
-                        $sqlCaixaAberto = "SELECT funcionario, DATE(data_caixa) as data, saldo_inicial 
-                                           FROM caixa 
-                                           WHERE status = 'aberto'";
-                        if ($conditions) {
-                            $sqlCaixaAberto .= ' AND ' . implode(' AND ', $conditions);
+                    // Depósitos do Caixa
+                    $stmtInner = $conn->prepare('SELECT valor_do_deposito FROM deposito_caixa WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_caixa) = :data AND status = "ativo"');
+                    if (!$isUnificado) { $stmtInner->bindParam(':funcionario', $funcionariosList); }
+                    $stmtInner->bindParam(':data', $data);
+                    $stmtInner->execute();
+                    $depositosArr = $stmtInner->fetchAll(PDO::FETCH_ASSOC);
+                    $totalDepositoCaixa = array_reduce($depositosArr, function($carry, $item){ return $carry + $item['valor_do_deposito']; }, 0);
+
+                    // Saldo Transportado (individual)
+                    $stmtInner = $conn->prepare('SELECT valor_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
+                    $stmtInner->bindParam(':data', $data);
+                    $stmtInner->bindParam(':funcionario', $funcionariosList);
+                    $stmtInner->execute();
+                    $transportes = $stmtInner->fetchAll(PDO::FETCH_ASSOC);
+                    $totalSaldoTransportado = array_reduce($transportes, function($carry, $item){ return $carry + floatval($item['valor_transportado']); }, 0);
+
+                    // Saldo Inicial (individual) e ID do caixa
+                    $stmtInner = $conn->prepare('SELECT id, saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data' . ($isUnificado ? '' : ' AND funcionario = :funcionario'));
+                    if (!$isUnificado) { $stmtInner->bindParam(':funcionario', $funcionariosList); }
+                    $stmtInner->bindParam(':data', $data);
+                    $stmtInner->execute();
+                    $caixa = $stmtInner->fetch(PDO::FETCH_ASSOC);
+                    $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
+                    $idCaixa = ($caixa && isset($caixa['id'])) ? $caixa['id'] : null;
+
+                    // Total em Caixa (para cor do card e, no individual, exibição)
+                    if ($isUnificado) {
+                        $totalEmCaixa_calc = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa;
+                        $stmtInner = $conn->prepare('SELECT SUM(valor_transportado) as total_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data');
+                        $stmtInner->bindParam(':data', $data);
+                        $stmtInner->execute();
+                        $saldoTransportadoUni = $stmtInner->fetch(PDO::FETCH_ASSOC);
+                        if ($saldoTransportadoUni && isset($saldoTransportadoUni['total_transportado'])) {
+                            $totalEmCaixa_calc -= $saldoTransportadoUni['total_transportado'];
                         }
+                    } else {
+                        $totalEmCaixa_calc = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa - $totalSaldoTransportado;
+                    }
 
-                        if ($isUnificado) {
-                            $sql = 'SELECT 
-                                        GROUP_CONCAT(DISTINCT funcionario SEPARATOR ", ") as funcionarios, 
-                                        DATE(data) as data,
-                                        SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
-                                        SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
-                                        SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
-                                        SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
-                                        SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos
-                                    FROM (
-                                        SELECT funcionario, data, "ato" as tipo, total 
-                                        FROM atos_liquidados
-                                        UNION ALL
-                                        SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
-                                        FROM pagamento_os
-                                        UNION ALL
-                                        SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
-                                        FROM devolucao_os
-                                        UNION ALL
-                                        SELECT funcionario, data, "saida" as tipo, valor_saida as total
-                                        FROM saidas_despesas WHERE status = "ativo"
-                                        UNION ALL
-                                        SELECT funcionario, data_caixa as data, "deposito" as tipo, valor_do_deposito as total
-                                        FROM deposito_caixa WHERE status = "ativo"
-                                        UNION ALL
-                                        SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
-                                        FROM caixa WHERE status = "aberto"
-                                    ) as fluxos';
-                            if ($conditions) {
-                                $sql .= ' WHERE ' . implode(' AND ', $conditions);
-                            }
-                            $sql .= ' GROUP BY DATE(data)';
-                        } else {
-                            $sql = 'SELECT 
-                                        funcionario, 
-                                        DATE(data) as data,
-                                        SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
-                                        SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
-                                        SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
-                                        SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
-                                        SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos,
-                                        SUM(CASE WHEN tipo = "caixa" THEN total ELSE 0 END) as saldo_inicial
-                                    FROM (
-                                        SELECT funcionario, data, "ato" as tipo, total 
-                                        FROM atos_liquidados
-                                        UNION ALL
-                                        SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
-                                        FROM pagamento_os
-                                        UNION ALL
-                                        SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
-                                        FROM devolucao_os
-                                        UNION ALL
-                                        SELECT funcionario, data, "saida" as tipo, valor_saida as total
-                                        FROM saidas_despesas WHERE status = "ativo"
-                                        UNION ALL
-                                        SELECT funcionario, data_caixa as data, "deposito" as tipo, valor_do_deposito as total
-                                        FROM deposito_caixa WHERE status = "ativo"
-                                        UNION ALL
-                                        SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
-                                        FROM caixa WHERE status = "aberto"
-                                    ) as fluxos';
-                            if ($conditions) {
-                                $sql .= ' WHERE ' . implode(' AND ', $conditions);
-                            }
-                            $sql .= ' GROUP BY funcionario, DATE(data)';
-                        }
+                    $isClosed = (round($totalEmCaixa_calc, 2) == 0.00);
+                    $cardBgClass = $isClosed ? 'pastel-closed' : 'pastel-open';
+                    $badgeClass = $isClosed ? 'badge-closed' : 'badge-open';
+                    $statusLabel = $isClosed ? 'Fechado' : 'Aberto';
+                    $statusIcon = $isClosed ? 'fa-lock' : 'fa-unlock-alt';
 
-                        $sql .= $filtered
-                            ? ' ORDER BY DATE(data) DESC'           
-                            : ' ORDER BY DATE(data) DESC LIMIT 50'; 
+                    // Helper de formatação
+                    $fmt = function($v){ return 'R$ ' . number_format(floatval($v), 2, ',', '.'); };
+                    $dataBR = date('d/m/Y', strtotime($data));
 
-                        $stmt = $conn->prepare($sql);
-                        foreach ($params as $key => $value) {
-                            $stmt->bindValue($key, $value);
-                        }
-                        $stmt->execute();
-                        $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    echo '<div class="col-12 col-sm-6 col-md-4 col-lg-3 caixa-col">
+                            <div class="card caixa-card '.$cardBgClass.'" onclick="verDetalhes(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\', \''.($isUnificado ? 'unificado' : 'individual').'\')">
+                                <div class="card-body">
+                                    <div class="header-block topline">
+                                        <div class="title-strong">'.htmlspecialchars($isUnificado ? "Caixa Unificado" : $funcionariosList).'</div>
+                                        <span class="badge-status '.$badgeClass.'"><i class="fa '.$statusIcon.'"></i> '.$statusLabel.'</span>
+                                    </div>
+                                    <div class="muted">Data: '.$dataBR.'</div>
 
-                        foreach ($resultados as $resultado) {
-                            $funcionarios = $isUnificado ? $resultado['funcionarios'] : $resultado['funcionario'];
-                            $data = $resultado['data'];
-                            $total_atos = $resultado['total_atos'];
-                            $total_pagamentos = $resultado['total_pagamentos'];
-                            $total_devolucoes = $resultado['total_devolucoes'];
-                            $total_saidas = $resultado['total_saidas'];
-                            $total_depositos = $resultado['total_depositos'];
-                            $saldo_inicial = isset($resultado['saldo_inicial']) ? $resultado['saldo_inicial'] : 0.0;
+                                    <div class="metrics">';
 
-                            // Calculando valores
-                            $totalRecebidoConta = 0;
-                            $totalRecebidoEspecie = 0;
-                            $totalDevolvidoEspecie = 0;
+                    if (!$isUnificado) {
+                        echo '      <div class="metric">
+                                        <span class="chip chip-saldo">Saldo Inicial</span>
+                                        <div class="k">'.$fmt($saldoInicial).'</div>
+                                    </div>';
+                    }
+                    echo '              <div class="metric">
+                                        <span class="chip chip-atos">Atos Liquidados</span>
+                                        <div class="k">'.$fmt($total_atos).'</div>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="chip chip-conta">Recebido em Conta</span>
+                                        <div class="k">'.$fmt($totalRecebidoConta).'</div>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="chip chip-especie">Recebido em Espécie</span>
+                                        <div class="k">'.$fmt($totalRecebidoEspecie).'</div>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="chip chip-devolucoes">Devoluções</span>
+                                        <div class="k">'.$fmt($total_devolucoes).'</div>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="chip chip-saidas">Saídas e Despesas</span>
+                                        <div class="k">'.$fmt($total_saidas).'</div>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="chip chip-deposito">Depósito do Caixa</span>
+                                        <div class="k">'.$fmt($totalDepositoCaixa).'</div>
+                                    </div>';
+                    if (!$isUnificado) {
+                        echo '      <div class="metric">
+                                        <span class="chip chip-total">Total em Caixa</span>
+                                        <div class="k">'.$fmt($totalEmCaixa_calc).'</div>
+                                    </div>';
+                    }
 
-                            // Recebido em Conta e Espécie
-                            $stmt = $conn->prepare('SELECT forma_de_pagamento, total_pagamento FROM pagamento_os WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_pagamento) = :data');
-                            if (!$isUnificado) {
-                                $stmt->bindParam(':funcionario', $funcionarios);
-                            }
-                            $stmt->bindParam(':data', $data);
-                            $stmt->execute();
-                            $pagamentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                            foreach ($pagamentos as $pagamento) {
-                                if (in_array($pagamento['forma_de_pagamento'], ['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'])) {
-                                    $totalRecebidoConta += $pagamento['total_pagamento'];
-                                } else if ($pagamento['forma_de_pagamento'] === 'Espécie') {
-                                    $totalRecebidoEspecie += $pagamento['total_pagamento'];
-                                }
-                            }
+                    echo '          </div>';
 
-                            // Devolvido em Espécie
-                            $stmt = $conn->prepare('SELECT forma_devolucao, total_devolucao FROM devolucao_os WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_devolucao) = :data');
-                            if (!$isUnificado) {
-                                $stmt->bindParam(':funcionario', $funcionarios);
-                            }
-                            $stmt->bindParam(':data', $data);
-                            $stmt->execute();
-                            $devolucoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                            foreach ($devolucoes as $devolucao) {
-                                if ($devolucao['forma_devolucao'] === 'Espécie') {
-                                    $totalDevolvidoEspecie += $devolucao['total_devolucao'];
-                                }
-                            }
+                    // Ações (preservadas) — padronizadas com .btn-icon — impedir propagação para não abrir detalhes junto
+                    echo '          <div class="card-footer-eq">
+                                        <div class="card-actions">';
 
-                            // Depósitos do Caixa
-                            $stmt = $conn->prepare('SELECT valor_do_deposito FROM deposito_caixa WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_caixa) = :data AND status = "ativo"');
-                            if (!$isUnificado) {
-                                $stmt->bindParam(':funcionario', $funcionarios);
-                            }
-                            $stmt->bindParam(':data', $data);
-                            $stmt->execute();
-                            $depositos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                            $totalDepositoCaixa = array_reduce($depositos, function($carry, $item) {
-                                return $carry + $item['valor_do_deposito'];
-                            }, 0);
-
-                            // Saldo Transportado individualizado por funcionário
-                            $stmt = $conn->prepare('SELECT valor_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
-                            $stmt->bindParam(':data', $data);
-                            $stmt->bindParam(':funcionario', $funcionarios);
-                            $stmt->execute();
-                            $transportes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                            $totalSaldoTransportado = array_reduce($transportes, function($carry, $item) {
-                                return $carry + floatval($item['valor_transportado']);
-                            }, 0);
-
-                            // Saldo Inicial individualizado por funcionário
-                            $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data' . ($isUnificado ? '' : ' AND funcionario = :funcionario'));
-                            if (!$isUnificado) {
-                                $stmt->bindParam(':funcionario', $funcionarios);
-                            }
-                            $stmt->bindParam(':data', $data);
-                            $stmt->execute();
-                            $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
-                            $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
-
-                            // Total em Caixa
-                            // Para caixas unificados, considere o saldo transportado:
-                            if ($isUnificado) {
-                                $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa;
-                                
-                                // Subtrai o saldo transportado para o caixa unificado
-                                $stmt = $conn->prepare('SELECT SUM(valor_transportado) as total_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data');
-                                $stmt->bindParam(':data', $data);
-                                $stmt->execute();
-                                $saldoTransportado = $stmt->fetch(PDO::FETCH_ASSOC);
-                                
-                                if ($saldoTransportado && isset($saldoTransportado['total_transportado'])) {
-                                    $totalEmCaixa -= $saldoTransportado['total_transportado'];
-                                }
-                            } else {
-                                // Para caixas individuais
-                                $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa - $totalSaldoTransportado;
-                            }
-
-
-                            ?>
-                            <tr>
-                                <td><?php echo $funcionarios; ?></td>
-                                <td data-order="<?php echo date('Y-m-d', strtotime($data)); ?>"><?php echo date('d/m/Y', strtotime($data)); ?></td>
-                                <td><?php echo 'R$ ' . number_format($saldoInicial, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($total_atos, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($totalRecebidoConta, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($totalRecebidoEspecie, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($total_saidas, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($totalDepositoCaixa, 2, ',', '.'); ?></td>
-                                <td><?php echo 'R$ ' . number_format($totalEmCaixa, 2, ',', '.'); ?></td>
-                                <td>
-                                    <button title="Visualizar" class="btn btn-info btn-sm" onclick="verDetalhes('<?php echo $funcionarios; ?>', '<?php echo $data; ?>', '<?php echo $isUnificado ? 'unificado' : 'individual'; ?>')">
-                                        <i class="fa fa-eye" aria-hidden="true"></i>
+                    if (!$isUnificado) {
+                        echo '          <button title="Saídas e Despesas" class="btn btn-delete btn-sm btn-icon" onclick="event.stopPropagation(); cadastrarSaida(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
+                                        <i class="fa fa-sign-out" aria-hidden="true"></i>
                                     </button>
-
-                                    <?php if (!$isUnificado) { ?>
-                                        <button title="Saídas e Despesas" class="btn btn-delete btn-sm" onclick="cadastrarSaida('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')">
-                                            <i class="fa fa-sign-out" aria-hidden="true"></i>
-                                        </button>
-                                        <button title="Depósito do Caixa" class="btn btn-success btn-sm" onclick="cadastrarDeposito('<?php echo $funcionarios; ?>', '<?php echo $data; ?>')">
-                                            <i class="fa fa-university" aria-hidden="true"></i>
-                                        </button>
-
-                                        <?php
-                                        // Buscar ID do caixa
-                                        $stmtId = $conn->prepare("
-                                            SELECT id, status 
-                                            FROM caixa 
-                                            WHERE DATE(data_caixa) = :data 
-                                            AND funcionario = :funcionario
-                                        ");
-                                        $stmtId->bindParam(':data', $data);
-                                        $stmtId->bindParam(':funcionario', $funcionarios);
-                                        $stmtId->execute();
-                                        $caixaEncontrado = $stmtId->fetch(PDO::FETCH_ASSOC);
-                                        $idCaixa = $caixaEncontrado ? $caixaEncontrado['id'] : null;
-                                        ?>
-
-                                        <?php if ($idCaixa) { ?>
-                                            <a href="imprimir_fechamento_caixa.php?id=<?= urlencode($idCaixa) ?>" target="_blank" title="Imprimir Fechamento" class="btn btn-primary btn-sm">
-                                                <i class="fa fa-file-pdf-o"></i>
-                                            </a>
-                                        <?php } ?>
-
-                                    <?php } else { ?>
-                                        <button title="Ver Depósitos do Caixa" class="btn btn-success btn-sm" onclick="verDepositosCaixa('<?php echo $data; ?>')">
-                                            <i class="fa fa-list" aria-hidden="true"></i>
-                                        </button>
-
-                                        <a href="imprimir_fechamento_caixa_unificado.php?data=<?= urlencode($data) ?>" target="_blank" title="Imprimir Fechamento Caixa Unificado" class="btn btn-primary btn-sm">
-                                            <i class="fa fa-file-pdf-o"></i>
-                                        </a>
-                                    <?php } ?>
-                                </td>
-
-                            </tr>
-                            <?php
+                                    <button title="Depósito do Caixa" class="btn btn-success btn-sm btn-icon" onclick="event.stopPropagation(); cadastrarDeposito(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
+                                        <i class="fa fa-university" aria-hidden="true"></i>
+                                    </button>';
+                        if ($idCaixa) {
+                            echo '<a href="imprimir_fechamento_caixa.php?id='.urlencode($idCaixa).'" target="_blank" title="Imprimir Fechamento" class="btn btn-primary btn-sm btn-icon" onclick="event.stopPropagation();">
+                                    <i class="fa fa-file-pdf-o"></i>
+                                  </a>';
                         }
-                        ?>
-                    </tbody>
-                </table>
-            </div>
+                    } else {
+                        echo '      <button title="Ver Depósitos do Caixa" class="btn btn-success btn-sm btn-icon" onclick="event.stopPropagation(); verDepositosCaixa(\''.$data.'\')">
+                                    <i class="fa fa-list" aria-hidden="true"></i>
+                                  </button>
+                                  <a href="imprimir_fechamento_caixa_unificado.php?data='.urlencode($data).'" target="_blank" title="Imprimir Fechamento Caixa Unificado" class="btn btn-primary btn-sm btn-icon" onclick="event.stopPropagation();">
+                                    <i class="fa fa-file-pdf-o"></i>
+                                  </a>';
+                    }
+
+                    echo '          </div>';
+
+                    // Botão de Fechamento (cadeado dourado) — aciona o mesmo fluxo do modal de Depósito
+                    if (!$isUnificado) {
+                        $disabledLock = $isClosed ? 'disabled' : '';
+                        echo '<button class="btn btn-lock btn-sm btn-icon" '.$disabledLock.' title="Fechar caixa" onclick="event.stopPropagation(); fecharCaixaRapido(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
+                                <i class="fa fa-lock"></i>
+                              </button>';
+                    }
+
+                    echo '      </div>
+                                </div>
+                            </div>
+                        </div>';
+                }
+                ?>
+            </div><!-- /cardsResultados -->
         </div>
     </div>
 
     <!-- Modal de Detalhes -->
     <div class="modal fade" id="detalhesModal" tabindex="-1" role="dialog" aria-labelledby="detalhesModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
             <div class="modal-content">
-                <div class="modal-header" style="display: flex; justify-content: center; align-items: center; position: relative;">
-                    <h5 class="modal-title" id="detalhesModalLabel" style="flex-grow: 1; text-align: center;"></h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" style="position: absolute; right: 15px; top: 10px;">&times;</button>
+                <div class="modal-header d-flex align-items-center justify-content-center position-relative">
+                    <h5 class="modal-title text-center mb-0" id="detalhesModalLabel"></h5>
+                    <div id="modalStatusPill" class="modal-status-pill"></div>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" style="position:absolute; right:12px; top:8px;">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-primary mb-3" style="background-color: #005d15 !important">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Saldo Inicial</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardSaldoInicial">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Saldo Inicial</div>
+                                <div class="card-body"><h5 class="card-title" id="cardSaldoInicial">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-primary mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Atos Liquidados</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardTotalAtos">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Atos Liquidados</div>
+                                <div class="card-body"><h5 class="card-title" id="cardTotalAtos">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white" style="background-color: #6f42c1;">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Atos Manuais</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardTotalAtosManuais">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Atos Manuais</div>
+                                <div class="card-body"><h5 class="card-title" id="cardTotalAtosManuais">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-warning mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Recebido em Conta</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardTotalRecebidoConta">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Recebido em Conta</div>
+                                <div class="card-body"><h5 class="card-title" id="cardTotalRecebidoConta">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-success mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Recebido em Espécie</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardTotalRecebidoEspecie">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Recebido em Espécie</div>
+                                <div class="card-body"><h5 class="card-title" id="cardTotalRecebidoEspecie">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-petroleo mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Total Recebido</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardTotalRecebido">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Total Recebido</div>
+                                <div class="card-body"><h5 class="card-title" id="cardTotalRecebido">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-secondary mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Devoluções</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardTotalDevolucoes">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Devoluções</div>
+                                <div class="card-body"><h5 class="card-title" id="cardTotalDevolucoes">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-danger mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Saídas e Despesas</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardSaidasDespesas">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Saídas e Despesas</div>
+                                <div class="card-body"><h5 class="card-title" id="cardSaidasDespesas">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-info mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Depósito do Caixa</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardDepositoCaixa">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Depósito do Caixa</div>
+                                <div class="card-body"><h5 class="card-title" id="cardDepositoCaixa">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white btn-4 mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Saldo Transportado</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardSaldoTransportado">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Saldo Transportado</div>
+                                <div class="card-body"><h5 class="card-title" id="cardSaldoTransportado">R$ 0,00</h5></div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-dark mb-3">
-                                <div class="card-header" style="padding: 0.20rem 0.45rem;font-size: 1.0rem;">Total em Caixa</div>
-                                <div class="card-body" style="padding: 0.90rem;">
-                                    <h5 class="card-title" id="cardTotalEmCaixa">R$ 0,00</h5>
-                                </div>
+                                <div class="card-header">Total em Caixa</div>
+                                <div class="card-body"><h5 class="card-title" id="cardTotalEmCaixa">R$ 0,00</h5></div>
                             </div>
                         </div>
                     </div>
                     <hr>
+
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>ATOS LIQUIDADOS</b></div>
                         <div class="card-body">
-                            <table id="tabelaAtos" class="table table-striped table-bordered" style="zoom: 80%">
-                                <thead>
-                                    <tr>
-                                        <th>Funcionário</th>
-                                        <th>Nº OS</th>
-                                        <th>Apresentante</th>
-                                        <th>Ato</th>
-                                        <th>Descrição</th>
-                                        <th>Quantidade</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="detalhesAtos">
-                                    <!-- Detalhes dos atos serão carregados aqui -->
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="tabelaAtos" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>
+                                            <th>Nº OS</th>
+                                            <th>Apresentante</th>
+                                            <th>Ato</th>
+                                            <th>Descrição</th>
+                                            <th>Quantidade</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesAtos"></tbody>
+                                </table>
+                            </div>
                             <h6 class="total-label">Total Atos Liquidados: <span id="totalAtos"></span></h6>
                         </div>
                     </div>
@@ -742,100 +573,104 @@ include(__DIR__ . '/db_connection.php');
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>ATOS MANUAIS</b></div>
                         <div class="card-body">
-                            <table id="tabelaAtosManuais" class="table table-striped table-bordered" style="zoom: 80%">
-                                <thead>
-                                    <tr>
-                                        <th>Funcionário</th>
-                                        <th>Nº OS</th>
-                                        <th>Apresentante</th>
-                                        <th>Ato</th>
-                                        <th>Descrição</th>
-                                        <th>Quantidade</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="detalhesAtosManuais">
-                                    <!-- Detalhes dos atos serão carregados aqui -->
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="tabelaAtosManuais" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>
+                                            <th>Nº OS</th>
+                                            <th>Apresentante</th>
+                                            <th>Ato</th>
+                                            <th>Descrição</th>
+                                            <th>Quantidade</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesAtosManuais"></tbody>
+                                </table>
+                            </div>
                             <h6 class="total-label">Total Atos Manuais: <span id="totalAtosManuais"></span></h6>
                         </div>
                     </div>
+
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>PAGAMENTOS</b></div>
                         <div class="card-body">
-                            <table id="tabelaPagamentos" class="table table-striped table-bordered" style="zoom: 80%">
-                                <thead>
-                                    <tr>
-                                        <th>Funcionário</th>    
-                                        <th>Nº OS</th>
-                                        <th>Apresentante</th>
-                                        <th>Forma de Pagamento</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="detalhesPagamentos">
-                                    <!-- Detalhes dos pagamentos serão carregados aqui -->
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="tabelaPagamentos" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>    
+                                            <th>Nº OS</th>
+                                            <th>Apresentante</th>
+                                            <th>Forma de Pagamento</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesPagamentos"></tbody>
+                                </table>
+                            </div>
                             <h6 class="total-label">Total Pagamentos: <span id="totalPagamentos"></span></h6>
                         </div>
                     </div>
+
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>TOTAL POR TIPO DE PAGAMENTO</b></div>
                         <div class="card-body">
-                            <table id="tabelaTotalPorTipo" class="table table-striped table-bordered" style="zoom: 80%">
-                                <thead>
-                                    <tr>
-                                        <th>Forma de Pagamento</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="detalhesTotalPorTipo">
-                                    <!-- Totais por tipo de pagamento serão carregados aqui -->
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="tabelaTotalPorTipo" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Forma de Pagamento</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesTotalPorTipo"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
+
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>DEVOLUÇÕES</b></div>
                         <div class="card-body">
-                            <table id="tabelaDevolucoes" class="table table-striped table-bordered" style="zoom: 80%">
-                                <thead>
-                                    <tr>
-                                        <th>Funcionário</th>
-                                        <th>Nº OS</th>
-                                        <th>Apresentante</th>
-                                        <th>Forma de Devolução</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="detalhesDevolucoes">
-                                    <!-- Detalhes das devoluções serão carregados aqui -->
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="tabelaDevolucoes" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>
+                                            <th>Nº OS</th>
+                                            <th>Apresentante</th>
+                                            <th>Forma de Devolução</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesDevolucoes"></tbody>
+                                </table>
+                            </div>
                             <h6 class="total-label">Total Devoluções: <span id="totalDevolucoes"></span></h6>
                         </div>
                     </div>
+
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>SAÍDAS E DESPESAS</b></div>
                         <div class="card-body">
-                            <table id="tabelaSaidas" class="table table-striped table-bordered" style="zoom: 80%">
-                                <thead>
-                                    <tr>
-                                        <th>Funcionário</th>
-                                        <th>Título</th>
-                                        <th>Valor</th>
-                                        <th>Forma de Saída</th>
-                                        <th>Data do Caixa</th>
-                                        <th>Data Cadastro</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="detalhesSaidas">
-                                    <!-- Detalhes das saídas serão carregados aqui -->
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="tabelaSaidas" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>
+                                            <th>Título</th>
+                                            <th>Valor</th>
+                                            <th>Forma de Saída</th>
+                                            <th>Data do Caixa</th>
+                                            <th>Data Cadastro</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesSaidas"></tbody>
+                                </table>
+                            </div>
                             <h6 class="total-label">Total Saídas: <span id="totalSaidas"></span></h6>
                         </div>
                     </div>
@@ -843,45 +678,45 @@ include(__DIR__ . '/db_connection.php');
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>DEPÓSITOS</b></div>
                         <div class="card-body">
-                            <table id="tabelaDepositos" class="table table-striped table-bordered" style="zoom: 80%">
-                                <thead>
-                                    <tr>
-                                        <th>Funcionário</th>
-                                        <th>Data do Caixa</th>
-                                        <th>Data Cadastro</th>
-                                        <th>Valor</th>
-                                        <th>Tipo</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="detalhesDepositos">
-                                    <!-- Detalhes dos depósitos serão carregados aqui -->
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="tabelaDepositos" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>
+                                            <th>Data do Caixa</th>
+                                            <th>Data Cadastro</th>
+                                            <th>Valor</th>
+                                            <th>Tipo</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesDepositos"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>SALDO TRANSPORTADO</b></div>
                         <div class="card-body">
-                            <table id="tabelaSaldoTransportado" class="table table-striped table-bordered" style="zoom: 80%">
-                                <thead>
-                                    <tr>
-                                        <th>Data Caixa</th>
-                                        <th>Data Transporte</th>
-                                        <th>Valor Transportado</th>
-                                        <th>Funcionário</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="detalhesSaldoTransportado">
-                                    <!-- Detalhes do saldo transportado serão carregados aqui -->
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="tabelaSaldoTransportado" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Data Caixa</th>
+                                            <th>Data Transporte</th>
+                                            <th>Valor Transportado</th>
+                                            <th>Funcionário</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesSaldoTransportado"></tbody>
+                                </table>
+                            </div>
                             <h6 class="total-label">Total Saldo Transportado: <span id="totalSaldoTransportado"></span></h6>
                         </div>
                     </div>
-                </div>
+                </div><!-- /modal-body -->
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
                 </div>
@@ -891,41 +726,53 @@ include(__DIR__ . '/db_connection.php');
 
     <!-- Modal de Cadastro de Saídas -->
     <div class="modal fade" id="cadastroSaidaModal" tabindex="-1" role="dialog" aria-labelledby="cadastroSaidaModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-            <div class="modal-content modal-saidas">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-responsive modal-modern" role="document">
+            <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="cadastroSaidaModalLabel">Cadastrar Saída/Despesa</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">&times;</button>
                 </div>
                 <div class="modal-body">
                     <form id="formCadastroSaida" enctype="multipart/form-data">
                         <div class="form-row">
-                            <div class="form-group col-md-8 col-12">
-                                <label for="titulo">Título</label>
-                                <input type="text" class="form-control" id="titulo" name="titulo" required>
+                            <div class="form-group col-12 col-md-8">
+                                <label class="input-label" for="titulo">Título</label>
+                                <input type="text" class="form-control" id="titulo" name="titulo" required placeholder="Ex.: Combustível, Material de escritório...">
                             </div>
-                            <div class="form-group col-md-4 col-12">
-                                <label for="valor_saida">Valor da Saída</label>
-                                <input type="text" class="form-control" id="valor_saida" name="valor_saida" required>
+                            <div class="form-group col-12 col-md-4">
+                                <label class="input-label" for="valor_saida">Valor da Saída</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+                                    <input type="text" class="form-control" id="valor_saida" name="valor_saida" required placeholder="0,00">
+                                </div>
                             </div>
                         </div>
-                        <div class="form-group" style="display: none;">
-                            <label for="forma_de_saida">Forma de Saída</label>
+
+                        <div class="form-group" style="display:none;">
+                            <label class="input-label" for="forma_de_saida">Forma de Saída</label>
                             <select class="form-control" id="forma_de_saida" name="forma_de_saida" required>
                                 <option value="Espécie">Espécie</option>
                             </select>
                         </div>
+
                         <div class="form-group">
-                            <label for="anexo">Anexo</label>
-                            <input type="file" class="form-control-file" id="anexo" name="anexo" required>
+                            <label class="input-label d-block" for="anexo">Anexo</label>
+                            <div class="custom-file">
+                                <input type="file" class="custom-file-input" id="anexo" name="anexo" required>
+                                <label class="custom-file-label" for="anexo">Selecione um arquivo...</label>
+                            </div>
+                            <small class="input-hint">Formatos aceitos: PDF, JPG, PNG (máx. 10MB).</small>
                         </div>
+
                         <input type="hidden" id="data_saida" name="data_saida">
                         <input type="hidden" id="data_caixa_saida" name="data_caixa_saida">
                         <input type="hidden" id="funcionario_saida" name="funcionario_saida">
-                        <button type="submit" style="width: 100%" class="btn btn-primary">Adicionar</button>
+
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fa fa-plus-circle" aria-hidden="true"></i> Adicionar
+                        </button>
                     </form>
+
                     <hr>
                     <h5>Saídas/Despesas Cadastradas</h5>
                     <div class="table-responsive">
@@ -940,9 +787,7 @@ include(__DIR__ . '/db_connection.php');
                                     <th>Ações</th>
                                 </tr>
                             </thead>
-                            <tbody id="detalhesSaidasCadastradas">
-                                <!-- Detalhes das saídas serão carregados aqui -->
-                            </tbody>
+                            <tbody id="detalhesSaidasCadastradas"></tbody>
                         </table>
                     </div>
                 </div>
@@ -952,50 +797,52 @@ include(__DIR__ . '/db_connection.php');
 
     <!-- Modal de Cadastro de Depósito -->
     <div class="modal fade" id="cadastroDepositoModal" tabindex="-1" role="dialog" aria-labelledby="cadastroDepositoModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-            <div class="modal-content modal-deposito-caixa">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-responsive modal-modern" role="document">
+            <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="cadastroDepositoModalLabel">Cadastrar Depósito do Caixa</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-4 col-12">
+                    <div class="row stats-card">
+                        <div class="col-12 col-md-4">
                             <div class="card mb-4">
                                 <div class="card-body">
-                                    <h5 class="card-title2">Total em Caixa:</h5>
-                                    <p class="card-text" id="total_em_caixa" style="font-size: 1.5em;">R$ 0,00</p>
+                                    <h5 class="card-title2">Total em Caixa</h5>
+                                    <p class="card-text" id="total_em_caixa" style="font-size:1.5em;">R$ 0,00</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4 col-12">
+                        <div class="col-12 col-md-4">
                             <div class="card mb-4">
                                 <div class="card-body">
-                                    <h5 class="card-title2">Depósitos:</h5>
-                                    <p class="card-text" id="total_depositos" style="font-size: 1.5em;">R$ 0,00</p>
+                                    <h5 class="card-title2">Depósitos</h5>
+                                    <p class="card-text" id="total_depositos" style="font-size:1.5em;">R$ 0,00</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4 col-12">
+                        <div class="col-12 col-md-4">
                             <div class="card mb-4">
                                 <div class="card-body">
-                                    <h5 class="card-title2">Saldo Transportado:</h5>
-                                    <p class="card-text" id="saldo_transportado" style="font-size: 1.5em;">R$ 0,00</p>
+                                    <h5 class="card-title2">Saldo Transportado</h5>
+                                    <p class="card-text" id="saldo_transportado" style="font-size:1.5em;">R$ 0,00</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <hr>
+
                     <form id="formCadastroDeposito" enctype="multipart/form-data">
                         <div class="form-row">
-                            <div class="form-group col-md-6 col-12">
-                                <label for="valor_deposito">Valor do Depósito</label>
-                                <input type="text" class="form-control" id="valor_deposito" name="valor_deposito" required>
+                            <div class="form-group col-12 col-md-6">
+                                <label class="input-label" for="valor_deposito">Valor do Depósito</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+                                    <input type="text" class="form-control" id="valor_deposito" name="valor_deposito" required placeholder="0,00">
+                                </div>
                             </div>
-                            <div class="form-group col-md-6 col-12">
-                                <label for="tipo_deposito">Tipo de Depósito</label>
+                            <div class="form-group col-12 col-md-6">
+                                <label class="input-label" for="tipo_deposito">Tipo de Depósito</label>
                                 <select class="form-control" id="tipo_deposito" name="tipo_deposito" required>
                                     <option value="" disabled selected>Selecione</option>
                                     <option value="Depósito Bancário">Depósito Bancário</option>
@@ -1004,22 +851,34 @@ include(__DIR__ . '/db_connection.php');
                                 </select>
                             </div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-6 col-12">
-                                <label for="comprovante_deposito">Comprovante de Depósito</label>
-                                <input type="file" class="form-control-file" id="comprovante_deposito" name="comprovante_deposito" required>
+
+                        <div class="form-row align-items-end">
+                            <div class="form-group col-12 col-md-6">
+                                <label class="input-label d-block" for="comprovante_deposito">Comprovante de Depósito</label>
+                                <div class="custom-file">
+                                    <input type="file" class="custom-file-input" id="comprovante_deposito" name="comprovante_deposito" required>
+                                    <label class="custom-file-label" for="comprovante_deposito">Selecione um arquivo...</label>
+                                </div>
+                                <small class="input-hint">PDF, JPG, PNG (máx. 10MB).</small>
                             </div>
-                            <div class="form-group col-md-6 col-12" id="sem-comprovante-group" style="display:none;">
-                                <input type="checkbox" id="sem_comprovante" name="sem_comprovante">
-                                <label for="sem_comprovante">Sem comprovante</label>
+
+                            <div class="form-group col-12 col-md-6" id="sem-comprovante-group" style="display:none;">
+                                <div class="custom-control custom-checkbox mt-4">
+                                    <input type="checkbox" class="custom-control-input" id="sem_comprovante" name="sem_comprovante">
+                                    <label class="custom-control-label" for="sem_comprovante">Sem comprovante</label>
+                                </div>
+                                <small class="input-hint">Use apenas quando o depósito em espécie não gerar comprovante.</small>
                             </div>
                         </div>
+
                         <input type="hidden" id="data_caixa_deposito" name="data_caixa_deposito">
                         <input type="hidden" id="funcionario_deposito" name="funcionario_deposito">
-                        <button type="submit" id="btnAdicionarDeposito" style="width: 100%" class="btn btn-primary">
+
+                        <button type="submit" id="btnAdicionarDeposito" class="btn btn-primary btn-block">
                             <i class="fa fa-plus-circle" aria-hidden="true"></i> Adicionar
                         </button>
                     </form>
+
                     <hr>
                     <h5>Depósitos Registrados</h5>
                     <div class="table-responsive">
@@ -1034,9 +893,7 @@ include(__DIR__ . '/db_connection.php');
                                     <th>Ações</th>
                                 </tr>
                             </thead>
-                            <tbody id="detalhesDepositosRegistrados">
-                                <!-- Detalhes dos depósitos serão carregados aqui -->
-                            </tbody>
+                            <tbody id="detalhesDepositosRegistrados"></tbody>
                         </table>
                     </div>
                     <hr>
@@ -1052,17 +909,15 @@ include(__DIR__ . '/db_connection.php');
 
     <!-- Modal de Listagem de Depósitos do Caixa Unificado -->
     <div class="modal fade" id="verDepositosCaixaModal" tabindex="-1" role="dialog" aria-labelledby="verDepositosCaixaModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content modal-deposito-caixa-unificado">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="verDepositosCaixaModalLabel">Depósitos do Caixa Unificado</h5>
-                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                            &times;
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <table id="tabelaDepositosCaixaUnificado" class="table table-striped table-bordered" style="zoom: 80%">
+        <div class="modal-dialog modal-deposito-caixa-unificado modal-dialog-centered modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="verDepositosCaixaModalLabel">Depósitos do Caixa Unificado</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table id="tabelaDepositosCaixaUnificado" class="table table-striped table-bordered">
                             <thead>
                                 <tr>
                                     <th>Funcionário</th>
@@ -1073,15 +928,14 @@ include(__DIR__ . '/db_connection.php');
                                     <th>Ações</th>
                                 </tr>
                             </thead>
-                            <tbody id="detalhesDepositosCaixaUnificado">
-                                <!-- Detalhes dos depósitos serão carregados aqui -->
-                            </tbody>
+                            <tbody id="detalhesDepositosCaixaUnificado"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
 
     <!-- Modal de Abertura de Caixa -->
     <div class="modal fade" id="abrirCaixaModal" tabindex="-1" role="dialog" aria-labelledby="abrirCaixaModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
@@ -1099,6 +953,16 @@ include(__DIR__ . '/db_connection.php');
                             </div>
                             <button type="submit" style="width: 100%" class="btn btn-primary">Abrir Caixa</button>
                         </form>
+
+                        <!-- NOVO: opção para entrar sem abrir agora -->
+                        <div class="text-center mt-3">
+                            <button type="button" class="btn btn-outline-secondary" style="width:100%" onclick="pularAberturaCaixa()">
+                                Entrar sem abrir agora
+                            </button>
+                            <small class="form-text text-muted mt-2">
+                                Você poderá abrir o caixa a qualquer momento.
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1114,69 +978,48 @@ include(__DIR__ . '/db_connection.php');
     <script src="../script/sweetalert2.js"></script>
     <script>
         $(document).ready(function() {
-            var table = $('#tabelaResultados').DataTable({
-                "language": {
-                    "url": "../style/Portuguese-Brasil.json"
-                },
-                "pageLength": 10,
-                "order": [[1, 'desc']], // Ordena a primeira coluna (índice 1) em ordem decrescente
-                "autoWidth": false, // Desativa o ajuste automático de largura
-                "responsive": true // Para garantir que a tabela seja responsiva
-            });
+            // Preencher datas com base no período rápido ao mudar o select
+            function applyPeriodoToDates() {
+                const periodo = $('#periodo').val();
+                const hoje = new Date();
+                function toISO(d){ return d.toISOString().slice(0,10); }
 
-            function toggleColumns(isUnificado) {
-                var saldoInicialColumn = table.column('.saldoInicialColumn');
-                var totalEmCaixaColumn = table.column('.totalEmCaixaColumn');
-
-                if (isUnificado) {
-                    saldoInicialColumn.visible(false); // Oculta a coluna Saldo Inicial
-                    totalEmCaixaColumn.visible(false); // Oculta a coluna Total em Caixa
+                if (periodo === 'hoje') {
+                    $('#data_inicial').val(toISO(hoje));
+                    $('#data_final').val(toISO(hoje));
+                } else if (periodo === 'ultimos7') {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 6);
+                    $('#data_inicial').val(toISO(d));
+                    $('#data_final').val(toISO(hoje));
+                } else if (periodo === 'ultimoMes') {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 30);
+                    $('#data_inicial').val(toISO(d));
+                    $('#data_final').val(toISO(hoje));
                 } else {
-                    saldoInicialColumn.visible(true);  // Exibe a coluna Saldo Inicial
-                    totalEmCaixaColumn.visible(true);  // Exibe a coluna Total em Caixa
+                    // todos: limpa
+                    $('#data_inicial').val('');
+                    $('#data_final').val('');
                 }
             }
 
-            // Função para detectar o valor de um parâmetro na URL
-            function getParameterByName(name) {
-                var url = window.location.href;
-                name = name.replace(/[\[\]]/g, '\\$&');
-                var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
-                var results = regex.exec(url);
-                if (!results) return null;
-                if (!results[2]) return '';
-                return decodeURIComponent(results[2].replace(/\+/g, ' '));
-            }
+            // Na primeira carga, se não houver parâmetros, aplicar "hoje" (evita sobrecarga)
+            <?php if (!isset($_GET['periodo']) && empty($_GET['data_inicial']) && empty($_GET['data_final'])): ?>
+                $('#periodo').val('hoje');
+                applyPeriodoToDates();
+            <?php endif; ?>
 
-            // Verifica se a opção "caixa_unificado" foi selecionada no filtro da pesquisa
-            var selectedFuncionario = getParameterByName('funcionario');
-
-            if (selectedFuncionario === 'caixa_unificado') {
-                toggleColumns(true); // Oculta as colunas necessárias se for caixa unificado
-            } else {
-                toggleColumns(false); // Exibe as colunas se for um funcionário específico ou todos
-            }
-
-            $('#pesquisarForm').on('submit', function(event) {
-                event.preventDefault(); // Previne o envio do formulário padrão
-
-                var selectedOption = $('#funcionario').val();
-
-                if (selectedOption === 'caixa_unificado') {
-                    toggleColumns(true);
-                } else {
-                    toggleColumns(false);
-                }
-
-                this.submit(); // Envia o formulário manualmente após alterar as colunas
+            $('#periodo').on('change', function(){
+                applyPeriodoToDates();
             });
 
-            // Inicializar máscara de dinheiro
+            // Máscaras
             $('#valor_saida').mask('#.##0,00', {reverse: true});
             $('#valor_deposito').mask('#.##0,00', {reverse: true});
             $('#saldo_inicial').mask('#.##0,00', {reverse: true});
 
-            // Evento de submissão do formulário de saída
+            // Envio de Saída
             $('#formCadastroSaida').on('submit', function(e) {
                 e.preventDefault();
 
@@ -1190,134 +1033,93 @@ include(__DIR__ . '/db_connection.php');
                     dataType: 'json',
                     success: function(response) {
                         if (response.success) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Sucesso!',
-                                text: 'Saída cadastrada com sucesso!',
-                                confirmButtonText: 'OK'
-                            }).then(() => {
-                                $('#cadastroSaidaModal').modal('hide');
-                                location.reload();
-                            });
+                            Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Saída cadastrada com sucesso!', confirmButtonText: 'OK' })
+                            .then(() => { $('#cadastroSaidaModal').modal('hide'); location.reload(); });
                         } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro!',
-                                text: 'Erro ao cadastrar saída: ' + response.error,
-                                confirmButtonText: 'OK'
-                            });
+                            Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao cadastrar saída: ' + response.error, confirmButtonText: 'OK' });
                         }
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro!',
-                            text: 'Erro ao cadastrar saída: ' + textStatus + ' - ' + errorThrown,
-                            confirmButtonText: 'OK'
-                        });
+                        Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao cadastrar saída: ' + textStatus + ' - ' + errorThrown, confirmButtonText: 'OK' });
                     }
                 });
             });
 
+            // Atualiza label do custom-file ao selecionar arquivo (Saída + Depósito)
+            $(document).on('change', '.custom-file-input', function () {
+                var fileName = $(this).val().split('\\').pop();
+                $(this).siblings('.custom-file-label').addClass('selected').text(fileName || 'Selecione um arquivo...');
+            });
 
-            // Evento de submissão do formulário de depósito
-            $(document).ready(function() {
-                // Verificar o tipo de depósito e exibir a opção "Sem comprovante" se for "Espécie"
-                $('#tipo_deposito').on('change', function() {
-                    var tipoDeposito = $(this).val();
+            // Depósito: comportamento do tipo
+            $('#tipo_deposito').on('change', function() {
+                var tipoDeposito = $(this).val();
+                if (tipoDeposito === 'Espécie') {
+                    $('#sem-comprovante-group').show();
+                    $('#comprovante_deposito').prop('required', true);
+                } else {
+                    $('#sem-comprovante-group').hide();
+                    $('#sem_comprovante').prop('checked', false);
+                    $('#comprovante_deposito').prop('required', true);
+                }
+            });
 
-                    if (tipoDeposito === 'Espécie') {
-                        $('#sem-comprovante-group').show();
-                        $('#comprovante_deposito').prop('required', true);
-                    } else {
-                        $('#sem-comprovante-group').hide();
-                        $('#sem_comprovante').prop('checked', false); // Desmarcar a opção "Sem comprovante"
-                        $('#comprovante_deposito').prop('required', true);
-                    }
-                });
+            $('#sem_comprovante').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#comprovante_deposito').prop('required', false);
+                } else {
+                    $('#comprovante_deposito').prop('required', true);
+                }
+            });
 
-                // Alterar obrigatoriedade do comprovante baseado na opção "Sem comprovante"
-                $('#sem_comprovante').on('change', function() {
-                    if ($(this).is(':checked')) {
-                        $('#comprovante_deposito').prop('required', false);
-                    } else {
-                        $('#comprovante_deposito').prop('required', true);
-                    }
-                });
+            // Envio Depósito (com validação do total em caixa)
+            $('#formCadastroDeposito').on('submit', function(e) {
+                e.preventDefault();
 
-                // Evento de submissão do formulário de depósito
-                $('#formCadastroDeposito').on('submit', function(e) {
-                    e.preventDefault();
+                var totalEmCaixa = parseFloat($('#total_em_caixa').text().replace('R$ ', '').replace(/\./g, '').replace(',', '.')) || 0;
+                var valorDeposito = parseFloat($('#valor_deposito').val().replace(/\./g, '').replace(',', '.')) || 0;
 
-                    var totalEmCaixa = parseFloat($('#total_em_caixa').text().replace('R$ ', '').replace('.', '').replace(',', '.'));
-                    var valorDeposito = parseFloat($('#valor_deposito').val().replace('.', '').replace(',', '.'));
+                if (valorDeposito > totalEmCaixa) {
+                    Swal.fire({ icon: 'error', title: 'Erro!', text: 'O valor do depósito não pode ser maior do que o total disponível em caixa.', confirmButtonText: 'OK' });
+                    return;
+                }
 
-                    // Verificar se o valor do depósito é maior do que o total em caixa
-                    if (valorDeposito > totalEmCaixa) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro!',
-                            text: 'O valor do depósito não pode ser maior do que o total disponível em caixa.',
-                            confirmButtonText: 'OK'
-                        });
-                        return;
-                    }
-
-                    // Solicitar confirmação do usuário
-                    Swal.fire({
-                        title: 'Você tem certeza?',
-                        text: `Deseja realmente inserir o depósito de R$ ${valorDeposito.toFixed(2).replace('.', ',')}?`,
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#3085d6',
-                        cancelButtonColor: '#d33',
-                        confirmButtonText: 'Sim, inserir',
-                        cancelButtonText: 'Cancelar'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            var formData = new FormData(this);
-                            $.ajax({
-                                url: 'salvar_deposito.php',
-                                type: 'POST',
-                                data: formData,
-                                contentType: false,
-                                processData: false,
-                                dataType: 'json',
-                                success: function(response) {
-                                    if (response.success) {
-                                        Swal.fire({
-                                            icon: 'success',
-                                            title: 'Sucesso!',
-                                            text: 'Depósito cadastrado com sucesso!',
-                                            confirmButtonText: 'OK'
-                                        }).then(() => {
-                                            $('#cadastroDepositoModal').modal('hide');
-                                            location.reload();
-                                        });
-                                    } else {
-                                        Swal.fire({
-                                            icon: 'error',
-                                            title: 'Erro!',
-                                            text: 'Erro ao cadastrar depósito: ' + response.error,
-                                            confirmButtonText: 'OK'
-                                        });
-                                    }
-                                },
-                                error: function(jqXHR, textStatus, errorThrown) {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Erro!',
-                                        text: 'Erro ao cadastrar depósito: ' + textStatus + ' - ' + errorThrown,
-                                        confirmButtonText: 'OK'
-                                    });
+                Swal.fire({
+                    title: 'Você tem certeza?',
+                    text: `Deseja realmente inserir o depósito de R$ ${valorDeposito.toFixed(2).replace('.', ',')}?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Sim, inserir',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        var formData = new FormData($('#formCadastroDeposito')[0]);
+                        $.ajax({
+                            url: 'salvar_deposito.php',
+                            type: 'POST',
+                            data: formData,
+                            contentType: false,
+                            processData: false,
+                            dataType: 'json',
+                            success: function(response) {
+                                if (response.success) {
+                                    Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Depósito cadastrado com sucesso!', confirmButtonText: 'OK' })
+                                    .then(() => { $('#cadastroDepositoModal').modal('hide'); location.reload(); });
+                                } else {
+                                    Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao cadastrar depósito: ' + response.error, confirmButtonText: 'OK' });
                                 }
-                            });
-                        }
-                    });
+                            },
+                            error: function(jqXHR, textStatus, errorThrown) {
+                                Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao cadastrar depósito: ' + textStatus + ' - ' + errorThrown, confirmButtonText: 'OK' });
+                            }
+                        });
+                    }
                 });
             });
 
-            // Carregar Saídas/Despesas no Modal
+            // Carregar Saídas no modal
             $('#cadastroSaidaModal').on('shown.bs.modal', function () {
                 var funcionario = $('#funcionario_saida').val();
                 var data_caixa = $('#data_caixa_saida').val();
@@ -1325,21 +1127,20 @@ include(__DIR__ . '/db_connection.php');
                 $.ajax({
                     url: 'listar_saidas.php',
                     type: 'GET',
-                    data: {
-                        funcionario: funcionario,
-                        data_caixa: data_caixa
-                    },
+                    data: { funcionario: funcionario, data_caixa: data_caixa },
                     dataType: 'json',
                     success: function(response) {
-                        if (response.error) {
-                            alert('Erro: ' + response.error);
-                            return;
-                        }
+                        if (response.error) { alert('Erro: ' + response.error); return; }
 
                         var saidas = response.saidas;
                         $('#detalhesSaidasCadastradas').empty();
                         saidas.forEach(function(saida) {
-                            var anexo = saida.caminho_anexo ? `<button title="Visualizar" class="btn btn-info btn-sm" onclick="visualizarAnexoSaida('${saida.caminho_anexo}', '${saida.funcionario}', '${saida.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>` : '';
+                            var anexo = saida.caminho_anexo ? `<button title="Visualizar" class="btn btn-info btn-sm btn-icon" onclick="visualizarAnexoSaida('${saida.caminho_anexo}', '${saida.funcionario}', '${saida.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>` : '';
+                            const podeExcluirSaida = (saida.pode_excluir === true || saida.pode_excluir === 1 || saida.pode_excluir === '1');
+                            const deleteBtnSaida = podeExcluirSaida
+                                ? `<button title="Remover" class="btn btn-delete btn-sm btn-icon" onclick="removerSaida(${saida.id})"><i class="fa fa-trash" aria-hidden="true"></i></button>`
+                                : '';
+
                             $('#detalhesSaidasCadastradas').append(`
                                 <tr>
                                     <td>${saida.funcionario}</td>
@@ -1347,102 +1148,64 @@ include(__DIR__ . '/db_connection.php');
                                     <td>${formatCurrency(saida.valor_saida)}</td>
                                     <td>${saida.forma_de_saida}</td>
                                     <td>${anexo}</td>
-                                    <td>
-                                        <button title="Remover" class="btn btn-delete btn-sm" onclick="removerSaida(${saida.id})"><i class="fa fa-trash" aria-hidden="true"></i></button>
-                                    </td>
+                                    <td>${deleteBtnSaida}</td>
                                 </tr>
                             `);
                         });
 
-                        // Inicializar DataTable
                         $('#tabelaSaidasCadastradas').DataTable({
-                            "language": {
-                                "url": "../style/Portuguese-Brasil.json"
-                            },
+                            "language": { "url": "../style/Portuguese-Brasil.json" },
                             "destroy": true,
                             "pageLength": 10,
                             "order": [],
                         });
                     },
-                    error: function() {
-                        alert('Erro ao obter saídas.');
-                    }
+                    error: function() { alert('Erro ao obter saídas.'); }
                 });
             });
 
-            // Carregar modal de abertura de caixa ao carregar a página
+            // Abrir Caixa ao carregar (se necessário)
             abrirCaixaModal();
 
-            function abrirCaixaModal() {
-                $.ajax({
-                    url: 'verificar_caixa_aberto.php',
-                    type: 'GET',
-                    dataType: 'json',
-                    success: function(response) {
-                        if (response.aberto) {
-                            return;
-                        } else {
-                            $('#abrirCaixaModal').modal('show');
-                            $('#saldo_inicial').val(response.saldo_transportado ? response.saldo_transportado.toFixed(2).replace('.', ',') : '');
-                        }
-                    },
-                    error: function() {
-                        alert('Erro ao verificar caixa.');
-                    }
-                });
+            // Validação de data (filtros)
+            var currentYear = new Date().getFullYear();
+            function validateDate(input) {
+                var selectedDate = new Date($(input).val());
+                if (selectedDate.getFullYear() > currentYear) {
+                    Swal.fire({ icon: 'warning', title: 'Data inválida', text: 'O ano não pode ser maior que o ano atual.', confirmButtonText: 'Ok' });
+                    $(input).val('');
+                }
             }
-
-            // Evento de submissão do formulário de abertura de caixa
-            $('#formAbrirCaixa').on('submit', function(e) {
-                e.preventDefault();
-
-                var saldoInicial = $('#saldo_inicial').val().replace('.', '').replace(',', '.');
-
-                $.ajax({
-                    url: 'abrir_caixa.php',
-                    type: 'POST',
-                    data: {
-                        saldo_inicial: saldoInicial
-                    },
-                    dataType: 'json',
-                    success: function(response) {
-                        if (response.success) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Caixa aberto com sucesso!',
-                                showConfirmButton: true,
-                                confirmButtonText: 'OK'
-                            }).then((result) => {
-                                if (result.isConfirmed) {
-                                    $('#abrirCaixaModal').modal('hide');
-                                    location.reload(); // Recarregar a página após fechar o modal
-                                }
-                            });
-                        } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro',
-                                text: 'Erro ao abrir caixa: ' + response.error,
-                                showConfirmButton: true,
-                                confirmButtonText: 'OK'
-                            });
-                        }
-                    },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro',
-                            text: 'Erro ao abrir caixa: ' + textStatus + ' - ' + errorThrown,
-                            showConfirmButton: true,
-                            confirmButtonText: 'OK'
-                        });
-                    }
-                });
+            $('#data_inicial, #data_final').on('change', function() {
+                if ($(this).val()) { validateDate(this); }
             });
 
+            // Toggle de "Sem Comprovante" (fallback – mantém compat.)
+            $('#tipo_deposito').on('change', function() {
+                var tipo = $(this).val();
+                if (tipo === 'Espécie') {
+                    $('#semComprovanteDiv').show();
+                } else {
+                    $('#semComprovanteDiv').hide();
+                    $('#sem_comprovante').val('nao');
+                    $('#comprovante_deposito').prop('required', true);
+                }
+            });
+            $('#sem_comprovante').on('change', function() {
+                var semComprovante = $(this).val();
+                if (semComprovante === 'sim') {
+                    $('#comprovante_deposito').prop('required', false);
+                    $('#divComprovante').hide();
+                } else {
+                    $('#comprovante_deposito').prop('required', true);
+                    $('#divComprovante').show();
+                }
+            });
         });
 
         function abrirCaixaModal() {
+            if (window.__skipAbrirCaixa === true) return;
+
             $.ajax({
                 url: 'verificar_caixa_aberto.php',
                 type: 'GET',
@@ -1452,45 +1215,40 @@ include(__DIR__ . '/db_connection.php');
                         return;
                     } else {
                         $('#abrirCaixaModal').modal('show');
-                        $('#saldo_inicial').val(response.saldo_transportado.replace('.', ','));
+                        var v = response.saldo_transportado || 0;
+                        $('#saldo_inicial').val(parseFloat(v).toFixed(2).replace('.', ','));
                     }
                 },
-                error: function() {
-                    alert('Erro ao verificar caixa.');
-                }
+                error: function() { alert('Erro ao verificar caixa.'); }
             });
+        }
+
+        function pularAberturaCaixa(){
+            window.__skipAbrirCaixa = true;
+            $('#abrirCaixaModal').modal('hide');
         }
 
         function verDetalhes(funcionarios, data, tipo) {
             $.ajax({
                 url: 'detalhes_fluxo_caixa.php',
                 type: 'GET',
-                data: {
-                    funcionarios: funcionarios,
-                    data: data,
-                    tipo: tipo
-                },
+                data: { funcionarios: funcionarios, data: data, tipo: tipo },
                 success: function(response) {
-                    if (response.error) {
-                        alert('Erro: ' + response.error);
-                        return;
-                    }
+                    if (response.error) { alert('Erro: ' + response.error); return; }
 
                     var detalhes = response;
 
-                    // Atualiza os cards no topo do modal
-                    var dataFormatada = formatDateForDisplay(data); // Usando função já existente para formatar a data
+                    var dataFormatada = formatDateForDisplay(data);
                     $('#detalhesModalLabel').html(`CAIXA DO DIA ${dataFormatada} - FUNCIONÁRIO: ${funcionarios}`);
-                    // $('#cardTotalAtos').text(formatCurrency(detalhes.totalAtos));
-                    // $('#cardTotalAtosManuais').text(formatCurrency(detalhes.totalAtosManuais));
-                    // $('#cardTotalRecebidoConta').text(formatCurrency(detalhes.totalRecebidoConta));
-                    // $('#cardTotalRecebidoEspecie').text(formatCurrency(detalhes.totalRecebidoEspecie));
-                    // $('#cardTotalDevolucoes').text(formatCurrency(detalhes.totalDevolucoes));
-                    // $('#cardTotalEmCaixa').text(formatCurrency(detalhes.totalEmCaixa));
-                    // $('#cardSaidasDespesas').text(formatCurrency(detalhes.totalSaidasDespesas));
-                    // $('#cardDepositoCaixa').text(formatCurrency(detalhes.totalDepositoCaixa));
-                    // $('#cardSaldoTransportado').text(formatCurrency(detalhes.totalSaldoTransportado));
-                    // $('#cardSaldoInicial').text(formatCurrency(detalhes.saldoInicial));
+
+                    // Status (com cadeado) no cabeçalho do modal
+                    var fechado = (parseFloat(detalhes.totalEmCaixa) === 0);
+                    var statusText = fechado ? 'Fechado' : 'Aberto';
+                    var statusClass = fechado ? 'badge-closed' : 'badge-open';
+                    var icon = fechado ? 'fa-lock' : 'fa-unlock-alt';
+                    $('#modalStatusPill').html(`<span class="badge-status ${statusClass}"><i class="fa ${icon}"></i> ${statusText}</span>`);
+
+                    // Cards topo
                     toggleCard('#cardTotalAtos', detalhes.totalAtos);
                     toggleCard('#cardTotalAtosManuais', detalhes.totalAtosManuais);
                     toggleCard('#cardTotalRecebidoConta', detalhes.totalRecebidoConta);
@@ -1501,15 +1259,6 @@ include(__DIR__ . '/db_connection.php');
                     toggleCard('#cardDepositoCaixa', detalhes.totalDepositoCaixa);
                     toggleCard('#cardSaldoTransportado', detalhes.totalSaldoTransportado);
                     toggleCard('#cardSaldoInicial', detalhes.saldoInicial);
-
-
-                    // Debugging logs
-                    console.log("Saldo Inicial: " + detalhes.saldoInicial);
-                    console.log("Total Recebido em Espécie: " + detalhes.totalRecebidoEspecie);
-                    console.log("Total Devolvido em Espécie: " + detalhes.totalDevolvidoEspecie);
-                    console.log("Total Saídas e Despesas: " + detalhes.totalSaidasDespesas);
-                    console.log("Total Depósito do Caixa: " + detalhes.totalDepositoCaixa);
-                    console.log("Total Saldo Transportado: " + detalhes.totalSaldoTransportado);
 
                     // Atos Liquidados
                     var totalAtos = 0;
@@ -1530,7 +1279,7 @@ include(__DIR__ . '/db_connection.php');
                     });
                     $('#totalAtos').text(formatCurrency(totalAtos));
 
-                    // Atos Manuais Liquidados
+                    // Atos Manuais
                     var totalAtosManuais = 0;
                     $('#detalhesAtosManuais').empty();
                     detalhes.atosManuais.forEach(function(atoManual) {
@@ -1555,9 +1304,7 @@ include(__DIR__ . '/db_connection.php');
                     $('#detalhesPagamentos').empty();
                     detalhes.pagamentos.forEach(function(pagamento) {
                         totalPagamentos += parseFloat(pagamento.total_pagamento);
-                        if (!totalPorTipo[pagamento.forma_de_pagamento]) {
-                            totalPorTipo[pagamento.forma_de_pagamento] = 0;
-                        }
+                        if (!totalPorTipo[pagamento.forma_de_pagamento]) totalPorTipo[pagamento.forma_de_pagamento] = 0;
                         totalPorTipo[pagamento.forma_de_pagamento] += parseFloat(pagamento.total_pagamento);
                         $('#detalhesPagamentos').append(`
                             <tr>
@@ -1571,7 +1318,7 @@ include(__DIR__ . '/db_connection.php');
                     });
                     $('#totalPagamentos').text(formatCurrency(totalPagamentos));
 
-                    // Total por Tipo de Pagamento
+                    // Total por Tipo
                     var totalRecebidoConta = 0;
                     var totalRecebidoEspecie = 0;
                     $('#detalhesTotalPorTipo').empty();
@@ -1585,24 +1332,18 @@ include(__DIR__ . '/db_connection.php');
                         if (['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'].includes(tipo)) {
                             totalRecebidoConta += totalPorTipo[tipo];
                         } else if (tipo === 'Espécie') {
-                        totalRecebidoEspecie += totalPorTipo[tipo];
-                    }
+                            totalRecebidoEspecie += totalPorTipo[tipo];
+                        }
                     }
                     $('#cardTotalRecebidoConta').text(formatCurrency(totalRecebidoConta));
                     $('#cardTotalRecebidoEspecie').text(formatCurrency(totalRecebidoEspecie));
-                    // Total Recebido = Conta + Espécie
-                    let totalRecebido = totalRecebidoConta + totalRecebidoEspecie;
-                    $('#cardTotalRecebido').text(formatCurrency(totalRecebido));
+                    $('#cardTotalRecebido').text(formatCurrency(totalRecebidoConta + totalRecebidoEspecie));
 
                     // Devoluções
                     var totalDevolucoes = 0;
-                    var totalDevolvidoEspecie = 0;
                     $('#detalhesDevolucoes').empty();
                     detalhes.devolucoes.forEach(function(devolucao) {
                         totalDevolucoes += parseFloat(devolucao.total_devolucao);
-                        if (devolucao.forma_devolucao === 'Espécie') {
-                            totalDevolvidoEspecie += parseFloat(devolucao.total_devolucao);
-                        }
                         $('#detalhesDevolucoes').append(`
                             <tr>
                                 <td>${devolucao.funcionario}</td>    
@@ -1615,15 +1356,13 @@ include(__DIR__ . '/db_connection.php');
                     });
                     $('#totalDevolucoes').text(formatCurrency(totalDevolucoes));
 
-                    // Saídas e Despesas
+                    // Saídas
                     var totalSaidas = 0;
                     $('#detalhesSaidas').empty();
                     detalhes.saidas.forEach(function(saida) {
                         totalSaidas += parseFloat(saida.valor_saida);
-
                         var dataCaixaFormatada = formatDateForDisplay(saida.data_caixa);
                         var dataCadastroFormatada = formatDateForDisplay(saida.data);
-
                         $('#detalhesSaidas').append(`
                             <tr>
                                 <td>${saida.funcionario}</td>    
@@ -1633,7 +1372,9 @@ include(__DIR__ . '/db_connection.php');
                                 <td>${dataCaixaFormatada}</td>
                                 <td>${dataCadastroFormatada}</td>
                                 <td>
-                                    <button title="Visualizar" class="btn btn-info btn-sm" onclick="visualizarAnexoSaida('${saida.caminho_anexo}', '${saida.funcionario}', '${saida.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    <button title="Visualizar" class="btn btn-info btn-sm btn-icon" onclick="visualizarAnexoSaida('${saida.caminho_anexo}', '${saida.funcionario}', '${saida.data_caixa}')">
+                                        <i class="fa fa-eye" aria-hidden="true"></i>
+                                    </button>
                                 </td>
                             </tr>
                         `);
@@ -1653,7 +1394,9 @@ include(__DIR__ . '/db_connection.php');
                                 <td>${formatCurrency(deposito.valor_do_deposito)}</td>
                                 <td>${deposito.tipo_deposito}</td>
                                 <td>
-                                    <button title="Visualizar" class="btn btn-info btn-sm" onclick="visualizarComprovante('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    <button title="Visualizar" class="btn btn-info btn-sm btn-icon" onclick="visualizarComprovante('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')">
+                                        <i class="fa fa-eye" aria-hidden="true"></i>
+                                    </button>
                                 </td>
                             </tr>
                         `);
@@ -1689,75 +1432,17 @@ include(__DIR__ . '/db_connection.php');
 
                     $('#detalhesModal').modal('show');
 
-                    // Inicializar DataTables
-                    $('#tabelaAtos').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
-                        "destroy": true,
-                        "pageLength": 10,
-                        "order": [],
-                    });
-                    $('#tabelaAtosManuais').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
-                        "destroy": true,
-                        "pageLength": 10,
-                        "order": [],
-                    });
-                    $('#tabelaPagamentos').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
-                        "destroy": true,
-                        "pageLength": 10,
-                        "order": [],
-                    });
-                    $('#tabelaTotalPorTipo').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
-                        "destroy": true,
-                        "pageLength": 10,
-                        "order": [],
-                    });
-                    $('#tabelaDevolucoes').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
-                        "destroy": true,
-                        "pageLength": 10,
-                        "order": [],
-                    });
-                    $('#tabelaSaidas').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
-                        "destroy": true,
-                        "pageLength": 10,
-                        "order": [],
-                    });
-                    $('#tabelaDepositos').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
-                        "destroy": true,
-                        "pageLength": 10,
-                        "order": [],
-                    });
-                    $('#tabelaSaldoTransportado').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
-                        "destroy": true,
-                        "pageLength": 10,
-                        "order": [],
-                    });
+                    // DataTables
+                    $('#tabelaAtos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+                    $('#tabelaAtosManuais').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+                    $('#tabelaPagamentos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+                    $('#tabelaTotalPorTipo').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+                    $('#tabelaDevolucoes').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+                    $('#tabelaSaidas').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+                    $('#tabelaDepositos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+                    $('#tabelaSaldoTransportado').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
                 },
-                error: function() {
-                    alert('Erro ao obter detalhes.');
-                }
+                error: function() { alert('Erro ao obter detalhes.'); }
             });
         }
 
@@ -1775,33 +1460,20 @@ include(__DIR__ . '/db_connection.php');
             $('#cadastroDepositoModal').modal('show');
         }
 
-        function carregarDepositos(funcionarios, data) {
+        // ADAPTADO: aceitar callback opcional após carregar depósitos (usado no fechamento rápido)
+        function carregarDepositos(funcionarios, data, callback) {
             $.ajax({
                 url: 'listar_depositos.php',
                 type: 'GET',
-                data: {
-                    funcionarios: funcionarios,
-                    data: data
-                },
+                data: { funcionarios: funcionarios, data: data },
                 dataType: 'json',
                 success: function(response) {
                     if (response.error) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro!',
-                            text: response.error,
-                            confirmButtonText: 'OK'
-                        });
+                        Swal.fire({ icon: 'error', title: 'Erro!', text: response.error, confirmButtonText: 'OK' });
                         return;
                     }
-
                     if (!Array.isArray(response.depositos)) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro!',
-                            text: 'Dados de depósitos inválidos',
-                            confirmButtonText: 'OK'
-                        });
+                        Swal.fire({ icon: 'error', title: 'Erro!', text: 'Dados de depósitos inválidos', confirmButtonText: 'OK' });
                         return;
                     }
 
@@ -1810,6 +1482,11 @@ include(__DIR__ . '/db_connection.php');
                     depositos.forEach(function(deposito) {
                         var dataCadastroFormatada = formatDateForDisplay2(deposito.data_cadastro);
                         var dataCaixaFormatada = formatDateForDisplay(deposito.data_caixa);
+                        const podeExcluirDeposito = (deposito.pode_excluir === true || deposito.pode_excluir === 1 || deposito.pode_excluir === '1');
+                        const deleteBtnDeposito = podeExcluirDeposito
+                            ? `<button title="Remover" style="margin-bottom: 5px !important;" class="btn btn-delete btn-sm btn-icon" data-id="${deposito.id ? deposito.id : 'undefined'}" onclick="removerDeposito(this)"><i class="fa fa-trash" aria-hidden="true"></i></button>`
+                            : '';
+
                         $('#detalhesDepositosRegistrados').append(`
                             <tr>
                                 <td>${deposito.funcionario}</td>
@@ -1818,89 +1495,73 @@ include(__DIR__ . '/db_connection.php');
                                 <td>${formatCurrency(deposito.valor_do_deposito)}</td>
                                 <td>${deposito.tipo_deposito}</td>
                                 <td>
-                                    <button title="Visualizar" class="btn btn-info btn-sm" onclick="visualizarComprovante('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                    <button title="Remover" style="margin-bottom: 5px !important;" class="btn btn-delete btn-sm" data-id="${deposito.id ? deposito.id : 'undefined'}" onclick="removerDeposito(this)"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                                    <button title="Visualizar" class="btn btn-info btn-sm btn-icon" onclick="visualizarComprovante('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    ${deleteBtnDeposito}
                                 </td>
                             </tr>
                         `);
-
-                        console.log('ID do depósito ao criar botão:', deposito.id);
-
-
-
                     });
 
-                    var saldoInicial = parseFloat(response.saldoInicial);
-                    var totalRecebidoEspecie = parseFloat(response.totalRecebidoEspecie);
-                    var totalDevolvidoEspecie = parseFloat(response.totalDevolvidoEspecie);
-                    var totalSaidasDespesas = parseFloat(response.totalSaidasDespesas);
-                    var totalDepositoCaixa = parseFloat(response.totalDepositoCaixa);
-                    var totalSaldoTransportado = parseFloat(response.totalSaldoTransportado);
+                    var saldoInicial = parseFloat(response.saldoInicial) || 0;
+                    var totalRecebidoEspecie = parseFloat(response.totalRecebidoEspecie) || 0;
+                    var totalDevolvidoEspecie = parseFloat(response.totalDevolvidoEspecie) || 0;
+                    var totalSaidasDespesas = parseFloat(response.totalSaidasDespesas) || 0;
+                    var totalDepositoCaixa = parseFloat(response.totalDepositoCaixa) || 0;
+                    var totalSaldoTransportado = parseFloat(response.totalSaldoTransportado) || 0;
 
-                    // Calcula o total em caixa levando em consideração o saldo transportado para a data e funcionário específicos
                     var totalEmCaixa = saldoInicial + totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidasDespesas - totalDepositoCaixa;
-
-                    // Subtrai o saldo transportado apenas se ele for para o mesmo funcionário e a mesma data do caixa
                     if (response.data_caixa === data && response.funcionario === funcionarios) {
                         totalEmCaixa -= totalSaldoTransportado;
                     }
 
-                    // Atualiza os valores dos cards
                     $('#total_em_caixa').text(formatCurrency(totalEmCaixa));
                     $('#total_depositos').text(formatCurrency(totalDepositoCaixa));
                     $('#saldo_transportado').text(formatCurrency(totalSaldoTransportado));
 
-                    // Desabilitar botões se o total em caixa for zero
                     if (totalEmCaixa === 0) {
                         $('#btnTransportarSaldo').prop('disabled', true);
                         $('#btnAdicionarDeposito').prop('disabled', true);
+                    } else {
+                        $('#btnTransportarSaldo').prop('disabled', false);
+                        $('#btnAdicionarDeposito').prop('disabled', false);
                     }
 
-                    // Inicializar DataTable
                     $('#tabelaDepositosRegistrados').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
+                        "language": { "url": "../style/Portuguese-Brasil.json" },
                         "destroy": true,
                         "pageLength": 10
                     });
+
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
                 },
                 error: function() {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro!',
-                        text: 'Erro ao obter depósitos.',
-                        confirmButtonText: 'OK'
-                    });
+                    Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao obter depósitos.', confirmButtonText: 'OK' });
                 }
             });
         }
-
 
         function carregarDepositosCaixaUnificado(data) {
             $.ajax({
                 url: 'listar_depositos_unificado.php',
                 type: 'GET',
-                data: {
-                    data: data
-                },
+                data: { data: data },
                 dataType: 'json',
                 success: function(response) {
-                    if (response.error) {
-                        alert('Erro: ' + response.error);
-                        return;
-                    }
-
-                    if (!Array.isArray(response.depositos)) {
-                        alert('Erro: Dados de depósitos inválidos');
-                        return;
-                    }
+                    if (response.error) { alert('Erro: ' + response.error); return; }
+                    if (!Array.isArray(response.depositos)) { alert('Erro: Dados de depósitos inválidos'); return; }
 
                     var depositos = response.depositos;
                     $('#detalhesDepositosCaixaUnificado').empty();
                     depositos.forEach(function(deposito) {
                         var dataCadastroFormatada = formatDateForDisplay2(deposito.data_cadastro);
                         var dataCaixaFormatada = formatDateForDisplay(deposito.data_caixa);
+                        const podeExcluirUnificado = (deposito.pode_excluir === true || deposito.pode_excluir === 1 || deposito.pode_excluir === '1');
+                        const deleteBtnUnificado = podeExcluirUnificado
+                            ? `<button title="Remover" style="margin-bottom: 5px !important;" class="btn btn-delete btn-sm btn-icon" onclick="removerDeposito(${deposito.id})"><i class="fa fa-trash" aria-hidden="true"></i></button>`
+                            : '';
+
                         $('#detalhesDepositosCaixaUnificado').append(`
                             <tr>
                                 <td>${deposito.funcionario}</td>
@@ -1909,37 +1570,33 @@ include(__DIR__ . '/db_connection.php');
                                 <td>${formatCurrency(deposito.valor_do_deposito)}</td>
                                 <td>${deposito.tipo_deposito}</td>
                                 <td>
-                                    <button title="Visualizar" class="btn btn-info btn-sm" onclick="visualizarComprovanteCaixaUnificado('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                    <button title="Remover" style="margin-bottom: 5px !important;" class="btn btn-delete btn-sm" onclick="removerDeposito(${deposito.id})"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                                    <button title="Visualizar" class="btn btn-info btn-sm btn-icon" onclick="visualizarComprovanteCaixaUnificado('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    ${deleteBtnUnificado}
                                 </td>
                             </tr>
                         `);
                     });
 
-                    // Inicializar DataTable
                     $('#tabelaDepositosCaixaUnificado').DataTable({
-                        "language": {
-                            "url": "../style/Portuguese-Brasil.json"
-                        },
-                        "destroy": true,
-                        "pageLength": 10,
-                        "order": [],
+                        language: { url: "../style/Portuguese-Brasil.json" },
+                        destroy: true,
+                        pageLength: 10,
+                        order: [],
+                        autoWidth: false,
+                        scrollX: true
                     });
                 },
-                error: function() {
-                    alert('Erro ao obter depósitos.');
-                }
+                error: function() { alert('Erro ao obter depósitos.'); }
             });
         }
 
         function formatDateForDisplay(date) {
-            var d = new Date(date + 'T00:00:00'); // Adiciona o horário para evitar problemas de fuso horário
+            var d = new Date(date + 'T00:00:00');
             var day = ('0' + d.getUTCDate()).slice(-2);
             var month = ('0' + (d.getUTCMonth() + 1)).slice(-2);
             var year = d.getUTCFullYear();
             return `${day}/${month}/${year}`;
         }
-
         function formatDateForDisplay2(date) {
             var d = new Date(date);
             var day = ('0' + d.getDate()).slice(-2);
@@ -1952,19 +1609,17 @@ include(__DIR__ . '/db_connection.php');
             var dir = `anexos/${formatDateForDir(data_caixa)}/${funcionario}/`;
             window.open(dir + caminho, '_blank');
         }
-
         function visualizarComprovanteCaixaUnificado(caminho, funcionario, data_caixa) {
             var dir = `anexos/${formatDateForDir(data_caixa)}/${funcionario}/`;
             window.open(dir + caminho, '_blank');
         }
-
         function visualizarAnexoSaida(caminho, funcionario, data_caixa) {
             var dir = `anexos/${data_caixa}/${funcionario}/saidas/`;
             window.open(dir + caminho, '_blank');
         }
 
         function formatDateForDir(date) {
-            var d = new Date(date + 'T00:00:00'); // Adiciona o horário para evitar problemas de fuso horário
+            var d = new Date(date + 'T00:00:00');
             var day = ('0' + d.getUTCDate()).slice(-2);
             var month = ('0' + (d.getUTCMonth() + 1)).slice(-2);
             var year = d.getUTCFullYear().toString().slice(-2);
@@ -1972,13 +1627,8 @@ include(__DIR__ . '/db_connection.php');
         }
 
         function removerDeposito(button) {
-            var id = $(button).attr('data-id'); // Alterar para 'attr' em vez de 'data' para garantir a leitura
-            console.log('ID do depósito a ser removido:', id); // Log do ID
-
-            if (!id || id === 'undefined') {
-                console.error('ID do depósito a ser removido é indefinido.');
-                return;
-            }
+            var id = $(button).attr('data-id');
+            if (!id || id === 'undefined') { console.error('ID do depósito a ser removido é indefinido.'); return; }
 
             Swal.fire({
                 title: 'Deseja realmente remover este depósito?',
@@ -1990,31 +1640,17 @@ include(__DIR__ . '/db_connection.php');
                 cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    console.log('ID do depósito enviado para remoção:', id); // Log do ID
                     $.post('remover_deposito.php', { id: id }, function(response) {
-                        console.log('Resposta do servidor:', response); // Log da resposta do servidor
                         if (response.success) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Sucesso!',
-                                text: 'Depósito removido com sucesso!',
-                                confirmButtonText: 'OK'
-                            }).then(() => {
-                                location.reload();
-                            });
+                            Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Depósito removido com sucesso!', confirmButtonText: 'OK' })
+                            .then(() => { location.reload(); });
                         } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro!',
-                                text: response.error || 'Erro ao remover depósito.',
-                                confirmButtonText: 'OK'
-                            });
+                            Swal.fire({ icon: 'error', title: 'Erro!', text: response.error || 'Erro ao remover depósito.', confirmButtonText: 'OK' });
                         }
                     }, 'json');
                 }
             });
         }
-
 
         function removerSaida(id) {
             Swal.fire({
@@ -2029,31 +1665,25 @@ include(__DIR__ . '/db_connection.php');
                 if (result.isConfirmed) {
                     $.post('update_saida.php', { id: id, status: 'removido' }, function(response) {
                         if (response.success) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Sucesso!',
-                                text: 'Saída/Despesa removida com sucesso!',
-                                confirmButtonText: 'OK'
-                            }).then(() => {
-                                location.reload();
-                            });
+                            Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Saída/Despesa removida com sucesso!', confirmButtonText: 'OK' })
+                            .then(() => { location.reload(); });
                         } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro!',
-                                text: 'Erro ao remover saída/despesa.',
-                                confirmButtonText: 'OK'
-                            });
+                            Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao remover saída/despesa.', confirmButtonText: 'OK' });
                         }
                     }, 'json');
                 }
             });
         }
 
-
         function verDepositosCaixa(data) {
             carregarDepositosCaixaUnificado(data);
             $('#verDepositosCaixaModal').modal('show');
+            // Ajusta largura das colunas quando o modal terminar de abrir
+            $('#verDepositosCaixaModal').one('shown.bs.modal', function () {
+                if ($.fn.DataTable.isDataTable('#tabelaDepositosCaixaUnificado')) {
+                    $('#tabelaDepositosCaixaUnificado').DataTable().columns.adjust();
+                }
+            });
         }
 
         function formatCurrency(value) {
@@ -2062,13 +1692,9 @@ include(__DIR__ . '/db_connection.php');
         }
 
         function transportarSaldoFecharCaixa() {
-            // Pega o valor de total_em_caixa e formata corretamente
-            var totalEmCaixa = $('#total_em_caixa').text().replace('.', '').replace(',', '.');
-
-            // Formata o valor para exibir na mensagem de confirmação
+            var totalEmCaixa = $('#total_em_caixa').text().replace(/\./g, '').replace(',', '.').replace('R$ ', '');
             var totalEmCaixaFormatado = $('#total_em_caixa').text();
 
-            // Exibe o alerta de confirmação com SweetAlert2
             Swal.fire({
                 title: 'Tem certeza?',
                 text: `Você realmente deseja fechar o caixa e transportar o saldo de ${totalEmCaixaFormatado} para o caixa seguinte?`,
@@ -2080,7 +1706,6 @@ include(__DIR__ . '/db_connection.php');
                 cancelButtonText: 'Não, cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Se o usuário confirmar, prossegue com o fechamento do caixa
                     var dataCaixa = $('#data_caixa_deposito').val();
                     var funcionario = $('#funcionario_deposito').val();
 
@@ -2095,110 +1720,69 @@ include(__DIR__ . '/db_connection.php');
                         dataType: 'json',
                         success: function(response) {
                             if (response.success) {
-                                Swal.fire(
-                                    'Sucesso!',
-                                    'Saldo transportado e caixa fechado com sucesso!',
-                                    'success'
-                                );
+                                Swal.fire('Sucesso!', 'Saldo transportado e caixa fechado com sucesso!', 'success');
                                 $('#cadastroDepositoModal').modal('hide');
                                 location.reload();
                             } else {
-                                Swal.fire(
-                                    'Erro!',
-                                    'Erro ao transportar saldo e fechar caixa: ' + response.error,
-                                    'error'
-                                );
+                                Swal.fire('Erro!', 'Erro ao transportar saldo e fechar caixa: ' + response.error, 'error');
                             }
                         },
                         error: function(jqXHR, textStatus, errorThrown) {
-                            Swal.fire(
-                                'Erro!',
-                                'Erro ao transportar saldo e fechar caixa: ' + textStatus + ' - ' + errorThrown,
-                                'error'
-                            );
+                            Swal.fire('Erro!', 'Erro ao transportar saldo e fechar caixa: ' + textStatus + ' - ' + errorThrown, 'error');
                         }
                     });
                 }
             });
         }
 
-        // Adicionar evento para recarregar a página ao fechar os modais
-        $('#detalhesModal').on('hidden.bs.modal', function () {
-            location.reload();
-        });
+        // NOVO: Fechamento rápido via botão com cadeado dourado no card
+        function fecharCaixaRapido(funcionario, data) {
+            // Prepara os campos ocultos (usados pelo fluxo existente)
+            $('#data_caixa_deposito').val(data);
+            $('#funcionario_deposito').val(funcionario);
 
-        $('#cadastroSaidaModal').on('hidden.bs.modal', function () {
-            location.reload();
-        });
-
-        $('#cadastroDepositoModal').on('hidden.bs.modal', function () {
-            location.reload();
-        });
-
-        $('#verDepositosCaixaModal').on('hidden.bs.modal', function () {
-            location.reload();
-        });
-
-        $(document).ready(function() {
-            var currentYear = new Date().getFullYear();
-
-            // Função de validação de data
-            function validateDate(input) {
-                var selectedDate = new Date($(input).val());
-                if (selectedDate.getFullYear() > currentYear) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Data inválida',
-                        text: 'O ano não pode ser maior que o ano atual.',
-                        confirmButtonText: 'Ok'
-                    });
-                    $(input).val(''); // Limpa o campo da data
-                }
-            }
-
-            // Aplicar a validação de data nos campos de filtro de pesquisa
-            $('#data_inicial, #data_final').on('change', function() {
-                // Certifique-se de que há um valor antes de validar
-                if ($(this).val()) {
-                    validateDate(this);
-                }
+            // Carrega os totais e, quando terminar, chama diretamente o fluxo de fechamento com os mesmos alerts
+            carregarDepositos(funcionario, data, function(){
+                transportarSaldoFecharCaixa();
             });
-        });
+        }
 
-        $(document).ready(function() {
-            // Detectar mudanças no campo tipo_deposito
-            $('#tipo_deposito').on('change', function() {
-                var tipo = $(this).val();
+        // Recarregar ao fechar modais
+        $('#detalhesModal').on('hidden.bs.modal', function () { location.reload(); });
+        $('#cadastroSaidaModal').on('hidden.bs.modal', function () { location.reload(); });
+        $('#cadastroDepositoModal').on('hidden.bs.modal', function () { location.reload(); });
+        $('#verDepositosCaixaModal').on('hidden.bs.modal', function () { location.reload(); });
 
-                if (tipo === 'Espécie') {
-                    // Mostrar a opção "Sem Comprovante"
-                    $('#semComprovanteDiv').show();
-                } else {
-                    // Ocultar a opção "Sem Comprovante" e restaurar obrigatoriedade do comprovante
-                    $('#semComprovanteDiv').hide();
-                    $('#sem_comprovante').val('nao');
-                    $('#comprovante_deposito').prop('required', true);
-                }
-            });
+        // Abertura do caixa (submit)
+        $('#formAbrirCaixa').on('submit', function(e) {
+            e.preventDefault();
 
-            // Detectar mudanças no select "Sem Comprovante"
-            $('#sem_comprovante').on('change', function() {
-                var semComprovante = $(this).val();
-                
-                if (semComprovante === 'sim') {
-                    // Se "Sem Comprovante" for selecionado, remover obrigatoriedade do anexo
-                    $('#comprovante_deposito').prop('required', false);
-                    $('#divComprovante').hide(); // Esconder o campo de anexo
-                } else {
-                    // Restaurar obrigatoriedade do anexo se "Sem Comprovante" for "Não"
-                    $('#comprovante_deposito').prop('required', true);
-                    $('#divComprovante').show(); // Mostrar o campo de anexo
+            var saldoInicial = $('#saldo_inicial').val().replace(/\./g, '').replace(',', '.');
+
+            $.ajax({
+                url: 'abrir_caixa.php',
+                type: 'POST',
+                data: { saldo_inicial: saldoInicial },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({ icon: 'success', title: 'Caixa aberto com sucesso!', showConfirmButton: true, confirmButtonText: 'OK' })
+                        .then((result) => {
+                            if (result.isConfirmed) {
+                                $('#abrirCaixaModal').modal('hide');
+                                location.reload();
+                            }
+                        });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao abrir caixa: ' + response.error, showConfirmButton: true, confirmButtonText: 'OK' });
+                    }
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao abrir caixa: ' + textStatus + ' - ' + errorThrown, showConfirmButton: true, confirmButtonText: 'OK' });
                 }
             });
         });
     </script>
-        <?php
-            include(__DIR__ . '/../rodape.php');
-      ?>
+    <?php include(__DIR__ . '/../rodape.php'); ?>
 </body>
 </html>

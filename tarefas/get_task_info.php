@@ -1,5 +1,6 @@
 <?php
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 if (isset($_GET['hash_tarefa'])) {
     $hash_tarefa = $_GET['hash_tarefa'];

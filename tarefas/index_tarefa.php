@@ -28,7 +28,18 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <div id="main" class="main-content">
         <div class="container">
-            <h3>Pesquisa de Tarefas</h3>
+
+         <!-- HERO / TÍTULO -->
+            <section class="page-hero">
+            <div class="title-row">
+                <div class="title-icon"><i class="fa fa-tasks"></i></div>
+                <div>
+                <h1>Pesquisa de Tarefas</h1>
+                <div class="subtitle muted">Filtre por número, apresentante, categoria, data, origem, status...</div>
+                </div>
+            </div>
+            </section>
+
             <form id="searchForm">
                 <div class="form-row">
                     <div class="form-group col-md-2">
@@ -39,7 +50,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         <label for="title">Título da Tarefa:</label>
                         <input type="text" class="form-control" id="title" name="title">
                     </div>
-                    <div class="form-group col-md-2">
+                    <div class="form-group col-md-3">
                         <label for="category">Categoria:</label>
                         <select id="category" name="category" class="form-control">
                             <option value="">Selecione</option>
@@ -54,6 +65,15 @@ date_default_timezone_set('America/Sao_Paulo');
                             ?>
                         </select>
                     </div>
+                    <div class="form-group col-md-4">
+                        <label>Data Limite:</label>
+                        <div class="d-flex gap-2">
+                            <input type="date" class="form-control" id="dateStart" name="dateStart">
+                            <span style="margin: 0 8px; align-self: center;">até</span>
+                            <input type="date" class="form-control" id="dateEnd" name="dateEnd">
+                        </div>
+                    </div>
+
                     <div class="form-group col-md-2">
                         <label for="origin">Origem:</label>
                         <select id="origin" name="origin" class="form-control">
@@ -86,7 +106,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             <option value="Finalizado sem prática do ato">Finalizado sem prática do ato</option>
                         </select>
                     </div>
-                    <div class="form-group col-md-4">
+                    <div class="form-group col-md-5">
                         <label for="description">Descrição:</label>
                         <input type="text" class="form-control" id="description" name="description">
                     </div>
@@ -130,15 +150,21 @@ date_default_timezone_set('America/Sao_Paulo');
                             ?>
                         </select>
                     </div>
+                
+                <div class="form-group col-md-3 align-self-end">
+                    <!-- <label style="visibility: hidden;">Filtrar</label> -->
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
+                    </button>
                 </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <button type="submit" style="width: 100%;" class="btn btn-primary"><i class="fa fa-filter" aria-hidden="true"></i> Filtrar</button>
-                    </div>
-                    <div class="col-md-6 text-right">
-                        <button id="add-button" type="button" style="width: 100%;" class="btn btn-success" onclick="window.location.href='criar-tarefa.php'"><i class="fa fa-plus" aria-hidden="true"></i> Adicionar</button>
-                    </div>
+
+                <div class="form-group col-md-3 align-self-end">
+                    <!-- <label style="visibility: hidden;">Adicionar</label> -->
+                    <button id="add-button" type="button" class="btn btn-success w-100" onclick="window.location.href='criar-tarefa.php'">
+                        <i class="fa fa-plus" aria-hidden="true"></i> Nova Tarefa
+                    </button>
                 </div>
+
             </form>
         </div>
         <div class="result-block">
@@ -192,28 +218,34 @@ date_default_timezone_set('America/Sao_Paulo');
             <div class="actions-toolbar">  
                 <div class="action-buttons">  
                     <button id="guiaProtocoloButton" class="action-btn">  
-                        <i class="fa fa-print"></i>  
-                        <span>Protocolo Geral</span>  
+                    <i class="fa fa-print"></i>  
+                    <span>Protocolo Geral</span>  
                     </button>  
                     <button id="guiaRecebimentoButton" class="action-btn">  
-                        <i class="fa fa-file-text"></i>  
-                        <span>Guia Recebimento</span>  
+                    <i class="fa fa-file-text"></i>  
+                    <span>Guia Recebimento</span>  
                     </button>  
                     <button id="add-button" class="action-btn success" onclick="window.open('../oficios/cadastrar-oficio.php', '_blank')">  
-                        <i class="fa fa-plus"></i>  
-                        <span>Criar Ofício</span>  
+                    <i class="fa fa-plus"></i>  
+                    <span>Criar Ofício</span>  
                     </button>  
                     <button id="vincularOficioButton" class="action-btn primary" data-toggle="modal" data-target="#vincularOficioModal">  
-                        <i class="fa fa-link"></i>  
-                        <span>Vincular Ofício</span>  
+                    <i class="fa fa-link"></i>  
+                    <span>Vincular Ofício</span>  
                     </button>  
                     <button id="reciboEntregaButton" class="action-btn">  
-                        <i class="fa fa-file-text"></i>  
-                        <span>Recibo Entrega</span>  
+                    <i class="fa fa-file-text"></i>  
+                    <span>Recibo Entrega</span>  
                     </button>  
                     <button id="editTaskButton" class="action-btn editar">
-                        <i class="fa fa-pencil"></i>
-                        <span>Editar</span>
+                    <i class="fa fa-pencil"></i>
+                    <span>Editar</span>
+                    </button>
+
+                    <!-- NOVO: Arquivar Ato -->
+                    <button id="archiveTaskButton" class="action-btn" data-toggle="modal" data-target="#modalArquivarAto">
+                    <i class="fa fa-archive"></i>
+                    <span>Arquivar Ato</span>
                     </button>
                 </div>  
             </div>
@@ -600,7 +632,7 @@ date_default_timezone_set('America/Sao_Paulo');
 </div>
 
 
-    <!-- Modal Criar Subtarefa -->  
+<!-- Modal Criar Subtarefa -->  
 <div class="modal fade" id="createSubTaskModal" tabindex="-1" role="dialog" aria-labelledby="createSubTaskModalLabel" aria-hidden="true">  
     <div class="modal-dialog modal-xl" role="document">  
         <div class="modal-content">  
@@ -640,7 +672,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                     ?>  
                                 </select>  
                             </div>  
-                          
+                        
                             <div class="info-item">  
                                 <label for="subTaskDeadline">Data Limite</label>  
                                 <input type="datetime-local" class="form-control-modern" id="subTaskDeadline" name="deadline" required>  
@@ -759,6 +791,152 @@ date_default_timezone_set('America/Sao_Paulo');
         </div>  
     </div>  
 </div>
+
+<!-- Modal Arquivar Ato -->
+<div class="modal fade" id="modalArquivarAto" tabindex="-1" role="dialog" aria-labelledby="modalArquivarAtoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-content">
+
+      <div class="primary-header">
+        <div class="modal-header-content">
+          <h5 class="modal-title" id="modalArquivarAtoLabel">
+            <i class="fa fa-archive"></i> Arquivar Ato
+          </h5>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <form id="arquivarAtoForm" enctype="multipart/form-data">
+          <!-- Dados do Ato -->
+          <div class="info-grid columns-4">
+            <div class="info-item">
+              <label for="arq_atribuicao">Atribuição</label>
+              <select id="arq_atribuicao" name="atribuicao" class="form-control-modern" required>
+                <option value="">Selecione</option>
+                <option value="Registro Civil">Registro Civil</option>
+                <option value="Registro de Imóveis">Registro de Imóveis</option>
+                <option value="Registro de Títulos e Documentos">Registro de Títulos e Documentos</option>
+                <option value="Registro Civil das Pessoas Jurídicas">Registro Civil das Pessoas Jurídicas</option>
+                <option value="Notas">Notas</option>
+                <option value="Protesto">Protesto</option>
+                <option value="Contratos Marítimos">Contratos Marítimos</option>
+              </select>
+            </div>
+
+            <div class="info-item">
+              <label for="arq_categoria">Categoria</label>
+              <select id="arq_categoria" name="categoria" class="form-control-modern" required>
+                <option value="">Carregando...</option>
+              </select>
+            </div>
+
+            <div class="info-item">
+              <label for="arq_data_ato">Data do Ato</label>
+              <input type="date" id="arq_data_ato" name="data_ato" class="form-control-modern" required>
+            </div>
+
+            <div class="info-item">
+              <label for="arq_livro">Livro</label>
+              <input type="text" id="arq_livro" name="livro" class="form-control-modern" placeholder="Opcional">
+            </div>
+
+            <div class="info-item">
+              <label for="arq_folha">Folha</label>
+              <input type="text" id="arq_folha" name="folha" class="form-control-modern" placeholder="Opcional">
+            </div>
+
+            <div class="info-item">
+              <label for="arq_termo">Termo/Ordem</label>
+              <input type="text" id="arq_termo" name="termo" class="form-control-modern" placeholder="Opcional">
+            </div>
+
+            <div class="info-item">
+              <label for="arq_protocolo">Protocolo</label>
+              <input type="text" id="arq_protocolo" name="protocolo" class="form-control-modern" placeholder="Opcional">
+            </div>
+
+            <div class="info-item">
+              <label for="arq_matricula">Matrícula</label>
+              <input type="text" id="arq_matricula" name="matricula" class="form-control-modern" placeholder="Opcional">
+            </div>
+          </div>
+
+          <!-- Partes Envolvidas (opcional) -->
+          <div class="enhanced-block" style="margin-top:10px;">
+            <div class="section-header">
+              <h4 class="section-title"><i class="fa fa-users"></i> Partes Envolvidas (opcional)</h4>
+            </div>
+
+            <div class="info-grid columns-3">
+              <div class="info-item">
+                <label for="arq_cpf">CPF/CNPJ</label>
+                <input type="text" id="arq_cpf" class="form-control-modern" placeholder="CPF/CNPJ">
+              </div>
+              <div class="info-item" style="grid-column: span 2;">
+                <label for="arq_nome_parte">Nome</label>
+                <input type="text" id="arq_nome_parte" class="form-control-modern" placeholder="Nome completo">
+              </div>
+            </div>
+
+            <button type="button" id="arq_add_parte" class="action-btn">
+              <i class="fa fa-user-plus"></i> Adicionar Parte
+            </button>
+
+            <div class="table-responsive" style="margin-top:10px;">
+              <table class="table table-modern" style="zoom: 90%">
+                <thead>
+                  <tr>
+                    <th>CPF/CNPJ</th>
+                    <th>Nome</th>
+                    <th style="width:80px">Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="arq_partes_table"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Descrição -->
+          <div class="description-section enhanced-block">
+            <label for="arq_descricao">Descrição e Detalhes</label>
+            <textarea id="arq_descricao" name="descricao" rows="4" class="form-control-modern"></textarea>
+          </div>
+
+          <!-- Anexos da Tarefa (selecionáveis) + opcionais novos uploads -->
+          <div class="attachments-section enhanced-block">
+            <h4 class="section-title"><i class="fa fa-paperclip"></i> Anexos da tarefa</h4>
+
+            <!-- lista de checkboxes será renderizada via JS -->
+            <div id="arq_attachments_list" class="attachments-list"></div>
+
+            <div class="soft-divider"></div>
+
+            <label>Anexos adicionais (opcional)</label>
+            <div class="file-upload-wrapper">
+              <input type="file" id="arq_file_input" name="file-input[]" class="modern-file-input" multiple>
+              <label for="arq_file_input" class="file-upload-label">
+                <i class="fa fa-cloud-upload"></i>
+                <span class="upload-text">Arraste os arquivos ou clique para selecionar</span>
+              </label>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-close-modal" data-dismiss="modal">
+          <i class="fa fa-times"></i> Cancelar
+        </button>
+        <button type="submit" form="arquivarAtoForm" class="action-btn success" id="arq_submit_btn">
+          <i class="fa fa-save"></i> Salvar Arquivamento
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/bootstrap.bundle.min.js"></script>
     <script src="../script/jquery.mask.min.js"></script>
@@ -1118,8 +1296,12 @@ $('#sortSelect, #sortOrder').on('change', function() {
             aValue = parseInt($(a).find('.card-title').text().replace(/\D/g, '')) || 0;
             bValue = parseInt($(b).find('.card-title').text().replace(/\D/g, '')) || 0;
         } else if (sortBy === 'data') {
-            aValue = new Date($(a).find('.card-info:contains("Data Limite")').text().replace('Data Limite:', '').trim());
-            bValue = new Date($(b).find('.card-info:contains("Data Limite")').text().replace('Data Limite:', '').trim());
+            const regex = /Data Limite:\s*(.*)/i;
+            const aText = ($(a).find('.card-info:contains("Data Limite")').text().match(regex) || [])[1] || '';
+            const bText = ($(b).find('.card-info:contains("Data Limite")').text().match(regex) || [])[1] || '';
+            
+            aValue = new Date(aText.split('/').reverse().join('-')).getTime() || 0;
+            bValue = new Date(bText.split('/').reverse().join('-')).getTime() || 0;
         } else if (sortBy === 'prioridade') {
             const priorityMap = { 'baixa': 1, 'média': 2, 'media': 2, 'alta': 3, 'crítica': 4, 'critica': 4 };
             aValue = priorityMap[$(a).find('.card-info:contains("Prioridade")').text().replace('Prioridade:', '').trim().toLowerCase()] || 0;
@@ -1619,21 +1801,100 @@ function viewTask(taskToken) {
             $('#taskNumber').text(task.id); // Atualizar o número da tarefa aqui
             $('#viewConclusionDate').val(task.data_conclusao ? new Date(task.data_conclusao).toLocaleString("pt-BR") : '');
 
-            // Gerenciamento de anexos
-            var viewAttachments = $('#viewAttachments');
-            viewAttachments.empty();
-            if (task.caminho_anexo) {
-                task.caminho_anexo.split(';').forEach(function(anexo, index) {
-                    var fileName = anexo.split('/').pop();
-                    var filePath = anexo.startsWith('/') ? anexo : '/' + anexo;
-                    var attachmentItem = '<div class="anexo-item">' +
-                        '<span>' + (index + 1) + '</span>' +
-                        '<span>' + fileName + '</span>' +
-                        '<button class="btn btn-info btn-sm visualizar-anexo" data-file="' + filePath + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
-                        '</div>';
-                    viewAttachments.append(attachmentItem);
-                });
-            }
+// Gerenciamento de anexos (tarefa + comentários)
+var viewAttachments = $('#viewAttachments');
+viewAttachments.empty();
+
+// array global para uso no modal de arquivar
+window.currentTaskAttachments = [];
+
+function normPathFromAnexo(raw) {
+  let anexo = (raw || '').trim();
+  if (!anexo) return null;
+
+  if ((anexo.startsWith('"') && anexo.endsWith('"')) || (anexo.startsWith("'") && anexo.endsWith("'"))) {
+    anexo = anexo.slice(1, -1).trim();
+  }
+  if (!anexo) return null;
+
+  anexo = anexo.replace(/\\/g, '/');
+  let pathOnly;
+  try {
+    const u = new URL(anexo, window.location.origin);
+    pathOnly = u.pathname;
+  } catch (e) {
+    pathOnly = anexo.split('?')[0].split('#')[0];
+  }
+
+  pathOnly = pathOnly.replace(/\/{2,}/g, '/').trim();
+  if (!pathOnly) return null;
+
+  const parts = pathOnly.split('/').filter(Boolean);
+  const fileName = decodeURIComponent(parts[parts.length - 1] || '');
+  if (!fileName) return null;
+
+  const relPath = pathOnly.startsWith('/') ? pathOnly.slice(1) : pathOnly;
+
+  return { relPath, fileName, urlPath: pathOnly.startsWith('/') ? pathOnly : '/' + pathOnly };
+}
+
+// coletores/deduplicação global
+const seen = new Set();
+const all = [];
+
+// 1) anexos da tarefa principal
+if (task.caminho_anexo) {
+  String(task.caminho_anexo).split(';').forEach(function(raw){
+    const norm = normPathFromAnexo(raw);
+    if (!norm) return;
+    const key = norm.relPath + '|' + norm.fileName;
+    if (seen.has(key)) return;
+    seen.add(key);
+    all.push({ rel: norm.relPath, name: norm.fileName, url: norm.urlPath });
+  });
+}
+
+// 2) anexos vindos dos comentários
+if (Array.isArray(task.comentarios)) {
+  task.comentarios.forEach(function(c){
+    if (!c || !c.caminho_anexo) return;
+    String(c.caminho_anexo).split(';').forEach(function(raw){
+      const norm = normPathFromAnexo(raw);
+      if (!norm) return;
+      const key = norm.relPath + '|' + norm.fileName;
+      if (seen.has(key)) return;
+      seen.add(key);
+      all.push({ rel: norm.relPath, name: norm.fileName, url: norm.urlPath });
+    });
+  });
+}
+
+// 3) preenche global e UI
+window.currentTaskAttachments = all.map(x => ({ rel: x.rel, name: x.name }));
+
+if (all.length) {
+  all.forEach(function(x, idx){
+    const attachmentItem =
+      '<div class="anexo-item">' +
+        '<span>' + (idx+1) + '</span>' +
+        '<span>' + x.name + '</span>' +
+        '<button class="btn btn-info btn-sm visualizar-anexo" data-file="' + x.url + '"><i class="fa fa-eye" aria-hidden="true"></i></button>' +
+      '</div>';
+    viewAttachments.append(attachmentItem);
+  });
+} else {
+  // nenhum anexo (mantém vazio)
+}
+
+
+// Pré-preencher descrição do arquivamento com título/descrição da tarefa
+var tituloTarefa = task.titulo || '';
+var descricaoTarefa = task.descricao || '';
+var protocoloStr = task.id ? ('Tarefa #' + task.id + ' • ') : '';
+var descCompleta = (protocoloStr + tituloTarefa).trim();
+if (descricaoTarefa) descCompleta += "\n\n" + descricaoTarefa;
+$('#arq_descricao').val(descCompleta);
+
 
             // Gerenciamento da linha do tempo de comentários
             var commentTimeline = $('#commentTimeline');
@@ -1684,13 +1945,230 @@ function viewTask(taskToken) {
 }
 
 
+// ======= Auxiliares (mesmas regras do cadastro) =======
+function arq_validarCPF_CNPJ(value){
+  const digitsOnly=(value||'').replace(/[^\d]/g,'');
+  if(!digitsOnly) return false;
+  if(digitsOnly.length===11){ // CPF
+    if(/^(\d)\1{10}$/.test(digitsOnly)) return false;
+    let soma=0, resto;
+    for(let i=1;i<=9;i++) soma+=parseInt(digitsOnly.substring(i-1,i))*(11-i);
+    resto=(soma*10)%11; if(resto===10||resto===11) resto=0;
+    if(resto!==parseInt(digitsOnly.substring(9,10))) return false;
+    soma=0;
+    for(let i=1;i<=10;i++) soma+=parseInt(digitsOnly.substring(i-1,i))*(12-i);
+    resto=(soma*10)%11; if(resto===10||resto===11) resto=0;
+    if(resto!==parseInt(digitsOnly.substring(10,11))) return false;
+    return true;
+  }
+  if(digitsOnly.length===14){ // CNPJ
+    if(/^(\d)\1{13}$/.test(digitsOnly)) return false;
+    let tamanho=digitsOnly.length-2;
+    let numeros=digitsOnly.substring(0,tamanho);
+    let digitos=digitsOnly.substring(tamanho);
+    let soma=0,pos=tamanho-7;
+    for(let i=tamanho;i>=1;i--){ soma+=numeros.charAt(tamanho-i)*pos--; if(pos<2) pos=9; }
+    let resultado=soma%11<2?0:11-soma%11;
+    if(resultado!==parseInt(digitos.charAt(0))) return false;
+    tamanho=tamanho+1; numeros=digitsOnly.substring(0,tamanho); soma=0; pos=tamanho-7;
+    for(let i=tamanho;i>=1;i--){ soma+=numeros.charAt(tamanho-i)*pos--; if(pos<2) pos=9; }
+    resultado=soma%11<2?0:11-soma%11;
+    if(resultado!==parseInt(digitos.charAt(1))) return false;
+    return true;
+  }
+  return false;
+}
+
+// ======= Carregar categorias do módulo Arquivamento =======
+let arqCategoriasLoaded = false;
+function carregarCategoriasArquivamento(){
+  return $.ajax({
+    url: '../arquivamento/categorias/categorias.json',
+    method: 'GET',
+    dataType: 'json'
+  }).then(function(list){
+    const $sel = $('#arq_categoria');
+    $sel.empty().append('<option value="">Selecione</option>');
+    (list||[]).forEach(function(cat){
+      $sel.append($('<option>', { value: cat, text: cat }));
+    });
+    arqCategoriasLoaded = true;
+  }).catch(function(){
+    $('#arq_categoria').html('<option value="">(Falha ao carregar)</option>');
+  });
+}
+
+// ======= Renderizar lista de anexos (checkboxes) =======
+function renderArquivamentoAnexos(){
+  const $list = $('#arq_attachments_list');
+  $list.empty();
+  if(!window.currentTaskAttachments || !window.currentTaskAttachments.length){
+    $list.html('<div class="muted" style="padding:8px 0;">Nenhum anexo na tarefa.</div>');
+    return;
+  }
+  window.currentTaskAttachments.forEach(function(item, idx){
+    const id = 'arq_att_' + idx;
+    const row = `
+      <div class="anexo-item" style="display:flex; align-items:center; gap:10px;">
+        <input type="checkbox" id="${id}" class="modern-checkbox" data-rel="${item.rel}" checked>
+        <label for="${id}" style="margin:0; cursor:pointer; display:flex; align-items:center; gap:8px;">
+          <i class="fa fa-paperclip"></i> <span>${item.name}</span>
+        </label>
+      </div>`;
+    $list.append(row);
+  });
+}
+
+// ======= Partes Envolvidas (opcionais) =======
+
+// NOVO: máscara dinâmica e apenas números no CPF/CNPJ do modal
+$('#arq_cpf')
+  .on('focus', function(){
+    // remove máscara e deixa só dígitos ao entrar no campo
+    $(this).unmask();
+    this.value = (this.value || '').replace(/\D/g,'');
+  })
+  .on('input', function(){
+    // só números e no máx. 14 dígitos
+    this.value = (this.value || '').replace(/\D/g,'').slice(0,14);
+  })
+  .on('blur', function(){
+    // aplica máscara conforme quantidade ao sair do campo
+    const digits = (this.value || '').replace(/\D/g,'');
+    if (!digits) return;
+    const mask = digits.length <= 11 ? '000.000.000-00' : '00.000.000/0000-00';
+    $(this).mask(mask, { reverse: true });
+  });
+
+$('#arq_add_parte').on('click', function(){
+  const cpf = ($('#arq_cpf').val()||'').trim();
+  const nome = ($('#arq_nome_parte').val()||'').trim();
+  if(!nome){
+    Swal.fire({ icon:'warning', title:'Atenção', text:'Informe o nome da parte.' });
+    return;
+  }
+  // valida com dígitos puros
+  const digits = cpf.replace(/\D/g,'');
+  if(digits && !arq_validarCPF_CNPJ(digits)){
+    Swal.fire({ icon:'error', title:'CPF/CNPJ inválido' });
+    return;
+  }
+  const tr = `
+    <tr>
+      <td>${cpf||''}</td>
+      <td>${nome}</td>
+      <td><button type="button" class="btn btn-sm btn-danger arq_remove_parte"><i class="fa fa-trash"></i></button></td>
+    </tr>`;
+  $('#arq_partes_table').append(tr);
+  $('#arq_cpf').val(''); $('#arq_nome_parte').val('').focus();
+});
+$(document).on('click', '.arq_remove_parte', function(){
+  $(this).closest('tr').remove();
+});
+
+
+// ======= Abrir modal: preparar campos =======
+$('#archiveTaskButton').on('click', async function(){
+  // Carrega categorias na primeira vez
+  if(!arqCategoriasLoaded){ await carregarCategoriasArquivamento(); }
+
+  // Data do ato padrão = hoje
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth()+1).padStart(2,'0');
+  const d = String(today.getDate()).padStart(2,'0');
+  $('#arq_data_ato').val(`${y}-${m}-${d}`);
+
+  // Monta lista dos anexos da tarefa
+  renderArquivamentoAnexos();
+
+  // Foco inicial
+  setTimeout(()=>$('#arq_atribuicao').focus(), 200);
+});
+
+// ======= Enviar para ../arquivamento/save_ato.php =======
+$('#arquivarAtoForm').on('submit', function(e){
+  e.preventDefault();
+
+  const $btn = $('#arq_submit_btn');
+  if ($btn.length) $btn.prop('disabled', true);
+
+  // Monta FormData com os mesmos nomes esperados pelo save_ato.php
+  const fd = new FormData();
+  ['atribuicao','categoria','data_ato','livro','folha','termo','protocolo','matricula','descricao'].forEach(name=>{
+    fd.append(name, $('#arq_'+name).val());
+  });
+
+  // Partes envolvidas (opcional)
+  const partes = [];
+  $('#arq_partes_table tr').each(function(){
+    const cpf  = $(this).find('td').eq(0).text().trim();
+    const nome = $(this).find('td').eq(1).text().trim();
+    if(nome) partes.push({ cpf, nome });
+  });
+  fd.append('partes_envolvidas', JSON.stringify(partes));
+
+  // Anexos já existentes (selecionados) — único loop
+  $('#arq_attachments_list input[type="checkbox"]:checked').each(function(){
+    const rel = $(this).data('rel'); // caminho relativo salvo na tarefa
+    if (rel) fd.append('existing_files[]', rel);
+  });
+
+  // Novos uploads (opcional)
+  const up = document.getElementById('arq_file_input');
+  if(up && up.files && up.files.length){
+    Array.from(up.files).forEach(f => fd.append('file-input[]', f));
+  }
+
+  // POST
+  $.ajax({
+    url: '../arquivamento/save_ato.php',
+    type: 'POST',
+    data: fd,
+    processData: false,
+    contentType: false
+  }).done(function(resp){
+    try{
+      const json = (typeof resp==='string') ? JSON.parse(resp) : resp;
+      if(json.status==='success' && json.redirect){
+        $('#modalArquivarAto').modal('hide');
+        Swal.fire({ icon:'success', title:'Arquivado!', text:'Ato arquivado com sucesso.' })
+          .then(()=> window.open('../arquivamento/'+json.redirect, '_blank'));
+      } else {
+        Swal.fire({ icon:'error', title:'Erro', text:(json.message||'Falha ao salvar o arquivamento.') });
+      }
+    }catch(e){
+      Swal.fire({ icon:'error', title:'Erro', text:'Resposta inválida do servidor.' });
+    }
+  }).fail(function(){
+    Swal.fire({ icon:'error', title:'Erro', text:'Não foi possível salvar o arquivamento.' });
+  }).always(function(){
+    if ($btn.length) $btn.prop('disabled', false);
+  });
+});
+
+
+
         $(document).on('click', '.visualizar-anexo', function() {
-            var filePath = $(this).data('file');
-            var baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '');
-            if (!filePath.startsWith('/')) {
-                filePath = '/' + filePath;
+            var filePath = String($(this).data('file') || '');
+            var basePrefix = '/atlas/tarefas/';
+
+            // Se já for URL completa, só abre
+            if (/^https?:\/\//i.test(filePath)) {
+                window.open(filePath, '_blank');
+                return;
             }
-            window.open(baseUrl + filePath, '_blank');
+
+            // Garante que sempre abra sob /atlas/tarefas/
+            if (filePath.startsWith('/')) {
+                if (!filePath.startsWith(basePrefix)) {
+                    filePath = basePrefix + filePath.replace(/^\/+/, '');
+                }
+            } else {
+                filePath = basePrefix + filePath.replace(/^\/+/, '');
+            }
+
+            window.open(filePath, '_blank');
         });
 
         function editTask(taskId) {
@@ -1913,7 +2391,7 @@ function viewTask(taskToken) {
         });
 
         // Adicionar rolagem ao modal principal após fechar o secundário
-        $('#vincularOficioModal, #reciboEntregaModal, #guiaRecebimentoModal, #createSubTaskModal, #addCommentModal').on('hidden.bs.modal', function () {
+        $('#vincularOficioModal, #modalArquivarAto, #reciboEntregaModal, #guiaRecebimentoModal, #createSubTaskModal, #addCommentModal').on('hidden.bs.modal', function () {
             $('#viewTaskModal').css('overflow-y', 'auto');
         });
 
@@ -2170,8 +2648,6 @@ function viewTask(taskToken) {
         $('#viewTaskModal').on('shown.bs.modal', function() {
             aplicarCorStatusSelect();
         });
-
-
 
         $(document).ready(function() {
             // Função para obter o valor do parâmetro da URL
