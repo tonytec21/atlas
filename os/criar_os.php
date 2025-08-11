@@ -208,7 +208,9 @@ include(__DIR__ . '/../menu.php');
             <label for="observacoes">Observações:</label>
             <textarea class="form-control" id="observacoes" name="observacoes" rows="4"></textarea>
         </div>
-        <button type="button" class="btn btn-primary btn-block" onclick="salvarOS()"><i class="fa fa-floppy-o" aria-hidden="true"></i> SALVAR OS</button>
+        <button type="button" id="btnSalvarOS" class="btn btn-primary btn-block" onclick="salvarOS()" disabled>
+            <i class="fa fa-floppy-o" aria-hidden="true"></i> SALVAR OS
+        </button>
     </div>
 </div>
 
@@ -248,6 +250,12 @@ include(__DIR__ . '/../menu.php');
 
     /* ---------- lista de exceções ---------- */
     const ATOS_SEM_VALOR = <?php echo json_encode($atosSemValor, JSON_UNESCAPED_UNICODE); ?>;
+
+    function updateSalvarButtonState() {
+        const hasItems   = $('#itensTable tr').length > 0;
+        const hasCliente = $('#cliente').val().trim().length > 0;
+        $('#btnSalvarOS').prop('disabled', !(hasItems && hasCliente));
+    }
 
     $(document).ready(function() {
     // Inicializa a funcionalidade de arrastar e soltar na tabela de itens
@@ -374,6 +382,9 @@ $(document).ready(function() {
         }
     });
 
+    // Atualiza o estado do botão ao digitar/focar no campo Apresentante
+    $('#cliente').on('input blur', updateSalvarButtonState);
+
     $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #total').mask('#.##0,00', {reverse: true});
 
     $('#osForm').on('submit', function(e) {
@@ -421,7 +432,8 @@ $(document).ready(function() {
             '</tr>';
             
         $('#itensTable').append(item);
-        atualizarISS(); 
+        atualizarISS();
+        updateSalvarButtonState();
         
         // var totalOS = parseFloat($('#total_os').val().replace(/\./g, '').replace(',', '.')) || 0;
         // totalOS += total;
@@ -454,6 +466,9 @@ $(document).ready(function() {
     $('#quantidade, #desconto_legal').on('input', function() {
         this.value = this.value.replace(/[^0-9]/g, '');
     });
+
+    // Habilita/Desabilita o botão Salvar conforme itens na OS
+    updateSalvarButtonState();
 });
 
 function buscarAto() {
@@ -585,11 +600,25 @@ function removerItem(button) {
     row.remove();
     atualizarISS();
     atualizarOrdemExibicao();
+    updateSalvarButtonState();
 }
 
 function salvarOS() {
+    // Valida pré-condições
+    const clientePreenchido = $('#cliente').val().trim().length > 0;
+    const temItens          = $('#itensTable tr').length > 0;
+
+    if (!clientePreenchido) {
+        showAlert('Preencha o campo "Apresentante" antes de salvar.', 'error');
+        return;
+    }
+    if (!temItens) {
+        showAlert('Adicione ao menos um ato à OS antes de salvar.', 'error');
+        return;
+    }
+
     // Desabilita o botão "SALVAR OS" para evitar clique duplo
-    $('button.btn-primary.btn-block').prop('disabled', true);
+    $('#btnSalvarOS').prop('disabled', true);
 
     var cliente = $('#cliente').val();
     var cpf_cliente = $('#cpf_cliente').val();
@@ -769,10 +798,11 @@ function carregarModeloSelecionado() {
                     $('#itensTable').append(row);
                 });
 
-                /* ----------------------------------------------------------
+                   /* ----------------------------------------------------------
                    Recalcula (ou cria) a linha fixa do ISS e o total da OS
                    ----------------------------------------------------------*/
                 atualizarISS();
+                updateSalvarButtonState();
             }
         },
         error: function (xhr) {

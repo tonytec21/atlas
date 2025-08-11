@@ -1422,10 +1422,9 @@ include(__DIR__ . '/../menu.php');
                 icon: 'warning',
                 title: 'Depósito Prévio ausente',
                 text: 'A OS não possui pagamento registrado. O que você deseja fazer?',
-                showDenyButton: true,
+                showDenyButton: false,        // ocultar "Continuar sem Pagamento"
                 showCancelButton: true,
                 confirmButtonText: 'Adicionar Pagamento',
-                denyButtonText: 'Continuar sem Pagamento',
                 cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
@@ -1439,10 +1438,9 @@ include(__DIR__ . '/../menu.php');
                 icon: 'warning',
                 title: 'Saldo insuficiente',
                 html: `O valor disponível em depósito (<b>R$ ${saldoDisponivel.toFixed(2).replace('.', ',')}</b>) não é suficiente para liquidar este ato que custa <b>R$ ${valorAtoALiquidar.toFixed(2).replace('.', ',')}</b>.<br><br>O que deseja fazer?`,
-                showDenyButton: true,
+                showDenyButton: false,        // ocultar "Continuar assim mesmo"
                 showCancelButton: true,
                 confirmButtonText: 'Adicionar Pagamento',
-                denyButtonText: 'Continuar assim mesmo',
                 cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
@@ -1455,8 +1453,6 @@ include(__DIR__ . '/../menu.php');
             abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada);
         }
     }
-
-
 
     function abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada) {
         liquidacaoItemId = itemId;
@@ -2010,10 +2006,9 @@ include(__DIR__ . '/../menu.php');
                     icon: 'warning',
                     title: 'Depósito Prévio ausente',
                     text: 'A OS não possui pagamento registrado. O que você deseja fazer?',
-                    showDenyButton: true,
+                    showDenyButton: false, // ocultar "Continuar sem Pagamento"
                     showCancelButton: true,
                     confirmButtonText: 'Adicionar Pagamento',
-                    denyButtonText: 'Continuar sem Pagamento',
                     cancelButtonText: 'Cancelar'
                 }).then((result) => {
                     if (result.isConfirmed) {
@@ -2027,10 +2022,9 @@ include(__DIR__ . '/../menu.php');
                     icon: 'warning',
                     title: 'Saldo insuficiente',
                     html: `O valor disponível em depósito (<b>R$ ${saldoDisponivel.toFixed(2).replace('.', ',')}</b>) não é suficiente para liquidar todos os atos restantes que somam <b>R$ ${totalRestante.toFixed(2).replace('.', ',')}</b>.<br><br>O que deseja fazer?`,
-                    showDenyButton: true,
+                    showDenyButton: false, // ocultar "Continuar assim mesmo"
                     showCancelButton: true,
                     confirmButtonText: 'Adicionar Pagamento',
-                    denyButtonText: 'Continuar assim mesmo',
                     cancelButtonText: 'Cancelar'
                 }).then((result) => {
                     if (result.isConfirmed) {
@@ -2043,7 +2037,6 @@ include(__DIR__ . '/../menu.php');
                 confirmarLiquidacaoTudo();
             }
         }
-
 
         function confirmarLiquidacaoTudo() {
             Swal.fire({
@@ -2088,7 +2081,6 @@ include(__DIR__ . '/../menu.php');
                 }
             });
         }
-
 
 </script>
 <?php

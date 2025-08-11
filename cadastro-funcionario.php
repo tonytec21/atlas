@@ -75,7 +75,6 @@ if (isset($_POST['import_xlsx']) && isset($_FILES['xlsx_file'])) {
         \PhpOffice\PhpSpreadsheet\Settings::setLibXmlLoaderOptions(LIBXML_NONET);
         $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader('Xlsx');
         $reader->setReadDataOnly(true);
-        // $reader->setReadEmptyCells(false); // opcional
         $spreadsheet = $reader->load($file['tmp_name']);
         $sheet = $spreadsheet->getActiveSheet();
         $highestRow = $sheet->getHighestDataRow();
@@ -336,64 +335,96 @@ $connAtlas->close();
     <link rel="stylesheet" href="style/css/dataTables.bootstrap4.min.css">
     <link href="style/css/select2.min.css" rel="stylesheet" />
     <style>
+        /* =======================================================================
+           TOKENS / THEME (alinhado ao layout moderno)
+        ======================================================================= */
         :root{
+            --brand:#4F46E5;
+            --brand-2:#6366F1;
             --brand-start:#0ea5e9;
             --brand-end:#7c3aed;
             --bg:#f6f7fb;
             --card:#ffffff;
             --muted:#6b7280;
-            --text:#0f172a;
+            --text:#1f2937;
             --border:#e5e7eb;
+            --shadow:0 10px 25px rgba(16,24,40,.06);
+            --soft-shadow:0 6px 18px rgba(16,24,40,.08);
         }
+        body.light-mode{ background:var(--bg); color:var(--text); }
         body.dark-mode{
-            --bg:#0b1020;
-            --card:#0f172a;
-            --muted:#94a3b8;
-            --text:#e5e7eb;
-            --border:#1f2937;
+            --bg:#0f141a; --card:#1a2129; --text:#e5e7eb; --muted:#9aa6b2; --border:#2a3440;
+            --shadow:0 10px 25px rgba(0,0,0,.35); --soft-shadow:0 6px 18px rgba(0,0,0,.4);
+            background:var(--bg); color:var(--text);
+        }
+        .muted{ color:var(--muted)!important; }
+
+        /* =======================================================================
+           HERO
+        ======================================================================= */
+        .page-hero{
+            background:linear-gradient(180deg, rgba(79,70,229,.10), rgba(79,70,229,0));
+            border-radius:18px; padding:18px 18px 10px; margin:20px 0 12px; box-shadow:var(--soft-shadow);
+        }
+        .page-hero .title-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+        .title-icon{
+            width:44px;height:44px;border-radius:12px;background:#EEF2FF;color:#3730A3;
+            display:flex;align-items:center;justify-content:center;font-size:20px;
+        }
+        body.dark-mode .title-icon{ background:#262f3b;color:#c7d2fe; }
+        .page-hero h1{ font-weight:800; margin:0; }
+
+        /* =======================================================================
+           CARDS
+        ======================================================================= */
+        .form-card, .list-card{
+            background:var(--card); border:1px solid var(--border);
+            border-radius:16px; padding:16px; box-shadow:var(--shadow);
+        }
+        .form-card label{
+            font-size:.78rem; text-transform:uppercase; letter-spacing:.04em;
+            color:var(--muted); margin-bottom:6px; font-weight:700;
+        }
+        .form-card .form-control, .form-card select{
+            background:transparent; color:var(--text);
+            border:1px solid var(--border); border-radius:10px;
+        }
+        .form-card .form-control:focus, .form-card select:focus{
+            border-color:#a5b4fc; box-shadow:0 0 0 .2rem rgba(99,102,241,.15);
         }
 
-        .chart-container{ position:relative; height:240px; }
-        .chart-container.full-height{ height:360px; }
-        .btn-info:hover{ color:#fff; }
-
-        @media (max-width: 768px){
-            .chart-container{ height:200px; margin-top:20px; }
-            .chart-container.full-height{ height:300px; margin:20px 0; }
-            .card-body{ padding:1rem; }
-            .card{ margin-bottom:1rem; }
+        .toolbar-actions{ display:flex; gap:.5rem; flex-wrap:wrap; }
+        .btn-gradient{
+            background:linear-gradient(135deg, var(--brand), var(--brand-2));
+            color:#fff; border:none;
         }
+        .btn-gradient:hover{ filter:brightness(.96); color:#fff; }
+        .btn-outline-secondary{ border-radius:10px; }
+        .btn-warning, .btn-danger{ border:none; }
 
-        .notification{
-            position:fixed; bottom:20px; right:20px; background-color:#343a40; color:#fff;
-            padding:15px; border-radius:5px; box-shadow:0 2px 10px rgba(0,0,0,.1); z-index:1000; display:none;
+        /* Input-group (olho de senha) */
+        .input-group .btn-eye{
+            border:1px solid var(--border); border-left:0; background:transparent; color:var(--muted);
         }
-        .notification .close-btn{ cursor:pointer; float:right; margin-left:10px; }
+        .input-group .btn-eye:hover{ color:var(--text); }
 
+        /* Select2 – aparência integrada */
         .select2-container--default .select2-selection--multiple{
-            display:block; width:100%; height:auto; padding:.375rem .75rem; font-size:1rem; font-weight:400;
-            line-height:1.5; color:#495057; background-color:#fff; background-clip:padding-box; border:1px solid #ced4da;
-            border-radius:.25rem; transition:border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+            display:block; width:100%; min-height: calc(2.25rem + 2px);
+            padding:.2rem .5rem; font-size:1rem; line-height:1.5; color:var(--text);
+            background-color:transparent; border:1px solid var(--border); border-radius:10px;
         }
-        .select2-container--default .select2-selection--multiple:focus,
-        .select2-container--default .select2-selection--multiple:active{
-            color:#495057; background-color:#fff; border-color:#80bdff; outline:0;
-            box-shadow:0 0 0 .2rem rgba(0,123,255,.25);
-        }
-        .select2-container--default .select2-selection--multiple .select2-selection__placeholder{ color:#6c757d; }
         .select2-container--default .select2-selection--multiple .select2-selection__choice{
-            background-color:#007bff; color:#fff; border-radius:.2rem; padding:.25rem .75rem .25rem .5rem;
-            margin-right:.25rem; margin-top:.25rem; display:inline-block;
+            background-color:#e0e7ff; color:#3730A3; border:1px solid #c7d2fe;
+            border-radius:999px; padding:.2rem .6rem; margin:.2rem;
+            font-weight:700; font-size:.78rem;
         }
-        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove{
-            position:relative; right:0; margin-left:-.5rem; font-weight:bold; font-size:1rem; color:#fff; cursor:pointer;
+        body.dark-mode .select2-container--default .select2-selection--multiple{
+            border-color:var(--border); color:var(--text); background:transparent;
         }
-        .select2-container--default .select2-selection--multiple:focus{
-            border-color:#80bdff; box-shadow:0 0 0 .2rem rgba(0,123,255,.25);
-        }
-        @media (prefers-reduced-motion: reduce){
-            .select2-container--default .select2-selection--multiple{ transition:none; }
-        }
+
+        /* DataTable */
+        table.dataTable thead th{ white-space:nowrap; }
 
         /* ===================== MODAL DE IMPORTAÇÃO ===================== */
         .modal-modern .modal-content{
@@ -406,7 +437,7 @@ $connAtlas->close();
             background: linear-gradient(90deg, var(--brand-start), var(--brand-end));
             color:#fff;
         }
-        .modal-modern .modal-title{ font-weight:600; letter-spacing:.3px; }
+        .modal-modern .modal-title{ font-weight:700; letter-spacing:.3px; }
         .modal-modern .modal-body{ background:var(--card); color:var(--text); }
         .modal-modern .modal-footer{ border-top:1px solid var(--border); background:var(--card); }
 
@@ -424,9 +455,12 @@ $connAtlas->close();
         .badge-soft-success{ background:rgba(16,185,129,.15); color:#10b981; }
         .badge-soft-danger{ background:rgba(239,68,68,.15); color:#ef4444; }
 
-        .toolbar-actions{ display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
-        .btn-gradient{ background: linear-gradient(90deg, var(--brand-start), var(--brand-end)); color:#fff; border:none; }
-        .btn-gradient:hover{ filter:brightness(0.95); color:#fff; }
+        /* Notificação antiga (mantida, mas usamos SweetAlert2) */
+        .notification{
+            position:fixed; bottom:20px; right:20px; background-color:#343a40; color:#fff;
+            padding:15px; border-radius:5px; box-shadow:0 2px 10px rgba(0,0,0,.1); z-index:1000; display:none;
+        }
+        .notification .close-btn{ cursor:pointer; float:right; margin-left:10px; }
     </style>
 </head>
 <body class="light-mode">
@@ -434,118 +468,142 @@ $connAtlas->close();
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="d-flex align-items-center justify-content-between flex-wrap">
-            <h3 class="mb-3">Cadastro de Funcionários</h3>
-            <div class="toolbar-actions">
-                <button id="novo-funcionario" type="button" class="btn btn-outline-secondary">
-                    <i class="mdi mdi-account-plus-outline"></i> Novo Funcionário
+
+        <!-- HERO / TÍTULO -->
+        <section class="page-hero">
+            <div class="title-row">
+                <div class="title-icon"><i class="mdi mdi-account-group"></i></div>
+                <div>
+                    <h1>Cadastro de Funcionários</h1>
+                    <div class="subtitle muted">Gerencie usuários, níveis de acesso e permissões. Importe em massa via planilha XLSX.</div>
+                </div>
+                <div class="ml-auto toolbar-actions">
+                    <button id="novo-funcionario" type="button" class="btn btn-outline-secondary">
+                        <i class="mdi mdi-account-plus-outline"></i> Novo Funcionário
+                    </button>
+                    <button id="btnImportarXlsx" type="button" class="btn btn-gradient" data-toggle="modal" data-target="#modalImportXlsx">
+                        <i class="mdi mdi-file-excel"></i> Importar XLSX
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- FORM CARD -->
+        <div class="form-card mb-3">
+            <form method="post" action="" id="formCadastro">
+                <input type="hidden" name="id" id="funcionario-id">
+
+                <div class="row">
+                    <div class="form-group col-md-4">
+                        <label for="usuario">Usuário</label>
+                        <input type="text" class="form-control" id="usuario" name="usuario" required>
+                    </div>
+
+                    <div class="form-group col-md-4">
+                        <label for="senha">Senha</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="senha" name="senha" aria-describedby="toggleSenhaMain">
+                            <div class="input-group-append">
+                                <button class="btn btn-eye" type="button" id="toggleSenhaMain" aria-label="Mostrar senha" aria-pressed="false">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <small id="senha-help-text" class="form-text text-muted">Obrigatório ao cadastrar.</small>
+                    </div>
+
+                    <div class="form-group col-md-4">
+                        <label for="nivel_de_acesso">Nível de Acesso</label>
+                        <select class="form-control" id="nivel_de_acesso" name="nivel_de_acesso" required>
+                            <option value="usuario">Usuário</option>
+                            <option value="administrador">Administrador</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group col-md-8">
+                        <label for="nome_completo">Nome Completo</label>
+                        <input type="text" class="form-control" id="nome_completo" name="nome_completo" required>
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label for="cargo">Cargo</label>
+                        <input type="text" class="form-control" id="cargo" name="cargo" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group col-md-8" id="email-container">
+                        <label for="e_mail">E-mail</label>
+                        <input type="email" class="form-control" id="e_mail" name="e_mail">
+                    </div>
+                    <div class="form-group col-md-4" id="acesso-adicional-container">
+                        <label for="acesso_adicional">Acesso Adicional</label>
+                        <select class="form-control select2" id="acesso_adicional" name="acesso_adicional[]" multiple="multiple">
+                            <option value="Controle de Tarefas">Controle de Tarefas</option>
+                            <option value="Fluxo de Caixa">Fluxo de Caixa</option>
+                            <option value="Controle de Contas a Pagar">Controle de Contas a Pagar</option>
+                            <option value="Cadastro de Funcionários">Cadastro de Funcionários</option>
+                            <!-- <option value="Configuração de Contas">Configuração de Contas</option> -->
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" id="submit-button" class="btn btn-gradient" style="width: 100%">
+                    <i class="fa fa-floppy-o" aria-hidden="true"></i> Cadastrar
                 </button>
-                <button id="btnImportarXlsx" type="button" class="btn btn-gradient" data-toggle="modal" data-target="#modalImportXlsx">
-                    <i class="mdi mdi-file-excel"></i> Importar via Planilha (XLSX)
-                </button>
+            </form>
+        </div>
+
+        <!-- LIST CARD -->
+        <div class="list-card">
+            <div class="d-flex align-items-center justify-content-between flex-wrap">
+                <h5 class="mb-2" style="font-weight:800;">Funcionários Cadastrados</h5>
+            </div>
+            <div class="table-responsive">
+                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 100%">
+                    <thead>
+                        <tr>
+                            <th>Usuário</th>
+                            <th>Nome Completo</th>
+                            <th>Cargo</th>
+                            <th>Nível de Acesso</th>
+                            <th>E-mail</th>
+                            <th>Acesso Adicional</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($funcionarios as $funcionario): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($funcionario['usuario'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars($funcionario['nome_completo'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars($funcionario['cargo'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars(ucfirst($funcionario['nivel_de_acesso']), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars($funcionario['e_mail'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo htmlspecialchars($funcionario['acesso_adicional'], ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td>
+                                <button class="btn btn-warning btn-sm btn-edit"
+                                        data-id="<?php echo $funcionario['id']; ?>"
+                                        data-usuario="<?php echo htmlspecialchars($funcionario['usuario'], ENT_QUOTES, 'UTF-8'); ?>"
+                                        data-nome="<?php echo htmlspecialchars($funcionario['nome_completo'], ENT_QUOTES, 'UTF-8'); ?>"
+                                        data-cargo="<?php echo htmlspecialchars($funcionario['cargo'], ENT_QUOTES, 'UTF-8'); ?>"
+                                        data-nivel_de_acesso="<?php echo htmlspecialchars($funcionario['nivel_de_acesso'], ENT_QUOTES, 'UTF-8'); ?>"
+                                        data-e_mail="<?php echo htmlspecialchars($funcionario['e_mail'], ENT_QUOTES, 'UTF-8'); ?>"
+                                        data-acesso_adicional="<?php echo htmlspecialchars($funcionario['acesso_adicional'], ENT_QUOTES, 'UTF-8'); ?>">
+                                    <i class="fa fa-pencil" aria-hidden="true"></i>
+                                </button>
+                                <a href="#" class="btn btn-danger btn-sm btn-delete" onclick="confirmDelete('<?php echo $funcionario['id']; ?>'); return false;">
+                                    <i class="fa fa-trash" aria-hidden="true"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <form method="post" action="">
-            <input type="hidden" name="id" id="funcionario-id">
-
-            <div class="row">
-                <div class="form-group col-md-4">
-                    <label for="usuario">Usuário</label>
-                    <input type="text" class="form-control" id="usuario" name="usuario" required>
-                </div>
-                <div class="form-group col-md-4">
-                    <label for="senha">Senha</label>
-                    <input type="password" class="form-control" id="senha" name="senha">
-                    <small id="senha-help-text" class="form-text text-muted">Obrigatório ao cadastrar.</small>
-                </div>
-                <div class="form-group col-md-4">
-                    <label for="nivel_de_acesso">Nível de Acesso</label>
-                    <select class="form-control" id="nivel_de_acesso" name="nivel_de_acesso" required>
-                        <option value="usuario">Usuário</option>
-                        <option value="administrador">Administrador</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="form-group col-md-8">
-                    <label for="nome_completo">Nome Completo</label>
-                    <input type="text" class="form-control" id="nome_completo" name="nome_completo" required>
-                </div>
-                <div class="form-group col-md-4">
-                    <label for="cargo">Cargo</label>
-                    <input type="text" class="form-control" id="cargo" name="cargo" required>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="form-group col-md-8" id="email-container">
-                    <label for="e_mail">E-mail</label>
-                    <input type="email" class="form-control" id="e_mail" name="e_mail">
-                </div>
-                <div class="form-group col-md-4" id="acesso-adicional-container">
-                    <label for="acesso_adicional">Acesso Adicional</label>
-                    <select class="form-control select2" id="acesso_adicional" name="acesso_adicional[]" multiple="multiple">
-                        <option value="Controle de Tarefas">Controle de Tarefas</option>
-                        <option value="Fluxo de Caixa">Fluxo de Caixa</option>
-                        <option value="Controle de Contas a Pagar">Controle de Contas a Pagar</option>
-                        <option value="Cadastro de Funcionários">Cadastro de Funcionários</option>
-                        <!-- <option value="Configuração de Contas">Configuração de Contas</option> -->
-                    </select>
-                </div>
-            </div>
-
-            <button type="submit" id="submit-button" class="btn btn-secondary" style="width: 100%">
-                <i class="fa fa-floppy-o" aria-hidden="true"></i> Cadastrar
-            </button>
-        </form>
-
-        <hr>
-
-        <div class="table-responsive">
-            <h5>Funcionários Cadastrados</h5>
-            <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 100%">
-                <thead>
-                    <tr>
-                        <th>Usuário</th>
-                        <th>Nome Completo</th>
-                        <th>Cargo</th>
-                        <th>Nível de Acesso</th>
-                        <th>E-mail</th>
-                        <th>Acesso Adicional</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($funcionarios as $funcionario): ?>
-                    <tr>
-                        <td><?php echo htmlspecialchars($funcionario['usuario'], ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($funcionario['nome_completo'], ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($funcionario['cargo'], ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars(ucfirst($funcionario['nivel_de_acesso']), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($funcionario['e_mail'], ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($funcionario['acesso_adicional'], ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td>
-                            <button class="btn btn-warning btn-edit"
-                                    data-id="<?php echo $funcionario['id']; ?>"
-                                    data-usuario="<?php echo htmlspecialchars($funcionario['usuario'], ENT_QUOTES, 'UTF-8'); ?>"
-                                    data-nome="<?php echo htmlspecialchars($funcionario['nome_completo'], ENT_QUOTES, 'UTF-8'); ?>"
-                                    data-cargo="<?php echo htmlspecialchars($funcionario['cargo'], ENT_QUOTES, 'UTF-8'); ?>"
-                                    data-nivel_de_acesso="<?php echo htmlspecialchars($funcionario['nivel_de_acesso'], ENT_QUOTES, 'UTF-8'); ?>"
-                                    data-e_mail="<?php echo htmlspecialchars($funcionario['e_mail'], ENT_QUOTES, 'UTF-8'); ?>"
-                                    data-acesso_adicional="<?php echo htmlspecialchars($funcionario['acesso_adicional'], ENT_QUOTES, 'UTF-8'); ?>">
-                                <i class="fa fa-pencil" aria-hidden="true"></i>
-                            </button>
-                            <a href="#" class="btn btn-delete" onclick="confirmDelete('<?php echo $funcionario['id']; ?>'); return false;">
-                                <i class="fa fa-trash" aria-hidden="true"></i>
-                            </a>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
     </div>
 </div>
 
@@ -628,23 +686,12 @@ $connAtlas->close();
 <script src="script/select2.min.js"></script>
 <script src="script/sweetalert2.js"></script>
 <script>
+    // SweetAlert helper
     function showNotification(message, type) {
         if (type === 'success') {
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso!',
-                text: message,
-                showConfirmButton: false,
-                timer: 5000
-            });
+            Swal.fire({ icon: 'success', title: 'Sucesso!', text: message, showConfirmButton: false, timer: 5000 });
         } else {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro!',
-                text: message,
-                showConfirmButton: false,
-                timer: 5000
-            });
+            Swal.fire({ icon: 'error', title: 'Erro!', text: message, showConfirmButton: false, timer: 5000 });
         }
     }
 
@@ -665,7 +712,29 @@ $connAtlas->close();
         });
     }
 
+    // Alternar tipo do campo de senha (mostrar/ocultar)
+    function bindToggle(btnId, inputId){
+        var $btn = $('#' + btnId), $inp = $('#' + inputId);
+        $btn.on('click', function(){
+            if ($btn.prop('disabled')) return;
+            var isText = $inp.attr('type') === 'text';
+            $inp.attr('type', isText ? 'password' : 'text');
+            var $icon = $(this).find('i');
+            $icon.toggleClass('fa-eye fa-eye-slash');
+            $(this).attr('aria-pressed', (!isText).toString());
+        });
+    }
+
+    // Habilita/Desabilita o olho conforme o estado do input
+    function syncEyeWithInput(inputSelector, btnSelector){
+        var disabled = $(inputSelector).is(':disabled');
+        $(btnSelector).prop('disabled', disabled).toggleClass('disabled', disabled);
+    }
+
     $(document).ready(function() {
+        bindToggle('toggleSenhaMain','senha');
+        syncEyeWithInput('#senha', '#toggleSenhaMain');
+
         // Mostrar notificação se existir
         <?php if ($notificationMessage): ?>
             showNotification('<?php echo $notificationMessage; ?>', '<?php echo $notificationType; ?>');
@@ -685,6 +754,7 @@ $connAtlas->close();
             $('#senha').prop('disabled', true);
             $('#senha').removeAttr('required');
             $('#senha-help-text').text('Deixe em branco para não alterar a senha.');
+            syncEyeWithInput('#senha', '#toggleSenhaMain');
 
             // Acessos adicionais
             $('#acesso_adicional').val(null).trigger('change');
@@ -710,6 +780,7 @@ $connAtlas->close();
 
             $('#senha').val('').prop('disabled', false).attr('required', true);
             $('#senha-help-text').text('Obrigatório ao cadastrar.');
+            syncEyeWithInput('#senha', '#toggleSenhaMain');
 
             $('#acesso_adicional').val(null).trigger('change');
 
@@ -719,16 +790,12 @@ $connAtlas->close();
 
         // DataTable (idioma via CDN para evitar 404)
         $('#tabelaResultados').DataTable({
-            "language": {
-                "url": "https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json"
-            },
-            "order": [],
+            "language": { "url": "https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json" },
+            "order": []
         });
 
-        // Notificação close
-        $('.notification .close-btn').on('click', function() {
-            $(this).parent().fadeOut();
-        });
+        // Notificação close (fallback antigo)
+        $('.notification .close-btn').on('click', function() { $(this).parent().fadeOut(); });
 
         // Limpar botão após submit
         $('form').on('submit', function() {
@@ -749,7 +816,8 @@ $connAtlas->close();
         // Select2
         $('.select2').select2({
             placeholder: "Selecione os acessos adicionais",
-            allowClear: true
+            allowClear: true,
+            width: '100%'
         });
 
         function toggleAcessoAdicional() {
@@ -819,25 +887,18 @@ $connAtlas->close();
             });
             dropArea.addEventListener('drop', function(e){
                 var dt = e.dataTransfer;
-                if (dt && dt.files && dt.files.length){
-                    setFile(dt.files[0]);
-                }
+                if (dt && dt.files && dt.files.length){ setFile(dt.files[0]); }
             }, false);
 
             // Clique para selecionar
-            dropArea.addEventListener('click', function(){
-                input.click();
-            });
+            dropArea.addEventListener('click', function(){ input.click(); });
         }
 
         // Input file
         if (input){
             input.addEventListener('change', function(e){
-                if (input.files && input.files.length){
-                    setFile(input.files[0]);
-                } else {
-                    setFile(null);
-                }
+                if (input.files && input.files.length){ setFile(input.files[0]); }
+                else { setFile(null); }
             });
         }
 
@@ -940,9 +1001,7 @@ $connAtlas->close();
         }
 
         if (btnRecarregar){
-            btnRecarregar.addEventListener('click', function(){
-                window.location.reload();
-            });
+            btnRecarregar.addEventListener('click', function(){ window.location.reload(); });
         }
 
         // Reset ao abrir o modal
@@ -958,9 +1017,7 @@ $connAtlas->close();
 </script>
 
 <br><br><br>
-<?php
-include(__DIR__ . '/rodape.php');
-?>
+<?php include(__DIR__ . '/rodape.php'); ?>
 
 </body>
 </html>
