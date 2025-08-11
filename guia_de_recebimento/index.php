@@ -51,7 +51,9 @@ date_default_timezone_set('America/Sao_Paulo');
             --card-fixed-h: 320px;
         }
 
-        #main.main-content{ background: var(--bg); min-height: 100vh; padding-bottom: 40px; }
+        /* área principal */
+        #main.main-content{ background: var(--bg); }
+
         .page-title{ color: var(--text); margin: 8px 0 2px; font-weight: 700; letter-spacing:.2px; }
         .sub-title{ color: var(--muted); font-size: .95rem; }
 
@@ -213,7 +215,7 @@ date_default_timezone_set('America/Sao_Paulo');
 <body class="light-mode">
     <?php include(__DIR__ . '/../menu.php'); ?>
 
-    <div id="main" class="main-content">
+    <main id="main" class="main-content">
         <div class="container">
 
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 top-actions">
@@ -311,7 +313,7 @@ date_default_timezone_set('America/Sao_Paulo');
 
             <div class="results-wrap">
                 <div class="results-head">
-                    <h5 class="text-white page-title" style="font-size:1.1rem">Resultados</h5>
+                    <h5 class="page-title" style="font-size:1.1rem">Resultados</h5>
                     <div class="results-count" id="resultsCount">—</div>
                 </div>
 
@@ -332,7 +334,7 @@ date_default_timezone_set('America/Sao_Paulo');
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <!-- MODAL: Criar Tarefa -->
     <div class="modal fade" id="tarefaModal" tabindex="-1" role="dialog" aria-labelledby="tarefaModalLabel" aria-hidden="true">
