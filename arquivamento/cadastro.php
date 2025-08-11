@@ -13,8 +13,9 @@ date_default_timezone_set('America/Sao_Paulo');
   <link rel="stylesheet" href="../style/css/font-awesome.min.css">
   <link rel="stylesheet" href="../style/css/style.css">
   <link rel="icon" href="../style/img/favicon.png" type="image/png">
-  <link rel="stylesheet" href="../style/sweetalert2.min.css">
-  <?php include(__DIR__ . '/../style/style_cadastro_arquivamento.php');?>
+  <!-- SweetAlert2 CSS via CDN para evitar 404 do caminho local -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+  <?php include(__DIR__ . '/../style/style_cadastro_arquivamento.php'); ?>
   <style>
     textarea.form-control {
         height: 170px;
@@ -160,7 +161,8 @@ date_default_timezone_set('America/Sao_Paulo');
   <script src="../script/jquery-3.5.1.min.js"></script>
   <script src="../script/bootstrap.min.js"></script>
   <script src="../script/jquery.mask.min.js"></script>
-  <script src="../script/sweetalert2.js"></script>
+  <!-- SweetAlert2 JS via CDN para garantir disponibilidade -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
   <script>
     // ======================== Helpers ========================
     function bytesToSize(bytes){
@@ -184,7 +186,6 @@ date_default_timezone_set('America/Sao_Paulo');
 
     // ======================== VALIDADORES CPF/CNPJ ========================
     function validarCPF_CNPJ(value) {
-      // Mantem compatibilidade com máscaras diferentes (já que no input aplicamos após blur)
       const digitsOnly = (value||'').replace(/[^\d]/g,'');
       if (!digitsOnly) return false;
 
@@ -372,7 +373,7 @@ date_default_timezone_set('America/Sao_Paulo');
       $('#ato-form').on('submit', function(e){
         e.preventDefault();
 
-        // Checa partes
+        // Checa partes (mantido conforme sua lógica atual do frontend)
         if ($('#partes-envolvidas tr').length === 0){
           Swal.fire({ icon:'warning', title:'Atenção!', text:'Adicione pelo menos uma parte envolvida.', confirmButtonText:'OK' });
           return;
@@ -405,21 +406,20 @@ date_default_timezone_set('America/Sao_Paulo');
           data: formData,
           processData: false,
           contentType: false,
-          success: function(response) {
-            try{
-              const result = JSON.parse(response);
-              if (result.status === 'success') {
-                Swal.fire({ icon:'success', title:'Sucesso!', text:'Dados salvos com sucesso!', confirmButtonText:'OK' })
+          dataType: 'json', // <- garante objeto JS no success
+          success: function(result) {
+            if (result && result.status === 'success') {
+              Swal.fire({ icon:'success', title:'Sucesso!', text:'Dados salvos com sucesso!', confirmButtonText:'OK' })
                 .then(()=> window.location.href = result.redirect);
-              } else {
-                Swal.fire({ icon:'error', title:'Erro!', text:(result.message||'Erro ao salvar os dados.'), confirmButtonText:'OK' });
-              }
-            }catch(err){
-              Swal.fire({ icon:'error', title:'Erro!', text:'Erro ao salvar os dados.', confirmButtonText:'OK' });
+            } else {
+              const msg = (result && result.message) ? result.message : 'Erro ao salvar os dados.';
+              Swal.fire({ icon:'error', title:'Erro!', text: msg, confirmButtonText:'OK' });
             }
           },
-          error: function() {
-            Swal.fire({ icon:'error', title:'Erro!', text:'Erro ao salvar os dados.', confirmButtonText:'OK' });
+          error: function(xhr) {
+            let msg = 'Erro ao salvar os dados.';
+            if (xhr && xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+            Swal.fire({ icon:'error', title:'Erro!', text: msg, confirmButtonText:'OK' });
           }
         });
       });
