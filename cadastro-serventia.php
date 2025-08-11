@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo'); 
 
 // Função para atualizar os dados nos dois bancos de dados
 function updateServentia($razao_social, $cidade, $status, $cns) {
