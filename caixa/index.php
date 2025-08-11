@@ -907,6 +907,38 @@ date_default_timezone_set('America/Sao_Paulo');
         </div>
     </div>
 
+    <!-- Modal: Anexar Comprovante de Depósito -->
+    <div class="modal fade" id="anexarComprovanteModal" tabindex="-1" role="dialog" aria-labelledby="anexarComprovanteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-responsive" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="anexarComprovanteModalLabel">Anexar Comprovante</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="formAnexarComprovante" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label class="input-label d-block" for="arquivo_comprovante">Comprovante</label>
+                            <div class="custom-file">
+                                <input type="file" class="custom-file-input" id="arquivo_comprovante" name="arquivo_comprovante" required>
+                                <label class="custom-file-label" for="arquivo_comprovante">Selecione um arquivo...</label>
+                            </div>
+                            <small class="input-hint">PDF, JPG, PNG (máx. 10MB).</small>
+                        </div>
+
+                        <input type="hidden" id="deposito_id_anexo" name="deposito_id_anexo">
+                        <input type="hidden" id="funcionario_anexo" name="funcionario_anexo">
+                        <input type="hidden" id="data_caixa_anexo" name="data_caixa_anexo">
+
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fa fa-upload" aria-hidden="true"></i> Enviar Comprovante
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Listagem de Depósitos do Caixa Unificado -->
     <div class="modal fade" id="verDepositosCaixaModal" tabindex="-1" role="dialog" aria-labelledby="verDepositosCaixaModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-deposito-caixa-unificado modal-dialog-centered modal-dialog-scrollable" role="document">
@@ -1051,26 +1083,37 @@ date_default_timezone_set('America/Sao_Paulo');
                 $(this).siblings('.custom-file-label').addClass('selected').text(fileName || 'Selecione um arquivo...');
             });
 
-            // Depósito: comportamento do tipo
+            // Depósito: comportamento do tipo (ajustado para "Espécie" + "Sem comprovante")
             $('#tipo_deposito').on('change', function() {
                 var tipoDeposito = $(this).val();
                 if (tipoDeposito === 'Espécie') {
                     $('#sem-comprovante-group').show();
-                    $('#comprovante_deposito').prop('required', true);
+                    // Se o usuário marcou "Sem comprovante", o anexo NÃO é obrigatório
+                    var semComprovanteMarcado = $('#sem_comprovante').is(':checked');
+                    $('#comprovante_deposito').prop('required', !semComprovanteMarcado);
                 } else {
                     $('#sem-comprovante-group').hide();
                     $('#sem_comprovante').prop('checked', false);
+                    // Para outros tipos, o anexo é sempre obrigatório
                     $('#comprovante_deposito').prop('required', true);
                 }
             });
 
+            // Marcar/Desmarcar "Sem comprovante" atualiza a obrigatoriedade do anexo
             $('#sem_comprovante').on('change', function() {
-                if ($(this).is(':checked')) {
-                    $('#comprovante_deposito').prop('required', false);
-                } else {
-                    $('#comprovante_deposito').prop('required', true);
+                var isChecked = $(this).is(':checked');
+                var tipoDeposito = $('#tipo_deposito').val();
+                if (tipoDeposito === 'Espécie') {
+                    $('#comprovante_deposito').prop('required', !isChecked);
+                    if (isChecked) {
+                        // limpa o input para evitar o "required" em alguns navegadores
+                        $('#comprovante_deposito').val('');
+                    }
                 }
             });
+
+            // Garante estado inicial consistente
+            $('#tipo_deposito').trigger('change');
 
             // Envio Depósito (com validação do total em caixa)
             $('#formCadastroDeposito').on('submit', function(e) {
@@ -1178,28 +1221,6 @@ date_default_timezone_set('America/Sao_Paulo');
             }
             $('#data_inicial, #data_final').on('change', function() {
                 if ($(this).val()) { validateDate(this); }
-            });
-
-            // Toggle de "Sem Comprovante" (fallback – mantém compat.)
-            $('#tipo_deposito').on('change', function() {
-                var tipo = $(this).val();
-                if (tipo === 'Espécie') {
-                    $('#semComprovanteDiv').show();
-                } else {
-                    $('#semComprovanteDiv').hide();
-                    $('#sem_comprovante').val('nao');
-                    $('#comprovante_deposito').prop('required', true);
-                }
-            });
-            $('#sem_comprovante').on('change', function() {
-                var semComprovante = $(this).val();
-                if (semComprovante === 'sim') {
-                    $('#comprovante_deposito').prop('required', false);
-                    $('#divComprovante').hide();
-                } else {
-                    $('#comprovante_deposito').prop('required', true);
-                    $('#divComprovante').show();
-                }
             });
         });
 
@@ -1487,6 +1508,15 @@ date_default_timezone_set('America/Sao_Paulo');
                             ? `<button title="Remover" style="margin-bottom: 5px !important;" class="btn btn-delete btn-sm btn-icon" data-id="${deposito.id ? deposito.id : 'undefined'}" onclick="removerDeposito(this)"><i class="fa fa-trash" aria-hidden="true"></i></button>`
                             : '';
 
+                        const temAnexo = deposito.caminho_anexo && String(deposito.caminho_anexo).trim() !== '';
+                        const visualizarBtn = temAnexo
+                            ? `<button title="Visualizar" class="btn btn-info btn-sm btn-icon" onclick="visualizarComprovante('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>`
+                            : '';
+
+                        const anexarBtn = !temAnexo
+                            ? `<button title="Anexar Comprovante" class="btn btn-primary btn-sm btn-icon" onclick="abrirModalAnexarComprovante(${deposito.id}, '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-paperclip" aria-hidden="true"></i></button>`
+                            : '';
+
                         $('#detalhesDepositosRegistrados').append(`
                             <tr>
                                 <td>${deposito.funcionario}</td>
@@ -1495,7 +1525,8 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <td>${formatCurrency(deposito.valor_do_deposito)}</td>
                                 <td>${deposito.tipo_deposito}</td>
                                 <td>
-                                    <button title="Visualizar" class="btn btn-info btn-sm btn-icon" onclick="visualizarComprovante('${deposito.caminho_anexo}', '${deposito.funcionario}', '${deposito.data_caixa}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    ${visualizarBtn}
+                                    ${anexarBtn}
                                     ${deleteBtnDeposito}
                                 </td>
                             </tr>
@@ -1737,15 +1768,47 @@ date_default_timezone_set('America/Sao_Paulo');
 
         // NOVO: Fechamento rápido via botão com cadeado dourado no card
         function fecharCaixaRapido(funcionario, data) {
-            // Prepara os campos ocultos (usados pelo fluxo existente)
             $('#data_caixa_deposito').val(data);
             $('#funcionario_deposito').val(funcionario);
-
-            // Carrega os totais e, quando terminar, chama diretamente o fluxo de fechamento com os mesmos alerts
             carregarDepositos(funcionario, data, function(){
                 transportarSaldoFecharCaixa();
             });
         }
+
+        // NOVO: Abrir modal para anexar comprovante posteriormente
+        function abrirModalAnexarComprovante(idDeposito, funcionario, data_caixa) {
+            $('#deposito_id_anexo').val(idDeposito);
+            $('#funcionario_anexo').val(funcionario);
+            $('#data_caixa_anexo').val(data_caixa);
+            $('#arquivo_comprovante').val('');
+            $('#anexarComprovanteModal').modal('show');
+        }
+
+        // NOVO: Submit do formulário de anexo de comprovante
+        $('#formAnexarComprovante').on('submit', function(e) {
+            e.preventDefault();
+
+            var formData = new FormData(this);
+            $.ajax({
+                url: 'anexar_comprovante_deposito.php',   // endpoint para salvar o anexo (BACK-END)
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Comprovante anexado com sucesso!', confirmButtonText: 'OK' })
+                        .then(() => { $('#anexarComprovanteModal').modal('hide'); location.reload(); });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Erro!', text: response.error || 'Falha ao anexar comprovante.', confirmButtonText: 'OK' });
+                    }
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    Swal.fire({ icon: 'error', title: 'Erro!', text: 'Falha ao anexar comprovante: ' + textStatus + ' - ' + errorThrown, confirmButtonText: 'OK' });
+                }
+            });
+        });
 
         // Recarregar ao fechar modais
         $('#detalhesModal').on('hidden.bs.modal', function () { location.reload(); });
