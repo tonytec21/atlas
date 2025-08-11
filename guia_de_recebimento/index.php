@@ -1193,15 +1193,55 @@ date_default_timezone_set('America/Sao_Paulo');
                 $('#vg-btn-ver-tarefa').addClass('d-none').off('click');
             }
 
-            // Copiar
+            // Copiar (com fallback para HTTP / estações sem contexto seguro)
             $('#btnCopyDocs').off('click').on('click', async () => {
-                try{
-                    await navigator.clipboard.writeText(obj.documentos || '');
+                const texto = obj.documentos || '';
+
+                async function copiar(text) {
+                    // 1) Tenta a API moderna (só funciona em HTTPS ou localhost)
+                    if (navigator.clipboard && window.isSecureContext) {
+                        try {
+                            await navigator.clipboard.writeText(text);
+                            return true;
+                        } catch (e) { /* continua para fallback */ }
+                    }
+
+                    // 2) Fallback para ambientes sem permissão / HTTP
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        ta.setAttribute('readonly', '');
+                        ta.style.position = 'fixed';
+                        ta.style.top = '0';
+                        ta.style.left = '0';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.focus();
+                        ta.select();
+                        const ok = document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        if (ok) return true;
+                    } catch (e) { /* continua */ }
+
+                    // 3) Último recurso (IE antigo)
+                    if (window.clipboardData && window.clipboardData.setData) {
+                        try {
+                            window.clipboardData.setData('Text', text);
+                            return true;
+                        } catch (e) {}
+                    }
+
+                    return false;
+                }
+
+                const ok = await copiar(texto);
+                if (ok) {
                     Swal.fire({icon:'success', title:'Copiado!', timer:1200, showConfirmButton:false});
-                }catch(e){
-                    Swal.fire({icon:'error', title:'Falha ao copiar'});
+                } else {
+                    Swal.fire({icon:'error', title:'Não foi possível copiar. Selecione e copie manualmente.'});
                 }
             });
+
 
             // Abre modal
             $('#visualizarGuiaModal').modal('show');
