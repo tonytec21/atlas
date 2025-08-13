@@ -2309,4 +2309,80 @@ body.dark-mode {
 }
 
 
-    </style>
+
+/* ====== Variáveis base p/ temas ====== */
+:root{
+  --card:#ffffff;
+  --border:#e5e7eb;
+  --text:#0f172a;
+  --muted:#6b7280;
+  --fc-bg:#ffffff;
+  --fc-grid:#e5e7eb;
+}
+body.dark-mode{
+  --card:#0f172a;       /* fundo de cards */
+  --border:#24324a;     /* linhas/grades */
+  --text:#e5e7eb;       /* texto padrão */
+  --muted:#94a3b8;
+  --fc-bg:#0b1220;      /* fundo do calendário */
+  --fc-grid:#24324a;    /* grade do calendário */
+}
+
+/* ====== Toggle Cards/Calendário ====== */
+.view-toggle .btn{ border-radius:12px; }
+.view-toggle .btn.active{ background:#4F46E5; color:#fff; border-color:#4F46E5; }
+
+/* ====== Wrapper do Calendário ====== */
+#calendarWrapper{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow:0 10px 25px rgba(16,24,40,.06);
+  overflow:hidden;
+  display:none; /* começa escondido */
+  color:var(--text);
+}
+#calendario{ padding:12px; }
+
+/* ====== FullCalendar – integra com tema ====== */
+.fc{
+  --fc-border-color: var(--fc-grid);
+  --fc-page-bg-color: var(--fc-bg);
+  --fc-neutral-bg-color: transparent;
+  --fc-today-bg-color: rgba(99,102,241,.15);
+  --fc-now-indicator-color:#ef4444;
+  color:var(--text);
+}
+.fc .fc-toolbar{ flex-wrap:wrap; row-gap:.5rem; }
+.fc .fc-toolbar-title{ font-size:1.05rem; }
+.fc .fc-button{
+  border-radius:10px;
+  background:var(--card);
+  border:1px solid var(--border);
+  color:var(--text);
+}
+.fc .fc-button:hover{ filter:brightness(.95); }
+.fc .fc-button.fc-button-active{ background:#4F46E5; border-color:#4F46E5; color:#fff; }
+
+.fc .fc-daygrid-day-number,
+.fc .fc-col-header-cell-cushion,
+.fc .fc-list-day-text,
+.fc .fc-list-day-side-text{ color:var(--text); }
+
+.fc .fc-popover{ background:var(--card); border:1px solid var(--border); }
+.fc .fc-list{ border:1px solid var(--border); }
+.fc .fc-list .fc-list-table tr{ border-color:var(--fc-grid); }
+
+/* ====== Cores por status (normaliza para classes evt-*) ====== */
+.evt-concluida{ background:#10b981 !important; color:#fff !important; }
+.evt-cancelada{ background:#ef4444 !important; color:#fff !important; text-decoration:line-through; }
+.evt-pendente{ background:#f59e0b !important; color:#111 !important; } /* bom contraste no dark */
+.evt-em-andamento{ background:#0ea5e9 !important; color:#fff !important; }
+.evt-em-espera{ background:#6b7280 !important; color:#fff !important; }
+.evt-iniciada{ background:#6366f1 !important; color:#fff !important; }
+.evt-prazo-de-edital{ background:#a855f7 !important; color:#fff !important; }
+.evt-aguardando-retirada,
+.evt-aguardando-pagamento{ background:#fbbf24 !important; color:#111 !important; }
+.evt-exigencia-cumprida{ background:#22c55e !important; color:#fff !important; }
+.evt-finalizado-sem-pratica-do-ato{ background:#475569 !important; color:#fff !important; }
+</style>

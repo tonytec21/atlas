@@ -29,18 +29,26 @@ if ($resultUser->num_rows > 0) {
     die('Usuário não encontrado ou inativo.');
 }
 
+// --- Suporte ao FullCalendar ---
+$isFC = isset($_GET['format']) && strtolower(trim($_GET['format'])) === 'fc';
+$fcStartRaw = isset($_GET['start']) ? trim($_GET['start']) : '';
+$fcEndRaw   = isset($_GET['end'])   ? trim($_GET['end'])   : '';
+// FullCalendar normalmente manda YYYY-MM-DD (ou YYYY-MM-DDTHH:MM:SS)
+$fcStart = $fcStartRaw ? substr($fcStartRaw, 0, 10) : '';
+$fcEnd   = $fcEndRaw   ? substr($fcEndRaw,   0, 10) : '';
+
 // Receber parâmetros de pesquisa
-$protocol = isset($_GET['protocol']) ? trim($_GET['protocol']) : '';
-$title = isset($_GET['title']) ? trim($_GET['title']) : '';
-$category = isset($_GET['category']) ? trim($_GET['category']) : '';
-$employee = isset($_GET['employee']) ? trim($_GET['employee']) : '';
-$revisor = isset($_GET['revisor']) ? trim($_GET['revisor']) : '';
-$status = isset($_GET['status']) ? trim($_GET['status']) : '';
+$protocol    = isset($_GET['protocol'])    ? trim($_GET['protocol'])    : '';
+$title       = isset($_GET['title'])       ? trim($_GET['title'])       : '';
+$category    = isset($_GET['category'])    ? trim($_GET['category'])    : '';
+$employee    = isset($_GET['employee'])    ? trim($_GET['employee'])    : '';
+$revisor     = isset($_GET['revisor'])     ? trim($_GET['revisor'])     : '';
+$status      = isset($_GET['status'])      ? trim($_GET['status'])      : '';
 $description = isset($_GET['description']) ? trim($_GET['description']) : '';
-$priority = isset($_GET['priority']) ? trim($_GET['priority']) : '';
-$origin = isset($_GET['origin']) ? trim($_GET['origin']) : '';
-$dateStart = isset($_GET['dateStart']) ? trim($_GET['dateStart']) : '';
-$dateEnd = isset($_GET['dateEnd']) ? trim($_GET['dateEnd']) : '';
+$priority    = isset($_GET['priority'])    ? trim($_GET['priority'])    : '';
+$origin      = isset($_GET['origin'])      ? trim($_GET['origin'])      : '';
+$dateStart   = isset($_GET['dateStart'])   ? trim($_GET['dateStart'])   : '';
+$dateEnd     = isset($_GET['dateEnd'])     ? trim($_GET['dateEnd'])     : '';
 
 // Início da query
 $sql = "SELECT tarefas.*, categorias.titulo AS categoria_titulo, origem.titulo AS origem_titulo 
@@ -73,6 +81,9 @@ if (!empty($revisor)) {
 if (!empty($status)) {
     $sql .= " AND tarefas.status = '" . $conn->real_escape_string($status) . "'";
 } elseif (
+    // 🔥 Nenhum filtro aplicado — carregamento inicial (somente para CARDS).
+    // Para o calendário (isFC), queremos ver tudo no intervalo, então NÃO aplicamos esse corte.
+    !$isFC &&
     empty($protocol) && 
     empty($title) && 
     empty($category) && 
@@ -84,7 +95,6 @@ if (!empty($status)) {
     empty($dateStart) && 
     empty($dateEnd)
 ) {
-    // 🔥 Nenhum filtro aplicado — carregamento inicial
     $sql .= " AND tarefas.status NOT IN ('Concluída', 'Cancelada', 'Finalizado sem prática do ato', 'Aguardando Retirada')";
 }
 if (!empty($description)) {
@@ -97,7 +107,7 @@ if (!empty($origin)) {
     $sql .= " AND tarefas.origem = '" . $conn->real_escape_string($origin) . "'";
 }
 
-// 🔍 Filtro por intervalo de datas da data limite
+// 🔍 Filtro por intervalo de datas da data limite (form de busca)
 if (!empty($dateStart) && !empty($dateEnd)) {
     $sql .= " AND DATE(tarefas.data_limite) BETWEEN '" . $conn->real_escape_string($dateStart) . "' AND '" . $conn->real_escape_string($dateEnd) . "'";
 } elseif (!empty($dateStart)) {
@@ -106,21 +116,71 @@ if (!empty($dateStart) && !empty($dateEnd)) {
     $sql .= " AND DATE(tarefas.data_limite) <= '" . $conn->real_escape_string($dateEnd) . "'";
 }
 
+// 🔍 Janela visível do Calendário (apenas quando format=fc)
+if ($isFC && $fcStart !== '' && $fcEnd !== '') {
+    $sql .= " AND DATE(tarefas.data_limite) BETWEEN '" . $conn->real_escape_string($fcStart) . "' AND '" . $conn->real_escape_string($fcEnd) . "'";
+}
+
 // 🔄 Ordenar por ID decrescente
 $sql .= " ORDER BY tarefas.id DESC";
 
 // Executar consulta
 $result = $conn->query($sql);
 
+// ---------------------- Saída para o CALENDÁRIO ----------------------
+if ($isFC) {
+    // Para o calendário, retornamos um array de eventos simples.
+    // Aqui podemos enviar header JSON sem afetar os cards (porque só cai neste bloco quando format=fc).
+    header('Content-Type: application/json; charset=utf-8');
+
+    $events = [];
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+
+            // Constrói o start no formato local "YYYY-MM-DDTHH:MM:SS" (sem Z) para não deslocar o horário no cliente
+            $start = '';
+            if (!empty($row['data_limite'])) {
+                $ts = strtotime($row['data_limite']);
+                $start = date('Y-m-d\TH:i:s', $ts);
+            }
+
+            // Normaliza status (opcional) para usar como classe, se quiser
+            $statusNorm = strtolower($row['status']);
+            $statusNorm = iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$statusNorm);
+            $statusNorm = preg_replace('/[^a-z0-9\s\-]/', '', $statusNorm);
+            $statusNorm = preg_replace('/\s+/', '-', trim($statusNorm));
+
+            $events[] = [
+                'id'    => (string)$row['id'],
+                'title' => $row['titulo'],
+                'start' => $start,
+                'allDay'=> false,
+                'extendedProps' => [
+                    'status'      => $statusNorm,
+                    'token'       => $row['token'],
+                    'funcionario' => $row['funcionario_responsavel'],
+                    'categoria'   => $row['categoria_titulo'],
+                    'origem'      => $row['origem_titulo'],
+                ]
+            ];
+        }
+    }
+
+    echo json_encode($events, JSON_UNESCAPED_UNICODE);
+    $conn->close();
+    exit;
+}
+
+// ---------------------- Saída para os CARDS (COMPORTAMENTO ORIGINAL) ----------------------
 $tasks = [];
-if ($result->num_rows > 0) {
+if ($result && $result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
-        // Buscar comentários da tarefa
+        // Buscar comentários da tarefa (mantido exatamente como no original)
         $taskToken = $row['token'];
         $sql_comments = "SELECT * FROM comentarios WHERE hash_tarefa = '$taskToken'";
         $comments_result = $conn->query($sql_comments);
         $comments = [];
-        if ($comments_result->num_rows > 0) {
+        if ($comments_result && $comments_result->num_rows > 0) {
             while ($comment_row = $comments_result->fetch_assoc()) {
                 $comments[] = $comment_row;
             }
@@ -130,7 +190,7 @@ if ($result->num_rows > 0) {
     }
 }
 
-// Retornar em JSON
+// Retornar em JSON (sem alterar header — assim seu front continua fazendo JSON.parse)
 echo json_encode($tasks, JSON_UNESCAPED_UNICODE);
 $conn->close();
 ?>

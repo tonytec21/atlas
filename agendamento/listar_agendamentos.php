@@ -28,6 +28,58 @@ if(isset($_GET['baseline']) && !$filtrou){
 $sql="SELECT * FROM agendamentos".($where?" WHERE ".implode(" AND ",$where):"")." ORDER BY data_hora DESC";
 $r=$conn->query($sql);
 
+$format = $_GET['format'] ?? '';
+
+/* ---------- SAÍDA PARA FULLCALENDAR (JSON) ---------- */
+if($format === 'fc'){
+    header('Content-Type: application/json; charset=utf-8');
+    $events = [];
+    if($r && $r->num_rows){
+        while($row=$r->fetch_assoc()){
+            $id       = $row['id'];
+            $nome     = $row['nome_solicitante'];
+            $servico  = $row['servico'];
+            $status   = $row['status'];
+            $obs      = $row['observacoes'];
+
+            // Data exibida: se reagendado → data_reagendamento
+            $rawData = ($status==='reagendado' && !empty($row['data_reagendamento']))
+                       ? $row['data_reagendamento']
+                       : $row['data_hora'];
+
+            $dhFmt = date('d/m/Y H:i', strtotime($rawData));
+            $dhInp = date('Y-m-d\TH:i', strtotime($row['data_hora']));
+            $reagInp = !empty($row['data_reagendamento'])
+                       ? date('Y-m-d\TH:i', strtotime($row['data_reagendamento']))
+                       : '';
+
+            $statusCap = ucfirst($status);
+
+            $events[] = [
+                'id'    => (string)$id,
+                'title' => $servico.' — '.$nome,
+                // envia data LOCAL sem offset/Z para o FullCalendar não converter
+                'start' => date('Y-m-d\TH:i:s', strtotime($rawData)),
+                'allDay' => false,
+                'className' => ['evt-'.$status],
+                'extendedProps' => [
+                    'status'           => $status,
+                    'status_formatado' => $statusCap,
+                    'nome'             => htmlspecialchars($nome, ENT_QUOTES, 'UTF-8'),
+                    'servico'          => htmlspecialchars($servico, ENT_QUOTES, 'UTF-8'),
+                    'hora_formatada'   => $dhFmt,
+                    'obs'              => htmlspecialchars((string)$obs, ENT_QUOTES, 'UTF-8'),
+                    'hora_inp'         => $dhInp,
+                    'reag_inp'         => $reagInp
+                ]
+            ];
+        }
+    }
+    echo json_encode($events);
+    exit;
+}
+
+/* ---------- SAÍDA EM CARDS (HTML) ---------- */
 if(!$r || !$r->num_rows){
     echo "<div class='col-12 text-center text-muted py-4'>Nenhum agendamento encontrado.</div>";
     exit;
@@ -39,7 +91,7 @@ while($row=$r->fetch_assoc()){
     $servico  = htmlspecialchars($row['servico']);
     $status   = $row['status'];
     $statusCap= ucfirst($status);
-    $obs      = htmlspecialchars($row['observacoes']);
+    $obs      = htmlspecialchars((string)$row['observacoes']);
 
     /* Data exibida: se reagendado → data_reagendamento */
     $rawData = ($status==='reagendado' && $row['data_reagendamento'])
@@ -79,8 +131,8 @@ while($row=$r->fetch_assoc()){
       <div class='card card-agendamento mb-3' $dataAttr>
         <div class='card-body'>
           <h5 class='card-title'><i class='fas fa-user me-2'></i>$nome</h5>
-          <p><strong>Serviço:</strong> $servico</p>
-          <p><strong>Data:</strong> $dhFmt</p>
+          <p class='mb-1'><strong>Serviço:</strong> $servico</p>
+          <p class='mb-2'><strong>Data:</strong> $dhFmt</p>
 
           <span class='badge badge-status $badgeClass $lock'
                 data-id='$id' data-status='$status'>$statusCap</span>
@@ -96,6 +148,19 @@ while($row=$r->fetch_assoc()){
                 data-status='$status'
                 data-obs=\"$obs\">
               <i class='fas fa-edit'></i>
+            </button>
+            <button class='btn btn-sm btn-outline-secondary btn-visualizar'
+                title='Visualizar'
+                data-id='$id'
+                data-nome=\"$nome\"
+                data-servico=\"$servico\"
+                data-hora=\"$dhInp\"
+                data-reag=\"$reagInp\"
+                data-status='$status'
+                data-status_formatado='$statusCap'
+                data-obs=\"$obs\"
+                data-hora_formatada=\"$dhFmt\">
+              <i class='fas fa-eye'></i>
             </button>
           </div>
         </div>

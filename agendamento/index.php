@@ -14,188 +14,272 @@ $minNow = date('Y-m-d\TH:i');
   <link rel="stylesheet" href="../style/css/all.min.css">
   <link rel="stylesheet" href="../style/css/style.css">
   <link rel="icon" href="../style/img/favicon.png" type="image/png">
+
+  <!-- SweetAlert & Dropzone -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dropzone@5/dist/min/dropzone.min.css">
+
+  <!-- FullCalendar -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css" rel="stylesheet">
+
   <style>
-    /* ---------- VARIÁVEIS GERAIS ---------- */
+    /* ======================================================================
+       TOKENS / THEME (alinhado ao exemplo "atualizar_credenciais.php")
+    ====================================================================== */
     :root{
-        /* núcleo da marca/site */
-        --primary:      #0d6efd;
+      /* base */
+      --bg:#f6f7fb; --card:#ffffff; --muted:#6b7280; --text:#1f2937; --border:#e5e7eb;
+      --shadow:0 10px 25px rgba(16,24,40,.06); --soft-shadow:0 6px 18px rgba(16,24,40,.08);
 
-        /* modo claro */
-        --bg-body:      #f8f9fa;
-        --bg-card:      #ffffff;
-        --bg-card-alt:  #f1f5f9;
-        --border-card:  #e9ecef;
-        --text-body:    #2c3e50;
+      /* brand */
+      --brand:#4F46E5;    /* indigo 600 */
+      --brand-2:#6366F1;  /* indigo 500 */
 
-        /* cores cartões-resumo (claro) */
-        --sum-mes:      #e0f2fe;      /* azul clarinho   */
-        --sum-semana:   #e0f7fa;      /* ciano claro     */
-        --sum-done:     #e7f6ee;      /* verde clarinho  */
-        --sum-pend:     #fff7e0;      /* amarelo claro   */
+      /* semantic */
+      --success:#10b981; --warning:#f59e0b; --danger:#ef4444; --info:#0ea5e9;
+
+      /* cards resumo (modo claro) */
+      --sum-mes:#e0f2fe;      /* azul clarinho   */
+      --sum-semana:#e0f7fa;   /* ciano claro     */
+      --sum-done:#e7f6ee;     /* verde clarinho  */
+      --sum-pend:#fff7e0;     /* amarelo claro   */
     }
-
-    /* ---------- DARK MODE --------------- */
+    body.light-mode{ background:var(--bg); color:var(--text); }
     body.dark-mode{
-        --bg-body:      #0f172a;
-        --bg-card:      #1e293b;
-        --bg-card-alt:  #243447;
-        --border-card:  #334155;
-        --text-body:    #e2e8f0;
+      --bg:#0f141a; --card:#1a2129; --text:#e5e7eb; --muted:#9aa6b2; --border:#2a3440;
+      --shadow:0 10px 25px rgba(0,0,0,.35); --soft-shadow:0 6px 18px rgba(0,0,0,.4);
 
-        /* cartões-resumo (escuro) */
-        --sum-mes:      #1e3a8a;
-        --sum-semana:   #155e75;
-        --sum-done:     #166534;
-        --sum-pend:     #854d0e;
+      --sum-mes:#1e3a8a;     /* mesmas do anterior em versão escura */
+      --sum-semana:#155e75;
+      --sum-done:#166534;
+      --sum-pend:#854d0e;
+      background:var(--bg); color:var(--text);
     }
+    .muted{ color:var(--muted)!important; }
 
-    /* ---------- APLICAÇÃO GLOBAL ---------- */
-    body{
-        background: var(--bg-body);
-        color: var(--text-body);
+    /* ======================================================================
+       HERO (cabeçalho da página)
+    ====================================================================== */
+    .page-hero{
+      background:linear-gradient(180deg, rgba(79,70,229,.10), rgba(79,70,229,0));
+      border-radius:18px; padding:18px; margin:20px 0 12px; box-shadow:var(--soft-shadow);
     }
-
-    /* ---------- CARTÕES GENÉRICOS ---------- */
-    .card{
-        background: var(--bg-card);
-        border:1px solid var(--border-card);
+    .page-hero .title-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .title-icon{
+      width:44px; height:44px; border-radius:12px; background:#EEF2FF; color:#3730A3;
+      display:flex; align-items:center; justify-content:center; font-size:20px;
     }
+    body.dark-mode .title-icon{ background:#262f3b; color:#c7d2fe; }
+    .page-hero h1{ font-weight:800; margin:0; }
 
+    /* ======================================================================
+       RESUMO (cards)
+    ====================================================================== */
     .summary-card{
-        border-radius:.75rem;
-        box-shadow:0 2px 6px rgba(0,0,0,.06);
+      border-radius:16px; background:var(--card); border:1px solid var(--border);
+      box-shadow:var(--shadow);
     }
-    .summary-card .card-body{
-        padding:.9rem .5rem;
-    }
-    .summary-card h2{
-        margin:0;
-        font-weight:700;
-    }
+    .summary-card .card-body{ padding:1rem 1rem; }
+    .summary-card h2{ margin:0; font-weight:800; }
 
-    /* cores individuais */
-    .card-month   {background:var(--sum-mes);}
-    .card-week    {background:var(--sum-semana);}
-    .card-done    {background:var(--sum-done);}
-    .card-pending {background:var(--sum-pend);}
+    .card-month{ background:var(--sum-mes); }
+    .card-week{ background:var(--sum-semana); }
+    .card-done{ background:var(--sum-done); }
+    .card-pending{ background:var(--sum-pend); }
 
-    /* ---------- CARD AGENDAMENTO ---------- */
-    .card-agendamento{
-        border-left:4px solid var(--primary);
-        border-radius:.75rem;
-        background:var(--bg-card-alt);
-        box-shadow:0 2px 6px rgba(0,0,0,.06);
-        cursor:pointer;
-        transition:.25s;
-    }
-    .card-agendamento:hover{
-        transform:translateY(-4px);
-        box-shadow:0 6px 18px rgba(0,0,0,.12);
-    }
-
-    /* ---------- FILTRO (FORM) ---------- */
+    /* ======================================================================
+       FILTROS (card do formulário)
+    ====================================================================== */
     .filter-card{
-        background:var(--bg-card);
-        border:1px solid var(--border-card);
-        border-radius:.75rem;
+      background:var(--card); border:1px solid var(--border); border-radius:16px;
+      box-shadow:var(--shadow);
     }
     .filter-card .card-header{
-        background:var(--primary);
-        color:#fff;
-        border-radius:.75rem .75rem 0 0;
+      background:linear-gradient(135deg, var(--brand), var(--brand-2));
+      color:#fff; border-radius:16px 16px 0 0; font-weight:700;
     }
-    .filter-card .form-control,
-    .filter-card .form-select{
-        background:var(--bg-card-alt);
-        color:var(--text-body);
-        border-color:var(--border-card);
+    .filter-card .form-control,.filter-card .form-select{
+      background:transparent; color:var(--text); border:1px solid var(--border); border-radius:10px;
     }
-    .filter-card .form-control::placeholder{
-        color:var(--text-body);
-        opacity:.6;
-    }
+    .filter-card .form-control::placeholder{ color:var(--muted); }
+    #btnFiltrar.btn{ min-width:140px; border-radius:10px; }
+    .btn-primary{ background:var(--brand); border-color:var(--brand); }
+    .btn-primary:hover{ filter:brightness(.95); }
+    .btn-outline-secondary{ border-radius:10px; }
 
-    /* especial: botão Filtrar */
-    #btnFiltrar.btn{
-        min-width:110px;
+    /* ======================================================================
+       LISTA (cards de agendamento)
+    ====================================================================== */
+    .card-agendamento{
+      border-left:4px solid var(--brand);
+      border-radius:16px; background:var(--card);
+      box-shadow:var(--soft-shadow); transition:.25s; cursor:pointer; border:1px solid var(--border);
     }
-    @media (min-width:768px){
-        /* fica alinhado à direita em telas ≥ md */
-        #btnFiltrar{
-            width:auto!important;
-        }
-    }
+    .card-agendamento:hover{ transform:translateY(-4px); box-shadow:0 10px 25px rgba(0,0,0,.12); }
+    .acoes{ display:flex; gap:.5rem; flex-wrap:wrap; justify-content:end; }
+    @media (max-width:576px){ .acoes{ justify-content:flex-start } }
 
-    /* ---------- BADGES & OUTROS ---------- */
-    .badge-status{
-        font-size:.75rem;
-        padding:.45em .7em;
-        border-radius:.5rem;
-        cursor:pointer;
-    }
-    .badge-locked{cursor:not-allowed;opacity:.65;}
+    /* badges de status (lista) */
+    .badge-status{ font-size:.78rem; padding:.45em .7em; border-radius:.6rem; cursor:pointer; }
+    .badge-locked{ cursor:not-allowed; opacity:.65; }
 
-    .acoes{
-        display:flex;
-        gap:.5rem;
-        flex-wrap:wrap;
-        justify-content:end;
-    }
-    @media (max-width:576px){
-        .acoes{justify-content:flex-start}
-    }
+    /* ======================================================================
+       TOGGLE CARDS/CALENDÁRIO
+    ====================================================================== */
+    .view-toggle .btn{ border-radius:12px; }
+    .view-toggle .btn.active{ background:var(--brand); color:#fff; border-color:var(--brand); }
 
+    /* ======================================================================
+       CALENDÁRIO (FullCalendar) – 100% responsivo e dentro da margem
+    ====================================================================== */
+    #calendarWrapper{
+      background:var(--card); border:1px solid var(--border); border-radius:16px;
+      box-shadow:var(--shadow); overflow:hidden;
+    }
+    #calendario{ padding:12px; }
+    .fc{ --fc-border-color: var(--border); --fc-page-bg-color: transparent; }
+    .fc .fc-toolbar{ flex-wrap:wrap; row-gap:.5rem; }
+    .fc .fc-toolbar-title{ font-size:1.05rem; }
+    .fc .fc-button{ border-radius:10px; }
+    .fc-event{ border:0; font-size:.82rem; padding:2px 4px; }
+    /* cores por status */
+    .evt-ativo      { background:#6b7280 !important; color:#fff !important; }
+    .evt-reagendado { background:#f59e0b !important; color:#000 !important; }
+    .evt-cancelado  { background:#ef4444 !important; color:#fff !important; text-decoration:line-through; }
+    .evt-concluido  { background:#10b981 !important; color:#fff !important; }
+
+    /* ======================================================================
+       MODAIS
+    ====================================================================== */
+    .modal-header .btn-print{
+      background:#fff; color:#000; border:1px solid var(--border); border-radius:10px;
+    }
+    .modal-header .btn-print:hover{ opacity:.9; }
   </style>
 </head>
 <body class="light-mode">
 <?php include(__DIR__.'/../menu.php'); ?>
 
 <div id="main" class="main-content">
-  <h2 class="page-title text-center mb-4">Agendamento de Serviços e Pesquisas</h2>
+  <div class="container">
 
-  <!-- cards resumo -->
-  <div class="row g-3 mb-4">
-    <div class="col-6 col-md-3"><div class="card summary-card card-month border-primary text-center shadow-sm"><div class="card-body"><h6 class="small text-muted">No mês</h6><h2 id="cntMes">0</h2></div></div></div>
-    <div class="col-6 col-md-3"><div class="card summary-card card-week border-info text-center shadow-sm"><div class="card-body"><h6 class="small text-muted">Na semana</h6><h2 id="cntSemana">0</h2></div></div></div>
-    <div class="col-6 col-md-3"><div class="card summary-card card-done border-success text-center shadow-sm"><div class="card-body"><h6 class="small text-muted">Concluídos</h6><h2 id="cntConcluidos">0</h2></div></div></div>
-    <div class="col-6 col-md-3"><div class="card summary-card card-pending border-warning text-center shadow-sm"><div class="card-body"><h6 class="small text-muted">Pendentes</h6><h2 id="cntPendentes">0</h2></div></div></div>
-  </div>
+    <!-- HERO / TÍTULO -->
+    <section class="page-hero">
+      <div class="title-row">
+        <div class="title-icon"><i class="fas fa-calendar-check"></i></div>
+        <div class="flex-grow-1">
+          <h1>Agendamento de Serviços e Pesquisas</h1>
+          <div class="subtitle muted">Visualize por cartões ou calendário, filtre resultados e gerencie anexos.</div>
+        </div>
 
-  <!-- filtros -->
-  <div class="filter-card shadow-sm mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span><i class="fas fa-search me-2"></i>Filtros</span>
-      <button class="btn btn-sm btn-light d-md-none" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse">
-        <i class="fas fa-sliders-h"></i>
-      </button>
-    </div>
-    <div id="filtrosCollapse" class="collapse show">
-      <div class="card-body">
-        <form id="filtro-form" class="row g-3 align-items-end">
-          <div class="col-12 col-md-6"><label class="form-label" for="filtro_nome">Nome</label><input id="filtro_nome" class="form-control" placeholder="Nome"></div>
-          <div class="col-12 col-md-6"><label class="form-label" for="filtro_servico">Serviço</label><input id="filtro_servico" class="form-control" placeholder="Serviço"></div>
-          <div class="col-6 col-md-3"><label class="form-label" for="filtro_inicio">Início</label><input type="date" id="filtro_inicio" class="form-control"></div>
-          <div class="col-6 col-md-3"><label class="form-label" for="filtro_fim">Fim</label><input type="date" id="filtro_fim" class="form-control"></div>
-          <div class="col-12 col-md-3"><label class="form-label" for="filtro_status">Status</label><br>
-            <select id="filtro_status" class="form-select" style="height:calc(2.8rem + 2px);width: 100%;border-radius:8px;border-color:#ced4da;">
-              <option value="">Todos</option><option value="ativo">Ativo</option><option value="reagendado">Reagendado</option><option value="cancelado">Cancelado</option><option value="concluido">Concluído</option>
-            </select>
+        <!-- Alternância Cards / Calendário -->
+        <div class="btn-group view-toggle ms-auto" role="group" aria-label="Alternar visualização">
+          <button class="btn btn-outline-secondary active" id="btnViewCards" title="Ver em Cards">
+            <i class="fas fa-th me-1"></i> Cards
+          </button>
+          <button class="btn btn-outline-secondary" id="btnViewCalendar" title="Ver em Calendário">
+            <i class="fas fa-calendar-alt me-1"></i> Calendário
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- CARDS RESUMO -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card summary-card card-month text-center">
+          <div class="card-body">
+            <h6 class="small muted mb-1">No mês</h6><h2 id="cntMes">0</h2>
           </div>
-          <div class="col-12 col-md-3 d-grid"><button type="button" id="btnFiltrar" class="btn btn-secondary w-100"><i class="fas fa-filter"></i></button></div>
-        </form>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card summary-card card-week text-center">
+          <div class="card-body">
+            <h6 class="small muted mb-1">Na semana</h6><h2 id="cntSemana">0</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card summary-card card-done text-center">
+          <div class="card-body">
+            <h6 class="small muted mb-1">Concluídos</h6><h2 id="cntConcluidos">0</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card summary-card card-pending text-center">
+          <div class="card-body">
+            <h6 class="small muted mb-1">Pendentes</h6><h2 id="cntPendentes">0</h2>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="mb-3 text-end">
-    <button id="btnNovoAgendamento" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Novo Agendamento</button>
-  </div>
+    <!-- FILTROS -->
+    <div class="filter-card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-search me-2"></i>Filtros</span>
+        <button class="btn btn-sm btn-light d-md-none" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse">
+          <i class="fas fa-sliders-h"></i>
+        </button>
+      </div>
+      <div id="filtrosCollapse" class="collapse show">
+        <div class="card-body">
+          <form id="filtro-form" class="row g-3 align-items-end">
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="filtro_nome">Nome</label>
+              <input id="filtro_nome" class="form-control" placeholder="Nome">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="filtro_servico">Serviço</label>
+              <input id="filtro_servico" class="form-control" placeholder="Serviço">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label" for="filtro_inicio">Início</label>
+              <input type="date" id="filtro_inicio" class="form-control">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label" for="filtro_fim">Fim</label>
+              <input type="date" id="filtro_fim" class="form-control">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label" for="filtro_status">Status</label><br>
+              <select id="filtro_status" class="form-select" style="height:calc(2.8rem + 2px);width: 100%;border-radius:10px;border-color:var(--border);">
+                <option value="">Todos</option>
+                <option value="ativo">Ativo</option>
+                <option value="reagendado">Reagendado</option>
+                <option value="cancelado">Cancelado</option>
+                <option value="concluido">Concluído</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3 d-grid">
+              <button type="button" id="btnFiltrar" class="btn btn-outline-secondary w-100">
+                <i class="fas fa-filter me-1"></i>Filtrar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
 
-  <div id="cards-agendamentos" class="row g-4"></div>
-</div>
+    <!-- AÇÕES -->
+    <div class="mb-3 d-flex justify-content-end">
+      <button id="btnNovoAgendamento" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>Novo Agendamento
+      </button>
+    </div>
 
+    <!-- LISTA (CARDS) -->
+    <div id="cards-agendamentos" class="row g-4"></div>
+
+    <!-- CALENDÁRIO -->
+    <div id="calendarWrapper" class="p-2" style="display:none;">
+      <div id="calendario"></div>
+    </div>
+
+  </div> <!-- /.container -->
+</div> <!-- /#main -->
 
 <?php include(__DIR__.'/modais_agendamento.php'); ?>
 
@@ -203,11 +287,15 @@ $minNow = date('Y-m-d\TH:i');
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dropzone@5/dist/min/dropzone.min.js"></script>
+
+<!-- FullCalendar -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales-all.global.min.js"></script>
+
 <script>
 Dropzone.autoDiscover=false;
 
 $(function(){
-
   /* -------- helpers -------- */
   const filtrosObj=()=>({
       nome:$('#filtro_nome').val(),
@@ -217,7 +305,7 @@ $(function(){
       fim:$('#filtro_fim').val()
   });
 
-  /* -------- carregar lista -------- */
+  /* -------- carregar lista (cards) -------- */
   function carregar(){
       const f=filtrosObj();
       const semFiltros = !f.nome && !f.servico && !f.status && !f.inicio && !f.fim;
@@ -238,7 +326,7 @@ $(function(){
       });
   }
 
-  $('#btnFiltrar').on('click',()=>{carregar();contagens();});
+  $('#btnFiltrar').on('click',()=>{carregar();contagens(); if(isCalendarInit) calendar.refetchEvents();});
 
   /* -------- Dropzone -------- */
   let dz;
@@ -289,7 +377,7 @@ $(function(){
       $('#modalAgendamentoLabel').text('Novo Agendamento');
       $('#listaAnexos').empty();
       $('#anexosWrapper').hide();
-      $('#status').hide();
+      $('#grp_status').hide();
       $('#grp_reagendamento').hide();
       $('#data_reagendamento').val('').prop('required',false);
       initDropzone('temp');
@@ -305,6 +393,7 @@ $(function(){
           dz.processQueue();
           $('#modalAgendamento').modal('hide');
           carregar();contagens();
+          if(isCalendarInit) calendar.refetchEvents();
       });
   });
 
@@ -314,7 +403,7 @@ $(function(){
       $('#modalAgendamentoLabel').text('Editar Agendamento');
       $('#agendamento_id').val(d.id);
       $('#nome').val(d.nome); $('#servico').val(d.servico);
-      $('#data_hora').val(d.hora); $('#status').val(d.status);
+      $('#data_hora').val(d.hora); $('#status_select').val(d.status);
       $('#observacoes').val(d.obs);
 
       if(d.status==='reagendado'){
@@ -326,13 +415,13 @@ $(function(){
       }
 
       $('#anexosWrapper').show();
-      $('#status').show();
+      $('#grp_status').show();
       initDropzone(d.id); carregarAnexos(d.id);
       $('#modalAgendamento').modal('show');
   });
 
   /* status change (mostra/oculta campo reagendamento) */
-  $('#status').on('change',function(){
+  $('#status_select').on('change',function(){
       if(this.value==='reagendado'){
           $('#grp_reagendamento').show();
           $('#data_reagendamento').prop('required',true);
@@ -344,12 +433,14 @@ $(function(){
 
   /* visualizar */
   function preencher(d){
-      $('#view_nome').text(d.nome);
-      $('#view_servico').text(d.servico);
-      $('#view_datahora').text(d.hora_formatada);
-      $('#view_status').text(d.status_formatado);
-      $('#view_obs').text(d.obs);
+      $('#view_id').text(d.id || '');
+      $('#view_nome').text(d.nome || '');
+      $('#view_servico').text(d.servico || '');
+      $('#view_datahora').text(d.hora_formatada || '');
+      $('#view_status').text(d.status_formatado || '');
+      $('#view_obs').text(d.obs || '');
       $('#view_anexos').html('Carregando...');
+      $('#modalVisualizar').data('payload', d); // guarda dados para imprimir
       $('#modalVisualizar').modal('show');
       $('#view_anexos').load('listar_anexos.php?id='+d.id,function(h){
           if(!h.trim()) $('#view_anexos').html('<span class="text-muted">Nenhum anexo</span>');
@@ -384,23 +475,151 @@ $(function(){
               $.post('atualizar_status.php',{id,status:novo,nova_data:dt},r=>{
                   if(r.trim()==='ok'){
                       carregar();contagens();
+                      if(isCalendarInit) calendar.refetchEvents();
                       Swal.fire({toast:true,icon:'success',title:'Status atualizado',position:'top-end',timer:1800,showConfirmButton:false});
                   }else Swal.fire('Erro',r,'error');
               }).fail(()=>Swal.fire('Erro','Falha na requisição','error'));
           };
 
           if(novo==='reagendado'){
-              Swal.fire({
-                  title:'Nova data e hora',
-                  html:'<input type="datetime-local" id="novaData" class="swal2-input" min="'+new Date().toISOString().slice(0,16)+'">',
-                  showCancelButton:true,focusConfirm:false,
-                  preConfirm:()=>{const v=document.getElementById('novaData').value;if(!v) return Swal.showValidationMessage('Informe data e hora');return v;}
-              }).then(r=>{ if(r.isConfirmed) prosseguir(r.value);});
-          }else{
+            const _minLocal = new Date(Date.now() - (new Date().getTimezoneOffset()*60000))
+                                .toISOString().slice(0,16);
+            Swal.fire({
+                title:'Nova data e hora',
+                html:'<input type="datetime-local" id="novaData" class="swal2-input" min="'+_minLocal+'">',
+                showCancelButton:true,focusConfirm:false,
+                preConfirm:()=>{const v=document.getElementById('novaData').value;if(!v) return Swal.showValidationMessage('Informe data e hora');return v;}
+            }).then(r=>{ if(r.isConfirmed) prosseguir(r.value);});
+            }else{
               Swal.fire({title:'Confirmar alteração?',icon:'question',showCancelButton:true})
                    .then(r=>{if(r.isConfirmed) prosseguir(null);});
           }
       });
+  });
+
+  /* -------- Calendário (FullCalendar) -------- */
+  let calendar=null, isCalendarInit=false;
+
+  function fetchCalendarEvents(info, success, failure){
+    const f=filtrosObj();
+    const semFiltros = !f.nome && !f.servico && !f.status && !f.inicio && !f.fim;
+    if(semFiltros) f.baseline=1;
+    // janela visível do calendário
+    f.start = info.startStr;
+    f.end   = info.endStr;
+    f.format = 'fc';
+    $.ajax({
+      url:'listar_agendamentos.php',
+      data:f, dataType:'json',
+      success: success,
+      error: failure
+    });
+  }
+
+  function initCalendar(){
+    const el=document.getElementById('calendario');
+    calendar = new FullCalendar.Calendar(el,{
+    locale:'pt-br',
+    timeZone:'local', // interpreta strings sem fuso como horário local
+    eventTimeFormat:{ hour:'2-digit', minute:'2-digit', meridiem:false }, // 24h
+    initialView:'dayGridMonth',
+    headerToolbar:{
+        left:'prev,next today',
+        center:'title',
+        right:'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+      },
+      buttonText:{
+        today:'Hoje', month:'Mês', week:'Semana', day:'Dia', list:'Lista'
+      },
+      navLinks:true,
+      nowIndicator:true,
+      selectable:false,
+      eventSources:[ fetchCalendarEvents ],
+      eventClassNames:function(arg){
+        const st = arg.event.extendedProps.status || '';
+        return ['evt-'+st]; // aplica classes de cor
+      },
+      eventClick:function(info){
+        const e = info.event;
+        const ep = e.extendedProps || {};
+        const d = {
+          id: e.id,
+          nome: ep.nome,
+          servico: ep.servico,
+          hora_formatada: ep.hora_formatada,
+          status_formatado: ep.status_formatado,
+          status: ep.status,
+          obs: ep.obs || '',
+          reag: ep.reag_inp || '',
+          hora: ep.hora_inp || ''
+        };
+        preencher(d);
+      },
+      height:'auto'
+    });
+    calendar.render();
+    isCalendarInit=true;
+  }
+
+  $('#btnViewCalendar').on('click', function(){
+    if($(this).hasClass('active')) return;
+    $('#btnViewCards').removeClass('active');
+    $(this).addClass('active');
+    $('#cards-agendamentos').hide();
+    $('#calendarWrapper').show();
+    if(!isCalendarInit) initCalendar(); else calendar.refetchEvents();
+  });
+
+  $('#btnViewCards').on('click', function(){
+    if($(this).hasClass('active')) return;
+    $('#btnViewCalendar').removeClass('active');
+    $(this).addClass('active');
+    $('#calendarWrapper').hide();
+    $('#cards-agendamentos').show();
+  });
+
+  /* -------- Imprimir comprovante -------- */
+  $(document).on('click','#btnImprimirComprovante', function(){
+    const d = $('#modalVisualizar').data('payload') || {};
+    const win = window.open('', '_blank');
+    const agora = new Date().toLocaleString('pt-BR');
+    const css = `
+      <style>
+        body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111;}
+        .header{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+        .brand{font-weight:700;font-size:18px;}
+        .badge{display:inline-block;padding:4px 8px;border-radius:6px;border:1px solid #ccc;font-size:12px;margin-left:8px;}
+        h2{margin:0 0 6px 0;font-size:20px}
+        .meta{color:#666;font-size:12px;margin-bottom:16px;}
+        dl{display:grid;grid-template-columns:180px 1fr;gap:8px 16px;}
+        dt{font-weight:700}
+        .footer{margin-top:24px;font-size:12px;color:#555;}
+        .print{margin-top:24px;text-align:center;font-size:12px;}
+      </style>`;
+    const html = `
+      <html><head><meta charset="utf-8"><title>Comprovante de Agendamento</title>${css}</head>
+      <body>
+        <div class="header">
+          <div class="brand">Comprovante de Agendamento</div>
+          <span class="badge">${d.status_formatado || ''}</span>
+        </div>
+        <h2>${(d.servico || '')}</h2>
+        <div class="meta">Emitido em ${agora}</div>
+        <dl>
+          <dt>Protocolo</dt><dd>${d.id || ''}</dd>
+          <dt>Nome do Solicitante</dt><dd>${d.nome || ''}</dd>
+          <dt>Data e Hora</dt><dd>${d.hora_formatada || ''}</dd>
+          <dt>Observações</dt><dd>${(d.obs||'').toString().replace(/\n/g,'<br>')}</dd>
+        </dl>
+        <div class="footer">
+          Guarde este comprovante. Apresente no atendimento, se solicitado.
+        </div>
+        <div class="print">
+          <script>window.onload = function(){ window.print(); }<\/script>
+        </div>
+      </body></html>`;
+    win.document.write(html);
+    win.document.close();
   });
 
   /* inicial */

@@ -19,6 +19,8 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
     <script src="../script/jquery-3.5.1.min.js"></script>
     <?php include(__DIR__ . '/../style/style_tarefas.php');?>
+    <!-- FullCalendar CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css" rel="stylesheet" />
 </head>
 
 <body class="light-mode">
@@ -33,12 +35,23 @@ date_default_timezone_set('America/Sao_Paulo');
             <section class="page-hero">
             <div class="title-row">
                 <div class="title-icon"><i class="fa fa-tasks"></i></div>
-                <div>
+                <div class="flex-grow-1">
                 <h1>Pesquisa de Tarefas</h1>
                 <div class="subtitle muted">Filtre por número, apresentante, categoria, data, origem, status...</div>
                 </div>
+
+                <!-- Toggle Cards / Calendário -->
+                <div class="btn-group view-toggle ms-auto" role="group" aria-label="Alternar visualização">
+                <button class="btn btn-outline-secondary active" id="btnViewCards" title="Ver em Cards">
+                    <i class="fa fa-th me-1"></i> Cards
+                </button>
+                <button class="btn btn-outline-secondary" id="btnViewCalendar" title="Ver em Calendário">
+                    <i class="fa fa-calendar me-1"></i> Calendário
+                </button>
+                </div>
             </div>
             </section>
+
 
             <form id="searchForm">
                 <div class="form-row">
@@ -196,6 +209,10 @@ date_default_timezone_set('America/Sao_Paulo');
                 </div>
             </div>
 
+            <!-- CALENDÁRIO -->
+            <div id="calendarWrapper" class="p-2">
+                <div id="calendario"></div>
+            </div>
         </div>
     </div>
 
@@ -943,6 +960,11 @@ date_default_timezone_set('America/Sao_Paulo');
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script src="../script/sweetalert2.js"></script>
+
+    <!-- FullCalendar JS -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales-all.global.min.js"></script>
+
     
     <script>  
         document.getElementById('compartilharAnexos').addEventListener('change', function() {  
@@ -1196,7 +1218,9 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
         $('#searchForm').on('submit', function(e) {
             e.preventDefault();
             loadTasks();  // Carregar as tarefas com base nos filtros do formulário
+            if (isCalendarInit) calendar.refetchEvents(); // ↩ também atualiza o calendário
         });
+
 
         // Função para carregar as tarefas
         function loadTasks() {
@@ -2648,6 +2672,103 @@ $('#arquivarAtoForm').on('submit', function(e){
         $('#viewTaskModal').on('shown.bs.modal', function() {
             aplicarCorStatusSelect();
         });
+
+
+        /* ========== CALENDÁRIO (FullCalendar) ========== */
+        let calendar = null, isCalendarInit = false;
+
+        // Constrói parâmetros a partir do form de filtros
+        function paramsFromForm(){
+        const arr = $('#searchForm').serializeArray();
+        const o = {};
+        arr.forEach(x => { o[x.name] = x.value; });
+        return o;
+        }
+
+        // Fonte de eventos: usa o mesmo endpoint de busca, com format=fc e janela visível
+        function fetchCalendarEvents(info, success, failure){
+        const params = $('#searchForm').serializeArray();
+        params.push(
+            {name:'format', value:'fc'},       // backend deve reconhecer para devolver JSON de eventos
+            {name:'start',  value:info.startStr},
+            {name:'end',    value:info.endStr}
+        );
+        $.ajax({
+            url: 'search_tasks.php',
+            data: params,
+            dataType: 'json',
+            success: success,
+            error: failure
+        });
+        }
+
+        // Inicializa o calendário
+        function initCalendar(){
+        const el = document.getElementById('calendario');
+        calendar = new FullCalendar.Calendar(el,{
+            locale:'pt-br',
+            timeZone:'local',                        // interpreta strings locais
+            eventTimeFormat:{hour:'2-digit',minute:'2-digit',meridiem:false}, // 24h
+            initialView:'dayGridMonth',
+            headerToolbar:{
+            left:'prev,next today',
+            center:'title',
+            right:'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+            },
+            buttonText:{ today:'Hoje', month:'Mês', week:'Semana', day:'Dia', list:'Lista' },
+            navLinks:true,
+            nowIndicator:true,
+            selectable:false,
+            height:'auto',
+            eventSources:[ fetchCalendarEvents ],
+            eventClassNames:function(arg){
+            // normaliza status em classe evt-*
+            const st = (arg.event.extendedProps.status || '')
+                .toString().toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+                .replace(/\s+/g,'-');
+            return ['evt-' + st];
+            },
+            eventClick:function(info){
+            const ep = info.event.extendedProps || {};
+            // abre o mesmo modal que os cards
+            if (ep.token) {
+                viewTask(ep.token);
+            } else {
+                // fallback: se não tiver token, usa id
+                viewTask(info.event.id);
+            }
+            }
+        });
+        calendar.render();
+        isCalendarInit = true;
+        }
+
+        // Alternar visualização
+        $('#btnViewCalendar').on('click', function(){
+        if($(this).hasClass('active')) return;
+        $('#btnViewCards').removeClass('active');
+        $(this).addClass('active');
+        $('.result-block').hide();
+        $('#calendarWrapper').show();
+        if(!isCalendarInit) initCalendar(); else calendar.refetchEvents();
+        });
+
+        $('#btnViewCards').on('click', function(){
+        if($(this).hasClass('active')) return;
+        $('#btnViewCalendar').removeClass('active');
+        $(this).addClass('active');
+        $('#calendarWrapper').hide();
+        $('.result-block').show();
+        });
+
+        /* === NOVO: recalcular calendário quando o tema (classe do body) mudar === */
+        const themeObserver = new MutationObserver(() => {
+        if (isCalendarInit) {
+            calendar.updateSize(); // reaplica tamanhos/cores sem refetch
+        }
+        });
+        themeObserver.observe(document.body, { attributes:true, attributeFilter:['class'] });
 
     </script>
     <?php
