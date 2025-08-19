@@ -1,7 +1,8 @@
 <?php
 include(__DIR__ . '/session_check.php');
 checkSession();
-include(__DIR__ . '/db_connection3.php');  // Ajuste o caminho se necessário
+include(__DIR__ . '/db_connection3.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 if (!isset($conn)) {
     die("Erro ao conectar ao banco de dados");

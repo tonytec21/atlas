@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nome_modelo       = $_POST['nome_modelo'];

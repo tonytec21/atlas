@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection2.php');
+date_default_timezone_set('America/Sao_Paulo');
 
 // Definir timezone corretamente
 date_default_timezone_set('America/Sao_Paulo');
