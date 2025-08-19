@@ -550,6 +550,32 @@ date_default_timezone_set('America/Sao_Paulo');
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>ATOS LIQUIDADOS</b></div>
                         <div class="card-body">
+                            <!-- NOVO: Toolbar de filtros -->
+                            <div class="row no-gutters align-items-end mb-3" id="filtrosAtosLiquidados">
+                                <div class="col-12 col-md-3 mb-2" id="filtroAtosFuncCol" style="display:none;">
+                                    <label class="input-label">Funcionário</label>
+                                    <select class="form-control form-control-sm" id="filtroAtosFuncionario"></select>
+                                </div>
+                                <div class="col-12 col-md-3 mb-2">
+                                    <label class="input-label">Ato</label>
+                                    <select class="form-control form-control-sm" id="filtroAtosAto"></select>
+                                </div>
+                                <div class="col-12 col-md-3 mb-2">
+                                    <label class="input-label">Apresentante</label>
+                                    <select class="form-control form-control-sm" id="filtroAtosApresentante"></select>
+                                </div>
+                                <div class="col-12 col-md-3 mb-2">
+                                    <label class="input-label">Nº OS</label>
+                                    <select class="form-control form-control-sm" id="filtroAtosOS"></select>
+                                </div>
+                                <div class="col-12 mt-1">
+                                    <button class="btn btn-outline-secondary btn-sm" id="btnLimparFiltrosAtos">
+                                        <i class="fa fa-eraser"></i> Limpar filtros
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- /Toolbar de filtros -->
+
                             <div class="table-responsive">
                                 <table id="tabelaAtos" class="table table-striped table-bordered">
                                     <thead>
@@ -566,13 +592,44 @@ date_default_timezone_set('America/Sao_Paulo');
                                     <tbody id="detalhesAtos"></tbody>
                                 </table>
                             </div>
-                            <h6 class="total-label">Total Atos Liquidados: <span id="totalAtos"></span></h6>
+
+                            <!-- NOVO: total com quantidade dinâmica -->
+                            <h6 class="total-label d-flex flex-wrap align-items-center">
+                                <span class="mr-3">Qtd.: <span id="qtdAtos">0</span></span>
+                                <span>Total Atos Liquidados: <span id="totalAtos"></span></span>
+                            </h6>
                         </div>
                     </div>
 
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>ATOS MANUAIS</b></div>
                         <div class="card-body">
+                            <!-- NOVO: Toolbar de filtros -->
+                            <div class="row no-gutters align-items-end mb-3" id="filtrosAtosManuais">
+                                <div class="col-12 col-md-3 mb-2" id="filtroManuaisFuncCol" style="display:none;">
+                                    <label class="input-label">Funcionário</label>
+                                    <select class="form-control form-control-sm" id="filtroManuaisFuncionario"></select>
+                                </div>
+                                <div class="col-12 col-md-3 mb-2">
+                                    <label class="input-label">Ato</label>
+                                    <select class="form-control form-control-sm" id="filtroManuaisAto"></select>
+                                </div>
+                                <div class="col-12 col-md-3 mb-2">
+                                    <label class="input-label">Apresentante</label>
+                                    <select class="form-control form-control-sm" id="filtroManuaisApresentante"></select>
+                                </div>
+                                <div class="col-12 col-md-3 mb-2">
+                                    <label class="input-label">Nº OS</label>
+                                    <select class="form-control form-control-sm" id="filtroManuaisOS"></select>
+                                </div>
+                                <div class="col-12 mt-1">
+                                    <button class="btn btn-outline-secondary btn-sm" id="btnLimparFiltrosManuais">
+                                        <i class="fa fa-eraser"></i> Limpar filtros
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- /Toolbar de filtros -->
+
                             <div class="table-responsive">
                                 <table id="tabelaAtosManuais" class="table table-striped table-bordered">
                                     <thead>
@@ -589,7 +646,12 @@ date_default_timezone_set('America/Sao_Paulo');
                                     <tbody id="detalhesAtosManuais"></tbody>
                                 </table>
                             </div>
-                            <h6 class="total-label">Total Atos Manuais: <span id="totalAtosManuais"></span></h6>
+
+                            <!-- NOVO: total com quantidade dinâmica -->
+                            <h6 class="total-label d-flex flex-wrap align-items-center">
+                                <span class="mr-3">Qtd.: <span id="qtdAtosManuais">0</span></span>
+                                <span>Total Atos Manuais: <span id="totalAtosManuais"></span></span>
+                            </h6>
                         </div>
                     </div>
 
@@ -1269,6 +1331,9 @@ date_default_timezone_set('America/Sao_Paulo');
                     var icon = fechado ? 'fa-lock' : 'fa-unlock-alt';
                     $('#modalStatusPill').html(`<span class="badge-status ${statusClass}"><i class="fa ${icon}"></i> ${statusText}</span>`);
 
+                    // NOVO: guardar tipo atual (individual | unificado)
+                    window.currentTipoCaixa = (tipo || 'individual');
+
                     // Cards topo
                     toggleCard('#cardTotalAtos', detalhes.totalAtos);
                     toggleCard('#cardTotalAtosManuais', detalhes.totalAtosManuais);
@@ -1300,6 +1365,9 @@ date_default_timezone_set('America/Sao_Paulo');
                     });
                     $('#totalAtos').text(formatCurrency(totalAtos));
 
+                    // NOVO: prepara filtros da seção ATOS LIQUIDADOS
+                    setupAtosFilterUI(detalhes, window.currentTipoCaixa);
+
                     // Atos Manuais
                     var totalAtosManuais = 0;
                     $('#detalhesAtosManuais').empty();
@@ -1318,6 +1386,9 @@ date_default_timezone_set('America/Sao_Paulo');
                         `);
                     });
                     $('#totalAtosManuais').text(formatCurrency(totalAtosManuais));
+
+                    // NOVO: prepara filtros da seção ATOS MANUAIS
+                    setupManuaisFilterUI(detalhes, window.currentTipoCaixa);
 
                     // Pagamentos
                     var totalPagamentos = 0;
@@ -1454,8 +1525,23 @@ date_default_timezone_set('America/Sao_Paulo');
                     $('#detalhesModal').modal('show');
 
                     // DataTables
-                    $('#tabelaAtos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
-                    $('#tabelaAtosManuais').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+                    // NOVO: manter referências globais para recálculo dinâmico
+                    if (window.dtAtos) window.dtAtos.destroy();
+                    window.dtAtos = $('#tabelaAtos').DataTable({
+                        language: { url: "../style/Portuguese-Brasil.json" },
+                        destroy: true,
+                        pageLength: 10,
+                        order: []
+                    }).on('draw', function(){ recalcAtosTotals(); });
+
+                    if (window.dtAtosManuais) window.dtAtosManuais.destroy();
+                    window.dtAtosManuais = $('#tabelaAtosManuais').DataTable({
+                        language: { url: "../style/Portuguese-Brasil.json" },
+                        destroy: true,
+                        pageLength: 10,
+                        order: []
+                    }).on('draw', function(){ recalcManuaisTotals(); });
+
                     $('#tabelaPagamentos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
                     $('#tabelaTotalPorTipo').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
                     $('#tabelaDevolucoes').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
@@ -1466,6 +1552,153 @@ date_default_timezone_set('America/Sao_Paulo');
                 error: function() { alert('Erro ao obter detalhes.'); }
             });
         }
+
+        // Escapa regex para buscas exatas nas colunas
+        function escapeRegex(s){ return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+        function parseBRMoney(str){
+            if (str == null) return 0;
+            const s = String(str).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+            const v = parseFloat(s);
+            return isNaN(v) ? 0 : v;
+        }
+
+        // Monta lista única e ordenada a partir de um campo
+        function distinctFrom(list, key){
+            const set = new Set();
+            (list || []).forEach(it=>{
+                const v = (it && it[key] != null) ? String(it[key]).trim() : '';
+                if (v) set.add(v);
+            });
+            return Array.from(set).sort((a,b)=> a.localeCompare(b,'pt-BR',{numeric:true, sensitivity:'base'}));
+        }
+
+        // Preenche um <select> com placeholder + valores
+        function fillSelect(selectId, values, placeholder){
+            const $sel = $(selectId);
+            $sel.empty().append(`<option value="">${placeholder}</option>`);
+            values.forEach(v => $sel.append(`<option value="${$('<div>').text(v).html()}">${v}</option>`));
+        }
+
+        // ---------- ATOS LIQUIDADOS ----------
+        function setupAtosFilterUI(detalhes, tipo){
+            const isUni = (tipo === 'unificado');
+            // Mostra/oculta filtro por funcionário
+            $('#filtroAtosFuncCol').toggle(isUni);
+
+            // Popula selects com base nos dados recebidos do back-end
+            fillSelect('#filtroAtosAto',          distinctFrom(detalhes.atos, 'ato'),                 'Todos os Atos');
+            fillSelect('#filtroAtosApresentante', distinctFrom(detalhes.atos, 'cliente'),             'Todos os Apresentantes');
+            fillSelect('#filtroAtosOS',           distinctFrom(detalhes.atos, 'ordem_servico_id'),    'Todas as O.S');
+            if (isUni){
+                fillSelect('#filtroAtosFuncionario', distinctFrom(detalhes.atos, 'funcionario'),      'Todos os Funcionários');
+            } else {
+                $('#filtroAtosFuncionario').empty().append('<option value=""></option>');
+            }
+
+            // Eventos
+            $('#filtroAtosAto, #filtroAtosApresentante, #filtroAtosOS, #filtroAtosFuncionario')
+                .off('change').on('change', applyAtosFilters);
+
+            $('#btnLimparFiltrosAtos').off('click').on('click', function(){
+                $('#filtrosAtosLiquidados select').val('');
+                applyAtosFilters();
+            });
+
+            // Inicializa totais coerentes com a tabela carregada
+            recalcAtosTotals();
+        }
+
+        function applyAtosFilters(){
+            if (!window.dtAtos) return;
+            const func  = $('#filtroAtosFuncionario').val() || '';
+            const ato   = $('#filtroAtosAto').val() || '';
+            const apr   = $('#filtroAtosApresentante').val() || '';
+            const os    = $('#filtroAtosOS').val() || '';
+
+            // Mapeamento de colunas: 0=Funcionário, 1=OS, 2=Apresentante, 3=Ato
+            window.dtAtos.column(0).search(func ? '^' + escapeRegex(func) + '$' : '', true, false);
+            window.dtAtos.column(1).search(os   ? '^' + escapeRegex(os)   + '$' : '', true, false);
+            window.dtAtos.column(2).search(apr  ? escapeRegex(apr) : '', true, false);  // contém
+            window.dtAtos.column(3).search(ato  ? '^' + escapeRegex(ato)  + '$' : '', true, false);
+
+            window.dtAtos.draw();
+            recalcAtosTotals();
+        }
+
+        function recalcAtosTotals(){
+            if (!window.dtAtos) return;
+            let soma = 0, qtd = 0;
+            window.dtAtos.rows({search:'applied'}).every(function(){
+                const row = this.data(); // array de células
+                // col[5]=Quantidade, col[6]=Total
+                qtd += parseFloat(String(row[5]).replace(/[^\d,.-]/g,'').replace('.','').replace(',','.')) || 0;
+                soma += parseBRMoney(row[6]);
+            });
+            $('#qtdAtos').text(qtd);
+            $('#totalAtos').text(formatCurrency(soma));
+            // Atualiza card topo
+            $('#cardTotalAtos').text(formatCurrency(soma));
+        }
+
+        // ---------- ATOS MANUAIS ----------
+        function setupManuaisFilterUI(detalhes, tipo){
+            const isUni = (tipo === 'unificado');
+            $('#filtroManuaisFuncCol').toggle(isUni);
+
+            fillSelect('#filtroManuaisAto',          distinctFrom(detalhes.atosManuais, 'ato'),                 'Todos os Atos');
+            fillSelect('#filtroManuaisApresentante', distinctFrom(detalhes.atosManuais, 'cliente'),             'Todos os Apresentantes');
+            fillSelect('#filtroManuaisOS',           distinctFrom(detalhes.atosManuais, 'ordem_servico_id'),    'Todas as O.S');
+            if (isUni){
+                fillSelect('#filtroManuaisFuncionario', distinctFrom(detalhes.atosManuais, 'funcionario'),      'Todos os Funcionários');
+            } else {
+                $('#filtroManuaisFuncionario').empty().append('<option value=""></option>');
+            }
+
+            $('#filtroManuaisAto, #filtroManuaisApresentante, #filtroManuaisOS, #filtroManuaisFuncionario')
+                .off('change').on('change', applyManuaisFilters);
+
+            $('#btnLimparFiltrosManuais').off('click').on('click', function(){
+                $('#filtrosAtosManuais select').val('');
+                applyManuaisFilters();
+            });
+
+            recalcManuaisTotals();
+        }
+
+        function applyManuaisFilters(){
+            if (!window.dtAtosManuais) return;
+            const func  = $('#filtroManuaisFuncionario').val() || '';
+            const ato   = $('#filtroManuaisAto').val() || '';
+            const apr   = $('#filtroManuaisApresentante').val() || '';
+            const os    = $('#filtroManuaisOS').val() || '';
+
+            // Mapeamento igual: 0=Funcionário, 1=OS, 2=Apresentante, 3=Ato
+            window.dtAtosManuais.column(0).search(func ? '^' + escapeRegex(func) + '$' : '', true, false);
+            window.dtAtosManuais.column(1).search(os   ? '^' + escapeRegex(os)   + '$' : '', true, false);
+            window.dtAtosManuais.column(2).search(apr  ? escapeRegex(apr) : '', true, false);
+            window.dtAtosManuais.column(3).search(ato  ? '^' + escapeRegex(ato)  + '$' : '', true, false);
+
+            window.dtAtosManuais.draw();
+            recalcManuaisTotals();
+        }
+
+        function recalcManuaisTotals(){
+            if (!window.dtAtosManuais) return;
+            let soma = 0, qtd = 0;
+            window.dtAtosManuais.rows({search:'applied'}).every(function(){
+                const row = this.data();
+                qtd += parseFloat(String(row[5]).replace(/[^\d,.-]/g,'').replace('.','').replace(',','.')) || 0;
+                soma += parseBRMoney(row[6]);
+            });
+            $('#qtdAtosManuais').text(qtd);
+            $('#totalAtosManuais').text(formatCurrency(soma));
+            // Atualiza card topo
+            $('#cardTotalAtosManuais').text(formatCurrency(soma));
+        }
+
+        // ============ /FIM NOVO BLOCO ============ 
+
 
         function cadastrarSaida(funcionarios, data) {
             $('#data_saida').val(data);

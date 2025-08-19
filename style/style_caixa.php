@@ -236,4 +236,115 @@
             position:absolute; right:48px; top:10px;
         }
         .modal-status-pill .badge-status { box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+
+        /* ====== SOMENTE OS FILTROS DO MODAL (ATOS LIQUIDADOS / ATOS MANUAIS) ====== */
+/* Paleta local por tema (apenas para os filtros) */
+body.light-mode #detalhesModal #filtrosAtosLiquidados,
+body.light-mode #detalhesModal #filtrosAtosManuais {
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #667085;
+  --border: #e6e8f0;
+  --focus: rgba(59,130,246,.32);
+}
+body.dark-mode #detalhesModal #filtrosAtosLiquidados,
+body.dark-mode #detalhesModal #filtrosAtosManuais {
+  --surface: #0f172a;
+  --text: #e5e7eb;
+  --muted: #a3b1c2;
+  --border: #1f2937;
+  --focus: rgba(59,130,246,.45);
+}
+
+/* Container dos filtros:
+   – volta a ser FLEX (não grid) para não brigar com Bootstrap
+   – espaçamentos amplos no desktop
+*/
+#detalhesModal #filtrosAtosLiquidados,
+#detalhesModal #filtrosAtosManuais {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: end;
+  column-gap: 24px;
+  row-gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* Cada coluna de filtro ganha largura mínima confortável
+   (funciona mesmo com .no-gutters) */
+#detalhesModal #filtrosAtosLiquidados > [class*="col-"],
+#detalhesModal #filtrosAtosManuais > [class*="col-"] {
+  min-width: 260px;
+  flex: 1 1 260px;
+}
+
+/* Labels dos filtros */
+#detalhesModal #filtrosAtosLiquidados .input-label,
+#detalhesModal #filtrosAtosManuais .input-label {
+  display: block;
+  margin: 0 0 .4rem 2px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: .92rem;
+}
+
+/* Selects 100% da coluna (corrige selects estreitos) */
+#detalhesModal #filtrosAtosLiquidados select.form-control,
+#detalhesModal #filtrosAtosManuais select.form-control {
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;              /* evita encolhimento estranho em alguns navegadores */
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: .5rem .75rem;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+}
+#detalhesModal #filtrosAtosLiquidados select.form-control:focus,
+#detalhesModal #filtrosAtosManuais select.form-control:focus {
+  border-color: rgba(59,130,246,.55);
+  box-shadow: 0 0 0 .2rem var(--focus);
+}
+
+/* Botão "Limpar filtros" com respiro e alinhado ao visual */
+#btnLimparFiltrosAtos,
+#btnLimparFiltrosManuais {
+  border-radius: 10px;
+  padding: .5rem .9rem;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: transparent;
+  margin-bottom: 8px;
+  height: 45px;
+}
+#btnLimparFiltrosAtos:hover,
+#btnLimparFiltrosManuais:hover {
+  background: rgba(148,163,184,.08);
+  color: var(--text);
+  border-color: rgba(148,163,184,.35);
+}
+#btnLimparFiltrosAtos .fa,
+#btnLimparFiltrosManuais .fa { margin-right: .4rem; }
+
+/* Desktop+: dá mais espaço entre campos */
+@media (min-width: 1200px) {
+  #detalhesModal #filtrosAtosLiquidados,
+  #detalhesModal #filtrosAtosManuais {
+    column-gap: 28px;
+    row-gap: 16px;
+    padding: 16px 18px;
+  }
+  #detalhesModal #filtrosAtosLiquidados > [class*="col-"],
+  #detalhesModal #filtrosAtosManuais > [class*="col-"] {
+    min-width: 300px;
+    flex-basis: 300px;
+  }
+}
+
     </style>
