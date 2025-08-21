@@ -3,7 +3,6 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
-
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -11,381 +10,245 @@ date_default_timezone_set('America/Sao_Paulo');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Atlas - Central de Acesso - Indexador</title>
+
+    <!-- CSS base (mesmos do index.php raiz) -->
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
-    <link href="../style/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <script src="../script/jquery-3.6.0.min.js"></script>
-    <script src="../script/jquery-ui.min.js"></script>
-    <link rel="stylesheet" href="../style/css/jquery-ui.css">
-    <style>
 
-        .page-title {  
-            font-size: 2.0rem;  
-            font-weight: 700;  
-            color: #34495e;  
-            margin-bottom: 2rem;  
-            text-align: center;  
-            text-transform: uppercase;  
-            letter-spacing: 1px;  
-        }  
-
-        body.dark-mode .page-title {
-            font-size: 2.0rem;  
-            font-weight: 700;  
-            color: #fff;  
-            margin-bottom: 2rem;  
-            text-align: center;  
-            text-transform: uppercase;  
-            letter-spacing: 1px;  
-            
-        }
-
-        #sortable-buttons .col-md-4 {
-            cursor: move;
-        }
-
-        .btn-warning {
-            color: #fff!important;
-        }
-
-        .text-tutoriais {
-            color: #1762b8;
-        }
-
-        .btn-tutoriais {
-            background: #1762b8;
-            color: #fff;
-        }
-
-        .btn-tutoriais:hover {
-            background: #0c52a3;
-            color: #fff;
-        }
-
-        .btn-4 {
-            background: #34495e;
-            color: #fff;
-        }
-        .btn-4:hover {
-            background: #2c3e50;
-            color: #fff;
-        }
-
-        .text-4 {
-            color: #34495e;
-        }
-
-        body.dark-mode .btn-4 {
-            background: #54718e;
-            color: #fff;
-        }
-        body.dark-mode .btn-4:hover {
-            background: #435c74;
-            color: #fff;
-        }
-
-        body.dark-mode .text-4 {
-            color: #54718e;
-        }
-
-        .btn-5 {
-            background: #ff8a80;
-            color: #fff;
-        }
-        .btn-5:hover {
-            background: #e3786f;
-            color: #fff;
-        }
-        
-        .text-5 {
-            color: #ff8a80;
-        }
-        
-        .btn-6 {
-            background: #427b8e;
-            color: #fff;
-        }
-        .btn-6:hover {
-            background: #366879;
-            color: #fff;
-        }
-        
-        .text-6 {
-            color: #427b8e;
-        }
-       
-        .btn-indexador {
-            background: #8e427c;
-            color: #fff;
-        }
-        
-        .btn-indexador:hover {
-            background: #783768;
-            color: #fff;
-        }
-        
-        .text-indexador {
-            color: #8e427c;
-        }
-        
-        .btn-info2{
-            background-color: #17a2b8;
-            color: white;
-            margin-bottom: 3px!important;
-            width: 40px;
-            height: 40px;
-            border-radius: 5px;
-            border: none;
-        }
-        .btn-info2:hover {
-            color: #fff;
-        }
-
-        
-        .btn-close {
-            outline: none; 
-            border: none; 
-            background: none;
-            padding: 0; 
-            font-size: 1.5rem;
-            cursor: pointer; 
-            transition: transform 0.2s ease;
-        }
-
-        .btn-close:hover {
-            transform: scale(2.10); 
-        }
-
-        .btn-close:focus {
-            outline: none;
-        }
-        .w-100 {
-            margin-bottom: 5px;
-        }
-        .btn-anotacoes {
-            background: #A7D676;
-            color: #fff;
-        }
-
-        .btn-anotacoes:hover {
-            background: #7CB342;
-            color: #fff;
-        }
-        
-        .text-anotacoes {
-            color: #A7D676;
-        }
-        .btn-reurb {
-            background: #FFC8A2;
-            color: #fff;
-        }
-
-        .btn-reurb:hover {
-            background: #f7b283;
-            color: #fff;
-        }
-        
-        .text-reurb {
-            color: #FFC8A2;
-        }
-        #sortable-cards .card {  
-            border: none;  
-            border-radius: 15px;  
-            transition: all var(--transition-speed) ease;  
-            cursor: grab;  
-            background: var(--primary-bg);  
-            box-shadow: var(--card-shadow);  
-            overflow: hidden;  
-            height: 100%;  
-        }  
-
-        #sortable-cards .card:hover {  
-            transform: var(--card-hover-transform);  
-            box-shadow: 0 12px 20px rgba(0,0,0,0.15);  
-        }  
-        .btn {  
-            border-radius: 10px!important;  
-        }
-    </style>
+    <!-- Estilos do hub (mesmo bundle usado pelo index.php principal) -->
+    <?php include(__DIR__ . '/../style/style_index.php'); ?>
 </head>
 <body class="light-mode">
-<?php
-include(__DIR__ . '/../menu.php');
-?>
 
-<div id="main" class="main-content">
-    <div class="container mt-4">
-        <h2 class="page-title">Central de Acesso - Indexador</h2>
+<?php include(__DIR__ . '/../menu.php'); ?>
 
-        <!-- Cards de Módulos -->
-        <div id="sortable-cards" class="row">
-            <!-- Nascimento -->
-            <div class="col-md-4 mb-3" id="card-pessoas">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center">
-                        <i class="fa fa-baby-carriage fa-3x text-anotacoes" aria-hidden="true"></i>
-                        <h5 class="card-title">Nascimento</h5>
-                        <a href="nascimento/index.php" class="btn btn-anotacoes w-100">Acessar</a>
-                    </div>
+<div class="main-container">
+    <h1 class="page-title"></h1>
+    <div class="title-divider"></div>
+
+    <div class="search-container">
+        <input type="text" class="search-box" id="searchModules" placeholder="Buscar módulos...">
+    </div>
+
+    <div id="sortable-cards">
+        <!-- Nascimento -->
+        <div class="module-card" id="card-nascimento">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Indexador</span>
+                <div class="card-icon icon-agenda">
+                    <i class="fa fa-child"></i>
                 </div>
             </div>
+            <h3 class="card-title">Nascimento</h3>
+            <p class="card-description">Indexe e pesquise registros de nascimento.</p>
+            <button class="card-button btn-anotacoes" onclick="window.location.href='nascimento/index.php'">
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
+        </div>
 
-            <!-- Casamento -->
-            <div class="col-md-4 mb-3" id="card-imoveis">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center">
-                        <i class="fas fa-heart-circle-check fa-3x text-5" aria-hidden="true"></i>
-                        <h5 class="card-title">Casamento</h5>
-                        <a href="index.php" class="btn btn-5 w-100">Acessar</a>
-                    </div>
+        <!-- Casamento -->
+        <div class="module-card" id="card-casamento">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Indexador</span>
+                <div class="card-icon icon-contas">
+                    <i class="fa fa-heart"></i>
                 </div>
             </div>
+            <h3 class="card-title">Casamento</h3>
+            <p class="card-description">Indexe e pesquise registros de casamento.</p>
+            <button class="card-button btn-5" onclick="window.location.href='index.php'" disabled>
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
+        </div>
 
-            <!-- Óbito -->
-            <div class="col-md-4 mb-3" id="card-processoadm">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center">
-                        <i class="fa fa-cross fa-3x text-secondary" aria-hidden="true"></i>
-                        <h5 class="card-title">Óbito</h5>
-                        <a href="obito/index.php" class="btn btn-secondary w-100">Acessar</a>
-                    </div>
+        <!-- Óbito -->
+        <div class="module-card" id="card-obito">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Indexador</span>
+                <div class="card-icon icon-tarefas">
+                    <i class="fa fa-book"></i>
                 </div>
             </div>
+            <h3 class="card-title">Óbito</h3>
+            <p class="card-description">Indexe e pesquise registros de óbito.</p>
+            <button class="card-button btn-secondary" onclick="window.location.href='obito/index.php'">
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
+        </div>
 
-            <!-- Notas -->
-            <div class="col-md-4 mb-3" id="card-exportar">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center">
-                        <i class="fa fa-file-alt fa-3x text-reurb mb-2"></i>
-                        <h5 class="card-title">Notas</h5>
-                        <a href="index.php" class="btn btn-reurb w-100">Acessar</a>
-                    </div>
+        <!-- Notas -->
+        <div class="module-card" id="card-notas">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Indexador</span>
+                <div class="card-icon icon-indexador">
+                    <i class="fa fa-file-text-o"></i>
                 </div>
             </div>
+            <h3 class="card-title">Notas</h3>
+            <p class="card-description">Indexe e pesquise atos de notas.</p>
+            <button class="card-button btn-indexador" onclick="window.location.href='index.php'" disabled>
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
+        </div>
 
-            <!-- Imóveis -->
-            <div class="col-md-4 mb-3" id="card-oficios">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center">
-                        <i class="fa fa-home fa-3x text-info"></i>
-                        <h5 class="card-title">Imóveis</h5>
-                        <a href="index.php" class="btn btn-info2 w-100">Acessar</a>
-                    </div>
+        <!-- Imóveis -->
+        <div class="module-card" id="card-imoveis">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Indexador</span>
+                <div class="card-icon icon-os">
+                    <i class="fa fa-home"></i>
                 </div>
             </div>
+            <h3 class="card-title">Imóveis</h3>
+            <p class="card-description">Indexe e pesquise matrículas de imóveis.</p>
+            <button class="card-button btn-os" onclick="window.location.href='index.php'" disabled>
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
+        </div>
 
-            <!-- Protesto -->
-            <div class="col-md-4 mb-3" id="card-provimento">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center">
-                        <i class="fa fa-gavel fa-3x text-success mb-2"></i>
-                        <h5 class="card-title">Protesto</h5>
-                        <a href="index.php" class="btn btn-success w-100">Acessar</a>
-                    </div>
+        <!-- Protesto -->
+        <div class="module-card" id="card-protesto">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Indexador</span>
+                <div class="card-icon icon-caixa">
+                    <i class="fa fa-gavel"></i>
                 </div>
             </div>
+            <h3 class="card-title">Protesto</h3>
+            <p class="card-description">Indexe e pesquise títulos de protesto.</p>
+            <button class="card-button btn-success" onclick="window.location.href='index.php'" disabled>
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
+        </div>
 
-            <!-- Guia de Recebimento -->
-            <div class="col-md-4 mb-3" id="card-guia">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center">
-                        <i class="fa fa-file-signature fa-3x text-4 mb-2"></i>
-                        <h5 class="card-title">Títulos e Documentos</h5>
-                        <a href="index.php" class="btn btn-4 w-100">Acessar</a>
-                    </div>
+        <!-- Títulos e Documentos -->
+        <div class="module-card" id="card-titulos-e-documentos">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Indexador</span>
+                <div class="card-icon icon-guia">
+                    <i class="fa fa-briefcase"></i>
                 </div>
             </div>
+            <h3 class="card-title">Títulos e Documentos</h3>
+            <p class="card-description">Indexe e pesquise registros de títulos e documentos.</p>
+            <button class="card-button btn-4" onclick="window.location.href='index.php'" disabled>
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
+        </div>
 
-            <!-- Controle de Contas a Pagar -->
-            <div class="col-md-4 mb-3" id="card-contas">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center">
-                        <i class="fa fa-building fa-3x text-6 mb-2"></i>
-                        <h5 class="card-title">Pessoas Jurídicas</h5>
-                        <a href="index.php" class="btn btn-6 w-100">Acessar</a>
-                    </div>
+        <!-- Pessoas Jurídicas -->
+        <div class="module-card" id="card-pessoas-juridicas">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Indexador</span>
+                <div class="card-icon icon-manuais">
+                    <i class="fa fa-building"></i>
                 </div>
             </div>
+            <h3 class="card-title">Pessoas Jurídicas</h3>
+            <p class="card-description">Indexe e pesquise registros de pessoas jurídicas.</p>
+            <button class="card-button btn-manuais" onclick="window.location.href='index.php'" disabled>
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
+        </div>
 
-            <!-- Vídeos Tutoriais -->
-            <div class="col-md-4 mb-3" id="card-manuais">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center">
-                        <i class="fa fa-ship fa-3x text-tutoriais mb-2"></i>
-                        <h5 class="card-title">Contratos Marítimos</h5>
-                        <a href="index.php" class="btn btn-tutoriais w-100">Acessar</a>
-                    </div>
+        <!-- Contratos Marítimos -->
+        <div class="module-card" id="card-contratos-maritimos">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Indexador</span>
+                <div class="card-icon icon-arquivamento">
+                    <i class="fa fa-ship"></i>
                 </div>
             </div>
-
+            <h3 class="card-title">Contratos Marítimos</h3>
+            <p class="card-description">Indexe e pesquise registros e contratos marítimos.</p>
+            <button class="card-button btn-arquivamento" onclick="window.location.href='index.php'" disabled>
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
         </div>
     </div>
 </div>
 
+<!-- Scripts (mesmos do index.php principal) -->
+<script src="../script/jquery-3.6.0.min.js"></script>
+<script src="../script/jquery-ui.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+
 <script>
-    $(document).ready(function () {
-        // Inicializa o sortable para os cards
-        $("#sortable-cards").sortable({
-            placeholder: "ui-state-highlight", 
-            helper: 'clone', 
-            containment: 'parent',
-            update: function (event, ui) {
-                saveCardOrder();
-            }
+$(document).ready(function () {
+
+    // Busca de módulos (filtra cards pelo texto)
+    $("#searchModules").on("keyup", function () {
+        const value = $(this).val().toLowerCase();
+        $("#sortable-cards .module-card").filter(function () {
+            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+        });
+    });
+
+    // Inicializa o sortable para os cards (arrastar pelo cabeçalho)
+    $("#sortable-cards").sortable({
+        placeholder: "ui-state-highlight",
+        handle: ".card-header",
+        cursor: "move",
+        update: function (event, ui) {
+            saveCardOrder();
+        }
+    });
+
+    // Salvar ordem dos cards (arquivo JSON no próprio diretório do indexador)
+    function saveCardOrder() {
+        let order = [];
+        $("#sortable-cards .module-card").each(function () {
+            order.push($(this).attr('id'));
         });
 
-        // Função para salvar a ordem dos cards no arquivo JSON
-        function saveCardOrder() {
-            let order = [];
-            $("#sortable-cards .col-md-4").each(function () {
-                order.push($(this).attr('id'));
-            });
+        $.ajax({
+            url: 'save_order.php',
+            type: 'POST',
+            data: { order: order },
+            success: function () {
+                console.log('Ordem salva com sucesso!');
+            },
+            error: function (xhr, status, error) {
+                console.error('Erro ao salvar a ordem:', error);
+            }
+        });
+    }
 
-            // Faz uma requisição AJAX para salvar a ordem no arquivo JSON
-            $.ajax({
-                url: 'save_order.php',
-                type: 'POST',
-                data: { order: order },
-                success: function (response) {
-                    console.log('Ordem salva com sucesso!');
-                },
-                error: function (xhr, status, error) {
-                    console.error('Erro ao salvar a ordem:', error);
-                }
-            });
-        }
-
-        // Carrega a ordem dos cards do arquivo JSON
-        function loadCardOrder() {
-            $.ajax({
-                url: 'load_order.php',
-                type: 'GET',
-                dataType: 'json',
-                success: function (data) {
+    // Carregar ordem salva
+    function loadCardOrder() {
+        $.ajax({
+            url: 'load_order.php',
+            type: 'GET',
+            dataType: 'json',
+            success: function (data) {
+                if (data && data.order) {
                     $.each(data.order, function (index, cardId) {
                         $("#" + cardId).appendTo("#sortable-cards");
                     });
-                },
-                error: function (xhr, status, error) {
-                    console.error('Erro ao carregar a ordem:', error);
                 }
-            });
-        }
+            },
+            error: function (xhr, status, error) {
+                console.error('Erro ao carregar a ordem:', error);
+            }
+        });
+    }
 
-        // Carrega a ordem ao carregar a página
-        loadCardOrder();
+    // Carrega ordem ao iniciar
+    loadCardOrder();
+
+    // Alternância de tema (a classe do <body> também é atualizada pelo menu)
+    $('.mode-switch').on('click', function() {
+        $('body').toggleClass('dark-mode light-mode');
     });
 
+});
 </script>
 
 <br><br><br>
-<?php
-include(__DIR__ . '/../rodape.php');
-?>
+<?php include(__DIR__ . '/../rodape.php'); ?>
 
 </body>
 </html>
