@@ -19,6 +19,39 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <!-- Estilos do hub (mesmo bundle usado pelo index.php principal) -->
     <?php include(__DIR__ . '/../style/style_index.php'); ?>
+
+    <style>
+        /* ======================= BUSCA / GRID ======================= */
+        .search-container { margin-bottom: 30px; }
+
+        .search-box {
+        width: 100%;
+        max-width: 800px;
+        padding: 12px 20px;
+        border-radius: 100px;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        font-size: 16px;
+        background-image: url('../style/img/search-icon.png');
+        background-repeat: no-repeat;
+        background-position: 15px center;
+        background-size: 16px;
+        padding-left: 45px;
+        display: block;
+        margin: 0 auto;
+        }
+        .search-box:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 2px 8px rgba(13,110,253,0.15);
+        }
+        body.dark-mode .search-box {
+        background-color: #22272e;
+        border-color: #2f3a46;
+        color: #e0e0e0;
+        box-shadow: none;
+        }
+    </style>
 </head>
 <body class="light-mode">
 
@@ -205,7 +238,7 @@ $(document).ready(function () {
         });
 
         $.ajax({
-            url: 'save_order.php',
+            url: '../save_order.php', 
             type: 'POST',
             data: { order: order },
             success: function () {
@@ -220,7 +253,7 @@ $(document).ready(function () {
     // Carregar ordem salva
     function loadCardOrder() {
         $.ajax({
-            url: 'load_order.php',
+            url: '../load_order.php',
             type: 'GET',
             dataType: 'json',
             success: function (data) {
