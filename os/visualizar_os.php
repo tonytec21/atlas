@@ -732,7 +732,7 @@ include(__DIR__ . '/../menu.php');
               <option value="PIX">PIX</option>
               <option value="Centrais Eletrônicas">Centrais Eletrônicas</option>
               <option value="Transferência Bancária">Transferência Bancária</option>
-              <option value="Transferência Bancária">Depósito Bancário</option>
+              <option value="Depósito Bancário">Depósito Bancário</option>
               <option value="Boleto">Boleto</option>
               <option value="Cheque">Cheque</option>
             </select>
