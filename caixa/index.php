@@ -303,7 +303,7 @@ date_default_timezone_set('America/Sao_Paulo');
                     $totalRecebidoConta = 0;
                     $totalRecebidoEspecie = 0;
                     foreach ($pagamentos as $pg) {
-                        if (in_array($pg['forma_de_pagamento'], ['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'])) {
+                        if (in_array($pg['forma_de_pagamento'], ['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Depósito Bancário', 'Crédito', 'Débito'])) {
                             $totalRecebidoConta += $pg['total_pagamento'];
                         } else if ($pg['forma_de_pagamento'] === 'Espécie') {
                             $totalRecebidoEspecie += $pg['total_pagamento'];
@@ -1421,7 +1421,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <td>${formatCurrency(totalPorTipo[tipo])}</td>
                             </tr>
                         `);
-                        if (['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Crédito', 'Débito'].includes(tipo)) {
+                        if (['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Depósito Bancário', 'Crédito', 'Débito'].includes(tipo)) {
                             totalRecebidoConta += totalPorTipo[tipo];
                         } else if (tipo === 'Espécie') {
                             totalRecebidoEspecie += totalPorTipo[tipo];
