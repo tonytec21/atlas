@@ -37,8 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // Obter o nome do funcionário da sessão
     session_start();
-    $funcionario = $_SESSION['nome_funcionario']; // Nome do funcionário logado
-
+    $funcionario = $_SESSION['username'];
+    
     // Captura os dados sem fazer qualquer conversão de caracteres especiais
     $termo = $_POST['termo'];
     $livro = $_POST['livro'];
