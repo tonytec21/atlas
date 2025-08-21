@@ -130,4 +130,57 @@
     /* spacing */
     .row.g-grid > [class^="col-"], .row.g-grid > [class*=" col-"]{ margin-bottom:12px; }
 
+    /* === Overlay de processamento centralizado e responsivo === */
+/* Mantém oculto por padrão; quando aria-hidden="false" vira flex (centralizado) */
+.upload-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;              /* respiro nas bordas em telas pequenas */
+  background: rgba(0,0,0,.45);
+  z-index: 12000;             /* acima de modais do Bootstrap */
+}
+
+/* Quando o JS marcar aria-hidden="false", força exibir como flex mesmo com fadeIn */
+.upload-overlay[aria-hidden="false"] {
+  display: flex !important;
+}
+
+/* Cartão do progresso: largura fluida e limite máximo */
+.upload-card {
+  width: 100%;
+  max-width: 560px;
+  margin: 0;                  /* centralizado pelo flex do overlay */
+  padding: clamp(16px, 2.2vw, 28px);
+  border-radius: 18px;
+  box-sizing: border-box;
+}
+
+/* Tipografia responsiva */
+.upload-title   { font-size: clamp(1rem, 1.2vw + .6rem, 1.15rem); }
+.upload-subtitle{ font-size: clamp(.9rem, 1vw + .45rem, 1rem); }
+
+/* Barra de progresso */
+.progress {
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0,0,0,.08);
+}
+.progress-bar { height: 100%; transition: width .2s ease; }
+.progress-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+
+/* Ajustes extras para telas muito pequenas */
+@media (max-width: 480px) {
+  .progress      { height: 10px; }
+  .upload-footer { font-size: .8rem; }
+}
+
+/* Compatível com seus temas claro/escuro */
+body.dark-mode .upload-card { background: #161b22; color: #e6edf3; }
+body.light-mode .upload-card { background: #fff;    color: #111; }
+
+
   </style>

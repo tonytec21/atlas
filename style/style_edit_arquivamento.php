@@ -317,4 +317,43 @@
     @media (min-width: 992px){
       .seal-wrapper .selo-form{ align-items:end; }
     }
+
+    /* === Overlay de processamento centralizado e responsivo === */
+    .upload-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0,0,0,.45);
+      z-index: 12000;
+    }
+    .upload-overlay[aria-hidden="false"] { display: flex !important; }
+
+    .upload-card {
+      width: 100%;
+      max-width: 560px;
+      margin: 0;
+      padding: clamp(16px, 2.2vw, 28px);
+      border-radius: 18px;
+      box-sizing: border-box;
+    }
+    .upload-title   { font-size: clamp(1rem, 1.2vw + .6rem, 1.15rem); font-weight: 600; display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+    .upload-subtitle{ font-size: clamp(.9rem, 1vw + .45rem, 1rem); opacity:.85; margin-bottom:14px; }
+
+    .progress { height: 12px; border-radius: 999px; overflow: hidden; background: rgba(0,0,0,.08); }
+    .progress-bar { height: 100%; transition: width .2s ease; }
+    .progress-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top:10px; }
+    .progress-value { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .upload-footer { margin-top: 12px; font-size: .85rem; opacity:.8; }
+
+    @media (max-width: 480px) {
+      .progress      { height: 10px; }
+      .upload-footer { font-size: .8rem; }
+    }
+
+    /* Temas */
+    body.dark-mode  .upload-card { background: #161b22; color: #e6edf3; }
+    body.light-mode .upload-card { background: #fff;    color: #111; }
   </style>

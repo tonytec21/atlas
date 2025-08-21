@@ -204,10 +204,28 @@ $selos_arquivamentos->close();
         <div id="filesList" class="files-list" aria-live="polite"></div>
       </div>
 
-      <button type="submit" class="btn btn-primary w-100" style="margin-top:0;margin-bottom:30px">
+      <button type="submit" id="btnSubmitEdit" class="btn btn-primary w-100" style="margin-top:0;margin-bottom:30px">
         <i class="fa fa-save"></i> Salvar
       </button>
     </form>
+<!-- Overlay de Upload (progresso) -->
+    <div id="uploadOverlay" class="upload-overlay" aria-hidden="true" aria-live="polite">
+      <div class="upload-card" role="dialog" aria-modal="true" aria-label="Progresso do envio">
+        <div class="upload-title">
+          <i class="fa fa-cloud-upload" aria-hidden="true"></i>
+          <span id="uploadTitle">Enviando anexos…</span>
+        </div>
+        <div class="upload-subtitle" id="uploadSubtitle">Preparando envio…</div>
+        <div class="progress">
+          <div id="uploadBar" class="progress-bar bg-primary" style="width:0%"></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label" id="uploadLabel">Upload</div>
+          <div class="progress-value" id="uploadValue">0%</div>
+        </div>
+        <div class="upload-footer">Por favor, não feche a página até finalizar.</div>
+      </div>
+    </div>
 
     <div class="soft-divider"></div>
 
@@ -801,31 +819,75 @@ $('#previewModal').on('hidden.bs.modal', function () {
   $('#previewImage').attr('src','').hide();
 });
 
-/* ======================== Envio do formulário ======================== */
+/* ===== Overlay helpers (progresso de upload) ===== */
+const $overlay   = $('#uploadOverlay');
+const $bar       = $('#uploadBar');
+const $value     = $('#uploadValue');
+const $title     = $('#uploadTitle');
+const $subtitle  = $('#uploadSubtitle');
+
+function showOverlay(title, subtitle) {
+  if (title)    $title.text(title);
+  if (subtitle) $subtitle.text(subtitle);
+  $bar.css('width','0%');
+  $value.text('0%');
+  $overlay.fadeIn(150).attr('aria-hidden','false');
+}
+function updateOverlay(percent) {
+  const p = Math.max(0, Math.min(100, Math.round(percent)));
+  $bar.css('width', p + '%');
+  $value.text(p + '%');
+  if (p >= 100) $subtitle.text('Processando…');
+}
+function hideOverlay() {
+  $overlay.fadeOut(150).attr('aria-hidden','true');
+}
+function beforeUnloadGuard(e){
+  e.preventDefault();
+  e.returnValue = '';
+}
+let isSubmittingEdit = false;
+
+/* ======================== Envio do formulário (com progresso) ======================== */
 $(document).on('submit','#ato-form', function(e){
   e.preventDefault();
+  if (isSubmittingEdit) return;
+  isSubmittingEdit = true;
 
   if ($('#partes-envolvidas tr').length === 0) {
+    isSubmittingEdit = false;
     Swal.fire({ icon:'error', title:'Erro!', text:'Adicione pelo menos uma parte envolvida.', confirmButtonText:'OK' });
     return;
   }
 
-  var formData = new FormData();
+  const formData = new FormData();
   ['id','atribuicao','categoria','data_ato','livro','folha','termo','protocolo','matricula','descricao'].forEach(id=>{
     formData.append(id, $('#'+id).val());
   });
 
-  var partes = [];
+  const partes = [];
   $('#partes-envolvidas tr').each(function(){
-    var cpf = $(this).find('td').eq(0).text();
-    var nome = $(this).find('td').eq(1).text();
-    partes.push({ cpf: cpf, nome: nome });
+    const cpf  = $(this).find('td').eq(0).text();
+    const nome = $(this).find('td').eq(1).text();
+    partes.push({ cpf, nome });
   });
   formData.append('partes_envolvidas', JSON.stringify(partes));
 
+  // Novos anexos
   dzFiles.forEach(f=> formData.append('file-input[]', f));
-
+  // Anexos marcados para remoção
   formData.append('files_to_remove', JSON.stringify(filesToRemove));
+
+  // Mostrar overlay (sempre). Exibe “Enviando” quando houver anexos, “Salvando…” quando não houver.
+  const hasFiles = dzFiles.length > 0;
+  const totalSize = hasFiles ? dzFiles.reduce((acc, f) => acc + (f.size||0), 0) : 0;
+  showOverlay(hasFiles ? 'Enviando anexos…' : 'Salvando…',
+              hasFiles ? (totalSize ? 'Tamanho total: ' + bytesToSize(totalSize) : 'Preparando envio…')
+                       : 'Aguarde um instante.');
+
+  // Desabilita botão e evita navegação
+  $('#btnSubmitEdit').prop('disabled', true).addClass('disabled');
+  window.addEventListener('beforeunload', beforeUnloadGuard);
 
   $.ajax({
     url: 'update_ato.php',
@@ -833,15 +895,40 @@ $(document).on('submit','#ato-form', function(e){
     data: formData,
     processData: false,
     contentType: false,
+    // Progresso real do envio
+    xhr: function(){
+      const xhr = new window.XMLHttpRequest();
+      xhr.upload.addEventListener('progress', function(evt){
+        if (!hasFiles) return;
+        if (evt.lengthComputable) {
+          const percent = (evt.loaded / evt.total) * 100;
+          updateOverlay(percent);
+        } else {
+          // quando não for computável, faça um avanço suave até 95%
+          const current = parseInt($('#uploadValue').text(), 10) || 0;
+          updateOverlay(Math.min(current + 1, 95));
+        }
+      });
+      return xhr;
+    },
     success: function(response) {
+      hideOverlay();
+      window.removeEventListener('beforeunload', beforeUnloadGuard);
       Swal.fire({ icon:'success', title:'Sucesso!', text:'Dados salvos com sucesso.', confirmButtonText:'OK' })
-      .then(()=> { location.reload(); });
+        .then(()=> { location.reload(); });
     },
     error: function() {
+      hideOverlay();
+      window.removeEventListener('beforeunload', beforeUnloadGuard);
       Swal.fire({ icon:'error', title:'Erro!', text:'Erro ao salvar os dados.', confirmButtonText:'OK' });
+    },
+    complete: function(){
+      isSubmittingEdit = false;
+      $('#btnSubmitEdit').prop('disabled', false).removeClass('disabled');
     }
   });
 });
+
 
 /* ======================== Form de Selo ======================== */
 // Exibe/oculta campo de motivo conforme checkbox "isento"

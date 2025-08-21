@@ -17,9 +17,7 @@ date_default_timezone_set('America/Sao_Paulo');
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <?php include(__DIR__ . '/../style/style_cadastro_arquivamento.php'); ?>
   <style>
-    textarea.form-control {
-        height: 170px;
-    }
+    textarea.form-control { height: 170px; }
   </style>
 </head>
 <body class="light-mode">
@@ -151,10 +149,29 @@ date_default_timezone_set('America/Sao_Paulo');
           <div id="filesList" class="files-list" aria-live="polite"></div>
         </div>
 
-        <button type="submit" class="btn btn-primary w-100" style="margin-top:0px; margin-bottom: 30px;">
+        <button type="submit" id="btnSubmit" class="btn btn-primary w-100" style="margin-top:0px; margin-bottom: 30px;">
           <i class="fa fa-save"></i> Salvar e Concluir
         </button>
       </form>
+    </div>
+  </div>
+
+  <!-- ===== Overlay de Upload (progresso) ===== -->
+  <div id="uploadOverlay" class="upload-overlay" aria-hidden="true" aria-live="polite">
+    <div class="upload-card" role="dialog" aria-modal="true" aria-label="Progresso do envio">
+      <div class="upload-title">
+        <i class="fa fa-cloud-upload" aria-hidden="true"></i>
+        <span id="uploadTitle">Enviando anexos…</span>
+      </div>
+      <div class="upload-subtitle" id="uploadSubtitle">Preparando envio…</div>
+      <div class="progress">
+        <div id="uploadBar" class="progress-bar bg-primary" style="width:0%"></div>
+      </div>
+      <div class="progress-row">
+        <div class="progress-label" id="uploadLabel">Upload</div>
+        <div class="progress-value" id="uploadValue">0%</div>
+      </div>
+      <div class="upload-footer">Por favor, não feche a página até finalizar.</div>
     </div>
   </div>
 
@@ -369,12 +386,41 @@ date_default_timezone_set('America/Sao_Paulo');
         if ($(this).val()) validateDate(this);
       });
 
+      // ======================== Overlay helpers ========================
+      const $overlay   = $('#uploadOverlay');
+      const $bar       = $('#uploadBar');
+      const $value     = $('#uploadValue');
+      const $title     = $('#uploadTitle');
+      const $subtitle  = $('#uploadSubtitle');
+
+      function showOverlay(title, subtitle) {
+        if (title)    $title.text(title);
+        if (subtitle) $subtitle.text(subtitle);
+        $bar.css('width','0%');
+        $value.text('0%');
+        $overlay.fadeIn(150).attr('aria-hidden','false');
+      }
+      function updateOverlay(percent) {
+        const p = Math.max(0, Math.min(100, Math.round(percent)));
+        $bar.css('width', p + '%');
+        $value.text(p + '%');
+        if (p >= 100) $subtitle.text('Processando…');
+      }
+      function hideOverlay() {
+        $overlay.fadeOut(150).attr('aria-hidden','true');
+      }
+
       // ======================== Envio do Form ========================
+      let isSubmitting = false;
+
       $('#ato-form').on('submit', function(e){
         e.preventDefault();
+        if (isSubmitting) return;
+        isSubmitting = true;
 
         // Checa partes (mantido conforme sua lógica atual do frontend)
         if ($('#partes-envolvidas tr').length === 0){
+          isSubmitting = false;
           Swal.fire({ icon:'warning', title:'Atenção!', text:'Adicione pelo menos uma parte envolvida.', confirmButtonText:'OK' });
           return;
         }
@@ -400,14 +446,47 @@ date_default_timezone_set('America/Sao_Paulo');
           dzFiles.forEach(f=> formData.append('file-input[]', f));
         }
 
+        // Decide exibir progresso (quando houver anexos). Se preferir, mantenha sempre.
+        const showProgress = dzFiles.length > 0;
+
+        // Desabilita botão e mostra overlay (se aplicável)
+        $('#btnSubmit').prop('disabled', true).addClass('disabled');
+        if (showProgress) {
+          const totalSize = dzFiles.reduce((acc, f) => acc + (f.size||0), 0);
+          showOverlay('Enviando anexos…', totalSize ? ('Tamanho total: ' + bytesToSize(totalSize)) : 'Preparando envio…');
+          // Evita fechar/acidental navegação durante upload
+          window.addEventListener('beforeunload', beforeUnloadGuard);
+        } else {
+          // Opcional: feedback rápido quando não há anexos
+          showOverlay('Salvando…', 'Aguarde um instante.');
+        }
+
         $.ajax({
           url: 'save_ato.php',
           type: 'POST',
           data: formData,
           processData: false,
           contentType: false,
-          dataType: 'json', // <- garante objeto JS no success
+          dataType: 'json',
+          xhr: function() {
+            const xhr = new window.XMLHttpRequest();
+            xhr.upload.addEventListener('progress', function(evt) {
+              if (showProgress) {
+                if (evt.lengthComputable) {
+                  const percent = (evt.loaded / evt.total) * 100;
+                  updateOverlay(percent);
+                } else {
+                  // Quando o tamanho não é computável, animação leve (incremento gradual)
+                  const current = parseInt($('#uploadValue').text(), 10) || 0;
+                  updateOverlay(Math.min(current + 1, 95));
+                }
+              }
+            });
+            return xhr;
+          },
           success: function(result) {
+            hideOverlay();
+            window.removeEventListener('beforeunload', beforeUnloadGuard);
             if (result && result.status === 'success') {
               Swal.fire({ icon:'success', title:'Sucesso!', text:'Dados salvos com sucesso!', confirmButtonText:'OK' })
                 .then(()=> window.location.href = result.redirect);
@@ -417,12 +496,23 @@ date_default_timezone_set('America/Sao_Paulo');
             }
           },
           error: function(xhr) {
+            hideOverlay();
+            window.removeEventListener('beforeunload', beforeUnloadGuard);
             let msg = 'Erro ao salvar os dados.';
             if (xhr && xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
             Swal.fire({ icon:'error', title:'Erro!', text: msg, confirmButtonText:'OK' });
+          },
+          complete: function() {
+            isSubmitting = false;
+            $('#btnSubmit').prop('disabled', false).removeClass('disabled');
           }
         });
       });
+
+      function beforeUnloadGuard(e){
+        e.preventDefault();
+        e.returnValue = '';
+      }
 
     });
   </script>
