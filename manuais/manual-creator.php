@@ -1,6 +1,15 @@
 <?php  
 require_once 'conexao_bd.php';  
 
+// Iniciar sessão  
+session_start();  
+
+// Verificar se o usuário está logado  
+if (!isset($_SESSION['username'])) {  
+    header('Location: ../login.php');  
+    exit;  
+}  
+
 // Verificar se é edição de um manual existente  
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;  
 $status = isset($_GET['status']) ? $_GET['status'] : '';  
@@ -46,6 +55,12 @@ function h($string) {
     <meta charset="UTF-8">  
     <meta name="viewport" content="width=device-width, initial-scale=1.0">  
     <title><?php echo $id > 0 ? 'Editar Manual' : 'Novo Manual'; ?></title>  
+
+    
+    <link rel="icon" href="img/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" href="img/manuflow-mark-32.png" sizes="32x32">
+    <link rel="apple-touch-icon" href="img/manuflow-mark-180.png" sizes="180x180">
+    <link rel="icon" type="image/png" href="img/manuflow-mark-512.png" sizes="512x512">
       
     <!-- Bootstrap 5 (moderno) -->  
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">  
@@ -188,34 +203,79 @@ function h($string) {
         .btn-primary{ background:linear-gradient(135deg, var(--primary) 0%, var(--primary-600) 100%); border:none; }
         .btn-primary:hover{ filter:brightness(.95); }
         .ql-toolbar.ql-snow + .ql-container.ql-snow { min-height: 180px; }
+
+        /* Logomarca se adapta ao tema */
+        .brand-logo{ height:50px; display:block; }
+        html[data-theme="dark"] .brand-logo{ filter: invert(1) hue-rotate(180deg) brightness(1.1); }
+
+        /* Avatar com iniciais (estilo pill redondo) */
+        .avatar-btn{
+        width: 42px; height: 42px; border-radius: 50%;
+        border: 1px solid var(--border); background: var(--surface);
+        color: var(--text);
+        }
+        .avatar-initials{
+        display:inline-flex; align-items:center; justify-content:center;
+        width: 100%; height: 100%;
+        font-weight: 700; letter-spacing: .5px; user-select:none;
+        }
+
+        /* Opcional: esconder texto do wordmark em telas bem pequenas (já controlado pelo <picture>) */
+        @media (max-width: 575.98px){
+        .brand h4{ display:none; }
+        }
+
     </style>  
 </head>  
 <body>  
     <!-- Topbar -->  
-    <div class="topbar">  
-        <button class="menu-toggle" id="menu-toggle" aria-label="Alternar menu"><i class="fa-solid fa-bars"></i></button>  
-        <div class="brand">  
-            <div class="logo">M</div>  
-            <h4 class="m-0">Sistema de Manuais</h4>  
-        </div>  
-        <div class="topbar-actions">  
+    <!-- TOPBAR (ADMIN) -->
+    <div class="topbar">
+        <!-- Botão que abre/fecha a sidebar -->
+        <button class="menu-toggle" id="menu-toggle" aria-label="Alternar menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
+        <!-- Logomarca: wordmark no desktop, mark compacta no mobile -->
+        <a href="manual-list.php" class="brand text-decoration-none" aria-label="Início ManuFlow">
+            <picture>
+                <!-- Desktop / md+ -->
+                <source srcset="img/manuflow-wordmark.svg" media="(min-width: 576px)">
+                <!-- Mobile: marca compacta -->
+                <img src="img/manuflow-mark.svg"
+                    alt="ManuFlow — Sistema de Manuais"
+                    class="brand-logo"
+                    height="28">
+            </picture>
+        </a>
+
+        <div class="topbar-actions ms-auto d-flex align-items-center gap-2">
+            <!-- Botão tema -->
             <button class="btn-ghost" id="themeToggle" type="button" aria-label="Alternar tema">
                 <i class="fa-solid fa-moon me-1" id="themeIcon"></i>
                 <span class="d-none d-md-inline" id="themeLabel">Dark</span>
             </button>
-            <div class="dropdown">  
-                <button class="avatar-btn" data-bs-toggle="dropdown" aria-expanded="false">  
-                    <i class="fa-solid fa-user"></i>  
-                </button>  
-                <ul class="dropdown-menu dropdown-menu-end" style="border-radius:12px;">  
-                    <li><a class="dropdown-item" href="#"><i class="fa-solid fa-user me-2"></i>Perfil</a></li>  
-                    <li><a class="dropdown-item" href="#"><i class="fa-solid fa-gear me-2"></i>Configurações</a></li>  
-                    <li><hr class="dropdown-divider"></li>  
-                    <li><a class="dropdown-item" href="#"><i class="fa-solid fa-right-from-bracket me-2"></i>Sair</a></li>  
-                </ul>  
-            </div>  
-        </div>  
-    </div>  
+
+            <!-- Menu do usuário (admin) -->
+            <!-- <div class="dropdown">
+                <button class="avatar-btn d-inline-flex align-items-center justify-content-center"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        aria-label="Abrir menu do usuário"> -->
+                    <!-- Iniciais do usuário (fallback ao ícone) -->
+                    <!-- <span class="avatar-initials">AD</span> -->
+                    <!-- <i class="fa-solid fa-user"></i> -->
+                <!-- </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="border-radius:12px;">
+                    <li><h6 class="dropdown-header">Administrador</h6></li>
+                    <li><a class="dropdown-item" href="profile.php"><i class="fa-solid fa-user me-2"></i>Perfil</a></li>
+                    <li><a class="dropdown-item" href="settings.php"><i class="fa-solid fa-gear me-2"></i>Configurações</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="logout.php"><i class="fa-solid fa-right-from-bracket me-2"></i>Sair</a></li>
+                </ul>
+            </div> -->
+        </div>
+    </div>
 
     <!-- Sidebar -->  
     <aside class="sidebar" id="sidebar">  

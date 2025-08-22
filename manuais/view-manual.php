@@ -259,6 +259,13 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             /* Melhorar contraste de cores no print */
             * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
+
+        .brand { display:flex; align-items:center; gap:10px; }
+        .brand-logo{ height:50px; display:block; }
+        /* Se o seu logo for escuro, este filtro ajuda no modo dark */
+        html[data-theme="dark"] .brand-logo{
+            filter: invert(1) hue-rotate(180deg) brightness(1.1);
+        }
     </style>
 </head>
 <body>
@@ -268,7 +275,20 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
         <a href="#" id="backButton" class="btn btn-ghost" title="Voltar" aria-label="Voltar para a página anterior">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
-        <div class="brand"></div>
+
+        <!-- LOGO (diretório /img) -->
+        <a href="manual-list.php" class="brand text-decoration-none" aria-label="Início ManuFlow">
+            <picture>
+                <!-- Desktop / md+ -->
+                <source srcset="img/manuflow-wordmark.svg" media="(min-width: 576px)">
+                <!-- Mobile: marca compacta -->
+                <img src="img/manuflow-mark.svg"
+                    alt="ManuFlow — Sistema de Manuais"
+                    class="brand-logo"
+                    height="28">
+            </picture>
+        </a>
+
         <div class="ms-auto d-flex align-items-center gap-2">
             <?php if (!$preview && isset($_SESSION['perfil']) && $_SESSION['perfil'] === 'admin'): ?>
                 <a href="manual-creator.php?id=<?= (int)$id ?>" class="btn btn-ghost">
@@ -283,7 +303,6 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             </button>
         </div>
     </div>
-
 
     <!-- Depurador para imagens base64 -->
     <?php if (isset($_GET['debug']) && isset($_SESSION['perfil']) && $_SESSION['perfil'] == 'admin'): ?>
@@ -615,18 +634,20 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             <?php endif; ?>
         })();
 
+        document.addEventListener('DOMContentLoaded', function () {
         const backBtn = document.getElementById('backButton');
-            if (backBtn) {
-            backBtn.addEventListener('click', function (e) {
-                e.preventDefault();
-                if (window.history.length > 1) {
-                window.history.back();
-                } else {
-                // fallback caso a página tenha sido aberta diretamente
-                window.location.href = 'manual-list.php';
-                }
-            });
+        if (backBtn) {
+        backBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (window.history.length > 1) {
+            window.history.back();
+            } else {
+            // Fallback caso não haja histórico (ajuste o destino se quiser)
+            window.location.href = 'manual-list.php';
+            }
+        });
         }
+    });
 
     </script>
 </body>

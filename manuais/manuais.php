@@ -53,6 +53,11 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">  
     <title>Lista de Manuais</title>  
 
+    <link rel="icon" href="img/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" href="img/manuflow-mark-32.png" sizes="32x32">
+    <link rel="apple-touch-icon" href="img/manuflow-mark-180.png" sizes="180x180">
+    <link rel="icon" type="image/png" href="img/manuflow-mark-512.png" sizes="512x512">
+
     <!-- Bootstrap CSS -->  
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">  
 
@@ -158,30 +163,6 @@ try {
             border: 1px solid var(--border); background: var(--surface);
             display: grid; place-items: center; color: var(--text);
         }
-
-        /* ---------------- Sidebar ----------------
-        .sidebar {
-            position: fixed; top: var(--topbar-h); left: 0; bottom: 0;
-            width: var(--sidebar-width);
-            background: var(--surface);
-            border-right: 1px solid var(--border);
-            padding: 16px;
-            overflow-y: auto;
-            transition: margin-left .25s ease;
-            z-index: 100;
-        }
-        .sidebar.collapsed { margin-left: calc(-1 * var(--sidebar-width)); }
-        .nav-stacked .nav-link {
-            display: flex; align-items: center; gap: 10px;
-            color: var(--muted); border-radius: 10px;
-            padding: 10px 12px; transition: .15s;
-        }
-        .nav-stacked .nav-link:hover { background: var(--surface-2); color: var(--text); }
-        .nav-stacked .nav-link.active {
-            color: var(--text);
-            background: linear-gradient(135deg, rgba(59,130,246,.12), rgba(34,197,94,.12));
-            border: 1px solid var(--border);
-        } */
 
         /* ---------------- Main ---------------- */
         .main {
@@ -417,40 +398,27 @@ try {
         .topbar .dropdown-menu {
             border-radius: 12px; border: 1px solid var(--border); background: var(--surface);
         }
+
+        .brand-logo{ height:50px; display:block; }
+        html[data-theme="dark"] .brand-logo{ filter: invert(1) hue-rotate(180deg) brightness(1.1); }
+
     </style>
 </head>  
 <body>  
     <!-- Topbar -->
     <div class="topbar">
-        <!-- <button class="menu-toggle" id="menu-toggle" aria-label="Alternar menu"><i class="fa-solid fa-bars"></i></button> -->
         <div class="brand">
-            <div class="logo">M</div>
-            <h4 class="m-0">Sistema de Manuais</h4>
+            <img src="img/manuflow-wordmark.svg" alt="ManuFlow — Sistema de Manuais" class="brand-logo" height="28">
         </div>
+
         <div class="topbar-actions">
             <button class="btn-ghost" id="themeToggle" type="button" aria-label="Alternar tema">
                 <i class="fa-solid fa-moon me-1" id="themeIcon"></i>
                 <span class="d-none d-md-inline" id="themeLabel">Dark</span>
             </button>
-            <div class="dropdown">
-                <button class="avatar-btn" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa-solid fa-user"></i></button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="#"><i class="fa-solid fa-user me-2"></i>Perfil</a></li>
-                    <li><a class="dropdown-item" href="#"><i class="fa-solid fa-gear me-2"></i>Configurações</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#"><i class="fa-solid fa-right-from-bracket me-2"></i>Sair</a></li>
-                </ul>
-            </div>
         </div>
     </div>
 
-    <!-- Sidebar -->
-    <!-- <aside class="sidebar" id="sidebar">
-        <nav class="nav flex-column nav-stacked">
-            <a class="nav-link active" href="manual-list.php"><i class="fa-solid fa-book"></i> Manuais</a>  
-            <a class="nav-link" href="categories.php"><i class="fa-solid fa-tags"></i> Categorias</a>  
-        </nav>
-    </aside> -->
 
     <!-- Main -->
     <main class="main" id="main-content">
@@ -703,35 +671,6 @@ try {
                 const current = htmlEl.getAttribute('data-theme');
                 applyTheme(current === 'dark' ? 'light' : 'dark');
             });
-
-            // /* ---------------- Sidebar Toggle ---------------- */
-            // const sidebar = document.getElementById('sidebar');
-            // const main    = document.getElementById('main-content');
-            // const menuBtn = document.getElementById('menu-toggle');
-
-            // function checkSize(){
-            //     if (window.innerWidth < 992) {
-            //         sidebar.classList.add('collapsed');
-            //         main.classList.add('expanded');
-            //     } else {
-            //         sidebar.classList.remove('collapsed','mobile-visible');
-            //         main.classList.remove('expanded');
-            //     }
-            // }
-            // window.addEventListener('resize', () => {
-            //     checkSize();
-            //     renderCardsFromTable(); // re-render cards no resize
-            // });
-            // checkSize();
-
-            // menuBtn.addEventListener('click', () => {
-            //     if (window.innerWidth < 992) {
-            //         sidebar.classList.toggle('mobile-visible');
-            //     } else {
-            //         sidebar.classList.toggle('collapsed');
-            //         main.classList.toggle('expanded');
-            //     }
-            // });
 
             /* ---------------- Tradução DataTables (inline, evita CORS) ---------------- */
             const DT_LANG_PTBR = {
