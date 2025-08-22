@@ -13,7 +13,7 @@ if ($id <= 0) {
 
 // Função para sanitizar HTML permitindo tags específicas
 function sanitize_html($text) {
-    $allowed_tags = '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><blockquote><pre><code><table><thead><tbody><tr><th><td><div><span><a><img>';
+    $allowed_tags = '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><blockquote><pre><code><table><thead><tbody><tr><th><td><div><span><a><img><figure><figcaption>';
     $text = strip_tags((string)$text, $allowed_tags);
 
     // Remove atributos potencialmente perigosos (on*, javascript:)
@@ -104,7 +104,7 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
 
     <style>
         /* =========================================================
-         *  Tema Light / Dark — UI moderna (consistente com as demais páginas)
+         *  Tema Light / Dark — UI moderna e 100% responsiva
          * =======================================================*/
         :root{
             --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f1f3f9;
@@ -114,6 +114,7 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             --shadow:0 10px 30px rgba(2,6,23,.07); --radius:14px;
             --topbar-h:64px;
             --step-number-size:44px;
+            --focus: 0 0 0 3px rgba(59,130,246,.35);
         }
         html[data-theme="dark"]{
             --bg:#0b1220; --surface:#0f172a; --surface-2:#0b1220;
@@ -121,6 +122,7 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             --primary:#60a5fa; --primary-600:#3b82f6; --accent:#34d399;
             --warning:#fbbf24; --danger:#f87171; --info:#22d3ee;
             --shadow:0 12px 40px rgba(2,6,23,.45);
+            --focus: 0 0 0 3px rgba(96,165,250,.45);
         }
         *{box-sizing:border-box}
         body{
@@ -129,6 +131,9 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
                         var(--bg);
             color:var(--text); min-height:100vh; padding-bottom:80px;
         }
+        a{ color: var(--primary-600); }
+        a:hover{ color: var(--primary); }
+        :focus-visible{ outline: none; box-shadow: var(--focus); border-radius: 10px; }
 
         /* Topbar */
         .topbar{
@@ -140,7 +145,7 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
         html[data-theme="dark"] .topbar{ background:linear-gradient(180deg, rgba(15,23,42,.7), rgba(15,23,42,.35)); }
         .btn-ghost{ display:inline-flex; align-items:center; gap:8px; border:1px solid var(--border);
             background:var(--surface); padding:8px 12px; border-radius:999px; color:var(--text); }
-        .brand h4{ margin:0; letter-spacing:.2px; }
+        .brand h4{ margin:0; letter-spacing:.2px; font-weight:700; }
         .theme-btn{ width:42px;height:42px;border-radius:50%;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;color:var(--text); }
 
         /* Main */
@@ -150,14 +155,28 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
 
         /* Manual header */
         .manual-header{ padding:24px; margin-bottom:24px; }
-        .manual-title{ font-size:1.75rem; font-weight:800; margin:0 0 10px 0; letter-spacing:.2px; }
-        .manual-cover{ width:100%; height:320px; border-radius:12px; overflow:hidden; background:var(--surface-2); border:1px solid var(--border); }
-        .manual-cover img{ width:100%; height:100%; object-fit:cover; }
+        .manual-title{ font-size:clamp(1.4rem, 2.2vw + .6rem, 2rem); font-weight:800; margin:0 0 12px 0; letter-spacing:.2px; }
+        .manual-cover{
+            width:100%;
+            border-radius:12px; overflow:hidden; background:var(--surface-2); border:1px solid var(--border);
+            aspect-ratio: 16/9; /* Responsiva em todas telas */
+        }
+        @media(min-width:1200px){ .manual-cover{ aspect-ratio: 21/9; } }
+        .manual-cover img{ width:100%; height:100%; object-fit:cover; display:block; }
         .manual-meta{ color:var(--muted); font-size:.95rem; display:flex; flex-wrap:wrap; gap:12px; }
         .badge-category{ background:rgba(59,130,246,.12); color:var(--primary-600); border:1px solid var(--border); padding:6px 10px; border-radius:999px; }
 
+        /* Conteúdo rico do manual */
+        .manual-description :where(p, ul, ol){ line-height:1.7; margin-bottom:1rem; }
+        .manual-description img{ max-width:100%; height:auto; border-radius:8px; border:1px solid var(--border); }
+        .manual-description table{ width:100%; border-collapse:collapse; margin:12px 0; }
+        .manual-description th, .manual-description td{ border:1px solid var(--border); padding:8px 10px; }
+        .manual-description pre{ background:var(--surface-2); border:1px solid var(--border); padding:12px; border-radius:10px; overflow:auto; }
+        .manual-description code{ background:var(--surface-2); padding:2px 6px; border-radius:6px; border:1px solid var(--border); }
+
         /* Índice (TOC) */
         .toc{ position:sticky; top:calc(var(--topbar-h) + 20px); padding:16px; }
+        @media(max-width:991.98px){ .toc{ position: static; } }
         .toc .toc-title{ font-weight:700; padding-bottom:8px; border-bottom:1px solid var(--border); margin-bottom:12px; }
         .toc-list{ list-style:none; margin:0; padding:0; }
         .toc-link{ display:flex; align-items:center; gap:10px; color:var(--muted); text-decoration:none; padding:8px 10px; border-radius:10px; transition:.15s; }
@@ -175,7 +194,7 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             background: linear-gradient(135deg, var(--primary) 0%, var(--info) 100%); }
         .step-title{ margin:0; font-size:1.15rem; }
         .step-content{ padding:18px; }
-        .step-text{ line-height:1.65; }
+        .step-text{ line-height:1.65; word-break: break-word; }
         .step-image-container{ margin-top:16px; text-align:center; }
         .step-image{ max-width:100%; border-radius:10px; border:1px solid var(--border); box-shadow:var(--shadow); }
         .step-image-caption{ color:var(--muted); font-style:italic; margin-top:8px; }
@@ -184,6 +203,16 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
         .action-bar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(0deg, rgba(0,0,0,.06), rgba(0,0,0,0));
             z-index:102; }
         .action-inner{ background:var(--surface); border-top:1px solid var(--border); padding:12px 16px; }
+        html[data-theme="dark"] .action-bar{ background:linear-gradient(0deg, rgba(255,255,255,.05), rgba(255,255,255,0)); }
+
+        /* SweetAlert compatível com tema */
+        .swal2-popup{ border-radius:14px; }
+        html[data-theme="dark"] .swal2-popup{ background:var(--surface); color:var(--text); border:1px solid var(--border); }
+
+        /* Acessibilidade / redução de movimento */
+        @media (prefers-reduced-motion: reduce){
+            *{ animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+        }
 
         /* ====== Impressão (1 passo por página) ====== */
         @media print{
@@ -236,26 +265,25 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
 
     <!-- Topbar -->
     <div class="topbar">
-        <a href="manual-list.php" class="btn btn-ghost" title="Voltar">
+        <a href="#" id="backButton" class="btn btn-ghost" title="Voltar" aria-label="Voltar para a página anterior">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
-        <div class="brand">
-            <h4 class="m-0"><?= h($manual['titulo']) ?></h4>
-        </div>
+        <div class="brand"></div>
         <div class="ms-auto d-flex align-items-center gap-2">
             <?php if (!$preview && isset($_SESSION['perfil']) && $_SESSION['perfil'] === 'admin'): ?>
                 <a href="manual-creator.php?id=<?= (int)$id ?>" class="btn btn-ghost">
                     <i class="fa-solid fa-pen-to-square me-1"></i>Editar
                 </a>
             <?php endif; ?>
-            <button id="printManual" class="btn btn-ghost" title="Imprimir">
+            <button id="printManual" class="btn btn-ghost" title="Imprimir" aria-label="Imprimir manual">
                 <i class="fa-solid fa-print"></i>
             </button>
-            <button class="theme-btn" id="themeToggle" title="Alternar tema">
+            <button class="theme-btn" id="themeToggle" title="Alternar tema" aria-label="Alternar tema">
                 <i class="fa-solid fa-moon" id="themeIcon"></i>
             </button>
         </div>
     </div>
+
 
     <!-- Depurador para imagens base64 -->
     <?php if (isset($_GET['debug']) && isset($_SESSION['perfil']) && $_SESSION['perfil'] == 'admin'): ?>
@@ -362,7 +390,7 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
 
                 <!-- Índice -->
                 <div class="col-lg-3">
-                    <aside class="panel toc">
+                    <aside class="panel toc" aria-label="Índice do Manual">
                         <h4 class="toc-title">Índice</h4>
                         <ul class="toc-list">
                             <?php foreach ($passos as $passo): ?>
@@ -384,11 +412,11 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
     <div class="action-bar">
         <div class="action-inner">
             <div class="container d-flex align-items-center justify-content-between">
-                <div>
+                <div class="d-flex flex-wrap gap-2">
                     <button id="prevStep" class="btn btn-outline-secondary" disabled>
                         <i class="fa-solid fa-arrow-left me-1"></i>Passo Anterior
                     </button>
-                    <button id="nextStep" class="btn btn-outline-primary ms-2">
+                    <button id="nextStep" class="btn btn-outline-primary">
                         Próximo Passo<i class="fa-solid fa-arrow-right ms-1"></i>
                     </button>
                 </div>
@@ -434,7 +462,8 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             // Links externos
             $('a[href^="http"]').attr('target','_blank').attr('rel','noopener noreferrer');
 
-            // Destaque do item do índice (TOC) conforme scroll
+            // Destaque do item do índice (TOC) conforme scroll (com leve debounce)
+            let tocTick = null;
             function highlightTocItem(){
                 const scrollPosition = $(window).scrollTop();
                 const offsetTop = 100;
@@ -453,7 +482,10 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
                     }
                 });
             }
-            $(window).on('scroll', highlightTocItem);
+            $(window).on('scroll', function(){
+                if (tocTick) cancelAnimationFrame(tocTick);
+                tocTick = requestAnimationFrame(highlightTocItem);
+            });
             highlightTocItem();
 
             // Rolagem suave TOC
@@ -475,7 +507,7 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             }
 
             $('#prevStep').on('click', function(){
-                const activeHref = $('.toc-link.active').attr('href');
+                const activeHref = $('.toc-link.active').attr('href') || '#step-1';
                 const prev = $(activeHref).prev('.step-card');
                 if (prev.length){
                     $('html, body').animate({ scrollTop: prev.offset().top - 80 }, 600);
@@ -483,7 +515,7 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             });
 
             $('#nextStep').on('click', function(){
-                const activeHref = $('.toc-link.active').attr('href');
+                const activeHref = $('.toc-link.active').attr('href') || '#step-1';
                 const next = $(activeHref).next('.step-card');
                 if (next.length){
                     $('html, body').animate({ scrollTop: next.offset().top - 80 }, 600);
@@ -582,6 +614,20 @@ function formatarData($data) { if (!$data) return ''; $t = strtotime($data); ret
             });
             <?php endif; ?>
         })();
+
+        const backBtn = document.getElementById('backButton');
+            if (backBtn) {
+            backBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (window.history.length > 1) {
+                window.history.back();
+                } else {
+                // fallback caso a página tenha sido aberta diretamente
+                window.location.href = 'manual-list.php';
+                }
+            });
+        }
+
     </script>
 </body>
 </html>

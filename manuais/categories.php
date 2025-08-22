@@ -166,10 +166,15 @@ try {
 
     <!-- DataTables -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+    <!-- DataTables Responsive -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
+
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
     <style>
         /* =========================================================
-         *  Tema Light / Dark — UI moderna (mesmo design do manual-list.php)
+         *  Tema Light / Dark — UI moderna
          * =======================================================*/
         :root{
             --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f1f3f9;
@@ -237,27 +242,136 @@ try {
         /* Header + CTA */
         .page-header .subtitle{ color:var(--muted); }
 
-        /* Table + Datatables */
+        /* Table wrap */
         .table-wrap{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:12px; }
-        table.dataTable thead th{ white-space:nowrap; font-weight:700; border-bottom:1px solid var(--border);
-            background:linear-gradient(180deg, var(--surface-2), var(--surface)); }
-        table.dataTable tbody td{ vertical-align:middle; border-top:1px solid var(--border); }
+
+        /* Tabela base + DataTables */
+        table.dataTable thead th{
+            white-space:nowrap; font-weight:700; border-bottom:1px solid var(--border);
+            background:linear-gradient(180deg, var(--surface-2), var(--surface));
+            color:var(--text);
+        }
+        table.dataTable tbody td{ vertical-align:middle; border-top:1px solid var(--border); color:var(--text); }
         .actions .btn{ width:36px; height:36px; border-radius:10px; display:inline-grid; place-items:center; margin-right:6px; }
         .actions .btn:last-child{ margin-right:0; }
 
-        /* Alerts custom */
-        .alert-soft{ display:none; border-radius:12px; border:1px solid var(--border); }
+        /* Ajustes Bootstrap Table via CSS vars (faz a tabela respeitar os temas) */
+        .table{
+            --bs-table-color: var(--text);
+            --bs-table-bg: var(--surface);
+            --bs-table-border-color: var(--border);
+            --bs-table-striped-bg: rgba(2,6,23,.04);
+            --bs-table-striped-color: var(--text);
+            --bs-table-hover-bg: rgba(2,6,23,.06);
+            --bs-table-hover-color: var(--text);
+        }
+        html[data-theme="dark"] .table{
+            --bs-table-striped-bg: rgba(255,255,255,.03);
+            --bs-table-hover-bg: rgba(255,255,255,.06);
+        }
 
-        /* Modal */
-        .modal-content{ background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:16px; }
-        .modal-header{ background:linear-gradient(180deg, var(--surface-2), var(--surface)); border-bottom:1px solid var(--border); }
-        .form-control, .form-select, textarea{ border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:12px; }
+        /* DataTables: length, search, info, paginate, processing */
+        .dataTables_wrapper .dataTables_length,
+        .dataTables_wrapper .dataTables_filter,
+        .dataTables_wrapper .dataTables_info,
+        .dataTables_wrapper .dataTables_paginate{
+            color: var(--text);
+        }
+        .dataTables_wrapper .dataTables_filter label,
+        .dataTables_wrapper .dataTables_length label{
+            color: var(--text);
+        }
+        .dataTables_wrapper .dataTables_filter input,
+        .dataTables_wrapper .dataTables_length select{
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 6px 10px;
+            outline: none;
+        }
+        .dataTables_wrapper .dataTables_filter input::placeholder{ color: var(--muted); opacity:.9; }
 
-        /* Responsive */
-        @media (max-width: 992px){
-            .sidebar{ margin-left:calc(-1 * var(--sidebar-width)); }
-            .sidebar.mobile-visible{ margin-left:0; }
-            .main{ margin-left:0; padding:calc(var(--topbar-h) + 16px) 16px 16px; }
+        /* Paginação (suporta tanto paginação do DT quanto do Bootstrap5) */
+        .dataTables_wrapper .dataTables_paginate .paginate_button{
+            border:1px solid var(--border) !important;
+            background: var(--surface) !important;
+            color: var(--text) !important;
+            border-radius:10px !important;
+            margin: 0 2px;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover{
+            background: var(--surface-2) !important;
+            color: var(--text) !important;
+            border-color: var(--border) !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover{
+            background: linear-gradient(135deg, var(--primary), var(--primary-600)) !important;
+            color:#fff !important;
+            border-color: var(--primary-600) !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
+        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover{
+            color: var(--muted) !important;
+            background: var(--surface) !important;
+            border-color: var(--border) !important;
+        }
+        /* Caso o plugin use page-link/page-item do Bootstrap */
+        .dataTables_wrapper .pagination .page-link{
+            background: var(--surface);
+            color: var(--text);
+            border:1px solid var(--border);
+        }
+        .dataTables_wrapper .pagination .page-link:hover{
+            background: var(--surface-2);
+            color: var(--text);
+        }
+        .dataTables_wrapper .pagination .page-item.active .page-link{
+            background: linear-gradient(135deg, var(--primary), var(--primary-600));
+            color:#fff;
+            border-color: var(--primary-600);
+        }
+
+        .dataTables_wrapper .dataTables_processing{
+            background: var(--surface);
+            color: var(--text);
+            border:1px solid var(--border);
+            box-shadow: var(--shadow);
+            border-radius: 10px;
+        }
+
+        /* Cards (mobile) */
+        #cards-container{ margin-top:12px; }
+        .cards-grid{
+            display:grid;
+            grid-template-columns: 1fr;
+            gap:12px;
+        }
+        .category-card{
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:16px;
+            box-shadow:var(--shadow);
+            padding:16px;
+            color: var(--text);
+        }
+        .category-card .title{ font-weight:700; margin-bottom:6px; }
+        .category-card .muted{ color:var(--muted); font-size:.925rem; }
+        .category-card .badge-id{
+            font-size:.75rem; border:1px solid var(--border); padding:2px 8px; border-radius:999px; margin-right:8px;
+            background:var(--surface-2);
+        }
+        .category-card .btn{ border-radius:10px; }
+
+        /* Mostrar Tabela no desktop, Cards no mobile */
+        @media (min-width: 992px){
+            .show-desktop{ display:block !important; }
+            .show-mobile{ display:none !important; }
+        }
+        @media (max-width: 991.98px){
+            .show-desktop{ display:none !important; }
+            .show-mobile{ display:block !important; }
         }
 
         .btn-primary{ background:linear-gradient(135deg, var(--primary) 0%, var(--primary-600) 100%); border:none; }
@@ -314,20 +428,18 @@ try {
             </button>
         </div>
 
-        <div class="alert alert-success alert-soft" id="success-alert"></div>
-        <div class="alert alert-danger alert-soft" id="error-alert"></div>
-
-        <div class="table-wrap">
+        <!-- Tabela (desktop) -->
+        <div class="table-wrap show-desktop">
             <div class="table-responsive">
                 <table id="tbl-categorias" class="table table-hover align-middle w-100">
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th style="width:70px;">ID</th>
                             <th>Nome</th>
                             <th>Descrição</th>
                             <th>Data de Criação</th>
                             <th>Última Atualização</th>
-                            <th class="text-center">Ações</th>
+                            <th class="text-center" style="width:120px;">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="categories-table-body">
@@ -370,6 +482,11 @@ try {
                 </table>
             </div>
         </div>
+
+        <!-- Cards (mobile) -->
+        <section id="cards-container" class="show-mobile">
+            <div class="cards-grid" id="cards-grid"></div>
+        </section>
     </main>
 
     <!-- Modal Criar/Editar Categoria -->
@@ -402,26 +519,6 @@ try {
         </div>
     </div>
 
-    <!-- Modal Confirmação Exclusão -->
-    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content border-danger">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title fw-bold" id="deleteModalLabel">Confirmar Exclusão</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Tem certeza que deseja excluir esta categoria?</p>
-                    <p><strong>Esta ação não pode ser desfeita.</strong></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-danger" id="btn-confirm-delete">Excluir</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- jQuery (único) -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <!-- Bootstrap Bundle 5 -->
@@ -429,6 +526,11 @@ try {
     <!-- DataTables -->
     <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+    <!-- DataTables Responsive -->
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
     (function(){
@@ -474,7 +576,10 @@ try {
                 main.classList.remove('expanded');
             }
         }
-        window.addEventListener('resize', checkSize);
+        window.addEventListener('resize', () => {
+            checkSize();
+            renderCardsFromTable(); // re-render cards ao mudar o tamanho
+        });
         checkSize();
 
         menuBtn.addEventListener('click', () => {
@@ -486,168 +591,280 @@ try {
             }
         });
 
-        /* -------- Notificações -------- */
-        function showAlert(type, message, duration = 5000){
-            const el = (type === 'success') ? $('#success-alert') : $('#error-alert');
-            el.text(message).fadeIn();
-            setTimeout(()=> el.fadeOut(), duration);
+        /* -------- SweetAlert helpers -------- */
+        function swalAlert(type, message, timer=1700){
+            Swal.fire({
+                icon: type,
+                title: (type === 'success') ? 'Sucesso' : 'Ops...',
+                text: message,
+                timer: timer,
+                showConfirmButton: false
+            });
         }
-
-        /* -------- DataTables -------- */
-        const dt = $('#tbl-categorias').DataTable({
-            language: { 
-                url: '//cdn.datatables.net/plug-ins/1.13.8/i18n/pt-BR.json',
-                emptyTable: 'Nenhuma categoria encontrada.'
-            },
-            responsive: true,
-            order: [[1, 'asc']],
-            columnDefs: [
-                { targets: [5], orderable: false }
-            ]
-        });
-
-        /* -------- Recarregar tabela -------- */
-        function reloadTable(){
-            $.ajax({
-                url: window.location.href,
-                type: 'GET',
-                success: function(data){
-                    const newTbodyHTML = $(data).find('#categories-table-body').html();
-
-                    // Limpa o DataTable atual
-                    dt.clear();
-
-                    // Monta linhas apenas se existir TR com 6 células
-                    const temp = document.createElement('tbody');
-                    temp.innerHTML = newTbodyHTML || '';
-
-                    $(temp).find('tr').each(function(){
-                        const $tr  = $(this);
-                        const tds  = $tr.children('td');
-                        const cols = tds.length;
-
-                        // Somente linhas "válidas" (6 colunas). Ignora placeholders/colspans.
-                        if (cols === 6){
-                            const idAttr = $tr.data('id');
-                            const id = (idAttr !== undefined) ? idAttr : parseInt((tds.eq(0).text() || '').trim(), 10);
-
-                            dt.row.add([
-                                tds.eq(0).html(), // ID
-                                tds.eq(1).html(), // Nome
-                                tds.eq(2).html(), // Descrição
-                                tds.eq(3).html(), // Data de criação
-                                tds.eq(4).html(), // Última atualização
-                                `<div class="actions text-center">
-                                    <button type="button" class="btn btn-outline-info btn-sm btn-edit" data-id="${id}" title="Editar">
-                                        <i class="fa-solid fa-pen-to-square"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm btn-delete" data-id="${id}" title="Excluir">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </button>
-                                  </div>`
-                            ]);
-                        }
-                    });
-
-                    // Redesenha (se não houver linhas, DataTables mostra emptyTable)
-                    dt.draw(false);
-
-                    // Reanexa handlers às novas linhas
-                    setupRowHandlers();
-                },
-                error: function(){
-                    showAlert('error', 'Erro ao atualizar a tabela de categorias.');
-                }
+        function swalConfirmDelete(){
+            return Swal.fire({
+                icon: 'warning',
+                title: 'Confirmar exclusão',
+                text: 'Tem certeza que deseja excluir esta categoria? Esta ação não pode ser desfeita.',
+                showCancelButton: true,
+                confirmButtonText: 'Excluir',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#ef4444'
             });
         }
 
-        /* -------- Handlers das linhas -------- */
-        let currentCategoryId = null;
+        /* -------- Tradução DataTables (inline, evita CORS) -------- */
+        const DT_LANG_PTBR = {
+            "decimal": ",",
+            "thousands": ".",
+            "processing": "Processando...",
+            "lengthMenu": "Mostrar _MENU_ registros",
+            "zeroRecords": "Nenhum registro encontrado",
+            "emptyTable": "Nenhuma categoria encontrada.",
+            "info": "Mostrando _START_ até _END_ de _TOTAL_ registros",
+            "infoEmpty": "Mostrando 0 até 0 de 0 registros",
+            "infoFiltered": "(filtrado de _MAX_ registros no total)",
+            "search": "Buscar:",
+            "loadingRecords": "Carregando...",
+            "paginate": {
+                "first": "Primeiro",
+                "last": "Último",
+                "next": "Próximo",
+                "previous": "Anterior"
+            },
+            "aria": {
+                "sortAscending":  ": ativar para ordenar a coluna em ordem crescente",
+                "sortDescending": ": ativar para ordenar a coluna em ordem decrescente"
+            },
+            "select": {
+                "rows": {
+                    "_": "%d linhas selecionadas",
+                    "0": "Nenhuma linha selecionada",
+                    "1": "1 linha selecionada"
+                }
+            }
+        };
+
+        /* -------- DataTables (init/reinit seguro) -------- */
+        let dt = null;
+
+        function getDTOptions(){
+            return {
+                language: DT_LANG_PTBR,
+                responsive: true,
+                order: [[1, 'asc']],
+                columnDefs: [
+                    { targets: [5], orderable: false }
+                ]
+            };
+        }
+
+        function initDataTable(){
+            dt = $('#tbl-categorias').DataTable(getDTOptions());
+            // Render cards sempre que a tabela desenhar (respeita busca/ordem)
+            dt.on('draw', renderCardsFromTable);
+            renderCardsFromTable();
+        }
+
+        function reinitDataTableWithHTML(newTbodyHTML){
+            if (dt) {
+                dt.off('draw', renderCardsFromTable);
+                dt.destroy();
+            }
+            $('#tbl-categorias tbody').html(newTbodyHTML || '');
+            initDataTable();
+        }
+
+        // Inicializa na primeira carga
+        initDataTable();
+
+        /* -------- Construção dos cards (mobile) -------- */
+        function renderCardsFromTable(){
+            const grid = document.getElementById('cards-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            if (!dt) return;
+            // percorre as linhas visíveis dado o filtro
+            dt.rows({ search: 'applied' }).every(function(){
+                // Lê o texto direto do DOM da linha para evitar [object Object]
+                const rowNode = this.node();
+                const cells = rowNode.querySelectorAll('td');
+
+                const idText          = (cells[0]?.textContent || '').trim();
+                const nomeText        = (cells[1]?.textContent || '').trim();
+                const descText        = (cells[2]?.textContent || '').trim();
+                const dataCriacao     = (cells[3]?.textContent || '').trim();
+                const dataAtualizacao = (cells[4]?.textContent || '').trim();
+
+                const id = idText.replace(/[^\d]/g,'') || idText;
+
+                const card = document.createElement('div');
+                card.className = 'category-card';
+
+                card.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="badge-id">#${id}</span>
+                            <span class="title">${nomeText || '(Sem nome)'}</span>
+                        </div>
+                    </div>
+                    <div class="mt-2 muted">${descText ? descText : '— sem descrição —'}</div>
+                    <div class="mt-3 muted">
+                        <div><i class="fa-regular fa-calendar-plus me-2"></i><strong>Criado:</strong> ${dataCriacao || '-'}</div>
+                        <div><i class="fa-regular fa-clock me-2"></i><strong>Atualizado:</strong> ${dataAtualizacao || '-'}</div>
+                    </div>
+                    <div class="mt-3 d-flex gap-2">
+                        <button type="button" class="btn btn-outline-info btn-sm btn-edit"
+                                data-id="${id}" data-nome="${encodeURIComponent(nomeText)}" data-descricao="${encodeURIComponent(descText)}">
+                            <i class="fa-solid fa-pen-to-square me-1"></i> Editar
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm btn-delete" data-id="${id}">
+                            <i class="fa-solid fa-trash me-1"></i> Excluir
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            if (!grid.children.length){
+                const empty = document.createElement('div');
+                empty.className = 'category-card';
+                empty.innerHTML = `<div class="muted">Nenhuma categoria encontrada.</div>`;
+                grid.appendChild(empty);
+            }
+        }
+
+        /* -------- Handlers (tabela e cards) -------- */
+        function openEditModal(id, nome, descricao){
+            $('#category-id').val(id || '');
+            $('#category-action').val(id ? 'update' : 'create');
+            $('#category-name').val(nome || '');
+            $('#category-description').val(descricao || '');
+            $('#categoryModalLabel').text(id ? 'Editar Categoria' : 'Nova Categoria');
+            const modal = new bootstrap.Modal(document.getElementById('categoryModal'));
+            modal.show();
+        }
 
         function setupRowHandlers(){
-            // Editar
+            // Editar (tabela)
             $('#tbl-categorias').off('click', '.btn-edit').on('click', '.btn-edit', function(){
                 const id  = $(this).data('id');
                 const row = $(this).closest('tr');
                 const nome = row.find('td').eq(1).text().trim();
                 const descricao = row.find('td').eq(2).text().trim();
-
-                $('#category-id').val(id);
-                $('#category-action').val('update');
-                $('#category-name').val(nome);
-                $('#category-description').val(descricao);
-                $('#categoryModalLabel').text('Editar Categoria');
-
-                const modal = new bootstrap.Modal(document.getElementById('categoryModal'));
-                modal.show();
+                openEditModal(id, nome, descricao);
             });
 
-            // Excluir
+            // Excluir (tabela)
             $('#tbl-categorias').off('click', '.btn-delete').on('click', '.btn-delete', function(){
-                currentCategoryId = $(this).data('id');
-                const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
-                modal.show();
+                const id = $(this).data('id');
+                if (!id) return;
+                swalConfirmDelete().then(result => {
+                    if (result.isConfirmed){
+                        deleteCategory(id);
+                    }
+                });
+            });
+
+            // Editar (cards)
+            $('#cards-container').off('click', '.btn-edit').on('click', '.btn-edit', function(){
+                const id = $(this).data('id');
+                const nome = decodeURIComponent($(this).data('nome') || '');
+                const descricao = decodeURIComponent($(this).data('descricao') || '');
+                openEditModal(id, nome, descricao);
+            });
+
+            // Excluir (cards)
+            $('#cards-container').off('click', '.btn-delete').on('click', '.btn-delete', function(){
+                const id = $(this).data('id');
+                if (!id) return;
+                swalConfirmDelete().then(result => {
+                    if (result.isConfirmed){
+                        deleteCategory(id);
+                    }
+                });
             });
         }
         setupRowHandlers();
 
-        // Nova categoria
+        // Novo
         $('#btn-new-category').on('click', function(){
-            $('#categoryForm')[0].reset();
-            $('#category-id').val('');
-            $('#category-action').val('create');
-            $('#categoryModalLabel').text('Nova Categoria');
-
-            const modal = new bootstrap.Modal(document.getElementById('categoryModal'));
-            modal.show();
+            openEditModal('', '', '');
         });
 
         // Salvar (criar/atualizar)
         $('#btn-save-category').on('click', function(){
+            const $btn = $(this);
             if (!$('#category-name').val().trim()){
-                showAlert('error', 'O nome da categoria é obrigatório.');
+                swalAlert('error', 'O nome da categoria é obrigatório.');
                 return;
             }
+            $btn.prop('disabled', true);
             $.ajax({
                 url: 'categories.php',
                 type: 'POST',
                 data: $('#categoryForm').serialize(),
                 dataType: 'json',
                 success: function(resp){
-                    if (resp.success){
+                    $btn.prop('disabled', false);
+                    if (resp && resp.success){
                         bootstrap.Modal.getInstance(document.getElementById('categoryModal')).hide();
-                        showAlert('success', resp.message);
+                        swalAlert('success', resp.message);
                         reloadTable();
                     } else {
-                        showAlert('error', resp.message);
-                    }
-                },
-                error: function(){ showAlert('error', 'Erro ao processar solicitação.'); }
-            });
-        });
-
-        // Confirmar exclusão
-        $('#btn-confirm-delete').on('click', function(){
-            $.ajax({
-                url: 'categories.php',
-                type: 'POST',
-                data: { action:'delete', id: currentCategoryId },
-                dataType: 'json',
-                success: function(resp){
-                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
-                    if (resp.success){
-                        showAlert('success', resp.message);
-                        reloadTable();
-                    } else {
-                        showAlert('error', resp.message);
+                        swalAlert('error', (resp && resp.message) ? resp.message : 'Não foi possível salvar.');
                     }
                 },
                 error: function(){
-                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
-                    showAlert('error', 'Erro ao processar solicitação.');
+                    $btn.prop('disabled', false);
+                    swalAlert('error', 'Erro ao processar a solicitação.');
                 }
             });
         });
+
+        // Excluir (função)
+        function deleteCategory(id){
+            $.ajax({
+                url: 'categories.php',
+                type: 'POST',
+                data: { action:'delete', id: id },
+                dataType: 'json',
+                success: function(resp){
+                    if (resp && resp.success){
+                        swalAlert('success', resp.message);
+                        reloadTable();
+                    } else {
+                        swalAlert('error', (resp && resp.message) ? resp.message : 'Não foi possível excluir.');
+                    }
+                },
+                error: function(){
+                    swalAlert('error', 'Erro ao processar a solicitação.');
+                }
+            });
+        }
+
+        /* -------- Recarregar tabela (corrige erro do DataTables) --------
+           Estratégia: buscar o HTML da página, extrair apenas o <tbody> da tabela
+           e REINICIALIZAR o DataTables do zero com o novo HTML.
+           Isso evita o erro "Requested unknown parameter [object Object]".
+        --------------------------------------------------------------- */
+        function reloadTable(){
+            $.ajax({
+                url: window.location.href,
+                type: 'GET',
+                success: function(data){
+                    const newTbodyHTML = $(data).find('#categories-table-body').html() || '';
+                    reinitDataTableWithHTML(newTbodyHTML);
+                    setupRowHandlers();           // reanexa os handlers
+                    renderCardsFromTable();       // atualiza cards (mobile)
+                },
+                error: function(){
+                    swalAlert('error', 'Erro ao atualizar a lista de categorias.');
+                }
+            });
+        }
+
     })();
     </script>
 </body>

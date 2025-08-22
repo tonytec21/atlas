@@ -64,9 +64,6 @@ try {
     <!-- DataTables Responsive -->
     <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
 
-    <!-- SweetAlert2 CSS (opcional, para temas) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-
     <style>
         /* =========================================================
          *  Tema Light / Dark  —  UI moderna e responsiva
@@ -162,7 +159,7 @@ try {
             display: grid; place-items: center; color: var(--text);
         }
 
-        /* ---------------- Sidebar ---------------- */
+        /* ---------------- Sidebar ----------------
         .sidebar {
             position: fixed; top: var(--topbar-h); left: 0; bottom: 0;
             width: var(--sidebar-width);
@@ -184,15 +181,15 @@ try {
             color: var(--text);
             background: linear-gradient(135deg, rgba(59,130,246,.12), rgba(34,197,94,.12));
             border: 1px solid var(--border);
-        }
+        } */
 
         /* ---------------- Main ---------------- */
         .main {
-            margin-left: var(--sidebar-width);
+            /* margin-left: var(--sidebar-width); */
             padding: calc(var(--topbar-h) + 24px) 28px 24px;
             transition: margin-left .25s ease;
         }
-        .main.expanded { margin-left: 0; }
+        /* .main.expanded { margin-left: 0; } */
 
         .panel {
             background: var(--surface);
@@ -425,7 +422,7 @@ try {
 <body>  
     <!-- Topbar -->
     <div class="topbar">
-        <button class="menu-toggle" id="menu-toggle" aria-label="Alternar menu"><i class="fa-solid fa-bars"></i></button>
+        <!-- <button class="menu-toggle" id="menu-toggle" aria-label="Alternar menu"><i class="fa-solid fa-bars"></i></button> -->
         <div class="brand">
             <div class="logo">M</div>
             <h4 class="m-0">Sistema de Manuais</h4>
@@ -448,12 +445,12 @@ try {
     </div>
 
     <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
+    <!-- <aside class="sidebar" id="sidebar">
         <nav class="nav flex-column nav-stacked">
             <a class="nav-link active" href="manual-list.php"><i class="fa-solid fa-book"></i> Manuais</a>  
             <a class="nav-link" href="categories.php"><i class="fa-solid fa-tags"></i> Categorias</a>  
         </nav>
-    </aside>
+    </aside> -->
 
     <!-- Main -->
     <main class="main" id="main-content">
@@ -511,15 +508,12 @@ try {
             </div>
         </div>
 
-        <!-- Header + CTA -->
+        <!-- Header (somente visualização: sem CTA de criar) -->
         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
             <div>
                 <h1 class="mb-0 fw-bold">Manuais</h1>
-                <small class="text-muted">Gerencie e acompanhe todos os manuais da sua equipe.</small>
+                <small class="text-muted">Navegue e visualize os manuais disponíveis.</small>
             </div>
-            <a href="manual-creator.php" class="btn btn-primary">
-                <i class="fa-solid fa-plus-circle me-2"></i> Criar Novo Manual
-            </a>
         </div>
 
         <!-- Filtros -->
@@ -573,7 +567,7 @@ try {
                             <th>Data de Criação</th>
                             <th>Status</th>
                             <th>Visualizações</th>
-                            <th class="text-center">Ações</th>
+                            <th class="text-center">Visualizar</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -638,12 +632,6 @@ try {
                                     <a href="view-manual.php?id=<?php echo (int)$manual['id']; ?>" class="btn btn-outline-info btn-sm" title="Visualizar">
                                         <i class="fa-solid fa-eye"></i>
                                     </a>
-                                    <a href="manual-creator.php?id=<?php echo (int)$manual['id']; ?>" class="btn btn-outline-primary btn-sm" title="Editar">
-                                        <i class="fa-solid fa-pen-to-square"></i>
-                                    </a>
-                                    <button class="btn btn-outline-danger btn-sm delete-manual" data-id="<?php echo (int)$manual['id']; ?>" title="Excluir">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -658,7 +646,7 @@ try {
                             <th>Data de Criação</th>
                             <th>Status</th>
                             <th>Visualizações</th>
-                            <th>Ações</th>
+                            <th>Visualizar</th>
                         </tr>
                     </tfoot>
                 </table>
@@ -683,9 +671,6 @@ try {
     <!-- DataTables Responsive -->
     <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
     <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
-
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
         (function(){
@@ -719,34 +704,34 @@ try {
                 applyTheme(current === 'dark' ? 'light' : 'dark');
             });
 
-            /* ---------------- Sidebar Toggle ---------------- */
-            const sidebar = document.getElementById('sidebar');
-            const main    = document.getElementById('main-content');
-            const menuBtn = document.getElementById('menu-toggle');
+            // /* ---------------- Sidebar Toggle ---------------- */
+            // const sidebar = document.getElementById('sidebar');
+            // const main    = document.getElementById('main-content');
+            // const menuBtn = document.getElementById('menu-toggle');
 
-            function checkSize(){
-                if (window.innerWidth < 992) {
-                    sidebar.classList.add('collapsed');
-                    main.classList.add('expanded');
-                } else {
-                    sidebar.classList.remove('collapsed','mobile-visible');
-                    main.classList.remove('expanded');
-                }
-            }
-            window.addEventListener('resize', () => {
-                checkSize();
-                renderCardsFromTable(); // re-render cards no resize
-            });
-            checkSize();
+            // function checkSize(){
+            //     if (window.innerWidth < 992) {
+            //         sidebar.classList.add('collapsed');
+            //         main.classList.add('expanded');
+            //     } else {
+            //         sidebar.classList.remove('collapsed','mobile-visible');
+            //         main.classList.remove('expanded');
+            //     }
+            // }
+            // window.addEventListener('resize', () => {
+            //     checkSize();
+            //     renderCardsFromTable(); // re-render cards no resize
+            // });
+            // checkSize();
 
-            menuBtn.addEventListener('click', () => {
-                if (window.innerWidth < 992) {
-                    sidebar.classList.toggle('mobile-visible');
-                } else {
-                    sidebar.classList.toggle('collapsed');
-                    main.classList.toggle('expanded');
-                }
-            });
+            // menuBtn.addEventListener('click', () => {
+            //     if (window.innerWidth < 992) {
+            //         sidebar.classList.toggle('mobile-visible');
+            //     } else {
+            //         sidebar.classList.toggle('collapsed');
+            //         main.classList.toggle('expanded');
+            //     }
+            // });
 
             /* ---------------- Tradução DataTables (inline, evita CORS) ---------------- */
             const DT_LANG_PTBR = {
@@ -780,7 +765,7 @@ try {
                 order: [[5, 'desc']], // Data de criação
                 columnDefs: [
                     { targets: [0], visible: false }, // Oculta ID
-                    { targets: [8], orderable: false } // Ações
+                    { targets: [8], orderable: false } // Botão Visualizar
                 ]
             });
 
@@ -921,12 +906,6 @@ try {
                             <a href="view-manual.php?id=${encodeURIComponent(id)}" class="btn btn-outline-info btn-sm">
                                 <i class="fa-solid fa-eye me-1"></i> Visualizar
                             </a>
-                            <a href="manual-creator.php?id=${encodeURIComponent(id)}" class="btn btn-outline-primary btn-sm">
-                                <i class="fa-solid fa-pen-to-square me-1"></i> Editar
-                            </a>
-                            <button class="btn btn-outline-danger btn-sm delete-manual" data-id="${encodeURIComponent(id)}">
-                                <i class="fa-solid fa-trash me-1"></i> Excluir
-                            </button>
                         </div>
                     `;
                     grid.appendChild(card);
@@ -942,25 +921,6 @@ try {
 
             // Primeira renderização de cards
             renderCardsFromTable();
-
-            /* ---------------- Exclusão (tabela e cards) ---------------- */
-            $(document).on('click', '.delete-manual', function(){
-                const id = $(this).data('id');
-                Swal.fire({
-                    title: 'Confirmar exclusão?',
-                    text: 'Esta ação não pode ser desfeita!',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc3545',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Sim, excluir!',
-                    cancelButtonText: 'Cancelar'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        window.location.href = 'delete_manual.php?id=' + id;
-                    }
-                });
-            });
         })();
     </script>
 </body>
