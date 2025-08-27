@@ -340,7 +340,7 @@ body.dark-mode .attach-chip{ background:#243042; color:#cbd5e1; border-color:#34
             <option>Registro Civil</option><option>Registro de Imóveis</option>
             <option>Registro de Títulos e Documentos</option>
             <option>Registro Civil das Pessoas Jurídicas</option>
-            <option>Notas</option><option>Protesto</option><option>Contratos Marítimos</option>
+            <option>Notas</option><option>Protesto</option><option>Contratos Marítimos</option><option>Administrativo</option>
           </select>
         </div>
         <div class="col-md-4">

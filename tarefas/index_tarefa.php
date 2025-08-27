@@ -820,6 +820,7 @@ date_default_timezone_set('America/Sao_Paulo');
                 <option value="Notas">Notas</option>
                 <option value="Protesto">Protesto</option>
                 <option value="Contratos Marítimos">Contratos Marítimos</option>
+                <option value="Administrativo">Administrativo</option>
               </select>
             </div>
 
