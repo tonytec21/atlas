@@ -314,11 +314,11 @@ date_default_timezone_set('America/Sao_Paulo');
                         <i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa
                     </button>
                 </div>
-                <!-- <div class="col-md-auto mb-2">
-                    <a href="index.php" class="btn btn-secondary">
-                        <i class="fa fa-search" aria-hidden="true"></i> Ordens de Serviço
+                <div class="col-md-auto mb-2">
+                    <a href="../liberar_os.php" class="btn btn-secondary">
+                        <i class="fa fa-undo" aria-hidden="true"></i> Desfazer Liquidações
                     </a>
-                </div> -->
+                </div>
                 <div class="col-md-auto mb-2">
                     <a href="modelos_orcamento.php" class="btn btn-primary">
                         <i class="fa fa-folder-open"></i> Modelos O.S
