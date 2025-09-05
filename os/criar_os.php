@@ -383,7 +383,28 @@ $(document).ready(function() {
     });
 
     // Atualiza o estado do botão ao digitar/focar no campo Apresentante
-    $('#cliente').on('input blur', updateSalvarButtonState);
+    // Apresentante: bloquear aspas/apóstrofos ao digitar e sanitizar colas
+    $('#cliente')
+    // Bloqueia a digitação de " e '
+    .on('keypress', function (e) {
+        if (e.key === "'" || e.key === '"') {
+        e.preventDefault();
+        }
+    })
+    // Remove aspas/apóstrofos enquanto digita (inclui aspas “ ” ‘ ’)
+    .on('input', function () {
+        this.value = this.value.replace(/["'“”‘’]/g, '');
+        updateSalvarButtonState();
+    })
+    // Garante a limpeza imediatamente após colar
+    .on('paste', function () {
+        const el = this;
+        setTimeout(function () {
+        el.value = el.value.replace(/["'“”‘’]/g, '');
+        updateSalvarButtonState();
+        }, 0);
+    })
+    .on('blur', updateSalvarButtonState);
 
     $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #total').mask('#.##0,00', {reverse: true});
 
@@ -620,7 +641,7 @@ function salvarOS() {
     // Desabilita o botão "SALVAR OS" para evitar clique duplo
     $('#btnSalvarOS').prop('disabled', true);
 
-    var cliente = $('#cliente').val();
+    var cliente = $('#cliente').val().replace(/["'“”‘’]/g, '');
     var cpf_cliente = $('#cpf_cliente').val();
     var total_os = $('#total_os').val().replace(/\./g, '').replace(',', '.');
     var descricao_os = $('#descricao_os').val();

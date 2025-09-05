@@ -5,14 +5,22 @@ include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $cliente = mb_strtoupper(trim($_POST['cliente']), 'UTF-8');
+    $cliente_raw   = $_POST['cliente'] ?? '';
+    $cliente_sanit = preg_replace('/["\'“”‘’]/u', '', $cliente_raw);
+    $cliente       = mb_strtoupper(trim($cliente_sanit), 'UTF-8');
     $cpf_cliente = $_POST['cpf_cliente'];
     $total_os = str_replace(',', '.', $_POST['total_os']);
     $base_calculo = isset($_POST['base_calculo']) && $_POST['base_calculo'] !== '' ? str_replace(',', '.', $_POST['base_calculo']) : 0;
     $itens = $_POST['itens'];
     $descricao_os = $_POST['descricao_os'];
-    $observacoes = $_POST['observacoes'];
-    $criado_por = $_SESSION['username'];
+    $observacoes  = $_POST['observacoes'];
+    $criado_por   = $_SESSION['username'];
+
+    if ($cliente === '') {
+        echo json_encode(['error' => 'O campo "Apresentante" é obrigatório.']);
+        exit;
+    }
+
 
     try {
         $conn = getDatabaseConnection();

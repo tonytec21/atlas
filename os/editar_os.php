@@ -170,7 +170,7 @@ include(__DIR__ . '/../menu.php');
             <div class="form-row">
                 <div class="form-group col-md-5">
                     <label for="cliente">Apresentante:</label>
-                    <input type="text" class="form-control" id="cliente" name="cliente" value="<?php echo $os['cliente']; ?>" required>
+                    <input type="text" class="form-control" id="cliente" name="cliente" value="<?php echo htmlspecialchars($os['cliente'], ENT_QUOTES, 'UTF-8'); ?>" required>
                 </div>
                 <div class="form-group col-md-2">
                     <label for="cpf_cliente">CPF/CNPJ do Apresentante:</label>
@@ -486,7 +486,27 @@ $(document).ready(function() {
     }).blur(); // Chamar a função quando o campo perde o foco
 
     $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #total').mask('#.##0,00', {reverse: true});
-   
+
+    // Apresentante: bloquear aspas/apóstrofos ao digitar e sanitizar colas
+    $('#cliente')
+      // Bloqueia a digitação de " e '
+      .on('keypress', function (e) {
+        if (e.key === "'" || e.key === '"') {
+          e.preventDefault();
+        }
+      })
+      // Remove aspas/apóstrofos enquanto digita (inclui aspas tipográficas “ ” ‘ ’)
+      .on('input', function () {
+        this.value = this.value.replace(/["'“”‘’]/g, '');
+      })
+      // Garante a limpeza logo após colar
+      .on('paste', function () {
+        const el = this;
+        setTimeout(function () {
+          el.value = el.value.replace(/["'“”‘’]/g, '');
+        }, 0);
+      });
+
     if (ISS_CONFIG.ativo) {
         atualizarISS();
         calcularTotalOS();
@@ -1010,7 +1030,7 @@ function atualizarTotalOS(os_id) {
 
 function salvarOS() {
     var os_id = $('#os_id').val();
-    var cliente = $('#cliente').val();
+    var cliente = $('#cliente').val().replace(/["'“”‘’]/g, '');
     var cpf_cliente = $('#cpf_cliente').val();
     var total_os = $('#total_os').val().replace(/\./g, '').replace(',', '.');
     var descricao_os = $('#descricao_os').val();
