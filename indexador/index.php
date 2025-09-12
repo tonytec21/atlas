@@ -201,10 +201,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
 
         $funcionarios = [];
         foreach ($agg as $usuarioOuNI => $vals) {
-            $display = ($usuarioOuNI === 'Não informado') ? 'Não informado' : ($userMap[$usuarioOuNI] ?? $usuarioOuNI);
+            $rotuloGrafico = $usuarioOuNI;
             $funcionarios[] = [
                 'usuario'     => ($usuarioOuNI === 'Não informado') ? null : $usuarioOuNI,
-                'funcionario' => $display, // nome completo para rotular no gráfico
+                'funcionario' => $rotuloGrafico,
                 'nascimento'  => (int)$vals['nascimento'],
                 'obito'       => (int)$vals['obito'],
                 'total'       => (int)$vals['total'],
