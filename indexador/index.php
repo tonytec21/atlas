@@ -686,9 +686,10 @@ $(function () {
         if (tiposChart) tiposChart.destroy();
         tiposChart = new Chart(document.getElementById('chartTipos').getContext('2d'), { type:'doughnut', data:tiposData, options:tiposOpts });
 
-        const labels = payload.by_funcionario.map(i => i.funcionario);
+        const labels = payload.by_funcionario.map(i => (i.funcionario || '').toString().toUpperCase());
         const nasc   = payload.by_funcionario.map(i => i.nascimento);
         const obit   = payload.by_funcionario.map(i => i.obito);
+
 
         const funcData = { labels, datasets:[
             { label:'Nascimento', data:nasc, backgroundColor:'#39c076' },
@@ -696,8 +697,20 @@ $(function () {
         ]};
         const funcOpts = {
             responsive:true, maintainAspectRatio:false,
-            scales:{ x:{ stacked:true, ticks:{ autoSkip:true, maxRotation:45, minRotation:0 } }, y:{ stacked:true, beginAtZero:true, precision:0 } },
-            plugins:{ legend:{ position:'bottom' }, tooltip:{ mode:'index', intersect:false } }
+            scales:{
+                x:{ stacked:true, ticks:{ autoSkip:true, maxRotation:45, minRotation:0 } },
+                y:{ stacked:true, beginAtZero:true, precision:0 }
+            },
+            plugins:{
+                legend:{ position:'bottom' },
+                tooltip:{
+                    mode:'index',
+                    intersect:false,
+                    callbacks:{
+                        title: (items) => (items && items.length ? (items[0].label || '').toUpperCase() : '')
+                    }
+                }
+            }
         };
         if (funcChart) funcChart.destroy();
         funcChart = new Chart(document.getElementById('chartFuncionarios').getContext('2d'), { type:'bar', data:funcData, options:funcOpts });
