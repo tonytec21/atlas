@@ -3,6 +3,209 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
+
+/* ========= Camada de compatibilidade de conexão (MySQLi ou PDO) ========= */
+function __atlas_classify_connection($c) {
+    if ($c instanceof mysqli) return ['driver' => 'mysqli', 'conn' => $c];
+    if ($c instanceof PDO)    return ['driver' => 'pdo',    'conn' => $c];
+    throw new Error('Tipo de conexão não suportado. Use MySQLi ou PDO.');
+}
+
+/**
+ * Tenta obter a conexão com o banco a partir de:
+ * 1) função getDatabaseConnection() (se existir)
+ * 2) variáveis globais comuns: $conn, $mysqli, $db, $pdo, $cnx, $conexao
+ * 3) constantes DB_HOST/DB_USER/DB_PASS/DB_NAME (cria MySQLi)
+ */
+function atlasDb() {
+    // 1) Função padrão, se existir
+    if (function_exists('getDatabaseConnection')) {
+        $c = getDatabaseConnection();
+        if ($c) return __atlas_classify_connection($c);
+    }
+    // 2) Variáveis globais comuns
+    foreach (['conn','mysqli','db','pdo','cnx','conexao'] as $name) {
+        if (isset($GLOBALS[$name]) && $GLOBALS[$name]) {
+            return __atlas_classify_connection($GLOBALS[$name]);
+        }
+    }
+    // 3) Constantes (opcional)
+    if (defined('DB_HOST') && defined('DB_USER') && defined('DB_PASS') && defined('DB_NAME')) {
+        $m = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+        if ($m && !$m->connect_errno) {
+            return ['driver' => 'mysqli', 'conn' => $m];
+        }
+    }
+    throw new Error('Conexão não encontrada. Defina getDatabaseConnection() OU uma variável $conn/$pdo no db_connection.php.');
+}
+
+/* ============================================================
+   ENDPOINT AJAX: /index.php?action=stats
+   PHP 8+ — retorna SEMPRE JSON (ok:true|false).
+   Parâmetros:
+     - start  (YYYY-MM-DD)
+     - end    (YYYY-MM-DD)
+     - basis  ('cadastro' | 'registro')  -> padrão: cadastro
+     - status ('ativos' | 'todos')       -> padrão: ativos
+   ============================================================ */
+if (isset($_GET['action']) && $_GET['action'] === 'stats') {
+    @ini_set('display_errors', 0);
+    @ini_set('html_errors', 0);
+    header('Content-Type: application/json; charset=utf-8');
+    ob_start();
+
+    $today      = date('Y-m-d');
+    $firstMonth = date('Y-m-01');
+
+    $start  = (isset($_GET['start'])  && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['start'])) ? $_GET['start'] : $firstMonth;
+    $end    = (isset($_GET['end'])    && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['end']))   ? $_GET['end']   : $today;
+    $basis  = (isset($_GET['basis'])  && $_GET['basis'] === 'registro') ? 'registro' : 'cadastro'; // padrão: cadastro
+    $status = (isset($_GET['status']) && $_GET['status'] === 'todos')   ? 'todos'    : 'ativos';
+
+    $resp = ['ok' => true];
+
+    try {
+        $db = atlasDb();
+        $driver = $db['driver'];
+        $conn   = $db['conn'];
+
+        if ($driver === 'mysqli' && function_exists('mysqli_report')) {
+            mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+            if (method_exists($conn, 'set_charset')) { $conn->set_charset('utf8mb4'); }
+        }
+        if ($driver === 'pdo') {
+            $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            // garante UTF-8
+            try { $conn->exec("SET NAMES utf8mb4"); } catch (Throwable $e) {}
+        }
+
+        // Colunas conforme base
+        $dateColNasc = ($basis === 'cadastro') ? "DATE(data_cadastro)" : "data_registro";
+        $dateColObit = ($basis === 'cadastro') ? "DATE(data_cadastro)" : "data_registro";
+
+        // Status
+        $statusNasc = ($status === 'ativos') ? " AND status = 'ativo' " : "";
+        $statusObit = ($status === 'ativos') ? " AND status = 'A' "     : "";
+
+        // ---------- Helpers de consulta ----------
+        $readCount = function(string $sql) use ($driver, $conn, $start, $end) {
+            if ($driver === 'mysqli') {
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param('ss', $start, $end);
+                $stmt->execute();
+                $res = $stmt->get_result();
+                $row = $res->fetch_assoc();
+                $stmt->close();
+                return (int)($row['total'] ?? 0);
+            } else { // PDO
+                $stmt = $conn->prepare($sql);
+                $stmt->execute([$start, $end]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                return (int)($row['total'] ?? 0);
+            }
+        };
+
+        $readGroup = function(string $sql) use ($driver, $conn, $start, $end) {
+            $rows = [];
+            if ($driver === 'mysqli') {
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param('ss', $start, $end);
+                $stmt->execute();
+                $res = $stmt->get_result();
+                while ($r = $res->fetch_assoc()) {
+                    $rows[] = ['label' => $r['label'], 'qtd' => (int)$r['qtd']];
+                }
+                $stmt->close();
+            } else { // PDO
+                $stmt = $conn->prepare($sql);
+                $stmt->execute([$start, $end]);
+                $rows = array_map(function($r){
+                    return ['label' => $r['label'], 'qtd' => (int)$r['qtd']];
+                }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+            }
+            return $rows;
+        };
+
+        // ---------- Totais ----------
+        $totNasc = $readCount("SELECT COUNT(*) AS total
+                               FROM indexador_nascimento
+                               WHERE {$dateColNasc} BETWEEN ? AND ? {$statusNasc}");
+
+        $totObit = $readCount("SELECT COUNT(*) AS total
+                               FROM indexador_obito
+                               WHERE {$dateColObit} BETWEEN ? AND ? {$statusObit}");
+
+        // ---------- Por funcionário (GROUP BY com mesma expressão) ----------
+        $funcExpr = "COALESCE(NULLIF(TRIM(funcionario),''),'Não informado')";
+
+        $rowsN = $readGroup("SELECT {$funcExpr} AS label, COUNT(*) AS qtd
+                             FROM indexador_nascimento
+                             WHERE {$dateColNasc} BETWEEN ? AND ? {$statusNasc}
+                             GROUP BY {$funcExpr}
+                             ORDER BY qtd DESC");
+
+        $rowsO = $readGroup("SELECT {$funcExpr} AS label, COUNT(*) AS qtd
+                             FROM indexador_obito
+                             WHERE {$dateColObit} BETWEEN ? AND ? {$statusObit}
+                             GROUP BY {$funcExpr}
+                             ORDER BY qtd DESC");
+
+        // Agrega N + O por funcionário
+        $agg = [];
+        foreach ($rowsN as $r) {
+            $f = $r['label'];
+            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'obito'=>0,'total'=>0];
+            $agg[$f]['nascimento'] = (int)$r['qtd'];
+            $agg[$f]['total']     += (int)$r['qtd'];
+        }
+        foreach ($rowsO as $r) {
+            $f = $r['label'];
+            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'obito'=>0,'total'=>0];
+            $agg[$f]['obito'] = (int)$r['qtd'];
+            $agg[$f]['total']+= (int)$r['qtd'];
+        }
+
+        // Ordena por total DESC
+        uasort($agg, fn($a,$b) => $b['total'] <=> $a['total']);
+
+        $funcionarios = [];
+        foreach ($agg as $nome => $vals) {
+            $funcionarios[] = [
+                'funcionario' => $nome,
+                'nascimento'  => (int)$vals['nascimento'],
+                'obito'       => (int)$vals['obito'],
+                'total'       => (int)$vals['total'],
+            ];
+        }
+
+        $resp['filters'] = [
+            'start'  => $start,
+            'end'    => $end,
+            'basis'  => $basis,
+            'status' => $status,
+        ];
+        $resp['totals'] = [
+            'nascimento' => $totNasc,
+            'obito'      => $totObit,
+            'total'      => $totNasc + $totObit,
+        ];
+        $resp['by_funcionario'] = $funcionarios;
+
+    } catch (Throwable $e) {
+        $resp = [
+            'ok'      => false,
+            'message' => 'Falha ao calcular estatísticas.',
+            'error'   => $e->getMessage(),
+            'type'    => get_class($e),
+        ];
+    }
+
+    $buffer = trim(ob_get_clean());
+    if ($buffer !== '') { $resp['debug'] = strip_tags($buffer); }
+
+    echo json_encode($resp);
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -11,46 +214,108 @@ date_default_timezone_set('America/Sao_Paulo');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Atlas - Central de Acesso - Indexador</title>
 
-    <!-- CSS base (mesmos do index.php raiz) -->
+    <!-- CSS base -->
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
 
-    <!-- Estilos do hub (mesmo bundle usado pelo index.php principal) -->
+    <!-- Estilos globais do Hub -->
     <?php include(__DIR__ . '/../style/style_index.php'); ?>
 
     <style>
         /* ======================= BUSCA / GRID ======================= */
         .search-container { margin-bottom: 30px; }
 
-        .search-box {
-        width: 100%;
-        max-width: 800px;
-        padding: 12px 20px;
-        border-radius: 100px;
-        border: 1px solid #e0e0e0;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        font-size: 16px;
-        background-image: url('../style/img/search-icon.png');
-        background-repeat: no-repeat;
-        background-position: 15px center;
-        background-size: 16px;
-        padding-left: 45px;
-        display: block;
-        margin: 0 auto;
+        .search-box{
+            width:100%;max-width:800px;padding:12px 20px;border-radius:100px;
+            border:1px solid #e0e0e0;box-shadow:0 2px 5px rgba(0,0,0,.05);
+            font-size:16px;background-image:url('../style/img/search-icon.png');
+            background-repeat:no-repeat;background-position:15px center;background-size:16px;
+            padding-left:45px;display:block;margin:0 auto;
         }
-        .search-box:focus {
-        outline: none;
-        border-color: #0d6efd;
-        box-shadow: 0 2px 8px rgba(13,110,253,0.15);
+        .search-box:focus{outline:none;border-color:#0d6efd;box-shadow:0 2px 8px rgba(13,110,253,.15);}
+        body.dark-mode .search-box{background:#22272e;border-color:#2f3a46;color:#e0e0e0;box-shadow:none;}
+
+        /* ======================= DASHBOARD ======================= */
+        .dashboard { margin-top: 10px; margin-bottom: 35px; }
+
+        .dash-card{
+            border:1px solid var(--card-border,#e9ecef);
+            border-radius:24px;
+            padding:18px;
+            background:linear-gradient(180deg, var(--card-bg,#fff) 0%, rgba(255,255,255,.92) 100%);
+            box-shadow:0 10px 30px rgba(0,0,0,.08);
+            margin-bottom:16px;
         }
-        body.dark-mode .search-box {
-        background-color: #22272e;
-        border-color: #2f3a46;
-        color: #e0e0e0;
-        box-shadow: none;
+        body.dark-mode .dash-card{
+            background:linear-gradient(180deg,#161b22 0%, rgba(22,27,34,.92) 100%);
+            border-color:#2f3a46; box-shadow:none;
         }
+
+        /* ==== Filtros (UI/UX moderno) ==== */
+        .filters-grid{ display:grid; grid-template-columns: repeat(12,1fr); grid-gap:12px; align-items:end; }
+        .filter-col{ grid-column: span 3; }
+        .filter-col.wide{ grid-column: span 6; }
+        .filter-col.actions{ grid-column: span 3; display:flex; gap:10px; }
+        @media (max-width:1200px){ .filter-col{grid-column: span 6;} .filter-col.actions{grid-column: span 6;} }
+        @media (max-width:576px){ .filter-col, .filter-col.actions{grid-column: span 12;} }
+
+        .filter-label{ font-size:.8rem; color:#6c757d; margin-bottom:6px; font-weight:600; }
+        .input-icon{ position:relative; }
+        .input-icon > i{
+            position:absolute; left:12px; top:50%; transform:translateY(-50%);
+            opacity:.6; pointer-events:none;
+        }
+        .input-icon .filter-control{
+            padding-left:38px; border-radius:14px; height:46px;
+            border:1px solid #e6e6e6;
+        }
+        body.dark-mode .input-icon .filter-control{ background:#0f141a; border-color:#2f3a46; color:#e0e0e0; }
+
+        .quick-ranges{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+        .chip{
+            border-radius:999px; padding:6px 12px; border:1px solid #e6e6e6; background:#fff;
+            font-size:.85rem; cursor:pointer; transition:.15s;
+        }
+        .chip:hover{ transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.08); }
+        .chip.active{ background:#0d6efd; color:#fff; border-color:#0d6efd; }
+        body.dark-mode .chip{ background:#0f141a; border-color:#2f3a46; color:#cfd3d7; }
+        body.dark-mode .chip.active{ background:#0d6efd; color:#fff; border-color:#0d6efd; }
+
+        .btn-modern{
+            border-radius:14px; height:46px; display:flex; align-items:center; justify-content:center;
+            gap:8px; font-weight:600;
+        }
+
+        /* ==== KPIs ==== */
+        .kpi-grid{ display:grid; grid-template-columns: repeat(3,1fr); grid-gap:12px; margin-top:14px; }
+        @media (max-width:768px){ .kpi-grid{ grid-template-columns: 1fr; } }
+
+        .kpi{
+            border-radius:18px; padding:18px; color:#fff; display:flex; align-items:center; justify-content:space-between; min-height:86px;
+        }
+        .kpi .kpi-label{ font-size:14px; opacity:.9; }
+        .kpi .kpi-value{ font-size:28px; font-weight:700; }
+        .kpi-primary   { background:linear-gradient(135deg,#0d6efd,#4da3ff); }
+        .kpi-success   { background:linear-gradient(135deg,#198754,#39c076); }
+        .kpi-secondary { background:linear-gradient(135deg,#6c757d,#9aa1a7); }
+
+        /* ==== Gráficos ==== */
+        .charts-grid{ display:grid; grid-template-columns: 1.1fr 1.9fr; grid-gap:16px; margin-top:16px; }
+        @media (max-width:992px){ .charts-grid{ grid-template-columns: 1fr; } }
+
+        .chart-card{
+            border:1px dashed var(--card-border,#e9ecef);
+            border-radius:20px; padding:16px; background:var(--card-bg,#fff);
+        }
+        body.dark-mode .chart-card{ background:#0f141a; border-color:#2f3a46; }
+
+        .chart-title{ font-weight:600; font-size:16px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+        .chart-wrap{ position:relative; width:100%; height:350px; }
+
+        /* Espaço da grade de módulos */
+        #sortable-cards{ margin-top: 18px; }
     </style>
 </head>
 <body class="light-mode">
@@ -61,6 +326,120 @@ date_default_timezone_set('America/Sao_Paulo');
     <h1 class="page-title"></h1>
     <div class="title-divider"></div>
 
+    <!-- ===================== DASHBOARD / GRÁFICOS ===================== -->
+    <div class="dashboard">
+        <div class="dash-card">
+            <!-- Filtros -->
+            <div class="filters-grid">
+                <div class="filter-col">
+                    <div class="filter-label">Data inicial</div>
+                    <div class="input-icon">
+                        <i class="fa fa-calendar-o"></i>
+                        <input type="date" id="fStart" class="form-control filter-control">
+                    </div>
+                </div>
+
+                <div class="filter-col">
+                    <div class="filter-label">Data final</div>
+                    <div class="input-icon">
+                        <i class="fa fa-calendar"></i>
+                        <input type="date" id="fEnd" class="form-control filter-control">
+                    </div>
+                </div>
+
+                <div class="filter-col">
+                    <div class="filter-label">Base da data</div>
+                    <div class="input-icon">
+                        <i class="fa fa-database"></i>
+                        <select id="fBasis" class="form-select filter-control" style="padding-left:38px;">
+                            <option value="cadastro">Data de Cadastro</option>
+                            <option value="registro">Data de Registro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="filter-col">
+                    <div class="filter-label">Status</div>
+                    <div class="input-icon">
+                        <i class="fa fa-filter"></i>
+                        <select id="fStatus" class="form-select filter-control" style="padding-left:38px;">
+                            <option value="ativos">Somente ativos</option>
+                            <option value="todos">Todos os status</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="filter-col wide">
+                    <div class="filter-label">Períodos rápidos</div>
+                    <div class="quick-ranges">
+                        <span class="chip" data-range="7">Últimos 7 dias</span>
+                        <span class="chip" data-range="15">Últimos 15 dias</span>
+                        <span class="chip active" data-range="30">Últimos 30 dias</span>
+                        <span class="chip" data-range="this_month">Este mês</span>
+                        <span class="chip" data-range="last_month">Mês passado</span>
+                        <span class="chip" data-range="ytd">Ano atual</span>
+                    </div>
+                </div>
+
+                <div class="filter-col actions">
+                    <button id="btnApply" class="btn btn-primary btn-modern w-100">
+                        <i class="fa fa-line-chart"></i> Aplicar filtros
+                    </button>
+                    <button id="btnReset" class="btn btn-outline-secondary btn-modern w-100">
+                        <i class="fa fa-refresh"></i> Resetar
+                    </button>
+                </div>
+            </div>
+
+            <!-- KPIs -->
+            <div class="kpi-grid">
+                <div class="kpi kpi-success">
+                    <div>
+                        <div class="kpi-label">Nascimentos</div>
+                        <div class="kpi-value" id="kpiNascimento">0</div>
+                    </div>
+                    <i class="fa fa-child fa-2x" aria-hidden="true"></i>
+                </div>
+                <div class="kpi kpi-secondary">
+                    <div>
+                        <div class="kpi-label">Óbitos</div>
+                        <div class="kpi-value" id="kpiObito">0</div>
+                    </div>
+                    <i class="fa fa-book fa-2x" aria-hidden="true"></i>
+                </div>
+                <div class="kpi kpi-primary">
+                    <div>
+                        <div class="kpi-label">Total</div>
+                        <div class="kpi-value" id="kpiTotal">0</div>
+                    </div>
+                    <i class="fa fa-bar-chart fa-2x" aria-hidden="true"></i>
+                </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">
+                        <i class="fa fa-pie-chart"></i> Quantitativo por tipo de ato
+                    </div>
+                    <div class="chart-wrap">
+                        <canvas id="chartTipos"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">
+                        <i class="fa fa-users"></i> Quantitativo por funcionário (Empilhado)
+                    </div>
+                    <div class="chart-wrap">
+                        <canvas id="chartFuncionarios"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- =================== /DASHBOARD / GRÁFICOS =================== -->
+
+    <!-- Busca -->
     <div class="search-container">
         <input type="text" class="search-box" id="searchModules" placeholder="Buscar módulos...">
     </div>
@@ -203,16 +582,168 @@ date_default_timezone_set('America/Sao_Paulo');
     </div>
 </div>
 
-<!-- Scripts (mesmos do index.php principal) -->
+<!-- Scripts -->
 <script src="../script/jquery-3.6.0.min.js"></script>
 <script src="../script/jquery-ui.min.js"></script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-$(document).ready(function () {
+$(function () {
+    // ---------- Elementos ----------
+    const $start  = $('#fStart');
+    const $end    = $('#fEnd');
+    const $basis  = $('#fBasis');
+    const $status = $('#fStatus');
 
-    // Busca de módulos (filtra cards pelo texto)
+    // Defaults: últimos 30 dias, base = CADASTRO
+    const today      = new Date();
+    const yyyy       = today.getFullYear();
+    const mm         = String(today.getMonth() + 1).padStart(2, '0');
+    const dd         = String(today.getDate()).padStart(2, '0');
+    const todayStr   = `${yyyy}-${mm}-${dd}`;
+
+    function addDays(date, days){ const d = new Date(date); d.setDate(d.getDate()+days); return d; }
+    function format(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${da}`; }
+
+    const start30 = format(addDays(today, -30));
+    $start.val(start30);
+    $end.val(todayStr);
+    $basis.val('cadastro'); // prioriza cadastro por padrão
+
+    // ---------- KPIs ----------
+    const $kNasc = $('#kpiNascimento');
+    const $kObit = $('#kpiObito');
+    const $kTot  = $('#kpiTotal');
+    function formatNumber(n){ try { return (n || 0).toLocaleString('pt-BR'); } catch(e){ return n; } }
+
+    // ---------- Gráficos ----------
+    let tiposChart = null;
+    let funcChart  = null;
+
+    function buildOrUpdateCharts(payload){
+        if(payload && payload.ok === false){
+            console.error('Endpoint retornou erro:', payload);
+            return;
+        }
+
+        // Totais
+        $kNasc.text(formatNumber(payload.totals.nascimento));
+        $kObit.text(formatNumber(payload.totals.obito));
+        $kTot.text(formatNumber(payload.totals.total));
+
+        // Pizza: tipos de atos
+        const tiposData = {
+            labels: ['Nascimento', 'Óbito'],
+            datasets: [{
+                label: 'Atos',
+                data: [payload.totals.nascimento, payload.totals.obito],
+                backgroundColor: ['#39c076','#6c757d'],
+                borderWidth: 0
+            }]
+        };
+        const tiposOpts = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } }
+        };
+        if (tiposChart) tiposChart.destroy();
+        tiposChart = new Chart(document.getElementById('chartTipos').getContext('2d'), { type: 'doughnut', data: tiposData, options: tiposOpts });
+
+        // Barras empilhadas: por funcionário
+        const labels = payload.by_funcionario.map(i => i.funcionario);
+        const nasc   = payload.by_funcionario.map(i => i.nascimento);
+        const obit   = payload.by_funcionario.map(i => i.obito);
+
+        const funcData = {
+            labels: labels,
+            datasets: [
+                { label: 'Nascimento', data: nasc, backgroundColor: '#39c076' },
+                { label: 'Óbito',      data: obit, backgroundColor: '#6c757d' }
+            ]
+        };
+        const funcOpts = {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true, ticks: { autoSkip: true, maxRotation: 45, minRotation: 0 } },
+                y: { stacked: true, beginAtZero: true, precision: 0 }
+            },
+            plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } }
+        };
+        if (funcChart) funcChart.destroy();
+        funcChart = new Chart(document.getElementById('chartFuncionarios').getContext('2d'), { type: 'bar', data: funcData, options: funcOpts });
+
+        if (payload.debug) { console.warn('DEBUG servidor:', payload.debug); }
+    }
+
+    function fetchStats(){
+        const params = {
+            action: 'stats',
+            start:  $start.val(),
+            end:    $end.val(),
+            basis:  $basis.val(),
+            status: $status.val()
+        };
+        $('#btnApply').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Carregando...');
+        $.ajax({
+            url: 'index.php',
+            type: 'GET',
+            dataType: 'json',
+            cache: false,
+            data: params,
+            success: function(resp){ buildOrUpdateCharts(resp); },
+            error: function(xhr){
+                console.error('Erro AJAX:', xhr.status, xhr.statusText, xhr.responseText);
+            },
+            complete: function(){ $('#btnApply').prop('disabled', false).html('<i class="fa fa-line-chart"></i> Aplicar filtros'); }
+        });
+    }
+
+    // Chips de período
+    $('.chip').on('click', function(){
+        $('.chip').removeClass('active');
+        $(this).addClass('active');
+        const kind = $(this).data('range');
+
+        const now  = new Date();
+        let s = $start.val(), e = $end.val();
+
+        if(kind === '7'){ s = format(addDays(now,-7)); e = format(now); }
+        else if(kind === '15'){ s = format(addDays(now,-15)); e = format(now); }
+        else if(kind === '30'){ s = format(addDays(now,-30)); e = format(now); }
+        else if(kind === 'this_month'){
+            const cur = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth()+1, 0);
+            s = format(cur); e = format(end);
+        } else if(kind === 'last_month'){
+            const cur = new Date(now.getFullYear(), now.getMonth()-1, 1);
+            const end = new Date(now.getFullYear(), now.getMonth(), 0);
+            s = format(cur); e = format(end);
+        } else if(kind === 'ytd'){
+            s = `${now.getFullYear()}-01-01`; e = format(now);
+        }
+
+        $start.val(s);
+        $end.val(e);
+        fetchStats();
+    });
+
+    // Botões filtros
+    $('#btnApply').on('click', fetchStats);
+    $('#btnReset').on('click', function(){
+        $('.chip').removeClass('active');
+        $('.chip[data-range="30"]').addClass('active');
+        $start.val(start30);
+        $end.val(todayStr);
+        $basis.val('cadastro');
+        $status.val('ativos');
+        fetchStats();
+    });
+
+    // Primeira carga
+    fetchStats();
+
+    // ------------ Busca de módulos ------------
     $("#searchModules").on("keyup", function () {
         const value = $(this).val().toLowerCase();
         $("#sortable-cards .module-card").filter(function () {
@@ -220,37 +751,26 @@ $(document).ready(function () {
         });
     });
 
-    // Inicializa o sortable para os cards (arrastar pelo cabeçalho)
+    // ------------ Sortable ------------
     $("#sortable-cards").sortable({
         placeholder: "ui-state-highlight",
         handle: ".card-header",
         cursor: "move",
-        update: function (event, ui) {
-            saveCardOrder();
-        }
+        update: function () { saveCardOrder(); }
     });
 
-    // Salvar ordem dos cards (arquivo JSON no próprio diretório do indexador)
     function saveCardOrder() {
         let order = [];
-        $("#sortable-cards .module-card").each(function () {
-            order.push($(this).attr('id'));
-        });
-
+        $("#sortable-cards .module-card").each(function () { order.push($(this).attr('id')); });
         $.ajax({
-            url: '../save_order.php', 
+            url: '../save_order.php',
             type: 'POST',
             data: { order: order },
-            success: function () {
-                console.log('Ordem salva com sucesso!');
-            },
-            error: function (xhr, status, error) {
-                console.error('Erro ao salvar a ordem:', error);
-            }
+            success: function () { console.log('Ordem salva com sucesso!'); },
+            error: function (xhr, status, error) { console.error('Erro ao salvar a ordem:', error); }
         });
     }
 
-    // Carregar ordem salva
     function loadCardOrder() {
         $.ajax({
             url: '../load_order.php',
@@ -258,25 +778,16 @@ $(document).ready(function () {
             dataType: 'json',
             success: function (data) {
                 if (data && data.order) {
-                    $.each(data.order, function (index, cardId) {
-                        $("#" + cardId).appendTo("#sortable-cards");
-                    });
+                    $.each(data.order, function (index, cardId) { $("#" + cardId).appendTo("#sortable-cards"); });
                 }
             },
-            error: function (xhr, status, error) {
-                console.error('Erro ao carregar a ordem:', error);
-            }
+            error: function (xhr, status, error) { console.error('Erro ao carregar a ordem:', error); }
         });
     }
-
-    // Carrega ordem ao iniciar
     loadCardOrder();
 
-    // Alternância de tema (a classe do <body> também é atualizada pelo menu)
-    $('.mode-switch').on('click', function() {
-        $('body').toggleClass('dark-mode light-mode');
-    });
-
+    // Alternância de tema
+    $('.mode-switch').on('click', function(){ $('body').toggleClass('dark-mode light-mode'); });
 });
 </script>
 
