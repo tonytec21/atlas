@@ -79,8 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Atualizar registro no banco de dados
-    $stmt = $conn->prepare("UPDATE indexador_nascimento SET termo = ?, livro = ?, folha = ?, nome_registrado = ?, data_nascimento = ?, nome_pai = ?, nome_mae = ?, data_registro = ?, naturalidade = ?, ibge_naturalidade = ?, matricula = ?, funcionario = ?, sexo = ? WHERE id = ?");
-    $stmt->bind_param("sssssssssssssi", $termo, $livro, $folha, $nome_registrado, $data_nascimento, $nome_pai, $nome_mae, $data_registro, $naturalidade, $ibge_naturalidade, $matricula, $funcionario, $sexo, $id);
+    $stmt = $conn->prepare("UPDATE indexador_nascimento SET termo = ?, livro = ?, folha = ?, nome_registrado = ?, data_nascimento = ?, nome_pai = ?, nome_mae = ?, data_registro = ?, naturalidade = ?, ibge_naturalidade = ?, matricula = ?, sexo = ? WHERE id = ?");
+    $stmt->bind_param("ssssssssssssi", $termo, $livro, $folha, $nome_registrado, $data_nascimento, $nome_pai, $nome_mae, $data_registro, $naturalidade, $ibge_naturalidade, $matricula, $sexo, $id);
 
     if ($stmt->execute()) {
         // Processar anexo se enviado
