@@ -4,32 +4,22 @@ checkSession();
 include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
 
-/* ========= Camada de compatibilidade de conexão (MySQLi ou PDO) ========= */
+/* ========= Descoberta da conexão (MySQLi ou PDO) ========= */
 function __atlas_classify_connection($c) {
     if ($c instanceof mysqli) return ['driver' => 'mysqli', 'conn' => $c];
     if ($c instanceof PDO)    return ['driver' => 'pdo',    'conn' => $c];
     throw new Error('Tipo de conexão não suportado. Use MySQLi ou PDO.');
 }
-
-/**
- * Tenta obter a conexão com o banco a partir de:
- * 1) função getDatabaseConnection() (se existir)
- * 2) variáveis globais comuns: $conn, $mysqli, $db, $pdo, $cnx, $conexao
- * 3) constantes DB_HOST/DB_USER/DB_PASS/DB_NAME (cria MySQLi)
- */
 function atlasDb() {
-    // 1) Função padrão, se existir
     if (function_exists('getDatabaseConnection')) {
         $c = getDatabaseConnection();
         if ($c) return __atlas_classify_connection($c);
     }
-    // 2) Variáveis globais comuns
     foreach (['conn','mysqli','db','pdo','cnx','conexao'] as $name) {
         if (isset($GLOBALS[$name]) && $GLOBALS[$name]) {
             return __atlas_classify_connection($GLOBALS[$name]);
         }
     }
-    // 3) Constantes (opcional)
     if (defined('DB_HOST') && defined('DB_USER') && defined('DB_PASS') && defined('DB_NAME')) {
         $m = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
         if ($m && !$m->connect_errno) {
@@ -41,7 +31,7 @@ function atlasDb() {
 
 /* ============================================================
    ENDPOINT AJAX: /index.php?action=stats
-   PHP 8+ — retorna SEMPRE JSON (ok:true|false).
+   PHP 8+ — retorna JSON (ok:true|false).
    Parâmetros:
      - start  (YYYY-MM-DD)
      - end    (YYYY-MM-DD)
@@ -69,135 +59,129 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
         $driver = $db['driver'];
         $conn   = $db['conn'];
 
-        if ($driver === 'mysqli' && function_exists('mysqli_report')) {
+        if ($driver === 'mysqli') {
             mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
             if (method_exists($conn, 'set_charset')) { $conn->set_charset('utf8mb4'); }
-        }
-        if ($driver === 'pdo') {
+        } else { // PDO
             $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            // garante UTF-8
             try { $conn->exec("SET NAMES utf8mb4"); } catch (Throwable $e) {}
         }
 
-        // Colunas conforme base
-        $dateColNasc = ($basis === 'cadastro') ? "DATE(data_cadastro)" : "data_registro";
-        $dateColObit = ($basis === 'cadastro') ? "DATE(data_cadastro)" : "data_registro";
+        /* ===== Predicados de data =====
+           Cadastro (TIMESTAMP): >= start 00:00:00 AND < end(+1 dia) 00:00:00
+           Registro (DATE): BETWEEN start AND end
+        */
+        if ($basis === 'cadastro') {
+            $colNasc = 'data_cadastro';
+            $colObit = 'data_cadastro';
+            $whereNascDate = "{$colNasc} >= ? AND {$colNasc} < ?";
+            $whereObitDate = "{$colObit} >= ? AND {$colObit} < ?";
 
-        // Status
+            $pStart = $start . ' 00:00:00';
+            $pEnd   = date('Y-m-d', strtotime($end . ' +1 day')) . ' 00:00:00';
+        } else {
+            $colNasc = 'data_registro';
+            $colObit = 'data_registro';
+            $whereNascDate = "{$colNasc} BETWEEN ? AND ?";
+            $whereObitDate = "{$colObit} BETWEEN ? AND ?";
+
+            $pStart = $start;
+            $pEnd   = $end;
+        }
+
         $statusNasc = ($status === 'ativos') ? " AND status = 'ativo' " : "";
         $statusObit = ($status === 'ativos') ? " AND status = 'A' "     : "";
 
-        // ---------- Helpers de consulta ----------
-        $readCount = function(string $sql) use ($driver, $conn, $start, $end) {
+        // ---------- Helpers ----------
+        $readCount = function(string $sql, string $ps, string $pe) use ($driver, $conn) {
             if ($driver === 'mysqli') {
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param('ss', $start, $end);
+                $stmt->bind_param('ss', $ps, $pe);
                 $stmt->execute();
                 $res = $stmt->get_result();
                 $row = $res->fetch_assoc();
                 $stmt->close();
                 return (int)($row['total'] ?? 0);
-            } else { // PDO
+            } else {
                 $stmt = $conn->prepare($sql);
-                $stmt->execute([$start, $end]);
+                $stmt->execute([$ps, $pe]);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 return (int)($row['total'] ?? 0);
             }
         };
-
-        $readGroup = function(string $sql) use ($driver, $conn, $start, $end) {
-            $rows = [];
+        $readGroup = function(string $sql, string $ps, string $pe) use ($driver, $conn) {
             if ($driver === 'mysqli') {
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param('ss', $start, $end);
+                $stmt->bind_param('ss', $ps, $pe);
                 $stmt->execute();
                 $res = $stmt->get_result();
+                $rows = [];
                 while ($r = $res->fetch_assoc()) {
                     $rows[] = ['label' => $r['label'], 'qtd' => (int)$r['qtd']];
                 }
                 $stmt->close();
-            } else { // PDO
+                return $rows;
+            } else {
                 $stmt = $conn->prepare($sql);
-                $stmt->execute([$start, $end]);
-                $rows = array_map(function($r){
-                    return ['label' => $r['label'], 'qtd' => (int)$r['qtd']];
-                }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+                $stmt->execute([$ps, $pe]);
+                return array_map(fn($r)=>['label'=>$r['label'],'qtd'=>(int)$r['qtd']], $stmt->fetchAll(PDO::FETCH_ASSOC));
             }
-            return $rows;
         };
 
         // ---------- Totais ----------
-        $totNasc = $readCount("SELECT COUNT(*) AS total
-                               FROM indexador_nascimento
-                               WHERE {$dateColNasc} BETWEEN ? AND ? {$statusNasc}");
+        $totNasc = $readCount(
+            "SELECT COUNT(*) AS total
+             FROM indexador_nascimento
+             WHERE {$whereNascDate} {$statusNasc}",
+             $pStart, $pEnd
+        );
+        $totObit = $readCount(
+            "SELECT COUNT(*) AS total
+             FROM indexador_obito
+             WHERE {$whereObitDate} {$statusObit}",
+             $pStart, $pEnd
+        );
 
-        $totObit = $readCount("SELECT COUNT(*) AS total
-                               FROM indexador_obito
-                               WHERE {$dateColObit} BETWEEN ? AND ? {$statusObit}");
-
-        // ---------- Por funcionário (GROUP BY com mesma expressão) ----------
+        // ---------- Por funcionário ----------
         $funcExpr = "COALESCE(NULLIF(TRIM(funcionario),''),'Não informado')";
+        $rowsN = $readGroup(
+            "SELECT {$funcExpr} AS label, COUNT(*) AS qtd
+             FROM indexador_nascimento
+             WHERE {$whereNascDate} {$statusNasc}
+             GROUP BY {$funcExpr}
+             ORDER BY qtd DESC",
+             $pStart, $pEnd
+        );
+        $rowsO = $readGroup(
+            "SELECT {$funcExpr} AS label, COUNT(*) AS qtd
+             FROM indexador_obito
+             WHERE {$whereObitDate} {$statusObit}
+             GROUP BY {$funcExpr}
+             ORDER BY qtd DESC",
+             $pStart, $pEnd
+        );
 
-        $rowsN = $readGroup("SELECT {$funcExpr} AS label, COUNT(*) AS qtd
-                             FROM indexador_nascimento
-                             WHERE {$dateColNasc} BETWEEN ? AND ? {$statusNasc}
-                             GROUP BY {$funcExpr}
-                             ORDER BY qtd DESC");
-
-        $rowsO = $readGroup("SELECT {$funcExpr} AS label, COUNT(*) AS qtd
-                             FROM indexador_obito
-                             WHERE {$dateColObit} BETWEEN ? AND ? {$statusObit}
-                             GROUP BY {$funcExpr}
-                             ORDER BY qtd DESC");
-
-        // Agrega N + O por funcionário
         $agg = [];
-        foreach ($rowsN as $r) {
-            $f = $r['label'];
-            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'obito'=>0,'total'=>0];
-            $agg[$f]['nascimento'] = (int)$r['qtd'];
-            $agg[$f]['total']     += (int)$r['qtd'];
-        }
-        foreach ($rowsO as $r) {
-            $f = $r['label'];
-            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'obito'=>0,'total'=>0];
-            $agg[$f]['obito'] = (int)$r['qtd'];
-            $agg[$f]['total']+= (int)$r['qtd'];
-        }
-
-        // Ordena por total DESC
-        uasort($agg, fn($a,$b) => $b['total'] <=> $a['total']);
+        foreach ($rowsN as $r) { $f=$r['label']; if(!isset($agg[$f])) $agg[$f]=['nascimento'=>0,'obito'=>0,'total'=>0]; $agg[$f]['nascimento']=(int)$r['qtd']; $agg[$f]['total']+=(int)$r['qtd']; }
+        foreach ($rowsO as $r) { $f=$r['label']; if(!isset($agg[$f])) $agg[$f]=['nascimento'=>0,'obito'=>0,'total'=>0]; $agg[$f]['obito']=(int)$r['qtd'];      $agg[$f]['total']+=(int)$r['qtd']; }
+        uasort($agg, fn($a,$b)=>$b['total']<=>$a['total']);
 
         $funcionarios = [];
-        foreach ($agg as $nome => $vals) {
+        foreach ($agg as $nome=>$vals) {
             $funcionarios[] = [
-                'funcionario' => $nome,
-                'nascimento'  => (int)$vals['nascimento'],
-                'obito'       => (int)$vals['obito'],
-                'total'       => (int)$vals['total'],
+                'funcionario'=>$nome,
+                'nascimento'=>(int)$vals['nascimento'],
+                'obito'=>(int)$vals['obito'],
+                'total'=>(int)$vals['total'],
             ];
         }
 
-        $resp['filters'] = [
-            'start'  => $start,
-            'end'    => $end,
-            'basis'  => $basis,
-            'status' => $status,
-        ];
-        $resp['totals'] = [
-            'nascimento' => $totNasc,
-            'obito'      => $totObit,
-            'total'      => $totNasc + $totObit,
-        ];
+        $resp['filters'] = ['start'=>$start,'end'=>$end,'basis'=>$basis,'status'=>$status];
+        $resp['totals']  = ['nascimento'=>$totNasc,'obito'=>$totObit,'total'=>$totNasc+$totObit];
         $resp['by_funcionario'] = $funcionarios;
 
     } catch (Throwable $e) {
-        $resp = [
-            'ok'      => false,
-            'message' => 'Falha ao calcular estatísticas.',
-            'error'   => $e->getMessage(),
-            'type'    => get_class($e),
-        ];
+        $resp = ['ok'=>false,'message'=>'Falha ao calcular estatísticas.','error'=>$e->getMessage(),'type'=>get_class($e)];
     }
 
     $buffer = trim(ob_get_clean());
@@ -226,7 +210,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
     <style>
         /* ======================= BUSCA / GRID ======================= */
         .search-container { margin-bottom: 30px; }
-
         .search-box{
             width:100%;max-width:800px;padding:12px 20px;border-radius:100px;
             border:1px solid #e0e0e0;box-shadow:0 2px 5px rgba(0,0,0,.05);
@@ -239,21 +222,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
 
         /* ======================= DASHBOARD ======================= */
         .dashboard { margin-top: 10px; margin-bottom: 35px; }
-
         .dash-card{
             border:1px solid var(--card-border,#e9ecef);
-            border-radius:24px;
-            padding:18px;
-            background:linear-gradient(180deg, var(--card-bg,#fff) 0%, rgba(255,255,255,.92) 100%);
-            box-shadow:0 10px 30px rgba(0,0,0,.08);
-            margin-bottom:16px;
+            border-radius:24px;padding:18px;
+            background:linear-gradient(180deg,var(--card-bg,#fff) 0%,rgba(255,255,255,.92) 100%);
+            box-shadow:0 10px 30px rgba(0,0,0,.08);margin-bottom:16px;
         }
         body.dark-mode .dash-card{
             background:linear-gradient(180deg,#161b22 0%, rgba(22,27,34,.92) 100%);
             border-color:#2f3a46; box-shadow:none;
         }
 
-        /* ==== Filtros (UI/UX moderno) ==== */
+        /* ==== Filtros ==== */
         .filters-grid{ display:grid; grid-template-columns: repeat(12,1fr); grid-gap:12px; align-items:end; }
         .filter-col{ grid-column: span 3; }
         .filter-col.wide{ grid-column: span 6; }
@@ -264,12 +244,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
         .filter-label{ font-size:.8rem; color:#6c757d; margin-bottom:6px; font-weight:600; }
         .input-icon{ position:relative; }
         .input-icon > i{
-            position:absolute; left:12px; top:50%; transform:translateY(-50%);
-            opacity:.6; pointer-events:none;
+            position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.6; pointer-events:none;
         }
         .input-icon .filter-control{
-            padding-left:38px; border-radius:14px; height:46px;
-            border:1px solid #e6e6e6;
+            padding-left:38px; border-radius:14px; height:46px; border:1px solid #e6e6e6;
         }
         body.dark-mode .input-icon .filter-control{ background:#0f141a; border-color:#2f3a46; color:#e0e0e0; }
 
@@ -283,18 +261,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
         body.dark-mode .chip{ background:#0f141a; border-color:#2f3a46; color:#cfd3d7; }
         body.dark-mode .chip.active{ background:#0d6efd; color:#fff; border-color:#0d6efd; }
 
-        .btn-modern{
-            border-radius:14px; height:46px; display:flex; align-items:center; justify-content:center;
-            gap:8px; font-weight:600;
-        }
+        .btn-modern{ border-radius:14px; height:46px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:600; }
 
         /* ==== KPIs ==== */
         .kpi-grid{ display:grid; grid-template-columns: repeat(3,1fr); grid-gap:12px; margin-top:14px; }
         @media (max-width:768px){ .kpi-grid{ grid-template-columns: 1fr; } }
-
-        .kpi{
-            border-radius:18px; padding:18px; color:#fff; display:flex; align-items:center; justify-content:space-between; min-height:86px;
-        }
+        .kpi{ border-radius:18px; padding:18px; color:#fff; display:flex; align-items:center; justify-content:space-between; min-height:86px; }
         .kpi .kpi-label{ font-size:14px; opacity:.9; }
         .kpi .kpi-value{ font-size:28px; font-weight:700; }
         .kpi-primary   { background:linear-gradient(135deg,#0d6efd,#4da3ff); }
@@ -304,17 +276,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
         /* ==== Gráficos ==== */
         .charts-grid{ display:grid; grid-template-columns: 1.1fr 1.9fr; grid-gap:16px; margin-top:16px; }
         @media (max-width:992px){ .charts-grid{ grid-template-columns: 1fr; } }
-
-        .chart-card{
-            border:1px dashed var(--card-border,#e9ecef);
-            border-radius:20px; padding:16px; background:var(--card-bg,#fff);
-        }
+        .chart-card{ border:1px dashed var(--card-border,#e9ecef); border-radius:20px; padding:16px; background:var(--card-bg,#fff); }
         body.dark-mode .chart-card{ background:#0f141a; border-color:#2f3a46; }
-
         .chart-title{ font-weight:600; font-size:16px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
         .chart-wrap{ position:relative; width:100%; height:350px; }
 
-        /* Espaço da grade de módulos */
         #sortable-cards{ margin-top: 18px; }
     </style>
 </head>
@@ -591,13 +557,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
 
 <script>
 $(function () {
-    // ---------- Elementos ----------
     const $start  = $('#fStart');
     const $end    = $('#fEnd');
     const $basis  = $('#fBasis');
     const $status = $('#fStatus');
 
-    // Defaults: últimos 30 dias, base = CADASTRO
     const today      = new Date();
     const yyyy       = today.getFullYear();
     const mm         = String(today.getMonth() + 1).padStart(2, '0');
@@ -610,15 +574,13 @@ $(function () {
     const start30 = format(addDays(today, -30));
     $start.val(start30);
     $end.val(todayStr);
-    $basis.val('cadastro'); // prioriza cadastro por padrão
+    $basis.val('cadastro'); // padrão
 
-    // ---------- KPIs ----------
     const $kNasc = $('#kpiNascimento');
     const $kObit = $('#kpiObito');
     const $kTot  = $('#kpiTotal');
     function formatNumber(n){ try { return (n || 0).toLocaleString('pt-BR'); } catch(e){ return n; } }
 
-    // ---------- Gráficos ----------
     let tiposChart = null;
     let funcChart  = null;
 
@@ -627,63 +589,39 @@ $(function () {
             console.error('Endpoint retornou erro:', payload);
             return;
         }
-
-        // Totais
         $kNasc.text(formatNumber(payload.totals.nascimento));
         $kObit.text(formatNumber(payload.totals.obito));
         $kTot.text(formatNumber(payload.totals.total));
 
-        // Pizza: tipos de atos
         const tiposData = {
             labels: ['Nascimento', 'Óbito'],
-            datasets: [{
-                label: 'Atos',
-                data: [payload.totals.nascimento, payload.totals.obito],
-                backgroundColor: ['#39c076','#6c757d'],
-                borderWidth: 0
-            }]
+            datasets: [{ label:'Atos', data:[payload.totals.nascimento, payload.totals.obito], backgroundColor:['#39c076','#6c757d'], borderWidth:0 }]
         };
-        const tiposOpts = {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } }
-        };
+        const tiposOpts = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' }, tooltip:{ mode:'index', intersect:false } } };
         if (tiposChart) tiposChart.destroy();
-        tiposChart = new Chart(document.getElementById('chartTipos').getContext('2d'), { type: 'doughnut', data: tiposData, options: tiposOpts });
+        tiposChart = new Chart(document.getElementById('chartTipos').getContext('2d'), { type:'doughnut', data:tiposData, options:tiposOpts });
 
-        // Barras empilhadas: por funcionário
         const labels = payload.by_funcionario.map(i => i.funcionario);
         const nasc   = payload.by_funcionario.map(i => i.nascimento);
         const obit   = payload.by_funcionario.map(i => i.obito);
 
-        const funcData = {
-            labels: labels,
-            datasets: [
-                { label: 'Nascimento', data: nasc, backgroundColor: '#39c076' },
-                { label: 'Óbito',      data: obit, backgroundColor: '#6c757d' }
-            ]
-        };
+        const funcData = { labels, datasets:[
+            { label:'Nascimento', data:nasc, backgroundColor:'#39c076' },
+            { label:'Óbito',      data:obit, backgroundColor:'#6c757d' }
+        ]};
         const funcOpts = {
-            responsive: true, maintainAspectRatio: false,
-            scales: {
-                x: { stacked: true, ticks: { autoSkip: true, maxRotation: 45, minRotation: 0 } },
-                y: { stacked: true, beginAtZero: true, precision: 0 }
-            },
-            plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } }
+            responsive:true, maintainAspectRatio:false,
+            scales:{ x:{ stacked:true, ticks:{ autoSkip:true, maxRotation:45, minRotation:0 } }, y:{ stacked:true, beginAtZero:true, precision:0 } },
+            plugins:{ legend:{ position:'bottom' }, tooltip:{ mode:'index', intersect:false } }
         };
         if (funcChart) funcChart.destroy();
-        funcChart = new Chart(document.getElementById('chartFuncionarios').getContext('2d'), { type: 'bar', data: funcData, options: funcOpts });
+        funcChart = new Chart(document.getElementById('chartFuncionarios').getContext('2d'), { type:'bar', data:funcData, options:funcOpts });
 
         if (payload.debug) { console.warn('DEBUG servidor:', payload.debug); }
     }
 
     function fetchStats(){
-        const params = {
-            action: 'stats',
-            start:  $start.val(),
-            end:    $end.val(),
-            basis:  $basis.val(),
-            status: $status.val()
-        };
+        const params = { action:'stats', start:$start.val(), end:$end.val(), basis:$basis.val(), status:$status.val() };
         $('#btnApply').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Carregando...');
         $.ajax({
             url: 'index.php',
@@ -692,9 +630,7 @@ $(function () {
             cache: false,
             data: params,
             success: function(resp){ buildOrUpdateCharts(resp); },
-            error: function(xhr){
-                console.error('Erro AJAX:', xhr.status, xhr.statusText, xhr.responseText);
-            },
+            error: function(xhr){ console.error('Erro AJAX:', xhr.status, xhr.statusText, xhr.responseText); },
             complete: function(){ $('#btnApply').prop('disabled', false).html('<i class="fa fa-line-chart"></i> Aplicar filtros'); }
         });
     }
@@ -711,39 +647,28 @@ $(function () {
         if(kind === '7'){ s = format(addDays(now,-7)); e = format(now); }
         else if(kind === '15'){ s = format(addDays(now,-15)); e = format(now); }
         else if(kind === '30'){ s = format(addDays(now,-30)); e = format(now); }
-        else if(kind === 'this_month'){
-            const cur = new Date(now.getFullYear(), now.getMonth(), 1);
-            const end = new Date(now.getFullYear(), now.getMonth()+1, 0);
-            s = format(cur); e = format(end);
-        } else if(kind === 'last_month'){
-            const cur = new Date(now.getFullYear(), now.getMonth()-1, 1);
-            const end = new Date(now.getFullYear(), now.getMonth(), 0);
-            s = format(cur); e = format(end);
-        } else if(kind === 'ytd'){
-            s = `${now.getFullYear()}-01-01`; e = format(now);
-        }
+        else if(kind === 'this_month'){ s = format(new Date(now.getFullYear(), now.getMonth(), 1)); e = format(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
+        else if(kind === 'last_month'){ s = format(new Date(now.getFullYear(), now.getMonth()-1, 1)); e = format(new Date(now.getFullYear(), now.getMonth(), 0)); }
+        else if(kind === 'ytd'){ s = `${now.getFullYear()}-01-01`; e = format(now); }
 
         $start.val(s);
         $end.val(e);
         fetchStats();
     });
 
-    // Botões filtros
     $('#btnApply').on('click', fetchStats);
     $('#btnReset').on('click', function(){
         $('.chip').removeClass('active');
         $('.chip[data-range="30"]').addClass('active');
-        $start.val(start30);
-        $end.val(todayStr);
-        $basis.val('cadastro');
-        $status.val('ativos');
+        $start.val(start30); $end.val(todayStr);
+        $basis.val('cadastro'); $status.val('ativos');
         fetchStats();
     });
 
     // Primeira carga
     fetchStats();
 
-    // ------------ Busca de módulos ------------
+    // Busca de módulos
     $("#searchModules").on("keyup", function () {
         const value = $(this).val().toLowerCase();
         $("#sortable-cards .module-card").filter(function () {
@@ -751,7 +676,7 @@ $(function () {
         });
     });
 
-    // ------------ Sortable ------------
+    // Sortable de cards
     $("#sortable-cards").sortable({
         placeholder: "ui-state-highlight",
         handle: ".card-header",
@@ -770,16 +695,13 @@ $(function () {
             error: function (xhr, status, error) { console.error('Erro ao salvar a ordem:', error); }
         });
     }
-
     function loadCardOrder() {
         $.ajax({
             url: '../load_order.php',
             type: 'GET',
             dataType: 'json',
             success: function (data) {
-                if (data && data.order) {
-                    $.each(data.order, function (index, cardId) { $("#" + cardId).appendTo("#sortable-cards"); });
-                }
+                if (data && data.order) { $.each(data.order, function (index, cardId) { $("#" + cardId).appendTo("#sortable-cards"); }); }
             },
             error: function (xhr, status, error) { console.error('Erro ao carregar a ordem:', error); }
         });
