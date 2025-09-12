@@ -37,6 +37,7 @@ function atlasDb() {
      - end    (YYYY-MM-DD)
      - basis  ('cadastro' | 'registro')  -> padrão: cadastro
      - status ('ativos' | 'todos')       -> padrão: ativos
+     - user   (usuario em funcionarios)  -> opcional
    ============================================================ */
 if (isset($_GET['action']) && $_GET['action'] === 'stats') {
     @ini_set('display_errors', 0);
@@ -51,6 +52,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
     $end    = (isset($_GET['end'])    && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['end']))   ? $_GET['end']   : $today;
     $basis  = (isset($_GET['basis'])  && $_GET['basis'] === 'registro') ? 'registro' : 'cadastro'; // padrão: cadastro
     $status = (isset($_GET['status']) && $_GET['status'] === 'todos')   ? 'todos'    : 'ativos';
+    $userParam = isset($_GET['user']) ? trim((string)$_GET['user']) : '';
+    $applyUser = ($userParam !== '');
 
     $resp = ['ok' => true];
 
@@ -91,12 +94,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
 
         $statusNasc = ($status === 'ativos') ? " AND status = 'ativo' " : "";
         $statusObit = ($status === 'ativos') ? " AND status = 'A' "     : "";
+        $userFilterNasc = $applyUser ? " AND funcionario = ? " : "";
+        $userFilterObit = $applyUser ? " AND funcionario = ? " : "";
 
-        // ---------- Helpers ----------
-        $readCount = function(string $sql, string $ps, string $pe) use ($driver, $conn) {
+        // ---------- Helpers dinâmicos ----------
+        $readCount = function(string $sql, array $params) use ($driver, $conn) {
             if ($driver === 'mysqli') {
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param('ss', $ps, $pe);
+                if (!empty($params)) { $types = str_repeat('s', count($params)); $stmt->bind_param($types, ...$params); }
                 $stmt->execute();
                 $res = $stmt->get_result();
                 $row = $res->fetch_assoc();
@@ -104,15 +109,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
                 return (int)($row['total'] ?? 0);
             } else {
                 $stmt = $conn->prepare($sql);
-                $stmt->execute([$ps, $pe]);
+                $stmt->execute($params);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 return (int)($row['total'] ?? 0);
             }
         };
-        $readGroup = function(string $sql, string $ps, string $pe) use ($driver, $conn) {
+        $readGroup = function(string $sql, array $params) use ($driver, $conn) {
             if ($driver === 'mysqli') {
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param('ss', $ps, $pe);
+                if (!empty($params)) { $types = str_repeat('s', count($params)); $stmt->bind_param($types, ...$params); }
                 $stmt->execute();
                 $res = $stmt->get_result();
                 $rows = [];
@@ -123,60 +128,90 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
                 return $rows;
             } else {
                 $stmt = $conn->prepare($sql);
-                $stmt->execute([$ps, $pe]);
+                $stmt->execute($params);
                 return array_map(fn($r)=>['label'=>$r['label'],'qtd'=>(int)$r['qtd']], $stmt->fetchAll(PDO::FETCH_ASSOC));
             }
         };
 
+        // ---------- Mapa usuario -> nome_completo ----------
+        $userMap = [];
+        try {
+            $sqlUsers = "SELECT usuario, COALESCE(NULLIF(TRIM(nome_completo),''), usuario) AS nome FROM funcionarios";
+            if ($driver === 'mysqli') {
+                $rs = $conn->query($sqlUsers);
+                while ($r = $rs->fetch_assoc()) { $userMap[(string)$r['usuario']] = (string)$r['nome']; }
+                if ($rs instanceof mysqli_result) { $rs->free(); }
+            } else {
+                $rs = $conn->query($sqlUsers);
+                foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) { $userMap[(string)$r['usuario']] = (string)$r['nome']; }
+            }
+        } catch (Throwable $e) { /* ignora */ }
+
         // ---------- Totais ----------
-        $totNasc = $readCount(
-            "SELECT COUNT(*) AS total
-             FROM indexador_nascimento
-             WHERE {$whereNascDate} {$statusNasc}",
-             $pStart, $pEnd
-        );
-        $totObit = $readCount(
-            "SELECT COUNT(*) AS total
-             FROM indexador_obito
-             WHERE {$whereObitDate} {$statusObit}",
-             $pStart, $pEnd
-        );
+        $sqlNasc = "SELECT COUNT(*) AS total
+                    FROM indexador_nascimento
+                    WHERE {$whereNascDate} {$statusNasc} {$userFilterNasc}";
+        $paramsNasc = [$pStart, $pEnd];
+        if ($applyUser) { $paramsNasc[] = $userParam; }
+        $totNasc = $readCount($sqlNasc, $paramsNasc);
+
+        $sqlObit = "SELECT COUNT(*) AS total
+                    FROM indexador_obito
+                    WHERE {$whereObitDate} {$statusObit} {$userFilterObit}";
+        $paramsObit = [$pStart, $pEnd];
+        if ($applyUser) { $paramsObit[] = $userParam; }
+        $totObit = $readCount($sqlObit, $paramsObit);
 
         // ---------- Por funcionário ----------
         $funcExpr = "COALESCE(NULLIF(TRIM(funcionario),''),'Não informado')";
-        $rowsN = $readGroup(
-            "SELECT {$funcExpr} AS label, COUNT(*) AS qtd
-             FROM indexador_nascimento
-             WHERE {$whereNascDate} {$statusNasc}
-             GROUP BY {$funcExpr}
-             ORDER BY qtd DESC",
-             $pStart, $pEnd
-        );
-        $rowsO = $readGroup(
-            "SELECT {$funcExpr} AS label, COUNT(*) AS qtd
-             FROM indexador_obito
-             WHERE {$whereObitDate} {$statusObit}
-             GROUP BY {$funcExpr}
-             ORDER BY qtd DESC",
-             $pStart, $pEnd
-        );
+
+        $sqlGN = "SELECT {$funcExpr} AS label, COUNT(*) AS qtd
+                  FROM indexador_nascimento
+                  WHERE {$whereNascDate} {$statusNasc} {$userFilterNasc}
+                  GROUP BY {$funcExpr}
+                  ORDER BY qtd DESC";
+        $paramsGN = [$pStart, $pEnd];
+        if ($applyUser) { $paramsGN[] = $userParam; }
+        $rowsN = $readGroup($sqlGN, $paramsGN);
+
+        $sqlGO = "SELECT {$funcExpr} AS label, COUNT(*) AS qtd
+                  FROM indexador_obito
+                  WHERE {$whereObitDate} {$statusObit} {$userFilterObit}
+                  GROUP BY {$funcExpr}
+                  ORDER BY qtd DESC";
+        $paramsGO = [$pStart, $pEnd];
+        if ($applyUser) { $paramsGO[] = $userParam; }
+        $rowsO = $readGroup($sqlGO, $paramsGO);
 
         $agg = [];
-        foreach ($rowsN as $r) { $f=$r['label']; if(!isset($agg[$f])) $agg[$f]=['nascimento'=>0,'obito'=>0,'total'=>0]; $agg[$f]['nascimento']=(int)$r['qtd']; $agg[$f]['total']+=(int)$r['qtd']; }
-        foreach ($rowsO as $r) { $f=$r['label']; if(!isset($agg[$f])) $agg[$f]=['nascimento'=>0,'obito'=>0,'total'=>0]; $agg[$f]['obito']=(int)$r['qtd'];      $agg[$f]['total']+=(int)$r['qtd']; }
+        foreach ($rowsN as $r) {
+            $f = $r['label'];
+            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'obito'=>0,'total'=>0];
+            $agg[$f]['nascimento'] = (int)$r['qtd'];
+            $agg[$f]['total']     += (int)$r['qtd'];
+        }
+        foreach ($rowsO as $r) {
+            $f = $r['label'];
+            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'obito'=>0,'total'=>0];
+            $agg[$f]['obito'] = (int)$r['qtd'];
+            $agg[$f]['total']+= (int)$r['qtd'];
+        }
+
         uasort($agg, fn($a,$b)=>$b['total']<=>$a['total']);
 
         $funcionarios = [];
-        foreach ($agg as $nome=>$vals) {
+        foreach ($agg as $usuarioOuNI => $vals) {
+            $display = ($usuarioOuNI === 'Não informado') ? 'Não informado' : ($userMap[$usuarioOuNI] ?? $usuarioOuNI);
             $funcionarios[] = [
-                'funcionario'=>$nome,
-                'nascimento'=>(int)$vals['nascimento'],
-                'obito'=>(int)$vals['obito'],
-                'total'=>(int)$vals['total'],
+                'usuario'     => ($usuarioOuNI === 'Não informado') ? null : $usuarioOuNI,
+                'funcionario' => $display, // nome completo para rotular no gráfico
+                'nascimento'  => (int)$vals['nascimento'],
+                'obito'       => (int)$vals['obito'],
+                'total'       => (int)$vals['total'],
             ];
         }
 
-        $resp['filters'] = ['start'=>$start,'end'=>$end,'basis'=>$basis,'status'=>$status];
+        $resp['filters'] = ['start'=>$start,'end'=>$end,'basis'=>$basis,'status'=>$status,'user'=>$userParam];
         $resp['totals']  = ['nascimento'=>$totNasc,'obito'=>$totObit,'total'=>$totNasc+$totObit];
         $resp['by_funcionario'] = $funcionarios;
 
@@ -189,6 +224,27 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
 
     echo json_encode($resp);
     exit;
+}
+
+/* ========================== Lista de usuários (para o filtro) ========================== */
+$USERS_LIST = [];
+try {
+    $dbL = atlasDb();
+    $driverL = $dbL['driver'];
+    $connL   = $dbL['conn'];
+    $sqlUsersList = "SELECT usuario, COALESCE(NULLIF(TRIM(nome_completo),''), usuario) AS nome
+                     FROM funcionarios
+                     ORDER BY nome ASC";
+    if ($driverL === 'mysqli') {
+        $rs = $connL->query($sqlUsersList);
+        while ($r = $rs->fetch_assoc()) { $USERS_LIST[] = ['usuario'=>$r['usuario'], 'nome'=>$r['nome']]; }
+        if ($rs instanceof mysqli_result) { $rs->free(); }
+    } else {
+        $rs = $connL->query($sqlUsersList);
+        foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) { $USERS_LIST[] = ['usuario'=>$r['usuario'], 'nome'=>$r['nome']]; }
+    }
+} catch (Throwable $e) {
+    $USERS_LIST = [];
 }
 ?>
 <!DOCTYPE html>
@@ -234,27 +290,40 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
         }
 
         /* ==== Filtros ==== */
-        .filters-grid{ display:grid; grid-template-columns: repeat(12,1fr); grid-gap:12px; align-items:end; }
-        .filter-col{ grid-column: span 3; }
+        .filters-grid{
+            display:grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap:16px;
+            align-items:start;   /* alinhamento pelo topo para evitar sobreposição visual */
+            grid-auto-rows:minmax(0, auto);
+        }
+        .filter-col{ grid-column: span 3; box-sizing:border-box; }
+        .filter-col.user { grid-column: span 3; }
         .filter-col.wide{ grid-column: span 6; }
-        .filter-col.actions{ grid-column: span 3; display:flex; gap:10px; }
-        @media (max-width:1200px){ .filter-col{grid-column: span 6;} .filter-col.actions{grid-column: span 6;} }
-        @media (max-width:576px){ .filter-col, .filter-col.actions{grid-column: span 12;} }
+        .filter-col.actions{ grid-column: span 3; display:flex; gap:10px; align-self:start; }
+        @media (max-width:1200px){
+            .filter-col{grid-column: span 6;}
+            .filter-col.wide{grid-column: span 6;}
+            .filter-col.actions{grid-column: span 6;}
+        }
+        @media (max-width:576px){
+            .filter-col, .filter-col.wide, .filter-col.actions{grid-column: span 12;}
+        }
 
-        .filter-label{ font-size:.8rem; color:#6c757d; margin-bottom:6px; font-weight:600; }
+        .filter-label{ font-size:.8rem; color:#6c757d; margin-bottom:6px; font-weight:600; display:block; }
         .input-icon{ position:relative; }
         .input-icon > i{
             position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.6; pointer-events:none;
         }
         .input-icon .filter-control{
-            padding-left:38px; border-radius:14px; height:46px; border:1px solid #e6e6e6;
+            padding-left:38px; border-radius:14px; height:46px; border:1px solid #e6e6e6; width:100%;
         }
         body.dark-mode .input-icon .filter-control{ background:#0f141a; border-color:#2f3a46; color:#e0e0e0; }
 
         .quick-ranges{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
         .chip{
             border-radius:999px; padding:6px 12px; border:1px solid #e6e6e6; background:#fff;
-            font-size:.85rem; cursor:pointer; transition:.15s;
+            font-size:.85rem; cursor:pointer; transition:.15s; white-space:nowrap;
         }
         .chip:hover{ transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.08); }
         .chip.active{ background:#0d6efd; color:#fff; border-color:#0d6efd; }
@@ -264,7 +333,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
         .btn-modern{ border-radius:14px; height:46px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:600; }
 
         /* ==== KPIs ==== */
-        .kpi-grid{ display:grid; grid-template-columns: repeat(3,1fr); grid-gap:12px; margin-top:14px; }
+        .kpi-grid{ display:grid; grid-template-columns: repeat(3,1fr); grid-gap:12px; margin-top:6px; }
         @media (max-width:768px){ .kpi-grid{ grid-template-columns: 1fr; } }
         .kpi{ border-radius:18px; padding:18px; color:#fff; display:flex; align-items:center; justify-content:space-between; min-height:86px; }
         .kpi .kpi-label{ font-size:14px; opacity:.9; }
@@ -298,7 +367,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
             <!-- Filtros -->
             <div class="filters-grid">
                 <div class="filter-col">
-                    <div class="filter-label">Data inicial</div>
+                    <span class="filter-label">Data inicial</span>
                     <div class="input-icon">
                         <i class="fa fa-calendar-o"></i>
                         <input type="date" id="fStart" class="form-control filter-control">
@@ -306,7 +375,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
                 </div>
 
                 <div class="filter-col">
-                    <div class="filter-label">Data final</div>
+                    <span class="filter-label">Data final</span>
                     <div class="input-icon">
                         <i class="fa fa-calendar"></i>
                         <input type="date" id="fEnd" class="form-control filter-control">
@@ -314,7 +383,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
                 </div>
 
                 <div class="filter-col">
-                    <div class="filter-label">Base da data</div>
+                    <span class="filter-label">Base da data</span>
                     <div class="input-icon">
                         <i class="fa fa-database"></i>
                         <select id="fBasis" class="form-select filter-control" style="padding-left:38px;">
@@ -325,7 +394,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
                 </div>
 
                 <div class="filter-col">
-                    <div class="filter-label">Status</div>
+                    <span class="filter-label">Status</span>
                     <div class="input-icon">
                         <i class="fa fa-filter"></i>
                         <select id="fStatus" class="form-select filter-control" style="padding-left:38px;">
@@ -335,8 +404,23 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
                     </div>
                 </div>
 
+                <div class="filter-col user">
+                    <span class="filter-label">Usuário</span>
+                    <div class="input-icon">
+                        <i class="fa fa-user"></i>
+                        <select id="fUser" class="form-select filter-control" style="padding-left:38px;">
+                            <option value="">Todos os usuários</option>
+                            <?php foreach ($USERS_LIST as $u): ?>
+                                <option value="<?php echo htmlspecialchars($u['usuario']); ?>">
+                                    <?php echo htmlspecialchars($u['nome']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="filter-col wide">
-                    <div class="filter-label">Períodos rápidos</div>
+                    <span class="filter-label">Períodos rápidos</span>
                     <div class="quick-ranges">
                         <span class="chip" data-range="7">Últimos 7 dias</span>
                         <span class="chip" data-range="15">Últimos 15 dias</span>
@@ -561,6 +645,7 @@ $(function () {
     const $end    = $('#fEnd');
     const $basis  = $('#fBasis');
     const $status = $('#fStatus');
+    const $user   = $('#fUser');
 
     const today      = new Date();
     const yyyy       = today.getFullYear();
@@ -621,7 +706,14 @@ $(function () {
     }
 
     function fetchStats(){
-        const params = { action:'stats', start:$start.val(), end:$end.val(), basis:$basis.val(), status:$status.val() };
+        const params = {
+            action:'stats',
+            start:$start.val(),
+            end:$end.val(),
+            basis:$basis.val(),
+            status:$status.val(),
+            user:$user.val()
+        };
         $('#btnApply').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Carregando...');
         $.ajax({
             url: 'index.php',
@@ -635,12 +727,12 @@ $(function () {
         });
     }
 
-    // Chips de período — **FIX**: normalizo para string antes de comparar
+    // Chips de período — normalizo para string antes de comparar
     $('.chip').on('click', function(){
         $('.chip').removeClass('active');
         $(this).addClass('active');
 
-        const kind = String($(this).data('range')); // <-- aqui está o conserto
+        const kind = String($(this).data('range'));
         const now  = new Date();
 
         let s = $start.val(), e = $end.val();
@@ -676,7 +768,7 @@ $(function () {
         $('.chip').removeClass('active');
         $('.chip[data-range="30"]').addClass('active');
         $start.val(start30); $end.val(todayStr);
-        $basis.val('cadastro'); $status.val('ativos');
+        $basis.val('cadastro'); $status.val('ativos'); $user.val('');
         fetchStats();
     });
 
