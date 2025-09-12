@@ -99,26 +99,24 @@ if ($cnsResult && $cnsResult->num_rows > 0) {
 }  
 
 /* ------------------- atualiza registro principal ------------------- */  
-$sql = "UPDATE indexador_obito  
-        SET livro = ?, folha = ?, termo = ?, data_registro = ?, data_obito = ?, hora_obito = ?,  
-            nome_registrado = ?, data_nascimento = ?, nome_pai = ?, nome_mae = ?, cidade_endereco = ?,  
-            ibge_cidade_endereco = ?, cidade_obito = ?, ibge_cidade_obito = ?, funcionario = ?,  
-            matricula = ?  
-        WHERE id = ? AND status = 'A'";  
+$sql = "UPDATE indexador_obito
+        SET livro = ?, folha = ?, termo = ?, data_registro = ?, data_obito = ?, hora_obito = ?,
+            nome_registrado = ?, data_nascimento = ?, nome_pai = ?, nome_mae = ?, cidade_endereco = ?,
+            ibge_cidade_endereco = ?, cidade_obito = ?, ibge_cidade_obito = ?, matricula = ?
+        WHERE id = ? AND status = 'A'";
 
 if (!$stmt = $conn->prepare($sql)) {  
     echo json_encode(['status' => 'error', 'message' => 'Erro ao preparar query: ' . $conn->error]);  
     exit;  
 }  
 
-$stmt->bind_param(  
-    "ssssssssssssssssi",  
-    $livro, $folha, $termo, $data_registro, $data_obito, $hora_obito,  
-    $nome_registrado, $data_nascimento, $nome_pai, $nome_mae, $cidade_endereco,  
-    $ibge_cidade_endereco, $cidade_obito, $ibge_cidade_obito, $funcionario,  
-    $matriculaFinal,  
-    $id  
-);  
+$stmt->bind_param(
+    "sssssssssssssssi",
+    $livro, $folha, $termo, $data_registro, $data_obito, $hora_obito,
+    $nome_registrado, $data_nascimento, $nome_pai, $nome_mae, $cidade_endereco,
+    $ibge_cidade_endereco, $cidade_obito, $ibge_cidade_obito, $matriculaFinal,
+    $id
+); 
 
 if (!$stmt->execute()) {  
     echo json_encode(['status' => 'error', 'message' => 'Erro ao atualizar: ' . $stmt->error]);  
