@@ -635,21 +635,36 @@ $(function () {
         });
     }
 
-    // Chips de período
+    // Chips de período — **FIX**: normalizo para string antes de comparar
     $('.chip').on('click', function(){
         $('.chip').removeClass('active');
         $(this).addClass('active');
-        const kind = $(this).data('range');
 
+        const kind = String($(this).data('range')); // <-- aqui está o conserto
         const now  = new Date();
+
         let s = $start.val(), e = $end.val();
 
-        if(kind === '7'){ s = format(addDays(now,-7)); e = format(now); }
-        else if(kind === '15'){ s = format(addDays(now,-15)); e = format(now); }
-        else if(kind === '30'){ s = format(addDays(now,-30)); e = format(now); }
-        else if(kind === 'this_month'){ s = format(new Date(now.getFullYear(), now.getMonth(), 1)); e = format(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
-        else if(kind === 'last_month'){ s = format(new Date(now.getFullYear(), now.getMonth()-1, 1)); e = format(new Date(now.getFullYear(), now.getMonth(), 0)); }
-        else if(kind === 'ytd'){ s = `${now.getFullYear()}-01-01`; e = format(now); }
+        switch (kind) {
+            case '7':
+                s = format(addDays(now,-7)); e = format(now); break;
+            case '15':
+                s = format(addDays(now,-15)); e = format(now); break;
+            case '30':
+                s = format(addDays(now,-30)); e = format(now); break;
+            case 'this_month':
+                s = format(new Date(now.getFullYear(), now.getMonth(), 1));
+                e = format(new Date(now.getFullYear(), now.getMonth()+1, 0));
+                break;
+            case 'last_month':
+                s = format(new Date(now.getFullYear(), now.getMonth()-1, 1));
+                e = format(new Date(now.getFullYear(), now.getMonth(), 0));
+                break;
+            case 'ytd':
+                s = `${now.getFullYear()}-01-01`;
+                e = format(now);
+                break;
+        }
 
         $start.val(s);
         $end.val(e);
