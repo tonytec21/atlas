@@ -592,7 +592,7 @@ try {
         </div>
 
         <!-- Notas -->
-        <div class="module-card" id="card-notas">
+        <!-- <div class="module-card" id="card-notas">
             <div class="card-header">
                 <span class="card-badge badge-documental">Indexador</span>
                 <div class="card-icon icon-indexador">
@@ -604,10 +604,10 @@ try {
             <button class="card-button btn-indexador" onclick="window.location.href='index.php'" disabled>
                 <i class="fa fa-arrow-right"></i> Acessar
             </button>
-        </div>
+        </div> -->
 
         <!-- Imóveis -->
-        <div class="module-card" id="card-imoveis">
+        <!-- <div class="module-card" id="card-imoveis">
             <div class="card-header">
                 <span class="card-badge badge-documental">Indexador</span>
                 <div class="card-icon icon-os">
@@ -619,10 +619,10 @@ try {
             <button class="card-button btn-os" onclick="window.location.href='index.php'" disabled>
                 <i class="fa fa-arrow-right"></i> Acessar
             </button>
-        </div>
+        </div> -->
 
         <!-- Protesto -->
-        <div class="module-card" id="card-protesto">
+        <!-- <div class="module-card" id="card-protesto">
             <div class="card-header">
                 <span class="card-badge badge-documental">Indexador</span>
                 <div class="card-icon icon-caixa">
@@ -634,10 +634,10 @@ try {
             <button class="card-button btn-success" onclick="window.location.href='index.php'" disabled>
                 <i class="fa fa-arrow-right"></i> Acessar
             </button>
-        </div>
+        </div> -->
 
         <!-- Títulos e Documentos -->
-        <div class="module-card" id="card-titulos-e-documentos">
+        <!-- <div class="module-card" id="card-titulos-e-documentos">
             <div class="card-header">
                 <span class="card-badge badge-documental">Indexador</span>
                 <div class="card-icon icon-guia">
@@ -649,10 +649,10 @@ try {
             <button class="card-button btn-4" onclick="window.location.href='index.php'" disabled>
                 <i class="fa fa-arrow-right"></i> Acessar
             </button>
-        </div>
+        </div> -->
 
         <!-- Pessoas Jurídicas -->
-        <div class="module-card" id="card-pessoas-juridicas">
+        <!-- <div class="module-card" id="card-pessoas-juridicas">
             <div class="card-header">
                 <span class="card-badge badge-documental">Indexador</span>
                 <div class="card-icon icon-manuais">
@@ -664,10 +664,10 @@ try {
             <button class="card-button btn-manuais" onclick="window.location.href='index.php'" disabled>
                 <i class="fa fa-arrow-right"></i> Acessar
             </button>
-        </div>
+        </div> -->
 
         <!-- Contratos Marítimos -->
-        <div class="module-card" id="card-contratos-maritimos">
+        <!-- <div class="module-card" id="card-contratos-maritimos">
             <div class="card-header">
                 <span class="card-badge badge-documental">Indexador</span>
                 <div class="card-icon icon-arquivamento">
@@ -679,7 +679,7 @@ try {
             <button class="card-button btn-arquivamento" onclick="window.location.href='index.php'" disabled>
                 <i class="fa fa-arrow-right"></i> Acessar
             </button>
-        </div>
+        </div> -->
     </div>
 </div>
 
