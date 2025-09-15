@@ -1,0 +1,40 @@
+-- Registros de Casamento
+CREATE TABLE IF NOT EXISTS indexador_casamento (
+  id                INT AUTO_INCREMENT PRIMARY KEY,
+  termo             VARCHAR(20) NOT NULL,
+  livro             VARCHAR(20) NOT NULL,
+  folha             VARCHAR(20) NOT NULL,
+  tipo_casamento    ENUM('CIVIL','RELIGIOSO') NOT NULL,
+  data_registro     DATE NOT NULL,
+  conjuge1_nome     VARCHAR(255) NOT NULL,
+  conjuge1_nome_casado VARCHAR(255) NULL,
+  conjuge1_sexo     CHAR(1) NOT NULL,
+  conjuge2_nome     VARCHAR(255) NOT NULL,
+  conjuge2_nome_casado VARCHAR(255) NULL,
+  conjuge2_sexo     CHAR(1) NOT NULL,
+  regime_bens       ENUM('COMUNHAO_PARCIAL','COMUNHAO_UNIVERSAL','PARTICIPACAO_FINAL_AQUESTOS','SEPARACAO_BENS','SEPARACAO_LEGAL_BENS','OUTROS','IGNORADO') NOT NULL,
+  data_casamento    DATE NOT NULL,
+  matricula         VARCHAR(32) DEFAULT NULL,
+  funcionario       VARCHAR(100) DEFAULT NULL,
+  status            ENUM('ativo','inativo') DEFAULT 'ativo',
+  criado_em         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_busca (livro, folha, termo, data_registro),
+  INDEX idx_conjuge1 (conjuge1_nome),
+  INDEX idx_conjuge1_casado (conjuge1_nome_casado),
+  INDEX idx_conjuge2 (conjuge2_nome),
+  INDEX idx_conjuge2_casado (conjuge2_nome_casado),
+  INDEX idx_tipo (tipo_casamento),
+  INDEX idx_regime (regime_bens),
+  UNIQUE KEY uq_indexador_casamento_matricula (matricula)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Anexos dos Registros de Casamento
+CREATE TABLE IF NOT EXISTS indexador_casamento_anexos (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  id_casamento   INT NOT NULL,
+  caminho_anexo  VARCHAR(500) NOT NULL,
+  funcionario    VARCHAR(100) DEFAULT NULL,
+  status         ENUM('ativo','inativo') DEFAULT 'ativo',
+  data           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_casamento_anexo FOREIGN KEY (id_casamento) REFERENCES indexador_casamento(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

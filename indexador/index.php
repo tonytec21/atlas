@@ -73,20 +73,31 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
         /* ===== Predicados de data =====
            Cadastro (TIMESTAMP): >= start 00:00:00 AND < end(+1 dia) 00:00:00
            Registro (DATE): BETWEEN start AND end
+
+           Tabelas/colunas:
+            - indexador_nascimento: data_cadastro (TIMESTAMP) / data_registro (DATE)
+            - indexador_obito:      data_cadastro (TIMESTAMP) / data_registro (DATE)
+            - indexador_casamento:  criado_em (TIMESTAMP)     / data_registro (DATE)
         */
         if ($basis === 'cadastro') {
             $colNasc = 'data_cadastro';
             $colObit = 'data_cadastro';
+            $colCasa = 'criado_em';
+
             $whereNascDate = "{$colNasc} >= ? AND {$colNasc} < ?";
             $whereObitDate = "{$colObit} >= ? AND {$colObit} < ?";
+            $whereCasaDate = "{$colCasa} >= ? AND {$colCasa} < ?";
 
             $pStart = $start . ' 00:00:00';
             $pEnd   = date('Y-m-d', strtotime($end . ' +1 day')) . ' 00:00:00';
         } else {
             $colNasc = 'data_registro';
             $colObit = 'data_registro';
+            $colCasa = 'data_registro';
+
             $whereNascDate = "{$colNasc} BETWEEN ? AND ?";
             $whereObitDate = "{$colObit} BETWEEN ? AND ?";
+            $whereCasaDate = "{$colCasa} BETWEEN ? AND ?";
 
             $pStart = $start;
             $pEnd   = $end;
@@ -94,8 +105,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
 
         $statusNasc = ($status === 'ativos') ? " AND status = 'ativo' " : "";
         $statusObit = ($status === 'ativos') ? " AND status = 'A' "     : "";
+        $statusCasa = ($status === 'ativos') ? " AND status = 'ativo' " : "";
+
         $userFilterNasc = $applyUser ? " AND funcionario = ? " : "";
         $userFilterObit = $applyUser ? " AND funcionario = ? " : "";
+        $userFilterCasa = $applyUser ? " AND funcionario = ? " : "";
 
         // ---------- Helpers dinâmicos ----------
         $readCount = function(string $sql, array $params) use ($driver, $conn) {
@@ -162,6 +176,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
         if ($applyUser) { $paramsObit[] = $userParam; }
         $totObit = $readCount($sqlObit, $paramsObit);
 
+        $sqlCasa = "SELECT COUNT(*) AS total
+                    FROM indexador_casamento
+                    WHERE {$whereCasaDate} {$statusCasa} {$userFilterCasa}";
+        $paramsCasa = [$pStart, $pEnd];
+        if ($applyUser) { $paramsCasa[] = $userParam; }
+        $totCasa = $readCount($sqlCasa, $paramsCasa);
+
         // ---------- Por funcionário ----------
         $funcExpr = "COALESCE(NULLIF(TRIM(funcionario),''),'Não informado')";
 
@@ -183,16 +204,31 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
         if ($applyUser) { $paramsGO[] = $userParam; }
         $rowsO = $readGroup($sqlGO, $paramsGO);
 
+        $sqlGC = "SELECT {$funcExpr} AS label, COUNT(*) AS qtd
+                  FROM indexador_casamento
+                  WHERE {$whereCasaDate} {$statusCasa} {$userFilterCasa}
+                  GROUP BY {$funcExpr}
+                  ORDER BY qtd DESC";
+        $paramsGC = [$pStart, $pEnd];
+        if ($applyUser) { $paramsGC[] = $userParam; }
+        $rowsC = $readGroup($sqlGC, $paramsGC);
+
         $agg = [];
         foreach ($rowsN as $r) {
             $f = $r['label'];
-            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'obito'=>0,'total'=>0];
+            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'casamento'=>0,'obito'=>0,'total'=>0];
             $agg[$f]['nascimento'] = (int)$r['qtd'];
             $agg[$f]['total']     += (int)$r['qtd'];
         }
+        foreach ($rowsC as $r) {
+            $f = $r['label'];
+            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'casamento'=>0,'obito'=>0,'total'=>0];
+            $agg[$f]['casamento'] = (int)$r['qtd'];
+            $agg[$f]['total']    += (int)$r['qtd'];
+        }
         foreach ($rowsO as $r) {
             $f = $r['label'];
-            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'obito'=>0,'total'=>0];
+            if (!isset($agg[$f])) $agg[$f] = ['nascimento'=>0,'casamento'=>0,'obito'=>0,'total'=>0];
             $agg[$f]['obito'] = (int)$r['qtd'];
             $agg[$f]['total']+= (int)$r['qtd'];
         }
@@ -206,13 +242,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'stats') {
                 'usuario'     => ($usuarioOuNI === 'Não informado') ? null : $usuarioOuNI,
                 'funcionario' => $rotuloGrafico,
                 'nascimento'  => (int)$vals['nascimento'],
+                'casamento'   => (int)$vals['casamento'],
                 'obito'       => (int)$vals['obito'],
                 'total'       => (int)$vals['total'],
             ];
         }
 
         $resp['filters'] = ['start'=>$start,'end'=>$end,'basis'=>$basis,'status'=>$status,'user'=>$userParam];
-        $resp['totals']  = ['nascimento'=>$totNasc,'obito'=>$totObit,'total'=>$totNasc+$totObit];
+        $resp['totals']  = [
+            'nascimento'=>$totNasc,
+            'casamento' =>$totCasa,
+            'obito'     =>$totObit,
+            'total'     =>$totNasc + $totCasa + $totObit
+        ];
         $resp['by_funcionario'] = $funcionarios;
 
     } catch (Throwable $e) {
@@ -333,14 +375,16 @@ try {
         .btn-modern{ border-radius:14px; height:46px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:600; }
 
         /* ==== KPIs ==== */
-        .kpi-grid{ display:grid; grid-template-columns: repeat(3,1fr); grid-gap:12px; margin-top:6px; }
-        @media (max-width:768px){ .kpi-grid{ grid-template-columns: 1fr; } }
+        .kpi-grid{ display:grid; grid-template-columns: repeat(4,1fr); grid-gap:12px; margin-top:6px; }
+        @media (max-width:992px){ .kpi-grid{ grid-template-columns: repeat(2,1fr); } }
+        @media (max-width:576px){ .kpi-grid{ grid-template-columns: 1fr; } }
         .kpi{ border-radius:18px; padding:18px; color:#fff; display:flex; align-items:center; justify-content:space-between; min-height:86px; }
         .kpi .kpi-label{ font-size:14px; opacity:.9; }
         .kpi .kpi-value{ font-size:28px; font-weight:700; }
         .kpi-primary   { background:linear-gradient(135deg,#0d6efd,#4da3ff); }
         .kpi-success   { background:linear-gradient(135deg,#198754,#39c076); }
         .kpi-secondary { background:linear-gradient(135deg,#6c757d,#9aa1a7); }
+        .kpi-pink      { background:linear-gradient(135deg,#e3786f,#ff8a80); }
 
         /* ==== Gráficos ==== */
         .charts-grid{ display:grid; grid-template-columns: 1.1fr 1.9fr; grid-gap:16px; margin-top:16px; }
@@ -450,6 +494,13 @@ try {
                     </div>
                     <i class="fa fa-child fa-2x" aria-hidden="true"></i>
                 </div>
+                <div class="kpi kpi-pink">
+                    <div>
+                        <div class="kpi-label">Casamentos</div>
+                        <div class="kpi-value" id="kpiCasamento">0</div>
+                    </div>
+                    <i class="fa fa-heart fa-2x" aria-hidden="true"></i>
+                </div>
                 <div class="kpi kpi-secondary">
                     <div>
                         <div class="kpi-label">Óbitos</div>
@@ -520,7 +571,7 @@ try {
             </div>
             <h3 class="card-title">Casamento</h3>
             <p class="card-description">Indexe e pesquise registros de casamento.</p>
-            <button class="card-button btn-5" onclick="window.location.href='index.php'" disabled>
+            <button class="card-button btn-5" onclick="window.location.href='casamento/index.php'">
                 <i class="fa fa-arrow-right"></i> Acessar
             </button>
         </div>
@@ -663,6 +714,7 @@ $(function () {
 
     const $kNasc = $('#kpiNascimento');
     const $kObit = $('#kpiObito');
+    const $kCasa = $('#kpiCasamento');
     const $kTot  = $('#kpiTotal');
     function formatNumber(n){ try { return (n || 0).toLocaleString('pt-BR'); } catch(e){ return n; } }
 
@@ -675,12 +727,22 @@ $(function () {
             return;
         }
         $kNasc.text(formatNumber(payload.totals.nascimento));
+        $kCasa.text(formatNumber(payload.totals.casamento));
         $kObit.text(formatNumber(payload.totals.obito));
         $kTot.text(formatNumber(payload.totals.total));
 
         const tiposData = {
-            labels: ['Nascimento', 'Óbito'],
-            datasets: [{ label:'Atos', data:[payload.totals.nascimento, payload.totals.obito], backgroundColor:['#39c076','#6c757d'], borderWidth:0 }]
+            labels: ['Nascimento', 'Casamento', 'Óbito'],
+            datasets: [{
+                label:'Atos',
+                data:[
+                    payload.totals.nascimento,
+                    payload.totals.casamento,
+                    payload.totals.obito
+                ],
+                backgroundColor:['#39c076','#ff8a80','#6c757d'],
+                borderWidth:0
+            }]
         };
         const tiposOpts = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' }, tooltip:{ mode:'index', intersect:false } } };
         if (tiposChart) tiposChart.destroy();
@@ -688,11 +750,12 @@ $(function () {
 
         const labels = payload.by_funcionario.map(i => (i.funcionario || '').toString().toUpperCase());
         const nasc   = payload.by_funcionario.map(i => i.nascimento);
+        const casa   = payload.by_funcionario.map(i => i.casamento);
         const obit   = payload.by_funcionario.map(i => i.obito);
-
 
         const funcData = { labels, datasets:[
             { label:'Nascimento', data:nasc, backgroundColor:'#39c076' },
+            { label:'Casamento',  data:casa, backgroundColor:'#ff8a80' },
             { label:'Óbito',      data:obit, backgroundColor:'#6c757d' }
         ]};
         const funcOpts = {
