@@ -45,7 +45,7 @@ class PDF extends TCPDF
     {
         // Número da página no canto inferior direito, na cor branca
         $this->SetY(-14.5);
-        $this->SetFont('arial', 'I', 8);
+        $this->SetFont('helvetica', 'I', 8);
         $this->SetTextColor(0, 0, 0);
 
         // Ajustar a posição horizontal com SetX para aproximar mais do canto
@@ -155,7 +155,7 @@ if (isset($_GET['id'])) {
     $pdf->SetMargins(10, 45, 10);
     $pdf->setCriadoPor($criado_por_nome); // Define o nome do usuário que criou a OS
     $pdf->AddPage();
-    $pdf->SetFont('arial', '', 10);
+    $pdf->SetFont('helvetica', '', 10);
 
     // Verificar e carregar a assinatura
     $assinatura_path = '';
