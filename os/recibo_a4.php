@@ -92,7 +92,7 @@ class PDF extends TCPDF
         }
 
         $this->SetY(-14.5);
-        $this->SetFont('arial', 'I', 8);
+        $this->SetFont('helvetica', 'I', 8);
         $this->SetTextColor($textColor[0], $textColor[1], $textColor[2]);
         $this->SetX(-23);
         $this->Cell(0, 11, 'Página ' . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 0, false, 'L', 0, '', 0, false, 'T', 'M');
@@ -207,7 +207,7 @@ if (isset($_GET['id'])) {
     $pdf->SetMargins(12, 40, 10);
     $pdf->setCriadoPor($criado_por_nome);
     $pdf->AddPage();
-    $pdf->SetFont('arial', '', 10);
+    $pdf->SetFont('helvetica', '', 10);
 
     // Assinatura
     $assinatura_path = '';
