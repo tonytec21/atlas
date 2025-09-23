@@ -40,7 +40,7 @@ class PDF extends TCPDF
     {  
         $textColor = [0, 0, 0];  
         $this->SetY(-14.5);  
-        $this->SetFont('arial', 'I', 8);  
+        $this->SetFont('helvetica', 'I', 8);  
         $this->SetTextColor($textColor[0], $textColor[1], $textColor[2]);  
         $this->SetX(-23);  
         $this->Cell(0, 11,  
