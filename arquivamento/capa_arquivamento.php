@@ -142,7 +142,7 @@ if (isset($_GET['id'])) {
         $pdf = new PDF();
         $pdf->SetMargins(25, 50, 25); // Definir as margens: esquerda, superior (ajustada), direita
         $pdf->AddPage();
-        $pdf->SetFont('arial', '', 10);
+        $pdf->SetFont('helvetica', '', 10);
 
         $html  = '';
         $html .= '<h1 style="text-align: center;">ARQUIVAMENTO</h1>';
