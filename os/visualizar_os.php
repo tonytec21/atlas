@@ -1880,9 +1880,6 @@ include(__DIR__ . '/../menu.php');
                                     <button type="button" class="btn btn-info btn-sm" onclick="visualizarAnexo('${caminhoCompleto}')">
                                         <i class="fa fa-eye" aria-hidden="true"></i>
                                     </button>
-                                    <button type="button" class="btn btn-delete btn-sm" onclick="removerAnexo(${anexo.id})">
-                                        <i class="fa fa-trash-o" aria-hidden="true"></i>
-                                    </button>
                                 </td>
                             </tr>
                         `);
