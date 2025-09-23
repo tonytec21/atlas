@@ -9,9 +9,10 @@
         .btn-close:focus { outline: none; }
 
         .btn-adicionar { height: 38px; line-height: 24px; margin-left: 10px; }
+        #detalhesModal.modal.fade.show {padding-right: 0px!important; }
 
         /* ===== Detalhes (visualização do caixa) – 90% da tela, UI/UX e dark/light ===== */
-        #detalhesModal .modal-dialog { width: 95vw; max-width: min(95vw, 1600px); margin: 1rem auto; }
+        #detalhesModal .modal-dialog { width: 98vw; max-width: min(98vw, 1600px); margin: .3rem auto; }
         #detalhesModal .modal-content { border-radius: 18px; border: 0; box-shadow: 0 12px 40px rgba(0,0,0,.18); }
         body.light-mode #detalhesModal .modal-content{ background: #f7fbff !important; color: #0f172a !important; }
         body.dark-mode #detalhesModal .modal-content{ background: #0f172a !important; color: #e5e7eb !important; }
@@ -20,7 +21,7 @@
             border-bottom: 1px solid rgba(0,0,0,.06); border-top-left-radius: 18px; border-top-right-radius: 18px;
         }
         body.dark-mode #detalhesModal .modal-header{ border-color: #1f2937; }
-        #detalhesModal .modal-body{ max-height: calc(100vh - 220px); overflow: auto; padding-bottom: 1rem; }
+        #detalhesModal .modal-body{ max-height: calc(110vh - 220px); overflow: auto; padding-bottom: 1rem; }
         @media (max-width: 575.98px){ #detalhesModal .modal-body{ max-height: calc(100vh - 180px); } }
 
         /* Cartões (dentro do modal) */
@@ -311,6 +312,8 @@ body.dark-mode #detalhesModal #filtrosAtosManuais {
   border-color: rgba(59,130,246,.55);
   box-shadow: 0 0 0 .2rem var(--focus);
 }
+
+.modal {height: 105%;}
 
 /* Botão "Limpar filtros" com respiro e alinhado ao visual */
 #btnLimparFiltrosAtos,
