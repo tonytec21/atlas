@@ -290,7 +290,23 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             <button class="card-button btn-relatorios" onclick="window.location.href='relatorios/index.php'">  
                 <i class="fa fa-arrow-right"></i> Acessar  
             </button>  
-        </div>  
+        </div> 
+        
+        <!-- Pedidos de Certidão -->
+        <div class="module-card" id="card-pedidos-certidao">
+            <div class="card-header">
+                <span class="card-badge badge-documental">Documental</span>
+                <div class="card-icon icon-certidao">
+                <i class="fa fa-certificate"></i>
+                </div>
+            </div>
+            <h3 class="card-title">Pedidos de Certidão</h3>
+            <p class="card-description">Registre, acompanhe e gerencie pedidos de certidões.</p>
+            <button class="card-button btn-certidao" onclick="window.location.href='pedidos_certidao/index.php'">
+                <i class="fa fa-arrow-right"></i> Acessar
+            </button>
+        </div>
+
     </div>  
 </div>  
 

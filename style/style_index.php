@@ -476,4 +476,43 @@ body.dark-mode .search-box {
 /* Animação de entrada do modal (suave) */
 .modal.fade .modal-dialog { transform: scale(0.96); transition: transform 0.18s ease-out; }
 .modal.show .modal-dialog { transform: scale(1); }
+
+/* ===== Pedidos de Certidão – cores e realces ===== */
+
+/* Ícone do card */
+.icon-certidao {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: #ffffff;
+  /* box-shadow: 0 10px 30px rgba(16, 185, 129, .35); */
+  border: 1px solid rgba(5, 150, 105, .25);
+  border-radius: 14px;
+}
+
+/* Botão de ação do card */
+.btn-certidao {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: 1px solid rgba(5, 150, 105, .5);
+  color: #ffffff;
+  font-weight: 600;
+  /* transition: transform .08s ease, box-shadow .2s ease, filter .2s ease; */
+}
+.btn-certidao:hover {
+  transform: translateY(-1px);
+  /* box-shadow: 0 10px 26px rgba(16, 185, 129, .35); */
+  filter: brightness(1.04);
+}
+.btn-certidao:active {
+  transform: translateY(0);
+  filter: brightness(.98);
+}
+
+/* Borda/realce do card ao passar o mouse */
+.dark-mode .icon-certidao {
+  /* box-shadow: 0 14px 34px rgba(16, 185, 129, .45); */
+  border-color: rgba(34, 197, 94, .35);
+}
+.dark-mode .btn-certidao {
+  border-color: rgba(34, 197, 94, .5);
+}
+
 </style>

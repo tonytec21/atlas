@@ -1,0 +1,1016 @@
+<?php
+// pedidos_certidao/novo_pedido.php
+include(__DIR__ . '/../os/session_check.php');
+checkSession();
+include(__DIR__ . '/../os/db_connection.php');
+date_default_timezone_set('America/Sao_Paulo');
+
+/* ------- Leitura de configs recicladas do módulo O.S. ------- */
+$issConfig     = json_decode(@file_get_contents(__DIR__ . '/../os/iss_config.json'), true) ?: [];
+$issAtivo      = !empty($issConfig['ativo']);
+$issPercentual = isset($issConfig['percentual']) ? (float)$issConfig['percentual'] : 0.0;
+$issDescricao  = isset($issConfig['descricao'])   ? $issConfig['descricao']         : 'ISS sobre Emolumentos';
+
+$atosSemValor = json_decode(@file_get_contents(__DIR__ . '/../os/atos_valor_zero.json'), true) ?: [];
+
+/* ------- CSRF ------- */
+if (session_status() !== PHP_SESSION_ACTIVE) {
+  session_start();
+}
+if (empty($_SESSION['csrf_pedidos'])) {
+  $_SESSION['csrf_pedidos'] = bin2hex(random_bytes(32));
+}
+$csrf = $_SESSION['csrf_pedidos'];
+
+/* ============================================================
+   MIGRAÇÃO local (garante tabelas)
+   ============================================================ */
+function ensureSchema(PDO $conn) {
+    $sqls = [];
+
+    $sqls[] = <<<SQL
+CREATE TABLE IF NOT EXISTS pedidos_certidao (
+  id                INT AUTO_INCREMENT PRIMARY KEY,
+  protocolo         VARCHAR(32)  NOT NULL UNIQUE,
+  token_publico     CHAR(40)     NOT NULL UNIQUE,
+  atribuicao        VARCHAR(20)  NOT NULL,
+  tipo              VARCHAR(50)  NOT NULL,
+  status            ENUM('pendente','em_andamento','emitida','entregue','cancelada') NOT NULL DEFAULT 'pendente',
+  requerente_nome   VARCHAR(255) NOT NULL,
+  requerente_doc    VARCHAR(32)  NULL,
+  requerente_email  VARCHAR(120) NULL,
+  requerente_tel    VARCHAR(30)  NULL,
+  portador_nome     VARCHAR(255) NULL,
+  portador_doc      VARCHAR(32)  NULL,
+  referencias_json  JSON         NULL,
+  base_calculo      DECIMAL(12,2) DEFAULT 0,
+  total_os          DECIMAL(12,2) DEFAULT 0,
+  ordem_servico_id  INT          NULL,
+  anexo_pdf_path    VARCHAR(500) NULL,
+  retirado_por      VARCHAR(255) NULL,
+  cancelado_motivo  VARCHAR(500) NULL,
+  criado_por        VARCHAR(120) NOT NULL,
+  atualizado_por    VARCHAR(120) NULL,
+  criado_em         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  atualizado_em     DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_status (status),
+  INDEX idx_protocolo (protocolo),
+  INDEX idx_token_publico (token_publico),
+  INDEX idx_os (ordem_servico_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+SQL;
+
+    $sqls[] = <<<SQL
+CREATE TABLE IF NOT EXISTS pedidos_certidao_status_log (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  pedido_id      INT NOT NULL,
+  status_anterior ENUM('pendente','em_andamento','emitida','entregue','cancelada') NULL,
+  novo_status     ENUM('pendente','em_andamento','emitida','entregue','cancelada') NOT NULL,
+  observacao      VARCHAR(500) NULL,
+  usuario         VARCHAR(255) NOT NULL,
+  ip              VARCHAR(45)  NULL,
+  user_agent      VARCHAR(255) NULL,
+  criado_em       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_pedido (pedido_id),
+  CONSTRAINT fk_pedido_statuslog FOREIGN KEY (pedido_id)
+    REFERENCES pedidos_certidao(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+SQL;
+
+    $sqls[] = <<<SQL
+CREATE TABLE IF NOT EXISTS api_outbox (
+  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+  topic         ENUM('pedido_criado','status_atualizado') NOT NULL,
+  protocolo     VARCHAR(32)  NOT NULL,
+  token_publico CHAR(40)     NOT NULL,
+  payload_json  JSON         NOT NULL,
+  api_key       VARCHAR(120) NULL,
+  signature     VARCHAR(256) NULL,
+  timestamp_utc BIGINT       NOT NULL,
+  request_id    VARCHAR(64)  NOT NULL,
+  delivered_at  DATETIME     NULL,
+  retries       INT          NOT NULL DEFAULT 0,
+  last_error    VARCHAR(1000) NULL,
+  criado_em     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_topic (topic),
+  INDEX idx_protocolo (protocolo),
+  INDEX idx_token (token_publico)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+SQL;
+
+    foreach ($sqls as $sql) { $conn->exec($sql); }
+}
+try { $conn = getDatabaseConnection(); ensureSchema($conn); } catch(Throwable $e){}
+
+/* ------- JSON de mapeamento de campos dinâmicos ------- */
+$MAPEAMENTO = [
+  "Registro Civil" => [
+    "2ª de Nascimento" => ["livro","folha","termo","ano","nome_registrado","filiacao","data_evento","cartorio_origem"],
+    "Inteiro Teor de Nascimento" => ["livro","folha","termo","ano","nome_registrado","filiacao","data_evento","cartorio_origem"],
+    "2ª de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
+    "Inteiro Teor de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
+    "2ª de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"],
+    "Inteiro Teor de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"]
+  ],
+  "Pessoas Jurídicas" => [
+    "Estatuto"   => ["livro_ficha","numero_registro","partes"],
+    "Atas"       => ["livro_ficha","numero_registro","partes"],
+    "Outros"     => ["livro_ficha","numero_registro","partes"]
+  ],
+  "Títulos e Documentos" => [
+    "Contratos"  => ["livro_ficha","numero_registro","partes"],
+    "Cédulas"    => ["livro_ficha","numero_registro","partes"],
+    "Outros"     => ["livro_ficha","numero_registro","partes"]
+  ],
+  "Registro de Imóveis" => [
+    "Matrícula Livro 2"         => ["matricula","proprietario","imovel"],
+    "Registro Livro 3"          => ["livro_transcricao","numero_registro","proprietario","imovel"],
+    "Ônus"                      => ["matricula","proprietario","descricao_onus"],
+    "Penhor"                    => ["matricula","proprietario","descricao_penhor"],
+    "Negativa"                  => ["proprietario","criterio_busca"],
+    "Situação Jurídica"         => ["matricula","proprietario","imovel"]
+  ],
+  "Notas" => [
+    "Escrituras"   => ["livro","folhas","partes","data_ato"],
+    "Testamentos"  => ["livro","folhas","partes","data_ato"],
+    "Procurações"  => ["livro","folhas","partes","data_ato"],
+    "Ata Notarial" => ["livro","folhas","partes","data_ato"]
+  ]
+];
+?>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Novo Pedido de Certidão</title>
+<link rel="stylesheet" href="../style/css/bootstrap.min.css">
+<link rel="stylesheet" href="../style/css/font-awesome.min.css">
+<link rel="stylesheet" href="../style/css/style.css">
+<link rel="icon" href="../style/img/favicon.png" type="image/png">
+<link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+<?php if (file_exists(__DIR__ . '/../style/sweetalert2.min.css')): ?>
+<link rel="stylesheet" href="../style/sweetalert2.min.css">
+<?php else: ?>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<?php endif; ?>
+<link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+<style>
+fieldset{ border:1px solid var(--border-color,#ddd); border-radius:12px; padding:16px; margin-bottom:18px;}
+legend{ padding:0 8px; font-weight:600; font-size:1rem;}
+.badge-status{ font-size:.85rem; }
+@media (max-width: 575.98px){
+  .stack-sm .form-group{ margin-bottom:12px; }
+}
+.btn-adicionar-manual{
+    line-height: 24px;
+    margin-left: 10px;
+}
+/* Alinha título e ação no mesmo eixo, com boa responsividade */
+.page-hero .hero-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+}
+
+/* Empilha no mobile sem ficar apertado */
+@media (max-width: 575.98px){
+  .page-hero .hero-header{ flex-direction:column; align-items:stretch; gap:10px; }
+  .page-hero .hero-actions{ width:100%; }
+  .page-hero .btn-hero{ width:100%; justify-content:center; }
+}
+
+/* Título com subtítulo discreto */
+.page-hero .hero-title small{
+  margin-top:2px;
+}
+
+/* Botão mais elegante/leve no hero */
+.btn-hero{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:.52rem .9rem;
+  border-radius:999px; /* pill */
+  font-weight:600;
+  background: #fff;                 /* claro */
+  border:1px solid rgba(13,110,253,.15);
+  box-shadow: var(--shadow, 0 6px 16px rgba(0,0,0,.06));
+  transition: all .2s ease;
+}
+.btn-hero i{ margin-right:0; }
+
+/* Hover/Focus com leve destaque e feedback */
+.btn-hero:hover{
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-strong, 0 10px 22px rgba(0,0,0,.08));
+  text-decoration:none;
+}
+
+/* Dark mode: mantém contraste sem pesar */
+.dark-mode .btn-hero{
+  background: rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.15);
+  color:#fff;
+}
+.dark-mode .btn-hero:hover{
+  background: rgba(255,255,255,.12);
+}
+</style>
+</head>
+<body>
+<?php include(__DIR__ . '/../menu.php'); ?>
+<div id="main" class="main-content">
+  <div class="container">
+
+    <section class="page-hero">
+      <div class="hero-header">
+        <div class="title-row">
+          <div class="title-icon"><i class="fa fa-file-text-o" aria-hidden="true"></i></div>
+          <div class="hero-title">
+            <h1 class="mb-0">Novo Pedido de Certidão</h1>
+            <small class="text-muted d-block">Preencha os dados e gere a O.S. no final</small>
+          </div>
+        </div>
+
+        <div class="hero-actions">
+          <a href="index.php" class="btn btn-hero">
+            <i class="fa fa-list" aria-hidden="true"></i>
+            Listar Pedidos
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <form id="formPedido" method="post" novalidate>
+      <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf); ?>">
+
+      <!-- A) ATRIBUIÇÃO / TIPO -->
+      <fieldset>
+        <legend>Tipo do Pedido</legend>
+        <div class="row">
+          <div class="form-group col-md-4">
+            <label for="atribuicao">Atribuição:</label>
+            <select id="atribuicao" name="atribuicao" class="form-control" required>
+              <option value="">Selecione...</option>
+              <option value="Registro Civil">RCPN (Registro Civil das Pessoas Naturais)</option>
+              <option value="Pessoas Jurídicas">RCPJ (Registro Civil das Pessoas Jurídicas)</option>
+              <option value="Títulos e Documentos">RTD (Registro de Títulos e Documentos)</option>
+              <option value="Registro de Imóveis">RI (Registro de Imóveis)</option>
+              <option value="Notas">Notas</option>
+            </select>
+          </div>
+          <div class="form-group col-md-4">
+            <label for="tipo">Tipo:</label>
+            <select id="tipo" name="tipo" class="form-control" required disabled>
+              <option value="">Selecione a atribuição primeiro</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Campos dinâmicos -->
+        <div id="camposDinamicos" class="row stack-sm"></div>
+      </fieldset>
+
+      <!-- B) DADOS DO REQUERENTE / PORTADOR -->
+      <fieldset>
+        <legend>Requerente & Portador</legend>
+        <div class="row">
+          <div class="form-group col-md-6">
+            <label for="requerente_nome">Requerente (nome completo):</label>
+            <input type="text" class="form-control" id="requerente_nome" name="requerente_nome" required>
+          </div>
+          <div class="form-group col-md-3">
+            <label for="requerente_doc">CPF/CNPJ (requerente):</label>
+            <input type="text" class="form-control" id="requerente_doc" name="requerente_doc">
+          </div>
+          <div class="form-group col-md-3">
+            <label for="requerente_tel">Telefone (celular):</label>
+            <input type="text" class="form-control" id="requerente_tel" name="requerente_tel" placeholder="(00) 00000-0000">
+          </div>
+        </div>
+        <div class="row">
+          <div class="form-group col-md-6">
+            <label for="requerente_email">E-mail:</label>
+            <input type="email" class="form-control" id="requerente_email" name="requerente_email">
+          </div>
+          <div class="form-group col-md-4">
+            <label for="portador_nome">Portador (registrado/partes):</label>
+            <input type="text" class="form-control" id="portador_nome" name="portador_nome" placeholder="Preenchido automaticamente">
+          </div>
+          <div class="form-group col-md-2">
+            <label for="portador_doc">Doc. Portador:</label>
+            <input type="text" class="form-control" id="portador_doc" name="portador_doc">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- C) O.S. acoplada (com recursos principais) -->
+      <fieldset>
+        <legend>Ordem de Serviço (Emolumentos)</legend>
+
+        <!-- Seleção de modelo de OS -->
+        <div class="form-row">
+          <div class="form-group col-md-12">
+            <label for="modelo_orcamento">Carregar Modelo de O.S:</label>
+            <select id="modelo_orcamento" class="form-control">
+              <option value="">Selecione um modelo...</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-md-5">
+            <label for="descricao_os">Título da OS:</label>
+            <input type="text" class="form-control" id="descricao_os" name="descricao_os" placeholder="Será preenchido automaticamente">
+          </div>
+          <div class="form-group col-md-3">
+            <label for="total_os">Valor Total da OS:</label>
+            <input type="text" class="form-control" id="total_os" name="total_os" readonly>
+          </div>
+          <div class="form-group col-md-4 d-flex align-items-end">
+            <button type="button" class="btn btn-secondary w-100" onclick="window.open('../os/tabela_de_emolumentos.php')">
+              <i class="fa fa-table"></i> Tabela de Emolumentos
+            </button>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-md-3">
+              <label for="ato">Código do Ato:</label>
+              <input type="text" class="form-control" id="ato" name="ato" pattern="[0-9.]+" placeholder="ex: 14.5.1">
+          </div>
+          <div class="form-group col-md-2">
+              <label for="quantidade">Quantidade:</label>
+              <input type="number" class="form-control" id="quantidade" name="quantidade" value="1" min="1">
+          </div>
+          <div class="form-group col-md-2">
+              <label for="desconto_legal">Desconto Legal (%):</label>
+              <input type="number" class="form-control" id="desconto_legal" name="desconto_legal" value="0" min="0" max="100">
+          </div>
+          <div class="form-group col-md-5 d-flex align-items-end">
+              <button type="button" class="btn btn-primary me-2 w-50" onclick="buscarAto()"><i class="fa fa-search"></i> Buscar Ato</button>
+              <button type="button" class="btn btn-secondary btn-adicionar-manual w-50" onclick="adicionarAtoManual()"><i class="fa fa-i-cursor"></i> Adicionar Ato Manualmente</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-md-12">
+              <label for="descricao">Descrição:</label>
+              <input type="text" class="form-control" id="descricao" name="descricao" readonly>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-md-2">
+              <label for="emolumentos">Emolumentos:</label>
+              <input type="text" class="form-control" id="emolumentos" name="emolumentos" readonly>
+          </div>
+          <div class="form-group col-md-2">
+              <label for="ferc">FERC:</label>
+              <input type="text" class="form-control" id="ferc" name="ferc" readonly>
+          </div>
+          <div class="form-group col-md-2">
+              <label for="fadep">FADEP:</label>
+              <input type="text" class="form-control" id="fadep" name="fadep" readonly>
+          </div>
+          <div class="form-group col-md-2">
+              <label for="femp">FEMP:</label>
+              <input type="text" class="form-control" id="femp" name="femp" readonly>
+          </div>
+          <div class="form-group col-md-2">
+              <label for="total">Total:</label>
+              <input type="text" class="form-control" id="total" name="total" readonly>
+          </div>
+          <div class="form-group col-md-2 d-flex align-items-end">
+            <button type="button" class="btn btn-success w-100" onclick="adicionarItemOS()"><i class="fa fa-plus"></i> Adicionar à OS</button>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <h5>Itens da O.S.</h5>
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Ato</th><th>Qtd</th><th>Desc.(%)</th>
+                  <th>Descrição</th><th>Emol.</th><th>FERC</th><th>FADEP</th><th>FEMP</th><th>Total</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="itensTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- D) AÇÕES -->
+      <div class="d-grid gap-2">
+        <button id="btnSalvar" type="submit" class="btn btn-primary btn-lg w-100">
+          <i class="fa fa-save"></i> Salvar Pedido
+        </button>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<script src="../script/jquery-3.5.1.min.js"></script>
+<script src="../script/jquery-ui.min.js"></script>
+<script src="../script/bootstrap.bundle.min.js"></script>
+<script src="../script/jquery.mask.min.js"></script>
+<script src="../script/sweetalert2.js"></script>
+<script>
+// Fallback do JS do SweetAlert2 se o arquivo local não existir
+if (typeof Swal === 'undefined') {
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js';
+  document.head.appendChild(s);
+}
+
+const ISS_CONFIG = {
+  ativo: <?php echo $issAtivo ? 'true':'false'; ?>,
+  percentual: <?php echo $issPercentual; ?>,
+  descricao: "<?php echo addslashes($issDescricao); ?>"
+};
+const ATOS_SEM_VALOR = <?php echo json_encode($atosSemValor, JSON_UNESCAPED_UNICODE); ?>;
+const MAPEAMENTO = <?php echo json_encode($MAPEAMENTO, JSON_UNESCAPED_UNICODE); ?>;
+
+function toast(type, text){
+  Swal.fire({icon:type, title: (type==='error'?'Erro':'Sucesso'), text});
+}
+
+/* =================== Helpers de saneamento =================== */
+function bindLettersOnly($el){
+  // Permite letras (com acentos) e espaços; remove demais.
+  const re = /[^A-Za-zÀ-ÖØ-öø-ÿ\s]/g;
+  $el.on('input', function(){
+    const cur = this.selectionStart;
+    const val = this.value;
+    const cleaned = val.replace(re,'');
+    if (val !== cleaned){
+      this.value = cleaned;
+      this.setSelectionRange(cur-1, cur-1);
+    }
+  });
+}
+function bindNumbersOnly($el, maxLen){
+  $el.on('input', function(){
+    this.value = this.value.replace(/\D/g,'');
+    if (maxLen){ this.value = this.value.slice(0, maxLen); }
+  });
+  if (maxLen){ $el.attr('maxlength', String(maxLen)); }
+}
+
+/* Aplica políticas de caracteres aos campos dinâmicos quando renderizam */
+function enforceCharacterPolicies(){
+  // Letras apenas
+  ['#nome_registrado','#proprietario','#nome_noivo','#nome_noiva','#nome_falecido'].forEach(sel=>{
+    if ($(sel).length){ bindLettersOnly($(sel)); }
+  });
+
+  // Números apenas
+  if ($('#termo').length){ bindNumbersOnly($('#termo')); }
+  if ($('#termos').length){ bindNumbersOnly($('#termos')); } // caso exista algum mapeamento plural
+  if ($('#folha').length){ bindNumbersOnly($('#folha'), 3); } // folha = 3 dígitos máx
+  if ($('#folhas').length){ bindNumbersOnly($('#folhas')); } // sem limite rígido, só números
+}
+
+/* =================== DOM Ready =================== */
+$(function(){
+  // aplica o modo salvo (o toggle fica no menu)
+  $.get('../load_mode.php', function(mode){
+    $('body').removeClass('light-mode dark-mode').addClass(mode);
+  });
+
+  // máscaras de moeda (inclui TOTAL)
+  $('#base_calculo,#emolumentos,#ferc,#fadep,#femp,#total_os,#total').mask('#.##0,00',{reverse:true});
+
+  // máscara dinâmica CPF/CNPJ + validação
+  var cpfCnpjBehavior = function (val) {
+    var v = val.replace(/\D/g, '');
+    return (v.length <= 11) ? '000.000.000-00' : '00.000.000/0000-00';
+  };
+  var cpfCnpjOptions = {
+    onKeyPress: function(val, e, field, options) { field.mask(cpfCnpjBehavior(val), options); },
+    clearIfNotMatch: false
+  };
+  $('#requerente_doc').mask(cpfCnpjBehavior, cpfCnpjOptions).on('blur', function(){
+    var v = $(this).val().replace(/\D/g,'');
+    if (!v) return;
+    if (v.length === 11 && !validarCPF(v)) { toast('error','CPF inválido.'); $(this).val(''); }
+    else if (v.length === 14 && !validarCNPJ(v)) { toast('error','CNPJ inválido.'); $(this).val(''); }
+    else if (v.length !== 11 && v.length !== 14) { toast('error','Informe CPF (11 dígitos) ou CNPJ (14 dígitos).'); $(this).val(''); }
+  });
+
+  // Telefone: sempre celular com nono dígito
+  $('#requerente_tel').mask('(00) 00000-0000');
+
+  // Regras de letras apenas no nome do requerente
+  bindLettersOnly($('#requerente_nome'));
+
+  // Popular tipos conforme atribuição
+  $('#atribuicao').on('change', function(){
+    const a = $(this).val();
+    $('#tipo').prop('disabled', !a).empty().append('<option value="">Selecione...</option>');
+    if (MAPEAMENTO[a]) { Object.keys(MAPEAMENTO[a]).forEach(t=>{ $('#tipo').append(new Option(t, t)); }); }
+    $('#camposDinamicos').empty();
+    updateTituloOS();
+    updatePortadorAuto(); // reset/inferir
+  });
+
+  // render de campos dinâmicos
+  $('#tipo').on('change', function(){
+    const a = $('#atribuicao').val();
+    const t = $(this).val();
+    const cont = $('#camposDinamicos').empty();
+    if (MAPEAMENTO[a] && MAPEAMENTO[a][t]) {
+      MAPEAMENTO[a][t].forEach(campo=>{
+        const label = campo.replace(/_/g,' ').replace(/\b\w/g, s=>s.toUpperCase());
+        cont.append(`
+          <div class="form-group col-md-4">
+            <label for="${campo}">${label}:</label>
+            <input type="text" class="form-control" id="${campo}" name="ref[${campo}]">
+          </div>`);
+      });
+      // aplica máscaras específicas após render
+      applyDynamicMasks();
+      // aplica políticas de caracteres
+      enforceCharacterPolicies();
+      // atualizar título e portador quando os campos dinâmicos mudarem
+      $('#camposDinamicos').on('input', 'input', function(){
+        updateTituloOS();
+        updatePortadorAuto();
+      });
+    }
+    updateTituloOS();
+    updatePortadorAuto();
+  });
+
+  // marca se o usuário mexeu manualmente no portador (não sobrescrever depois)
+  $('#portador_nome').on('input', function(){ $(this).data('manual', true); });
+  $('#requerente_nome').on('input', updateTituloOS);
+
+  /* =========================== Recursos OS (modelos/drag/ISS) =========================== */
+
+  // Sortable (arrastar para reordenar)
+  $("#itensTable").sortable({
+    placeholder: "ui-state-highlight",
+    update: function(){ renumerar(); atualizarISS(); }
+  }).disableSelection();
+
+  // Carregar lista de modelos no select
+  $.ajax({
+    url: '../os/listar_todos_modelos.php',
+    method: 'GET',
+    dataType: 'json'
+  }).done(function(resp){
+    if (resp && resp.modelos){
+      resp.modelos.forEach(function(m){
+        $('#modelo_orcamento').append(new Option(m.nome_modelo, m.id));
+      });
+    }
+  });
+
+  // Ao escolher um modelo, carrega itens
+  $('#modelo_orcamento').on('change', function(){
+    const id = $(this).val();
+    if (!id) return;
+    carregarModeloSelecionado(id);
+  });
+
+  // SUBMIT AJAX
+  $('#formPedido').on('submit', function(e){
+    e.preventDefault();
+    const payload = gatherFormData();
+    if (!payload) return;
+
+    const $btn = $('#btnSalvar');
+    const originalHtml = $btn.html();
+    $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Salvando...');
+
+    $.ajax({
+      url: 'salvar_pedido.php',
+      method: 'POST',
+      data: payload,
+      dataType: 'text', // parse manual tolerante
+      success: function(resText){
+        let r = null;
+        try{
+          r = typeof resText === 'object' ? resText : JSON.parse(resText);
+        }catch(e){
+          const m = String(resText||'').match(/\{[\s\S]*\}$/);
+          if (m){ try{ r = JSON.parse(m[0]); }catch(e2){} }
+        }
+        if (!r){
+          console.error('Resposta do servidor:', resText);
+          toast('error','Falha ao interpretar a resposta do servidor.');
+          return;
+        }
+        if (r.error){
+          toast('error', r.error);
+          return;
+        }
+        if (r.success){
+          const delivery = r.api_delivery || {};
+          const pedidoId = r.id;
+          if (delivery.attempted && !delivery.delivered){
+            Swal.fire({
+              icon: 'warning',
+              title: 'Pedido salvo, mas houve falha ao enviar para a API',
+              html: `
+                <div class="text-start">
+                  <p class="mb-1"><strong>Detalhes:</strong></p>
+                  <ul class="mb-2"><li>HTTP: <code>${delivery.http_code || 0}</code></li></ul>
+                  <p class="mb-0">Deseja tentar reenviar agora?</p>
+                </div>`,
+              showCancelButton: true,
+              confirmButtonText: 'Reenviar agora',
+              cancelButtonText: 'Ver pedido'
+            }).then((res)=>{
+              if (res.isConfirmed){
+                Swal.fire({title:'Reenviando...', html:'Tentando entregar mensagens pendentes.', allowOutsideClick:false, didOpen:()=>{ Swal.showLoading(); }});
+                $.post('reenvio_api.php', { pedido_id: pedidoId }, function(resp){
+                  if (resp && resp.success){
+                    const ok = (resp.failed === 0);
+                    Swal.fire({icon: ok ? 'success' : 'warning', title: ok ? 'Reenvio concluído!' : 'Reenviado parcialmente', text: `Entregues: ${resp.delivered||0}${resp.failed>0?` • Falhas: ${resp.failed}`:''}`})
+                      .then(()=>{ window.location.href = 'visualizar_pedido.php?id=' + pedidoId; });
+                  } else {
+                    Swal.fire({icon:'error', title:'Erro', text:(resp && resp.error) ? resp.error : 'Falha no reenvio.'})
+                      .then(()=>{ window.location.href = 'visualizar_pedido.php?id=' + pedidoId; });
+                  }
+                }, 'json').fail(function(xhr){
+                  console.error(xhr.responseText);
+                  Swal.fire({icon:'error', title:'Erro', text:'Não foi possível contatar o servidor.'})
+                    .then(()=>{ window.location.href = 'visualizar_pedido.php?id=' + pedidoId; });
+                });
+              } else {
+                window.location.href = 'visualizar_pedido.php?id=' + pedidoId;
+              }
+            });
+          } else if (!delivery.attempted){
+            Swal.fire({icon:'info', title:'Pedido salvo', text:'A API não está configurada. Você poderá reenviar depois pela tela do pedido.', confirmButtonText:'Abrir pedido'})
+              .then(()=>{ window.location.href = 'visualizar_pedido.php?id=' + pedidoId; });
+          } else {
+            Swal.fire({icon:'success', title:'Sucesso', text:'Pedido salvo e enviado para a API com sucesso!'})
+              .then(()=>{ window.location.href = 'visualizar_pedido.php?id=' + pedidoId; });
+          }
+        } else {
+          toast('error','Resposta inesperada do servidor.');
+        }
+      },
+      error: function(xhr){
+        console.error(xhr.responseText);
+        toast('error','Falha na requisição.');
+      },
+      complete: function(){
+        $btn.prop('disabled', false).html(originalHtml);
+      }
+    });
+  });
+});
+
+/* =================== PORTADOR & CAMPOS DINÂMICOS =================== */
+
+/* Gera automaticamente o Portador (registrado/partes) se o usuário não digitou manualmente */
+function updatePortadorAuto(){
+  const $p = $('#portador_nome');
+  const manual = $p.data('manual') === true;
+  if (manual) return; // não sobrescreve edição do usuário
+
+  const atr  = $('#atribuicao').val() || '';
+  const tipo = $('#tipo').val() || '';
+  let valor  = '';
+
+  if (atr === 'Registro Civil') {
+    if (/Nascimento/i.test(tipo)) {
+      valor = $('#nome_registrado').val() || '';
+    } else if (/Casamento/i.test(tipo)) {
+      const noivo = $('#nome_noivo').val() || '';
+      const noiva = $('#nome_noiva').val() || '';
+      valor = [noivo, noiva].filter(Boolean).join(' e ');
+    } else if (/Óbito|Obito/i.test(tipo)) {
+      valor = $('#nome_falecido').val() || '';
+    }
+  } else if (atr === 'Pessoas Jurídicas' || atr === 'Títulos e Documentos' || atr === 'Notas') {
+    valor = $('#partes').val() || '';
+  } else if (atr === 'Registro de Imóveis') {
+    const m   = $('#matricula').val() || '';
+    const imv = $('#imovel').val() || '';
+    valor = m ? ('Matrícula ' + m) : (imv || '');
+  }
+
+  if (valor) { $p.val(valor); }
+}
+
+/* Aplica máscaras específicas nos campos dinâmicos (datas/ano) */
+function applyDynamicMasks(){
+  if ($('#data_evento').length){ $('#data_evento').mask('00/00/0000'); }
+  if ($('#data_ato').length){ $('#data_ato').mask('00/00/0000'); }
+  if ($('#ano').length){ $('#ano').mask('0000'); }
+}
+
+/* Monta automaticamente o Título da O.S. */
+function updateTituloOS(){
+  const atr  = $('#atribuicao').val() || '';
+  const tipo = $('#tipo').val() || '';
+  if (!atr || !tipo) { $('#descricao_os').val(''); return; }
+
+  let detalhe = '';
+
+  if (atr === 'Registro Civil') {
+    if (/Nascimento/i.test(tipo)) {
+      detalhe = $('#nome_registrado').val() || '';
+    } else if (/Casamento/i.test(tipo)) {
+      const noivo = $('#nome_noivo').val() || '';
+      const noiva = $('#nome_noiva').val() || '';
+      detalhe = [noivo, noiva].filter(Boolean).join(' & ');
+    } else if (/Óbito|Obito/i.test(tipo)) {
+      detalhe = $('#nome_falecido').val() || '';
+    }
+  } else if (atr === 'Pessoas Jurídicas' || atr === 'Títulos e Documentos' || atr === 'Notas') {
+    detalhe = $('#partes').length ? ($('#partes').val() || '') : '';
+  } else if (atr === 'Registro de Imóveis') {
+    const m   = $('#matricula').val() || '';
+    const imv = $('#imovel').val() || '';
+    detalhe = m ? ('Matrícula ' + m) : (imv ? ('Imóvel ' + imv) : '');
+  }
+
+  const base   = `Certidão ${tipo} (${atr})`;
+  const titulo = detalhe ? `${base} – ${detalhe}` : base;
+  $('#descricao_os').val(titulo);
+}
+
+/* =================== O.S. – Funções utilitárias =================== */
+
+function buscarAto(){
+  const ato = $('#ato').val();
+  const quantidade = parseInt($('#quantidade').val()||'1',10);
+  const descontoLegal = parseFloat($('#desconto_legal').val()||'0');
+
+  $.get('../os/buscar_ato.php', {ato: ato}, function(resp){
+    if (resp.error) return toast('error', resp.error);
+    try{
+      let emolumentos = parseFloat(resp.EMOLUMENTOS) * quantidade;
+      let ferc = parseFloat(resp.FERC) * quantidade;
+      let fadep = parseFloat(resp.FADEP) * quantidade;
+      let femp = parseFloat(resp.FEMP) * quantidade;
+
+      const fator = (1 - (descontoLegal/100));
+      emolumentos*=fator; ferc*=fator; fadep*=fator; femp*=fator;
+
+      if (ATOS_SEM_VALOR.includes(String(ato).trim())) { emolumentos=ferc=fadep=femp=0; }
+
+      const total = emolumentos + ferc + fadep + femp;
+
+      $('#descricao').val(resp.DESCRICAO);
+      $('#emolumentos').val(emolumentos.toFixed(2).replace('.',','));
+      $('#ferc').val(ferc.toFixed(2).replace('.',','));
+      $('#fadep').val(fadep.toFixed(2).replace('.',','));
+      $('#femp').val(femp.toFixed(2).replace('.',','));
+      $('#total').val(total.toFixed(2).replace('.',','));
+    }catch(e){ toast('error','Erro ao processar o ato.'); }
+  }, 'json').fail(function(xhr){ console.error(xhr.responseText); toast('error','Erro ao buscar ato.'); });
+}
+
+function adicionarAtoManual(){
+  $('#ato').val('0');
+  $('#descricao').prop('readonly',false).val('');
+  $('#emolumentos,#ferc,#fadep,#femp').prop('readonly',false).val('0,00');
+  $('#total').prop('readonly',false).val('0,00'); // permitir digitar o total do ato manual
+}
+
+function adicionarItemOS(){
+  const ato = $('#ato').val();
+  const qtd = parseInt($('#quantidade').val()||'1',10);
+  const desc = parseFloat($('#desconto_legal').val()||'0');
+  const descTxt = isNaN(desc)?'0':String(desc);
+
+  const descStr = $('#descricao').val();
+  const emol = toFloat($('#emolumentos').val());
+  const ferc = toFloat($('#ferc').val());
+  const fadep = toFloat($('#fadep').val());
+  const femp = toFloat($('#femp').val());
+  let totalTyped = toFloat($('#total').val());
+
+  // Se o usuário digitou um TOTAL manual válido, prioriza-o; senão, calcula a partir das partes
+  let total = !isNaN(totalTyped) && totalTyped > 0 ? totalTyped : (emol+ferc+fadep+femp);
+
+  const codigoAto = String(ato||'').trim();
+  const isExcecao = ATOS_SEM_VALOR.includes(codigoAto);
+  if ((isNaN(total) || total <= 0) && !isExcecao) { return toast('error','Informe um Total válido ou preencha os valores do ato.'); }
+
+  const ordem = $('#itensTable tr').length + 1;
+
+  $('#itensTable').append(`
+    <tr>
+      <td>${ordem}</td>
+      <td>${escapeHtml(ato)}</td>
+      <td>${qtd}</td>
+      <td>${descTxt}%</td>
+      <td>${escapeHtml(descStr)}</td>
+      <td>${fmt(totalPart(emol))}</td>
+      <td>${fmt(totalPart(ferc))}</td>
+      <td>${fmt(totalPart(fadep))}</td>
+      <td>${fmt(totalPart(femp))}</td>
+      <td>${fmt(total)}</td>
+      <td><button type="button" class="btn btn-sm btn-danger" onclick="removerItem(this)"><i class="fa fa-trash"></i></button></td>
+    </tr>
+  `);
+  atualizarISS();
+  renumerar();
+  // limpa campos do topo
+  $('#ato').val(''); $('#quantidade').val('1'); $('#desconto_legal').val('0');
+  $('#descricao').val('').prop('readonly',true);
+  $('#emolumentos,#ferc,#fadep,#femp').val('').prop('readonly',true);
+  $('#total').val('').prop('readonly',true);
+}
+
+function removerItem(btn){
+  $(btn).closest('tr').remove();
+  renumerar();
+  atualizarISS();
+}
+
+function renumerar(){
+  $('#itensTable tr').each(function(i){ $(this).find('td:first').text(i+1); });
+}
+
+function totalPart(x){ return isNaN(x)?0:x; }
+function toFloat(v){ return parseFloat(String(v).replace(/\./g,'').replace(',','.')); }
+function fmt(n){ return (isNaN(n)?0:n).toFixed(2).replace('.',','); }
+
+function atualizarISS(){
+  // soma emolumentos de itens não-ISS (coluna 5 = index 5)
+  let emolTotal = 0;
+  $('#itensTable tr').each(function(){
+    const isISS = $(this).attr('id') === 'ISS_ROW';
+    if (!isISS) {
+      const em = toFloat($(this).find('td').eq(5).text());
+      emolTotal += isNaN(em)?0:em;
+    }
+  });
+
+  if (ISS_CONFIG.ativo) {
+    const baseISS = emolTotal * 0.88;
+    const valorISS = baseISS * (ISS_CONFIG.percentual/100);
+    const linha = $('#ISS_ROW');
+    if (linha.length===0) {
+      const ordem = $('#itensTable tr').length + 1;
+      $('#itensTable').append(`
+        <tr id="ISS_ROW" data-tipo="iss">
+          <td>${ordem}</td><td>ISS</td><td>1</td><td>0%</td>
+          <td>${escapeHtml(ISS_CONFIG.descricao)}</td>
+          <td>${fmt(valorISS)}</td><td>0,00</td><td>0,00</td><td>0,00</td>
+          <td>${fmt(valorISS)}</td>
+          <td><span class="text-muted"><i class="fa fa-lock"></i></span></td>
+        </tr>
+      `);
+    } else {
+      linha.find('td').eq(5).text(fmt(valorISS));
+      linha.find('td').eq(9).text(fmt(valorISS));
+    }
+  } else {
+    $('#ISS_ROW').remove();
+  }
+
+  // total geral (coluna index 9)
+  let totalOS = 0;
+  $('#itensTable tr').each(function(){
+    const t = toFloat($(this).find('td').eq(9).text());
+    totalOS += isNaN(t)?0:t;
+  });
+  $('#total_os').val(fmt(totalOS));
+}
+
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+/* Carrega um modelo de OS e injeta os itens */
+function carregarModeloSelecionado(idModelo){
+  if (!idModelo) return;
+  $.ajax({
+    url: '../os/carregar_modelo_orcamento.php',
+    type: 'GET',
+    data: { id: idModelo },
+    dataType: 'json'
+  }).done(function(response){
+    if (response.error){ toast('error', response.error); return; }
+    if (response.itens){
+      response.itens.forEach(function(item){
+        const emolumentos = parseFloat((item.emolumentos || '0').replace(',', '.'));
+        const ferc        = parseFloat((item.ferc        || '0').replace(',', '.'));
+        const fadep       = parseFloat((item.fadep       || '0').replace(',', '.'));
+        const femp        = parseFloat((item.femp        || '0').replace(',', '.'));
+        const total       = parseFloat((item.total       || '0').replace(',', '.'));
+        const ordem       = $('#itensTable tr').length + 1;
+        $('#itensTable').append(`
+          <tr>
+            <td>${ordem}</td>
+            <td>${escapeHtml(item.ato)}</td>
+            <td>${escapeHtml(item.quantidade)}</td>
+            <td>${escapeHtml(item.desconto_legal)}%</td>
+            <td>${escapeHtml(item.descricao)}</td>
+            <td>${fmt(emolumentos)}</td>
+            <td>${fmt(ferc)}</td>
+            <td>${fmt(fadep)}</td>
+            <td>${fmt(femp)}</td>
+            <td>${fmt(total)}</td>
+            <td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="removerItem(this)"><i class="fa fa-trash"></i></button></td>
+          </tr>
+        `);
+      });
+      atualizarISS();
+      renumerar();
+    }
+  }).fail(function(xhr){
+    console.error(xhr.responseText);
+    toast('error','Erro ao carregar o modelo selecionado.');
+  });
+}
+
+/* Junta todos os dados para enviar ao servidor */
+function gatherFormData(){
+  const atribuicao = $('#atribuicao').val();
+  const tipo = $('#tipo').val();
+  if (!atribuicao || !tipo){ toast('error','Selecione atribuição e tipo.'); return null; }
+
+  // refs dinâmicas
+  const refs = {};
+  $('#camposDinamicos input').each(function(){ refs[$(this).attr('id')] = $(this).val(); });
+
+  // OS itens
+  const itens = [];
+  $('#itensTable tr').each(function(idx){
+    const tds = $(this).find('td');
+    itens.push({
+      ato: tds.eq(1).text(),
+      quantidade: tds.eq(2).text(),
+      desconto_legal: tds.eq(3).text().replace('%',''),
+      descricao: tds.eq(4).text(),
+      emolumentos: tds.eq(5).text(),
+      ferc:        tds.eq(6).text(),
+      fadep:       tds.eq(7).text(),
+      femp:        tds.eq(8).text(),
+      total:       tds.eq(9).text(),
+      ordem_exibicao: (idx+1)
+    });
+  });
+  if (itens.length===0){ toast('error','Adicione ao menos um item na O.S.'); return null; }
+
+  const payload = {
+    csrf: $('input[name="csrf"]').val(),
+    atribuicao, tipo,
+    base_calculo: $('#base_calculo').val(),
+    requerente_nome: $('#requerente_nome').val(),
+    requerente_doc: $('#requerente_doc').val(),
+    requerente_email: $('#requerente_email').val(),
+    requerente_tel: $('#requerente_tel').val(),
+    portador_nome: $('#portador_nome').val(),
+    portador_doc: $('#portador_doc').val(),
+    referencias_json: JSON.stringify(refs),
+    descricao_os: $('#descricao_os').val(),
+    total_os: $('#total_os').val(),
+    itens: JSON.stringify(itens)
+  };
+  return payload;
+}
+
+/* Validação CPF/CNPJ */
+function validarCPF(cpf) {
+  cpf = cpf.replace(/[^\d]+/g, '');
+  if (cpf.length !== 11) return false;
+  if (!!cpf.match(/^(.)\1+$/)) return false;
+  let soma = 0, resto;
+  for (let i=1;i<=9;i++) soma += parseInt(cpf.substring(i-1,i))* (11-i);
+  resto = (soma*10)%11; if (resto===10||resto===11) resto=0;
+  if (resto !== parseInt(cpf.substring(9,10))) return false;
+  soma=0;
+  for (let i=1;i<=10;i++) soma += parseInt(cpf.substring(i-1,i))*(12-i);
+  resto = (soma*10)%11; if (resto===10||resto===11) resto=0;
+  if (resto !== parseInt(cpf.substring(10,11))) return false;
+  return true;
+}
+function validarCNPJ(cnpj) {
+  cnpj = cnpj.replace(/[^\d]+/g, '');
+  if (cnpj.length !== 14) return false;
+  if (!!cnpj.match(/^(.)\1+$/)) return false;
+  let tamanho = cnpj.length - 2;
+  let numeros = cnpj.substring(0, tamanho);
+  let digitos = cnpj.substring(tamanho);
+  let soma = 0;
+  let pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) { soma += numeros.charAt(tamanho - i) * pos--; if (pos < 2) pos = 9; }
+  let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+  if (resultado !== parseInt(digitos.charAt(0))) return false;
+  tamanho = tamanho + 1;
+  numeros = cnpj.substring(0, tamanho);
+  soma = 0; pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) { soma += numeros.charAt(tamanho - i) * pos--; if (pos < 2) pos = 9; }
+  resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+  if (resultado !== parseInt(digitos.charAt(1))) return false;
+  return true;
+}
+</script>
+<?php include(__DIR__ . '/../rodape.php'); ?>
+</body>
+</html>
