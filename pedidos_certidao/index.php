@@ -350,6 +350,7 @@ td .actions{ display:inline-flex; flex-wrap:wrap; gap:8px; }
         <table id="tabela" class="table table-striped table-hover align-middle">
           <thead>
             <tr>
+              <th>ID</th>
               <th class="nowrap">Protocolo</th>
               <th>Status</th>
               <th>Atribuição / Tipo</th>
@@ -368,6 +369,7 @@ td .actions{ display:inline-flex; flex-wrap:wrap; gap:8px; }
               $hasErr = $pend > 0 && !empty($p['last_api_error']);
             ?>
             <tr data-pedido-id="<?=$p['id']?>">
+              <td class="nowrap"><?=htmlspecialchars($p['id'])?></td>
               <td class="nowrap"><?=htmlspecialchars($p['protocolo'])?></td>
               <td>
                 <span class="badge badge-status status-<?=htmlspecialchars($p['status'])?>"><?=str_replace('_',' ',htmlspecialchars($p['status']))?></span>
@@ -490,12 +492,12 @@ $(function(){
   if (window.matchMedia('(min-width: 992px)').matches) {
     table = $('#tabela').DataTable({
       pageLength: 25,
-      order:[[6,'desc']],
+      order:[[0,'desc']],
       language: { url: '../style/Portuguese-Brasil.json' },
       autoWidth: false,
       dom: 't<"d-flex justify-content-between align-items-center mt-2"ip>',
       columnDefs: [
-        { targets: [0,5,6,7,8], className: 'nowrap' }
+        { targets: [1,6,7,8,9], className: 'nowrap' }
       ]
     });
 

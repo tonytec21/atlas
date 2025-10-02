@@ -347,7 +347,7 @@ try {
                           VALUES (:cliente,:cpf,:total,:desc,:obs,:user,:base)");
   $cliente = $requerente_nome;
   $cpf     = $requerente_doc;
-  $obs     = 'Pedido de Certidão: '.$atribuicao.' / '.$tipo;
+  $obs     = 'Pedido de Certidão: '.$atribuicao.' / '.$tipo.' • Protocolo: '.$protocolo;
   $stmt->execute([
     ':cliente'=>$cliente,
     ':cpf'=>$cpf,

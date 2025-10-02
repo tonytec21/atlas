@@ -271,6 +271,14 @@ legend{ padding:0 8px; font-weight:600; font-size:1rem;}
 
         <!-- Campos dinâmicos -->
         <div id="camposDinamicos" class="row stack-sm"></div>
+
+        <!-- Observação do pedido/registrado -->
+        <div class="row">
+          <div class="form-group col-12">
+            <label for="observacao_pedido">Observação (opcional):</label>
+            <textarea id="observacao_pedido" class="form-control" rows="3" placeholder="Inclua detalhes importantes ou instruções adicionais"></textarea>
+          </div>
+        </div>
       </fieldset>
 
       <!-- B) DADOS DO REQUERENTE / PORTADOR -->
@@ -283,7 +291,7 @@ legend{ padding:0 8px; font-weight:600; font-size:1rem;}
           </div>
           <div class="form-group col-md-3">
             <label for="requerente_doc">CPF/CNPJ (requerente):</label>
-            <input type="text" class="form-control" id="requerente_doc" name="requerente_doc">
+            <input type="text" class="form-control" id="requerente_doc" name="requerente_doc" placeholder="CPF ou CNPJ">
           </div>
           <div class="form-group col-md-3">
             <label for="requerente_tel">Telefone (celular):</label>
@@ -450,7 +458,7 @@ function bindLettersOnly($el){
     const cleaned = val.replace(re,'');
     if (val !== cleaned){
       this.value = cleaned;
-      this.setSelectionRange(cur-1, cur-1);
+      this.setSelectionRange(Math.max(cur-1,0), Math.max(cur-1,0));
     }
   });
 }
@@ -462,6 +470,100 @@ function bindNumbersOnly($el, maxLen){
   if (maxLen){ $el.attr('maxlength', String(maxLen)); }
 }
 
+/* Máscaras documentos (utilitários básicos) */
+function maskCpf($el){
+  $el.mask('000.000.000-00', {clearIfNotMatch:false});
+}
+function maskCnpj($el){
+  $el.mask('00.000.000/0000-00', {clearIfNotMatch:false});
+}
+
+/* === Estratégia “clássica”: sem máscara ao focar, decide CPF/CNPJ ao sair === */
+function attachCpfCnpjSmart($el, opts){
+  const options = Object.assign({ required: false, label: 'Documento' }, opts||{});
+
+  // Ao focar: remove máscara e deixa só números (permite digitar 14 dígitos)
+  $el.on('focus', function(){
+    try { $(this).unmask(); } catch(e) {}
+    this.value = (this.value||'').replace(/\D/g,'');
+    $(this).attr('maxlength', '14'); // só números, até 14 (CNPJ)
+  });
+
+  // Durante a digitação em foco: manter apenas números
+  $el.on('input', function(){
+    this.value = (this.value||'').replace(/\D/g,'').slice(0,14);
+  });
+
+  // Ao sair: aplica a máscara correta e valida
+  $el.on('blur', function(){
+    const raw = (this.value||'').replace(/\D/g,'');
+    if (!raw){
+      if (options.required){ showDocError($(this), `${options.label} é obrigatório.`); }
+      return;
+    }
+    if (raw.length === 11){
+      maskCpf($(this));
+      $(this).val(raw.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4'));
+      if (!validarCPF(raw)) { showDocError($(this), `${options.label} (CPF) inválido.`); }
+      return;
+    }
+    if (raw.length === 14){
+      maskCnpj($(this));
+      $(this).val(raw.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'));
+      if (!validarCNPJ(raw)) { showDocError($(this), `${options.label} (CNPJ) inválido.`); }
+      return;
+    }
+    showDocError($(this), `${options.label} deve ser CPF (11 dígitos) ou CNPJ (14 dígitos).`);
+  });
+}
+
+/* Validações documentos */
+function validarCPF(cpf) {
+  cpf = String(cpf||'').replace(/[^\d]+/g, '');
+  if (cpf.length !== 11) return false;
+  if (!!cpf.match(/^(.)\1+$/)) return false;
+  let soma = 0, resto;
+  for (let i=1;i<=9;i++) soma += parseInt(cpf.substring(i-1,i))* (11-i);
+  resto = (soma*10)%11; if (resto===10||resto===11) resto=0;
+  if (resto !== parseInt(cpf.substring(9,10))) return false;
+  soma=0;
+  for (let i=1;i<=10;i++) soma += parseInt(cpf.substring(i-1,i))*(12-i);
+  resto = (soma*10)%11; if (resto===10||resto===11) resto=0;
+  if (resto !== parseInt(cpf.substring(10,11))) return false;
+  return true;
+}
+function validarCNPJ(cnpj) {
+  cnpj = String(cnpj||'').replace(/[^\d]+/g, '');
+  if (cnpj.length !== 14) return false;
+  if (!!cnpj.match(/^(.)\1+$/)) return false;
+  let tamanho = cnpj.length - 2;
+  let numeros = cnpj.substring(0, tamanho);
+  let digitos = cnpj.substring(tamanho);
+  let soma = 0;
+  let pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) { soma += numeros.charAt(tamanho - i) * pos--; if (pos < 2) pos = 9; }
+  let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+  if (resultado !== parseInt(digitos.charAt(0))) return false;
+  tamanho = tamanho + 1;
+  numeros = cnpj.substring(0, tamanho);
+  soma = 0; pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) { soma += numeros.charAt(tamanho - i) * pos--; if (pos < 2) pos = 9; }
+  resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+  if (resultado !== parseInt(digitos.charAt(1))) return false;
+  return true;
+}
+function validarCpfOuCnpj(raw){
+  const v = String(raw||'').replace(/\D/g,'');
+  if (v.length === 11) return validarCPF(v);
+  if (v.length === 14) return validarCNPJ(v);
+  return false;
+}
+function showDocError($el, msg){
+  toast('error', msg);
+  try { $el.unmask(); } catch(e) {}
+  $el.val('').focus();
+}
+
 /* Aplica políticas de caracteres aos campos dinâmicos quando renderizam */
 function enforceCharacterPolicies(){
   // Letras apenas
@@ -471,9 +573,132 @@ function enforceCharacterPolicies(){
 
   // Números apenas
   if ($('#termo').length){ bindNumbersOnly($('#termo')); }
-  if ($('#termos').length){ bindNumbersOnly($('#termos')); } // caso exista algum mapeamento plural
-  if ($('#folha').length){ bindNumbersOnly($('#folha'), 3); } // folha = 3 dígitos máx
-  if ($('#folhas').length){ bindNumbersOnly($('#folhas')); } // sem limite rígido, só números
+  if ($('#termos').length){ bindNumbersOnly($('#termos')); }
+  if ($('#folha').length){ bindNumbersOnly($('#folha'), 3); }
+  if ($('#folhas').length){ bindNumbersOnly($('#folhas')); }
+}
+
+/* Renderiza os campos de documentos exigidos por atribuição/tipo */
+function renderDocSpecificFields(a, t) {
+  const blocks = [];
+
+  if (a === 'Registro Civil') {
+    if (/Nascimento/i.test(t) || /Óbito|Obito/i.test(t)) {
+      blocks.push(`
+        <div class="form-group col-md-4">
+          <label for="cpf_registrado">CPF do Registrado:</label>
+          <input type="text" class="form-control" id="cpf_registrado" name="ref[cpf_registrado]" placeholder="000.000.000-00">
+        </div>
+      `);
+    } else if (/Casamento/i.test(t)) {
+      blocks.push(`
+        <div class="form-group col-md-4">
+          <label for="cpf_noivo">CPF do Noivo:</label>
+          <input type="text" class="form-control" id="cpf_noivo" name="ref[cpf_noivo]" placeholder="000.000.000-00">
+        </div>
+        <div class="form-group col-md-4">
+          <label for="cpf_noiva">CPF da Noiva:</label>
+          <input type="text" class="form-control" id="cpf_noiva" name="ref[cpf_noiva]" placeholder="000.000.000-00">
+        </div>
+      `);
+    }
+  }
+
+  if (a === 'Registro de Imóveis') {
+    blocks.push(`
+      <div class="form-group col-md-4">
+        <label for="doc_proprietario">CPF/CNPJ do Proprietário:</label>
+        <input type="text" class="form-control" id="doc_proprietario" name="ref[doc_proprietario]" placeholder="CPF ou CNPJ">
+      </div>
+    `);
+  }
+
+  if (a === 'Títulos e Documentos') {
+    blocks.push(`
+      <div class="form-group col-md-4">
+        <label for="doc_partes">CPF/CNPJ das Partes:</label>
+        <input type="text" class="form-control" id="doc_partes" name="ref[doc_partes]" placeholder="CPF ou CNPJ">
+      </div>
+    `);
+  }
+
+  if (a === 'Pessoas Jurídicas') {
+    blocks.push(`
+      <div class="form-group col-md-4">
+        <label for="cnpj_pj">CNPJ da Pessoa Jurídica:</label>
+        <input type="text" class="form-control" id="cnpj_pj" name="ref[cnpj_pj]" placeholder="00.000.000/0000-00">
+      </div>
+    `);
+  }
+
+  if (a === 'Notas') {
+    blocks.push(`
+      <div class="form-group col-md-4">
+        <label for="doc_partes_notas">CPF/CNPJ das Partes:</label>
+        <input type="text" class="form-control" id="doc_partes_notas" name="ref[doc_partes_notas]" placeholder="CPF ou CNPJ">
+      </div>
+    `);
+  }
+
+  return blocks.join('');
+}
+
+/* Aplica máscaras e validações aos campos de documentos específicos */
+function applyDocMasksAndValidation(){
+  // Registro Civil – nascimento/óbito (CPF fixo)
+  if ($('#cpf_registrado').length){
+    maskCpf($('#cpf_registrado'));
+    $('#cpf_registrado').on('blur', function(){
+      const raw = (this.value||'').replace(/\D/g,'');
+      if (this.value && !validarCPF(raw)) {
+        showDocError($(this), 'CPF do registrado inválido.');
+      }
+    });
+  }
+  // Registro Civil – casamento (CPF fixo)
+  if ($('#cpf_noivo').length){
+    maskCpf($('#cpf_noivo'));
+    $('#cpf_noivo').on('blur', function(){
+      const raw = (this.value||'').replace(/\D/g,'');
+      if (this.value && !validarCPF(raw)) {
+        showDocError($(this), 'CPF do noivo inválido.');
+      }
+    });
+  }
+  if ($('#cpf_noiva').length){
+    maskCpf($('#cpf_noiva'));
+    $('#cpf_noiva').on('blur', function(){
+      const raw = (this.value||'').replace(/\D/g,'');
+      if (this.value && !validarCPF(raw)) {
+        showDocError($(this), 'CPF da noiva inválido.');
+      }
+    });
+  }
+
+  // RI – proprietário (CPF/CNPJ dinâmico)
+  if ($('#doc_proprietario').length){
+    attachCpfCnpjSmart($('#doc_proprietario'), {label:'Documento do proprietário'});
+  }
+  // RTD – partes (CPF/CNPJ dinâmico)
+  if ($('#doc_partes').length){
+    attachCpfCnpjSmart($('#doc_partes'), {label:'Documento das partes'});
+  }
+  // Pessoas Jurídicas – CNPJ fixo
+  if ($('#cnpj_pj').length){
+    $('#cnpj_pj').on('focus', function(){ try{$(this).unmask();}catch(e){} this.value = (this.value||'').replace(/\D/g,'').slice(0,14); $(this).attr('maxlength','14'); });
+    $('#cnpj_pj').on('input', function(){ this.value = (this.value||'').replace(/\D/g,'').slice(0,14); });
+    $('#cnpj_pj').on('blur', function(){
+      const raw = (this.value||'').replace(/\D/g,'');
+      if (!raw) return;
+      maskCnpj($(this));
+      if (!validarCNPJ(raw)) { showDocError($(this), 'CNPJ inválido.'); }
+      else $(this).val(raw.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'));
+    });
+  }
+  // Notas – partes (CPF/CNPJ dinâmico)
+  if ($('#doc_partes_notas').length){
+    attachCpfCnpjSmart($('#doc_partes_notas'), {label:'Documento das partes'});
+  }
 }
 
 /* =================== DOM Ready =================== */
@@ -486,28 +711,14 @@ $(function(){
   // máscaras de moeda (inclui TOTAL)
   $('#base_calculo,#emolumentos,#ferc,#fadep,#femp,#total_os,#total').mask('#.##0,00',{reverse:true});
 
-  // máscara dinâmica CPF/CNPJ + validação
-  var cpfCnpjBehavior = function (val) {
-    var v = val.replace(/\D/g, '');
-    return (v.length <= 11) ? '000.000.000-00' : '00.000.000/0000-00';
-  };
-  var cpfCnpjOptions = {
-    onKeyPress: function(val, e, field, options) { field.mask(cpfCnpjBehavior(val), options); },
-    clearIfNotMatch: false
-  };
-  $('#requerente_doc').mask(cpfCnpjBehavior, cpfCnpjOptions).on('blur', function(){
-    var v = $(this).val().replace(/\D/g,'');
-    if (!v) return;
-    if (v.length === 11 && !validarCPF(v)) { toast('error','CPF inválido.'); $(this).val(''); }
-    else if (v.length === 14 && !validarCNPJ(v)) { toast('error','CNPJ inválido.'); $(this).val(''); }
-    else if (v.length !== 11 && v.length !== 14) { toast('error','Informe CPF (11 dígitos) ou CNPJ (14 dígitos).'); $(this).val(''); }
-  });
-
   // Telefone: sempre celular com nono dígito
   $('#requerente_tel').mask('(00) 00000-0000');
 
   // Regras de letras apenas no nome do requerente
   bindLettersOnly($('#requerente_nome'));
+
+  // CPF/CNPJ do REQUERENTE – estratégia foco/blur
+  attachCpfCnpjSmart($('#requerente_doc'), {label:'Documento do requerente'});
 
   // Popular tipos conforme atribuição
   $('#atribuicao').on('change', function(){
@@ -519,7 +730,7 @@ $(function(){
     updatePortadorAuto(); // reset/inferir
   });
 
-  // render de campos dinâmicos
+  // render de campos dinâmicos + documentos + observação (observação já está no DOM)
   $('#tipo').on('change', function(){
     const a = $('#atribuicao').val();
     const t = $(this).val();
@@ -533,10 +744,17 @@ $(function(){
             <input type="text" class="form-control" id="${campo}" name="ref[${campo}]">
           </div>`);
       });
+
+      // --- Campos de documentos adicionais por atribuição/tipo ---
+      cont.append( renderDocSpecificFields(a, t) );
+
       // aplica máscaras específicas após render
       applyDynamicMasks();
+      applyDocMasksAndValidation();
+
       // aplica políticas de caracteres
       enforceCharacterPolicies();
+
       // atualizar título e portador quando os campos dinâmicos mudarem
       $('#camposDinamicos').on('input', 'input', function(){
         updateTituloOS();
@@ -934,9 +1152,20 @@ function gatherFormData(){
   const tipo = $('#tipo').val();
   if (!atribuicao || !tipo){ toast('error','Selecione atribuição e tipo.'); return null; }
 
-  // refs dinâmicas
+  // refs dinâmicas (inclui documentos específicos + observação)
   const refs = {};
-  $('#camposDinamicos input').each(function(){ refs[$(this).attr('id')] = $(this).val(); });
+  $('#camposDinamicos input, #camposDinamicos textarea, #camposDinamicos select').each(function(){
+    const id = $(this).attr('id');
+    const name = $(this).attr('name') || id;
+    // Se já estiver no formato ref[...], apenas pega o valor
+    if (name && name.startsWith('ref[')) {
+      refs[id] = $(this).val();
+    } else if (id) {
+      refs[id] = $(this).val();
+    }
+  });
+  const obsExtra = $('#observacao_pedido').val();
+  if (obsExtra) refs['observacao'] = obsExtra;
 
   // OS itens
   const itens = [];
@@ -973,42 +1202,6 @@ function gatherFormData(){
     itens: JSON.stringify(itens)
   };
   return payload;
-}
-
-/* Validação CPF/CNPJ */
-function validarCPF(cpf) {
-  cpf = cpf.replace(/[^\d]+/g, '');
-  if (cpf.length !== 11) return false;
-  if (!!cpf.match(/^(.)\1+$/)) return false;
-  let soma = 0, resto;
-  for (let i=1;i<=9;i++) soma += parseInt(cpf.substring(i-1,i))* (11-i);
-  resto = (soma*10)%11; if (resto===10||resto===11) resto=0;
-  if (resto !== parseInt(cpf.substring(9,10))) return false;
-  soma=0;
-  for (let i=1;i<=10;i++) soma += parseInt(cpf.substring(i-1,i))*(12-i);
-  resto = (soma*10)%11; if (resto===10||resto===11) resto=0;
-  if (resto !== parseInt(cpf.substring(10,11))) return false;
-  return true;
-}
-function validarCNPJ(cnpj) {
-  cnpj = cnpj.replace(/[^\d]+/g, '');
-  if (cnpj.length !== 14) return false;
-  if (!!cnpj.match(/^(.)\1+$/)) return false;
-  let tamanho = cnpj.length - 2;
-  let numeros = cnpj.substring(0, tamanho);
-  let digitos = cnpj.substring(tamanho);
-  let soma = 0;
-  let pos = tamanho - 7;
-  for (let i = tamanho; i >= 1; i--) { soma += numeros.charAt(tamanho - i) * pos--; if (pos < 2) pos = 9; }
-  let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
-  if (resultado !== parseInt(digitos.charAt(0))) return false;
-  tamanho = tamanho + 1;
-  numeros = cnpj.substring(0, tamanho);
-  soma = 0; pos = tamanho - 7;
-  for (let i = tamanho; i >= 1; i--) { soma += numeros.charAt(tamanho - i) * pos--; if (pos < 2) pos = 9; }
-  resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
-  if (resultado !== parseInt(digitos.charAt(1))) return false;
-  return true;
 }
 </script>
 <?php include(__DIR__ . '/../rodape.php'); ?>
