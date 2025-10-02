@@ -4,6 +4,11 @@ checkSession();
 include(__DIR__ . '/db_connection2.php');
 date_default_timezone_set('America/Sao_Paulo');
 
+// CSRF para chamadas ao módulo de pedidos (usado no AJAX abaixo)
+if (empty($_SESSION['csrf_pedidos'])) {
+    $_SESSION['csrf_pedidos'] = bin2hex(random_bytes(32));
+}
+
 // Verifique se a conexão está definida
 if (!isset($conn)) {
     die("Erro ao conectar ao banco de dados");
@@ -152,6 +157,35 @@ foreach ($ordem_servico_itens as $item) {
         break;
     }
 }
+
+// ===== Detectar Protocolo nas Observações e localizar o pedido de certidão =====
+$pedido_id = null;
+$pedido_token = null;
+$pedido_protocolo = null;
+
+// Procura "Protocolo: XXXXX" nas observações (aceita letras, números e hifens)
+if (!empty($ordem_servico['observacoes']) &&
+    preg_match('/Protocolo:\s*([A-Za-z0-9\-]+)/u', $ordem_servico['observacoes'], $m)) {
+
+    $pedido_protocolo = $m[1];
+
+    // Buscar pedido por protocolo
+    $stmtPedido = $conn->prepare("SELECT id, token_publico FROM pedidos_certidao WHERE protocolo = ? LIMIT 1");
+    $stmtPedido->bind_param("s", $pedido_protocolo);
+    if ($stmtPedido->execute()) {
+        $resPedido = $stmtPedido->get_result();
+        if ($row = $resPedido->fetch_assoc()) {
+            $pedido_id    = (int)$row['id'];
+            $pedido_token = $row['token_publico'];
+        }
+    }
+    $stmtPedido->close();
+}
+
+// Sinalizadores para JS
+$todos_itens_liquidados = !$temItensNaoLiquidados && count($ordem_servico_itens) > 0;
+$algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -489,6 +523,24 @@ include(__DIR__ . '/../menu.php');
                         <i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço
                     </button>
                 </div>
+
+                <?php if ($pedido_id): ?>
+                    <div class="col-auto">
+                        <button 
+                            type="button" 
+                            class="btn btn-outline-primary btn-sm w-100" 
+                            id="btnAtualizarPedido" 
+                            onclick="atualizarStatusPedido()">
+                            <i class="fa fa-refresh" aria-hidden="true"></i> Atualizar status do pedido de certidão
+                        </button>
+                        <div class="text-center mt-1">
+                            <small class="text-muted">
+                                Protocolo: <?php echo htmlspecialchars($pedido_protocolo); ?>
+                            </small>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
             </div>
         </div>
 
@@ -1087,12 +1139,96 @@ include(__DIR__ . '/../menu.php');
         // Formato YYYY-MM-DDTHH:MM
         var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
         deadlineInput.min = minDateTime;
+        
+        // Desabilita botão quando não há protocolo detectado
+        const btn = document.getElementById('btnAtualizarPedido');
+        if (btn && !PEDIDO_PROTOCOLO) {
+            btn.disabled = true;
+            btn.title = 'Sem protocolo nas observações da O.S.';
+        }
     });
 
     var pagamentos = <?php echo json_encode($pagamentos); ?>;
     var liquidacaoItemId = null;
     var quantidadeTotal = 0;
     var quantidadeLiquidada = 0;
+
+    // ===== Variáveis do Pedido (se houver protocolo nas observações) =====
+    const PEDIDO_ID         = <?php echo json_encode($pedido_id); ?>;
+    const PEDIDO_PROTOCOLO  = <?php echo json_encode($pedido_protocolo); ?>;
+    const CSRF_PEDIDOS      = <?php echo json_encode($_SESSION['csrf_pedidos']); ?>;
+
+    // Sinalizadores de liquidação (vindos do PHP)
+    const TODOS_ITENS_LIQUIDADOS = <?php echo $todos_itens_liquidados ? 'true' : 'false'; ?>;
+    const ALGUM_ITEM_LIQUIDADO   = <?php echo $algum_item_liquidado ? 'true' : 'false'; ?>;
+
+    // Sugere status conforme a liquidação
+    function sugerirStatusPedido() {
+        if (TODOS_ITENS_LIQUIDADOS) return 'emitida';
+        if (ALGUM_ITEM_LIQUIDADO)   return 'em_andamento';
+        return 'pendente';
+    }
+
+    // Chama o endpoint que atualiza status do pedido por protocolo (sem exigir anexo)
+    function atualizarStatusPedido() {
+        if (!PEDIDO_PROTOCOLO) {
+            Swal.fire({ icon: 'error', title: 'Sem protocolo', text: 'Não há protocolo nas observações desta O.S.' });
+            return;
+        }
+
+        const status = sugerirStatusPedido();
+        if (status === 'pendente') {
+            Swal.fire({ icon: 'info', title: 'Sem liquidação', text: 'A O.S. ainda não foi liquidada. Status sugerido: pendente.' });
+            return;
+        }
+
+        // Confirmação
+        Swal.fire({
+            icon: 'question',
+            title: 'Atualizar status do pedido?',
+            html: `Protocolo <b>${PEDIDO_PROTOCOLO}</b><br> Novo status: <b>${status}</b>`,
+            showCancelButton: true,
+            confirmButtonText: 'Atualizar',
+            cancelButtonText: 'Cancelar'
+        }).then((r) => {
+            if (!r.isConfirmed) return;
+
+            $('#btnAtualizarPedido').prop('disabled', true);
+
+            $.ajax({
+                url: '../pedidos_certidao/alterar_status_auto.php',
+                method: 'POST',
+                data: {
+                    csrf: CSRF_PEDIDOS,
+                    protocolo: PEDIDO_PROTOCOLO,
+                    novo_status: status,
+                    observacao: `Status atualizado automaticamente pela O.S. nº <?php echo (int)$os_id; ?>`
+                },
+                success: function(resp) {
+                    try {
+                        if (typeof resp === 'string') resp = JSON.parse(resp);
+                    } catch (e) {
+                        Swal.fire({ icon: 'error', title: 'Erro', text: 'Resposta inválida do servidor.' });
+                        return;
+                    }
+
+                    if (resp && resp.success) {
+                        Swal.fire({ icon: 'success', title: 'Status atualizado!', text: 'O pedido de certidão foi atualizado com sucesso.' })
+                        .then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Falha ao atualizar', text: (resp && resp.error) ? resp.error : 'Erro desconhecido.' });
+                    }
+                },
+                error: function(xhr) {
+                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível atualizar o status.' });
+                },
+                complete: function() {
+                    $('#btnAtualizarPedido').prop('disabled', false);
+                }
+            });
+        });
+    }
+
 
     $(document).ready(function() {
         $('#valor_pagamento').mask('#.##0,00', { reverse: true });
