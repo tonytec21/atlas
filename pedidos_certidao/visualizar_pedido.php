@@ -732,7 +732,7 @@ if (file_exists($swalCssLocal)) {
                   <select id="novo_status" name="novo_status" class="form-control" required>
                     <option value="">Selecione...</option>
                     <option value="em_andamento">Em andamento</option>
-                    <option value="emitida">Emitida (exige PDF)</option>
+                    <option value="emitida">Emitida</option>
                     <option value="entregue">Entregue (exige quem retirou)</option>
                     <option value="cancelada">Cancelada (exige motivo)</option>
                   </select>
@@ -886,7 +886,7 @@ $(function(){
     $wrapEntregue.hide(); $retirado.prop('required', false);
     $wrapCancel.hide(); $motivo.prop('required', false);
 
-    if (v === 'emitida')   { $wrapEmitida.show(); $file.prop('required', true); }
+    if (v === 'emitida')   { $wrapEmitida.show(); /* anexo opcional */ }
     if (v === 'entregue')  { $wrapEntregue.show(); $retirado.prop('required', true); }
     if (v === 'cancelada') { $wrapCancel.show(); $motivo.prop('required', true); }
   }

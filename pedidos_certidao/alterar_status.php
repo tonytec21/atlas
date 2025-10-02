@@ -460,16 +460,13 @@ try {
   $retirado_por     = null;
   $cancelado_motivo = null;
 
-  // ===== Quando "emitida": anexa o arquivo na mesma lista (pedido_anexos) =====
+  // ===== Quando "emitida": anexo é OPCIONAL; se vier, salva =====
   if ($novo === 'emitida' && !$osCancelada) {
-    if (empty($_FILES['anexo_pdf']) || $_FILES['anexo_pdf']['error'] !== UPLOAD_ERR_OK) {
-      throw new Exception('Anexe o PDF ou JPG da certidão para marcar como EMITIDA.');
-    }
-
-    // Salva o anexo como os demais (com conversão PDF->imagens)
-    $resAnexo = anexar_certidao($conn, (int)$p['id'], $_FILES['anexo_pdf']);
-    if (empty($resAnexo['success'])) {
-      throw new Exception($resAnexo['error'] ?? 'Falha ao anexar a certidão.');
+    if (!empty($_FILES['anexo_pdf']) && $_FILES['anexo_pdf']['error'] === UPLOAD_ERR_OK) {
+      $resAnexo = anexar_certidao($conn, (int)$p['id'], $_FILES['anexo_pdf']);
+      if (empty($resAnexo['success'])) {
+        throw new Exception($resAnexo['error'] ?? 'Falha ao anexar a certidão.');
+      }
     }
   }
 
