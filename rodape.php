@@ -1,13 +1,14 @@
 <footer>
     <div class="footer-content">
         <p>
-            &copy; <span id="year"></span> Atlas | <a href="https://backupcloud.site/" target="_blank" style="color: inherit; text-decoration: none;">By Backup Cloud.</a> Todos os direitos reservados.
+            <br><br>
+            <!-- &copy; <span id="year"></span> Atlas | <a href="https://backupcloud.site/" target="_blank" style="color: inherit; text-decoration: none;">By Backup Cloud.</a> Todos os direitos reservados. -->
         </p>
     </div>
 </footer>
-<script>
+<!-- <script>
     document.getElementById('year').textContent = new Date().getFullYear();
-</script>
+</script> -->
 <style>
     body {
         margin: 0;
@@ -22,11 +23,11 @@
     }
 
     footer {
-        background-color: #f8f9fa;
+        /* background-color: #f8f9fa; */
         padding: 20px 0;
         text-align: center;
-        border-top: 1px solid #e9ecef;
-        box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+        /* border-top: 1px solid #e9ecef; */
+        /* box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); */
         width: 100%;
         margin-top: auto;
         position: relative;
@@ -44,9 +45,9 @@
     }
 
     body.dark-mode footer {
-        background-color: #343a40; 
-        color: #f8f9fa; 
-        border-top: 1px solid #454d55;
+        /* background-color: #343a40;  */
+        /* color: #f8f9fa;  */
+        /* border-top: 1px solid #454d55; */
     }
 
     body.dark-mode .footer-content a {

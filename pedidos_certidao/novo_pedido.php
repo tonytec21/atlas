@@ -144,93 +144,588 @@ $MAPEAMENTO = [
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Novo Pedido de Certidão</title>
+
+<!-- Fontes -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<!-- Estilos -->
 <link rel="stylesheet" href="../style/css/bootstrap.min.css">
 <link rel="stylesheet" href="../style/css/font-awesome.min.css">
 <link rel="stylesheet" href="../style/css/style.css">
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
+<link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
 <?php if (file_exists(__DIR__ . '/../style/sweetalert2.min.css')): ?>
 <link rel="stylesheet" href="../style/sweetalert2.min.css">
 <?php else: ?>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <?php endif; ?>
-<link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+
 <style>
-fieldset{ border:1px solid var(--border-color,#ddd); border-radius:12px; padding:16px; margin-bottom:18px;}
-legend{ padding:0 8px; font-weight:600; font-size:1rem;}
-.badge-status{ font-size:.85rem; }
-@media (max-width: 575.98px){
-  .stack-sm .form-group{ margin-bottom:12px; }
-}
-.btn-adicionar-manual{
-    line-height: 24px;
-    margin-left: 10px;
-}
-/* Alinha título e ação no mesmo eixo, com boa responsividade */
-.page-hero .hero-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:14px;
+/* ===================== CSS VARIABLES ===================== */
+:root {
+  /* Colors */
+  --brand-primary: #6366f1;
+  --brand-primary-light: #818cf8;
+  --brand-primary-dark: #4f46e5;
+  --brand-success: #10b981;
+  --brand-warning: #f59e0b;
+  --brand-error: #ef4444;
+  --brand-info: #3b82f6;
+
+  /* Backgrounds */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-elevated: #ffffff;
+  
+  /* Text */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --text-inverse: #ffffff;
+  
+  /* Borders */
+  --border-primary: #e2e8f0;
+  --border-secondary: #cbd5e1;
+  --border-focus: var(--brand-primary);
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Surfaces */
+  --surface-hover: rgba(99, 102, 241, 0.04);
+  --surface-active: rgba(99, 102, 241, 0.08);
+  
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  
+  /* Typography */
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --gradient-error: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  --gradient-mesh: radial-gradient(at 40% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                   radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+                   radial-gradient(at 0% 50%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+                   radial-gradient(at 80% 50%, rgba(236, 72, 153, 0.15) 0px, transparent 50%),
+                   radial-gradient(at 0% 100%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
+                   radial-gradient(at 80% 100%, rgba(245, 158, 11, 0.15) 0px, transparent 50%);
 }
 
-/* Empilha no mobile sem ficar apertado */
-@media (max-width: 575.98px){
-  .page-hero .hero-header{ flex-direction:column; align-items:stretch; gap:10px; }
-  .page-hero .hero-actions{ width:100%; }
-  .page-hero .btn-hero{ width:100%; justify-content:center; }
+/* Dark mode variables */
+.dark-mode {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-elevated: #1e293b;
+  
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  
+  --border-primary: #334155;
+  --border-secondary: #475569;
+  
+  --surface-hover: rgba(99, 102, 241, 0.08);
+  --surface-active: rgba(99, 102, 241, 0.12);
 }
 
-/* Título com subtítulo discreto */
-.page-hero .hero-title small{
-  margin-top:2px;
+/* ===================== GLOBAL STYLES ===================== */
+body {
+  font-family: var(--font-primary) !important;
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
-/* Botão mais elegante/leve no hero */
-.btn-hero{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  padding:.52rem .9rem;
-  border-radius:999px; /* pill */
-  font-weight:600;
-  background: #fff;                 /* claro */
-  border:1px solid rgba(13,110,253,.15);
-  box-shadow: var(--shadow, 0 6px 16px rgba(0,0,0,.06));
-  transition: all .2s ease;
+.main-content {
+  position: relative;
+  min-height: auto;
+  flex: 1;
 }
-.btn-hero i{ margin-right:0; }
 
-/* Hover/Focus com leve destaque e feedback */
-.btn-hero:hover{
+.main-content::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--gradient-mesh);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  padding-bottom: var(--space-xl);
+}
+
+/* ===================== PAGE HERO ===================== */
+.page-hero {
+  padding: var(--space-2xl) 0;
+  margin-bottom: var(--space-xl);
+}
+
+.page-hero .hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+}
+
+.page-hero .title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.page-hero .title-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-lg);
+  flex-shrink: 0;
+}
+
+.title-icon i {  
+  font-size: 32px;  
+  color: var(--text-primary);  
+  position: relative;  
+  z-index: 1;  
+}  
+
+.dark-mode .title-icon {
+  color: white; 
+}
+
+.page-hero .hero-title h1 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.page-hero .hero-title small {
+  font-size: 15px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-top: var(--space-xs);
+}
+
+.btn-hero {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 15px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-primary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+}
+
+.btn-hero:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  text-decoration: none;
+}
+
+.btn-hero i {
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  .page-hero {
+    padding: var(--space-xl) 0;
+  }
+  
+  .page-hero .hero-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-md);
+  }
+  
+  .page-hero .title-row {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .page-hero .title-icon {
+    width: 56px;
+    height: 56px;
+  }
+  
+  .page-hero .hero-title h1 {
+    font-size: 24px;
+  }
+  
+  .btn-hero {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ===================== FIELDSET STYLES ===================== */
+fieldset {
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+fieldset:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-secondary);
+}
+
+legend {
+  padding: 0 var(--space-md);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  background: var(--gradient-primary);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  width: auto;
+  margin-bottom: 0;
+}
+
+/* ===================== FORM CONTROLS ===================== */
+.form-control,
+.custom-select {
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 15px;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  font-family: var(--font-primary);
+}
+
+.form-control:focus,
+.custom-select:focus {
+  background: var(--bg-elevated);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  outline: none;
+}
+
+.form-control::placeholder {
+  color: var(--text-tertiary);
+}
+
+.form-control[readonly] {
+  background: var(--bg-secondary);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+select.form-control,
+.custom-select {
+  cursor: pointer;
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 12px;
+  padding-right: 40px;
+}
+
+/* ===================== LABELS ===================== */
+.form-group label {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+/* ===================== BUTTONS ===================== */
+.btn {
+  border-radius: var(--radius-md);
+  padding: 12px 24px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  font-family: var(--font-primary);
+}
+
+.btn i {
+  font-size: 16px;
+}
+
+.btn-primary {
+  background: var(--gradient-primary);
+  color: white;
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
+  opacity: 0.95;
+}
+
+.btn-success {
+  background: var(--gradient-success);
+  color: white;
+  box-shadow: var(--shadow-md);
+}
+
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
+  opacity: 0.95;
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 2px solid var(--border-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--surface-hover);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-strong, 0 10px 22px rgba(0,0,0,.08));
-  text-decoration:none;
 }
 
-/* Dark mode: mantém contraste sem pesar */
-.dark-mode .btn-hero{
-  background: rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.15);
-  color:#fff;
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 16px;
+  border-radius: var(--radius-lg);
 }
-.dark-mode .btn-hero:hover{
-  background: rgba(255,255,255,.12);
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn-adicionar-manual {
+  line-height: 24px;
+  margin-left: 10px;
+}
+
+/* ===================== TABLE STYLES ===================== */
+.table-responsive {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  margin-top: var(--space-lg);
+}
+
+.table {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.table thead th {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: none;
+  padding: var(--space-md);
+}
+
+.table tbody td {
+  padding: var(--space-md);
+  vertical-align: middle;
+  border-top: 1px solid var(--border-primary);
+  font-size: 14px;
+}
+
+.table tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+/* ===================== BADGE STYLES ===================== */
+.badge-status {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.02em;
+}
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 575.98px) {
+  .stack-sm .form-group {
+    margin-bottom: var(--space-md);
+  }
+  
+  fieldset {
+    padding: var(--space-lg);
+  }
+  
+  .btn {
+    width: 100%;
+  }
+  
+  .form-row {
+    flex-direction: column;
+  }
+  
+  .form-row .form-group {
+    width: 100% !important;
+    flex: none !important;
+  }
+}
+
+/* ===================== ANIMATIONS ===================== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+fieldset {
+  animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+fieldset:nth-child(1) { animation-delay: 0.1s; }
+fieldset:nth-child(2) { animation-delay: 0.2s; }
+fieldset:nth-child(3) { animation-delay: 0.3s; }
+
+/* ===================== SCROLL TO TOP ===================== */
+#scrollTop {
+  position: fixed;
+  bottom: 80px;
+  right: 30px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+  box-shadow: var(--shadow-xl);
+  cursor: pointer;
+  z-index: 1000;
+  opacity: 0;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#scrollTop:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-2xl);
+}
+
+/* ===================== FOOTER COMPATIBILITY ===================== */
+footer {
+  position: relative !important;
+  z-index: 10 !important;
+  margin-top: auto !important;
+  width: 100% !important;
+}
+
+body.dark-mode footer {
+  background-color: transparent !important;
+}
+
+body.dark-mode footer .footer-content p {
+  color: var(--text-secondary) !important;
+}
+
+body.dark-mode footer .footer-content a {
+  color: var(--brand-primary) !important;
+}
+
+body.dark-mode footer .footer-content a:hover {
+  color: var(--brand-primary-light) !important;
+}
+
+@media (max-width: 768px) {
+  #scrollTop {
+    bottom: 90px !important;
+  }
 }
 </style>
 </head>
+
 <body>
 <?php include(__DIR__ . '/../menu.php'); ?>
-<div id="main" class="main-content">
+
+<main id="main" class="main-content">
   <div class="container">
 
     <section class="page-hero">
       <div class="hero-header">
         <div class="title-row">
-          <div class="title-icon"><i class="fa fa-file-text-o" aria-hidden="true"></i></div>
+          <div class="title-icon">
+            <i class="fa fa-file-text-o" aria-hidden="true"></i>
+          </div>
           <div class="hero-title">
-            <h1 class="mb-0">Novo Pedido de Certidão</h1>
-            <small class="text-muted d-block">Preencha os dados e gere a O.S. no final</small>
+            <h1>Novo Pedido de Certidão</h1>
+            <small class="d-block">Preencha os dados e gere a O.S. no final</small>
           </div>
         </div>
 
@@ -346,64 +841,79 @@ legend{ padding:0 8px; font-weight:600; font-size:1rem;}
 
         <div class="form-row">
           <div class="form-group col-md-3">
-              <label for="ato">Código do Ato:</label>
-              <input type="text" class="form-control" id="ato" name="ato" pattern="[0-9.]+" placeholder="ex: 14.5.1">
+            <label for="ato">Código do Ato:</label>
+            <input type="text" class="form-control" id="ato" name="ato" pattern="[0-9.]+" placeholder="ex: 14.5.1">
           </div>
           <div class="form-group col-md-2">
-              <label for="quantidade">Quantidade:</label>
-              <input type="number" class="form-control" id="quantidade" name="quantidade" value="1" min="1">
+            <label for="quantidade">Quantidade:</label>
+            <input type="number" class="form-control" id="quantidade" name="quantidade" value="1" min="1">
           </div>
           <div class="form-group col-md-2">
-              <label for="desconto_legal">Desconto Legal (%):</label>
-              <input type="number" class="form-control" id="desconto_legal" name="desconto_legal" value="0" min="0" max="100">
+            <label for="desconto_legal">Desconto Legal (%):</label>
+            <input type="number" class="form-control" id="desconto_legal" name="desconto_legal" value="0" min="0" max="100">
           </div>
           <div class="form-group col-md-5 d-flex align-items-end">
-              <button type="button" class="btn btn-primary me-2 w-50" onclick="buscarAto()"><i class="fa fa-search"></i> Buscar Ato</button>
-              <button type="button" class="btn btn-secondary btn-adicionar-manual w-50" onclick="adicionarAtoManual()"><i class="fa fa-i-cursor"></i> Adicionar Ato Manualmente</button>
-            </div>
+            <button type="button" class="btn btn-primary me-2 w-50" onclick="buscarAto()">
+              <i class="fa fa-search"></i> Buscar Ato
+            </button>
+            <button type="button" class="btn btn-secondary btn-adicionar-manual w-50" onclick="adicionarAtoManual()">
+              <i class="fa fa-i-cursor"></i> Adicionar Manualmente
+            </button>
+          </div>
         </div>
 
         <div class="form-row">
           <div class="form-group col-md-12">
-              <label for="descricao">Descrição:</label>
-              <input type="text" class="form-control" id="descricao" name="descricao" readonly>
+            <label for="descricao">Descrição:</label>
+            <input type="text" class="form-control" id="descricao" name="descricao" readonly>
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-group col-md-2">
-              <label for="emolumentos">Emolumentos:</label>
-              <input type="text" class="form-control" id="emolumentos" name="emolumentos" readonly>
+            <label for="emolumentos">Emolumentos:</label>
+            <input type="text" class="form-control" id="emolumentos" name="emolumentos" readonly>
           </div>
           <div class="form-group col-md-2">
-              <label for="ferc">FERC:</label>
-              <input type="text" class="form-control" id="ferc" name="ferc" readonly>
+            <label for="ferc">FERC:</label>
+            <input type="text" class="form-control" id="ferc" name="ferc" readonly>
           </div>
           <div class="form-group col-md-2">
-              <label for="fadep">FADEP:</label>
-              <input type="text" class="form-control" id="fadep" name="fadep" readonly>
+            <label for="fadep">FADEP:</label>
+            <input type="text" class="form-control" id="fadep" name="fadep" readonly>
           </div>
           <div class="form-group col-md-2">
-              <label for="femp">FEMP:</label>
-              <input type="text" class="form-control" id="femp" name="femp" readonly>
+            <label for="femp">FEMP:</label>
+            <input type="text" class="form-control" id="femp" name="femp" readonly>
           </div>
           <div class="form-group col-md-2">
-              <label for="total">Total:</label>
-              <input type="text" class="form-control" id="total" name="total" readonly>
+            <label for="total">Total:</label>
+            <input type="text" class="form-control" id="total" name="total" readonly>
           </div>
           <div class="form-group col-md-2 d-flex align-items-end">
-            <button type="button" class="btn btn-success w-100" onclick="adicionarItemOS()"><i class="fa fa-plus"></i> Adicionar à OS</button>
+            <button type="button" class="btn btn-success w-100" onclick="adicionarItemOS()">
+              <i class="fa fa-plus"></i> Adicionar à OS
+            </button>
           </div>
         </div>
 
         <div class="mt-3">
-          <h5>Itens da O.S.</h5>
+          <h5 style="color: var(--text-primary); font-weight: 700; margin-bottom: var(--space-md);">Itens da O.S.</h5>
           <div class="table-responsive">
             <table class="table">
               <thead>
                 <tr>
-                  <th>#</th><th>Ato</th><th>Qtd</th><th>Desc.(%)</th>
-                  <th>Descrição</th><th>Emol.</th><th>FERC</th><th>FADEP</th><th>FEMP</th><th>Total</th><th></th>
+                  <th>#</th>
+                  <th>Ato</th>
+                  <th>Qtd</th>
+                  <th>Desc.(%)</th>
+                  <th>Descrição</th>
+                  <th>Emol.</th>
+                  <th>FERC</th>
+                  <th>FADEP</th>
+                  <th>FEMP</th>
+                  <th>Total</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody id="itensTable"></tbody>
@@ -421,7 +931,8 @@ legend{ padding:0 8px; font-weight:600; font-size:1rem;}
     </form>
 
   </div>
-</div>
+</main>
+
 
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="../script/jquery-ui.min.js"></script>
@@ -701,6 +1212,8 @@ function applyDocMasksAndValidation(){
   }
 }
 
+let isSubmittingPedido = false;
+
 /* =================== DOM Ready =================== */
 $(function(){
   // aplica o modo salvo (o toggle fica no menu)
@@ -799,20 +1312,28 @@ $(function(){
 
   // SUBMIT AJAX
   $('#formPedido').on('submit', function(e){
-    e.preventDefault();
-    const payload = gatherFormData();
-    if (!payload) return;
+  e.preventDefault();
 
-    const $btn = $('#btnSalvar');
-    const originalHtml = $btn.html();
-    $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Salvando...');
+  // bloqueia cliques/submit duplos
+  if (isSubmittingPedido) return;
+  isSubmittingPedido = true;
 
-    $.ajax({
-      url: 'salvar_pedido.php',
-      method: 'POST',
-      data: payload,
-      dataType: 'text', // parse manual tolerante
-      success: function(resText){
+  const payload = gatherFormData();
+  if (!payload) { 
+    isSubmittingPedido = false; 
+    return; 
+  }
+
+  const $btn = $('#btnSalvar');
+  const originalHtml = $btn.html();
+  $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Salvando...');
+
+  $.ajax({
+    url: 'salvar_pedido.php',
+    method: 'POST',
+    data: payload,
+    dataType: 'text',
+    success: function(resText){
         let r = null;
         try{
           r = typeof resText === 'object' ? resText : JSON.parse(resText);
@@ -882,7 +1403,9 @@ $(function(){
         toast('error','Falha na requisição.');
       },
       complete: function(){
-        $btn.prop('disabled', false).html(originalHtml);
+        // libera novamente só ao finalizar a requisição
+        isSubmittingPedido = false;
+        $btn.prop('disabled', true).html(originalHtml);
       }
     });
   });
@@ -894,7 +1417,7 @@ $(function(){
 function updatePortadorAuto(){
   const $p = $('#portador_nome');
   const manual = $p.data('manual') === true;
-  if (manual) return; // não sobrescreve edição do usuário
+  if (manual) return;
 
   const atr  = $('#atribuicao').val() || '';
   const tipo = $('#tipo').val() || '';
@@ -912,10 +1435,8 @@ function updatePortadorAuto(){
     }
   } else if (atr === 'Pessoas Jurídicas' || atr === 'Títulos e Documentos' || atr === 'Notas') {
     valor = $('#partes').val() || '';
-  } else if (atr === 'Registro de Imóveis') {
-    const m   = $('#matricula').val() || '';
-    const imv = $('#imovel').val() || '';
-    valor = m ? ('Matrícula ' + m) : (imv || '');
+    } else if (atr === 'Registro de Imóveis') {
+    valor = $('#proprietario').val() || '';
   }
 
   if (valor) { $p.val(valor); }
@@ -949,9 +1470,21 @@ function updateTituloOS(){
   } else if (atr === 'Pessoas Jurídicas' || atr === 'Títulos e Documentos' || atr === 'Notas') {
     detalhe = $('#partes').length ? ($('#partes').val() || '') : '';
   } else if (atr === 'Registro de Imóveis') {
-    const m   = $('#matricula').val() || '';
-    const imv = $('#imovel').val() || '';
-    detalhe = m ? ('Matrícula ' + m) : (imv ? ('Imóvel ' + imv) : '');
+      const m   = $('#matricula').val()    || '';
+      const p   = $('#proprietario').val() || '';
+      const imv = $('#imovel').val()       || '';
+
+      if (m && p) {
+          detalhe = `Matrícula: ${m} – Proprietário: ${p}`;
+      } else if (m) {
+          detalhe = `Matrícula: ${m}`;
+      } else if (p) {
+          detalhe = `Proprietário: ${p}`;
+      } else if (imv) {
+          detalhe = `Imóvel: ${imv}`;
+      } else {
+          detalhe = '';
+      }
   }
 
   const base   = `Certidão ${tipo} (${atr})`;

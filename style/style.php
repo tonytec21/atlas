@@ -289,7 +289,7 @@ body.dark-mode .form-control[readonly] {
 #system-name {
     position: fixed !important;
     top: 0 !important;
-    left: var(--mini-sidebar-width) !important;
+    /* left: var(--mini-sidebar-width) !important; */
     right: 0 !important;
     height: var(--header-height) !important;
     background-color: var(--bg-primary) !important;
@@ -372,7 +372,7 @@ body.dark-mode .form-control[readonly] {
 
 /* Conteúdo principal quando existir numa página com menu */
 .main-content {
-    margin-left: var(--mini-sidebar-width);
+    /* margin-left: var(--mini-sidebar-width); */
     padding: calc(var(--header-height) + 20px) 20px 20px;
     transition: var(--transition);
 }

@@ -1,407 +1,1338 @@
-<?php
-include(__DIR__ . '/session_check.php');
-checkSession();
-include(__DIR__ . '/db_connection.php');
-date_default_timezone_set('America/Sao_Paulo');
-?>
-<!DOCTYPE html>
-<html lang="pt-br">
+<?php  
+include(__DIR__ . '/session_check.php');  
+checkSession();  
+include(__DIR__ . '/db_connection.php');  
+date_default_timezone_set('America/Sao_Paulo');  
+?>  
+<!DOCTYPE html>  
+<html lang="pt-br">  
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pesquisar Ordens de Serviço</title>
-    <link rel="stylesheet" href="../style/css/bootstrap.min.css">
-    <link rel="stylesheet" href="../style/css/font-awesome.min.css">
-    <link rel="stylesheet" href="../style/css/style.css">
-    <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <!-- Tentativa local -->
-    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
-    <!-- CDN oficial (corrige ícones MDI que não carregavam localmente) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
-    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
-    <style>
-        /* ==============================
-           Tema base (Light/Dark ready)
-        ===============================*/
-        body.light-mode{
-            --bg: #ffffff;
-            --fg: #0f172a;
-            --muted:#6b7280;
-            --panel:#ffffff;
-            --panel-brd:#e5e7eb;
-            --soft:#f8fafc;
-            --accent:#2563eb;
-            --accent-2:#1e40af;
-            --success:#28a745;
-            --warning:#ffa907;
-            --danger:#dc3545;
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+    <title>Pesquisar Ordens de Serviço</title>  
 
-            --chip-bg:#eef2ff;
-            --chip-fg:#1e3a8a;
-        }
-        body.dark-mode{
-            --bg:#0b1220;
-            --fg:#e5e7eb;
-            --muted:#9ca3af;
-            --panel:#0b1324;
-            --panel-brd:rgba(255,255,255,.12);
-            --soft:#0e1627;
-            --accent:#60a5fa;
-            --accent-2:#3b82f6;
-            --success:#19c37d;
-            --warning:#f4b740;
-            --danger:#ef4444;
+    <!-- Fontes modernas -->  
+    <link rel="preconnect" href="https://fonts.googleapis.com">  
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>  
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">  
 
-            --chip-bg:#0e1627;
-            --chip-fg:#c7d2fe;
-        }
+    <link rel="icon" href="../style/img/favicon.png" type="image/png">  
+    <link rel="stylesheet" href="../style/css/bootstrap.min.css">  
+    <link rel="stylesheet" href="../style/css/font-awesome.min.css">  
+    <link rel="stylesheet" href="../style/css/style.css">  
 
-        /* ==============================
-           Barra de ações superior
-        ===============================*/
-        .top-actions .btn{ border-radius:10px; }
-        .btn-info2{ background:#17a2b8; color:#fff; }
-        .btn-info2:hover{ filter:brightness(0.95); color:#fff; }
+    <?php  
+    $mdiCssLocal = __DIR__ . '/../style/css/materialdesignicons.min.css';  
+    $mdiWoff2    = __DIR__ . '/../style/fonts/materialdesignicons-webfont.woff2';  
+    if (file_exists($mdiCssLocal) && file_exists($mdiWoff2)) {  
+      echo '<link rel="stylesheet" href="../style/css/materialdesignicons.min.css">' . PHP_EOL;  
+    } else {  
+      echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">' . PHP_EOL;  
+    }  
+    ?>  
 
-        /* ==============================
-           Formulário (card leve)
-        ===============================*/
-        .filter-card{
-            background:var(--panel);
-            border:1px solid var(--panel-brd);
-            border-radius:14px;
-            padding:16px;
-            box-shadow:0 8px 24px rgba(0,0,0,.06);
-        }
-        #pesquisarForm .form-group{ margin-bottom:12px; }
-        .w-100 { margin-top: 5px; }
+    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">  
 
-        /* ==============================
-           Tabela responsiva
-        ===============================*/
-        .table-wrap{
-            background:var(--panel);
-            border:1px solid var(--panel-brd);
-            border-radius:14px;
-            padding:16px;
-            box-shadow:0 8px 24px rgba(0,0,0,.06);
-        }
-        table.dataTable thead th{ white-space:nowrap; }
+    <style>  
+/* ===================== CSS VARIABLES ===================== */  
+:root {  
+  --brand-primary: #6366f1;  
+  --brand-primary-light: #818cf8;  
+  --brand-primary-dark: #4f46e5;  
+  --brand-success: #10b981;  
+  --brand-warning: #f59e0b;  
+  --brand-error: #ef4444;  
+  --brand-info: #3b82f6;  
 
-        /* ==============================
-           Badges de situação
-        ===============================*/
-        .situacao-pago,
-        .situacao-ativo,
-        .situacao-cancelado{
-            color: #fff; width: 90px; text-align: center; padding: 6px 10px; border-radius: 8px; display:inline-block; font-size: 13px; font-weight:600;
-        }
-        .situacao-pago{ background-color: var(--success); }
-        .situacao-ativo{ background-color: var(--warning); }
-        .situacao-cancelado{ background-color: var(--danger); }
+  --bg-primary: #ffffff;  
+  --bg-secondary: #f8fafc;  
+  --bg-tertiary: #f1f5f9;  
+  --bg-elevated: #ffffff;  
+  
+  --text-primary: #1e293b;  
+  --text-secondary: #64748b;  
+  --text-tertiary: #94a3b8;  
+  --text-inverse: #ffffff;  
+  
+  --border-primary: #e2e8f0;  
+  --border-secondary: #cbd5e1;  
+  --border-focus: var(--brand-primary);  
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);  
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);  
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);  
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);  
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);  
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);  
+  
+  --surface-hover: rgba(99, 102, 241, 0.04);  
+  --surface-active: rgba(99, 102, 241, 0.08);  
+  
+  --space-xs: 4px;  
+  --space-sm: 8px;  
+  --space-md: 16px;  
+  --space-lg: 24px;  
+  --space-xl: 32px;  
+  --space-2xl: 48px;  
+  
+  --radius-sm: 6px;  
+  --radius-md: 10px;  
+  --radius-lg: 14px;  
+  --radius-xl: 20px;  
+  --radius-2xl: 28px;  
+  
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;  
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;  
+  
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);  
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);  
+  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);  
+  --gradient-error: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);  
+  --gradient-mesh: radial-gradient(at 40% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),  
+                   radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),  
+                   radial-gradient(at 0% 50%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),  
+                   radial-gradient(at 80% 50%, rgba(236, 72, 153, 0.15) 0px, transparent 50%),  
+                   radial-gradient(at 0% 100%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),  
+                   radial-gradient(at 80% 100%, rgba(245, 158, 11, 0.15) 0px, transparent 50%);  
+}  
 
-        .status-label{
-            padding: 6px 10px; border-radius: 8px; color: #fff; display:inline-block; font-weight:600;
-        }
-        .status-pendente{ background-color: var(--danger); min-width:80px; text-align:center; }
-        .status-parcialmente{ background-color: var(--warning); min-width:80px; text-align:center; }
-        .status-liquidado{ background-color: var(--success); min-width:80px; text-align:center; }
+.dark-mode {  
+  --bg-primary: #0f172a;  
+  --bg-secondary: #1e293b;  
+  --bg-tertiary: #334155;  
+  --bg-elevated: #1e293b;  
+  
+  --text-primary: #f1f5f9;  
+  --text-secondary: #cbd5e1;  
+  --text-tertiary: #94a3b8;  
+  
+  --border-primary: #334155;  
+  --border-secondary: #475569;  
+  
+  --surface-hover: rgba(99, 102, 241, 0.08);  
+  --surface-active: rgba(99, 102, 241, 0.12);  
+}  
 
-        /* ==============================
-           Botão fechar dos modais
-        ===============================*/
-        .btn-close { outline: none; border: none; background: none; padding: 0; font-size: 1.6rem; cursor: pointer; transition: transform .2s ease; color:#fff; }
-        .btn-close:hover { transform: scale(1.15); }
-        .btn-adicionar { height: 38px; line-height: 24px; margin-left: 10px; }
+/* ===================== GLOBAL STYLES ===================== */  
+body {  
+  font-family: var(--font-primary) !important;  
+  background: var(--bg-primary) !important;  
+  color: var(--text-primary) !important;  
+  transition: background-color 0.3s ease, color 0.3s ease;  
+  margin: 0 !important;  
+  padding: 0 !important;  
+  min-height: 100vh !important;  
+  display: flex !important;  
+  flex-direction: column !important;  
+}  
 
-        /* ==============================
-           Modais modernos e responsivos
-        ===============================*/
-        .modal-modern .modal-content{
-            border-radius: 14px;
-            border:1px solid var(--panel-brd);
-            background: var(--panel);
-            color: var(--fg);
-            box-shadow: 0 25px 60px rgba(0,0,0,.35);
-            /* Torna o conteúdo flexível e com rolagem interna em telas menores */
-            display: flex;
-            flex-direction: column;
-            max-height: min(90vh, 100dvh);
-        }
-        .modal-modern .modal-header{
-            background: linear-gradient(135deg, var(--accent), var(--accent-2));
-            color:#fff; border-top-left-radius:14px; border-top-right-radius:14px; border-bottom:0;
-            display:flex; justify-content:space-between; align-items:center;
-            flex: 0 0 auto;
-        }
-        .modal-modern .modal-title{ font-weight:700; }
-        .modal-modern .modal-body{ overflow:auto; }
-        .modal-modern .modal-footer{ border-top:1px solid var(--panel-brd); flex: 0 0 auto; }
+.main-content {  
+  position: relative;  
+  min-height: auto;  
+  flex: 1;  
+}  
 
-        /* Larguras responsivas padrão (desktop e tablets) */
-        .modal-dialog{ margin: 1.25rem auto; }
-        #pagamentoModal .modal-dialog{ max-width: 900px; }
-        #devolucaoModal .modal-dialog{ max-width: 520px; }
-        #anexoModal .modal-dialog{ max-width: 700px; }
-        #mensagemModal .modal-dialog{ max-width: 520px; }
+.main-content::before {  
+  content: '';  
+  position: fixed;  
+  top: 0;  
+  left: 0;  
+  right: 0;  
+  bottom: 0;  
+  background: var(--gradient-mesh);  
+  pointer-events: none;  
+  z-index: 0;  
+  opacity: 0.4;  
+}  
 
-        @media (max-width: 992px){
-            #pagamentoModal .modal-dialog{ max-width: 95vw; }
-            #anexoModal .modal-dialog{ max-width: 95vw; }
-        }
+.container {  
+  position: relative;  
+  z-index: 1;  
+  padding-bottom: var(--space-xl);  
+}  
 
-        /* Mobile-first: ocupar 100% da tela com rolagem suave */
-        @media (max-width: 576px){
-            .modal-dialog{
-                max-width: 100vw !important;
-                width: 100vw !important;
-                margin: 0 !important;
-                height: 100dvh;
-            }
-            .modal-content{
-                border-radius: 0 !important;
-                height: 100dvh;
-                max-height: 100dvh;
-            }
-            .modal-modern .modal-body{
-                padding: 12px;
-            }
-            /* Evita "zoom/overflow" lateral em botões/ícones dentro da tabela */
-            .action-btn{ width: 36px; height: 36px; font-size: 18px; }
-        }
+/* ===================== PAGE HERO ===================== */  
+.page-hero {  
+  padding: var(--space-2xl) 0;  
+  margin-bottom: var(--space-xl);  
+}  
 
-        /* Cards/inputs finos nos modais */
-        .modal-modern .form-control{ border-radius: 10px; }
+.title-row {  
+  display: flex;  
+  align-items: center;  
+  gap: var(--space-md);  
+}  
 
-        /* ==============================
-           Dropzone (Anexos)
-        ===============================*/
-        .dropzone{
-            border:2px dashed var(--panel-brd);
-            background: var(--soft);
-            border-radius: 14px;
-            padding: 18px;
-            text-align: center;
-            cursor: pointer;
-            transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
-        }
-        .dropzone:hover{ background: rgba(37,99,235,.06); }
-        .dropzone.dragover{
-            background: rgba(37,99,235,.10);
-            border-color: var(--accent);
-            box-shadow: 0 0 0 4px rgba(37,99,235,.08) inset;
-        }
-        .dropzone .dz-icon{
-            width:46px;height:46px;border-radius:12px;
-            background:var(--chip-bg); color:var(--chip-fg);
-            display:inline-flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:8px;
-        }
-        .dropzone .dz-title{ font-weight:700; }
-        .dropzone .dz-sub{ color:var(--muted); font-size:.92rem; }
+.title-icon {  
+  width: 64px;  
+  height: 64px;  
+  background: var(--gradient-primary);  
+  border-radius: var(--radius-xl);  
+  display: flex;  
+  align-items: center;  
+  justify-content: center;  
+  box-shadow: var(--shadow-lg);  
+  flex-shrink: 0;  
+}  
 
-        .file-list{ margin-top:12px; text-align:left; }
-        .file-list .file-item{
-            display:flex; align-items:center; justify-content:space-between; gap:10px;
-            padding:8px 10px; background:var(--panel); border:1px solid var(--panel-brd); border-radius:10px; margin-bottom:8px;
-            word-break:break-all;
-        }
-        .file-name{ color:var(--fg); }
-        .file-size{ color:var(--muted); font-size:.9rem; }
+.title-icon i {  
+  font-size: 32px;  
+  color: var(--text-primary);  
+  position: relative;  
+  z-index: 1;  
+}  
 
-        /* ==============================
-           Toasters (feedback)
-        ===============================*/
-        .toast { min-width: 250px; margin-top: 0px; }
-        .toast .toast-header{ color:#fff; }
-        .toast .bg-success{ background-color: var(--success)!important; }
-        .toast .bg-danger{ background-color: var(--danger)!important; }
+.dark-mode .title-icon {
+  color: white; 
+}
 
-        /* Ícones grandes (ações tabela) */
-        .action-btn{
-            margin-bottom: 5px; font-size: 20px; width: 40px; height: 40px; border-radius: 8px; border: none;
-            display:inline-flex; align-items:center; justify-content:center;
-        }
+.page-hero h1 {  
+  font-size: 28px;  
+  font-weight: 800;  
+  letter-spacing: -0.02em;  
+  color: var(--text-primary);  
+  margin: 0;  
+  line-height: 1.2;  
+}  
 
-        /* Pequenos ajustes */
-        .btn-info:hover, .btn-success:hover, .btn-secondary:hover, .btn-primary:hover { color:#fff!important; }
+.subtitle {  
+  font-size: 14px;  
+  color: var(--text-secondary);  
+  margin-top: var(--space-xs);  
+}  
 
-        /* ==============================
-           Modal de visualização (90% desktop; 100% mobile)
-        ===============================*/
-        #viewerModal{ z-index: 1060; }
-        #viewerModal .modal-dialog{
-            max-width: 90vw;
-            width: 90vw;
-        }
-        #viewerModal .modal-content{
-            height: 90vh;
-            max-height: min(90vh, 100dvh);
-            display: flex;
-            flex-direction: column;
-        }
-        #viewerModal .viewer-body{
-            flex: 1;
-            display: flex;
-            min-height: 0;
-            padding: 0;
-            background: var(--panel);
-        }
-        .viewer-frame{
-            border: 0;
-            width: 100%;
-            height: 100%;
-        }
-        .viewer-img{
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            background: #000;
-        }
-        .viewer-fallback{
-            padding: 16px;
-        }
-        @media (max-width: 768px){
-            #viewerModal .modal-dialog{
-                max-width: 100vw;
-                width: 100vw;
-                margin: 0;
-                height: 100dvh;
-            }
-            #viewerModal .modal-content{
-                height: 100dvh;
-                max-height: 100dvh;
-                border-radius: 0;
-            }
-        }
-    </style>
-</head>
+/* ===================== TOP ACTIONS ===================== */  
+.top-actions {  
+  margin-bottom: var(--space-lg);  
+  gap: var(--space-sm);  
+}  
 
-<body class="light-mode">
-    <?php include(__DIR__ . '/../menu.php'); ?>
+.top-actions .btn {  
+  border-radius: var(--radius-md);  
+  font-weight: 700;  
+  padding: 10px 20px;  
+  font-size: 14px;  
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);  
+  display: inline-flex;  
+  align-items: center;  
+  gap: var(--space-sm);  
+  border: none;  
+}  
 
-    <div id="main" class="main-content">
-        <div class="container">
+.top-actions .btn i {  
+  font-size: 16px;  
+}  
 
-            <!-- HERO / TÍTULO -->
-            <section class="page-hero">
-            <div class="title-row">
-                <div class="title-icon"><i class="mdi mdi-clipboard-list-outline" aria-hidden="true"></i></div>
-                <div>
-                <h1>Pesquisar Ordens de Serviço</h1>
-                <div class="subtitle muted">Filtre por número, apresentante, CPF/CNPJ, data, valores e status.</div>
-                </div>
-            </div>
-            </section>
+.top-actions .btn:hover {  
+  transform: translateY(-2px);  
+  box-shadow: var(--shadow-lg);  
+}  
 
-            <!-- Ações principais -->
-            <div class="d-flex flex-wrap justify-content-center justify-content-md-between align-items-center text-center mb-3 top-actions">
-                <div class="col-md-auto mb-2">
-                    <button id="add-button" type="button" class="btn btn-secondary text-white"
-                            onclick="window.location.href='tabela_de_emolumentos.php'">
-                        <i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos
-                    </button>
-                </div>
-                <div class="col-md-auto mb-2">
-                    <button id="add-button" type="button" class="btn btn-info2 text-white"
-                            onclick="window.location.href='criar_os.php'">
-                        <i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço
-                    </button>
-                </div>
-                <div class="col-md-auto mb-2">
-                    <button id="add-button" type="button" class="btn btn-success text-white"
-                            onclick="window.location.href='../caixa/index.php'">
-                        <i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa
-                    </button>
-                </div>
-                <div class="col-md-auto mb-2">
-                    <a href="../liberar_os.php" class="btn btn-secondary">
-                        <i class="fa fa-undo" aria-hidden="true"></i> Desfazer Liquidações
-                    </a>
-                </div>
-                <div class="col-md-auto mb-2">
-                    <a href="modelos_orcamento.php" class="btn btn-primary">
-                        <i class="fa fa-folder-open"></i> Modelos O.S
-                    </a>
-                </div>
-            </div>
+.btn-info2 {  
+  background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);  
+  color: #fff;  
+}  
 
-            <!-- Formulário de filtro -->
-            <div class="filter-card">
-                <form id="pesquisarForm" method="GET">
-                    <div class="form-row align-items-end">
-                        <div class="form-group col-md-2">
-                            <label for="os_id">Nº OS:</label>
-                            <input type="number" class="form-control" id="os_id" name="os_id" min="1">
-                        </div>
-                        <div class="form-group col-md-5">
-                            <label for="cliente">Apresentante:</label>
-                            <input type="text" class="form-control" id="cliente" name="cliente">
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="cpf_cliente">CPF/CNPJ:</label>
-                            <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente">
-                        </div>
-                        <div class="form-group col-md-2">
-                            <label for="total_os">Valor Total:</label>
-                            <input type="text" class="form-control" id="total_os" name="total_os">
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="funcionario">Funcionário:</label>
-                            <select class="form-control" id="funcionario" name="funcionario">
-                                <option value="">Selecione o Funcionário</option>
-                                <?php
-                                $conn = getDatabaseConnection();
-                                $stmt = $conn->query("SELECT DISTINCT criado_por FROM ordens_de_servico");
-                                $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                                foreach ($funcionarios as $funcionario) {
-                                    echo '<option value="' . $funcionario['criado_por'] . '">' . $funcionario['criado_por'] . '</option>';
-                                }
-                                ?>
-                            </select>
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="situacao">Situação:</label>
-                            <select class="form-control" id="situacao" name="situacao">
-                                <option value="">Selecione a Situação</option>
-                                <option value="Ativo">Ativo</option>
-                                <option value="Cancelado">Cancelado</option>
-                            </select>
-                        </div>
+.btn-info2:hover {  
+  opacity: 0.95;  
+  color: #fff;  
+}  
 
-                        <div class="form-group col-md-3">
-                            <label for="data_inicial">Data Inicial:</label>
-                            <input type="date" class="form-control" id="data_inicial" name="data_inicial">
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="data_final">Data Final:</label>
-                            <input type="date" class="form-control" id="data_final" name="data_final">
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="descricao_os">Título da O.S:</label>
-                            <input type="text" class="form-control" id="descricao_os" name="descricao_os">
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="observacoes">Observações:</label>
-                            <input type="text" class="form-control" id="observacoes" name="observacoes">
-                        </div>
+/* ===================== FILTER CARD ===================== */  
+.filter-card {  
+  background: var(--bg-elevated);  
+  border: 2px solid var(--border-primary);  
+  border-radius: var(--radius-lg);  
+  padding: var(--space-lg);  
+  box-shadow: var(--shadow-md);  
+  margin-bottom: var(--space-lg);  
+  transition: all 0.3s ease;  
+}  
 
-                        <div class="form-group col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary w-100 text-white">
-                                <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
+.filter-card:hover {  
+  box-shadow: var(--shadow-xl);  
+  border-color: var(--border-secondary);  
+}  
 
-            <hr>
+.filter-card .form-group {  
+  margin-bottom: var(--space-md);  
+}  
+
+.filter-card label {  
+  font-weight: 600;  
+  font-size: 13px;  
+  color: var(--text-secondary);  
+  margin-bottom: var(--space-sm);  
+  letter-spacing: 0.01em;  
+}  
+
+.filter-card .form-control,  
+.filter-card select.form-control {  
+  background: var(--bg-tertiary);  
+  border: 2px solid var(--border-primary);  
+  border-radius: var(--radius-md);  
+  padding: 10px 14px;  
+  font-size: 14px;  
+  color: var(--text-primary);  
+  transition: all 0.3s ease;  
+  font-family: var(--font-primary);  
+}  
+
+.filter-card .form-control:focus,  
+.filter-card select.form-control:focus {  
+  background: var(--bg-elevated);  
+  border-color: var(--brand-primary);  
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);  
+  outline: none;  
+}  
+
+/* ===================== TABLE WRAP ===================== */  
+.table-wrap {  
+  background: var(--bg-elevated);  
+  border: 2px solid var(--border-primary);  
+  border-radius: var(--radius-lg);  
+  padding: var(--space-lg);  
+  box-shadow: var(--shadow-md);  
+  transition: all 0.3s ease;  
+}  
+
+.table-wrap:hover {  
+  box-shadow: var(--shadow-xl);  
+}  
+
+.table-wrap h5 {  
+  font-weight: 700;  
+  font-size: 18px;  
+  color: var(--text-primary);  
+  margin-bottom: var(--space-md);  
+}  
+
+table.dataTable {  
+  border-collapse: separate;  
+  border-spacing: 0;  
+  width: 100%;  
+}  
+
+table.dataTable thead th {  
+  background: var(--bg-tertiary);  
+  color: var(--text-primary);  
+  font-weight: 700;  
+  font-size: 13px;  
+  text-transform: uppercase;  
+  letter-spacing: 0.05em;  
+  padding: 12px 10px;  
+  border: none;  
+  white-space: nowrap;  
+}  
+
+table.dataTable tbody td {  
+  padding: 12px 10px;  
+  border-bottom: 1px solid var(--border-primary);  
+  color: var(--text-primary);  
+  font-size: 13px;  
+}  
+
+table.dataTable tbody tr {  
+  transition: background-color 0.2s ease;  
+}  
+
+table.dataTable tbody tr:hover {  
+  background: var(--surface-hover);  
+}  
+
+/* ===================== BADGES DE SITUAÇÃO ===================== */  
+.situacao-pago,  
+.situacao-ativo,  
+.situacao-cancelado {  
+  color: #fff;  
+  width: 90px;  
+  text-align: center;  
+  padding: 6px 10px;  
+  border-radius: var(--radius-sm);  
+  display: inline-block;  
+  font-size: 13px;  
+  font-weight: 700;  
+  letter-spacing: 0.02em;  
+}  
+
+.situacao-pago {  
+  background: var(--gradient-success);  
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);  
+}  
+
+.situacao-ativo {  
+  background: var(--gradient-warning);  
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);  
+}  
+
+.situacao-cancelado {  
+  background: var(--gradient-error);  
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);  
+}  
+
+.status-label {  
+  padding: 6px 10px;  
+  border-radius: var(--radius-sm);  
+  color: #fff;  
+  display: inline-block;  
+  font-weight: 700;  
+  font-size: 13px;  
+  letter-spacing: 0.02em;  
+}  
+
+.status-pendente {  
+  background: var(--gradient-error);  
+  min-width: 80px;  
+  text-align: center;  
+}  
+
+.status-parcialmente {  
+  background: var(--gradient-warning);  
+  min-width: 80px;  
+  text-align: center;  
+}  
+
+.status-liquidado {  
+  background: var(--gradient-success);  
+  min-width: 80px;  
+  text-align: center;  
+}  
+
+/* ===================== BUTTONS ===================== */  
+.btn {  
+  border-radius: var(--radius-md);  
+  padding: 10px 20px;  
+  font-weight: 700;  
+  font-size: 14px;  
+  letter-spacing: 0.01em;  
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);  
+  border: none;  
+  display: inline-flex;  
+  align-items: center;  
+  justify-content: center;  
+  gap: var(--space-sm);  
+  font-family: var(--font-primary);  
+}  
+
+.btn i {  
+  font-size: 16px;  
+}  
+
+.btn-primary {  
+  background: var(--gradient-primary);  
+  color: white;  
+  box-shadow: var(--shadow-md);  
+}  
+
+.btn-primary:hover {  
+  transform: translateY(-2px);  
+  box-shadow: var(--shadow-xl);  
+  opacity: 0.95;  
+  color: white;  
+}  
+
+.btn-success {  
+  background: var(--gradient-success);  
+  color: white;  
+  box-shadow: var(--shadow-md);  
+}  
+
+.btn-success:hover {  
+  transform: translateY(-2px);  
+  box-shadow: var(--shadow-xl);  
+  opacity: 0.95;  
+  color: white;  
+}  
+
+.btn-secondary {  
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);  
+  color: white;  
+  box-shadow: var(--shadow-md);  
+}  
+
+.btn-secondary:hover {  
+  transform: translateY(-2px);  
+  box-shadow: var(--shadow-xl);  
+  opacity: 0.95;  
+  color: white;  
+}  
+
+.btn-warning {  
+  background: var(--gradient-warning);  
+  color: white;  
+  box-shadow: var(--shadow-md);  
+}  
+
+.btn-warning:hover {  
+  transform: translateY(-2px);  
+  box-shadow: var(--shadow-xl);  
+  opacity: 0.95;  
+  color: white;  
+}  
+
+.btn-delete {  
+  background: var(--gradient-error);  
+  color: white;  
+  border: none;  
+}  
+
+.btn-delete:hover {  
+  opacity: 0.9;  
+  color: white;  
+}  
+
+/* ===================== ACTION BUTTONS ===================== */  
+.action-btn {  
+  margin-bottom: 5px;  
+  font-size: 20px;  
+  width: 40px;  
+  height: 40px;  
+  border-radius: var(--radius-sm);  
+  border: none;  
+  display: inline-flex;  
+  align-items: center;  
+  justify-content: center;  
+  transition: all 0.3s ease;  
+  cursor: pointer;  
+}  
+
+.action-btn:hover {  
+  transform: translateY(-2px);  
+  box-shadow: var(--shadow-lg);  
+}  
+
+.btn-info2.action-btn {  
+  background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);  
+  color: white;  
+}  
+
+.btn-success.action-btn {  
+  background: var(--gradient-success);  
+  color: white;  
+}  
+
+.btn-primary.action-btn {  
+  background: var(--gradient-primary);  
+  color: white;  
+}  
+
+.btn-secondary.action-btn {  
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);  
+  color: white;  
+}  
+
+.btn-secondary.action-btn.btn-danger {  
+  background: var(--gradient-error);  
+  color: white;  
+}  
+
+/* ===================== MODALS ===================== */  
+.modal-modern .modal-content {  
+  border-radius: var(--radius-lg);  
+  border: 2px solid var(--border-primary);  
+  background: var(--bg-elevated);  
+  color: var(--text-primary);  
+  box-shadow: var(--shadow-2xl);  
+  display: flex;  
+  flex-direction: column;  
+  max-height: min(90vh, 100dvh);  
+}  
+
+.modal-modern .modal-header {  
+  background: var(--gradient-primary);  
+  color: #fff;  
+  border-top-left-radius: calc(var(--radius-lg) - 2px);  
+  border-top-right-radius: calc(var(--radius-lg) - 2px);  
+  border-bottom: 0;  
+  display: flex;  
+  justify-content: space-between;  
+  align-items: center;  
+  flex: 0 0 auto;  
+  padding: var(--space-md) var(--space-lg);  
+}  
+
+.modal-modern .modal-title {  
+  font-weight: 700;  
+  font-size: 18px;  
+  margin: 0;  
+}  
+
+.modal-modern .modal-body {  
+  overflow: auto;  
+  padding: var(--space-lg);  
+  flex: 1;  
+}  
+
+.modal-modern .modal-footer {  
+  border-top: 2px solid var(--border-primary);  
+  flex: 0 0 auto;  
+  padding: var(--space-md) var(--space-lg);  
+}  
+
+.btn-close {  
+  outline: none;  
+  border: none;  
+  background: none;  
+  padding: 0;  
+  font-size: 1.6rem;  
+  cursor: pointer;  
+  transition: transform 0.2s ease;  
+  color: #fff;  
+  font-weight: 300;  
+}  
+
+.btn-close:hover {  
+  transform: scale(1.15);  
+}  
+
+/* Modais responsivos */  
+.modal-dialog {  
+  margin: 1.25rem auto;  
+}  
+
+#pagamentoModal .modal-dialog {  
+  max-width: 900px;  
+}  
+
+#devolucaoModal .modal-dialog {  
+  max-width: 520px;  
+}  
+
+#anexoModal .modal-dialog {  
+  max-width: 700px;  
+}  
+
+#mensagemModal .modal-dialog {  
+  max-width: 520px;  
+}  
+
+@media (max-width: 992px) {  
+  #pagamentoModal .modal-dialog {  
+    max-width: 95vw;  
+  }  
+  #anexoModal .modal-dialog {  
+    max-width: 95vw;  
+  }  
+}  
+
+@media (max-width: 576px) {  
+  .modal-dialog {  
+    max-width: 100vw !important;  
+    width: 100vw !important;  
+    margin: 0 !important;  
+    height: 100dvh;  
+  }  
+
+  .modal-content {  
+    border-radius: 0 !important;  
+    height: 100dvh;  
+    max-height: 100dvh;  
+  }  
+
+  .modal-modern .modal-body {  
+    padding: 12px;  
+  }  
+
+  .action-btn {  
+    width: 36px;  
+    height: 36px;  
+    font-size: 18px;  
+  }  
+
+  .page-hero {  
+    padding: var(--space-xl) 0;  
+  }  
+
+  .title-row {  
+    flex-direction: column;  
+    text-align: center;  
+  }  
+
+  .title-icon {  
+    width: 56px;  
+    height: 56px;  
+  }  
+
+  .page-hero h1 {  
+    font-size: 22px;  
+  }  
+
+  .top-actions {  
+    flex-direction: column;  
+  }  
+
+  .top-actions .btn {  
+    width: 100%;  
+    justify-content: center;  
+  }  
+}  
+
+/* ===================== DROPZONE ===================== */  
+.dropzone {  
+  border: 3px dashed var(--brand-primary);  
+  background: rgba(99, 102, 241, 0.04);  
+  border-radius: var(--radius-lg);  
+  padding: var(--space-xl);  
+  text-align: center;  
+  cursor: pointer;  
+  transition: all 0.3s ease;  
+}  
+
+.dropzone:hover {  
+  background: rgba(99, 102, 241, 0.08);  
+  border-color: var(--brand-primary-light);  
+  transform: translateY(-2px);  
+}  
+
+.dropzone.dragover {  
+  background: rgba(99, 102, 241, 0.12);  
+  border-color: var(--brand-primary);  
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08) inset;  
+}  
+
+.dropzone .dz-icon {  
+  width: 46px;  
+  height: 46px;  
+  border-radius: var(--radius-md);  
+  background: rgba(99, 102, 241, 0.1);  
+  color: var(--brand-primary);  
+  display: inline-flex;  
+  align-items: center;  
+  justify-content: center;  
+  font-size: 22px;  
+  margin-bottom: var(--space-sm);  
+}  
+
+.dropzone .dz-title {  
+  font-weight: 700;  
+  color: var(--text-primary);  
+  margin-bottom: var(--space-xs);  
+}  
+
+.dropzone .dz-sub {  
+  color: var(--text-tertiary);  
+  font-size: 14px;  
+}  
+
+.file-list {  
+  margin-top: var(--space-md);  
+  text-align: left;  
+}  
+
+.file-list .file-item {  
+  display: flex;  
+  align-items: center;  
+  justify-content: space-between;  
+  gap: var(--space-sm);  
+  padding: var(--space-sm) var(--space-md);  
+  background: var(--bg-tertiary);  
+  border: 2px solid var(--border-primary);  
+  border-radius: var(--radius-md);  
+  margin-bottom: var(--space-sm);  
+  word-break: break-all;  
+  transition: all 0.3s ease;  
+}  
+
+.file-list .file-item:hover {  
+  border-color: var(--brand-primary);  
+  transform: translateX(4px);  
+}  
+
+.file-name {  
+  color: var(--text-primary);  
+  font-weight: 600;  
+  font-size: 14px;  
+  display: flex;  
+  align-items: center;  
+  gap: var(--space-xs);  
+}  
+
+.file-size {  
+  color: var(--text-tertiary);  
+  font-size: 13px;  
+}  
+
+.dark-mode .dropzone {  
+  border-color: rgba(147, 197, 253, 0.6);  
+  background: rgba(147, 197, 253, 0.08);  
+}  
+
+.dark-mode .dropzone .dz-icon {  
+  background: rgba(147, 197, 253, 0.15);  
+  color: #93c5fd;  
+}  
+
+.dark-mode .dropzone .dz-title {  
+  color: #cfe5ff;  
+}  
+
+/* ===================== TOASTERS ===================== */  
+.toast {  
+  min-width: 250px;  
+  margin-top: 0;  
+  border-radius: var(--radius-md);  
+  box-shadow: var(--shadow-xl);  
+}  
+
+.toast .toast-header {  
+  color: #fff;  
+  border-radius: var(--radius-md) var(--radius-md) 0 0;  
+  font-weight: 700;  
+}  
+
+.toast .bg-success {  
+  background: var(--gradient-success) !important;  
+}  
+
+.toast .bg-danger {  
+  background: var(--gradient-error) !important;  
+}  
+
+/* ===================== VIEWER MODAL ===================== */  
+#viewerModal {  
+  z-index: 1060;  
+}  
+
+#viewerModal .modal-dialog {  
+  max-width: 90vw;  
+  width: 90vw;  
+}  
+
+#viewerModal .modal-content {  
+  height: 90vh;  
+  max-height: min(90vh, 100dvh);  
+  display: flex;  
+  flex-direction: column;  
+}  
+
+#viewerModal .viewer-body {  
+  flex: 1;  
+  display: flex;  
+  min-height: 0;  
+  padding: 0;  
+  background: var(--bg-primary);  
+}  
+
+.viewer-frame {  
+  border: 0;  
+  width: 100%;  
+  height: 100%;  
+}  
+
+.viewer-img {  
+  width: 100%;  
+  height: 100%;  
+  object-fit: contain;  
+  background: #000;  
+}  
+
+.viewer-fallback {  
+  padding: var(--space-md);  
+  color: var(--text-secondary);  
+  font-size: 14px;  
+}  
+
+@media (max-width: 768px) {  
+  #viewerModal .modal-dialog {  
+    max-width: 100vw;  
+    width: 100vw;  
+    margin: 0;  
+    height: 100dvh;  
+  }  
+
+  #viewerModal .modal-content {  
+    height: 100dvh;  
+    max-height: 100dvh;  
+    border-radius: 0;  
+  }  
+}  
+
+/* ===================== ANIMATIONS ===================== */  
+@keyframes fadeInUp {  
+  from {  
+    opacity: 0;  
+    transform: translateY(20px);  
+  }  
+  to {  
+    opacity: 1;  
+    transform: translateY(0);  
+  }  
+}  
+
+.filter-card,  
+.table-wrap {  
+  animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) backwards;  
+}  
+
+.filter-card {  
+  animation-delay: 0.1s;  
+}  
+
+.table-wrap {  
+  animation-delay: 0.2s;  
+}  
+
+/* ===================== SCROLL TO TOP ===================== */  
+#scrollTop {  
+  position: fixed;  
+  bottom: 80px;  
+  right: 30px;  
+  width: 50px;  
+  height: 50px;  
+  border-radius: 50%;  
+  background: var(--gradient-primary);  
+  color: white;  
+  border: none;  
+  box-shadow: var(--shadow-xl);  
+  cursor: pointer;  
+  z-index: 1000;  
+  opacity: 0;  
+  transition: all 0.3s ease;  
+  display: flex;  
+  align-items: center;  
+  justify-content: center;  
+}  
+
+#scrollTop:hover {  
+  transform: translateY(-4px);  
+  box-shadow: var(--shadow-2xl);  
+}  
+
+/* ===================== FOOTER ===================== */  
+footer {  
+  position: relative !important;  
+  z-index: 10 !important;  
+  margin-top: auto !important;  
+  width: 100% !important;  
+}  
+
+body.dark-mode footer {  
+  background-color: transparent !important;  
+}  
+
+body.dark-mode footer .footer-content p {  
+  color: var(--text-secondary) !important;  
+}  
+
+body.dark-mode footer .footer-content a {  
+  color: var(--brand-primary) !important;  
+}  
+
+body.dark-mode footer .footer-content a:hover {  
+  color: var(--brand-primary-light) !important;  
+}  
+
+@media (max-width: 768px) {  
+  #scrollTop {  
+    bottom: 90px !important;  
+  }  
+}  
+
+/* ===================== MOBILE CARDS (substituem tabela) ===================== */
+.results-cards {
+  display: none;
+}
+
+@media (max-width: 992px) {
+  /* Esconde tabela em mobile */
+  .table-responsive {
+    display: none !important;
+  }
+  
+  /* Mostra cards em mobile */
+  .results-cards {
+    display: block;
+  }
+}
+
+.os-card {
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.os-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+}
+
+.os-card.cancelado::before {
+  background: var(--gradient-error);
+}
+
+.os-card.liquidado::before {
+  background: var(--gradient-success);
+}
+
+.os-card.parcial::before {
+  background: var(--gradient-warning);
+}
+
+.os-card:active {
+  transform: scale(0.98);
+  box-shadow: var(--shadow);
+}
+
+.os-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.os-card-number {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--brand-primary);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.os-card-badges {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  align-items: flex-end;
+}
+
+.os-card-body {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.os-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.os-card-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+}
+
+.os-card-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.os-card-value.highlight {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--brand-primary);
+}
+
+.os-card-value.success {
+  color: var(--brand-success);
+}
+
+.os-card-value.warning {
+  color: var(--brand-warning);
+}
+
+.os-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm);
+}
+
+.os-card-divider {
+  height: 1px;
+  background: var(--border-primary);
+  margin: var(--space-sm) 0;
+}
+
+.os-card-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-primary);
+}
+
+.os-card-action-btn {
+  width: 100%;
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.os-card-action-btn:active {
+  transform: scale(0.95);
+}
+
+.os-card-action-btn.btn-view {
+  background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+  color: white;
+}
+
+.os-card-action-btn.btn-payment {
+  background: var(--gradient-success);
+  color: white;
+}
+
+.os-card-action-btn.btn-print {
+  background: var(--gradient-primary);
+  color: white;
+}
+
+.os-card-action-btn.btn-attach {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  color: white;
+}
+
+.os-card-action-btn.btn-attach.alert {
+  background: var(--gradient-error);
+}
+
+/* Badge mini para cards */
+.badge-mini {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.badge-pago {
+  background: var(--gradient-success);
+  color: white;
+}
+
+.badge-ativo {
+  background: var(--gradient-warning);
+  color: white;
+}
+
+.badge-cancelado {
+  background: var(--gradient-error);
+  color: white;
+}
+
+.badge-pendente {
+  background: var(--gradient-error);
+  color: white;
+}
+
+.badge-parcial {
+  background: var(--gradient-warning);
+  color: white;
+}
+
+.badge-liquidado {
+  background: var(--gradient-success);
+  color: white;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-tertiary);
+}
+
+.empty-state i {
+  font-size: 64px;
+  margin-bottom: var(--space-md);
+  opacity: 0.3;
+}
+
+.empty-state h5 {
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+/* Loading skeleton */
+.skeleton-card {
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.skeleton-line {
+  height: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  margin-bottom: var(--space-sm);
+}
+
+.skeleton-line.short {
+  width: 60%;
+}
+
+.skeleton-line.medium {
+  width: 80%;
+}
+    </style>  
+</head>  
+
+<body>  
+    <?php include(__DIR__ . '/../menu.php'); ?>  
+
+    <div id="main" class="main-content">  
+        <div class="container">  
+
+            <!-- HERO / TÍTULO -->  
+            <section class="page-hero">  
+                <div class="title-row">  
+                    <div class="title-icon">  
+                        <i class="mdi mdi-clipboard-list-outline" aria-hidden="true"></i>  
+                    </div>  
+                    <div>  
+                        <h1>Pesquisar Ordens de Serviço</h1>  
+                        <div class="subtitle muted">Filtre por número, apresentante, CPF/CNPJ, data, valores e status.</div>  
+                    </div>  
+                </div>  
+            </section>  
+
+            <!-- Ações principais -->  
+            <div class="d-flex flex-wrap justify-content-center justify-content-md-between align-items-center text-center mb-3 top-actions">  
+                <div class="col-md-auto mb-2">  
+                    <button id="add-button" type="button" class="btn btn-secondary text-white"  
+                            onclick="window.location.href='tabela_de_emolumentos.php'">  
+                        <i class="fa fa-table" aria-hidden="true"></i> Tabela de Emolumentos  
+                    </button>  
+                </div>  
+                <div class="col-md-auto mb-2">  
+                    <button id="add-button" type="button" class="btn btn-info2 text-white"  
+                            onclick="window.location.href='criar_os.php'">  
+                        <i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço  
+                    </button>  
+                </div>  
+                <div class="col-md-auto mb-2">  
+                    <button id="add-button" type="button" class="btn btn-success text-white"  
+                            onclick="window.location.href='../caixa/index.php'">  
+                        <i class="fa fa-university" aria-hidden="true"></i> Controle de Caixa  
+                    </button>  
+                </div>  
+                <div class="col-md-auto mb-2">  
+                    <a href="../liberar_os.php" class="btn btn-secondary">  
+                        <i class="fa fa-undo" aria-hidden="true"></i> Desfazer Liquidações  
+                    </a>  
+                </div>  
+                <div class="col-md-auto mb-2">  
+                    <a href="modelos_orcamento.php" class="btn btn-primary">  
+                        <i class="fa fa-folder-open"></i> Modelos O.S  
+                    </a>  
+                </div>  
+            </div>  
+
+            <!-- Formulário de filtro -->  
+            <div class="filter-card">  
+                <form id="pesquisarForm" method="GET">  
+                    <div class="form-row align-items-end">  
+                        <div class="form-group col-md-2">  
+                            <label for="os_id">Nº OS:</label>  
+                            <input type="number" class="form-control" id="os_id" name="os_id" min="1">  
+                        </div>  
+                        <div class="form-group col-md-5">  
+                            <label for="cliente">Apresentante:</label>  
+                            <input type="text" class="form-control" id="cliente" name="cliente">  
+                        </div>  
+                        <div class="form-group col-md-3">  
+                            <label for="cpf_cliente">CPF/CNPJ:</label>  
+                            <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente">  
+                        </div>  
+                        <div class="form-group col-md-2">  
+                            <label for="total_os">Valor Total:</label>  
+                            <input type="text" class="form-control" id="total_os" name="total_os">  
+                        </div>  
+                        <div class="form-group col-md-3">  
+                            <label for="funcionario">Funcionário:</label>  
+                            <select class="form-control" id="funcionario" name="funcionario">  
+                                <option value="">Selecione o Funcionário</option>  
+                                <?php  
+                                $conn = getDatabaseConnection();  
+                                $stmt = $conn->query("SELECT DISTINCT criado_por FROM ordens_de_servico");  
+                                $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);  
+                                foreach ($funcionarios as $funcionario) {  
+                                    echo '<option value="' . $funcionario['criado_por'] . '">' . $funcionario['criado_por'] . '</option>';  
+                                }  
+                                ?>  
+                            </select>  
+                        </div>  
+                        <div class="form-group col-md-3">  
+                            <label for="situacao">Situação:</label>  
+                            <select class="form-control" id="situacao" name="situacao">  
+                                <option value="">Selecione a Situação</option>  
+                                <option value="Ativo">Ativo</option>  
+                                <option value="Cancelado">Cancelado</option>  
+                            </select>  
+                        </div>  
+
+                        <div class="form-group col-md-3">  
+                            <label for="data_inicial">Data Inicial:</label>  
+                            <input type="date" class="form-control" id="data_inicial" name="data_inicial">  
+                        </div>  
+                        <div class="form-group col-md-3">  
+                            <label for="data_final">Data Final:</label>  
+                            <input type="date" class="form-control" id="data_final" name="data_final">  
+                        </div>  
+                        <div class="form-group col-md-4">  
+                            <label for="descricao_os">Título da O.S:</label>  
+                            <input type="text" class="form-control" id="descricao_os" name="descricao_os">  
+                        </div>  
+                        <div class="form-group col-md-6">  
+                            <label for="observacoes">Observações:</label>  
+                            <input type="text" class="form-control" id="observacoes" name="observacoes">  
+                        </div>  
+
+                        <div class="form-group col-md-2 d-flex align-items-end">  
+                            <button type="submit" class="btn btn-primary w-100 text-white">  
+                                <i class="fa fa-filter" aria-hidden="true"></i> Filtrar  
+                            </button>  
+                        </div>  
+                    </div>  
+                </form>  
+            </div>  
+
+                        <hr style="border-color: var(--border-primary); margin: var(--space-xl) 0;">
 
             <!-- Resultados -->
-            <div class="table-responsive table-wrap">
-                <h5 class="mb-3" style="font-weight:700;">Resultados da Pesquisa</h5>
+            <div class="table-wrap">
+                <h5 class="mb-3">Resultados da Pesquisa</h5>
+                
+                <!-- TABELA DESKTOP -->
                 <div class="table-responsive">
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 85%">
+                <table id="tabelaResultados" class="table table-striped table-bordered">
                     <thead>
                         <tr>
                             <th style="width: 7%;">Nº OS</th>
@@ -412,7 +1343,6 @@ date_default_timezone_set('America/Sao_Paulo');
                             <th style="width: 10%;">Valor Total</th>
                             <th style="width: 10%;">Dep. Prévio</th>
                             <th style="width: 10%;">Liquidado</th>
-                            <!-- <th style="width: 12%;">Observações</th> -->
                             <th>Data</th>
                             <th>Status</th>
                             <th style="width: 5%;">Situação</th>
@@ -495,6 +1425,9 @@ date_default_timezone_set('America/Sao_Paulo');
                         }
                         $stmt->execute();
                         $ordens = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                        // Armazena ordens para renderizar cards também
+                        $ordensData = [];
 
                         foreach ($ordens as $ordem) {
                             // Calcula o depósito prévio
@@ -594,6 +1527,28 @@ date_default_timezone_set('America/Sao_Paulo');
 
                             // Saldo (considerando devoluções)
                             $saldo = ($deposito_previo - $total_devolvido) - $ordem['total_os'];
+                            
+                            // Armazena dados para cards
+                            $ordensData[] = [
+                                'id' => $ordem['id'],
+                                'criado_por' => $ordem['criado_por'],
+                                'cliente' => $ordem['cliente'],
+                                'cpf_cliente' => $ordem['cpf_cliente'],
+                                'descricao_os' => $ordem['descricao_os'],
+                                'total_os' => $ordem['total_os'],
+                                'deposito_previo' => $deposito_previo,
+                                'total_liquidado' => $total_liquidado,
+                                'total_devolvido' => $total_devolvido,
+                                'data_criacao' => $ordem['data_criacao'],
+                                'status' => $ordem['status'],
+                                'statusOS' => $statusOS,
+                                'statusClass' => $statusClasses[$statusOS],
+                                'saldo' => $saldo,
+                                'temPagamentoRelevante' => $temPagamentoRelevante,
+                                'temAnexos' => $temAnexos,
+                                'botaoAnexoClasses' => $botaoAnexoClasses,
+                                'botaoAnexoIcone' => $botaoAnexoIcone
+                            ];
                             ?>
                             <tr>
                                 <td><?php echo $ordem['id']; ?></td>
@@ -604,7 +1559,6 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <td><?php echo 'R$ ' . number_format($ordem['total_os'], 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($deposito_previo, 2, ',', '.'); ?></td>
                                 <td><?php echo 'R$ ' . number_format($total_liquidado, 2, ',', '.'); ?></td>
-                                <!-- <td><?php echo strlen($ordem['observacoes']) > 100 ? substr($ordem['observacoes'], 0, 100) . '...' : $ordem['observacoes']; ?></td> -->
                                 <td data-order="<?php echo date('Y-m-d', strtotime($ordem['data_criacao'])); ?>"><?php echo date('d/m/Y', strtotime($ordem['data_criacao'])); ?></td>
                                 <td><span style="font-size: 13px" class="status-label <?php echo $statusClasses[$statusOS]; ?>"><?php echo $statusOS; ?></span></td>
                                 <td>
@@ -635,7 +1589,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                     </button>
                                     <?php if ($ordem['status'] !== 'Cancelado') : ?>
                                     <button class="btn btn-success btn-sm action-btn" title="Pagamentos e Devoluções"
-                                        onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo $ordem['cliente']; ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')">
+                                        onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo addslashes($ordem['cliente']); ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')">
                                         <i class="fa fa-money" aria-hidden="true"></i>
                                     </button>
                                     <?php endif; ?>
@@ -651,121 +1605,240 @@ date_default_timezone_set('America/Sao_Paulo');
                     </tbody>
                 </table>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Modal de Pagamento -->
-    <div class="modal fade modal-modern" id="pagamentoModal" tabindex="-1" role="dialog" aria-labelledby="pagamentoModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title mb-0" id="pagamentoModalLabel">Efetuar Pagamento</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="total_os_modal">Valor Total da OS</label>
-                        <input type="text" class="form-control" id="total_os_modal" readonly>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="forma_pagamento">Forma de Pagamento</label>
-                            <select class="form-control" id="forma_pagamento">
-                                <option value="">Selecione</option>
-                                <option value="Espécie">Espécie</option>
-                                <option value="Crédito">Crédito</option>
-                                <option value="Débito">Débito</option>
-                                <option value="PIX">PIX</option>
-                                <option value="Transferência Bancária">Transferência Bancária</option>
-                                <option value="Boleto">Boleto</option>
-                                <option value="Cheque">Cheque</option>
-                            </select>
+                <!-- CARDS MOBILE -->
+                <div class="results-cards">
+                    <?php if (empty($ordensData)): ?>
+                        <div class="empty-state">
+                            <i class="mdi mdi-clipboard-text-off-outline"></i>
+                            <h5>Nenhuma OS encontrada</h5>
+                            <p>Tente ajustar os filtros de pesquisa</p>
                         </div>
-                        <div class="form-group col-md-6">
-                            <label for="valor_pagamento">Valor do Pagamento</label>
-                            <input type="text" class="form-control" id="valor_pagamento">
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-primary w-100" onclick="adicionarPagamento()">Adicionar</button>
-                    <hr>
-                    <div class="form-row">
-                        <div class="form-group col-md-3">
-                            <label for="total_pagamento">Valor Pago</label>
-                            <input type="text" class="form-control" id="total_pagamento" readonly>
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="valor_liquidado_modal">Valor Liquidado</label>
-                            <input type="text" class="form-control" id="valor_liquidado_modal" readonly>
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="saldo_modal">Saldo</label>
-                            <input type="text" class="form-control" id="saldo_modal" readonly>
-                        </div>
-                        <div class="form-group col-md-3">
-                            <label for="valor_devolvido_modal">Valor Devolvido</label>
-                            <input type="text" class="form-control" id="valor_devolvido_modal" readonly>
-                        </div>
-                    </div>
+                    <?php else: ?>
+                        <?php foreach ($ordensData as $data): ?>
+                            <?php
+                            $cardClass = 'os-card';
+                            if ($data['statusOS'] === 'Cancelado') $cardClass .= ' cancelado';
+                            elseif ($data['statusOS'] === 'Liquidado') $cardClass .= ' liquidado';
+                            elseif ($data['statusOS'] === 'Parcial') $cardClass .= ' parcial';
 
-                    <!-- Botão controlado por JS conforme saldo -->
-                    <button type="button" class="btn btn-warning" id="btnDevolver" onclick="abrirDevolucaoModal()">Devolver valores</button>
+                            $situacaoBadge = '';
+                            $situacaoText = '';
+                            if ($data['status'] === 'Cancelado') {
+                                $situacaoBadge = 'badge-cancelado';
+                                $situacaoText = 'Cancelada';
+                            } elseif ($data['deposito_previo'] > 0) {
+                                $situacaoBadge = 'badge-pago';
+                                $situacaoText = 'Pago';
+                            } elseif ($data['status'] === 'Ativo') {
+                                $situacaoBadge = 'badge-ativo';
+                                $situacaoText = 'Ativa';
+                            }
 
-                    <div id="pagamentosAdicionados" class="mt-3">
-                        <h5>Pagamentos Adicionados</h5>
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 50%;">Forma de Pagamento</th>
-                                    <th style="width: 40%;">Valor</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pagamentosTable">
-                                <!-- Pagamentos adicionados serão listados aqui -->
-                            </tbody>
-                        </table>
-                    </div>
-                    </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                </div>
-            </div>
-        </div>
-    </div>
+                            $statusBadge = '';
+                            if ($data['statusOS'] === 'Pendente') $statusBadge = 'badge-pendente';
+                            elseif ($data['statusOS'] === 'Parcial') $statusBadge = 'badge-parcial';
+                            elseif ($data['statusOS'] === 'Liquidado') $statusBadge = 'badge-liquidado';
+                            elseif ($data['statusOS'] === 'Cancelado') $statusBadge = 'badge-cancelado';
+                            ?>
+                            <div class="<?php echo $cardClass; ?>">
+                                <div class="os-card-header">
+                                    <div class="os-card-number">#<?php echo $data['id']; ?></div>
+                                    <div class="os-card-badges">
+                                        <span class="badge-mini <?php echo $situacaoBadge; ?>"><?php echo $situacaoText; ?></span>
+                                        <span class="badge-mini <?php echo $statusBadge; ?>"><?php echo $data['statusOS']; ?></span>
+                                    </div>
+                                </div>
 
-    <!-- Modal de Devolução -->
-    <div class="modal fade modal-modern" id="devolucaoModal" tabindex="-1" role="dialog" aria-labelledby="devolucaoModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title mb-0" id="devolucaoModalLabel">Devolver Valores</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="forma_devolucao">Forma de Devolução</label>
-                        <select class="form-control" id="forma_devolucao">
-                            <option value="">Selecione</option>
-                            <option value="Espécie">Espécie</option>
-                            <option value="PIX">PIX</option>
-                            <option value="Transferência Bancária">Transferência Bancária</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="valor_devolucao">Valor da Devolução</label>
-                        <input type="text" class="form-control" id="valor_devolucao">
-                    </div>
-                    <button type="button" class="btn btn-primary" onclick="salvarDevolucao()">Salvar</button>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                </div>
-            </div>
-        </div>
-    </div>
+                                <div class="os-card-body">
+                                    <div class="os-card-field">
+                                        <div class="os-card-label">Apresentante</div>
+                                        <div class="os-card-value highlight"><?php echo $data['cliente']; ?></div>
+                                    </div>
 
-    <!-- Modal de Anexos -->
+                                    <div class="os-card-field">
+                                        <div class="os-card-label">Título da OS</div>
+                                        <div class="os-card-value"><?php echo $data['descricao_os']; ?></div>
+                                    </div>
+
+                                    <div class="os-card-grid">
+                                        <div class="os-card-field">
+                                            <div class="os-card-label">CPF/CNPJ</div>
+                                            <div class="os-card-value"><?php echo $data['cpf_cliente']; ?></div>
+                                        </div>
+                                        <div class="os-card-field">
+                                            <div class="os-card-label">Data</div>
+                                            <div class="os-card-value"><?php echo date('d/m/Y', strtotime($data['data_criacao'])); ?></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="os-card-divider"></div>
+
+                                    <div class="os-card-grid">
+                                        <div class="os-card-field">
+                                            <div class="os-card-label">Valor Total</div>
+                                            <div class="os-card-value success">R$ <?php echo number_format($data['total_os'], 2, ',', '.'); ?></div>
+                                        </div>
+                                        <div class="os-card-field">
+                                            <div class="os-card-label">Dep. Prévio</div>
+                                            <div class="os-card-value">R$ <?php echo number_format($data['deposito_previo'], 2, ',', '.'); ?></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="os-card-grid">
+                                        <div class="os-card-field">
+                                            <div class="os-card-label">Liquidado</div>
+                                            <div class="os-card-value">R$ <?php echo number_format($data['total_liquidado'], 2, ',', '.'); ?></div>
+                                        </div>
+                                        <div class="os-card-field">
+                                            <div class="os-card-label">Funcionário</div>
+                                            <div class="os-card-value"><?php echo $data['criado_por']; ?></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="os-card-actions">
+                                    <button type="button" class="os-card-action-btn btn-view" title="Visualizar OS"
+                                        onclick="location.href='visualizar_os.php?id=<?php echo $data['id']; ?>'">
+                                        <i class="fa fa-eye"></i>
+                                    </button>
+                                    <?php if ($data['status'] !== 'Cancelado'): ?>
+                                    <button class="os-card-action-btn btn-payment" title="Pagamentos"
+                                        onclick="abrirPagamentoModal(<?php echo $data['id']; ?>, '<?php echo addslashes($data['cliente']); ?>', <?php echo $data['total_os']; ?>, <?php echo $data['deposito_previo']; ?>, <?php echo $data['total_liquidado']; ?>, <?php echo $data['total_devolvido']; ?>, <?php echo $data['saldo']; ?>, '<?php echo $data['statusOS']; ?>')">
+                                        <i class="fa fa-money"></i>
+                                    </button>
+                                    <?php else: ?>
+                                    <button class="os-card-action-btn btn-payment" disabled style="opacity: 0.3;">
+                                        <i class="fa fa-ban"></i>
+                                    </button>
+                                    <?php endif; ?>
+                                    <button type="button" class="os-card-action-btn btn-print" title="Imprimir"
+                                        onclick="verificarTimbrado(<?php echo $data['id']; ?>)">
+                                        <i class="fa fa-print"></i>
+                                    </button>
+                                    <button class="os-card-action-btn btn-attach <?php echo ($data['temPagamentoRelevante'] && !$data['temAnexos']) ? 'alert' : ''; ?>" title="Anexos"
+                                        onclick="abrirAnexoModal(<?php echo $data['id']; ?>)">
+                                        <i class="fa fa-<?php echo ($data['temPagamentoRelevante'] && !$data['temAnexos']) ? 'exclamation-circle' : 'paperclip'; ?>"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>  
+        </div>  
+    </div>  
+
+    <!-- Modal de Pagamento -->  
+    <div class="modal fade modal-modern" id="pagamentoModal" tabindex="-1" role="dialog" aria-labelledby="pagamentoModalLabel" aria-hidden="true">  
+        <div class="modal-dialog" role="document">  
+            <div class="modal-content">  
+                <div class="modal-header">  
+                    <h5 class="modal-title mb-0" id="pagamentoModalLabel">Efetuar Pagamento</h5>  
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>  
+                </div>  
+                <div class="modal-body">  
+                    <div class="form-group">  
+                        <label for="total_os_modal">Valor Total da OS</label>  
+                        <input type="text" class="form-control" id="total_os_modal" readonly>  
+                    </div>  
+                    <div class="form-row">  
+                        <div class="form-group col-md-6">  
+                            <label for="forma_pagamento">Forma de Pagamento</label>  
+                            <select class="form-control" id="forma_pagamento">  
+                                <option value="">Selecione</option>  
+                                <option value="Espécie">Espécie</option>  
+                                <option value="Crédito">Crédito</option>  
+                                <option value="Débito">Débito</option>  
+                                <option value="PIX">PIX</option>  
+                                <option value="Transferência Bancária">Transferência Bancária</option>  
+                                <option value="Boleto">Boleto</option>  
+                                <option value="Cheque">Cheque</option>  
+                            </select>  
+                        </div>  
+                        <div class="form-group col-md-6">  
+                            <label for="valor_pagamento">Valor do Pagamento</label>  
+                            <input type="text" class="form-control" id="valor_pagamento">  
+                        </div>  
+                    </div>  
+                    <button type="button" class="btn btn-primary w-100" onclick="adicionarPagamento()">Adicionar</button>  
+                    <hr style="border-color: var(--border-primary); margin: var(--space-md) 0;">  
+                    <div class="form-row">  
+                        <div class="form-group col-md-3">  
+                            <label for="total_pagamento">Valor Pago</label>  
+                            <input type="text" class="form-control" id="total_pagamento" readonly>  
+                        </div>  
+                        <div class="form-group col-md-3">  
+                            <label for="valor_liquidado_modal">Valor Liquidado</label>  
+                            <input type="text" class="form-control" id="valor_liquidado_modal" readonly>  
+                        </div>  
+                        <div class="form-group col-md-3">  
+                            <label for="saldo_modal">Saldo</label>  
+                            <input type="text" class="form-control" id="saldo_modal" readonly>  
+                        </div>  
+                        <div class="form-group col-md-3">  
+                            <label for="valor_devolvido_modal">Valor Devolvido</label>  
+                            <input type="text" class="form-control" id="valor_devolvido_modal" readonly>  
+                        </div>  
+                    </div>  
+
+                    <!-- <button type="button" class="btn btn-warning" id="btnDevolver" onclick="abrirDevolucaoModal()">Devolver valores</button>   -->
+
+                    <div id="pagamentosAdicionados" class="mt-3">  
+                        <h5 style="font-weight: 700; font-size: 16px; color: var(--text-primary);">Pagamentos Adicionados</h5>  
+                        <table class="table">  
+                            <thead>  
+                                <tr>  
+                                    <th style="width: 50%;">Forma de Pagamento</th>  
+                                    <th style="width: 40%;">Valor</th>  
+                                    <th>Data</th>  
+                                </tr>  
+                            </thead>  
+                            <tbody id="pagamentosTable">  
+                                <!-- Pagamentos adicionados serão listados aqui -->  
+                            </tbody>  
+                        </table>  
+                    </div>  
+                </div>  
+                <div class="modal-footer">  
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>  
+                </div>  
+            </div>  
+        </div>  
+    </div>  
+
+    <!-- Modal de Devolução -->  
+    <div class="modal fade modal-modern" id="devolucaoModal" tabindex="-1" role="dialog" aria-labelledby="devolucaoModalLabel" aria-hidden="true">  
+        <div class="modal-dialog" role="document">  
+            <div class="modal-content">  
+                <div class="modal-header">  
+                    <h5 class="modal-title mb-0" id="devolucaoModalLabel">Devolver Valores</h5>  
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>  
+                </div>  
+                <div class="modal-body">  
+                    <div class="form-group">  
+                        <label for="forma_devolucao">Forma de Devolução</label>  
+                        <select class="form-control" id="forma_devolucao">  
+                            <option value="">Selecione</option>  
+                            <option value="Espécie">Espécie</option>  
+                            <option value="PIX">PIX</option>  
+                            <option value="Transferência Bancária">Transferência Bancária</option>  
+                        </select>  
+                    </div>  
+                    <div class="form-group">  
+                        <label for="valor_devolucao">Valor da Devolução</label>  
+                        <input type="text" class="form-control" id="valor_devolucao">  
+                    </div>  
+                    <button type="button" class="btn btn-primary" onclick="salvarDevolucao()">Salvar</button>  
+                </div>  
+                <div class="modal-footer">  
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>  
+                </div>  
+            </div>  
+        </div>  
+    </div>  
+
+        <!-- Modal de Anexos -->
     <div class="modal fade modal-modern" id="anexoModal" tabindex="-1" role="dialog" aria-labelledby="anexoModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
@@ -791,9 +1864,9 @@ date_default_timezone_set('America/Sao_Paulo');
                         </button>
                     </form>
 
-                    <hr>
+                    <hr style="border-color: var(--border-primary); margin: var(--space-md) 0;">
                     <div id="anexosAdicionados">
-                        <h5>Anexos Adicionados</h5>
+                        <h5 style="font-weight: 700; font-size: 16px; color: var(--text-primary);">Anexos Adicionados</h5>
                         <table class="table">
                             <thead>
                                 <tr>
@@ -839,8 +1912,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <div class="modal fade modal-modern" id="mensagemModal" tabindex="-1" role="dialog" aria-labelledby="mensagemModalLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
-                <!-- Mantém classes .error/.success para compatibilidade -->
-                <div class="modal-header error" style="background:var(--danger);">
+                <div class="modal-header error" style="background:var(--gradient-error);">
                     <h5 class="modal-title mb-0" id="mensagemModalLabel">Erro</h5>
                     <button type="button" class="btn-close" data-dismiss="modal" aria-label="Fechar">&times;</button>
                 </div>
@@ -856,8 +1928,13 @@ date_default_timezone_set('America/Sao_Paulo');
 
     <!-- Toasters -->
     <div aria-live="polite" aria-atomic="true" style="position: relative; z-index: 1050;">
-        <div id="toastContainer" style="position: absolute; top: 16px; right: 0;"></div>
+        <div id="toastContainer" style="position: fixed; top: 80px; right: 20px; z-index: 1060;"></div>
     </div>
+
+    <!-- Scroll to Top -->
+    <button id="scrollTop" aria-label="Voltar ao topo">
+        <i class="fa fa-chevron-up"></i>
+    </button>
 
     <script src="../script/jquery-3.6.0.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
@@ -868,7 +1945,26 @@ date_default_timezone_set('America/Sao_Paulo');
     <script src="../script/sweetalert2.js"></script>
     <script>
         $(document).ready(function() {
-            // Máscaras
+            // ===================== TEMA =====================
+            $.get('../load_mode.php', function(mode){
+                $('body').removeClass('light-mode dark-mode').addClass(mode);
+            });
+
+            // ===================== SCROLL TO TOP =====================
+            const $scrollTop = $('#scrollTop');
+            $(window).on('scroll', function() {
+                if ($(this).scrollTop() > 300) {
+                    $scrollTop.css('opacity', '1');
+                } else {
+                    $scrollTop.css('opacity', '0');
+                }
+            });
+
+            $scrollTop.on('click', function() {
+                $('html, body').animate({ scrollTop: 0 }, 600);
+            });
+
+            // ===================== MÁSCARAS =====================
             $('#cpf_cliente').mask('000.000.000-00', { reverse: true }).on('blur', function() {
                 var cpfCnpj = $(this).val().replace(/\D/g, '');
                 if (cpfCnpj.length === 11) {
@@ -881,14 +1977,33 @@ date_default_timezone_set('America/Sao_Paulo');
             $('#valor_pagamento').mask('#.##0,00', { reverse: true });
             $('#valor_devolucao').mask('#.##0,00', { reverse: true });
 
-            // DataTable
+            // ===================== DATATABLE =====================
             $('#tabelaResultados').DataTable({
                 "language": { "url": "../style/Portuguese-Brasil.json" },
                 "order": [[0, 'desc']],
                 "pageLength": 10
             });
+
+            // ===================== VALIDAÇÃO DE DATAS =====================
+            var currentYear = new Date().getFullYear();
+            function validateDate(input) {
+                var selectedDate = new Date($(input).val());
+                if (selectedDate.getFullYear() > currentYear) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Data inválida',
+                        text: 'O ano não pode ser maior que o ano atual.',
+                        confirmButtonText: 'Ok'
+                    });
+                    $(input).val('');
+                }
+            }
+            $('#data_inicial, #data_final').on('change', function() {
+                if ($(this).val()) { validateDate(this); }
+            });
         });
 
+        // ===================== FUNÇÕES DE PAGAMENTO =====================
         function verificarTimbrado(id) {
             $.ajax({
                 url: '../style/configuracao.json',
@@ -904,15 +2019,22 @@ date_default_timezone_set('America/Sao_Paulo');
                     window.open(url, '_blank');
                 },
                 error: function() {
-                    alert('Erro ao carregar o arquivo de configuração.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: 'Erro ao carregar o arquivo de configuração.'
+                    });
                 }
             });
         }
 
         function abrirPagamentoModal(osId, cliente, totalOs, totalPagamentos, totalLiquidado, totalDevolvido, saldo, statusOS) {
-            // Guarda de segurança extra: bloquear se cancelado
             if (statusOS === 'Cancelado') {
-                Swal.fire({ icon:'warning', title:'Operação não permitida', text:'Esta OS está cancelada.' });
+                Swal.fire({ 
+                    icon:'warning', 
+                    title:'Operação não permitida', 
+                    text:'Esta OS está cancelada.' 
+                });
                 return;
             }
 
@@ -925,17 +2047,18 @@ date_default_timezone_set('America/Sao_Paulo');
             $('#total_pagamento').val('R$ ' + totalPagamentos.toFixed(2).replace('.', ','));
             $('#saldo_modal').val('R$ ' + saldo.toFixed(2).replace('.', ','));
 
-            // Controla o botão "Devolver Valores"
-            if (saldo <= 0) { $('#btnDevolver').hide(); } else { $('#btnDevolver').show(); }
+            if (saldo <= 0) { 
+                $('#btnDevolver').hide(); 
+            } else { 
+                $('#btnDevolver').show(); 
+            }
 
             $('#pagamentoModal').modal('show');
 
-            // Persistir informações
             window.currentOsId = osId;
             window.currentClient = cliente;
             window.statusOS = statusOS;
 
-            // Atualizar tabela de pagamentos existentes
             atualizarTabelaPagamentos();
         }
 
@@ -944,17 +2067,24 @@ date_default_timezone_set('America/Sao_Paulo');
             var valorPagamento = parseFloat($('#valor_pagamento').val().replace(/\./g, '').replace(',', '.'));
 
             if (formaPagamento === "") {
-                Swal.fire({ icon: 'error', title: 'Erro', text: 'Por favor, selecione uma forma de pagamento.' });
+                Swal.fire({ 
+                    icon: 'error', 
+                    title: 'Erro', 
+                    text: 'Por favor, selecione uma forma de pagamento.' 
+                });
                 return;
             }
             if (isNaN(valorPagamento) || valorPagamento <= 0) {
-                Swal.fire({ icon: 'error', title: 'Erro', text: 'Por favor, insira um valor válido para o pagamento.' });
+                Swal.fire({ 
+                    icon: 'error', 
+                    title: 'Erro', 
+                    text: 'Por favor, insira um valor válido para o pagamento.' 
+                });
                 return;
             }
 
-            // Regra para "Espécie": somente valores terminados em 0 ou 5 centavos (múltiplos de R$ 0,05)
+            // Validação para Espécie (múltiplos de R$ 0,05)
             if (formaPagamento === 'Espécie') {
-                // Evita problemas de ponto flutuante
                 var cents = Math.round((valorPagamento + Number.EPSILON) * 100);
                 if (cents % 5 !== 0) {
                     Swal.fire({
@@ -992,16 +2122,32 @@ date_default_timezone_set('America/Sao_Paulo');
                                 if (response.success) {
                                     atualizarTabelaPagamentos();
                                     $('#valor_pagamento').val('');
-                                    Swal.fire({ icon: 'success', title: 'Sucesso', text: 'Pagamento adicionado com sucesso!' });
+                                    Swal.fire({ 
+                                        icon: 'success', 
+                                        title: 'Sucesso', 
+                                        text: 'Pagamento adicionado com sucesso!' 
+                                    });
                                 } else {
-                                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao adicionar pagamento.' });
+                                    Swal.fire({ 
+                                        icon: 'error', 
+                                        title: 'Erro', 
+                                        text: 'Erro ao adicionar pagamento.' 
+                                    });
                                 }
                             } catch (e) {
-                                Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao processar resposta do servidor.' });
+                                Swal.fire({ 
+                                    icon: 'error', 
+                                    title: 'Erro', 
+                                    text: 'Erro ao processar resposta do servidor.' 
+                                });
                             }
                         },
                         error: function() {
-                            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao adicionar pagamento.' });
+                            Swal.fire({ 
+                                icon: 'error', 
+                                title: 'Erro', 
+                                text: 'Erro ao adicionar pagamento.' 
+                            });
                         }
                     });
                 }
@@ -1028,9 +2174,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <tr>
                                     <td>${pagamento.forma_de_pagamento}</td>
                                     <td>R$ ${parseFloat(pagamento.total_pagamento).toFixed(2).replace('.', ',')}</td>
-                                    <td>
-                                        ${canDelete ? `<button type="button" class="btn btn-delete btn-sm" onclick="removerPagamento(${pagamento.id})"><i class="fa fa-trash-o" aria-hidden="true"></i></button>` : ''}
-                                    </td>
+                                    <td>${(v=>{if(!v)return'-';const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:new Date(v).toLocaleDateString('pt-BR');})(pagamento.data_pagamento)}</td>
                                 </tr>
                             `);
                         });
@@ -1039,7 +2183,11 @@ date_default_timezone_set('America/Sao_Paulo');
                         var saldo = total - parseFloat($('#total_os_modal').val().replace('R$ ', '').replace(/\./g, '').replace(',', '.')) - parseFloat($('#valor_devolvido_modal').val().replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
                         $('#saldo_modal').val('R$ ' + saldo.toFixed(2).replace('.', ','));
 
-                        if (saldo <= 0) { $('#btnDevolver').hide(); } else { $('#btnDevolver').show(); }
+                        if (saldo <= 0) { 
+                            $('#btnDevolver').hide(); 
+                        } else { 
+                            $('#btnDevolver').show(); 
+                        }
                     } catch (e) {
                         exibirMensagem('Erro ao processar resposta do servidor.', 'error');
                     }
@@ -1145,6 +2293,7 @@ date_default_timezone_set('America/Sao_Paulo');
             });
         }
 
+        // ===================== FUNÇÕES DE ANEXOS =====================
         function abrirAnexoModal(osId) {
             $('#anexoModal').modal('show');
             window.currentOsId = osId;
@@ -1182,8 +2331,16 @@ date_default_timezone_set('America/Sao_Paulo');
             }
 
             dropArea.addEventListener('click', ()=> fileInput.click());
-            dropArea.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }});
-            dropArea.addEventListener('dragover', (e)=>{ e.preventDefault(); dropArea.classList.add('dragover'); });
+            dropArea.addEventListener('keydown', (e)=>{ 
+                if(e.key === 'Enter' || e.key === ' ') { 
+                    e.preventDefault(); 
+                    fileInput.click(); 
+                }
+            });
+            dropArea.addEventListener('dragover', (e)=>{ 
+                e.preventDefault(); 
+                dropArea.classList.add('dragover'); 
+            });
             dropArea.addEventListener('dragleave', ()=> dropArea.classList.remove('dragover'));
             dropArea.addEventListener('drop', (e)=>{
                 e.preventDefault();
@@ -1212,17 +2369,33 @@ date_default_timezone_set('America/Sao_Paulo');
                         if (response.success) {
                             $('#novo_anexo').val('');
                             $('#fileList').empty();
-                            Swal.fire({ icon: 'success', title: 'Sucesso', text: 'Anexo salvo com sucesso!' });
+                            Swal.fire({ 
+                                icon: 'success', 
+                                title: 'Sucesso', 
+                                text: 'Anexo salvo com sucesso!' 
+                            });
                             atualizarTabelaAnexos();
                         } else {
-                            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao salvar anexo.' });
+                            Swal.fire({ 
+                                icon: 'error', 
+                                title: 'Erro', 
+                                text: 'Erro ao salvar anexo.' 
+                            });
                         }
                     } catch (e) {
-                        Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao processar resposta do servidor.' });
+                        Swal.fire({ 
+                            icon: 'error', 
+                            title: 'Erro', 
+                            text: 'Erro ao processar resposta do servidor.' 
+                        });
                     }
                 },
                 error: function() {
-                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao salvar anexo.' });
+                    Swal.fire({ 
+                        icon: 'error', 
+                        title: 'Erro', 
+                        text: 'Erro ao salvar anexo.' 
+                    });
                 }
             });
         }
@@ -1244,8 +2417,9 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <tr>
                                     <td>${anexo.caminho_anexo}</td>
                                     <td>
-                                        <button type="button" class="btn btn-info btn-sm" onclick="visualizarAnexo('${caminhoCompleto}')"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                        
+                                        <button type="button" class="btn btn-info btn-sm" onclick="visualizarAnexo('${caminhoCompleto}')">
+                                            <i class="fa fa-eye" aria-hidden="true"></i>
+                                        </button>
                                     </td>
                                 </tr>
                             `);
@@ -1260,7 +2434,6 @@ date_default_timezone_set('America/Sao_Paulo');
             });
         }
 
-        // Utilitário para obter URL absoluta (mesmo domínio)
         function absoluteUrl(path){
             try{
                 return new URL(path, window.location.origin + window.location.pathname).href;
@@ -1269,7 +2442,6 @@ date_default_timezone_set('America/Sao_Paulo');
             }
         }
 
-        // Visualizar anexo dentro de modal (PDF com PDF.js; imagens; outros via iframe)
         function visualizarAnexo(caminho) {
             const abs = absoluteUrl(caminho);
             const name = caminho.split('/').pop();
@@ -1308,22 +2480,19 @@ date_default_timezone_set('America/Sao_Paulo');
                 container.appendChild(fallback);
             }
 
-            // Mostrar modal do visualizador
             $('#viewerModal').modal('show');
         }
 
-        // Ajuste de z-index/backdrop para modal aninhado + restaurar rolagem do modal anterior
         $('#viewerModal').on('shown.bs.modal', function () {
             const backdrops = $('.modal-backdrop');
             backdrops.last().css('z-index', 1055);
             $(this).css('z-index', 1060);
         });
+
         $('#viewerModal').on('hidden.bs.modal', function () {
-            // Se o modal de anexos ainda estiver aberto, mantém o body com overflow escondido
             if ($('#anexoModal').hasClass('show')) {
                 $('body').addClass('modal-open');
             }
-            // Limpa o viewer para liberar memória
             $('#viewerContainer').empty();
         });
 
@@ -1345,58 +2514,56 @@ date_default_timezone_set('America/Sao_Paulo');
                             try {
                                 response = JSON.parse(response);
                                 if (response.success) {
-                                    Swal.fire({ icon: 'success', title: 'Sucesso', text: 'Anexo removido com sucesso!' });
+                                    Swal.fire({ 
+                                        icon: 'success', 
+                                        title: 'Sucesso', 
+                                        text: 'Anexo removido com sucesso!' 
+                                    });
                                     atualizarTabelaAnexos();
                                 } else {
-                                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao remover anexo.' });
+                                    Swal.fire({ 
+                                        icon: 'error', 
+                                        title: 'Erro', 
+                                        text: 'Erro ao remover anexo.' 
+                                    });
                                 }
                             } catch (e) {
-                                Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao processar resposta do servidor.' });
+                                Swal.fire({ 
+                                    icon: 'error', 
+                                    title: 'Erro', 
+                                    text: 'Erro ao processar resposta do servidor.' 
+                                });
                             }
                         },
                         error: function() {
-                            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao remover anexo.' });
+                            Swal.fire({ 
+                                icon: 'error', 
+                                title: 'Erro', 
+                                text: 'Erro ao remover anexo.' 
+                            });
                         }
                     });
                 }
             });
         }
 
-        // Atualiza label do input (fallback se usar input visível por algum motivo)
         document.addEventListener('change', function(e){
             if(e.target && e.target.id === 'novo_anexo'){
                 const lbl = document.querySelector('label[for="novo_anexo"]');
                 if(!lbl) return;
                 const files = e.target.files || [];
-                if (files.length === 1) { lbl.textContent = files[0].name; }
-                else if (files.length > 1) { lbl.textContent = files.length + ' arquivos selecionados'; }
-                else { lbl.textContent = 'Selecione os arquivos para anexar'; }
-            }
-        });
-
-        // Recarrega a página ao fechar modal de anexos (mantido do original)
-        $('#anexoModal').on('hidden.bs.modal', function () {
-            location.reload();
-        });
-
-        // Validação de datas (não permite ano futuro)
-        $(document).ready(function() {
-            var currentYear = new Date().getFullYear();
-            function validateDate(input) {
-                var selectedDate = new Date($(input).val());
-                if (selectedDate.getFullYear() > currentYear) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Data inválida',
-                        text: 'O ano não pode ser maior que o ano atual.',
-                        confirmButtonText: 'Ok'
-                    });
-                    $(input).val('');
+                if (files.length === 1) { 
+                    lbl.textContent = files[0].name; 
+                } else if (files.length > 1) { 
+                    lbl.textContent = files.length + ' arquivos selecionados'; 
+                } else { 
+                    lbl.textContent = 'Selecione os arquivos para anexar'; 
                 }
             }
-            $('#data_inicial, #data_final').on('change', function() {
-                if ($(this).val()) { validateDate(this); }
-            });
+        });
+
+        $('#anexoModal').on('hidden.bs.modal', function () {
+            location.reload();
         });
     </script>
 
