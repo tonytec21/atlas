@@ -2776,12 +2776,10 @@ $(document).ready(function() {
         $('#mensagemModal').modal('show');
     }
 
-    // Adicionar evento para recarregar a página ao fechar os modais
-    // Não recarrega a página; mantém dados em tempo real
+    // Ao fechar o modal de pagamento, recarrega a página
     $('#pagamentoModal').on('hidden.bs.modal', function () {
-        refreshOsHeaderAndStats();
+        window.location.reload();
     });
-
 
     function cancelarOS() {
         var totalPagamentos = parseFloat('<?php echo $total_pagamentos; ?>');
