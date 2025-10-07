@@ -189,7 +189,8 @@ if ($pedidoStatus === 'entregue') {
 } elseif ($osStatus === 'Cancelado' || $osStatus === 'Cancelada') {  
   $bloquearAlteracao = true;  
   $bloqueioMsg = 'O.S. cancelada. Pedido cancelado automaticamente.';  
-} elseif (!($totalPag > 0)) {  
+} elseif ($osId > 0 && !($totalPag > 0)) {  
+  // Só exige pagamento quando houver O.S. vinculada  
   $bloquearAlteracao = true;  
   $bloqueioMsg = 'Para alterar o status do pedido é necessário que a O.S. esteja com Depósito Prévio pago.';  
 }  
@@ -1465,6 +1466,7 @@ body.dark-mode footer .footer-content a:hover {
             <form id="formStatus" method="post" enctype="multipart/form-data" aria-describedby="ajudaStatus">
               <input type="hidden" name="csrf" value="<?=htmlspecialchars($csrf)?>">
               <input type="hidden" name="id" value="<?=$id?>">
+              <input type="hidden" id="hasOSFlag" value="<?= ($osId > 0 ? '1' : '0') ?>">
               <input type="hidden" id="osPagoFlag" value="<?= ($totalPag > 0 ? '1' : '0') ?>">
               <input type="hidden" id="osStatusHidden" value="<?=htmlspecialchars($osStatus ?? '')?>">
               <input type="hidden" id="pedidoStatusHidden" value="<?=htmlspecialchars($pedidoStatus)?>">
@@ -1659,21 +1661,26 @@ $(function(){
   $('#formStatus').on('submit', function(e){
     e.preventDefault();
 
+    const hasOS = $('#hasOSFlag').val() === '1';
+
     const osStatus = $('#osStatusHidden').val();
-    if (osStatus && (osStatus.toLowerCase() === 'cancelado' || osStatus.toLowerCase() === 'cancelada')) {
+    if (hasOS && osStatus && (osStatus.toLowerCase() === 'cancelado' || osStatus.toLowerCase() === 'cancelada')) {
       Swal.fire({icon:'info', title:'Pedido já cancelado', text:'A O.S. está cancelada; o pedido foi/será cancelado automaticamente.'});
       return false;
     }
 
-    const osPago = $('#osPagoFlag').val() === '1';
-    if (!osPago) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Ação bloqueada',
-        text: 'Para alterar o status do pedido a O.S. precisa estar com Depósito Prévio pago.'
-      });
-      return false;
+    if (hasOS) {
+      const osPago = $('#osPagoFlag').val() === '1';
+      if (!osPago) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Ação bloqueada',
+          text: 'Para alterar o status do pedido a O.S. precisa estar com Depósito Prévio pago.'
+        });
+        return false;
+      }
     }
+    // Se não há O.S., segue sem exigir pagamento (pedido isento)
 
     const fd = new FormData(this);
     const btn = $(this).find('button[type="submit"]');

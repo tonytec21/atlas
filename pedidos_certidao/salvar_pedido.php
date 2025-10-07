@@ -243,7 +243,7 @@ function post_json_signed(string $url, string $apiKey, string $hmacSecret, array
         'http' => [
           'method'  => 'POST',
           'header'  => implode("\r\n", $headers),
-        'content' => $json,
+          'content' => $json,
           'timeout' => 25,
         ]
       ]);
@@ -316,12 +316,15 @@ try {
 
   $itens_json   = $_POST['itens'] ?? '[]';
   $itens        = json_decode($itens_json, true);
+  $isento_ato   = !empty($_POST['isento_ato']) && $_POST['isento_ato'] !== '0';
 
   $username     = $_SESSION['username'] ?? 'sistema';
 
   if (!$atribuicao || !$tipo) { if (ob_get_length()) ob_clean(); echo json_encode(['error'=>'Atribuição e Tipo são obrigatórios.']); exit; }
   if (empty($requerente_nome)) { if (ob_get_length()) ob_clean(); echo json_encode(['error'=>'Informe o nome do requerente.']); exit; }
-  if (!$itens || !is_array($itens) || count($itens)==0) { if (ob_get_length()) ob_clean(); echo json_encode(['error'=>'Inclua ao menos um item na O.S.']); exit; }
+  if (!$isento_ato && (!$itens || !is_array($itens) || count($itens)==0)) {
+    if (ob_get_length()) ob_clean(); echo json_encode(['error'=>'Inclua ao menos um item na O.S. ou marque que o ato é isento.']); exit;
+  }
 
   // PROTOCOLO e TOKEN
   $protocolo     = strtoupper(bin2hex(random_bytes(6)));  // 12 hex
@@ -342,46 +345,53 @@ try {
   // Transação
   $conn->beginTransaction();
 
-  // 1) Inserir OS
-  $stmt = $conn->prepare("INSERT INTO ordens_de_servico (cliente, cpf_cliente, total_os, descricao_os, observacoes, criado_por, base_de_calculo)
-                          VALUES (:cliente,:cpf,:total,:desc,:obs,:user,:base)");
-  $cliente = $requerente_nome;
-  $cpf     = $requerente_doc;
-  $obs     = 'Pedido de Certidão: '.$atribuicao.' / '.$tipo.' • Protocolo: '.$protocolo;
-  $stmt->execute([
-    ':cliente'=>$cliente,
-    ':cpf'=>$cpf,
-    ':total'=>$total_os,
-    ':desc'=>$descricao_os,
-    ':obs'=>$obs,
-    ':user'=>$username,
-    ':base'=>$base_calc
-  ]);
-  $os_id = $conn->lastInsertId();
+  $os_id = null;
 
-  $stmtItem = $conn->prepare("INSERT INTO ordens_de_servico_itens
-      (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, ordem_exibicao)
-       VALUES (:os,:ato,:qtd,:descleg,:descr,:em,:fe,:fa,:fm,:tot,:ordem)");
-
-  foreach($itens as $it){
-    $em  = br_money_to_decimal($it['emolumentos'] ?? 0);
-    $fe  = br_money_to_decimal($it['ferc'] ?? 0);
-    $fa  = br_money_to_decimal($it['fadep'] ?? 0);
-    $fm  = br_money_to_decimal($it['femp'] ?? 0);
-    $tot = br_money_to_decimal($it['total'] ?? 0);
-    $stmtItem->execute([
-      ':os'    => $os_id,
-      ':ato'   => $it['ato'],
-      ':qtd'   => (int)$it['quantidade'],
-      ':descleg'=> (float)$it['desconto_legal'],
-      ':descr' => $it['descricao'],
-      ':em'    => $em,
-      ':fe'    => $fe,
-      ':fa'    => $fa,
-      ':fm'    => $fm,
-      ':tot'   => $tot,
-      ':ordem' => (int)$it['ordem_exibicao']
+  if ($isento_ato) {
+    // Ato isento: não cria OS e zera total_os
+    $total_os = 0.0;
+  } else {
+    // 1) Inserir OS
+    $stmt = $conn->prepare("INSERT INTO ordens_de_servico (cliente, cpf_cliente, total_os, descricao_os, observacoes, criado_por, base_de_calculo)
+                            VALUES (:cliente,:cpf,:total,:desc,:obs,:user,:base)");
+    $cliente = $requerente_nome;
+    $cpf     = $requerente_doc;
+    $obs     = 'Pedido de Certidão: '.$atribuicao.' / '.$tipo.' • Protocolo: '.$protocolo;
+    $stmt->execute([
+      ':cliente'=>$cliente,
+      ':cpf'=>$cpf,
+      ':total'=>$total_os,
+      ':desc'=>$descricao_os,
+      ':obs'=>$obs,
+      ':user'=>$username,
+      ':base'=>$base_calc
     ]);
+    $os_id = $conn->lastInsertId();
+
+    $stmtItem = $conn->prepare("INSERT INTO ordens_de_servico_itens
+        (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, ordem_exibicao)
+         VALUES (:os,:ato,:qtd,:descleg,:descr,:em,:fe,:fa,:fm,:tot,:ordem)");
+
+    foreach($itens as $it){
+      $em  = br_money_to_decimal($it['emolumentos'] ?? 0);
+      $fe  = br_money_to_decimal($it['ferc'] ?? 0);
+      $fa  = br_money_to_decimal($it['fadep'] ?? 0);
+      $fm  = br_money_to_decimal($it['femp'] ?? 0);
+      $tot = br_money_to_decimal($it['total'] ?? 0);
+      $stmtItem->execute([
+        ':os'    => $os_id,
+        ':ato'   => $it['ato'],
+        ':qtd'   => (int)$it['quantidade'],
+        ':descleg'=> (float)$it['desconto_legal'],
+        ':descr' => $it['descricao'],
+        ':em'    => $em,
+        ':fe'    => $fe,
+        ':fa'    => $fa,
+        ':fm'    => $fm,
+        ':tot'   => $tot,
+        ':ordem' => (int)$it['ordem_exibicao']
+      ]);
+    }
   }
 
   // 2) Inserir Pedido
@@ -404,7 +414,7 @@ try {
     ':refs'  => $referencias_json,
     ':base'  => $base_calc,
     ':tot'   => $total_os,
-    ':os'    => $os_id,
+    ':os'    => $os_id, // pode ser NULL quando isento
     ':user'  => $username
   ]);
   $pedido_id = $conn->lastInsertId();
@@ -449,7 +459,8 @@ try {
     'tipo'             => $tipo,
     'status'           => 'pendente',
     'pedido_id'        => (int)$pedido_id,
-    'ordem_servico_id' => (int)$os_id,
+    'ordem_servico_id' => $os_id === null ? null : (int)$os_id,
+    'isento_ato'       => $isento_ato ? true : false,
     'criado_em'        => date('c'),
     // Resumo sem dados sensíveis (LGPD)
     'resumo' => [

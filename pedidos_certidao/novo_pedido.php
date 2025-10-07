@@ -323,6 +323,11 @@ body {
   flex-shrink: 0;
 }
 
+.form-check-input{
+  margin: 6px!important;
+  margin-bottom: 12px!important;
+}
+
 .title-icon i {  
   font-size: 32px;  
   color: var(--text-primary);  
@@ -813,6 +818,18 @@ body.dark-mode footer .footer-content a:hover {
       <fieldset>
         <legend>Ordem de Serviço (Emolumentos)</legend>
 
+        <!-- Marcação de isenção (sem orçamento) -->
+        <div class="form-row mb-2">
+          <div class="form-group col-md-12">
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="isento_ato">
+              <label class="form-check-label" for="isento_ato">
+                Ato isento (sem orçamento) — não gerar Ordem de Serviço
+              </label>
+            </div>
+          </div>
+        </div>
+
         <!-- Seleção de modelo de OS -->
         <div class="form-row">
           <div class="form-group col-md-12">
@@ -1283,25 +1300,49 @@ $(function(){
   $('#requerente_nome').on('input', updateTituloOS);
 
   /* =========================== Recursos OS (modelos/drag/ISS) =========================== */
+  
+  function setOSDisabled(disabled){
+  // Desabilita todos os controles da seção de O.S.
+  $('#modelo_orcamento, #descricao_os, #total_os, #ato, #quantidade, #desconto_legal, #descricao, #emolumentos, #ferc, #fadep, #femp, #total')
+    .prop('disabled', disabled);
+  // Botões
+  $('button[onclick="buscarAto()"], button[onclick="adicionarAtoManual()"], button[onclick="adicionarItemOS()"]')
+    .prop('disabled', disabled);
+  // Tabela de itens (limpa se desabilitar)
+  if (disabled){
+    $('#itensTable').empty();
+    atualizarISS();
+    renumerar();
+    $('#total_os').val('0,00');
+  }
+}
 
-  // Sortable (arrastar para reordenar)
-  $("#itensTable").sortable({
-    placeholder: "ui-state-highlight",
-    update: function(){ renumerar(); atualizarISS(); }
-  }).disableSelection();
+$('#isento_ato').on('change', function(){
+  const isento = $(this).is(':checked');
+  setOSDisabled(isento);
+});
 
-  // Carregar lista de modelos no select
-  $.ajax({
-    url: '../os/listar_todos_modelos.php',
-    method: 'GET',
-    dataType: 'json'
-  }).done(function(resp){
-    if (resp && resp.modelos){
-      resp.modelos.forEach(function(m){
-        $('#modelo_orcamento').append(new Option(m.nome_modelo, m.id));
-      });
-    }
-  });
+// Sortable (arrastar para reordenar)
+$("#itensTable").sortable({
+  placeholder: "ui-state-highlight",
+  update: function(){ renumerar(); atualizarISS(); }
+}).disableSelection();
+
+// Carregar lista de modelos no select
+$.ajax({
+  url: '../os/listar_todos_modelos.php',
+  method: 'GET',
+  dataType: 'json'
+}).done(function(resp){
+  if (resp && resp.modelos){
+    resp.modelos.forEach(function(m){
+      $('#modelo_orcamento').append(new Option(m.nome_modelo, m.id));
+    });
+  }
+});
+
+// Estado inicial (por via das dúvidas)
+setOSDisabled($('#isento_ato').is(':checked'));
 
   // Ao escolher um modelo, carrega itens
   $('#modelo_orcamento').on('change', function(){
@@ -1532,6 +1573,9 @@ function adicionarAtoManual(){
 }
 
 function adicionarItemOS(){
+  if ($('#isento_ato').is(':checked')){
+    return toast('error','Ato isento: não é possível adicionar itens à O.S.');
+  }
   const ato = $('#ato').val();
   const qtd = parseInt($('#quantidade').val()||'1',10);
   const desc = parseFloat($('#desconto_legal').val()||'0');
@@ -1701,23 +1745,31 @@ function gatherFormData(){
   if (obsExtra) refs['observacao'] = obsExtra;
 
   // OS itens
+    const isento = $('#isento_ato').is(':checked');
+
+  // OS itens (somente se NÃO isento)
   const itens = [];
-  $('#itensTable tr').each(function(idx){
-    const tds = $(this).find('td');
-    itens.push({
-      ato: tds.eq(1).text(),
-      quantidade: tds.eq(2).text(),
-      desconto_legal: tds.eq(3).text().replace('%',''),
-      descricao: tds.eq(4).text(),
-      emolumentos: tds.eq(5).text(),
-      ferc:        tds.eq(6).text(),
-      fadep:       tds.eq(7).text(),
-      femp:        tds.eq(8).text(),
-      total:       tds.eq(9).text(),
-      ordem_exibicao: (idx+1)
+  if (!isento){
+    $('#itensTable tr').each(function(idx){
+      const tds = $(this).find('td');
+      itens.push({
+        ato: tds.eq(1).text(),
+        quantidade: tds.eq(2).text(),
+        desconto_legal: tds.eq(3).text().replace('%',''),
+        descricao: tds.eq(4).text(),
+        emolumentos: tds.eq(5).text(),
+        ferc:        tds.eq(6).text(),
+        fadep:       tds.eq(7).text(),
+        femp:        tds.eq(8).text(),
+        total:       tds.eq(9).text(),
+        ordem_exibicao: (idx+1)
+      });
     });
-  });
-  if (itens.length===0){ toast('error','Adicione ao menos um item na O.S.'); return null; }
+    if (itens.length===0){
+      toast('error','Adicione ao menos um item na O.S. ou marque "Ato isento".');
+      return null;
+    }
+  }
 
   const payload = {
     csrf: $('input[name="csrf"]').val(),
@@ -1731,7 +1783,8 @@ function gatherFormData(){
     portador_doc: $('#portador_doc').val(),
     referencias_json: JSON.stringify(refs),
     descricao_os: $('#descricao_os').val(),
-    total_os: $('#total_os').val(),
+    total_os: isento ? '0,00' : $('#total_os').val(),
+    isento_ato: isento ? '1' : '0',
     itens: JSON.stringify(itens)
   };
   return payload;

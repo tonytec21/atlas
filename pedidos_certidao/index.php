@@ -841,6 +841,26 @@ body {
   border-radius: var(--radius-sm);  
 }  
 
+/* ===================== ISENTO BADGE ===================== */
+.badge-isento {
+  background: rgba(99, 102, 241, 0.12); /* roxinho leve */
+  color: var(--brand-primary);
+  border: 1.5px solid rgba(99, 102, 241, 0.35);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge-isento::before {
+  content: '●';
+  font-size: 10px;
+  line-height: 1;
+}
+
 .badge-api-warn {  
   background: var(--status-pendente-bg);  
   color: var(--status-pendente-text);  
@@ -1621,6 +1641,7 @@ body.dark-mode footer .footer-content a:hover {
             <?php  
               $pend = (int)($p['pend_api'] ?? 0);  
               $hasErr = $pend > 0 && !empty($p['last_api_error']);  
+              $isento = empty($p['ordem_servico_id']) || (int)$p['ordem_servico_id'] === 0;
             ?>  
             <tr data-pedido-id="<?=$p['id']?>">  
               <td class="nowrap"><?=htmlspecialchars($p['id'])?></td>  
@@ -1631,7 +1652,12 @@ body.dark-mode footer .footer-content a:hover {
               <td><?=htmlspecialchars($p['atribuicao'])?> / <?=htmlspecialchars($p['tipo'])?></td>  
               <td><?=htmlspecialchars($p['requerente_nome'])?></td>  
               <td><?=htmlspecialchars($p['portador_nome'] ?? '-')?></td>  
-              <td class="nowrap"><strong>R$ <?=number_format((float)$p['total_os'],2,',','.')?></strong></td>  
+              <td class="nowrap">
+                <strong>R$ <?=number_format((float)$p['total_os'],2,',','.')?></strong>
+                <?php if ($isento): ?>
+                  <span class="badge-isento" style="margin-left:6px;">Isento</span>
+                <?php endif; ?>
+              </td>
               <td class="nowrap"><?=date('d/m/Y H:i', strtotime($p['criado_em']))?></td>  
               <td class="nowrap">  
                 <?php if ($pend > 0): ?>  
@@ -1682,6 +1708,7 @@ body.dark-mode footer .footer-content a:hover {
       <?php
         $pend = (int)($p['pend_api'] ?? 0);
         $hasErr = $pend > 0 && !empty($p['last_api_error']);
+        $isento = empty($p['ordem_servico_id']) || (int)$p['ordem_servico_id'] === 0;
       ?>
       <div class="card card-pedido" data-pedido-id="<?=$p['id']?>">
         <div class="card-body">
@@ -1693,7 +1720,12 @@ body.dark-mode footer .footer-content a:hover {
           <p class="mb-2"><strong><?=htmlspecialchars($p['atribuicao'])?> / <?=htmlspecialchars($p['tipo'])?></strong></p>
           <p class="mb-2"><strong>Requerente:</strong> <?=htmlspecialchars($p['requerente_nome'])?></p>
           <p class="mb-2"><strong>Portador:</strong> <?=htmlspecialchars($p['portador_nome'] ?? '-')?></p>
-          <p class="mb-2"><strong>Total O.S.:</strong> R$ <?=number_format((float)$p['total_os'],2,',','.')?></p>
+          <p class="mb-2">
+            <strong>Total O.S.:</strong> R$ <?=number_format((float)$p['total_os'],2,',','.')?>
+            <?php if ($isento): ?>
+              <span class="badge-isento" style="margin-left:6px;">Isento</span>
+            <?php endif; ?>
+          </p>
           <p class="mb-3">
             <strong>API:</strong>
             <?php if ($pend > 0): ?>
