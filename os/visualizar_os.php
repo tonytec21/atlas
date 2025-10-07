@@ -14,6 +14,43 @@ if (!isset($conn)) {
     die("Erro ao conectar ao banco de dados");
 }
 
+/* ===================== CONTROLE DO BOTÃO "PAGAMENTOS" POR JSON ===================== */
+// Lê a flag no JSON (usa o mesmo configuracao.json já usado no projeto)
+$__configPath = __DIR__ . '/../style/config_os.json';
+$__controlarPorAcessosAdicionais = false;
+
+if (is_file($__configPath)) {
+    $cfgRaw = file_get_contents($__configPath);
+    $cfgArr = json_decode($cfgRaw, true);
+    // Aceita "S", true ou "1"
+    $val = $cfgArr['controlar_pagamentos_por_acessos_adicionais'] ?? null;
+    $__controlarPorAcessosAdicionais = ($val === 'S' || $val === true || $val === '1');
+}
+
+// Por padrão, sem controle adicional o botão aparece normalmente
+$podeVerBotaoPagamentos = true;
+
+if ($__controlarPorAcessosAdicionais) {
+    // Busca perfil e acessos adicionais do usuário logado
+    $stmtUsr = $conn->prepare("SELECT nivel_de_acesso, acesso_adicional FROM funcionarios WHERE usuario = ?");
+    $stmtUsr->bind_param("s", $_SESSION['username']);
+    $stmtUsr->execute();
+    $resUsr = $stmtUsr->get_result();
+    $usrRow = $resUsr->fetch_assoc();
+    $stmtUsr->close();
+
+    $nivel = strtolower(trim($usrRow['nivel_de_acesso'] ?? ''));
+    $adicionaisStr = trim($usrRow['acesso_adicional'] ?? '');
+    $adicionais = $adicionaisStr !== '' ? array_map('trim', explode(',', $adicionaisStr)) : [];
+
+    $isAdmin = ($nivel === 'administrador' || $nivel === 'admin');
+    $temFluxoDeCaixa = in_array('Fluxo de Caixa', $adicionais, true);
+
+    // Só mostra para Administrador OU quem tem “Fluxo de Caixa”
+    $podeVerBotaoPagamentos = ($isAdmin || $temFluxoDeCaixa);
+}
+/* ================================================================================ */
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $titulo = $_POST['title'];
     $categoria = $_POST['category'];
@@ -1060,7 +1097,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     </div>
                 </div>
 
-                <?php if ($ordem_servico['status'] !== 'Cancelado'): ?>
+                <?php if ($ordem_servico['status'] !== 'Cancelado' && $podeVerBotaoPagamentos): ?>
                     <div class="col-auto">  
                         <button type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#pagamentoModal">  
                             <i class="fa fa-money" aria-hidden="true"></i> Pagamentos  
