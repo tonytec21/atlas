@@ -2012,7 +2012,7 @@ i, i::before, i::after {
 
     <!-- TOP ACTIONS -->  
     <div class="top-actions">  
-      <a href="../os/index.php" class="btn btn-secondary">  
+      <a href="../caixa/index.php" class="btn btn-secondary">  
         <i class="fas fa-arrow-left"></i> Voltar  
       </a>  
       <button class="btn btn-primary" id="btnProcessar">  

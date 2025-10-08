@@ -169,14 +169,19 @@ date_default_timezone_set('America/Sao_Paulo');
                 </div>
 
                 <div class="row mb-3">
-                    <div class="col-md-6">
+                    <div class="col-12 col-md-4">
                         <button type="submit" style="width: 100%;" class="btn btn-primary">
                             <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
                         </button>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-12 col-md-4">
                         <button type="button" style="width: 100%;" class="btn btn-secondary" onclick="window.location.href='../os/index.php'">
                             <i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS
+                        </button>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <button type="button" style="width: 100%;" class="btn btn-success" onclick="window.location.href='../analitico/analiticos.php'">
+                            <i class="fa fa-file-excel-o" aria-hidden="true"></i> Relatório Analítico (XLSX)
                         </button>
                     </div>
                 </div>
