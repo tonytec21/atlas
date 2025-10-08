@@ -24,6 +24,48 @@ date_default_timezone_set('America/Sao_Paulo');
     <?php
     include(__DIR__ . '/../menu.php');
 
+    // ============================ DB: tabela (auto-criação) ============================
+    try {
+        $conn = getDatabaseConnection();
+
+        // Cria/atualiza tabela relatorios_analiticos
+        $conn->exec("
+            CREATE TABLE IF NOT EXISTS relatorios_analiticos (
+                id               INT AUTO_INCREMENT PRIMARY KEY,
+                seq_linha        INT NULL,
+                cartorio         VARCHAR(255) NULL,
+                numero_selo      VARCHAR(80) NOT NULL,
+                ato              VARCHAR(255) NULL,
+                usuario          VARCHAR(255) NULL,
+                isento           TINYINT(1) NOT NULL DEFAULT 0,
+                cancelado        TINYINT(1) NOT NULL DEFAULT 0,
+                diferido         TINYINT(1) NOT NULL DEFAULT 0,
+                selagem          DATE NULL,                  -- era VARCHAR(100), agora DATE (apenas data)
+                operacao         DATETIME NULL,              -- era VARCHAR(100), agora DATETIME (data e hora)
+                tipo             VARCHAR(120) NULL,
+                emolumentos      DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                ferj             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                fadep            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                ferc             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                femp             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                selo_valor       DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                total            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                arquivo_origem   VARCHAR(255) NULL,
+                uploaded_by      VARCHAR(120) NULL,
+                created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at       DATETIME NULL,
+                UNIQUE KEY uq_numero_selo (numero_selo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+
+        // Se a tabela existir com tipos antigos (VARCHAR), tentar ajustar (best-effort, silencioso)
+        // OBS: ALTERs são seguros mesmo se já estiver no tipo correto.
+        $conn->exec("ALTER TABLE relatorios_analiticos MODIFY COLUMN selagem DATE NULL");
+        $conn->exec("ALTER TABLE relatorios_analiticos MODIFY COLUMN operacao DATETIME NULL");
+    } catch (Exception $e) {
+        // Silencioso
+    }
+
     $conn = getDatabaseConnection();
     $stmt = $conn->prepare('SELECT nivel_de_acesso, status, usuario FROM funcionarios WHERE usuario = :usuario');
     $stmt->bindParam(':usuario', $_SESSION['username']);
