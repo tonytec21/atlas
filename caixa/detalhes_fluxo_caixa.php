@@ -83,6 +83,61 @@ try {
         $stmt->bindParam(':data', $data);
         $stmt->execute();
         $saldoTransportado = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // SELOS (Unificado): mapear r.usuario (nome completo) -> f.usuario por join com funcionarios.nome_completo
+        $sql = "
+            SELECT 
+                f.usuario        AS funcionario,
+                r.numero_selo    AS numero_selo,
+                r.ato            AS ato,
+                r.tipo           AS tipo,
+                r.selagem        AS selagem,
+                r.emolumentos    AS emolumentos,
+                r.ferj           AS ferj,
+                r.fadep          AS fadep,
+                r.ferc           AS ferc,
+                r.femp           AS femp,  
+                r.total          AS total
+            FROM relatorios_analiticos r
+            INNER JOIN funcionarios f 
+                    ON TRIM(LOWER(f.nome_completo)) = TRIM(LOWER(r.usuario))
+            WHERE DATE(r.selagem) = :data
+            AND r.cancelado = 0
+            AND r.isento    = 0
+            AND r.diferido  = 0
+        ";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+        $stmt->execute();
+        $selos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // NOVO: ATOS ISENTOS (Unificado) — mesmo join, mas com isento = 1
+        $sql = "
+            SELECT 
+                f.usuario        AS funcionario,
+                r.numero_selo    AS numero_selo,
+                r.ato            AS ato,
+                r.tipo           AS tipo,
+                r.selagem        AS selagem,
+                r.emolumentos    AS emolumentos,
+                r.ferj           AS ferj,
+                r.fadep          AS fadep,
+                r.ferc           AS ferc,
+                r.femp           AS femp,  
+                r.total          AS total
+            FROM relatorios_analiticos r
+            INNER JOIN funcionarios f 
+                    ON TRIM(LOWER(f.nome_completo)) = TRIM(LOWER(r.usuario))
+            WHERE DATE(r.selagem) = :data
+            AND r.cancelado = 0
+            AND r.isento    = 1
+            AND r.diferido  = 0
+        ";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+        $stmt->execute();
+        $atos_isentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     } else {
         // Atos Liquidados
         $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total, al.funcionario, al.data
@@ -157,6 +212,64 @@ try {
         $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->execute();
         $saldoTransportado = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // SELOS (Individual): join pelo nome completo -> filtra pelo f.usuario = :funcionario
+        $sql = "
+            SELECT 
+                f.usuario        AS funcionario,
+                r.numero_selo    AS numero_selo,
+                r.ato            AS ato,
+                r.tipo           AS tipo,
+                r.selagem        AS selagem,
+                r.emolumentos    AS emolumentos,
+                r.ferj           AS ferj,
+                r.fadep          AS fadep,
+                r.ferc           AS ferc,
+                r.femp           AS femp,                                
+                r.total          AS total
+            FROM relatorios_analiticos r
+            INNER JOIN funcionarios f 
+                    ON TRIM(LOWER(f.nome_completo)) = TRIM(LOWER(r.usuario))
+            WHERE DATE(r.selagem) = :data
+            AND f.usuario = :funcionario
+            AND r.cancelado = 0
+            AND r.isento    = 0
+            AND r.diferido  = 0
+        ";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+        $stmt->bindParam(':funcionario', $funcionarios);
+        $stmt->execute();
+        $selos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // NOVO: ATOS ISENTOS (Individual) — mesmo join, filtrando o funcionário, com isento = 1
+        $sql = "
+            SELECT 
+                f.usuario        AS funcionario,
+                r.numero_selo    AS numero_selo,
+                r.ato            AS ato,
+                r.tipo           AS tipo,
+                r.selagem        AS selagem,
+                r.emolumentos    AS emolumentos,
+                r.ferj           AS ferj,
+                r.fadep          AS fadep,
+                r.ferc           AS ferc,
+                r.femp           AS femp,                                
+                r.total          AS total
+            FROM relatorios_analiticos r
+            INNER JOIN funcionarios f 
+                    ON TRIM(LOWER(f.nome_completo)) = TRIM(LOWER(r.usuario))
+            WHERE DATE(r.selagem) = :data
+            AND f.usuario = :funcionario
+            AND r.cancelado = 0
+            AND r.isento    = 1
+            AND r.diferido  = 0
+        ";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+        $stmt->bindParam(':funcionario', $funcionarios);
+        $stmt->execute();
+        $atos_isentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     $totalAtos = array_reduce($atos, function($carry, $item) {
@@ -205,6 +318,17 @@ try {
         return $carry + floatval($item['valor_transportado']);
     }, 0.0);
 
+    // Total em Selos (somando selo_valor)
+    $totalSelos = array_reduce(isset($selos) ? $selos : [], function($carry, $item) {
+        return $carry + floatval($item['total']);
+    }, 0.0);
+
+    // NOVO: Total em Atos Isentos (somente amostragem — não entra em total recebido)
+    $totalAtosIsentos = array_reduce(isset($atos_isentos) ? $atos_isentos : [], function($carry, $item) {
+        return $carry + floatval($item['total']);
+    }, 0.0);
+
+
     if ($tipo === 'unificado') {
         // Para o caixa unificado, somamos os saldos iniciais de todos os caixas na data especificada
         $stmt = $conn->prepare('SELECT SUM(saldo_inicial) as saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data');
@@ -226,6 +350,8 @@ try {
     error_log("Total Saídas e Despesas: " . $totalSaidasDespesas);
     error_log("Total Depósito do Caixa: " . $totalDepositoCaixa);
     error_log("Total Saldo Transportado: " . $totalSaldoTransportado);
+    error_log("Total em Selos: " . $totalSelos);
+    error_log("Total Atos Isentos: " . $totalAtosIsentos);
 
     $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $totalSaidasDespesas - $totalDepositoCaixa - $totalSaldoTransportado;
 
@@ -237,6 +363,11 @@ try {
         'saidas' => $saidas,
         'depositos' => $depositos,
         'saldoTransportado' => $saldoTransportado,
+        'selos' => isset($selos) ? $selos : [],
+
+        // NOVO: retornar também a lista dos Atos Isentos (opcional para uso futuro no front)
+        'atosIsentos' => isset($atos_isentos) ? $atos_isentos : [],
+
         'totalAtos' => $totalAtos,
         'totalAtosManuais' => $totalAtosManuais,
         'totalRecebidoConta' => $totalRecebidoConta,
@@ -246,7 +377,11 @@ try {
         'totalSaidasDespesas' => $totalSaidasDespesas,
         'totalDepositoCaixa' => $totalDepositoCaixa,
         'saldoInicial' => $saldoInicial,
-        'totalSaldoTransportado' => $totalSaldoTransportado
+        'totalSaldoTransportado' => $totalSaldoTransportado,
+        'totalSelos' => $totalSelos,
+
+        // NOVO: total dos Atos Isentos (usado no card do front)
+        'totalAtosIsentos' => isset($totalAtosIsentos) ? $totalAtosIsentos : 0.0
     ]);
 } catch (Exception $e) {
     echo json_encode(['error' => $e->getMessage()]);

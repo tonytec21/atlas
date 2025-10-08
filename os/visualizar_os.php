@@ -1264,7 +1264,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0">Itens da Ordem de Serviço</h4>
 
-                <?php if ($temItensNaoLiquidados): ?>
+                <?php if ($temItensNaoLiquidados && $total_pagamentos > 0): ?>
                 <button 
                     type="button" 
                     class="btn btn-liquidartudo btn-sm" 
@@ -1273,6 +1273,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     <i class="fa fa-check-circle"></i> Liquidar Tudo
                 </button>
                 <?php endif; ?>
+
             </div>
 
             <!-- TABELA DESKTOP -->
@@ -1321,7 +1322,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                                 <?php endif; ?>  
                             </td>  
                             <td>  
-                                <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado'): ?>  
+                                <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado' && $total_pagamentos > 0): ?>  
                                     <button type="button" class="btn btn-primary btn-sm"  
                                     onclick="liquidarAto(  
                                         <?php echo $item['id']; ?>,  
@@ -1331,7 +1332,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                                     )">  
                                         <i class="fa fa-check"></i> Liquidar  
                                     </button>  
-                                <?php endif; ?>  
+                                <?php endif; ?>
                             </td>  
                         </tr>  
                         <?php endforeach; ?>  
@@ -1431,7 +1432,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     </div>
 
                     <!-- Ações -->
-                    <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado'): ?>
+                    <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado' && $total_pagamentos > 0): ?>
                     <div class="card-actions">
                         <button type="button" class="btn btn-primary btn-sm"
                         onclick="liquidarAto(
@@ -1654,6 +1655,9 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <option value="Depósito Bancário">Depósito Bancário</option>  
                             <option value="Boleto">Boleto</option>  
                             <option value="Cheque">Cheque</option>  
+                            <?php if ($__controlarPorAcessosAdicionais): ?>
+                                <option value="Ato Isento">Ato Isento</option>
+                            <?php endif; ?>
                         </select>  
                     </div>  
 

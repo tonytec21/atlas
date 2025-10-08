@@ -496,6 +496,13 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <div class="card-body"><h5 class="card-title" id="cardTotalAtosManuais">R$ 0,00</h5></div>
                             </div>
                         </div>
+                        <!-- NOVO: Atos Isentos -->
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
+                            <div class="card text-white" style="background-color: #17a2b8;">
+                                <div class="card-header">Atos Isentos</div>
+                                <div class="card-body"><h5 class="card-title" id="cardAtosIsentos">R$ 0,00</h5></div>
+                            </div>
+                        </div>
                         <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-warning mb-3">
                                 <div class="card-header">Recebido em Conta</div>
@@ -532,12 +539,22 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <div class="card-body"><h5 class="card-title" id="cardDepositoCaixa">R$ 0,00</h5></div>
                             </div>
                         </div>
+
+                        <!-- NOVO: Total em Selos -->
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
+                            <div class="card text-white bg-primary mb-3">
+                                <div class="card-header">Total em Selos</div>
+                                <div class="card-body"><h5 class="card-title" id="cardTotalSelos">R$ 0,00</h5></div>
+                            </div>
+                        </div>
+
                         <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white btn-4 mb-3">
                                 <div class="card-header">Saldo Transportado</div>
                                 <div class="card-body"><h5 class="card-title" id="cardSaldoTransportado">R$ 0,00</h5></div>
                             </div>
                         </div>
+                        
                         <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-dark mb-3">
                                 <div class="card-header">Total em Caixa</div>
@@ -598,6 +615,34 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <span class="mr-3">Qtd.: <span id="qtdAtos">0</span></span>
                                 <span>Total Atos Liquidados: <span id="totalAtos"></span></span>
                             </h6>
+                        </div>
+                    </div>
+
+                    <!-- NOVO: SELOS -->
+                    <div class="card mb-3">
+                        <div class="card-header table-title text-center"><b>SELOS</b></div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="tabelaSelos" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>
+                                            <th>Nº Selo</th>
+                                            <th>Ato</th>
+                                            <th>Tipo</th>
+                                            <th>Selagem</th>
+                                            <th>Emolumentos</th>
+                                            <th>FERJ</th>
+                                            <th>FADEP</th>
+                                            <th>FERC</th>
+                                            <th>FERC</th>
+                                            <th>TOTAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesSelos"></tbody>
+                                </table>
+                            </div>
+                            <h6 class="total-label">Total em Selos: <span id="totalSelos">R$ 0,00</span></h6>
                         </div>
                     </div>
 
@@ -1343,8 +1388,13 @@ date_default_timezone_set('America/Sao_Paulo');
                     toggleCard('#cardTotalEmCaixa', detalhes.totalEmCaixa);
                     toggleCard('#cardSaidasDespesas', detalhes.totalSaidasDespesas);
                     toggleCard('#cardDepositoCaixa', detalhes.totalDepositoCaixa);
+
+                    // NOVO: Card Total em Selos
+                    toggleCard('#cardTotalSelos', detalhes.totalSelos);
+
                     toggleCard('#cardSaldoTransportado', detalhes.totalSaldoTransportado);
                     toggleCard('#cardSaldoInicial', detalhes.saldoInicial);
+
 
                     // Atos Liquidados
                     var totalAtos = 0;
@@ -1431,6 +1481,10 @@ date_default_timezone_set('America/Sao_Paulo');
                     $('#cardTotalRecebidoEspecie').text(formatCurrency(totalRecebidoEspecie));
                     $('#cardTotalRecebido').text(formatCurrency(totalRecebidoConta + totalRecebidoEspecie));
 
+                    // >>> NOVO: Card "Atos Isentos" vem do total por tipo de pagamento "Ato Isento"
+                    var totalAtoIsento = totalPorTipo['Ato Isento'] || 0;
+                    toggleCard('#cardAtosIsentos', totalAtoIsento);
+
                     // Devoluções
                     var totalDevolucoes = 0;
                     $('#detalhesDevolucoes').empty();
@@ -1495,6 +1549,31 @@ date_default_timezone_set('America/Sao_Paulo');
                     });
                     $('#totalDepositos').text(formatCurrency(totalDepositos));
 
+                    /* NOVO: SELOS */
+                    var totalSelos = 0;
+                    $('#detalhesSelos').empty();
+                    (detalhes.selos || []).forEach(function(s) {
+                        totalSelos += parseFloat(s.total || 0);
+                        $('#detalhesSelos').append(`
+                            <tr>
+                                <td>${s.funcionario}</td>
+                                <td>${s.numero_selo}</td>
+                                <td>${s.ato || ''}</td>
+                                <td>${s.tipo || ''}</td>
+                                <td>${s.selagem ? formatDateForDisplay(s.selagem) : ''}</td>
+                                <td>${formatCurrency(s.emolumentos)}</td>
+                                <td>${formatCurrency(s.ferj)}</td>
+                                <td>${formatCurrency(s.fadep)}</td>
+                                <td>${formatCurrency(s.ferc)}</td>
+                                <td>${formatCurrency(s.femp)}</td>
+                                <td>${formatCurrency(s.total)}</td>
+                            </tr>
+                        `);
+                    });
+                    $('#totalSelos').text(formatCurrency(totalSelos));
+                    // mantém o card em sincronia (caso tabela seja paginada/filtrada no futuro)
+                    $('#cardTotalSelos').text(formatCurrency(totalSelos));
+
                     // Saldo Transportado
                     var totalSaldoTransportado = 0;
                     $('#detalhesSaldoTransportado').empty();
@@ -1547,6 +1626,10 @@ date_default_timezone_set('America/Sao_Paulo');
                     $('#tabelaDevolucoes').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
                     $('#tabelaSaidas').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
                     $('#tabelaDepositos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+
+                    // NOVO: tabela de Selos
+                    $('#tabelaSelos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+
                     $('#tabelaSaldoTransportado').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
                 },
                 error: function() { alert('Erro ao obter detalhes.'); }
