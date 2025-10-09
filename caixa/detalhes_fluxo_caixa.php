@@ -15,6 +15,9 @@ try {
     $tipo = $_GET['tipo'];
 
     $conn = getDatabaseConnection();
+    /* Collation compatível com MySQL 5.7/8.0 e MariaDB */
+    $conn->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $conn->exec("SET collation_connection = 'utf8mb4_unicode_ci'");
 
     if ($tipo === 'unificado') {
         // Atos Liquidados
@@ -60,7 +63,8 @@ try {
         // Saídas e Despesas
         $sql = 'SELECT sd.titulo, sd.valor_saida, sd.forma_de_saida, sd.funcionario, sd.data, sd.data_caixa, sd.caminho_anexo
                 FROM saidas_despesas sd
-                WHERE DATE(sd.data) = :data AND sd.status = "ativo"';
+                WHERE DATE(sd.data) = :data
+                  AND CONVERT(sd.status USING utf8mb4) COLLATE utf8mb4_unicode_ci = "ativo"';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
         $stmt->execute();
@@ -69,7 +73,8 @@ try {
         // Depósitos
         $sql = 'SELECT funcionario, data_caixa, data_cadastro, valor_do_deposito, tipo_deposito, caminho_anexo
                 FROM deposito_caixa
-                WHERE DATE(data_caixa) = :data AND status = "ativo"';
+                WHERE DATE(data_caixa) = :data
+                  AND CONVERT(status USING utf8mb4) COLLATE utf8mb4_unicode_ci = "ativo"';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
         $stmt->execute();
@@ -100,18 +105,19 @@ try {
                 r.total          AS total
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
-                    ON TRIM(LOWER(f.nome_completo)) = TRIM(LOWER(r.usuario))
+                    ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+                     = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
-            AND r.cancelado = 0
-            AND r.isento    = 0
-            AND r.diferido  = 0
+              AND r.cancelado = 0
+              AND r.isento    = 0
+              AND r.diferido  = 0
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
         $stmt->execute();
         $selos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // NOVO: ATOS ISENTOS (Unificado) — mesmo join, mas com isento = 1
+        // ATOS ISENTOS (Unificado)
         $sql = "
             SELECT 
                 f.usuario        AS funcionario,
@@ -127,11 +133,12 @@ try {
                 r.total          AS total
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
-                    ON TRIM(LOWER(f.nome_completo)) = TRIM(LOWER(r.usuario))
+                    ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+                     = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
-            AND r.cancelado = 0
-            AND r.isento    = 1
-            AND r.diferido  = 0
+              AND r.cancelado = 0
+              AND r.isento    = 1
+              AND r.diferido  = 0
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
@@ -186,7 +193,9 @@ try {
         // Saídas e Despesas
         $sql = 'SELECT sd.titulo, sd.valor_saida, sd.forma_de_saida, sd.funcionario, sd.data, sd.data_caixa, sd.caminho_anexo
                 FROM saidas_despesas sd
-                WHERE sd.funcionario = :funcionario AND DATE(sd.data) = :data AND sd.status = "ativo"';
+                WHERE sd.funcionario = :funcionario
+                  AND DATE(sd.data) = :data
+                  AND CONVERT(sd.status USING utf8mb4) COLLATE utf8mb4_unicode_ci = "ativo"';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->bindParam(':data', $data);
@@ -196,7 +205,9 @@ try {
         // Depósitos
         $sql = 'SELECT funcionario, data_caixa, data_cadastro, valor_do_deposito, tipo_deposito, caminho_anexo
                 FROM deposito_caixa
-                WHERE funcionario = :funcionario AND DATE(data_caixa) = :data AND status = "ativo"';
+                WHERE funcionario = :funcionario
+                  AND DATE(data_caixa) = :data
+                  AND CONVERT(status USING utf8mb4) COLLATE utf8mb4_unicode_ci = "ativo"';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->bindParam(':data', $data);
@@ -229,12 +240,13 @@ try {
                 r.total          AS total
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
-                    ON TRIM(LOWER(f.nome_completo)) = TRIM(LOWER(r.usuario))
+                    ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+                     = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
-            AND f.usuario = :funcionario
-            AND r.cancelado = 0
-            AND r.isento    = 0
-            AND r.diferido  = 0
+              AND f.usuario = :funcionario
+              AND r.cancelado = 0
+              AND r.isento    = 0
+              AND r.diferido  = 0
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
@@ -242,7 +254,7 @@ try {
         $stmt->execute();
         $selos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // NOVO: ATOS ISENTOS (Individual) — mesmo join, filtrando o funcionário, com isento = 1
+        // ATOS ISENTOS (Individual)
         $sql = "
             SELECT 
                 f.usuario        AS funcionario,
@@ -258,12 +270,13 @@ try {
                 r.total          AS total
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
-                    ON TRIM(LOWER(f.nome_completo)) = TRIM(LOWER(r.usuario))
+                    ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+                     = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
-            AND f.usuario = :funcionario
-            AND r.cancelado = 0
-            AND r.isento    = 1
-            AND r.diferido  = 0
+              AND f.usuario = :funcionario
+              AND r.cancelado = 0
+              AND r.isento    = 1
+              AND r.diferido  = 0
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
@@ -318,7 +331,7 @@ try {
         return $carry + floatval($item['valor_transportado']);
     }, 0.0);
 
-    // Total em Selos (somando selo_valor)
+    // Total em Selos
     $totalSelos = array_reduce(isset($selos) ? $selos : [], function($carry, $item) {
         return $carry + floatval($item['total']);
     }, 0.0);
@@ -327,7 +340,6 @@ try {
     $totalAtosIsentos = array_reduce(isset($atos_isentos) ? $atos_isentos : [], function($carry, $item) {
         return $carry + floatval($item['total']);
     }, 0.0);
-
 
     if ($tipo === 'unificado') {
         // Para o caixa unificado, somamos os saldos iniciais de todos os caixas na data especificada
@@ -338,7 +350,7 @@ try {
         $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
         $stmt->bindParam(':data', $data);
         $stmt->bindParam(':funcionario', $funcionarios);
-    }    
+    }
     $stmt->execute();
     $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
     $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
