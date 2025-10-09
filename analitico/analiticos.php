@@ -154,54 +154,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
     $sql = "SELECT * FROM relatorios_analiticos WHERE 1=1";
     $sqlCount = "SELECT COUNT(*) as total FROM relatorios_analiticos WHERE 1=1";
     $params = [];
-    
+
     if ($search !== '') {
         $condition = " AND (numero_selo LIKE :search OR ato LIKE :search OR usuario LIKE :search)";
         $sql .= $condition;
         $sqlCount .= $condition;
-        $params[':search'] = "%$search%";
+        $params['search'] = "%$search%";
     }
-    
+
     if ($cartorio !== '') {
         $condition = " AND cartorio LIKE :cartorio";
         $sql .= $condition;
         $sqlCount .= $condition;
-        $params[':cartorio'] = "%$cartorio%";
+        $params['cartorio'] = "%$cartorio%";
     }
-    
+
     if ($ato !== '') {
         $condition = " AND ato LIKE :ato";
         $sql .= $condition;
         $sqlCount .= $condition;
-        $params[':ato'] = "%$ato%";
+        $params['ato'] = "%$ato%";
     }
-    
+
     if ($dataInicio !== '' && $dataFim !== '') {
         $condition = " AND created_at BETWEEN :data_inicio AND :data_fim";
         $sql .= $condition;
         $sqlCount .= $condition;
-        $params[':data_inicio'] = "$dataInicio 00:00:00";
-        $params[':data_fim'] = "$dataFim 23:59:59";
+        $params['data_inicio'] = "$dataInicio 00:00:00";
+        $params['data_fim']    = "$dataFim 23:59:59";
     }
-    
+
     try {
         // Conta total de registros
         $stmtCount = $conn->prepare($sqlCount);
-        $stmtCount->execute($params);
+        foreach ($params as $key => $value) {
+            $stmtCount->bindValue(':' . $key, $value);
+        }
+        $stmtCount->execute();
         $totalRecords = $stmtCount->fetch(PDO::FETCH_ASSOC)['total'];
+
         $totalPages = ceil($totalRecords / $perPage);
         
         // Busca registros da página atual
         $sql .= " ORDER BY created_at DESC LIMIT :limit OFFSET :offset";
         $stmt = $conn->prepare($sql);
-        
+
         foreach ($params as $key => $value) {
-            $stmt->bindValue($key, $value);
+            $stmt->bindValue(':' . $key, $value);
         }
         $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        
+
         $stmt->execute();
+
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         echo json_encode([
@@ -2089,14 +2094,7 @@ i, i::before, i::after {
             <i class="fas fa-search"></i> Busca Geral  
           </label>  
           <input type="text" class="form-control" id="search" name="search" placeholder="Nº do Selo, Ato, Usuário...">  
-        </div>  
-
-        <div class="form-group">  
-          <label class="form-label">  
-            <i class="fas fa-building"></i> Cartório  
-          </label>  
-          <input type="text" class="form-control" id="cartorio" name="cartorio" placeholder="Nome do cartório">  
-        </div>  
+        </div>
 
         <div class="form-group">  
           <label class="form-label">  
@@ -2147,7 +2145,6 @@ i, i::before, i::after {
               <tr>  
                 <th><i class="fas fa-hashtag"></i> Seq</th>  
                 <th><i class="fas fa-certificate"></i> Nº do Selo</th>  
-                <th><i class="fas fa-building"></i> Cartório</th>  
                 <th><i class="fas fa-file-alt"></i> Ato</th>  
                 <th><i class="fas fa-user"></i> Usuário</th>  
                 <th><i class="fas fa-dollar-sign"></i> Total</th>  
@@ -2655,7 +2652,6 @@ function performSearch() {
               </span>
               ${statusBadges ? '<br>' + statusBadges : ''}
             </td>
-            <td>${item.cartorio || '—'}</td>
             <td>${item.ato || '—'}</td>
             <td>${item.usuario || '—'}</td>
             <td><strong style="color:var(--brand-success); font-size:15px;">R$ ${parseFloat(item.total || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</strong></td>
@@ -2694,11 +2690,6 @@ function performSearch() {
             </div>
             
             <div class="mobile-card-body">
-              <div class="mobile-card-field">
-                <span class="mobile-card-label">Cartório:</span>
-                <span class="mobile-card-value">${item.cartorio || '—'}</span>
-              </div>
-              
               <div class="mobile-card-field">
                 <span class="mobile-card-label">Ato:</span>
                 <span class="mobile-card-value">${item.ato || '—'}</span>
