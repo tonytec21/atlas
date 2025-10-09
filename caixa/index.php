@@ -57,11 +57,6 @@ date_default_timezone_set('America/Sao_Paulo');
                 UNIQUE KEY uq_numero_selo (numero_selo)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         ");
-
-        // Se a tabela existir com tipos antigos (VARCHAR), tentar ajustar (best-effort, silencioso)
-        // OBS: ALTERs são seguros mesmo se já estiver no tipo correto.
-        $conn->exec("ALTER TABLE relatorios_analiticos MODIFY COLUMN selagem DATE NULL");
-        $conn->exec("ALTER TABLE relatorios_analiticos MODIFY COLUMN operacao DATETIME NULL");
     } catch (Exception $e) {
         // Silencioso
     }
