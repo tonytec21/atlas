@@ -8,7 +8,6 @@ checkSession();
 include(__DIR__ . '/../os/db_connection.php');  
 date_default_timezone_set('America/Sao_Paulo');  
 header_remove('X-Powered-By');  
-
 /* ========================================================================  
    SCHEMA - MySQL 8+ (mesmo padrão dos outros arquivos)  
    ======================================================================== */  
