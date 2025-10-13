@@ -319,20 +319,27 @@ if ($isAjax) {
 
       $wsql = $where ? ("WHERE ".implode(" AND ", $where)) : ""; 
 
-      $sql = "SELECT t.*, f.nome_completo, f.usuario, e.nome AS equipe_nome, p.protocolo  
-              FROM tarefas_pedido t  
-              LEFT JOIN funcionarios f ON f.id = t.funcionario_id  
-              LEFT JOIN equipes e ON e.id = t.equipe_id  
-              LEFT JOIN pedidos_certidao p ON p.id = t.pedido_id  
-              $wsql  
-              ORDER BY   
-                  CASE t.status   
-                  WHEN 'pendente' THEN 1  
-                  WHEN 'em_andamento' THEN 2  
-                  WHEN 'concluida' THEN 3  
-                  ELSE 4  
-                  END,  
-                  t.atualizado_em DESC, t.criado_em DESC";  
+      $sql = "SELECT 
+          t.*,
+          f.nome_completo, 
+          f.usuario, 
+          e.nome AS equipe_nome, 
+          p.protocolo,
+          p.tipo               AS pedido_tipo,
+          p.ordem_servico_id   AS os_numero
+        FROM tarefas_pedido t  
+        LEFT JOIN funcionarios f ON f.id = t.funcionario_id  
+        LEFT JOIN equipes e ON e.id = t.equipe_id  
+        LEFT JOIN pedidos_certidao p ON p.id = t.pedido_id  
+        $wsql  
+        ORDER BY   
+            CASE t.status   
+            WHEN 'pendente' THEN 1  
+            WHEN 'em_andamento' THEN 2  
+            WHEN 'concluida' THEN 3  
+            ELSE 4  
+            END,  
+            t.atualizado_em DESC, t.criado_em DESC"; 
       $st = $conn->prepare($sql);  
       $st->execute($bind);  
       J(['success'=>true,'data'=>$st->fetchAll(PDO::FETCH_ASSOC)]);  
@@ -1788,7 +1795,28 @@ body {
             </label>
             <input type="text" class="form-control" id="f_protocolo" placeholder="Ex.: 12345/2025">
           </div>
-  
+
+          <!-- Classificação -->
+          <div class="col-md-3">
+            <label class="form-label">
+              <i class="fas fa-sort"></i> Classificar por
+            </label>
+            <select class="form-select" id="sort_by">
+              <option value="data">Data (criação)</option>
+              <option value="ordem">Ordem (nº O.S.)</option>
+              <option value="tipo">Tipo</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">
+              <i class="fas fa-arrow-up-wide-short"></i> Direção
+            </label>
+            <select class="form-select" id="sort_dir">
+              <option value="desc">Decrescente</option>
+              <option value="asc">Crescente</option>
+            </select>
+          </div>
+
         </div>  
         
         <div class="d-flex justify-content-end gap-2" style="margin-top: var(--space-lg);">  
@@ -2058,6 +2086,11 @@ function bindFiltros() {
   $("#f_equipe").on('change', function() {
     carregarFuncionarios($(this).val());
   });
+
+  $("#sort_by, #sort_dir").on('change', function() {
+    carregarKanban();
+  });
+
 }
 
 // ===================== CARREGAR EQUIPES =====================
@@ -2130,6 +2163,37 @@ function carregarContadores() {
   });
 }
 
+function getSortOptions() {
+  const by  = ($('#sort_by').val() || 'data').trim();
+  const dir = ($('#sort_dir').val() || 'desc').trim();
+  const mul = (dir === 'asc') ? 1 : -1;
+  return { by, dir, mul };
+}
+
+function compareTasks(a, b, by, mul) {
+  let va, vb;
+
+  if (by === 'data') {
+    va = new Date(a.criado_em || a.atualizado_em || 0).getTime();
+    vb = new Date(b.criado_em || b.atualizado_em || 0).getTime();
+  } else if (by === 'ordem') {
+    // nº da O.S.; nulls por último
+    va = (a.os_numero == null ? Number.MAX_SAFE_INTEGER : parseInt(a.os_numero, 10));
+    vb = (b.os_numero == null ? Number.MAX_SAFE_INTEGER : parseInt(b.os_numero, 10));
+  } else if (by === 'tipo') {
+    va = (a.pedido_tipo || '').toString().toLowerCase();
+    vb = (b.pedido_tipo || '').toString().toLowerCase();
+  } else {
+    // fallback: data
+    va = new Date(a.criado_em || 0).getTime();
+    vb = new Date(b.criado_em || 0).getTime();
+  }
+
+  if (va < vb) return -1 * mul;
+  if (va > vb) return  1 * mul;
+  return 0;
+}
+
 // ===================== CARREGAR KANBAN =====================
 function carregarKanban() {
   const cols = {
@@ -2178,15 +2242,33 @@ function carregarKanban() {
       return;
     }
 
-    // Renderiza cards nas colunas
+    // Agrupa por status
+    const buckets = {
+      pendente: [],
+      em_andamento: [],
+      concluida: [],
+      cancelada: []
+    };
+
     r.data.forEach(t => {
-      const $card = $(renderCard(t)).data('id', t.id);
-      const $col = cols[t.status] || $('#col_pendente');
-      $col.append($card);
+      (buckets[t.status] || buckets.pendente).push(t);
+    });
+
+    // Lê opções de sort
+    const { by, mul } = getSortOptions();
+
+    // Ordena cada coluna e renderiza
+    Object.keys(buckets).forEach(st => {
+      buckets[st].sort((a, b) => compareTasks(a, b, by, mul));
+      buckets[st].forEach(t => {
+        const $card = $(renderCard(t)).data('id', t.id);
+        (cols[st] || $('#col_pendente')).append($card);
+      });
     });
 
     // Reaplica sortable após carregar novos cards
     initializeSortable();
+
   }).fail(function(xhr, status, error) {
     Object.values(cols).forEach($c => {
       $c.empty().append('<div class="text-center text-danger py-3"><i class="fas fa-exclamation-triangle"></i> Erro de conexão</div>');
@@ -2292,14 +2374,27 @@ function renderCard(t) {
           <i class="fas fa-users"></i>
           <span>Equipe: <strong>${escapeHtml(t.equipe_nome || 'N/A')}</strong></span>
         </div>
+
         <div class="task-meta-item">
           <i class="fas fa-user"></i>
           <span>Resp.: ${nome}</span>
         </div>
+
+        <div class="task-meta-item">
+          <i class="fas fa-tag"></i>
+          <span>Tipo: <strong>${escapeHtml(t.pedido_tipo || '—')}</strong></span>
+        </div>
+
+        <div class="task-meta-item">
+          <i class="fas fa-hashtag"></i>
+          <span>O.S.: <strong>${t.os_numero ? escapeHtml(t.os_numero) : '—'}</strong></span>
+        </div>
+
         <div class="task-meta-item">
           <i class="fas fa-calendar"></i>
           <span>Criado: <strong>${formatarData(t.criado_em)}</strong></span>
         </div>
+
         ${t.atualizado_em ? `
           <div class="task-meta-item">
             <i class="fas fa-sync"></i>
