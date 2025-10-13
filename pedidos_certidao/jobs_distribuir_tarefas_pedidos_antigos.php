@@ -94,70 +94,136 @@ function candidatosTipo(string $tipo): array {
 }
 
 /* ======================== Regras de distribuição (iguais ao salvar_pedido) ======================== */
+// function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?array {
+//   $atrCands = candidatosAtribuicao($atribuicao);
+//   $tipoCands = candidatosTipo($tipo);
+
+//   // 1) match EXATO
+//   $sqlExact = "SELECT r.*, e.nome AS equipe_nome
+//                FROM equipe_regras r
+//                JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
+//                WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = :t
+//                ORDER BY r.prioridade ASC, r.id ASC
+//                LIMIT 1";
+//   $stExact = $conn->prepare($sqlExact);
+
+//   foreach ($atrCands as $a) {
+//     foreach ($tipoCands as $t) {
+//       $stExact->execute([':a'=>$a, ':t'=>$t]);
+//       $row = $stExact->fetch(PDO::FETCH_ASSOC);
+//       if ($row) return $row;
+//     }
+//   }
+
+//   // 2) curinga ('*')
+//   $sqlStar = "SELECT r.*, e.nome AS equipe_nome
+//               FROM equipe_regras r
+//               JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
+//               WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = '*'
+//               ORDER BY r.prioridade ASC, r.id ASC
+//               LIMIT 1";
+//   $stStar = $conn->prepare($sqlStar);
+//   foreach ($atrCands as $a) {
+//     $stStar->execute([':a'=>$a]);
+//     $row = $stStar->fetch(PDO::FETCH_ASSOC);
+//     if ($row) return $row;
+//   }
+
+//   // 3) LIKE por palavra-chave do tipo
+//   $sqlLike = "SELECT r.*, e.nome AS equipe_nome
+//               FROM equipe_regras r
+//               JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
+//               WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo LIKE :tk
+//               ORDER BY r.prioridade ASC, r.id ASC
+//               LIMIT 1";
+//   $stLike = $conn->prepare($sqlLike);
+//   foreach ($atrCands as $a) {
+//     foreach ($tipoCands as $tk) {
+//       $stLike->execute([':a'=>$a, ':tk'=>'%'.$tk.'%']);
+//       $row = $stLike->fetch(PDO::FETCH_ASSOC);
+//       if ($row) return $row;
+//     }
+//   }
+
+//   return null;
+// }
+
 function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?array {
-  $atrCands = candidatosAtribuicao($atribuicao);
-  $tipoCands = candidatosTipo($tipo);
-
-  // 1) match EXATO
-  $sqlExact = "SELECT r.*, e.nome AS equipe_nome
-               FROM equipe_regras r
-               JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
-               WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = :t
-               ORDER BY r.prioridade ASC, r.id ASC
-               LIMIT 1";
-  $stExact = $conn->prepare($sqlExact);
-
-  foreach ($atrCands as $a) {
-    foreach ($tipoCands as $t) {
-      $stExact->execute([':a'=>$a, ':t'=>$t]);
-      $row = $stExact->fetch(PDO::FETCH_ASSOC);
-      if ($row) return $row;
-    }
-  }
-
-  // 2) curinga ('*')
-  $sqlStar = "SELECT r.*, e.nome AS equipe_nome
-              FROM equipe_regras r
-              JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
-              WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = '*'
-              ORDER BY r.prioridade ASC, r.id ASC
-              LIMIT 1";
-  $stStar = $conn->prepare($sqlStar);
-  foreach ($atrCands as $a) {
-    $stStar->execute([':a'=>$a]);
-    $row = $stStar->fetch(PDO::FETCH_ASSOC);
-    if ($row) return $row;
-  }
-
-  // 3) LIKE por palavra-chave do tipo
-  $sqlLike = "SELECT r.*, e.nome AS equipe_nome
-              FROM equipe_regras r
-              JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
-              WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo LIKE :tk
-              ORDER BY r.prioridade ASC, r.id ASC
-              LIMIT 1";
-  $stLike = $conn->prepare($sqlLike);
-  foreach ($atrCands as $a) {
-    foreach ($tipoCands as $tk) {
-      $stLike->execute([':a'=>$a, ':tk'=>'%'.$tk.'%']);
-      $row = $stLike->fetch(PDO::FETCH_ASSOC);
-      if ($row) return $row;
-    }
-  }
-
-  return null;
+  $sql = "SELECT r.*, e.nome AS equipe_nome
+          FROM equipe_regras r
+          JOIN equipes e ON e.id = r.equipe_id AND e.ativa = 1
+          WHERE r.ativa = 1
+            AND r.atribuicao = :a
+            AND r.tipo       = :t
+          ORDER BY r.prioridade ASC, r.id ASC
+          LIMIT 1";
+  $st = $conn->prepare($sql);
+  $st->execute([':a' => $atribuicao, ':t' => $tipo]);
+  $row = $st->fetch(PDO::FETCH_ASSOC);
+  return $row ?: null;
 }
 
-function escolherMembroParaEquipe(PDO $conn, int $equipeId): ?array {
+
+// function escolherMembroParaEquipe(PDO $conn, int $equipeId): ?array {
+//   $membros = $conn->prepare("SELECT m.id, m.funcionario_id, m.ordem, m.carga_maxima_diaria,
+//                                     f.nome_completo, f.usuario
+//                              FROM equipe_membros m
+//                              JOIN funcionarios f ON f.id = m.funcionario_id
+//                              WHERE m.equipe_id=? AND m.ativo=1
+//                              ORDER BY m.ordem ASC, m.id ASC");
+//   $membros->execute([$equipeId]);
+//   $arr = $membros->fetchAll(PDO::FETCH_ASSOC);
+//   if (!$arr) return null;
+
+//   $calcHoje = $conn->prepare("SELECT COUNT(*) FROM tarefas_pedido
+//                               WHERE funcionario_id=? AND status IN ('pendente','em_andamento')
+//                                 AND DATE(criado_em)=CURRENT_DATE()");
+//   $calcGeral = $conn->prepare("SELECT COUNT(*) FROM tarefas_pedido
+//                                WHERE funcionario_id=? AND status IN ('pendente','em_andamento')");
+
+//   $melhor = null; $melhorCarga = null;
+//   foreach ($arr as $m) {
+//     $calcGeral->execute([$m['funcionario_id']]);
+//     $cargaTotal = (int)$calcGeral->fetchColumn();
+
+//     $calcHoje->execute([$m['funcionario_id']]);
+//     $cargaHoje = (int)$calcHoje->fetchColumn();
+
+//     // respeita carga_maxima_diaria se configurada
+//     if (!is_null($m['carga_maxima_diaria']) && $m['carga_maxima_diaria'] >= 0 && $cargaHoje >= (int)$m['carga_maxima_diaria']) {
+//       continue;
+//     }
+
+//     if ($melhor===null || $cargaTotal < $melhorCarga) {
+//       $melhor = $m;
+//       $melhorCarga = $cargaTotal;
+//     }
+//   }
+
+//   if ($melhor===null) {
+//     // fallback: ignora carga diaria, pega menor carga total
+//     foreach ($arr as $m) {
+//       $calcGeral->execute([$m['funcionario_id']]);
+//       $cargaTotal = (int)$calcGeral->fetchColumn();
+//       if ($melhor===null || $cargaTotal < $melhorCarga) { $melhor=$m; $melhorCarga=$cargaTotal; }
+//     }
+//   }
+//   return $melhor;
+// }
+
+function escolherMembroParaEquipe(PDO $conn, int $equipeId, string $tipo): ?array {
+  // Apenas membros ativos COM papel exatamente igual ao tipo do pedido
   $membros = $conn->prepare("SELECT m.id, m.funcionario_id, m.ordem, m.carga_maxima_diaria,
                                     f.nome_completo, f.usuario
                              FROM equipe_membros m
                              JOIN funcionarios f ON f.id = m.funcionario_id
-                             WHERE m.equipe_id=? AND m.ativo=1
+                             WHERE m.equipe_id = ?
+                               AND m.ativo = 1
+                               AND m.papel = ?
                              ORDER BY m.ordem ASC, m.id ASC");
-  $membros->execute([$equipeId]);
+  $membros->execute([$equipeId, $tipo]);
   $arr = $membros->fetchAll(PDO::FETCH_ASSOC);
-  if (!$arr) return null;
+  if (!$arr) return null; // Sem membro com papel == tipo -> sem distribuição
 
   $calcHoje = $conn->prepare("SELECT COUNT(*) FROM tarefas_pedido
                               WHERE funcionario_id=? AND status IN ('pendente','em_andamento')
@@ -173,7 +239,6 @@ function escolherMembroParaEquipe(PDO $conn, int $equipeId): ?array {
     $calcHoje->execute([$m['funcionario_id']]);
     $cargaHoje = (int)$calcHoje->fetchColumn();
 
-    // respeita carga_maxima_diaria se configurada
     if (!is_null($m['carga_maxima_diaria']) && $m['carga_maxima_diaria'] >= 0 && $cargaHoje >= (int)$m['carga_maxima_diaria']) {
       continue;
     }
@@ -184,16 +249,10 @@ function escolherMembroParaEquipe(PDO $conn, int $equipeId): ?array {
     }
   }
 
-  if ($melhor===null) {
-    // fallback: ignora carga diaria, pega menor carga total
-    foreach ($arr as $m) {
-      $calcGeral->execute([$m['funcionario_id']]);
-      $cargaTotal = (int)$calcGeral->fetchColumn();
-      if ($melhor===null || $cargaTotal < $melhorCarga) { $melhor=$m; $melhorCarga=$cargaTotal; }
-    }
-  }
+  // Se todos estouraram carga diária, não distribui
   return $melhor;
 }
+
 
 function criarTarefaParaPedido(PDO $conn, int $pedidoId, int $equipeId, ?int $funcionarioId): int {
   $st = $conn->prepare("INSERT INTO tarefas_pedido (pedido_id, equipe_id, funcionario_id, status)
@@ -259,7 +318,7 @@ try {
         $equipeNome = $regra['equipe_nome'] ?? null;
 
         // Escolhe membro
-        $membro = escolherMembroParaEquipe($pdo, $equipeId);
+        $membro = escolherMembroParaEquipe($pdo, $equipeId, $tipo);
         if (!$membro) {
             $out['sem_membro'][] = [
                 'pedido_id'  => $pedidoId,
