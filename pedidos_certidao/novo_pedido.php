@@ -105,12 +105,18 @@ try { $conn = getDatabaseConnection(); ensureSchema($conn); } catch(Throwable $e
 /* ------- JSON de mapeamento de campos dinâmicos ------- */
 $MAPEAMENTO = [
   "Registro Civil" => [
-    "2ª de Nascimento" => ["livro","folha","termo","ano","nome_registrado","filiacao","data_evento","cartorio_origem"],
+    "2ª via de Nascimento" => ["livro","folha","termo","ano","nome_registrado","filiacao","data_evento","cartorio_origem"],
     "Inteiro Teor de Nascimento" => ["livro","folha","termo","ano","nome_registrado","filiacao","data_evento","cartorio_origem"],
-    "2ª de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
+    "Retificação Administrativa de Nascimento" => ["livro","folha","termo","ano","nome_registrado","filiacao","data_evento","cartorio_origem"],
+    "Restauração de Nascimento" => ["livro","folha","termo","ano","nome_registrado","filiacao","data_evento","cartorio_origem"],
+    "2ª via de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
     "Inteiro Teor de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
-    "2ª de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"],
-    "Inteiro Teor de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"]
+    "Retificação Administrativa de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
+    "Restauração de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
+    "2ª via de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"],
+    "Inteiro Teor de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"],
+    "Retificação Administrativa de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"],
+    "Restauração de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"]
   ],
   "Pessoas Jurídicas" => [
     "Estatuto"   => ["livro_ficha","numero_registro","partes"],
