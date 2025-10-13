@@ -1126,16 +1126,24 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                     <div id="novas-tarefas-list" class="task-list-container"></div>  
                 </div>  
                 
+                <!-- ===================== TAREFAS DE PEDIDOS DE CERTIDÃO ===================== -->
+                <div id="tarefas-certidao-section" style="display:none;">
+                    <h6 class="section-title text-info">
+                        <i class="mdi mdi-certificate"></i> Tarefas de Pedidos de Certidão
+                    </h6>
+                    <div id="tarefas-certidao-list" class="task-list-container"></div>
+                </div>
+
                 <!-- Divisor -->  
                 <hr class="my-4">  
                 
-                <!-- Seção para tarefas pendentes -->  
-                <div>  
-                    <h6 class="section-title text-primary">  
-                        <i class="mdi mdi-clock-alert"></i> Tarefas Pendentes  
-                    </h6>  
-                    <div id="tarefas-list" class="task-list-container"></div>  
-                </div>  
+                <!-- Seção para tarefas pendentes -->
+                <div id="tarefas-pendentes-section" style="display:none;">
+                    <h6 class="section-title text-primary">
+                        <i class="mdi mdi-clock-alert"></i> Tarefas Pendentes
+                    </h6>
+                    <div id="tarefas-list" class="task-list-container"></div>
+                </div>
             </div>  
         </div>  
     </div>  
@@ -1258,12 +1266,22 @@ $(document).ready(function() {
         return texto;  
     }  
 
-    function capitalize(text) {  
-        return text.charAt(0).toUpperCase() + text.slice(1);  
-    }  
+    function capitalize(text) {
+        return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+    }
 
+    // NOVO: normaliza o status vindo do banco (troca "_" por espaço e aplica Title Case)
+    function formatStatusLabel(status) {
+        const pretty = (status || '').replace(/_/g, ' ');
+        return pretty
+            ? pretty.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+            : '';
+    }
+
+    // AJUSTE: também normaliza para decidir a classe do badge
     function getStatusBadgeClass(status) {
-        switch ((status || '').toLowerCase()) {
+        const s = (status || '').replace(/_/g, ' ').toLowerCase();
+        switch (s) {
             case 'iniciada':      return 'soft-badge soft-blue';
             case 'em espera':     return 'soft-badge soft-amber';
             case 'em andamento':  return 'soft-badge soft-indigo';
@@ -1323,7 +1341,7 @@ $(document).ready(function() {
                     <td><strong>#${tarefa.id}</strong></td>  
                     <td>${limitarTexto(tarefa.titulo, 70)}</td>  
                     <td>${formatarDataBrasileira(tarefa.data_limite)}</td>  
-                    <td><span class="${statusClass}">${capitalize(tarefa.status || '') || '—'}</span></td>  
+                    <td><span class="${statusClass}">${formatStatusLabel(tarefa.status) || '—'}</span></td>  
                     <td>${situacaoTexto ? `<span class="${situacaoClass}">${situacaoTexto}</span>` : '—'}</td>  
                     <td class="text-end">  
                         <button class="btn btn-sm btn-secondary" title="Ver tarefa" onclick="window.location.href='tarefas/index_tarefa.php?token=${tarefa.token}'">  
@@ -1361,7 +1379,7 @@ $(document).ready(function() {
                 <div class="task-card">
                     <div class="task-card-header">
                         <span class="task-card-id"><i class="mdi mdi-pound"></i> ${tarefa.id}</span>
-                        <span class="${statusClass}">${capitalize(tarefa.status || '') || '—'}</span>
+                        <span class="${statusClass}">${formatStatusLabel(tarefa.status) || '—'}</span>
                     </div>
                     <div class="task-card-title">${limitarTexto(tarefa.titulo, 60)}</div>
                     <div class="task-card-body">
@@ -1385,6 +1403,56 @@ $(document).ready(function() {
 
         cards += `</div>`;
         return cards;
+    }
+
+    // ===================== TABELA - TAREFAS DE PEDIDOS DE CERTIDÃO =====================
+    function criarTabelaCertidao(tarefas) {
+        if (!tarefas || !tarefas.length) return '';
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th><i class="mdi mdi-pound"></i> ID Tarefa</th>
+                            <th><i class="mdi mdi-text-box"></i> Protocolo</th>
+                            <th><i class="mdi mdi-account-group"></i> Equipe</th>
+                            <th><i class="mdi mdi-chart-line"></i> Status</th>
+                            <th><i class="mdi mdi-calendar-clock"></i> Criado</th>
+                            <th><i class="mdi mdi-update"></i> Atualizado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        tarefas.forEach(t => {
+            const statusClass = getStatusBadgeClass(t.status);
+
+            html += `
+                <tr>
+                    <td><strong>#${t.id}</strong></td>
+                    <td>${t.protocolo ? `<strong>${t.protocolo}</strong>` : `Pedido #${t.pedido_id}`}</td>
+                    <td>${t.equipe_nome || '—'}</td>
+                    <td><span class="${statusClass}">${formatStatusLabel(t.status) || '—'}</span></td>
+                    <td>${formatarDataBrasileira(t.criado_em)}</td>
+                    <td>${t.atualizado_em ? formatarDataBrasileira(t.atualizado_em) : '—'}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-secondary" title="Abrir Tarefas de Certidão"
+                                onclick="window.location.href='${t.link}'">
+                            <i class="mdi mdi-open-in-new"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        return html;
     }
 
     // ===================== PROCESSAR TAREFAS =====================
@@ -1476,14 +1544,21 @@ $(document).ready(function() {
         method: 'GET',  
         dataType: 'json',  
         success: function(response) {  
-            var tarefasList = $('#tarefas-list');  
-            var novasTarefasList = $('#novas-tarefas-list');  
+            var tarefasList        = $('#tarefas-list');  
+            var novasTarefasList   = $('#novas-tarefas-list');  
+            var certidaoSection    = $('#tarefas-certidao-section');
+            var certidaoList       = $('#tarefas-certidao-list');
+            var pendentesSection   = $('#tarefas-pendentes-section');
+
             tarefasList.empty();  
             novasTarefasList.empty();  
+            certidaoList.empty();
+            pendentesSection.hide(); // começa oculta
 
             var totalTarefas = 0;  
+            var tarefasPendentesCount = 0; // contador só das tarefas “normais”
 
-            // Exibir as novas tarefas  
+            // Exibir as novas tarefas (módulo de tarefas)
             $.each(response.novas_tarefas, function(funcionario, tarefasFuncionario) {  
                 $('#novas-tarefas-section').show();  
                 novasTarefasList.append(`<h6 class="fw-bold mt-4"><i class="mdi mdi-account"></i> ${funcionario}</h6>`);  
@@ -1491,18 +1566,38 @@ $(document).ready(function() {
                 totalTarefas += tarefasFuncionario.length;  
             });  
 
-            // Exibir as tarefas pendentes  
+            // Exibir as tarefas pendentes (módulo de tarefas)
             $.each(response.tarefas, function(funcionario, tarefasFuncionario) {  
-                tarefasList.append(`<h6 class="fw-bold mt-4"><i class="mdi mdi-account"></i> ${funcionario}</h6>`);  
-                processarTarefas(tarefasFuncionario, tarefasList);
-                totalTarefas += tarefasFuncionario.length;  
-            });  
+                // só cria a seção se existir ao menos 1 item
+                if (tarefasFuncionario && tarefasFuncionario.length) {
+                    if (!pendentesSection.is(':visible')) pendentesSection.show();
+                    tarefasList.append(`<h6 class="fw-bold mt-4"><i class="mdi mdi-account"></i> ${funcionario}</h6>`);  
+                    processarTarefas(tarefasFuncionario, tarefasList);
+                    tarefasPendentesCount += tarefasFuncionario.length;  
+                    totalTarefas += tarefasFuncionario.length;  
+                }
+            });
 
-            // Mostrar o modal se houver tarefas  
+            // Se não houve nenhuma tarefa “normal”, mantém a seção oculta
+            if (tarefasPendentesCount === 0) {
+                pendentesSection.hide();
+            }
+
+            // Exibir tarefas de pedidos de certidão (pendentes)
+            if (response.tarefas_certidao && response.tarefas_certidao.length) {
+                certidaoSection.show();
+                certidaoList.append(criarTabelaCertidao(response.tarefas_certidao));
+                totalTarefas += response.tarefas_certidao.length;
+            } else {
+                certidaoSection.hide();
+            }
+
+            // Mostrar o modal se houver qualquer tarefa
             if (totalTarefas > 0) {  
                 $('#tarefasModal').modal('show');  
             }  
         },  
+  
         error: function(xhr, status, error) {  
             console.error('❌ Erro ao carregar as tarefas:', error);  
         }  

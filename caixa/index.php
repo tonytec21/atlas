@@ -660,7 +660,35 @@ date_default_timezone_set('America/Sao_Paulo');
                         </div>
                     </div>
 
-                    <!-- NOVO: SELOS -->
+                    <!-- ATOS ISENTOS -->
+                    <div class="card mb-3">
+                        <div class="card-header table-title text-center"><b>ATOS ISENTOS</b></div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="tabelaAtosIsentos" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>
+                                            <th>Nº OS</th>
+                                            <th>Apresentante</th>
+                                            <th>Ato</th>
+                                            <th>Descrição</th>
+                                            <th>Quantidade</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesAtosIsentos"></tbody>
+                                </table>
+                            </div>
+
+                            <h6 class="total-label d-flex flex-wrap align-items-center">
+                                <span class="mr-3">Qtd.: <span id="qtdAtosIsentos">0</span></span>
+                                <span>Total Atos Isentos: <span id="totalAtosIsentos">R$ 0,00</span></span>
+                            </h6>
+                        </div>
+                    </div>
+
+                    <!-- SELOS -->
                     <div class="card mb-3">
                         <div class="card-header table-title text-center"><b>SELOS</b></div>
                         <div class="card-body">
@@ -1461,10 +1489,15 @@ date_default_timezone_set('America/Sao_Paulo');
                     setupAtosFilterUI(detalhes, window.currentTipoCaixa);
 
                     // Atos Manuais
+                    // Atos Manuais -> separar NÃO ISENTOS e ISENTOS (ato contém "(isento)")
+                    const isIsento = (s) => String(s || '').toLowerCase().includes('(isento)');
+
+                    // 2.1) NÃO ISENTOS (preenche a tabela "ATOS MANUAIS")
+                    const atosManuaisNaoIsentos = (detalhes.atosManuais || []).filter(a => !isIsento(a.ato));
                     var totalAtosManuais = 0;
                     $('#detalhesAtosManuais').empty();
-                    detalhes.atosManuais.forEach(function(atoManual) {
-                        totalAtosManuais += parseFloat(atoManual.total);
+                    atosManuaisNaoIsentos.forEach(function(atoManual) {
+                        totalAtosManuais += parseFloat(atoManual.total || 0);
                         $('#detalhesAtosManuais').append(`
                             <tr>
                                 <td>${atoManual.funcionario}</td>    
@@ -1478,9 +1511,31 @@ date_default_timezone_set('America/Sao_Paulo');
                         `);
                     });
                     $('#totalAtosManuais').text(formatCurrency(totalAtosManuais));
+                    // Filtros devem considerar APENAS os não isentos
+                    setupManuaisFilterUI({ atosManuais: atosManuaisNaoIsentos }, window.currentTipoCaixa);
 
-                    // NOVO: prepara filtros da seção ATOS MANUAIS
-                    setupManuaisFilterUI(detalhes, window.currentTipoCaixa);
+                    // 2.2) ISENTOS (preenche o novo bloco "ATOS ISENTOS")
+                    const atosIsentos = (detalhes.atosManuais || []).filter(a => isIsento(a.ato));
+                    var totalAtosIsentos = 0;
+                    $('#detalhesAtosIsentos').empty();
+                    atosIsentos.forEach(function(atoManual) {
+                        totalAtosIsentos += parseFloat(atoManual.total || 0);
+                        $('#detalhesAtosIsentos').append(`
+                            <tr>
+                                <td>${atoManual.funcionario}</td>    
+                                <td>${atoManual.ordem_servico_id}</td>
+                                <td>${atoManual.cliente}</td>
+                                <td>${atoManual.ato}</td>
+                                <td>${atoManual.descricao}</td>
+                                <td>${atoManual.quantidade_liquidada}</td>
+                                <td>${formatCurrency(atoManual.total)}</td>
+                            </tr>
+                        `);
+                    });
+                    $('#totalAtosIsentos').text(formatCurrency(totalAtosIsentos));
+                    $('#qtdAtosIsentos').text(
+                        atosIsentos.reduce((acc, it) => acc + (parseFloat(it.quantidade_liquidada || 0) || 0), 0)
+                    );
 
                     // Pagamentos
                     var totalPagamentos = 0;
@@ -1663,6 +1718,15 @@ date_default_timezone_set('America/Sao_Paulo');
                         order: []
                     }).on('draw', function(){ recalcManuaisTotals(); });
 
+                    // NOVO: DataTable para ATOS ISENTOS
+                    if (window.dtAtosIsentos) window.dtAtosIsentos.destroy();
+                    window.dtAtosIsentos = $('#tabelaAtosIsentos').DataTable({
+                        language: { url: "../style/Portuguese-Brasil.json" },
+                        destroy: true,
+                        pageLength: 10,
+                        order: []
+                    }).on('draw', function(){ recalcIsentosTotals(); });
+
                     $('#tabelaPagamentos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
                     $('#tabelaTotalPorTipo').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
                     $('#tabelaDevolucoes').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
@@ -1820,6 +1884,19 @@ date_default_timezone_set('America/Sao_Paulo');
             $('#totalAtosManuais').text(formatCurrency(soma));
             // Atualiza card topo
             $('#cardTotalAtosManuais').text(formatCurrency(soma));
+        }
+
+        // NOVO: totalização dinâmica para a tabela de ATOS ISENTOS
+        function recalcIsentosTotals(){
+            if (!window.dtAtosIsentos) return;
+            let soma = 0, qtd = 0;
+            window.dtAtosIsentos.rows({search:'applied'}).every(function(){
+                const row = this.data(); // col[5]=Quantidade, col[6]=Total
+                qtd  += parseFloat(String(row[5]).replace(/[^\d,.-]/g,'').replace('.','').replace(',','.')) || 0;
+                soma += parseBRMoney(row[6]);
+            });
+            $('#qtdAtosIsentos').text(qtd);
+            $('#totalAtosIsentos').text(formatCurrency(soma));
         }
 
         // ============ /FIM NOVO BLOCO ============ 

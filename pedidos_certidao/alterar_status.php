@@ -215,6 +215,56 @@ function ensureSchema(PDO $conn){
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
 }
 
+/* === Garantia mínima das tabelas de tarefas para permitir sincronização === */
+function ensureSchemaDistribuicao(PDO $conn) {
+  $conn->exec("CREATE TABLE IF NOT EXISTS tarefas_pedido (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    pedido_id INT NOT NULL,
+    equipe_id INT NOT NULL,
+    funcionario_id INT NULL,
+    status ENUM('pendente','em_andamento','concluida','cancelada') NOT NULL DEFAULT 'pendente',
+    observacao VARCHAR(500) NULL,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_pedido (pedido_id),
+    INDEX idx_func_status (funcionario_id, status),
+    INDEX idx_equipe (equipe_id),
+    INDEX idx_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+
+  $conn->exec("CREATE TABLE IF NOT EXISTS tarefas_pedido_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tarefa_id BIGINT NOT NULL,
+    acao ENUM('status','reatribuicao','observacao') NOT NULL,
+    de_valor VARCHAR(255) NULL,
+    para_valor VARCHAR(255) NULL,
+    observacao VARCHAR(500) NULL,
+    usuario VARCHAR(120) NOT NULL,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_tarefa (tarefa_id),
+    INDEX idx_acao (acao)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+}
+
+/**
+ * Mapeia status do pedido -> status da tarefa
+ * pendente -> pendente
+ * em_andamento -> em_andamento
+ * emitida -> concluida
+ * entregue -> concluida
+ * cancelada -> cancelada
+ */
+function mapPedidoToTarefaStatus(string $pedidoStatus): ?string {
+  switch ($pedidoStatus) {
+    case 'pendente': return 'pendente';
+    case 'em_andamento': return 'em_andamento';
+    case 'emitida': return 'concluida';
+    case 'entregue': return 'concluida';
+    case 'cancelada': return 'cancelada';
+    default: return null;
+  }
+}
+
 function post_json_signed(string $url, string $apiKey, string $hmacSecret, array $body, string $requestId, int $timestampMs, bool $verifySsl): array {
   $json = json_encode($body, JSON_UNESCAPED_UNICODE);
   $sig  = hash_hmac('sha256', $timestampMs . $json, $hmacSecret);
@@ -417,6 +467,7 @@ if (!in_array($novo, $validos, true)) {
 try {
   $conn = getDatabaseConnection();
   ensureSchema($conn);
+  ensureSchemaDistribuicao($conn); // garante tabelas de tarefas/log para sincronização
   $conn->beginTransaction();
 
   // Carrega pedido + status OS (lock)
@@ -460,13 +511,16 @@ try {
   $retirado_por     = null;
   $cancelado_motivo = null;
 
-  // ===== Quando "emitida": anexo é OPCIONAL; se vier, salva =====
+  // ===== Quando "emitida": anexa o arquivo na mesma lista (pedido_anexos) =====
   if ($novo === 'emitida' && !$osCancelada) {
-    if (!empty($_FILES['anexo_pdf']) && $_FILES['anexo_pdf']['error'] === UPLOAD_ERR_OK) {
-      $resAnexo = anexar_certidao($conn, (int)$p['id'], $_FILES['anexo_pdf']);
-      if (empty($resAnexo['success'])) {
-        throw new Exception($resAnexo['error'] ?? 'Falha ao anexar a certidão.');
-      }
+    if (empty($_FILES['anexo_pdf']) || $_FILES['anexo_pdf']['error'] !== UPLOAD_ERR_OK) {
+      throw new Exception('Anexe o PDF ou JPG da certidão para marcar como EMITIDA.');
+    }
+
+    // Salva o anexo como os demais (com conversão PDF->imagens)
+    $resAnexo = anexar_certidao($conn, (int)$p['id'], $_FILES['anexo_pdf']);
+    if (empty($resAnexo['success'])) {
+      throw new Exception($resAnexo['error'] ?? 'Falha ao anexar a certidão.');
     }
   }
 
@@ -508,11 +562,36 @@ try {
   $uaRaw        = $_SERVER['HTTP_USER_AGENT'] ?? '';
   $uaSummary    = summarize_user_agent($uaRaw);            // resumo + UA bruto (truncado)
 
-  // Log
+  // Log do pedido
   $conn->prepare("
     INSERT INTO pedidos_certidao_status_log (pedido_id, status_anterior, novo_status, observacao, usuario, ip, user_agent)
     VALUES (?,?,?,?,?,?,?)
   ")->execute([$id, $anterior, $novo, ($observacao ?: null), $username, $clientIpDisp, $uaSummary]);
+
+  /* =================== SINCRONIZAÇÃO DE TAREFAS =================== */
+  $novoStatusTarefa = mapPedidoToTarefaStatus($novo);
+  if ($novoStatusTarefa !== null) {
+    // Seleciona tarefas do pedido (lock) para garantir consistência
+    $stT = $conn->prepare("SELECT id, status FROM tarefas_pedido WHERE pedido_id = ? FOR UPDATE");
+    $stT->execute([$id]);
+    $tarefas = $stT->fetchAll(PDO::FETCH_ASSOC);
+
+    if ($tarefas) {
+      $updT = $conn->prepare("UPDATE tarefas_pedido SET status = ? WHERE id = ?");
+      $logT = $conn->prepare("INSERT INTO tarefas_pedido_log (tarefa_id, acao, de_valor, para_valor, observacao, usuario)
+                              VALUES (?,?,?,?,?,?)");
+
+      foreach ($tarefas as $t) {
+        if ($t['status'] !== $novoStatusTarefa) {
+          $updT->execute([$novoStatusTarefa, $t['id']]);
+          $obsT = 'Sync status pedido: ' . $anterior . ' -> ' . $novo;
+          if ($observacao !== '') $obsT .= ' | Obs: ' . $observacao;
+          $logT->execute([$t['id'], 'status', $t['status'], $novoStatusTarefa, $obsT, $username]);
+        }
+      }
+    }
+  }
+  /* ================================================================ */
 
   // === Payload FLAT compatível com ingest.php ===
   $body = [

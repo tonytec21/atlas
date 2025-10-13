@@ -344,7 +344,8 @@ table.dataTable tbody tr:hover {
 /* ===================== BADGES DE SITUAÇÃO ===================== */  
 .situacao-pago,  
 .situacao-ativo,  
-.situacao-cancelado {  
+.situacao-cancelado,
+.situacao-isento {  
   color: #fff;  
   width: 90px;  
   text-align: center;  
@@ -369,7 +370,13 @@ table.dataTable tbody tr:hover {
 .situacao-cancelado {  
   background: var(--gradient-error);  
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);  
-}  
+}
+
+.situacao-isento {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.25);
+}
+
 
 .status-label {  
   padding: 6px 10px;  
@@ -1128,6 +1135,11 @@ body.dark-mode footer .footer-content a:hover {
   color: white;
 }
 
+.badge-isento {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  color: white;
+}
+
 .badge-ativo {
   background: var(--gradient-warning);
   color: white;
@@ -1513,6 +1525,12 @@ body.dark-mode footer .footer-content a:hover {
                             $stmt->execute();
                             $temPagamentoRelevante = $stmt->fetchColumn() > 0;
 
+                            /* NOVO: verificar isenção registrada */
+                            $stmt = $conn->prepare("SELECT COUNT(*) FROM pagamento_os WHERE ordem_de_servico_id = :os_id AND forma_de_pagamento = 'Isento de Pagamento'");
+                            $stmt->bindParam(':os_id', $ordem['id']);
+                            $stmt->execute();
+                            $temIsencao = $stmt->fetchColumn() > 0;
+
                             $stmt = $conn->prepare("SELECT COUNT(*) FROM anexos_os WHERE ordem_servico_id = :os_id AND status = 'ativo'");
                             $stmt->bindParam(':os_id', $ordem['id']);
                             $stmt->execute();
@@ -1546,6 +1564,7 @@ body.dark-mode footer .footer-content a:hover {
                                 'saldo' => $saldo,
                                 'temPagamentoRelevante' => $temPagamentoRelevante,
                                 'temAnexos' => $temAnexos,
+                                'temIsencao' => $temIsencao, // NOVO
                                 'botaoAnexoClasses' => $botaoAnexoClasses,
                                 'botaoAnexoIcone' => $botaoAnexoIcone
                             ];
@@ -1569,6 +1588,10 @@ body.dark-mode footer .footer-content a:hover {
                                     if ($ordem['status'] === 'Cancelado') {
                                         $statusClass = 'situacao-cancelado';
                                         $statusText = 'Cancelada';
+                                    } elseif (!empty($temIsencao) && $temIsencao) {
+                                        /* NOVO: Situação Isento */
+                                        $statusClass = 'situacao-isento';
+                                        $statusText = 'Isento';
                                     } elseif ($deposito_previo > 0) {
                                         $statusClass = 'situacao-pago';
                                         $statusText = 'Pago';
@@ -1627,6 +1650,9 @@ body.dark-mode footer .footer-content a:hover {
                             if ($data['status'] === 'Cancelado') {
                                 $situacaoBadge = 'badge-cancelado';
                                 $situacaoText = 'Cancelada';
+                            } elseif (!empty($data['temIsencao']) && $data['temIsencao']) { /* NOVO */
+                                $situacaoBadge = 'badge-isento';
+                                $situacaoText = 'Isento';
                             } elseif ($data['deposito_previo'] > 0) {
                                 $situacaoBadge = 'badge-pago';
                                 $situacaoText = 'Pago';
@@ -1761,7 +1787,13 @@ body.dark-mode footer .footer-content a:hover {
                             <input type="text" class="form-control" id="valor_pagamento">  
                         </div>  
                     </div>  
-                    <button type="button" class="btn btn-primary w-100" onclick="adicionarPagamento()">Adicionar</button>  
+                    <div class="d-grid gap-2">
+                      <button id="btnAdicionarPagamento" type="button" class="btn btn-primary w-100" onclick="adicionarPagamento()">Adicionar</button>
+                      <button id="btnIsentoPagamento" type="button" class="btn btn-warning w-100" style="display:none" onclick="isentarPagamento()">
+                        <i class="fa fa-check-circle" aria-hidden="true"></i> Isento de Pagamento
+                      </button>
+                    </div>
+
                     <hr style="border-color: var(--border-primary); margin: var(--space-md) 0;">  
                     <div class="form-row">  
                         <div class="form-group col-md-3">  
@@ -2028,7 +2060,7 @@ body.dark-mode footer .footer-content a:hover {
             });
         }
 
-        function abrirPagamentoModal(osId, cliente, totalOs, totalPagamentos, totalLiquidado, totalDevolvido, saldo, statusOS) {
+        function abrirPagamentoModal(osId, cliente, totalOs, totalPagamentos, totalLiquidado, totalDevolvido, saldo, statusOS, pagamentosCount) {
             if (statusOS === 'Cancelado') {
                 Swal.fire({ 
                     icon:'warning', 
@@ -2047,6 +2079,20 @@ body.dark-mode footer .footer-content a:hover {
             $('#total_pagamento').val('R$ ' + totalPagamentos.toFixed(2).replace('.', ','));
             $('#saldo_modal').val('R$ ' + saldo.toFixed(2).replace('.', ','));
 
+            // RESET VISUAL (evita ficar oculto da OS anterior)
+            $('#forma_pagamento').prop('disabled', false).closest('.form-group').show();
+            $('#valor_pagamento').prop('disabled', false).closest('.form-group').show();
+            $('#btnIsentoPagamento').hide();
+            $('#btnAdicionarPagamento').show();
+
+            // Só mostra "Isento" se total OS == 0 E não houver nenhum pagamento (valor inicial; depois o AJAX reafirma)
+            if (Number(totalOs) === 0 && Number(pagamentosCount) === 0) {
+                $('#forma_pagamento').prop('disabled', true);
+                $('#valor_pagamento').prop('disabled', true);
+                $('#btnAdicionarPagamento').hide();
+                $('#btnIsentoPagamento').show();
+            }
+
             if (saldo <= 0) { 
                 $('#btnDevolver').hide(); 
             } else { 
@@ -2058,11 +2104,34 @@ body.dark-mode footer .footer-content a:hover {
             window.currentOsId = osId;
             window.currentClient = cliente;
             window.statusOS = statusOS;
+            window.currentTotalOs = Number(totalOs);
+            window.hasIsencao = false; // será definido em atualizarTabelaPagamentos()
 
             atualizarTabelaPagamentos();
         }
 
         function adicionarPagamento() {
+            // BLOQUEIO: se houver isenção registrada, não permitir adicionar novos pagamentos
+            if (window.hasIsencao) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'O.S isenta',
+                    text: 'Já existe um registro "Isento de Pagamento" nesta O.S. Não é possível adicionar outros pagamentos.'
+                });
+                return;
+            }
+
+            // Bloquear inclusão se Total OS = 0
+            var totalAtual = parseFloat($('#total_os_modal').val().replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(totalAtual) && totalAtual <= 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'O.S isenta',
+                    text: 'Para O.S com valor zero, utilize o botão "Isento de Pagamento".'
+                });
+                return;
+            }
+
             var formaPagamento = $('#forma_pagamento').val();
             var valorPagamento = parseFloat($('#valor_pagamento').val().replace(/\./g, '').replace(',', '.'));
 
@@ -2074,6 +2143,7 @@ body.dark-mode footer .footer-content a:hover {
                 });
                 return;
             }
+
             if (isNaN(valorPagamento) || valorPagamento <= 0) {
                 Swal.fire({ 
                     icon: 'error', 
@@ -2154,6 +2224,7 @@ body.dark-mode footer .footer-content a:hover {
             });
         }
 
+
         function atualizarTabelaPagamentos() {
             var pagamentosTable = $('#pagamentosTable');
             pagamentosTable.empty();
@@ -2187,6 +2258,36 @@ body.dark-mode footer .footer-content a:hover {
                             $('#btnDevolver').hide(); 
                         } else { 
                             $('#btnDevolver').show(); 
+                        }
+
+                        // --- REGRAS DE VISUALIZAÇÃO ---
+                        var temPagamentos = Array.isArray(response.pagamentos) && response.pagamentos.length > 0;
+
+                        // Existe pagamento "Isento de Pagamento"?
+                        var existeIsencao = (response.pagamentos || []).some(function(p){
+                            return String(p.forma_de_pagamento).toLowerCase() === 'isento de pagamento';
+                        });
+                        window.hasIsencao = !!existeIsencao;
+
+                        if (existeIsencao) {
+                            // Se há isenção registrada, ocultar opção de adicionar pagamento
+                            $('#btnIsentoPagamento').hide();
+                            $('#btnAdicionarPagamento').hide();
+                            $('#forma_pagamento').prop('disabled', true).closest('.form-group').hide();
+                            $('#valor_pagamento').prop('disabled', true).closest('.form-group').hide();
+                        } else {
+                            // Sem isenção: regra para mostrar/ocultar botão "Isento" quando total OS = 0 e sem pagamentos
+                            if (window.currentTotalOs === 0 && !temPagamentos) {
+                                $('#forma_pagamento').prop('disabled', true).closest('.form-group').show();
+                                $('#valor_pagamento').prop('disabled', true).closest('.form-group').show();
+                                $('#btnAdicionarPagamento').hide();
+                                $('#btnIsentoPagamento').show();
+                            } else {
+                                $('#forma_pagamento').prop('disabled', false).closest('.form-group').show();
+                                $('#valor_pagamento').prop('disabled', false).closest('.form-group').show();
+                                $('#btnIsentoPagamento').hide();
+                                $('#btnAdicionarPagamento').show();
+                            }
                         }
                     } catch (e) {
                         exibirMensagem('Erro ao processar resposta do servidor.', 'error');
@@ -2440,6 +2541,64 @@ body.dark-mode footer .footer-content a:hover {
             }catch(e){
                 return path;
             }
+        }
+
+        function isentarPagamento() {
+            Swal.fire({
+                title: 'Confirmar Isenção',
+                text: 'Registrar esta O.S como "Isento de Pagamento"?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Sim',
+                cancelButtonText: 'Não'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: 'salvar_pagamento.php',
+                        type: 'POST',
+                        data: {
+                            os_id: window.currentOsId,
+                            cliente: window.currentClient,
+                            total_os: 0,
+                            funcionario: '<?php echo $_SESSION['username']; ?>',
+                            forma_pagamento: 'Isento de Pagamento',
+                            valor_pagamento: 0
+                        },
+                        success: function(response) {
+                            try {
+                                response = JSON.parse(response);
+                                if (response.success) {
+                                    atualizarTabelaPagamentos();
+                                    Swal.fire({ 
+                                        icon: 'success', 
+                                        title: 'Sucesso', 
+                                        text: 'Isenção registrada com sucesso!' 
+                                    });
+                                } else {
+                                    Swal.fire({ 
+                                        icon: 'error', 
+                                        title: 'Erro', 
+                                        text: response.message || 'Erro ao registrar isenção.' 
+                                    });
+                                }
+                            } catch (e) {
+                                Swal.fire({ 
+                                    icon: 'error', 
+                                    title: 'Erro', 
+                                    text: 'Erro ao processar resposta do servidor.' 
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({ 
+                                icon: 'error', 
+                                title: 'Erro', 
+                                text: 'Erro ao registrar isenção.' 
+                            });
+                        }
+                    });
+                }
+            });
         }
 
         function visualizarAnexo(caminho) {

@@ -95,29 +95,61 @@ $logsStmt = $conn->prepare("SELECT * FROM pedidos_certidao_status_log WHERE pedi
 $logsStmt->execute([$id]);  
 $logs = $logsStmt->fetchAll(PDO::FETCH_ASSOC);  
 
-/* Dados da O.S. vinculada */  
-$osId     = (int)($pedido['ordem_servico_id'] ?? 0);  
-$osStatus = null;  
-$totalOS  = (float)($pedido['total_os'] ?? 0);  
-$totalPag = 0.0;  
-$totalDev = 0.0;  
+/* Dados da O.S. vinculada */
+$osId     = (int)($pedido['ordem_servico_id'] ?? 0);
+$osStatus = null;
+$totalOS  = (float)($pedido['total_os'] ?? 0);
+$totalPag = 0.0;
+$totalDev = 0.0;
+$isento   = false;
 
-if ($osId > 0) {  
-  $q = $conn->prepare("SELECT status, total_os, base_de_calculo FROM ordens_de_servico WHERE id=? LIMIT 1");  
-  $q->execute([$osId]);  
-  if ($row = $q->fetch(PDO::FETCH_ASSOC)) {  
-    $osStatus = $row['status'] ?? null;  
-    if (isset($row['total_os'])) $totalOS = (float)$row['total_os'];  
-  }  
+if ($osId > 0) {
+  $q = $conn->prepare("SELECT status, total_os, base_de_calculo FROM ordens_de_servico WHERE id=? LIMIT 1");
+  $q->execute([$osId]);
+  if ($row = $q->fetch(PDO::FETCH_ASSOC)) {
+    $osStatus = $row['status'] ?? null;
+    if (isset($row['total_os'])) $totalOS = (float)$row['total_os'];
+  }
 
-  $q = $conn->prepare("SELECT SUM(total_pagamento) AS t FROM pagamento_os WHERE ordem_de_servico_id=?");  
-  $q->execute([$osId]);  
-  $totalPag = (float)($q->fetchColumn() ?: 0);  
+  // Total pago
+  $q = $conn->prepare("SELECT SUM(total_pagamento) FROM pagamento_os WHERE ordem_de_servico_id=?");
+  $q->execute([$osId]);
+  $totalPag = (float)($q->fetchColumn() ?: 0);
 
-  $q = $conn->prepare("SELECT SUM(total_devolucao) AS t FROM devolucao_os WHERE ordem_de_servico_id=?");  
-  $q->execute([$osId]);  
-  $totalDev = (float)($q->fetchColumn() ?: 0);  
-}  
+  // Verifica se há pagamento do tipo ISENTO
+  $q = $conn->prepare("
+    SELECT COUNT(*) 
+    FROM pagamento_os 
+    WHERE ordem_de_servico_id=? 
+      AND (forma_de_pagamento = 'Isento de Pagamento' OR forma_de_pagamento = 'Isento')
+  ");
+  $q->execute([$osId]);
+  $isento = ((int)$q->fetchColumn() > 0);
+
+  // Total devolvido
+  $q = $conn->prepare("SELECT SUM(total_devolucao) FROM devolucao_os WHERE ordem_de_servico_id=?");
+  $q->execute([$osId]);
+  $totalDev = (float)($q->fetchColumn() ?: 0);
+}
+
+/* Badge de situação (inclui ISENTO) */
+$osBadgeText  = '';
+$osBadgeClass = '';
+
+if ($osStatus === 'Cancelado' || $osStatus === 'Cancelada') {
+  $osBadgeText  = 'Cancelada';
+  $osBadgeClass = 'situacao-cancelado';
+} elseif ($isento) {
+  $osBadgeText  = 'Isento de Pagamento'; // ou apenas 'Isento'
+  $osBadgeClass = 'situacao-isento';
+} elseif ($totalPag > 0) {
+  $osBadgeText  = 'Pago (Depósito Prévio)';
+  $osBadgeClass = 'situacao-pago';
+} else {
+  $osBadgeText  = 'Ativa (Pendente de Pagamento)';
+  $osBadgeClass = 'situacao-ativo';
+}
+
 
 /* Auto-cancelamento se O.S. cancelada */  
 $fezAutoCancelamento = false;  
@@ -163,18 +195,22 @@ try {
 } catch (Throwable $e) {}  
 
 /* Status "visual" da O.S. */  
-$osBadgeText  = '';  
-$osBadgeClass = '';  
-if ($osStatus === 'Cancelado' || $osStatus === 'Cancelada') {  
-  $osBadgeText = 'Cancelada';  
-  $osBadgeClass = 'situacao-cancelado';  
-} elseif ($totalPag > 0) {  
-  $osBadgeText = 'Pago (Depósito Prévio)';  
-  $osBadgeClass = 'situacao-pago';  
-} else {  
-  $osBadgeText = 'Ativa (Pendente de Pagamento)';  
-  $osBadgeClass = 'situacao-ativo';  
-}  
+$osBadgeText  = '';
+$osBadgeClass = '';
+
+if ($osStatus === 'Cancelado' || $osStatus === 'Cancelada') {
+  $osBadgeText  = 'Cancelada';
+  $osBadgeClass = 'situacao-cancelado';
+} elseif (!empty($isento)) {
+  $osBadgeText  = 'Isento de Pagamento';
+  $osBadgeClass = 'situacao-isento';
+} elseif ($totalPag > 0) {
+  $osBadgeText  = 'Pago (Depósito Prévio)';
+  $osBadgeClass = 'situacao-pago';
+} else {
+  $osBadgeText  = 'Ativa (Pendente de Pagamento)';
+  $osBadgeClass = 'situacao-ativo';
+}
 
 /* Bloqueios e mensagem do bloqueio */  
 $bloquearAlteracao = false;  
@@ -189,10 +225,10 @@ if ($pedidoStatus === 'entregue') {
 } elseif ($osStatus === 'Cancelado' || $osStatus === 'Cancelada') {  
   $bloquearAlteracao = true;  
   $bloqueioMsg = 'O.S. cancelada. Pedido cancelado automaticamente.';  
-} elseif ($osId > 0 && !($totalPag > 0)) {  
-  // Só exige pagamento quando houver O.S. vinculada  
-  $bloquearAlteracao = true;  
-  $bloqueioMsg = 'Para alterar o status do pedido é necessário que a O.S. esteja com Depósito Prévio pago.';  
+} elseif ($osId > 0 && !($totalPag > 0) && !$isento && !(strcasecmp(trim((string)$osStatus),'Isento de Pagamento')===0)) {
+  // Exige pagamento SOMENTE se não houver isenção (pagamento "Isento de Pagamento")
+  $bloquearAlteracao = true;
+  $bloqueioMsg = 'Para alterar o status do pedido é necessário que a O.S. esteja com Depósito Prévio pago ou marcada como Isento de Pagamento.';
 }  
 
 /* QR / URL pública */  
@@ -1468,6 +1504,7 @@ body.dark-mode footer .footer-content a:hover {
               <input type="hidden" name="id" value="<?=$id?>">
               <input type="hidden" id="hasOSFlag" value="<?= ($osId > 0 ? '1' : '0') ?>">
               <input type="hidden" id="osPagoFlag" value="<?= ($totalPag > 0 ? '1' : '0') ?>">
+              <input type="hidden" id="osIsentoFlag" value="<?= ( ($isento || (strcasecmp(trim((string)$osStatus),'Isento de Pagamento')===0)) ? '1' : '0') ?>">
               <input type="hidden" id="osStatusHidden" value="<?=htmlspecialchars($osStatus ?? '')?>">
               <input type="hidden" id="pedidoStatusHidden" value="<?=htmlspecialchars($pedidoStatus)?>">
 
@@ -1670,12 +1707,13 @@ $(function(){
     }
 
     if (hasOS) {
-      const osPago = $('#osPagoFlag').val() === '1';
-      if (!osPago) {
+      const osPago   = $('#osPagoFlag').val() === '1';
+      const osIsento = $('#osIsentoFlag').val() === '1'; // novo
+      if (!osPago && !osIsento) {
         Swal.fire({
           icon: 'warning',
           title: 'Ação bloqueada',
-          text: 'Para alterar o status do pedido a O.S. precisa estar com Depósito Prévio pago.'
+          text: 'Para alterar o status do pedido a O.S. precisa estar com Depósito Prévio pago ou marcada como Isento de Pagamento.'
         });
         return false;
       }

@@ -50,7 +50,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $total_valor = 0;
 
         // Verificar se o ato é válido
-        if (!empty($item['ato']) && !in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
+        // Detectar marcação "(ato isento)" no código do ato
+        $atoIsento = isset($item['ato']) && stripos($item['ato'], '(isento)') !== false;
+
+        // Verificar se o ato é válido e NÃO é isento
+        if (!$atoIsento && !empty($item['ato']) && !in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
             // Buscar valores na tabela apropriada
             $emolumentos_query = $conn->prepare("SELECT * FROM $tabela_emolumentos WHERE ato = ?");
             $emolumentos_query->bind_param("s", $item['ato']);
@@ -102,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $stmt->execute();
             }
         } else {
-            // Ato inválido (0 ou 00), inserir na tabela atos_manuais_liquidados
+            // Ato inválido OU isento -> inserir na tabela atos_manuais_liquidados
             $emolumentos_valor = floatval($item['emolumentos']) * $quantidade_liquidar;
             $ferc_valor = floatval($item['ferc']) * $quantidade_liquidar;
             $fadep_valor = floatval($item['fadep']) * $quantidade_liquidar;

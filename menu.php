@@ -997,6 +997,67 @@ $mode_query->close();
         a {
             text-decoration: none !important;
         }
+
+        .atlas-toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        max-width: 360px;
+        z-index: 2000;
+        background: rgba(33, 38, 45, 0.96);
+        color: #fff;
+        border-radius: 14px;
+        padding: 14px 16px;
+        box-shadow: 0 10px 32px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.08);
+        backdrop-filter: blur(12px) saturate(160%);
+        display: none;
+        animation: atlasToastIn .28s ease-out both;
+      }
+      body.light-mode .atlas-toast {
+        background: rgba(255, 255, 255, 0.98);
+        color: #111827;
+        border: 1px solid rgba(0,0,0,0.06);
+      }
+      .atlas-toast .atlas-toast-title {
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .atlas-toast .atlas-toast-body {
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .atlas-toast .atlas-toast-actions {
+        margin-top: 10px;
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      .atlas-toast .btn-toast {
+        border: none;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .btn-toast-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+      }
+      .btn-toast-muted {
+        background: rgba(0,0,0,0.06);
+        color: inherit;
+      }
+      body.dark-mode .btn-toast-muted {
+        background: rgba(255,255,255,0.08);
+      }
+      @keyframes atlasToastIn {
+        from { transform: translateY(12px); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+      }
     </style>
 </head>
 
@@ -1354,6 +1415,7 @@ $mode_query->close();
         }
 
         // Marca o item ativo baseado na URL atual
+               // Marca o item ativo baseado na URL atual
         document.addEventListener('DOMContentLoaded', function() {
             const currentPath = window.location.pathname;
             const navItems = document.querySelectorAll('.bottom-nav .nav-item');
@@ -1392,7 +1454,87 @@ $mode_query->close();
                     }
                 }
             });
+
+            // ===================== NOTIFICAÇÕES EM "TEMPO REAL" (polling) =====================
+            (function initTaskNotify(){
+              const API_URL = '<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/pedidos_certidao/tarefas.php'?>';
+              const CURRENT_USER = '<?=addslashes($_SESSION['username'] ?? '')?>';
+              if (!CURRENT_USER) return; // sem usuário logado, não notifica
+
+              const STORAGE_KEY = 'atlas_last_task_seen_' + CURRENT_USER;
+              let lastSeen = localStorage.getItem(STORAGE_KEY) || ''; // ISO ou vazio
+
+              const $toast = $('#atlas-toast');
+              const $toastBody = $('#atlas-toast .atlas-toast-body');
+
+              $('#atlas-toast-dismiss').on('click', function(){
+                $toast.fadeOut(150);
+              });
+
+              function humanizeDate(s) {
+                try {
+                  const d = new Date(s.replace(' ', 'T'));
+                  return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                } catch(e) { return s; }
+              }
+
+              function checkNewAssignments() {
+                $.ajax({
+                  url: API_URL,
+                  data: { action: 'notify_new_assignments', since: lastSeen },
+                  dataType: 'json',
+                  cache: false,
+                  success: function(r){
+                    if (!r || !r.success) return;
+                    if ((r.count || 0) > 0) {
+                      // Monta corpo do toast
+                      const items = (r.items || []).map(it => {
+                        const proto = it.protocolo ? `<strong>${it.protocolo}</strong>` : `#${it.pedido_id}`;
+                        const when  = humanizeDate(it.criado_em || '');
+                        return `<div style="margin-bottom:6px;">
+                                  <i class="fas fa-circle" style="font-size:7px; margin-right:6px;"></i>
+                                  Pedido ${proto} — <span style="opacity:0.8">${when}</span>
+                                </div>`;
+                      }).join('') || 'Você recebeu novas tarefas.';
+
+                      $toastBody.html(items);
+                      $toast.stop(true, true).fadeIn(150);
+
+                      // Atualiza ponteiro para não repetir
+                      if (r.latest_ts) {
+                        lastSeen = r.latest_ts;
+                        localStorage.setItem(STORAGE_KEY, lastSeen);
+                      }
+                    } else {
+                      // Nenhuma nova; mantém lastSeen como está
+                    }
+                  }
+                });
+              }
+
+              // Primeira rodada rápida ao entrar
+              setTimeout(checkNewAssignments, 1500);
+              // Polling a cada 15s (ajuste se quiser)
+              setInterval(checkNewAssignments, 15000);
+            })();
+            // ======================================================================
         });
+
     </script>  
+
+    
+    
+    <!-- Container de Toast (injetado dinamicamente) -->
+    <div id="atlas-toast" class="atlas-toast" role="alert" aria-live="polite" aria-atomic="true">
+      <div class="atlas-toast-title">
+        <i class="fas fa-bell"></i>
+        <span>Novas tarefas atribuídas</span>
+      </div>
+      <div class="atlas-toast-body"></div>
+      <div class="atlas-toast-actions">
+        <button type="button" class="btn-toast btn-toast-muted" id="atlas-toast-dismiss">Dispensar</button>
+        <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/pedidos_certidao/tarefas.php'?>" class="btn-toast btn-toast-primary">Ver Tarefas</a>
+      </div>
+    </div>
 </body>  
 </html>

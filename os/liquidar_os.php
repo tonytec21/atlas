@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             if ($quantidadeRestante > 0) {
                 $status = ($quantidadeRestante + $item['quantidade_liquidada'] >= $item['quantidade']) 
-                          ? 'liquidado' : 'parcialmente liquidado';
+                        ? 'liquidado' : 'parcialmente liquidado';
 
                 $emolumentos_valor = 0;
                 $ferc_valor = 0;
@@ -47,7 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $femp_valor = 0;
                 $total_valor = 0;
 
-                if (!empty($item['ato']) && !in_array($item['ato'], ['0', '00', '9999'])) {
+                // Detectar marcação "(ato isento)" no código do ato
+                $atoIsento = isset($item['ato']) && stripos($item['ato'], '(isento)') !== false;
+
+                if (!$atoIsento && !empty($item['ato']) && !in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
                     // Buscar valores na tabela de emolumentos
                     $emol_query = $conn->prepare("SELECT * FROM $tabela_emolumentos WHERE ato = ?");
                     $emol_query->bind_param("s", $item['ato']);
@@ -69,6 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $total_valor = floatval($item['total']) * $quantidadeRestante;
                     }
                 } else {
+                    // Isento ou inválido: usar os valores já salvos no item
                     $emolumentos_valor = floatval($item['emolumentos']) * $quantidadeRestante;
                     $ferc_valor = floatval($item['ferc']) * $quantidadeRestante;
                     $fadep_valor = floatval($item['fadep']) * $quantidadeRestante;
@@ -86,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $total_valor *= $factor;
                 }
 
-                if (!in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
+                if (!$atoIsento && !in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
                     $stmt_insert = $conn->prepare(
                         "INSERT INTO atos_liquidados 
                         (ordem_servico_id, ato, quantidade_liquidada, desconto_legal, descricao, emolumentos, 
@@ -101,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     );
                     $stmt_insert->execute();
                 } else {
+                    // Isento OU inválido => atos_manuais_liquidados
                     $stmt_insert = $conn->prepare(
                         "INSERT INTO atos_manuais_liquidados 
                         (ordem_servico_id, ato, quantidade_liquidada, desconto_legal, descricao, emolumentos, 

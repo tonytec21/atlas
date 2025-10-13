@@ -128,6 +128,7 @@ $atosSemValor = json_decode(
             box-shadow: var(--shadow);  
             position: relative;  
             overflow: hidden;  
+            margin: 2px;
             border: none;  
         }  
 
@@ -1138,9 +1139,16 @@ $atosSemValor = json_decode(
                 '<td>' + fadep.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' + femp.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' + total.toFixed(2).replace('.', ',') + '</td>' +  
-                '<td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="removerItem(this)"><i class="fa fa-trash" aria-hidden="true"></i></button></td>' +  
-                '</tr>';  
-                
+                '<td>' +
+                '<button type="button" class="btn btn-warning btn-sm" onclick="marcarItemIsento(this)">' +
+                    '<i class="fa fa-ban"></i> Ato Isento' +
+                '</button> ' +
+                '<button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="removerItem(this)">' +
+                    '<i class="fa fa-trash" aria-hidden="true"></i>' +
+                '</button>' +
+                '</td>' +  
+                '</tr>';
+                  
             $('#itensTable').append(item);  
             atualizarISS();  
             atualizarCardsMobile();  
@@ -1305,7 +1313,7 @@ $atosSemValor = json_decode(
         $('#total').prop('readonly', false);  
     }  
 
-    // ===================== REMOVER ITEM =====================  
+    // ===================== REMOVER ITEM =====================
     function removerItem(button) {  
         var row = $(button).closest('tr');  
         var totalItem = parseFloat(row.find('td').eq(9).text().replace(/\./g, '').replace(',', '.')) || 0;  
@@ -1319,7 +1327,32 @@ $atosSemValor = json_decode(
         atualizarOrdemExibicao();  
         atualizarCardsMobile();  
         updateSalvarButtonState();  
-    }  
+    }
+
+    // ===================== MARCAR ITEM COMO ISENTO =====================
+    window.marcarItemIsento = function(btn){
+        const $tr = $(btn).closest('tr');
+        const $tds = $tr.find('td');
+
+        // 1) Zera os valores (colunas 5..9: Emol., FERC, FADEP, FEMP, Total)
+        for (let i = 5; i <= 9; i++) {
+            $tds.eq(i).text('0,00');
+        }
+
+        // 2) Anexa " (isento)" ao código do ato (coluna 1) caso ainda não exista
+        const $tdAto = $tds.eq(1);
+        const atoTxt = ($tdAto.text() || '').trim();
+        if (!/\(isento\)$/i.test(atoTxt)) {
+            $tdAto.text(atoTxt + ' (isento)');
+        }
+
+        // 3) Desabilita o botão para evitar reaplicações
+        $(btn).prop('disabled', true).text('Isento aplicado');
+
+        // 4) Recalcula ISS e total
+        atualizarISS();
+        atualizarCardsMobile();
+    };
 
     // ===================== SALVAR OS =====================  
     function salvarOS() {  
@@ -1490,6 +1523,9 @@ $atosSemValor = json_decode(
                                 <td>${femp.toFixed(2).replace('.', ',')}</td>
                                 <td>${total.toFixed(2).replace('.', ',')}</td>
                                 <td>
+                                    <button type="button" class="btn btn-warning btn-sm" onclick="marcarItemIsento(this)">
+                                        <i class="fa fa-ban"></i> Ato Isento
+                                    </button>
                                     <button type="button" title="Remover"
                                             class="btn btn-delete btn-sm"
                                             onclick="removerItem(this)">

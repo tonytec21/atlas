@@ -19,7 +19,7 @@ if (empty($_POST['csrf']) || empty($_SESSION['csrf_pedidos']) || !hash_equals($_
   if (ob_get_length()) ob_clean(); echo json_encode(['error'=>'Falha de CSRF.']); exit;
 }
 
-/* Config da API – ../api_secrets.json */
+/* ======================== Config da API ======================== */
 $apiConfig   = @json_decode(@file_get_contents(__DIR__ . '/api_secrets.json'), true) ?: [];
 $BASE_URL    = $apiConfig['base_url']    ?? 'https://consultapedido.sistemaatlas.com.br';
 $INGEST_URL  = $apiConfig['ingest_url']  ?? (rtrim($BASE_URL,'/').'/api/ingest.php');
@@ -27,7 +27,7 @@ $API_KEY     = $apiConfig['api_key']     ?? null;
 $HMAC_SECRET = $apiConfig['hmac_secret'] ?? null;
 $VERIFY_SSL  = array_key_exists('verify_ssl',$apiConfig) ? (bool)$apiConfig['verify_ssl'] : true;
 
-/* ===== Helpers / Schema ===== */
+/* ======================== Helpers / Schema existentes ======================== */
 function ensureSchema(PDO $conn){
   // Pedidos
   $conn->exec("CREATE TABLE IF NOT EXISTS pedidos_certidao (
@@ -131,6 +131,69 @@ function ensureSchema(PDO $conn){
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
 }
 
+/* ======================== SCHEMA distribuição (NOVO) ======================== */
+function ensureSchemaDistribuicao(PDO $conn) {
+  $conn->exec("CREATE TABLE IF NOT EXISTS equipes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(120) NOT NULL,
+    descricao VARCHAR(500) NULL,
+    ativa TINYINT(1) NOT NULL DEFAULT 1,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_equipe_nome (nome),
+    INDEX idx_ativa (ativa)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+
+  $conn->exec("CREATE TABLE IF NOT EXISTS equipe_membros (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    equipe_id INT NOT NULL,
+    funcionario_id INT NOT NULL,
+    papel VARCHAR(60) NULL,
+    ordem INT NOT NULL DEFAULT 1,
+    ativo TINYINT(1) NOT NULL DEFAULT 1,
+    carga_maxima_diaria INT NULL,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_membro_equipe FOREIGN KEY (equipe_id) REFERENCES equipes(id) ON DELETE CASCADE,
+    CONSTRAINT fk_membro_func FOREIGN KEY (funcionario_id) REFERENCES funcionarios(id) ON DELETE RESTRICT,
+    UNIQUE KEY uq_equipe_func (equipe_id, funcionario_id),
+    INDEX idx_equipe_ativo (equipe_id, ativo),
+    INDEX idx_ordem (ordem)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+
+  $conn->exec("CREATE TABLE IF NOT EXISTS equipe_regras (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    equipe_id INT NOT NULL,
+    atribuicao VARCHAR(50) NOT NULL,
+    tipo VARCHAR(80) NOT NULL,
+    prioridade INT NOT NULL DEFAULT 10,
+    ativa TINYINT(1) NOT NULL DEFAULT 1,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_regra_equipe FOREIGN KEY (equipe_id) REFERENCES equipes(id) ON DELETE CASCADE,
+    INDEX idx_match (atribuicao, tipo, ativa, prioridade),
+    INDEX idx_equipe (equipe_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+
+  $conn->exec("CREATE TABLE IF NOT EXISTS tarefas_pedido (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    pedido_id INT NOT NULL,
+    equipe_id INT NOT NULL,
+    funcionario_id INT NULL,
+    status ENUM('pendente','em_andamento','concluida','cancelada') NOT NULL DEFAULT 'pendente',
+    observacao VARCHAR(500) NULL,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_tarefa_equipe FOREIGN KEY (equipe_id) REFERENCES equipes(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_tarefa_func FOREIGN KEY (funcionario_id) REFERENCES funcionarios(id) ON DELETE SET NULL,
+    INDEX idx_pedido (pedido_id),
+    INDEX idx_func_status (funcionario_id, status),
+    INDEX idx_equipe (equipe_id),
+    INDEX idx_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+}
+
+/* Conversores */
 function br_money_to_decimal($v) {
   $v = preg_replace('/[^\d,.\-]/', '', (string)$v);
   $v = str_replace('.', '', $v);
@@ -185,15 +248,11 @@ function inferir_portador_nome($atr, $tipo, array $refs){
   return '';
 }
 
-/**
- * HTTP POST JSON assinado com HMAC + RETRY/backoff e opções de rede robustas.
- * Retenta automaticamente em falhas de transporte (http_code==0 ou erro cURL).
- */
+/* ======================== POST JSON assinado (seu original) ======================== */
 function post_json_signed(string $url, string $apiKey, string $hmacSecret, array $body, string $requestId, int $timestampMs, bool $verifySsl): array {
   $json = json_encode($body, JSON_UNESCAPED_UNICODE);
   $sig  = hash_hmac('sha256', $timestampMs . $json, $hmacSecret);
 
-  // Desativa "Expect: 100-continue" e força encerramento da conexão
   $headers = [
     'Content-Type: application/json; charset=utf-8',
     'X-Api-Key: '      . $apiKey,
@@ -204,9 +263,8 @@ function post_json_signed(string $url, string $apiKey, string $hmacSecret, array
     'Connection: close'
   ];
 
-  $attempts = 3;              // 1 tentativa + 2 retries
-  $delayMs  = [250, 800];     // backoff entre as tentativas
-
+  $attempts = 3;
+  $delayMs  = [250, 800];
   $last = ['ok'=>false,'http_code'=>0,'response'=>null,'error'=>null,'signature'=>$sig];
 
   for ($i=0; $i<$attempts; $i++) {
@@ -219,7 +277,6 @@ function post_json_signed(string $url, string $apiKey, string $hmacSecret, array
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER     => $headers,
         CURLOPT_POSTFIELDS     => $json,
-        // CURLOPT_POSTFIELDSIZE removido por compatibilidade
         CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_TIMEOUT        => 25,
         CURLOPT_SSL_VERIFYPEER => $verifySsl ? 1 : 0,
@@ -231,14 +288,10 @@ function post_json_signed(string $url, string $apiKey, string $hmacSecret, array
         CURLOPT_FRESH_CONNECT  => 1,
       ]);
       $resp = curl_exec($ch);
-      if ($resp === false) {
-        $errno = curl_errno($ch);
-        $err = 'cURL('.$errno.'): '.curl_error($ch);
-      }
+      if ($resp === false) { $errno = curl_errno($ch); $err = 'cURL('.$errno.'): '.curl_error($ch); }
       $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
       curl_close($ch);
     } else {
-      // Fallback sem cURL
       $context = stream_context_create([
         'http' => [
           'method'  => 'POST',
@@ -264,27 +317,203 @@ function post_json_signed(string $url, string $apiKey, string $hmacSecret, array
 
     $last = ['ok'=>$ok,'http_code'=>$http,'response'=>$resp,'error'=>$err,'signature'=>$sig];
 
-    // Sucesso ou erro de aplicação (HTTP 4xx/5xx com corpo) — não retentar
     if ($ok || ($http >= 400 && $http < 600)) break;
-
-    // Falha de transporte (http 0 ou erro cURL) — retentar com backoff
     if ($http === 0 || $err) {
-      if ($i < $attempts - 1) {
-        $sleep = $delayMs[min($i, count($delayMs)-1)];
-        usleep($sleep * 1000);
-        continue;
-      }
+      if ($i < $attempts - 1) { usleep(($delayMs[min($i, count($delayMs)-1)]) * 1000); continue; }
     }
     break;
   }
-
   return $last;
 }
 
-/* ===== Execução ===== */
+/* ======================== Helpers de normalização (NOVO) ======================== */
+/** Gera candidatos de atribuição aceitando sinônimos/abreviações usadas nas regras. */
+function candidatosAtribuicao(string $atr): array {
+  $a = trim($atr);
+  $norm = mb_strtolower($a, 'UTF-8');
+
+  $out = [$a];
+
+  if (strpos($norm, 'registro civil') !== false) {
+    $out[] = 'RCPN';
+    $out[] = 'Registro Civil';
+  }
+  if (strpos($norm, 'título') !== false || strpos($norm, 'titul') !== false || strpos($norm, 'document') !== false ||
+      strpos($norm, 'pessoa jurídica') !== false || strpos($norm, 'pessoas jurídicas') !== false) {
+    $out[] = 'RTD/RTDPJ';
+    $out[] = 'Títulos e Documentos';
+    $out[] = 'Pessoas Jurídicas';
+  }
+  if (strpos($norm, 'imóv') !== false || strpos($norm, 'imov') !== false) {
+    $out[] = 'RI';
+    $out[] = 'Registro de Imóveis';
+  }
+  if (strpos($norm, 'nota') !== false) {
+    $out[] = 'Notas';
+  }
+
+  return array_values(array_unique($out));
+}
+
+/**
+ * Extrai variações úteis do 'tipo' para casar com regras:
+ * - o texto completo do formulário
+ * - uma forma simplificada (sem “2ª”, “Inteiro Teor de”, etc.)
+ * - uma palavra-chave (Nascimento, Casamento, Óbito, Escrituras, etc.)
+ */
+function candidatosTipo(string $tipo): array {
+  $t = trim($tipo);
+  $out = [$t];
+
+  // Simplificações comuns
+  $simp = $t;
+  $simp = preg_replace('~^\s*(\d+ª|\d+a)\s+(de|da)\s+~iu', '', $simp);      // remove "2ª de", "2a de"
+  $simp = preg_replace('~^\s*inteiro\s+teor\s+(de|da)\s+~iu', '', $simp);   // remove "Inteiro Teor de"
+  $simp = preg_replace('~\s+livro\s*\d*$~iu', '', $simp);                   // ruídos ocasionais
+  $simp = trim($simp);
+  if ($simp !== '' && $simp !== $t) $out[] = $simp;
+
+  // palavra-chave
+  $kw = $simp !== '' ? $simp : $t;
+  $map = ['Ó'=>'O','ó'=>'o','ã'=>'a','â'=>'a','á'=>'a','à'=>'a','ê'=>'e','é'=>'e','í'=>'i','î'=>'i','õ'=>'o','ô'=>'o','ú'=>'u','ç'=>'c'];
+  $kwn = strtr(mb_strtolower($kw,'UTF-8'), $map);
+  if (preg_match('~(nascimento|casamento|obito|óbito|escritura|escrituras|procura(c|ç)ao|procura(c|ç)oes|ata|testamento|oner|onus|penhor|negativa|matr(i|í)cula)~iu', $kwn, $m)) {
+    $key = $m[0];
+    $replacements = [
+      'obito' => 'Óbito',
+      'procuracao' => 'Procuração', 'procuracoes' => 'Procurações',
+      'matricula' => 'Matrícula', 'onus' => 'Ônus',
+    ];
+    $keyShow = $replacements[$key] ?? ucfirst($key);
+    $out[] = $keyShow;
+  }
+
+  return array_values(array_unique($out));
+}
+
+/* ======================== DISTRIBUIÇÃO (NOVO) ======================== */
+/**
+ * Encontra a equipe pela melhor regra (atribuicao, tipo) com tolerância:
+ * - tenta todos os candidatos de atribuição e tipo (sinônimos)
+ * - tenta match exato, depois curinga '*', depois LIKE por palavra-chave
+ * - respeita prioridade ASC e equipe/regel ativas
+ */
+function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?array {
+  $atrCands = candidatosAtribuicao($atribuicao);
+  $tipoCands = candidatosTipo($tipo);
+
+  // 1) match EXATO
+  $sqlExact = "SELECT r.*, e.nome AS equipe_nome
+               FROM equipe_regras r
+               JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
+               WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = :t
+               ORDER BY r.prioridade ASC, r.id ASC
+               LIMIT 1";
+  $stExact = $conn->prepare($sqlExact);
+
+  foreach ($atrCands as $a) {
+    foreach ($tipoCands as $t) {
+      $stExact->execute([':a'=>$a, ':t'=>$t]);
+      $row = $stExact->fetch(PDO::FETCH_ASSOC);
+      if ($row) return $row;
+    }
+  }
+
+  // 2) curinga ('*')
+  $sqlStar = "SELECT r.*, e.nome AS equipe_nome
+              FROM equipe_regras r
+              JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
+              WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = '*'
+              ORDER BY r.prioridade ASC, r.id ASC
+              LIMIT 1";
+  $stStar = $conn->prepare($sqlStar);
+  foreach ($atrCands as $a) {
+    $stStar->execute([':a'=>$a]);
+    $row = $stStar->fetch(PDO::FETCH_ASSOC);
+    if ($row) return $row;
+  }
+
+  // 3) LIKE por palavra-chave do tipo
+  $sqlLike = "SELECT r.*, e.nome AS equipe_nome
+              FROM equipe_regras r
+              JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
+              WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo LIKE :tk
+              ORDER BY r.prioridade ASC, r.id ASC
+              LIMIT 1";
+  $stLike = $conn->prepare($sqlLike);
+  foreach ($atrCands as $a) {
+    foreach ($tipoCands as $tk) {
+      $stLike->execute([':a'=>$a, ':tk'=>'%'.$tk.'%']);
+      $row = $stLike->fetch(PDO::FETCH_ASSOC);
+      if ($row) return $row;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Escolhe o membro da equipe com menor carga atual (tarefas pendentes/em_andamento).
+ * Empate: menor 'ordem' e, por fim, menor ID. Respeita 'carga_maxima_diaria' se preenchida.
+ */
+function escolherMembroParaEquipe(PDO $conn, int $equipeId): ?array {
+  $membros = $conn->prepare("SELECT m.id, m.funcionario_id, m.ordem, m.carga_maxima_diaria,
+                                    f.nome_completo, f.usuario
+                             FROM equipe_membros m
+                             JOIN funcionarios f ON f.id = m.funcionario_id
+                             WHERE m.equipe_id=? AND m.ativo=1
+                             ORDER BY m.ordem ASC, m.id ASC");
+  $membros->execute([$equipeId]);
+  $arr = $membros->fetchAll(PDO::FETCH_ASSOC);
+  if (!$arr) return null;
+
+  $calc = $conn->prepare("SELECT COUNT(*) FROM tarefas_pedido
+                          WHERE funcionario_id=? AND status IN ('pendente','em_andamento')
+                            AND DATE(criado_em)=CURRENT_DATE()");
+  $geral = $conn->prepare("SELECT COUNT(*) FROM tarefas_pedido
+                           WHERE funcionario_id=? AND status IN ('pendente','em_andamento')");
+
+  $melhor = null; $melhorCarga = null;
+  foreach ($arr as $m) {
+    $geral->execute([$m['funcionario_id']]);
+    $cargaTotal = (int)$geral->fetchColumn();
+
+    $calc->execute([$m['funcionario_id']]);
+    $cargaHoje = (int)$calc->fetchColumn();
+
+    if (!is_null($m['carga_maxima_diaria']) && $m['carga_maxima_diaria'] >= 0 && $cargaHoje >= (int)$m['carga_maxima_diaria']) {
+      continue;
+    }
+
+    if ($melhor===null || $cargaTotal < $melhorCarga) {
+      $melhor = $m;
+      $melhorCarga = $cargaTotal;
+    }
+  }
+
+  if ($melhor===null) {
+    foreach ($arr as $m) {
+      $geral->execute([$m['funcionario_id']]);
+      $cargaTotal = (int)$geral->fetchColumn();
+      if ($melhor===null || $cargaTotal < $melhorCarga) { $melhor=$m; $melhorCarga=$cargaTotal; }
+    }
+  }
+  return $melhor;
+}
+
+/** Cria a tarefa vinculada ao pedido para a equipe/membro selecionados. */
+function criarTarefaParaPedido(PDO $conn, int $pedidoId, int $equipeId, ?int $funcionarioId): int {
+  $st = $conn->prepare("INSERT INTO tarefas_pedido (pedido_id, equipe_id, funcionario_id, status)
+                        VALUES (?,?,?, 'pendente')");
+  $st->execute([$pedidoId, $equipeId, $funcionarioId]);
+  return (int)$conn->lastInsertId();
+}
+
+/* ======================== Execução principal ======================== */
 try {
   $conn = getDatabaseConnection();
   ensureSchema($conn);
+  ensureSchemaDistribuicao($conn); // <<< garante tabelas de distribuição
 
   // Sanitização
   $atribuicao = trim($_POST['atribuicao'] ?? '');
@@ -330,25 +559,20 @@ try {
   $protocolo     = strtoupper(bin2hex(random_bytes(6)));  // 12 hex
   $token_publico = bin2hex(random_bytes(20));             // 40 chars
 
-  // ====== Razão social do cartório (cadastro_serventia.razao_social)
+  // Razão social (se disponível)
   $razao_social = null;
   try {
     $stRS = $conn->query("SELECT razao_social FROM cadastro_serventia LIMIT 1");
     if ($stRS && ($rowRS = $stRS->fetch(PDO::FETCH_ASSOC))) {
       $razao_social = trim((string)($rowRS['razao_social'] ?? '')) ?: null;
     }
-  } catch (Throwable $eRS) {
-    // Silencioso: se a tabela não existir ou erro, segue sem a razão social
-    $razao_social = null;
-  }
+  } catch (Throwable $eRS) { $razao_social = null; }
 
-  // Transação
+  // Transação principal
   $conn->beginTransaction();
 
   $os_id = null;
-
   if ($isento_ato) {
-    // Ato isento: não cria OS e zera total_os
     $total_os = 0.0;
   } else {
     // 1) Inserir OS
@@ -417,7 +641,7 @@ try {
     ':os'    => $os_id, // pode ser NULL quando isento
     ':user'  => $username
   ]);
-  $pedido_id = $conn->lastInsertId();
+  $pedido_id = (int)$conn->lastInsertId();
 
   // 3) Log inicial
   $ip = $_SERVER['REMOTE_ADDR'] ?? null;
@@ -426,7 +650,7 @@ try {
                   VALUES (?,?,?,?,?,?,?)")
        ->execute([$pedido_id,null,'pendente','Pedido criado',$username,$ip,$ua]);
 
-  // 4) QR da URL pública /v1/rastreio/{token}
+  // 4) QR
   $dirQr = __DIR__.'/qrcodes';
   if (!is_dir($dirQr)) @mkdir($dirQr,0777,true);
   $urlPublica = rtrim($BASE_URL,'/').'/v1/rastreio/'.$token_publico;
@@ -450,7 +674,7 @@ try {
     }
   }
 
-  // 5) OUTBOX + envio imediato (topic: pedido_criado | formato FLAT)
+  // 5) OUTBOX + envio imediato
   $body = [
     'topic'            => 'pedido_criado',
     'protocolo'        => $protocolo,
@@ -458,16 +682,14 @@ try {
     'atribuicao'       => $atribuicao,
     'tipo'             => $tipo,
     'status'           => 'pendente',
-    'pedido_id'        => (int)$pedido_id,
+    'pedido_id'        => $pedido_id,
     'ordem_servico_id' => $os_id === null ? null : (int)$os_id,
     'isento_ato'       => $isento_ato ? true : false,
     'criado_em'        => date('c'),
-    // Resumo sem dados sensíveis (LGPD)
     'resumo' => [
       'requerente' => mb_substr($requerente_nome,0,1,'UTF-8').'***',
       'total_os'   => (float)$total_os
     ],
-    // >>>>>>> Razão social do cartório (inclusão solicitada)
     'razao_social'     => $razao_social,
     'source'           => 'atlas-app',
     'event_time'       => date('c')
@@ -512,12 +734,32 @@ try {
     }
   }
 
+  /* ======================== DISTRIBUIR TAREFA (NOVO) ======================== */
+  $equipeRegra  = encontrarEquipePorRegra($conn, $atribuicao, $tipo);
+  $tarefa_info  = null;
+  if ($equipeRegra) {
+    $equipeId   = (int)$equipeRegra['equipe_id'];
+    $membro     = escolherMembroParaEquipe($conn, $equipeId);
+    $funcId     = $membro ? (int)$membro['funcionario_id'] : null;
+    $tarefaId   = criarTarefaParaPedido($conn, $pedido_id, $equipeId, $funcId);
+
+    $tarefa_info = [
+      'tarefa_id'          => $tarefaId,
+      'equipe_id'          => $equipeId,
+      'equipe_nome'        => $equipeRegra['equipe_nome'] ?? null,
+      'funcionario_id'     => $funcId,
+      'funcionario_nome'   => $membro['nome_completo'] ?? null,
+      'funcionario_usuario'=> $membro['usuario'] ?? null,
+    ];
+  }
+
   if (ob_get_length()) ob_clean();
   echo json_encode([
     'success'=>true,
     'id'=>$pedido_id,
     'api_delivery'=>$apiDelivery,
-    'url_publica'=>$urlPublica
+    'url_publica'=>$urlPublica,
+    'distribuicao'=>$tarefa_info ?: ['mensagem'=>'Nenhuma equipe/regra encontrada para esta combinação.']
   ]);
 
 } catch(Throwable $e){

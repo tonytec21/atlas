@@ -165,6 +165,25 @@ foreach ($pagamentos as $pagamento) {
     $total_pagamentos += $pagamento['total_pagamento'];
 }
 
+// Quantidade de pagamentos (conta entradas, inclusive de valor 0)
+$qtde_pagamentos = is_array($pagamentos) ? count($pagamentos) : 0;
+
+/* ===== FLAG ISENTO =====
+   Agora só fica TRUE se existir ao menos um pagamento
+   cuja forma_de_pagamento seja exatamente "Isento de Pagamento". */
+$isIsento = false;
+
+if (is_array($pagamentos)) {
+    foreach ($pagamentos as $p) {
+        $fp = trim($p['forma_de_pagamento'] ?? '');
+        if (strcasecmp($fp, 'Isento de Pagamento') === 0) {
+            $isIsento = true;
+            break;
+        }
+    }
+}
+
+
 // Calcular total das devoluções
 $total_devolucoes = 0;
 foreach ($devolucoes as $devolucao) {
@@ -255,16 +274,21 @@ if (!empty($ordem_servico['observacoes']) &&
     $pedido_protocolo = $m[1];
 
     // Buscar pedido por protocolo
-    $stmtPedido = $conn->prepare("SELECT id, token_publico FROM pedidos_certidao WHERE protocolo = ? LIMIT 1");
+    $stmtPedido = $conn->prepare("SELECT id, token_publico, status FROM pedidos_certidao WHERE protocolo = ? LIMIT 1");
     $stmtPedido->bind_param("s", $pedido_protocolo);
     if ($stmtPedido->execute()) {
         $resPedido = $stmtPedido->get_result();
         if ($row = $resPedido->fetch_assoc()) {
-            $pedido_id    = (int)$row['id'];
-            $pedido_token = $row['token_publico'];
+            $pedido_id            = (int)$row['id'];
+            $pedido_token         = $row['token_publico'];
+            $pedido_status_atual  = $row['status']; // <-- NOVO
         }
     }
     $stmtPedido->close();
+
+    // Em caso de não achar, garante variável definida
+    if (!isset($pedido_status_atual)) { $pedido_status_atual = null; }
+
 }
 
 // Sinalizadores para JS
@@ -343,7 +367,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
         }  
 
         /* ===================== BADGES STATUS ===================== */  
-        .situacao-pago, .situacao-ativo, .situacao-cancelado {  
+        .situacao-pago, .situacao-ativo, .situacao-cancelado, .situacao-isento {  
             padding: 6px 16px;  
             border-radius: var(--radius-lg);  
             display: inline-flex;  
@@ -371,6 +395,12 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
             background: var(--gradient-error);  
             color: white;  
         }  
+
+        /* ISENTO (cinza) */
+        .situacao-isento{
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+            color:#fff;
+        }
 
         /* ===================== STATUS LABELS ===================== */  
         .status-label {  
@@ -1140,24 +1170,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     <button type="button" class="btn btn-info3 btn-sm" onclick="window.location.href='criar_os.php'">  
                         <i class="fa fa-plus" aria-hidden="true"></i> Criar Ordem de Serviço  
                     </button>  
-                </div>  
-
-                <?php if ($pedido_id): ?>  
-                    <div class="col-auto">  
-                        <button   
-                            type="button"   
-                            class="btn btn-outline-primary btn-sm"   
-                            id="btnAtualizarPedido"   
-                            onclick="atualizarStatusPedido()">  
-                            <i class="fa fa-refresh" aria-hidden="true"></i> Atualizar status do pedido de certidão  
-                        </button>  
-                        <div class="text-center mt-1">  
-                            <small class="text-muted">  
-                                Protocolo: <?php echo htmlspecialchars($pedido_protocolo); ?>  
-                            </small>  
-                        </div>  
-                    </div>  
-                <?php endif; ?>  
+                </div>    
             </div>  
         </div>  
 
@@ -1167,28 +1180,53 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
         <div class="os-header">  
             <h4>ORDEM DE SERVIÇO Nº: <?php echo $ordem_servico['id']; ?></h4>  
             <div>  
-                <?php  
-                $statusLegenda = '';  
-                $statusClass = '';  
+                <?php
+                    $statusLegenda = '';
+                    $statusClass = '';
 
-                if ($ordem_servico['status'] === 'Cancelado') {  
-                    $statusLegenda = 'Cancelada';  
-                    $statusClass = 'situacao-cancelado';  
-                } elseif ($total_pagamentos > 0) {  
-                    $statusLegenda = 'Pago (Depósito Prévio)';  
-                    $statusClass = 'situacao-pago';  
-                } elseif ($ordem_servico['status'] === 'Ativo') {  
-                    $statusLegenda = 'Ativa (Pendente de Pagamento)';  
-                    $statusClass = 'situacao-ativo';  
-                }  
+                    if ($ordem_servico['status'] === 'Cancelado') {
+                        $statusLegenda = 'Cancelada';
+                        $statusClass = 'situacao-cancelado';
 
-                if ($statusLegenda) {
-                    // adiciona id e data-os-status para o JS
-                    echo '<span id="osStatusBadge" class="' . $statusClass . '" data-os-status="' . htmlspecialchars($ordem_servico['status']) . '">' . $statusLegenda . '</span>';
-                }
+                    } elseif ($isIsento) {
+                        $statusLegenda = 'Isento';
+                        $statusClass = 'situacao-isento';
 
-                ?>  
+                    } elseif ($total_pagamentos > 0) {
+                        $statusLegenda = 'Pago (Depósito Prévio)';
+                        $statusClass = 'situacao-pago';
+
+                    } elseif ($ordem_servico['status'] === 'Ativo') {
+                        $statusLegenda = 'Ativa (Pendente de Pagamento)';
+                        $statusClass = 'situacao-ativo';
+                    }
+
+                    if ($statusLegenda) {
+                        // adiciona id + data-os-status + data-isento para o JS
+                        echo '<span id="osStatusBadge" class="' . $statusClass
+                            . '" data-os-status="' . htmlspecialchars($ordem_servico['status'])
+                            . '" data-isento="' . ($isIsento ? '1' : '0') . '">'
+                            . $statusLegenda . '</span>';
+                    }
+                ?>
+
             </div>  
+            <?php if ($pedido_id): ?>  
+                    <div class="col-auto">  
+                        <!-- <button   
+                            type="button"   
+                            class="btn btn-outline-primary btn-sm"   
+                            id="btnAtualizarPedido"   
+                            onclick="atualizarStatusPedido()">  
+                            <i class="fa fa-refresh" aria-hidden="true"></i> Atualizar status do pedido de certidão  
+                        </button>   -->
+                        <div class="text-center mt-1">  
+                            <small class="text-muted">  
+                                Protocolo: <?php echo htmlspecialchars($pedido_protocolo); ?>  
+                            </small>  
+                        </div>  
+                    </div>  
+            <?php endif; ?>
         </div>  
 
         <hr>  
@@ -1264,7 +1302,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0">Itens da Ordem de Serviço</h4>
 
-                <?php if ($temItensNaoLiquidados && $total_pagamentos > 0): ?>
+                <?php if ($temItensNaoLiquidados && $qtde_pagamentos > 0): ?>
                 <button 
                     type="button" 
                     class="btn btn-liquidartudo btn-sm" 
@@ -1322,7 +1360,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                                 <?php endif; ?>  
                             </td>  
                             <td>  
-                                <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado' && $total_pagamentos > 0): ?>  
+                                <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado' && $qtde_pagamentos > 0): ?>  
                                     <button type="button" class="btn btn-primary btn-sm"  
                                     onclick="liquidarAto(  
                                         <?php echo $item['id']; ?>,  
@@ -1432,7 +1470,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     </div>
 
                     <!-- Ações -->
-                    <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado' && $total_pagamentos > 0): ?>
+                    <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado' && $qtde_pagamentos > 0): ?>
                     <div class="card-actions">
                         <button type="button" class="btn btn-primary btn-sm"
                         onclick="liquidarAto(
@@ -1601,8 +1639,17 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                 <div class="stats-grid">  
                     <div class="stat-card">  
                         <div class="stat-label">Valor Total da OS</div>  
-                        <input type="text" class="form-control" id="total_os_modal" value="<?php echo 'R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.'); ?>" readonly>  
-                    </div>  
+                        <input type="text" class="form-control" id="total_os_modal" value="<?php echo 'R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.'); ?>" readonly>
+
+                        <?php if ((float)$ordem_servico['total_os'] == 0.0 && (int)$qtde_pagamentos === 0): ?>
+                            <button type="button"
+                                    class="btn btn-warning w-100 mt-2"
+                                    id="btnIsentoPagamento"
+                                    onclick="isentarPagamento()">
+                                <i class="fa fa-ban"></i> Isento de pagamento
+                            </button>
+                        <?php endif; ?>
+                    </div>
 
                     <?php if ($total_pagamentos > 0): ?>  
                     <div class="stat-card">  
@@ -1640,6 +1687,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     <?php endif; ?>  
                 </div>  
 
+                <?php if ((float)$ordem_servico['total_os'] > 0.0): ?>
                 <h6 class="section-title">Adicionar pagamento</h6>  
                 <div class="form-grid">  
                     <div class="form-group">  
@@ -1674,7 +1722,8 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <i class="fa fa-plus"></i> Adicionar Pagamento  
                         </button>  
                     </div>  
-                </div>  
+                </div>
+                <?php endif; ?>
 
                 <?php if ($saldo > 0.01 || $has_ato_17): ?>  
                 <h6 class="section-title">Ações rápidas</h6>  
@@ -2039,13 +2088,14 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
 var pagamentos = <?php echo json_encode($pagamentos); ?>;
 var liquidacaoItemId = null;
 var quantidadeTotal = 0;
-var quantidadeLiquidada = 0;
+var quantidadeLiquidadaAtual = 0;
 
 // ===== Constantes vindas do PHP para cálculos em tempo real =====
 const OS_STATUS_SERVER   = <?php echo json_encode($ordem_servico['status']); ?>; // "Ativo" | "Cancelado"
 const TOTAL_OS           = parseFloat('<?php echo $ordem_servico['total_os']; ?>');
 const TOTAL_DEVOLUCOES   = parseFloat('<?php echo $total_devolucoes; ?>');
 const TOTAL_REPASSES     = parseFloat('<?php echo $total_repasses; ?>');
+const ISENTO_SERVER = <?php echo $isIsento ? 'true' : 'false'; ?>;
 
 // ===== Utilidades de formatação =====
 function formatCurrencyBRL(n) {
@@ -2054,6 +2104,10 @@ function formatCurrencyBRL(n) {
 }
 function sumPagamentos() {
     return pagamentos.reduce((acc, p) => acc + parseFloat(p.total_pagamento || 0), 0);
+}
+
+function temAlgumPagamento() {
+    return Array.isArray(pagamentos) && pagamentos.length > 0;
 }
 
 // ===== Atualiza os campos do topo e o status da O.S. sem recarregar =====
@@ -2072,13 +2126,18 @@ function refreshOsHeaderAndStats() {
     const badge = document.getElementById('osStatusBadge');
     if (badge) {
         const osStatusAtual = badge.getAttribute('data-os-status') || OS_STATUS_SERVER;
+        const isentoAttr    = badge.getAttribute('data-isento') === '1';
+        const isentoFlag    = isentoAttr || ISENTO_SERVER;
 
         if (osStatusAtual === 'Cancelado') {
-            // mantém "Cancelada"
             badge.className = 'situacao-cancelado';
             badge.textContent = 'Cancelada';
         } else {
-            if (totalPagos > 0) {
+            // prioridade: Isento > Pago > Ativa
+            if (isentoFlag) {
+                badge.className = 'situacao-isento';
+                badge.textContent = 'Isento de Pagamento';
+            } else if (sumPagamentos() > 0) {
                 badge.className = 'situacao-pago';
                 badge.textContent = 'Pago (Depósito Prévio)';
             } else {
@@ -2094,22 +2153,82 @@ function refreshOsHeaderAndStats() {
         receiptGroup.style.display = (totalPagos > 0) ? '' : 'none';
     }
 }
-
-
     // ===== Variáveis do Pedido (se houver protocolo nas observações) =====
-    const PEDIDO_ID         = <?php echo json_encode($pedido_id); ?>;
-    const PEDIDO_PROTOCOLO  = <?php echo json_encode($pedido_protocolo); ?>;
-    const CSRF_PEDIDOS      = <?php echo json_encode($_SESSION['csrf_pedidos']); ?>;
+    const PEDIDO_ID             = <?php echo json_encode($pedido_id); ?>;
+    const PEDIDO_PROTOCOLO      = <?php echo json_encode($pedido_protocolo); ?>;
+    const CSRF_PEDIDOS          = <?php echo json_encode($_SESSION['csrf_pedidos']); ?>;
+    const PEDIDO_STATUS_ATUAL   = <?php echo json_encode($pedido_status_atual ?? null); ?>; // <-- NOVO
+
+    // ===== Sinalizadores globais (defensivos) =====
+    if (typeof window.TODOS_ITENS_LIQUIDADOS === 'undefined') {
+        window.TODOS_ITENS_LIQUIDADOS = <?php echo $todos_itens_liquidados ? 'true' : 'false'; ?>;
+    }
+    if (typeof window.ALGUM_ITEM_LIQUIDADO === 'undefined') {
+        window.ALGUM_ITEM_LIQUIDADO = <?php echo $algum_item_liquidado ? 'true' : 'false'; ?>;
+    }
+
+    // ===== Fallback para sugerirStatusPedido() =====
+    if (typeof window.sugerirStatusPedido !== 'function') {
+        window.sugerirStatusPedido = function sugerirStatusPedido() {
+            if (window.TODOS_ITENS_LIQUIDADOS) return 'emitida';
+            if (window.ALGUM_ITEM_LIQUIDADO)   return 'em_andamento';
+            return 'pendente';
+        };
+    }
+
 
     // Sinalizadores de liquidação (vindos do PHP)
-    const TODOS_ITENS_LIQUIDADOS = <?php echo $todos_itens_liquidados ? 'true' : 'false'; ?>;
-    const ALGUM_ITEM_LIQUIDADO   = <?php echo $algum_item_liquidado ? 'true' : 'false'; ?>;
+    // Dispara uma notificação para atualizar o pedido de certidão quando tudo estiver liquidado (com fallbacks)
+    function tentarNotificarAtualizacaoPedido() {
+        // Valores base (com fallback do PHP)
+        const PED_ID   = (typeof PEDIDO_ID !== 'undefined' && PEDIDO_ID) 
+            ? PEDIDO_ID 
+            : <?php echo json_encode($pedido_id); ?>;
 
-    // Sugere status conforme a liquidação
-    function sugerirStatusPedido() {
-        if (TODOS_ITENS_LIQUIDADOS) return 'emitida';
-        if (ALGUM_ITEM_LIQUIDADO)   return 'em_andamento';
-        return 'pendente';
+        const PED_PROTO = (typeof PEDIDO_PROTOCOLO !== 'undefined' && PEDIDO_PROTOCOLO) 
+            ? PEDIDO_PROTOCOLO 
+            : <?php echo json_encode($pedido_protocolo); ?>;
+
+        const ALL_DONE = (typeof TODOS_ITENS_LIQUIDADOS !== 'undefined') 
+            ? TODOS_ITENS_LIQUIDADOS 
+            : <?php echo $todos_itens_liquidados ? 'true' : 'false'; ?>;
+
+        const SOME_DONE = (typeof ALGUM_ITEM_LIQUIDADO !== 'undefined') 
+            ? ALGUM_ITEM_LIQUIDADO 
+            : <?php echo $algum_item_liquidado ? 'true' : 'false'; ?>;
+
+        // Só prossegue se existe pedido identificado e todos os atos estão liquidados
+        if (!PED_ID || !PED_PROTO || !ALL_DONE) return;
+
+        // Se já estiver emitida/cancelada no servidor, nem mostra
+        const serverStatus = (typeof PEDIDO_STATUS_ATUAL !== 'undefined' && PEDIDO_STATUS_ATUAL) 
+            ? ('' + PEDIDO_STATUS_ATUAL).toLowerCase()
+            : null;
+
+        if (serverStatus === 'emitida' || serverStatus === 'cancelada') return;
+
+        // Status sugerido local (fallback se não houver função externa)
+        const statusSugerido = (typeof sugerirStatusPedido === 'function') 
+            ? sugerirStatusPedido() 
+            : (ALL_DONE ? 'emitida' : (SOME_DONE ? 'em_andamento' : 'pendente'));
+
+        // Só avisa quando a sugestão for "emitida"
+        if (statusSugerido !== 'emitida') return;
+
+        // Mostra SEM usar sessionStorage (aparece a cada entrada na página)
+        Swal.fire({
+            icon: 'info',
+            title: 'Pedido de certidão pode ser atualizado',
+            html: `Foi detectado que todos os atos desta O.S. foram liquidados.<br><br>
+                Deseja atualizar o pedido de certidão (protocolo <b>${PED_PROTO}</b>) para o status <b>${statusSugerido}</b>?`,
+            showCancelButton: true,
+            confirmButtonText: 'Sim, atualizar',
+            cancelButtonText: 'Agora não'
+        }).then(r => {
+            if (r.isConfirmed && typeof atualizarStatusPedido === 'function') {
+                atualizarStatusPedido();
+            }
+        });
     }
 
     // Chama o endpoint que atualiza status do pedido por protocolo (sem exigir anexo)
@@ -2119,7 +2238,19 @@ function refreshOsHeaderAndStats() {
             return;
         }
 
-        const status = sugerirStatusPedido();
+        // Calcula o status de forma resiliente
+        const ALL_DONE = (typeof window.TODOS_ITENS_LIQUIDADOS !== 'undefined')
+            ? window.TODOS_ITENS_LIQUIDADOS
+            : <?php echo $todos_itens_liquidados ? 'true' : 'false'; ?>;
+
+        const SOME_DONE = (typeof window.ALGUM_ITEM_LIQUIDADO !== 'undefined')
+            ? window.ALGUM_ITEM_LIQUIDADO
+            : <?php echo $algum_item_liquidado ? 'true' : 'false'; ?>;
+
+        const status = (typeof window.sugerirStatusPedido === 'function')
+            ? window.sugerirStatusPedido()
+            : (ALL_DONE ? 'emitida' : (SOME_DONE ? 'em_andamento' : 'pendente'));
+
         if (status === 'pendente') {
             Swal.fire({ icon: 'info', title: 'Sem liquidação', text: 'A O.S. ainda não foi liquidada. Status sugerido: pendente.' });
             return;
@@ -2162,7 +2293,7 @@ function refreshOsHeaderAndStats() {
                         Swal.fire({ icon: 'error', title: 'Falha ao atualizar', text: (resp && resp.error) ? resp.error : 'Erro desconhecido.' });
                     }
                 },
-                error: function(xhr) {
+                error: function() {
                     Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível atualizar o status.' });
                 },
                 complete: function() {
@@ -2173,6 +2304,7 @@ function refreshOsHeaderAndStats() {
     }
 
 
+
 $(document).ready(function() {
     $('#valor_pagamento').mask('#.##0,00', { reverse: true });
     $('#valor_devolucao').mask('#.##0,00', { reverse: true });
@@ -2180,8 +2312,16 @@ $(document).ready(function() {
 
     atualizarTabelaPagamentos();
     atualizarSaldo();
-    refreshOsHeaderAndStats(); // garante que o topo já fica coerente com "pagamentos" inicial
+    refreshOsHeaderAndStats();
+
+    // Se há protocolo e a O.S. está 100% liquidada, sugere atualizar o pedido
+    try { 
+        tentarNotificarAtualizacaoPedido(); 
+    } catch (e) { 
+        console.warn('Aviso de atualização do pedido não pôde ser exibido:', e); 
+    }
 });
+
 
     // Inicializar DataTable
     $('#tabelaItensOS').DataTable({
@@ -2259,41 +2399,28 @@ $(document).ready(function() {
     // Função para adicionar pagamento
     function adicionarPagamento() {
         const addBtn = $('#btnAdicionarPagamento');
-        addBtn.prop('disabled', true);           
+        addBtn.prop('disabled', true);
 
-        var formaPagamento  = $('#forma_pagamento').val();
-        var valorPagamento  = parseFloat($('#valor_pagamento').val().replace('.', '').replace(',', '.'));
+        var formaPagamento = $('#forma_pagamento').val();
+        var valorPagamento = parseFloat($('#valor_pagamento').val().replace('.', '').replace(',', '.'));
 
         if (formaPagamento === "") {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro!',
-                text: 'Por favor, selecione uma forma de pagamento.',
-                confirmButtonText: 'OK'
-            }).then(() => addBtn.prop('disabled', false));  // reativa
+            Swal.fire({ icon: 'error', title: 'Erro!', text: 'Por favor, selecione uma forma de pagamento.' })
+                .then(() => addBtn.prop('disabled', false));
             return;
         }
 
         if (isNaN(valorPagamento) || valorPagamento <= 0) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro!',
-                text: 'Por favor, insira um valor válido para o pagamento.',
-                confirmButtonText: 'OK'
-            });
+            Swal.fire({ icon: 'error', title: 'Erro!', text: 'Insira um valor válido para o pagamento.' })
+                .then(() => addBtn.prop('disabled', false));
             return;
         }
 
-        // Validação específica para pagamento em espécie: apenas centavos terminando em 0 ou 5
         if (formaPagamento === 'Espécie') {
             const centavos = Math.round((valorPagamento * 100) % 100);
             if (centavos % 5 !== 0) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Valor inválido',
-                    text: 'Para pagamentos em espécie, os centavos devem terminar em 0 ou 5. Ex: 174,70 ou 174,75.',
-                    confirmButtonText: 'OK'
-                });
+                Swal.fire({ icon: 'error', title: 'Valor inválido', text: 'Em espécie, os centavos devem terminar em 0 ou 5.' })
+                    .then(() => addBtn.prop('disabled', false));
                 return;
             }
         }
@@ -2305,7 +2432,7 @@ $(document).ready(function() {
         if (existeDuplicado) {
             Swal.fire({
                 title: 'Pagamento Duplicado',
-                text: 'Já existe um pagamento com essa forma e esse valor. Deseja adicionar mesmo assim?',
+                text: 'Já existe um pagamento com essa forma e valor. Deseja adicionar mesmo assim?',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: 'Sim, adicionar',
@@ -2313,6 +2440,8 @@ $(document).ready(function() {
             }).then((result) => {
                 if (result.isConfirmed) {
                     efetuarPagamento(formaPagamento, valorPagamento);
+                } else {
+                    addBtn.prop('disabled', false);
                 }
             });
         } else {
@@ -2529,20 +2658,17 @@ $(document).ready(function() {
         const quantidadeRestante = quantidade - quantidadeLiquidada;
         const valorAtoALiquidar = (totalAto / quantidade) * quantidadeRestante;
 
-        if (valorPago <= 0) {
+        if (!temAlgumPagamento()) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Depósito Prévio ausente',
-                text: 'A OS não possui pagamento registrado. O que você deseja fazer?',
-                showDenyButton: false,        // ocultar "Continuar sem Pagamento"
+                title: 'Pagamento ausente',
+                text: 'Não há nenhum pagamento registrado nesta OS. Deseja adicionar?',
                 showCancelButton: true,
                 confirmButtonText: 'Adicionar Pagamento',
                 cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $('#pagamentoModal').modal('show');
-                } else if (result.isDenied) {
-                    abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada);
                 }
             });
         } else if (saldoDisponivel < valorAtoALiquidar - 0.01) {
@@ -2569,20 +2695,19 @@ $(document).ready(function() {
     function abrirLiquidacaoModal(itemId, quantidade, quantidadeLiquidada) {
         liquidacaoItemId = itemId;
         quantidadeTotal = quantidade;
-        quantidadeLiquidada = quantidadeLiquidada;
+        quantidadeLiquidadaAtual = quantidadeLiquidada; // usar o global renomeado
 
-        var quantidadeRestante = quantidadeTotal - quantidadeLiquidada;
+        var quantidadeRestante = quantidadeTotal - quantidadeLiquidadaAtual;
         $('#quantidade_liquidar').val(quantidadeRestante);
 
         $('#liquidacaoModal').modal('show');
     }
 
-
     // Função para confirmar liquidação
     function confirmarLiquidacao() {
         var quantidadeALiquidar = parseInt($('#quantidade_liquidar').val());
 
-        if (quantidadeALiquidar <= 0 || (quantidadeLiquidada + quantidadeALiquidar) > quantidadeTotal) {
+        if (quantidadeALiquidar <= 0 || (quantidadeLiquidadaAtual + quantidadeALiquidar) > quantidadeTotal) {
             Swal.fire({
                 icon: 'error',
                 title: 'Erro!',
@@ -3110,20 +3235,17 @@ $(document).ready(function() {
             const saldoDisponivel = valorPago - valorLiquidado;
             const totalRestante = <?php echo $ordem_servico['total_os']; ?> - valorLiquidado;
 
-            if (valorPago <= 0) {
+            if (!temAlgumPagamento()) {
                 Swal.fire({
                     icon: 'warning',
-                    title: 'Depósito Prévio ausente',
-                    text: 'A OS não possui pagamento registrado. O que você deseja fazer?',
-                    showDenyButton: false, // ocultar "Continuar sem Pagamento"
+                    title: 'Pagamento ausente',
+                    text: 'Não há nenhum pagamento registrado nesta OS. Deseja adicionar?',
                     showCancelButton: true,
                     confirmButtonText: 'Adicionar Pagamento',
                     cancelButtonText: 'Cancelar'
                 }).then((result) => {
                     if (result.isConfirmed) {
                         $('#pagamentoModal').modal('show');
-                    } else if (result.isDenied) {
-                        confirmarLiquidacaoTudo();
                     }
                 });
             } else if (saldoDisponivel < totalRestante - 0.01) {
@@ -3187,6 +3309,65 @@ $(document).ready(function() {
                             });
                         }
                     });
+                }
+            });
+        }
+
+        function isentarPagamento() {
+            const btn = document.getElementById('btnIsentoPagamento');
+            if (btn) btn.disabled = true;
+
+            $.ajax({
+                url: 'salvar_pagamento.php',
+                type: 'POST',
+                data: {
+                    os_id: <?php echo $os_id; ?>,
+                    cliente: '<?php echo $ordem_servico['cliente']; ?>',
+                    total_os: <?php echo $ordem_servico['total_os']; ?>,
+                    funcionario: '<?php echo $_SESSION['username']; ?>',
+                    forma_pagamento: 'Isento de Pagamento',
+                    valor_pagamento: 0
+                },
+                success: function(response) {
+                    // Tenta converter para objeto caso venha como string
+                    try { response = (typeof response === 'object') ? response : JSON.parse(response); } catch(e) { response = null; }
+
+                    if (response && response.success) {
+                        // Atualiza a lista em memória (mostra na tabela do modal imediatamente)
+                        pagamentos.push({
+                            id: response.pagamento_id || null,
+                            forma_de_pagamento: 'Isento de Pagamento',
+                            total_pagamento: 0,
+                            data_pagamento:  response.data_pagamento || new Date().toISOString().slice(0,19).replace('T',' '),
+                            funcionario:     '<?php echo $_SESSION['username']; ?>'
+                        });
+
+                        atualizarTabelaPagamentos();
+                        atualizarSaldo();
+                        refreshOsHeaderAndStats();
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Marcado como "Isento de Pagamento".'
+                        }).then(() => {
+                            // Fechar modal e recarregar para re-renderizar botões de liquidação (PHP usa $qtde_pagamentos)
+                            $('#pagamentoModal').modal('hide');
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: (response && response.error) ? response.error : 'Falha ao isentar.'
+                        });
+                    }
+                },
+                error: function() {
+                    Swal.fire({ icon:'error', title:'Erro', text:'Falha na solicitação.' });
+                },
+                complete: function() {
+                    if (btn) btn.disabled = false;
                 }
             });
         }

@@ -508,6 +508,7 @@ select.form-control,
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
+  margin: 2px;
   font-family: var(--font-primary);
 }
 
@@ -819,7 +820,7 @@ body.dark-mode footer .footer-content a:hover {
         <legend>Ordem de Serviço (Emolumentos)</legend>
 
         <!-- Marcação de isenção (sem orçamento) -->
-        <div class="form-row mb-2">
+        <!-- <div class="form-row mb-2">
           <div class="form-group col-md-12">
             <div class="form-check">
               <input type="checkbox" class="form-check-input" id="isento_ato">
@@ -828,7 +829,7 @@ body.dark-mode footer .footer-content a:hover {
               </label>
             </div>
           </div>
-        </div>
+        </div> -->
 
         <!-- Seleção de modelo de OS -->
         <div class="form-row">
@@ -1609,7 +1610,14 @@ function adicionarItemOS(){
       <td>${fmt(totalPart(fadep))}</td>
       <td>${fmt(totalPart(femp))}</td>
       <td>${fmt(total)}</td>
-      <td><button type="button" class="btn btn-sm btn-danger" onclick="removerItem(this)"><i class="fa fa-trash"></i></button></td>
+      <td>
+        <button type="button" class="btn btn-sm btn-warning" onclick="marcarItemIsento(this)">
+          <i class="fa fa-ban"></i> Ato Isento
+        </button>
+        <button type="button" class="btn btn-sm btn-danger" onclick="removerItem(this)">
+          <i class="fa fa-trash"></i> Remover
+        </button>
+      </td>
     </tr>
   `);
   atualizarISS();
@@ -1621,15 +1629,39 @@ function adicionarItemOS(){
   $('#total').val('').prop('readonly',true);
 }
 
-function removerItem(btn){
+window.marcarItemIsento = function(btn){
+  const $tr = $(btn).closest('tr');
+  const $tds = $tr.find('td');
+
+  // 1) Zera os valores EMOL., FERC, FADEP, FEMP, TOTAL (colunas 5..9)
+  for (let i = 5; i <= 9; i++) {
+    $tds.eq(i).text(fmt(0));
+  }
+
+  // 2) Adiciona " (isento)" ao lado do código do Ato (coluna 1), se ainda não constar
+  const $tdAto = $tds.eq(1);
+  const atoTxt = $tdAto.text();
+  if (!/\(isento\)$/i.test(atoTxt.trim())) {
+    $tdAto.text(atoTxt.trim() + ' (isento)');
+  }
+
+  // 3) Desabilita o botão para evitar reaplicações
+  $(btn).prop('disabled', true).text('Isento aplicado');
+
+  // 4) Recalcula ISS e total da OS
+  atualizarISS();
+};
+
+window.removerItem = function(btn){
   $(btn).closest('tr').remove();
   renumerar();
   atualizarISS();
-}
+};
 
 function renumerar(){
   $('#itensTable tr').each(function(i){ $(this).find('td:first').text(i+1); });
 }
+
 
 function totalPart(x){ return isNaN(x)?0:x; }
 function toFloat(v){ return parseFloat(String(v).replace(/\./g,'').replace(',','.')); }
@@ -1710,7 +1742,14 @@ function carregarModeloSelecionado(idModelo){
             <td>${fmt(fadep)}</td>
             <td>${fmt(femp)}</td>
             <td>${fmt(total)}</td>
-            <td><button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="removerItem(this)"><i class="fa fa-trash"></i></button></td>
+            <td>
+              <button type="button" class="btn btn-sm btn-warning" onclick="marcarItemIsento(this)">
+                <i class="fa fa-ban"></i> Ato Isento
+              </button>
+              <button type="button" title="Remover" class="btn btn-danger btn-sm" onclick="removerItem(this)">
+                <i class="fa fa-trash"></i> Remover
+              </button>
+            </td>
           </tr>
         `);
       });
