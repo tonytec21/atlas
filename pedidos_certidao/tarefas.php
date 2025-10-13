@@ -562,6 +562,67 @@ if ($isAjax) {
   }  
   exit;  
 }  
+
+// ====== Contexto de acesso para renderizar botões (não-AJAX) ======
+$__showGerenciarEquipes = false;
+try {
+  $usuarioSessao = trim((string)($_SESSION['username'] ?? ''));
+  $nivelAcesso = '';
+  $acessoAdicionalRaw = '';
+
+  if ($usuarioSessao !== '') {
+    $stUser = $conn->prepare("SELECT nivel_de_acesso, acesso_adicional FROM funcionarios WHERE usuario = ? LIMIT 1");
+    $stUser->execute([$usuarioSessao]);
+    if ($rowU = $stUser->fetch(PDO::FETCH_ASSOC)) {
+      $nivelAcesso        = (string)($rowU['nivel_de_acesso'] ?? '');
+      $acessoAdicionalRaw = (string)($rowU['acesso_adicional'] ?? '');
+    }
+  }
+  if ($nivelAcesso === '') {
+    $nivelAcesso = (string)($_SESSION['nivel_de_acesso'] ?? '');
+  }
+  if ($acessoAdicionalRaw === '') {
+    $tmp = $_SESSION['acesso_adicional'] ?? '';
+    if (is_array($tmp)) { $acessoAdicionalRaw = implode(',', $tmp); }
+    else { $acessoAdicionalRaw = (string)$tmp; }
+  }
+
+  // Normalizador
+  $norm = function($s) {
+    $s = trim((string)$s);
+    $s = mb_strtolower($s, 'UTF-8');
+    $no = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+    if ($no !== false && $no !== null) $s = $no;
+    $s = preg_replace('/\s+/u', ' ', $s);
+    return trim($s);
+  };
+
+  $nivelAcessoNorm = $norm($nivelAcesso);
+
+  // Quebra tokens (CSV/; /| ou JSON)
+  $tokens = [];
+  if (is_string($acessoAdicionalRaw) && strlen($acessoAdicionalRaw)) {
+    $first = $acessoAdicionalRaw[0];
+    if ($first === '[' || $first === '{') {
+      $decoded = json_decode($acessoAdicionalRaw, true);
+      if (is_array($decoded)) $tokens = array_values((array)$decoded);
+    }
+    if (!$tokens) {
+      $tokens = preg_split('/[,\|;]+/u', $acessoAdicionalRaw) ?: [];
+    }
+  } elseif (is_array($acessoAdicionalRaw)) {
+    $tokens = $acessoAdicionalRaw;
+  }
+
+  $tokensNorm = array_map($norm, $tokens);
+  $alvo = $norm('Controle de Tarefas');
+  $temControleTarefas = in_array($alvo, $tokensNorm, true) || (strpos($norm($acessoAdicionalRaw), $alvo) !== false);
+
+  $__showGerenciarEquipes = ($nivelAcessoNorm === 'administrador') || $temControleTarefas;
+} catch (Throwable $e) {
+  $__showGerenciarEquipes = false;
+}
+
 ?>  
 <!DOCTYPE html>  
 <html lang="pt-br">  
@@ -1661,11 +1722,13 @@ body {
             </p>  
           </div>  
         </div>  
-        <div>  
-          <a href="equipes.php" class="btn btn-outline-light">  
-            <i class="fas fa-users"></i> Gerenciar Equipes  
-          </a>  
-        </div>  
+        <div>
+          <?php if (!empty($__showGerenciarEquipes)): ?>
+            <a href="equipes.php" class="btn btn-outline-light">
+              <i class="fas fa-users"></i> Gerenciar Equipes
+            </a>
+          <?php endif; ?>
+        </div>
       </div>  
     </section>  
 

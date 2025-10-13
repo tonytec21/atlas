@@ -1589,13 +1589,18 @@ body.dark-mode footer .footer-content a:hover {
             <a href="novo_pedido.php" class="btn btn-primary">  
               <i class="fa fa-plus"></i> Novo Pedido  
             </a>  
+
+            <a href="tarefas.php" class="btn btn-outline-primary">
+              <i class="fa fa-tasks"></i> Fila de Tarefas
+            </a>
+
             <button id="btnAplicar" class="btn btn-outline-primary">  
               <i class="fa fa-filter"></i> Aplicar  
             </button>  
             <button id="btnLimpar" class="btn btn-outline-secondary">  
               <i class="fa fa-times"></i> Limpar  
             </button>  
-          </div>  
+          </div>
         </div>  
       </div>  
     </div> 
