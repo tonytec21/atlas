@@ -1,12 +1,12 @@
 <?php
 /**
  * Distribui TAREFAS para pedidos antigos (já protocolados) obedecendo
- * as MESMAS regras do salvar_pedido.php.
+ * as MESMAS regras do salvar_pedido.php, usando a lista específica (MAPEAMENTO_REGRAS).
  *
  * Regras:
  *  - Só considera pedidos em ('pendente','em_andamento')
  *  - Ignora pedidos que já tenham tarefa aberta (pendente/em_andamento)
- *  - Descobre equipe pela matriz de regras (atribuicao, tipo)
+ *  - Descobre equipe por (atribuicao, tipo) EXATOS após canonicalização pelo MAPEAMENTO_REGRAS
  *  - Escolhe o membro com menor carga (desempate por ordem e id)
  *
  * Parâmetros:
@@ -35,120 +35,119 @@ $out = [
     'erros'                => []
 ];
 
-/* ======================== Helpers de normalização (iguais ao salvar_pedido) ======================== */
-function candidatosAtribuicao(string $atr): array {
-  $a = trim($atr);
-  $norm = mb_strtolower($a, 'UTF-8');
+/* ======================== MAPEAMENTO ESPECÍFICO (igual ao salvar_pedido) ======================== */
+const MAPEAMENTO_REGRAS = [
+  "Registro Civil" => [
+    "2ª via de Nascimento",
+    "Inteiro Teor de Nascimento",
+    "Retificação Administrativa de Nascimento",
+    "Restauração de Nascimento",
+    "Busca de Nascimento",
+    "2ª via de Casamento",
+    "Inteiro Teor de Casamento",
+    "Retificação Administrativa de Casamento",
+    "Restauração de Casamento",
+    "Busca de Casamento",
+    "Divórcio",
+    "2ª via de Óbito",
+    "Inteiro Teor de Óbito",
+    "Retificação Administrativa de Óbito",
+    "Restauração de Óbito",
+    "Busca de Óbito"
+  ],
+  "Pessoas Jurídicas" => [
+    "Estatuto",
+    "Atas",
+    "Outros"
+  ],
+  "Títulos e Documentos" => [
+    "Contratos",
+    "Cédulas",
+    "Outros"
+  ],
+  "Registro de Imóveis" => [
+    "Matrícula Livro 2",
+    "Registro Livro 3",
+    "Ônus",
+    "Penhor",
+    "Negativa",
+    "Situação Jurídica"
+  ],
+  "Notas" => [
+    "Escrituras",
+    "Testamentos",
+    "Procurações",
+    "Ata Notarial"
+  ]
+];
 
-  $out = [$a];
-
-  if (strpos($norm, 'registro civil') !== false) {
-    $out[] = 'RCPN';
-    $out[] = 'Registro Civil';
-  }
-  if (strpos($norm, 'título') !== false || strpos($norm, 'titul') !== false || strpos($norm, 'document') !== false ||
-      strpos($norm, 'pessoa jurídica') !== false || strpos($norm, 'pessoas jurídicas') !== false) {
-    $out[] = 'RTD/RTDPJ';
-    $out[] = 'Títulos e Documentos';
-    $out[] = 'Pessoas Jurídicas';
-  }
-  if (strpos($norm, 'imóv') !== false || strpos($norm, 'imov') !== false) {
-    $out[] = 'RI';
-    $out[] = 'Registro de Imóveis';
-  }
-  if (strpos($norm, 'nota') !== false) {
-    $out[] = 'Notas';
-  }
-
-  return array_values(array_unique($out));
+/* ======================== Normalização/Canonicalização (igual ao salvar_pedido) ======================== */
+function normalizar($s) {
+  $s = trim((string)$s);
+  $s = iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$s);
+  $s = strtolower($s);
+  $s = preg_replace('/\s+/', ' ', $s);
+  return $s;
 }
+function canonicalizarAtribuicao($atr) {
+  $n = normalizar($atr);
+  $map = [
+    'registro civil' => 'Registro Civil',
+    'rcpn' => 'Registro Civil',
+    'registro civil das pessoas naturais' => 'Registro Civil',
+    'pessoas juridicas' => 'Pessoas Jurídicas',
+    'rtdpj' => 'Pessoas Jurídicas',
+    'rtd/pj' => 'Pessoas Jurídicas',
+    'rtdpj/rtpj' => 'Pessoas Jurídicas',
+    'rtd/rtdpj' => 'Pessoas Jurídicas',
+    'rtd' => 'Títulos e Documentos',
+    'titulos e documentos' => 'Títulos e Documentos',
+    'registro de imoveis' => 'Registro de Imóveis',
+    'ri' => 'Registro de Imóveis',
+    'notas' => 'Notas'
+  ];
+  if (isset($map[$n])) return $map[$n];
+  foreach (array_keys(MAPEAMENTO_REGRAS) as $k) {
+    if (normalizar($k) === $n) return $k;
+  }
+  return null;
+}
+function canonicalizarTipo($atrCanon, $tipo) {
+  if (!$atrCanon) return null;
+  $raw = trim((string)$tipo);
+  $n = normalizar($raw);
 
-function candidatosTipo(string $tipo): array {
-  $t = trim($tipo);
-  $out = [$t];
-
-  // Simplificações comuns
-  $simp = $t;
-  $simp = preg_replace('~^\s*(\d+ª|\d+a)\s+(de|da)\s+~iu', '', $simp);      // "2ª de", "2a de"
-  $simp = preg_replace('~^\s*inteiro\s+teor\s+(de|da)\s+~iu', '', $simp);   // "Inteiro Teor de"
-  $simp = preg_replace('~\s+livro\s*\d*$~iu', '', $simp);                   // " ... livro 3"
-  $simp = trim($simp);
-  if ($simp !== '' && $simp !== $t) $out[] = $simp;
-
-  // palavra-chave
-  $kw = $simp !== '' ? $simp : $t;
-  $map = ['Ó'=>'O','ó'=>'o','ã'=>'a','â'=>'a','á'=>'a','à'=>'a','ê'=>'e','é'=>'e','í'=>'i','î'=>'i','õ'=>'o','ô'=>'o','ú'=>'u','ç'=>'c'];
-  $kwn = strtr(mb_strtolower($kw,'UTF-8'), $map);
-  if (preg_match('~(nascimento|casamento|obito|óbito|escritura|escrituras|procura(c|ç)ao|procura(c|ç)oes|ata|testamento|oner|onus|penhor|negativa|matr(i|í)cula)~iu', $kwn, $m)) {
-    $key = $m[0];
-    $replacements = [
-      'obito' => 'Óbito',
-      'procuracao' => 'Procuração', 'procuracoes' => 'Procurações',
-      'matricula' => 'Matrícula', 'onus' => 'Ônus',
-    ];
-    $keyShow = $replacements[$key] ?? ucfirst($key);
-    $out[] = $keyShow;
+  if (preg_match('~^2(a|ª)\s*(de\s*)?nascimento$~i', $raw)) {
+    $cand = '2ª via de Nascimento';
+  } elseif (preg_match('~^2(a|ª)\s*(de\s*)?casamento$~i', $raw)) {
+    $cand = '2ª via de Casamento';
+  } elseif (preg_match('~^2(a|ª)\s*(de\s*)?(obito|óbito)$~iu', $raw)) {
+    $cand = '2ª via de Óbito';
+  } elseif (preg_match('~^inteiro\s*teor\s*de\s*nascimento$~i', $n)) {
+    $cand = 'Inteiro Teor de Nascimento';
+  } elseif (preg_match('~^inteiro\s*teor\s*de\s*casamento$~i', $n)) {
+    $cand = 'Inteiro Teor de Casamento';
+  } elseif (preg_match('~^inteiro\s*teor\s*de\s*(obito|óbito)$~iu', $n)) {
+    $cand = 'Inteiro Teor de Óbito';
+  } else {
+    $cand = null;
+    foreach (MAPEAMENTO_REGRAS[$atrCanon] ?? [] as $opt) {
+      if (normalizar($opt) === $n) { $cand = $opt; break; }
+    }
   }
 
-  return array_values(array_unique($out));
+  if ($cand && in_array($cand, MAPEAMENTO_REGRAS[$atrCanon] ?? [], true)) {
+    return $cand;
+  }
+  return null;
 }
 
 /* ======================== Regras de distribuição (iguais ao salvar_pedido) ======================== */
-// function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?array {
-//   $atrCands = candidatosAtribuicao($atribuicao);
-//   $tipoCands = candidatosTipo($tipo);
-
-//   // 1) match EXATO
-//   $sqlExact = "SELECT r.*, e.nome AS equipe_nome
-//                FROM equipe_regras r
-//                JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
-//                WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = :t
-//                ORDER BY r.prioridade ASC, r.id ASC
-//                LIMIT 1";
-//   $stExact = $conn->prepare($sqlExact);
-
-//   foreach ($atrCands as $a) {
-//     foreach ($tipoCands as $t) {
-//       $stExact->execute([':a'=>$a, ':t'=>$t]);
-//       $row = $stExact->fetch(PDO::FETCH_ASSOC);
-//       if ($row) return $row;
-//     }
-//   }
-
-//   // 2) curinga ('*')
-//   $sqlStar = "SELECT r.*, e.nome AS equipe_nome
-//               FROM equipe_regras r
-//               JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
-//               WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = '*'
-//               ORDER BY r.prioridade ASC, r.id ASC
-//               LIMIT 1";
-//   $stStar = $conn->prepare($sqlStar);
-//   foreach ($atrCands as $a) {
-//     $stStar->execute([':a'=>$a]);
-//     $row = $stStar->fetch(PDO::FETCH_ASSOC);
-//     if ($row) return $row;
-//   }
-
-//   // 3) LIKE por palavra-chave do tipo
-//   $sqlLike = "SELECT r.*, e.nome AS equipe_nome
-//               FROM equipe_regras r
-//               JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
-//               WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo LIKE :tk
-//               ORDER BY r.prioridade ASC, r.id ASC
-//               LIMIT 1";
-//   $stLike = $conn->prepare($sqlLike);
-//   foreach ($atrCands as $a) {
-//     foreach ($tipoCands as $tk) {
-//       $stLike->execute([':a'=>$a, ':tk'=>'%'.$tk.'%']);
-//       $row = $stLike->fetch(PDO::FETCH_ASSOC);
-//       if ($row) return $row;
-//     }
-//   }
-
-//   return null;
-// }
-
 function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?array {
+  $atrCanon  = canonicalizarAtribuicao($atribuicao);
+  $tipoCanon = $atrCanon ? canonicalizarTipo($atrCanon, $tipo) : null;
+  if (!$atrCanon || !$tipoCanon) return null;
+
   $sql = "SELECT r.*, e.nome AS equipe_nome
           FROM equipe_regras r
           JOIN equipes e ON e.id = r.equipe_id AND e.ativa = 1
@@ -158,72 +157,21 @@ function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?
           ORDER BY r.prioridade ASC, r.id ASC
           LIMIT 1";
   $st = $conn->prepare($sql);
-  $st->execute([':a' => $atribuicao, ':t' => $tipo]);
+  $st->execute([':a' => $atrCanon, ':t' => $tipoCanon]);
   $row = $st->fetch(PDO::FETCH_ASSOC);
   return $row ?: null;
 }
 
-
-// function escolherMembroParaEquipe(PDO $conn, int $equipeId): ?array {
-//   $membros = $conn->prepare("SELECT m.id, m.funcionario_id, m.ordem, m.carga_maxima_diaria,
-//                                     f.nome_completo, f.usuario
-//                              FROM equipe_membros m
-//                              JOIN funcionarios f ON f.id = m.funcionario_id
-//                              WHERE m.equipe_id=? AND m.ativo=1
-//                              ORDER BY m.ordem ASC, m.id ASC");
-//   $membros->execute([$equipeId]);
-//   $arr = $membros->fetchAll(PDO::FETCH_ASSOC);
-//   if (!$arr) return null;
-
-//   $calcHoje = $conn->prepare("SELECT COUNT(*) FROM tarefas_pedido
-//                               WHERE funcionario_id=? AND status IN ('pendente','em_andamento')
-//                                 AND DATE(criado_em)=CURRENT_DATE()");
-//   $calcGeral = $conn->prepare("SELECT COUNT(*) FROM tarefas_pedido
-//                                WHERE funcionario_id=? AND status IN ('pendente','em_andamento')");
-
-//   $melhor = null; $melhorCarga = null;
-//   foreach ($arr as $m) {
-//     $calcGeral->execute([$m['funcionario_id']]);
-//     $cargaTotal = (int)$calcGeral->fetchColumn();
-
-//     $calcHoje->execute([$m['funcionario_id']]);
-//     $cargaHoje = (int)$calcHoje->fetchColumn();
-
-//     // respeita carga_maxima_diaria se configurada
-//     if (!is_null($m['carga_maxima_diaria']) && $m['carga_maxima_diaria'] >= 0 && $cargaHoje >= (int)$m['carga_maxima_diaria']) {
-//       continue;
-//     }
-
-//     if ($melhor===null || $cargaTotal < $melhorCarga) {
-//       $melhor = $m;
-//       $melhorCarga = $cargaTotal;
-//     }
-//   }
-
-//   if ($melhor===null) {
-//     // fallback: ignora carga diaria, pega menor carga total
-//     foreach ($arr as $m) {
-//       $calcGeral->execute([$m['funcionario_id']]);
-//       $cargaTotal = (int)$calcGeral->fetchColumn();
-//       if ($melhor===null || $cargaTotal < $melhorCarga) { $melhor=$m; $melhorCarga=$cargaTotal; }
-//     }
-//   }
-//   return $melhor;
-// }
-
-function escolherMembroParaEquipe(PDO $conn, int $equipeId, string $tipo): ?array {
-  // Apenas membros ativos COM papel exatamente igual ao tipo do pedido
+function escolherMembroParaEquipe(PDO $conn, int $equipeId): ?array {
   $membros = $conn->prepare("SELECT m.id, m.funcionario_id, m.ordem, m.carga_maxima_diaria,
                                     f.nome_completo, f.usuario
                              FROM equipe_membros m
                              JOIN funcionarios f ON f.id = m.funcionario_id
-                             WHERE m.equipe_id = ?
-                               AND m.ativo = 1
-                               AND m.papel = ?
+                             WHERE m.equipe_id=? AND m.ativo=1
                              ORDER BY m.ordem ASC, m.id ASC");
-  $membros->execute([$equipeId, $tipo]);
+  $membros->execute([$equipeId]);
   $arr = $membros->fetchAll(PDO::FETCH_ASSOC);
-  if (!$arr) return null; // Sem membro com papel == tipo -> sem distribuição
+  if (!$arr) return null;
 
   $calcHoje = $conn->prepare("SELECT COUNT(*) FROM tarefas_pedido
                               WHERE funcionario_id=? AND status IN ('pendente','em_andamento')
@@ -249,10 +197,15 @@ function escolherMembroParaEquipe(PDO $conn, int $equipeId, string $tipo): ?arra
     }
   }
 
-  // Se todos estouraram carga diária, não distribui
+  if ($melhor===null) {
+    foreach ($arr as $m) {
+      $calcGeral->execute([$m['funcionario_id']]);
+      $cargaTotal = (int)$calcGeral->fetchColumn();
+      if ($melhor===null || $cargaTotal < $melhorCarga) { $melhor=$m; $melhorCarga=$cargaTotal; }
+    }
+  }
   return $melhor;
 }
-
 
 function criarTarefaParaPedido(PDO $conn, int $pedidoId, int $equipeId, ?int $funcionarioId): int {
   $st = $conn->prepare("INSERT INTO tarefas_pedido (pedido_id, equipe_id, funcionario_id, status)
@@ -302,7 +255,7 @@ try {
             continue;
         }
 
-        // Encontra equipe pelas regras
+        // Encontra equipe pelas REGRAS EXATAS (com canonicalização)
         $regra = encontrarEquipePorRegra($pdo, $atr, $tipo);
         if (!$regra) {
             $out['sem_regra'][] = [
@@ -317,8 +270,8 @@ try {
         $equipeId   = (int)$regra['equipe_id'];
         $equipeNome = $regra['equipe_nome'] ?? null;
 
-        // Escolhe membro
-        $membro = escolherMembroParaEquipe($pdo, $equipeId, $tipo);
+        // Escolhe membro (sem filtro por papel)
+        $membro = escolherMembroParaEquipe($pdo, $equipeId);
         if (!$membro) {
             $out['sem_membro'][] = [
                 'pedido_id'  => $pedidoId,
