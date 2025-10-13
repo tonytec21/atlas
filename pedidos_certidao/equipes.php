@@ -1287,24 +1287,23 @@ small.muted {
               
               <div class="col-md-4">  
                 <label class="form-label">  
-                  <i class="fas fa-building"></i> Atribuição  
+                    <i class="fas fa-building"></i> Atribuição  
                 </label>  
                 <select class="form-select" id="r_atr" required>  
-                  <option value="">Selecione...</option>  
-                  <option>Registro Civil</option>  
-                  <option>Pessoas Jurídicas</option>  
-                  <option>Títulos e Documentos</option>  
-                  <option>Registro de Imóveis</option>  
-                  <option>Notas</option>  
+                    <option value="">Selecione...</option>  
                 </select>  
-              </div>  
+              </div>
+ 
               
               <div class="col-md-4">  
                 <label class="form-label">  
-                  <i class="fas fa-tag"></i> Tipo  
+                    <i class="fas fa-tag"></i> Tipo  
                 </label>  
-                <input class="form-control" id="r_tipo" placeholder='Ex.: "2ª de Nascimento" ou "*"' required>  
-              </div>  
+                <select class="form-select" id="r_tipo" required>
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+ 
               
               <div class="col-md-2">  
                 <label class="form-label">  
@@ -1425,6 +1424,82 @@ small.muted {
 let MODAL_EQ = null;  
 let EQUIPE_SELECIONADA = null;  
 
+// ===================== MAPA (mesmo do novo_pedido.php, mas apenas os TIPO/nomes) =====================
+const MAPEAMENTO_REGRAS = {
+  "Registro Civil": [
+    "2ª via de Nascimento",
+    "Inteiro Teor de Nascimento",
+    "Retificação Administrativa de Nascimento",
+    "Restauração de Nascimento",
+    "Busca de Nascimento",
+    "2ª via de Casamento",
+    "Inteiro Teor de Casamento",
+    "Retificação Administrativa de Casamento",
+    "Restauração de Casamento",
+    "Busca de Casamento",
+    "Divórcio",
+    "2ª via de Óbito",
+    "Inteiro Teor de Óbito",
+    "Retificação Administrativa de Óbito",
+    "Restauração de Óbito",
+    "Busca de Óbito"
+  ],
+  "Pessoas Jurídicas": [
+    "Estatuto",
+    "Atas",
+    "Outros"
+  ],
+  "Títulos e Documentos": [
+    "Contratos",
+    "Cédulas",
+    "Outros"
+  ],
+  "Registro de Imóveis": [
+    "Matrícula Livro 2",
+    "Registro Livro 3",
+    "Ônus",
+    "Penhor",
+    "Negativa",
+    "Situação Jurídica"
+  ],
+  "Notas": [
+    "Escrituras",
+    "Testamentos",
+    "Procurações",
+    "Ata Notarial"
+  ]
+};
+
+// Preenche a lista de atribuições
+function popularAtribuicoes() {
+  const $atr = $('#r_atr').empty();
+  $atr.append('<option value="">Selecione...</option>');
+  Object.keys(MAPEAMENTO_REGRAS).forEach(nome => {
+    $atr.append(new Option(nome, nome));
+  });
+}
+
+// Preenche a lista de tipos conforme a atribuição selecionada
+function popularTipos(atribuicao, valorSelecionado) {
+  const $tipo = $('#r_tipo').empty();
+  $tipo.append('<option value="">Selecione...</option>');
+  // sempre oferece curinga
+  $tipo.append(new Option('* (qualquer tipo)', '*'));
+
+  const lista = MAPEAMENTO_REGRAS[atribuicao] || [];
+  lista.forEach(tp => $tipo.append(new Option(tp, tp)));
+
+  if (valorSelecionado) {
+    // se o valor não estiver na lista, mantém criando option ad-hoc (para regras antigas fora do mapa)
+    if ($tipo.find(`option[value="${valorSelecionado.replace(/"/g, '\\"')}"]`).length === 0) {
+      $tipo.append(new Option(valorSelecionado, valorSelecionado));
+    }
+    $tipo.val(valorSelecionado);
+  } else {
+    $tipo.val('');
+  }
+}
+
 // ===================== INICIALIZAÇÃO =====================  
 $(function(){  
   // Carrega tema  
@@ -1439,12 +1514,19 @@ $(function(){
   carregarFuncionarios();  
   carregarEquipes();  
 
-  // Event Listeners  
+    // Event Listeners  
   $('#btnNovaEquipe').on('click', abrirModalNovaEquipe);  
   $('#formEquipe').on('submit', salvarEquipe);  
   $('#formMembro').on('submit', salvarMembro);  
   $('#formRegra').on('submit', salvarRegra);  
   $('#btnLimparRegra').on('click', limparFormularioRegra);  
+
+  // Atribuição/Tipo dinâmicos
+  popularAtribuicoes();
+  $('#r_atr').on('change', function() {
+    const atr = $(this).val();
+    popularTipos(atr);
+  });
 });  
 
 // ===================== MODAL NOVA EQUIPE =====================  
@@ -1946,15 +2028,16 @@ function salvarRegra(e) {
     return;
   }
   
-  const payload = {
-    action: 'salvar_regra',
-    id: $('#r_id').val(),
-    equipe_id: equipeId,
-    atribuicao: $('#r_atr').val(),
-    tipo: $('#r_tipo').val(),
-    prioridade: $('#r_prior').val(),
-    ativa: $('#r_ativa').is(':checked') ? 1 : 0
-  };
+    const payload = {
+        action: 'salvar_regra',
+        id: $('#r_id').val(),
+        equipe_id: equipeId,
+        atribuicao: $('#r_atr').val(),
+        tipo: $('#r_tipo').val(),            // <- agora vem do <select>
+        prioridade: $('#r_prior').val(),
+        ativa: $('#r_ativa').is(':checked') ? 1 : 0
+    };
+
 
   $.ajax({
     url: 'equipes.php',
@@ -2069,22 +2152,26 @@ function listarRegras(equipeId) {
       tr.find('.btn-editar-regra').on('click', function() {
         $('#r_id').val(rg.id);
         $('#r_equipe_id').val(rg.equipe_id);
+
+        // seta atribuição e popula os tipos correspondentes (inclui '*')
         $('#r_atr').val(rg.atribuicao);
-        $('#r_tipo').val(rg.tipo);
+        popularTipos(rg.atribuicao, rg.tipo);
+
         $('#r_prior').val(rg.prioridade);
         $('#r_ativa').prop('checked', !!Number(rg.ativa));
         
         // Smooth scroll para formulário
         $('html, body').animate({
-          scrollTop: $('#formRegra').offset().top - 100
+            scrollTop: $('#formRegra').offset().top - 100
         }, 500);
         
         // Destaca formulário
         $('#formRegra').addClass('highlight-form');
         setTimeout(() => {
-          $('#formRegra').removeClass('highlight-form');
+            $('#formRegra').removeClass('highlight-form');
         }, 2000);
       });
+
       
       // Excluir
       tr.find('.btn-excluir-regra').on('click', function() {
@@ -2160,7 +2247,7 @@ function listarRegras(equipeId) {
 function limparFormularioRegra() {
   $('#r_id').val('');
   $('#r_atr').val('');
-  $('#r_tipo').val('');
+  popularTipos('', ''); // reseta a lista de tipos (placeholder + '*')
   $('#r_prior').val('10');
   $('#r_ativa').prop('checked', true);
 }

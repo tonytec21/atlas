@@ -398,58 +398,77 @@ function candidatosTipo(string $tipo): array {
  * - tenta match exato, depois curinga '*', depois LIKE por palavra-chave
  * - respeita prioridade ASC e equipe/regel ativas
  */
+// function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?array {
+//   $atrCands = candidatosAtribuicao($atribuicao);
+//   $tipoCands = candidatosTipo($tipo);
+
+//   // 1) match EXATO
+//   $sqlExact = "SELECT r.*, e.nome AS equipe_nome
+//                FROM equipe_regras r
+//                JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
+//                WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = :t
+//                ORDER BY r.prioridade ASC, r.id ASC
+//                LIMIT 1";
+//   $stExact = $conn->prepare($sqlExact);
+
+//   foreach ($atrCands as $a) {
+//     foreach ($tipoCands as $t) {
+//       $stExact->execute([':a'=>$a, ':t'=>$t]);
+//       $row = $stExact->fetch(PDO::FETCH_ASSOC);
+//       if ($row) return $row;
+//     }
+//   }
+
+//   // 2) curinga ('*')
+//   $sqlStar = "SELECT r.*, e.nome AS equipe_nome
+//               FROM equipe_regras r
+//               JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
+//               WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = '*'
+//               ORDER BY r.prioridade ASC, r.id ASC
+//               LIMIT 1";
+//   $stStar = $conn->prepare($sqlStar);
+//   foreach ($atrCands as $a) {
+//     $stStar->execute([':a'=>$a]);
+//     $row = $stStar->fetch(PDO::FETCH_ASSOC);
+//     if ($row) return $row;
+//   }
+
+//   // 3) LIKE por palavra-chave do tipo
+//   $sqlLike = "SELECT r.*, e.nome AS equipe_nome
+//               FROM equipe_regras r
+//               JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
+//               WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo LIKE :tk
+//               ORDER BY r.prioridade ASC, r.id ASC
+//               LIMIT 1";
+//   $stLike = $conn->prepare($sqlLike);
+//   foreach ($atrCands as $a) {
+//     foreach ($tipoCands as $tk) {
+//       $stLike->execute([':a'=>$a, ':tk'=>'%'.$tk.'%']);
+//       $row = $stLike->fetch(PDO::FETCH_ASSOC);
+//       if ($row) return $row;
+//     }
+//   }
+
+//   return null;
+// }
+
+/**
+ * Encontra a equipe pela regra EXATA (atribuicao == tipo ==) sem curinga e sem LIKE.
+ * Respeita prioridade ASC e somente equipes/regras ativas.
+ */
 function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?array {
-  $atrCands = candidatosAtribuicao($atribuicao);
-  $tipoCands = candidatosTipo($tipo);
-
-  // 1) match EXATO
-  $sqlExact = "SELECT r.*, e.nome AS equipe_nome
-               FROM equipe_regras r
-               JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
-               WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = :t
-               ORDER BY r.prioridade ASC, r.id ASC
-               LIMIT 1";
-  $stExact = $conn->prepare($sqlExact);
-
-  foreach ($atrCands as $a) {
-    foreach ($tipoCands as $t) {
-      $stExact->execute([':a'=>$a, ':t'=>$t]);
-      $row = $stExact->fetch(PDO::FETCH_ASSOC);
-      if ($row) return $row;
-    }
-  }
-
-  // 2) curinga ('*')
-  $sqlStar = "SELECT r.*, e.nome AS equipe_nome
-              FROM equipe_regras r
-              JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
-              WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo = '*'
-              ORDER BY r.prioridade ASC, r.id ASC
-              LIMIT 1";
-  $stStar = $conn->prepare($sqlStar);
-  foreach ($atrCands as $a) {
-    $stStar->execute([':a'=>$a]);
-    $row = $stStar->fetch(PDO::FETCH_ASSOC);
-    if ($row) return $row;
-  }
-
-  // 3) LIKE por palavra-chave do tipo
-  $sqlLike = "SELECT r.*, e.nome AS equipe_nome
-              FROM equipe_regras r
-              JOIN equipes e ON e.id = r.equipe_id AND e.ativa=1
-              WHERE r.ativa=1 AND r.atribuicao = :a AND r.tipo LIKE :tk
-              ORDER BY r.prioridade ASC, r.id ASC
-              LIMIT 1";
-  $stLike = $conn->prepare($sqlLike);
-  foreach ($atrCands as $a) {
-    foreach ($tipoCands as $tk) {
-      $stLike->execute([':a'=>$a, ':tk'=>'%'.$tk.'%']);
-      $row = $stLike->fetch(PDO::FETCH_ASSOC);
-      if ($row) return $row;
-    }
-  }
-
-  return null;
+  $sql = "SELECT r.*, e.nome AS equipe_nome
+          FROM equipe_regras r
+          JOIN equipes e ON e.id = r.equipe_id AND e.ativa = 1
+          WHERE r.ativa = 1
+            AND r.atribuicao = :a
+            AND r.tipo = :t
+          ORDER BY r.prioridade ASC, r.id ASC
+          LIMIT 1";
+  $st = $conn->prepare($sql);
+  $st->execute([':a' => $atribuicao, ':t' => $tipo]);
+  $row = $st->fetch(PDO::FETCH_ASSOC);
+  return $row ?: null;
 }
 
 /**
