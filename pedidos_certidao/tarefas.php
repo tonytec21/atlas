@@ -1802,8 +1802,8 @@ body {
               <i class="fas fa-sort"></i> Classificar por
             </label>
             <select class="form-select" id="sort_by">
-              <option value="data">Data (criação)</option>
               <option value="ordem">Ordem (nº O.S.)</option>
+              <option value="data">Data (criação)</option>
               <option value="tipo">Tipo</option>
             </select>
           </div>
@@ -1812,8 +1812,8 @@ body {
               <i class="fas fa-arrow-up-wide-short"></i> Direção
             </label>
             <select class="form-select" id="sort_dir">
-              <option value="desc">Decrescente</option>
               <option value="asc">Crescente</option>
+              <option value="desc">Decrescente</option>
             </select>
           </div>
 
