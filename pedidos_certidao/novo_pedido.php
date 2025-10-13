@@ -113,6 +113,7 @@ $MAPEAMENTO = [
     "Inteiro Teor de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
     "Retificação Administrativa de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
     "Restauração de Casamento"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
+    "Divórcio"  => ["livro","folha","termo","ano","nome_noivo","nome_noiva","data_evento","cartorio_origem"],
     "2ª via de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"],
     "Inteiro Teor de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"],
     "Retificação Administrativa de Óbito"      => ["livro","folha","termo","ano","nome_falecido","filiacao","data_evento","cartorio_origem"],
