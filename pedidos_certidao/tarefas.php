@@ -917,6 +917,7 @@ body {
   font-weight: 700;  
   color: var(--text-secondary) !important;  
   margin-bottom: var(--space-sm);  
+  margin-top: 10px;
   letter-spacing: -0.01em;  
   text-transform: uppercase;  
   display: flex;  
@@ -1746,7 +1747,7 @@ body {
       </div>  
       <form id="filtros">  
         <div class="row g-3">  
-          <div class="col-md-3">  
+          <div class="col-md-4">  
             <label class="form-label">  
               <i class="fas fa-users"></i> Equipe  
             </label>  
@@ -1755,7 +1756,7 @@ body {
             </select>  
           </div>  
           
-          <div class="col-md-3">  
+          <div class="col-md-6">  
             <label class="form-label">  
               <i class="fas fa-user"></i> Funcionário  
             </label>  
@@ -1797,7 +1798,7 @@ body {
           </div>
 
           <!-- Classificação -->
-          <div class="col-md-3">
+          <div class="col-md-2">
             <label class="form-label">
               <i class="fas fa-sort"></i> Classificar por
             </label>
@@ -1807,7 +1808,7 @@ body {
               <option value="tipo">Tipo</option>
             </select>
           </div>
-          <div class="col-md-2">
+          <div class="col-md-3">
             <label class="form-label">
               <i class="fas fa-arrow-up-wide-short"></i> Direção
             </label>
