@@ -1303,9 +1303,8 @@ small.muted {
                 <select class="form-select" id="r_tipo" required>
                     <option value="">Selecione...</option>
                 </select>
-            </div>
+              </div>
  
-              
               <div class="col-md-2">  
                 <label class="form-label">  
                   <i class="fas fa-sort-amount-down"></i> Prioridade  
@@ -1313,14 +1312,14 @@ small.muted {
                 <input type="number" class="form-control" id="r_prior" value="10" min="0">  
               </div>  
               
-              <div class="col-md-2">  
+              <div class="col-md-3">  
                 <div class="form-check mt-4">  
                   <input class="form-check-input" type="checkbox" id="r_ativa" checked>  
                   <label class="form-check-label" for="r_ativa">Regra Ativa</label>  
                 </div>  
               </div>  
               
-              <div class="col-12 text-end">  
+              <div class="col-8 text-end">  
                 <button class="btn btn-secondary me-2" type="button" id="btnLimparRegra">  
                   <i class="fas fa-eraser"></i> Limpar Formulário  
                 </button>  
