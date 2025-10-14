@@ -8,10 +8,163 @@ checkSession();
 include(__DIR__ . '/../os/db_connection.php');  
 date_default_timezone_set('America/Sao_Paulo');  
 header_remove('X-Powered-By');  
+
+/* ===== Helpers de IP/UA (iguais aos do alterar_status.php) ===== */
+function str_truncate(string $s, int $limit, string $suffix = '…'): string {
+  if ($limit <= 0) return '';
+  if (mb_strlen($s, 'UTF-8') <= $limit) return $s;
+  $cut = max(0, $limit - mb_strlen($suffix, 'UTF-8'));
+  return mb_substr($s, 0, $cut, 'UTF-8') . $suffix;
+}
+function get_client_ip(): ?string {
+  $candidates = [];
+  if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) $candidates[] = $_SERVER['HTTP_CF_CONNECTING_IP'];
+  if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+    foreach (array_map('trim', explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])) as $p) $candidates[] = $p;
+  }
+  if (!empty($_SERVER['HTTP_CLIENT_IP']))  $candidates[] = $_SERVER['HTTP_CLIENT_IP'];
+  if (!empty($_SERVER['HTTP_X_REAL_IP']))  $candidates[] = $_SERVER['HTTP_X_REAL_IP'];
+  if (!empty($_SERVER['REMOTE_ADDR']))     $candidates[] = $_SERVER['REMOTE_ADDR'];
+  foreach ($candidates as $ip) {
+    if (!$ip) continue;
+    if (stripos($ip, '::ffff:') === 0) {
+      $maybeV4 = substr($ip, 7);
+      if (filter_var($maybeV4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) return $maybeV4;
+    }
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) return $ip;
+  }
+  return null;
+}
+function normalize_localhost_ip_display(?string $ip): ?string {
+  if (!$ip) return null;
+  if ($ip === '::1') return '127.0.0.1 / ::1';
+  if ($ip === '127.0.0.1') return '127.0.0.1 / ::1';
+  return $ip;
+}
+function summarize_user_agent(?string $uaRaw): string {
+  $ua = (string)($uaRaw ?? '');
+  $device = 'Desktop';
+  if (preg_match('/Mobile|Android|iPhone|iPod/i', $ua)) $device = 'Mobile';
+  if (preg_match('/Tablet|iPad/i', $ua)) $device = 'Tablet';
+  if (preg_match('/Bot|Crawler|Spider|Googlebot|Bingbot|DuckDuckBot|Slurp/i', $ua)) $device = 'Bot';
+  $os = 'Desconhecido';
+  if (preg_match('/Windows NT 10\.0/i',$ua)) $os='Windows 10/11';
+  elseif (preg_match('/Windows NT 6\.3/i',$ua)) $os='Windows 8.1';
+  elseif (preg_match('/Windows NT 6\.2/i',$ua)) $os='Windows 8';
+  elseif (preg_match('/Windows NT 6\.1/i',$ua)) $os='Windows 7';
+  elseif (preg_match('/Mac OS X ([0-9_\.]+)/i',$ua,$m)) $os='macOS '.str_replace('_','.',$m[1]);
+  elseif (preg_match('/iPhone OS ([0-9_]+)/i',$ua,$m)) $os='iOS '.str_replace('_','.',$m[1]);
+  elseif (preg_match('/iPad; CPU OS ([0-9_]+)/i',$ua,$m)) $os='iPadOS '.str_replace('_','.',$m[1]);
+  elseif (preg_match('/Android ([0-9\.]+)/i',$ua,$m)) $os='Android '.$m[1];
+  elseif (preg_match('/Linux/i',$ua)) $os='Linux';
+  $browser='Navegador';
+  if (preg_match('/Edg\/([0-9\.]+)/',$ua,$m)) $browser='Edge '.$m[1];
+  elseif (preg_match('/OPR\/([0-9\.]+)/',$ua,$m) || preg_match('/Opera\/([0-9\.]+)/',$ua,$m)) $browser='Opera '.$m[1];
+  elseif (preg_match('/Chrome\/([0-9\.]+)/',$ua,$m) && !preg_match('/Chromium/i',$ua)) $browser='Chrome '.$m[1];
+  elseif (preg_match('/Firefox\/([0-9\.]+)/',$ua,$m)) $browser='Firefox '.$m[1];
+  elseif (preg_match('/Version\/([0-9\.]+).*Safari\//',$ua,$m)) $browser='Safari '.$m[1];
+  elseif (preg_match('/MSIE ([0-9\.]+)/',$ua,$m) || preg_match('/Trident\/.*rv:([0-9\.]+)/',$ua,$m)) $browser='Internet Explorer '.$m[1];
+  elseif (preg_match('/Chromium\/([0-9\.]+)/',$ua,$m)) $browser='Chromium '.$m[1];
+  $summary = "{$device} • {$os} • {$browser}";
+  return str_truncate($summary.' | UA: '.$ua, 255);
+}
+
+/* ===== CONFIG DA API / OUTBOX ===== */
+$apiConfig   = @json_decode(@file_get_contents(__DIR__ . '/api_secrets.json'), true) ?: [];
+$BASE_URL    = $apiConfig['base_url']    ?? 'https://consultapedido.sistemaatlas.com.br';
+$INGEST_URL  = $apiConfig['ingest_url']  ?? (rtrim($BASE_URL,'/').'/api/ingest.php');
+$API_KEY     = $apiConfig['api_key']     ?? null;
+$HMAC_SECRET = $apiConfig['hmac_secret'] ?? null;
+$VERIFY_SSL  = array_key_exists('verify_ssl',$apiConfig) ? (bool)$apiConfig['verify_ssl'] : true;
+
+/* Tabelas mínimas para outbox + log de status (mesmo formato do alterar_status.php) */
+function ensureSchemaApi(PDO $conn){
+  $conn->exec("CREATE TABLE IF NOT EXISTS api_outbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    topic ENUM('pedido_criado','status_atualizado') NOT NULL,
+    protocolo VARCHAR(32) NOT NULL,
+    token_publico CHAR(40) NOT NULL,
+    payload_json JSON NOT NULL,
+    api_key VARCHAR(120) NULL,
+    signature VARCHAR(256) NULL,
+    timestamp_utc BIGINT NOT NULL,
+    request_id VARCHAR(64) NOT NULL,
+    delivered_at DATETIME NULL,
+    retries INT NOT NULL DEFAULT 0,
+    last_error VARCHAR(1000) NULL,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_topic (topic),
+    INDEX idx_protocolo (protocolo),
+    INDEX idx_token (token_publico)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+  $conn->exec("CREATE TABLE IF NOT EXISTS pedidos_certidao_status_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    pedido_id INT NOT NULL,
+    status_anterior ENUM('pendente','em_andamento','emitida','entregue','cancelada') NULL,
+    novo_status ENUM('pendente','em_andamento','emitida','entregue','cancelada') NOT NULL,
+    observacao VARCHAR(500) NULL,
+    usuario VARCHAR(255) NOT NULL,
+    ip VARCHAR(45) NULL,
+    user_agent VARCHAR(255) NULL,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_pedido (pedido_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+}
+
+/* POST assinado (idêntico ao alterar_status.php) */
+function post_json_signed(string $url, string $apiKey, string $hmacSecret, array $body, string $requestId, int $timestampMs, bool $verifySsl): array {
+  $json = json_encode($body, JSON_UNESCAPED_UNICODE);
+  $sig  = hash_hmac('sha256', $timestampMs . $json, $hmacSecret);
+  $headers = [
+    'Content-Type: application/json; charset=utf-8',
+    'X-Api-Key: '      . $apiKey,
+    'X-Timestamp-Ms: ' . $timestampMs,
+    'X-Request-Id: '   . $requestId,
+    'X-Signature: '    . $sig,
+    'Expect:',
+    'Connection: close'
+  ];
+  $attempts = 3; $delayMs=[250,800]; $last=['ok'=>false,'http_code'=>0,'response'=>null,'error'=>null,'signature'=>$sig];
+  for($i=0;$i<$attempts;$i++){
+    $resp=null;$http=0;$err=null;
+    if(function_exists('curl_init')){
+      $ch=curl_init($url);
+      curl_setopt_array($ch,[
+        CURLOPT_POST=>true, CURLOPT_RETURNTRANSFER=>true, CURLOPT_HTTPHEADER=>$headers, CURLOPT_POSTFIELDS=>$json,
+        CURLOPT_CONNECTTIMEOUT=>8, CURLOPT_TIMEOUT=>25,
+        CURLOPT_SSL_VERIFYPEER=>$verifySsl?1:0, CURLOPT_SSL_VERIFYHOST=>$verifySsl?2:0,
+        CURLOPT_HTTP_VERSION=>CURL_HTTP_VERSION_1_1, CURLOPT_IPRESOLVE=>CURL_IPRESOLVE_V4,
+        CURLOPT_NOSIGNAL=>1, CURLOPT_FORBID_REUSE=>1, CURLOPT_FRESH_CONNECT=>1
+      ]);
+      $resp=curl_exec($ch);
+      if($resp===false){ $err='cURL('.curl_errno($ch).'): '.curl_error($ch); }
+      $http=(int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+      curl_close($ch);
+    } else {
+      $context=stream_context_create(['http'=>['method'=>'POST','header'=>implode("\r\n",$headers),'content'=>$json,'timeout'=>25]]);
+      $resp=@file_get_contents($url,false,$context);
+      if($resp===false){ $err='HTTP stream falhou'; }
+      if(isset($http_response_header) && is_array($http_response_header)){
+        foreach($http_response_header as $h){ if(preg_match('#HTTP/\S+\s+(\d{3})#',$h,$m)){ $http=(int)$m[1]; break; } }
+      }
+    }
+    $ok=false;
+    if($resp!==null && $http>=200 && $http<300){
+      $j=json_decode($resp,true); $ok=is_array($j) && !empty($j['success']);
+    }
+    $last=['ok'=>$ok,'http_code'=>$http,'response'=>$resp,'error'=>$err,'signature'=>$sig];
+    if($ok || ($http>=400 && $http<600)) break;
+    if($http===0 || $err){ if($i<$attempts-1){ usleep(($delayMs[min($i,count($delayMs)-1)])*1000); continue; } }
+    break;
+  }
+  return $last;
+}
+
 /* ========================================================================  
    SCHEMA - MySQL 8+ (mesmo padrão dos outros arquivos)  
    ======================================================================== */  
-function ensureSchemaDistribuicao(PDO $conn) {  
+function ensureSchemaDistribuicao(PDO $conn) {
+
   // equipes  
   $conn->exec("CREATE TABLE IF NOT EXISTS equipes (  
     id INT AUTO_INCREMENT PRIMARY KEY,  
@@ -93,8 +246,9 @@ function ensureSchemaDistribuicao(PDO $conn) {
 
 try {  
   $conn = getDatabaseConnection();  
-  ensureSchemaDistribuicao($conn);  
-} catch (Throwable $e) {  
+  ensureSchemaDistribuicao($conn);
+  ensureSchemaApi($conn);  // <<< garante api_outbox + status_log  
+} catch (Throwable $e) {   
   // UI mostra aviso simples se necessário  
 }  
 
@@ -362,7 +516,10 @@ if ($isAjax) {
         SELECT 
           t.status             AS status_atual,
           p.id                 AS pedido_id,
+          p.status             AS pedido_status,
           p.ordem_servico_id   AS os_id,
+          p.protocolo          AS pedido_protocolo,          -- <<< novo
+          p.token_publico      AS pedido_token_publico,      -- <<< novo
           os.status            AS os_status
         FROM tarefas_pedido t
         LEFT JOIN pedidos_certidao p ON p.id = t.pedido_id
@@ -370,6 +527,7 @@ if ($isAjax) {
         WHERE t.id = ?
         FOR UPDATE
       ");
+
       $stInfo->execute([$id]);
       $row = $stInfo->fetch(PDO::FETCH_ASSOC);
 
@@ -382,28 +540,58 @@ if ($isAjax) {
       $pedidoId   = (int)($row['pedido_id'] ?? 0);
       $osStatus   = $row['os_status'] ?? null;   // pode ser NULL quando isento (sem O.S.)
 
-      // >>> Regra: NÃO permitir iniciar tarefa (em_andamento) se o pedido ainda não tem pagamento liberado na O.S.
+      // >>> Regra: permitir iniciar (em_andamento) se houver DEPÓSITO PRÉVIO pago OU se for ISENTO,
+      // exatamente como em visualizar_pedido.php.
       if ($novo === 'em_andamento') {
-        // Se não há O.S. (isento), libera.
-        $temPagamentoLiberado = true;
-        if (!is_null($osStatus)) {
-          // normaliza e aceita variações comuns de "pago/quitado/finalizado"
-          $norm = mb_strtolower(trim((string)$osStatus), 'UTF-8');
+        $osId       = (int)($row['os_id'] ?? 0);
+        $osStatusTx = (string)($row['os_status'] ?? '');
 
-          // Considera pago se conter "pago" (pago, pago parcial), "quit" (quitado/quitada) ou "finaliz" (finalizada/o)
-          $temPagamentoLiberado = (
-            (strpos($norm, 'pago') !== false) ||
-            (strpos($norm, 'quit') !== false) ||
-            (strpos($norm, 'finaliz') !== false)
-          );
-        }
+        // Sem O.S. associada ⇒ considerar "isento por desenho" (libera)
+        if ($osId <= 0) {
+          // libera
+        } else {
+          $totalPag = 0.0;
+          $isento   = false;
 
-        if (!$temPagamentoLiberado) {
-          $conn->rollBack();
-          J([
-            'success' => false,
-            'error'   => 'Não é possível iniciar a tarefa agora: existe pendência de pagamento na O.S. do pedido.'
-          ]);
+          try {
+            // Total pago (mesma tabela/coluna usada em visualizar_pedido.php)
+            $stPag = $conn->prepare("SELECT SUM(total_pagamento) FROM pagamento_os WHERE ordem_de_servico_id = ?");
+            $stPag->execute([$osId]);
+            $totalPag = (float)($stPag->fetchColumn() ?: 0);
+          } catch (Throwable $e) {
+            // se a tabela não existir, seguimos — não vamos bloquear sem comprovar
+          }
+
+          try {
+            // Isento via forma_de_pagamento (mesma regra do visualizar_pedido.php)
+            $stIs = $conn->prepare("
+              SELECT COUNT(*)
+                FROM pagamento_os
+              WHERE ordem_de_servico_id = ?
+                AND (
+                      forma_de_pagamento = 'Isento de Pagamento'
+                  OR forma_de_pagamento = 'Isento'
+                )
+            ");
+            $stIs->execute([$osId]);
+            $isento = ((int)$stIs->fetchColumn() > 0);
+          } catch (Throwable $e) {
+            // segue
+          }
+
+          // Isento também se o status textual da O.S. for "Isento de Pagamento"
+          if (strcasecmp(trim($osStatusTx), 'Isento de Pagamento') === 0) {
+            $isento = true;
+          }
+
+          // BLOQUEIO somente quando: tem O.S. e NÃO há pagamento e NÃO é isento
+          if (!($totalPag > 0) && !$isento) {
+            $conn->rollBack();
+            J([
+              'success' => false,
+              'error'   => 'Não é possível iniciar a tarefa agora: existe pendência de pagamento na O.S. do pedido.'
+            ]);
+          }
         }
       }
 
@@ -418,13 +606,120 @@ if ($isAjax) {
       $upd->execute([$novo, $obs, $id]);
 
       $log = $conn->prepare("
-        INSERT INTO tarefas_pedido_log (tarefa_id, acao, de_valor, para_valor, observacao, usuario)
-        VALUES (?,?,?,?,?,?)
-      ");
-      $log->execute([$id, 'status', $ant, $novo, $obs, $user]);
+  INSERT INTO tarefas_pedido_log (tarefa_id, acao, de_valor, para_valor, observacao, usuario)
+  VALUES (?,?,?,?,?,?)
+");
+$log->execute([$id, 'status', $ant, $novo, $obs, $user]);
 
-      $conn->commit();
-      J(['success'=>true]);
+/* ======== NOVO: refletir status da tarefa no status do pedido ======== */
+// Mapeamento desejado:
+// tarefa.pendente     -> (não altera pedido)
+// tarefa.em_andamento -> pedido.em_andamento
+// tarefa.concluida    -> pedido.emitida
+// tarefa.cancelada    -> pedido.cancelada   (opcional: mantenho por coerência)
+$novoPedidoStatus = null;
+if ($novo === 'em_andamento') {
+  $novoPedidoStatus = 'em_andamento';
+} elseif ($novo === 'concluida') {
+  $novoPedidoStatus = 'emitida';
+} elseif ($novo === 'cancelada') {
+  $novoPedidoStatus = 'cancelada';
+}
+
+if ($novoPedidoStatus !== null && $pedidoId > 0) {
+  $pedidoStatusAtual = (string)($row['pedido_status'] ?? '');
+
+  $atualizouPedido = false;
+  // Evita sobrescrever estados finais do pedido
+  if (!in_array($pedidoStatusAtual, ['entregue','cancelada'], true)) {
+    if ($pedidoStatusAtual !== $novoPedidoStatus) {
+      $stUpdPed = $conn->prepare("
+        UPDATE pedidos_certidao
+           SET status = ?,
+               atualizado_por = ?,
+               atualizado_em = NOW()
+         WHERE id = ?
+      ");
+      $stUpdPed->execute([$novoPedidoStatus, $user, $pedidoId]);
+      $atualizouPedido = true;
+    }
+  }
+
+  // ===== sempre que refletirmos (e especialmente quando mudou), registramos log + outbox =====
+  if ($atualizouPedido) {
+    // IP/UA do cliente
+    $clientIpRaw  = get_client_ip();
+    $clientIpDisp = normalize_localhost_ip_display($clientIpRaw);
+    $uaRaw        = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $uaSummary    = summarize_user_agent($uaRaw);
+
+    // Log do pedido (igual ao alterar_status.php)
+    $conn->prepare("
+      INSERT INTO pedidos_certidao_status_log (pedido_id, status_anterior, novo_status, observacao, usuario, ip, user_agent)
+      VALUES (?,?,?,?,?,?,?)
+    ")->execute([$pedidoId, $pedidoStatusAtual, $novoPedidoStatus, ($obs?:null), $user, $clientIpDisp, $uaSummary]);
+
+    // Monta payload FLAT compatível com ingest.php
+    $body = [
+      'topic'           => 'status_atualizado',
+      'protocolo'       => (string)($row['pedido_protocolo'] ?? ''),
+      'token_publico'   => (string)($row['pedido_token_publico'] ?? ''),
+      'status'          => $novoPedidoStatus,
+      'atualizado_em'   => date('c'),
+      'observacao'      => $obs ? true : false,
+      'observacao_text' => $obs ?: null,
+      'pedido_id'       => (int)$pedidoId,
+      'ordem_servico_id'=> (int)($row['os_id'] ?? 0),
+    ];
+
+    // Outbox + assinatura
+    $timestamp = (int) round(microtime(true) * 1000);
+    $requestId = bin2hex(random_bytes(12));
+    $signature = $HMAC_SECRET ? hash_hmac('sha256', $timestamp . json_encode($body, JSON_UNESCAPED_UNICODE), $HMAC_SECRET) : null;
+
+    $conn->prepare("
+      INSERT INTO api_outbox (topic, protocolo, token_publico, payload_json, api_key, signature, timestamp_utc, request_id)
+      VALUES (?,?,?,?,?,?,?,?)
+    ")->execute([
+      'status_atualizado',
+      (string)($row['pedido_protocolo'] ?? ''),
+      (string)($row['pedido_token_publico'] ?? ''),
+      json_encode($body, JSON_UNESCAPED_UNICODE),
+      $API_KEY ?: null,
+      $signature,
+      $timestamp,
+      $requestId
+    ]);
+    $outbox_id = (int)$conn->lastInsertId();
+
+    // Envio imediato (best-effort)
+    $GLOBALS['__api_delivery'] = ['attempted'=>false,'delivered'=>false,'http_code'=>0];
+    if ($INGEST_URL && $API_KEY && $HMAC_SECRET) {
+      $GLOBALS['__api_delivery']['attempted'] = true;
+      $res = post_json_signed($INGEST_URL, $API_KEY, $HMAC_SECRET, $body, $requestId, $timestamp, $VERIFY_SSL);
+      if (!empty($res['ok'])) {
+        $GLOBALS['__api_delivery']['delivered'] = true;
+        $GLOBALS['__api_delivery']['http_code'] = (int)$res['http_code'];
+        $conn->prepare("UPDATE api_outbox SET delivered_at=NOW(), last_error=NULL WHERE id=?")->execute([$outbox_id]);
+      } else {
+        $GLOBALS['__api_delivery']['delivered'] = false;
+        $GLOBALS['__api_delivery']['http_code'] = (int)($res['http_code'] ?? 0);
+        $err = trim((string)($res['error'] ?? '') . ' ' . substr((string)($res['response'] ?? ''),0,600));
+        $conn->prepare("UPDATE api_outbox SET retries=retries+1, last_error=? WHERE id=?")->execute([$err ?: 'falha desconhecida', $outbox_id]);
+      }
+    }
+  }
+}
+
+/* ===================================================================== */
+
+$conn->commit();
+J([
+  'success'=>true,
+  'api_delivery' => $GLOBALS['__api_delivery'] ?? ['attempted'=>false]
+]);
+
+
     }
 
 
@@ -455,8 +750,12 @@ if ($isAjax) {
                              VALUES (?,?,?,?,?,?)");  
       $log->execute([$id,'reatribuicao', (string)($ant ?? ''), (string)($func ?? ''), $obs, $user]);  
 
-      $conn->commit();  
-      J(['success'=>true]);  
+      $conn->commit();
+      J([
+        'success'=>true,
+        'api_delivery' => $GLOBALS['__api_delivery'] ?? ['attempted'=>false]
+      ]);
+ 
     }  
 
     if ($action === 'append_note') {  
