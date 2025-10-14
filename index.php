@@ -1414,9 +1414,9 @@ $(document).ready(function() {
                 <table class="table table-hover align-middle">
                     <thead>
                         <tr>
-                            <th><i class="mdi mdi-pound"></i> ID Tarefa</th>
+                            <th><i class="mdi mdi-file-document-edit-outline"></i> O.S.</th>
                             <th><i class="mdi mdi-text-box"></i> Protocolo</th>
-                            <th><i class="mdi mdi-account-group"></i> Equipe</th>
+                            <th><i class="mdi mdi-account"></i> Responsável</th>
                             <th><i class="mdi mdi-chart-line"></i> Status</th>
                             <th><i class="mdi mdi-calendar-clock"></i> Criado</th>
                             <th><i class="mdi mdi-update"></i> Atualizado</th>
@@ -1431,9 +1431,9 @@ $(document).ready(function() {
 
             html += `
                 <tr>
-                    <td><strong>#${t.id}</strong></td>
+                    <td><strong>${t.numero_os ? `O.S.: ${t.numero_os}` : '—'}</strong></td>
                     <td>${t.protocolo ? `<strong>${t.protocolo}</strong>` : `Pedido #${t.pedido_id}`}</td>
-                    <td>${t.equipe_nome || '—'}</td>
+                    <td>${t.responsavel_nome || '—'}</td>
                     <td><span class="${statusClass}">${formatStatusLabel(t.status) || '—'}</span></td>
                     <td>${formatarDataBrasileira(t.criado_em)}</td>
                     <td>${t.atualizado_em ? formatarDataBrasileira(t.atualizado_em) : '—'}</td>

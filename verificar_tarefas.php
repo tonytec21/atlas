@@ -113,10 +113,13 @@ if (!empty($tarefas)) {
 if ($nivel_de_acesso === 'administrador' || $tem_acesso_controle_tarefas) {
     $sql_cert = "
         SELECT t.id, t.pedido_id, t.status, t.criado_em, t.atualizado_em,
-               e.nome AS equipe_nome, p.protocolo
+               f.nome_completo AS responsavel_nome,
+               p.protocolo,
+               os.id AS numero_os
         FROM tarefas_pedido t
-        LEFT JOIN equipes e ON e.id = t.equipe_id
+        LEFT JOIN funcionarios f   ON f.id = t.funcionario_id
         LEFT JOIN pedidos_certidao p ON p.id = t.pedido_id
+        LEFT JOIN ordens_de_servico os ON os.id = p.ordem_servico_id
         WHERE t.status IN ('pendente','em_andamento')
         ORDER BY t.criado_em DESC
     ";
@@ -124,10 +127,13 @@ if ($nivel_de_acesso === 'administrador' || $tem_acesso_controle_tarefas) {
 } else {
     $sql_cert = "
         SELECT t.id, t.pedido_id, t.status, t.criado_em, t.atualizado_em,
-               e.nome AS equipe_nome, p.protocolo
+               f.nome_completo AS responsavel_nome,
+               p.protocolo,
+               os.id AS numero_os
         FROM tarefas_pedido t
-        LEFT JOIN equipes e ON e.id = t.equipe_id
+        LEFT JOIN funcionarios f   ON f.id = t.funcionario_id
         LEFT JOIN pedidos_certidao p ON p.id = t.pedido_id
+        LEFT JOIN ordens_de_servico os ON os.id = p.ordem_servico_id
         WHERE t.status IN ('pendente','em_andamento')
           AND t.funcionario_id = ?
         ORDER BY t.criado_em DESC
@@ -144,15 +150,17 @@ if (!empty($tarefas_cert)) {
     foreach ($tarefas_cert as $tc) {
         $pedidoId = (int)$tc['pedido_id'];
         $response['tarefas_certidao'][] = [
-            'id'            => (int)$tc['id'],
-            'pedido_id'     => $pedidoId,
-            'protocolo'     => $tc['protocolo'],
-            'equipe_nome'   => $tc['equipe_nome'],
-            'status'        => $tc['status'],
-            'criado_em'     => $tc['criado_em'],
-            'atualizado_em' => $tc['atualizado_em'],
+            // Mantemos o id interno se precisar em outro lugar, mas o modal passará a exibir numero_os
+            'id'               => (int)$tc['id'],
+            'numero_os'        => isset($tc['numero_os']) ? (int)$tc['numero_os'] : null,
+            'pedido_id'        => $pedidoId,
+            'protocolo'        => $tc['protocolo'],
+            'responsavel_nome' => $tc['responsavel_nome'],
+            'status'           => $tc['status'],
+            'criado_em'        => $tc['criado_em'],
+            'atualizado_em'    => $tc['atualizado_em'],
             // Agora abrimos diretamente a visualização do pedido de certidão
-            'link'          => 'pedidos_certidao/visualizar_pedido.php?id=' . $pedidoId
+            'link'             => 'pedidos_certidao/visualizar_pedido.php?id=' . $pedidoId
         ];
     }
 }
