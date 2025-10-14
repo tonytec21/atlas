@@ -17,20 +17,49 @@ $p = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$p) die('Pedido não encontrado');
 
 $apiConfig  = @json_decode(@file_get_contents(__DIR__ . '/api_secrets.json'), true) ?: [];
-$BASE_URL   = $apiConfig['base_url'] ?? 'https://sistemaatlas.com.br';
-$urlPublica = rtrim($BASE_URL,'/').'/'.$p['protocolo'];
+$BASE_URL   = $apiConfig['base_url'] ?? 'https://consultapedido.sistemaatlas.com.br';
+$urlPublica = rtrim($BASE_URL,'/').'/'.($p['protocolo'] ?? '');
 
+// Caminhos de imagem
 $qrPath     = __DIR__."/qrcodes/pedido_{$id}.png";
 $bgPath     = __DIR__ . '/../style/img/timbrado.png';
+
+// ========= Descobre "quem protocolou" (nome completo do funcionário) =========
+$usuarioProtocolou = '';
+foreach (['criado_por','usuario','usuario_criacao','criado_por_usuario','registrado_por','protocolo_por','protocolado_por','atualizado_por'] as $col) {
+  if (!empty($p[$col])) { $usuarioProtocolou = (string)$p[$col]; break; }
+}
+if (!$usuarioProtocolou && !empty($_SESSION['username'])) {
+  $usuarioProtocolou = (string)$_SESSION['username'];
+}
+
+$nomeProtocolou = '';
+if ($usuarioProtocolou !== '') {
+  try {
+    $stU = $conn->prepare("SELECT nome_completo FROM funcionarios WHERE usuario = ? LIMIT 1");
+    $stU->execute([$usuarioProtocolou]);
+    $nomeProtocolou = (string)($stU->fetchColumn() ?: '');
+  } catch (Throwable $e) {
+    // ignora silenciosamente
+  }
+}
+if ($nomeProtocolou === '' && $usuarioProtocolou !== '') {
+  // fallback: mostra o usuário se o nome completo não foi encontrado
+  $nomeProtocolou = $usuarioProtocolou;
+}
 
 // TCPDF
 require_once(__DIR__ . '/../oficios/tcpdf/tcpdf.php');
 
 class PDF extends TCPDF {
   protected $bgPath = null;
+  protected $protTexto = null; // "Protocolado por: Fulano"
 
   public function setBackground($path){
     $this->bgPath = $path;
+  }
+  public function setProtocoladoPor(?string $texto){
+    $this->protTexto = $texto ?: null;
   }
 
   public function Header(){
@@ -49,41 +78,62 @@ class PDF extends TCPDF {
       $this->SetAutoPageBreak($auto_page_break, $bMargin);
       $this->setPageMark(); // garante que o conteúdo venha por cima
     }
+
+    // Texto vertical na lateral direita: "Protocolado por: Nome"
+    if ($this->protTexto) {
+      $this->SetFont('helvetica','',8.5);
+      $this->SetTextColor(90,90,90);
+
+      // Define âncora de rotação no lado direito, central verticalmente
+      $xAnchor = $this->getPageWidth() - 4;       // ~4mm da borda direita
+      $yAnchor = $this->getPageHeight() / 2;      // meio da página
+
+      $this->StartTransform();
+      // Rotaciona 90° em torno da âncora
+      $this->Rotate(90, $xAnchor, $yAnchor);
+
+      // Posiciona e imprime
+      $this->SetXY($xAnchor - 2, 10);
+      $this->Cell(0, 275, 'Protocolado por: '.$this->protTexto, 0, 1, 'C', 0, '', 0, false, 'T', 'M');
+
+      $this->StopTransform();
+    }
   }
 }
 
 $pdf = new PDF('P', 'mm', 'A4', true, 'UTF-8', false);
 $pdf->SetCreator('Atlas');
 $pdf->SetAuthor('Atlas');
-$pdf->SetTitle('Recibo - Protocolo '.$p['protocolo']);
+$pdf->SetTitle('Recibo de Protocolo - '.$p['protocolo']);
 
-// Margens: 15 mm nas laterais e **30 mm** no topo (3 cm) para não sobrepor o cabeçalho do timbrado
-$pdf->SetMargins(15, 30, 15);
+// Margens: laterais 15mm e topo 30mm (reduzido para evitar grande espaço inicial)
+$pdf->SetMargins(15, 35, 15);
 $pdf->SetAutoPageBreak(true, 15);
 $pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
 
-// Cabeçalho/rodapé: usamos o Header() para o fundo (timbrado)
+// Cabeçalho/rodapé
 $pdf->setPrintHeader(true);
 $pdf->setPrintFooter(true);
 
-// Define o timbrado
+// Define o timbrado e o texto "protocolado por"
 $pdf->setBackground($bgPath);
+$pdf->setProtocoladoPor($nomeProtocolou);
 
 $pdf->AddPage();
 
 // ====== CONTEÚDO ======
 $pdf->SetFont('helvetica','',11);
 
-// Título “moderno” (sem competir com o cabeçalho do timbrado)
+// Título genérico
 $html = '
-  <div style="text-align:center; font-size:16px; font-weight:bold; letter-spacing:.3px; margin-bottom:6px;">
-    Recibo do Pedido de Certidão
+  <div style="text-align:center; font-size:16px; font-weight:bold; letter-spacing:.3px; margin-bottom:4px;">
+    Recibo de Protocolo
   </div>
-  <div style="text-align:center; font-size:12px; color:#444; margin-bottom:12px;">
+  <div style="text-align:center; font-size:12px; color:#444; margin-bottom:8px;">
     Protocolo: <strong>'.htmlspecialchars($p['protocolo']).'</strong> &nbsp;•&nbsp;
     Status: <strong>'.str_replace('_',' ',htmlspecialchars($p['status'])).'</strong>
   </div>
-  <hr style="border:0; height:1px; background:#999; margin:6px 0 10px 0;">
+  <hr style="border:0; height:1px; background:#999; margin:4px 0 8px 0;">
 ';
 
 $html.= '
@@ -98,7 +148,7 @@ $html.= '
 
 $refs = json_decode($p['referencias_json']??'{}', true);
 if ($refs && is_array($refs)){
-  $html.='<h4 style="font-size:13px; margin:10px 0 4px 0;">Referências</h4><ul style="margin:0 0 6px 18px; padding:0;">';
+  $html.='<h4 style="font-size:13px; margin:8px 0 4px 0;">Referências</h4><ul style="margin:0 0 6px 18px; padding:0;">';
   foreach($refs as $k=>$v){
     $label = ucwords(str_replace('_',' ',$k));
     $html.='<li><strong>'.$label.':</strong> '.htmlspecialchars($v).'</li>';
@@ -107,7 +157,7 @@ if ($refs && is_array($refs)){
 }
 
 $html.= '
-  <h4 style="font-size:13px; margin:10px 0 4px 0;">O.S.</h4>
+  <h4 style="font-size:13px; margin:8px 0 4px 0;">O.S.</h4>
   <div style="line-height:1.55;">
     <strong>#'.(int)$p['ordem_servico_id'].'</strong> – '.htmlspecialchars($p['descricao_os']).' – Total:
     <strong>R$ '.number_format((float)$p['total_os'],2,',','.').'</strong>
@@ -117,7 +167,7 @@ $html.= '
 $pdf->writeHTML($html, true, false, true, false, '');
 
 // ====== QR CODE (centralizado, tamanho menor + indicação de uso) ======
-$pdf->Ln(4);
+$pdf->Ln(2);
 $qrSize = 42; // menor e mais elegante
 
 // Y atual antes do QR
@@ -145,7 +195,7 @@ if (file_exists($qrPath)) {
 $pdf->SetY($y + $qrSize + 2);
 $pdf->SetFont('helvetica','',9.5);
 $pdf->SetTextColor(80,80,80);
-$pdf->Cell(0, 5, 'Aponte a câmera do celular para consultar o pedido via QR Code', 0, 1, 'C');
+$pdf->Cell(0, 5, 'Aponte a câmera do celular para consultar o protocolo via QR Code', 0, 1, 'C');
 
 // Posiciona o cursor abaixo do texto do QR
 $pdf->SetY($y + $qrSize + 8);
@@ -168,4 +218,4 @@ $linkHtml = '
 $pdf->writeHTML($linkHtml, true, false, true, false, 'C');
 
 // Saída
-$pdf->Output('recibo-pedido-'.$p['protocolo'].'.pdf', 'I');
+$pdf->Output('recibo-protocolo-'.$p['protocolo'].'.pdf', 'I');
