@@ -2657,7 +2657,9 @@ function renderCard(t) {
     `;
   }
 
-  const slaCls = slaClassFromCreated(t.criado_em || t.criado_em); // usa criado_em
+  const slaEligible = (t.status === 'pendente' || t.status === 'em_andamento');
+  const slaCls = slaEligible ? slaClassFromCreated(t.criado_em) : '';
+
   return `
     <div class="task ${slaCls}" id="task_${t.id}">
       <div class="task-header">
