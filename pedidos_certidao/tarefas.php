@@ -1756,7 +1756,7 @@ body {
             </select>  
           </div>  
           
-          <div class="col-md-6">  
+          <div class="col-md-5">  
             <label class="form-label">  
               <i class="fas fa-user"></i> Funcionário  
             </label>  
@@ -1765,7 +1765,7 @@ body {
             </select>  
           </div>  
           
-          <div class="col-md-2">  
+          <div class="col-md-3">  
             <label class="form-label">  
               <i class="fas fa-flag"></i> Status  
             </label>  
