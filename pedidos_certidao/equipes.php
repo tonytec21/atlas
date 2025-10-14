@@ -544,6 +544,7 @@ body {
   font-weight: 700;  
   color: var(--text-secondary) !important;  
   margin-bottom: var(--space-sm);  
+  margin-top: 10px;
   letter-spacing: -0.01em;  
   text-transform: uppercase;  
   display: flex;  
@@ -1203,7 +1204,7 @@ small.muted {
             <form class="row g-3 align-items-end" id="formMembro">  
               <input type="hidden" id="m_equipe_id">  
               
-              <div class="col-md-5">  
+              <div class="col-md-8">  
                 <label class="form-label">  
                   <i class="fas fa-user"></i> Funcionário  
                 </label>  
@@ -1212,11 +1213,11 @@ small.muted {
                 </select>  
               </div>  
               
-              <div class="col-md-3">  
+              <div class="col-md-4">  
                 <label class="form-label">  
                   <i class="fas fa-id-badge"></i> Papel  
                 </label>  
-                <input class="form-control" id="m_papel" placeholder="Ex.: Analista">  
+                <input class="form-control" id="m_papel" placeholder="Ex.: Emissor">  
               </div>  
               
               <div class="col-md-2">  
@@ -1226,21 +1227,21 @@ small.muted {
                 <input type="number" class="form-control" id="m_ordem" value="1" min="1">  
               </div>  
               
-              <div class="col-md-2">  
+              <div class="col-md-3">  
                 <label class="form-label">  
                   <i class="fas fa-tachometer-alt"></i> Carga Máx.  
                 </label>  
                 <input type="number" class="form-control" id="m_carga" min="0" placeholder="Dia">  
               </div>  
               
-              <div class="col-md-6">  
+              <div class="col-md-3">  
                 <div class="form-check">  
                   <input class="form-check-input" type="checkbox" id="m_ativo" checked>  
                   <label class="form-check-label" for="m_ativo">Membro Ativo</label>  
                 </div>  
               </div>  
               
-              <div class="col-md-6 text-end">  
+              <div class="col-md-4 text-end">  
                 <button class="btn btn-primary" type="submit">  
                   <i class="fas fa-plus"></i> Adicionar/Atualizar  
                 </button>  
