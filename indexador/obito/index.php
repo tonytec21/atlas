@@ -564,15 +564,45 @@ while($row = mysqli_fetch_assoc($result_livros)) {
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label for="livro" class="form-label required-label">Livro</label>
-                            <input type="text" class="form-control rounded-pill" id="livro" name="livro" required>
+                            <input
+                                type="text"
+                                class="form-control rounded-pill"
+                                id="livro"
+                                name="livro"
+                                inputmode="numeric"
+                                pattern="\d*"
+                                oninput="this.value=this.value.replace(/\D/g,'')"
+                                autocomplete="off"
+                                required
+                            >
                         </div>
                         <div class="col-md-4">
                             <label for="folha" class="form-label required-label">Folha</label>
-                            <input type="text" class="form-control rounded-pill" id="folha" name="folha" required>
+                            <input
+                                type="text"
+                                class="form-control rounded-pill"
+                                id="folha"
+                                name="folha"
+                                inputmode="numeric"
+                                pattern="\d*"
+                                oninput="this.value=this.value.replace(/\D/g,'')"
+                                autocomplete="off"
+                                required
+                            >
                         </div>
                         <div class="col-md-4">
                             <label for="termo" class="form-label required-label">Termo</label>
-                            <input type="text" class="form-control rounded-pill" id="termo" name="termo" required>
+                            <input
+                                type="text"
+                                class="form-control rounded-pill"
+                                id="termo"
+                                name="termo"
+                                inputmode="numeric"
+                                pattern="\d*"
+                                oninput="this.value=this.value.replace(/\D/g,'')"
+                                autocomplete="off"
+                                required
+                            >
                         </div>
                     </div>
 
@@ -675,15 +705,45 @@ while($row = mysqli_fetch_assoc($result_livros)) {
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label for="edit-livro" class="form-label required-label">Livro</label>
-                            <input type="text" class="form-control rounded-pill" id="edit-livro" name="livro" required>
+                            <input
+                                type="text"
+                                class="form-control rounded-pill"
+                                id="edit-livro"
+                                name="livro"
+                                inputmode="numeric"
+                                pattern="\d*"
+                                oninput="this.value=this.value.replace(/\D/g,'')"
+                                autocomplete="off"
+                                required
+                            >
                         </div>
                         <div class="col-md-4">
                             <label for="edit-folha" class="form-label required-label">Folha</label>
-                            <input type="text" class="form-control rounded-pill" id="edit-folha" name="folha" required>
+                            <input
+                                type="text"
+                                class="form-control rounded-pill"
+                                id="edit-folha"
+                                name="folha"
+                                inputmode="numeric"
+                                pattern="\d*"
+                                oninput="this.value=this.value.replace(/\D/g,'')"
+                                autocomplete="off"
+                                required
+                            >
                         </div>
                         <div class="col-md-4">
                             <label for="edit-termo" class="form-label required-label">Termo</label>
-                            <input type="text" class="form-control rounded-pill" id="edit-termo" name="termo" required>
+                            <input
+                                type="text"
+                                class="form-control rounded-pill"
+                                id="edit-termo"
+                                name="termo"
+                                inputmode="numeric"
+                                pattern="\d*"
+                                oninput="this.value=this.value.replace(/\D/g,'')"
+                                autocomplete="off"
+                                required
+                            >
                         </div>
                     </div>
 
