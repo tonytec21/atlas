@@ -1052,6 +1052,30 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             }  
         ?>  
 
+        <!-- DOCMARK -->  
+        <?php  
+            $configFile = __DIR__ . '/indexador/config_docmark.json';  
+            if (file_exists($configFile)) {  
+                $configData = json_decode(file_get_contents($configFile), true);  
+                if (isset($configData['docmark_ativo']) && $configData['docmark_ativo'] === 'S') {  
+                    echo '  
+                        <div class="module-card" id="card-xuxuzinho">  
+                            <div class="card-header">  
+                                <span class="card-badge badge-administrativo">Administrativo</span>  
+                                <div class="card-icon icon-xuxuzinho">  
+                                                                        <img src="../docmark/img/logo.png" alt="Ícone Xuxuzinho" style="width: 40px; height: 40px; border-radius: 8px;">  
+                                </div>  
+                            </div>  
+                            <h3 class="card-title">DocMark</h3>  
+                            <p class="card-description">Subsistema para controle de selos e comunicações.</p>  
+                            <button class="card-button btn-xuxuzinho" onclick="window.open(\'../docmark/index.php\', \'_blank\')">  
+                                <i class="fa fa-external-link"></i> Acessar em Nova Aba
+                            </button>  
+                        </div>';  
+                }  
+            }  
+        ?>  
+
         <!-- Anotações -->  
         <div class="module-card" id="card-anotacao">  
             <div class="card-header">  
