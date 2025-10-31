@@ -1067,7 +1067,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                                 </div>  
                             </div>  
                             <h3 class="card-title">DocMark</h3>  
-                            <p class="card-description">Subsistema para controle de selos e comunicações.</p>  
+                            <p class="card-description">Subsistema para controle e envio de matriculas para a ONR.</p>  
                             <button class="card-button btn-xuxuzinho" onclick="window.open(\'../docmark/index.php\', \'_blank\')">  
                                 <i class="fa fa-external-link"></i> Acessar em Nova Aba
                             </button>  
