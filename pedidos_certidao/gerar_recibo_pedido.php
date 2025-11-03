@@ -115,7 +115,7 @@ $pdf->SetAuthor('Atlas');
 $pdf->SetTitle('Recibo de Protocolo - '.$p['protocolo']);
 
 // Margens: laterais 15mm e topo 30mm (reduzido para evitar grande espaço inicial)
-$pdf->SetMargins(15, 35, 15);
+$pdf->SetMargins(15, 40, 15);
 $pdf->SetAutoPageBreak(true, 15);
 $pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
 
