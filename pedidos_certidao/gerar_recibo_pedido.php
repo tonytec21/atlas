@@ -24,6 +24,14 @@ $urlPublica = rtrim($BASE_URL,'/').'/'.($p['protocolo'] ?? '');
 $qrPath     = __DIR__."/qrcodes/pedido_{$id}.png";
 $bgPath     = __DIR__ . '/../style/img/timbrado.png';
 
+$raw = $p['criado_em'] ?? '';
+$dt =
+    DateTime::createFromFormat('Y-m-d H:i:s', $raw)   // ex.: 2025-11-03 10:12:34
+    ?: DateTime::createFromFormat('Y-m-d', $raw)      // ex.: 2025-11-03
+    ?: (strtotime($raw) ? new DateTime($raw) : null); // tenta outros formatos comuns
+
+$dataFmt = $dt ? $dt->format('d/m/Y') : '';
+
 // ========= Descobre "quem protocolou" (nome completo do funcionário) =========
 $usuarioProtocolou = '';
 foreach (['criado_por','usuario','usuario_criacao','criado_por_usuario','registrado_por','protocolo_por','protocolado_por','atualizado_por'] as $col) {
@@ -130,8 +138,8 @@ $html = '
     Recibo de Protocolo
   </div>
   <div style="text-align:center; font-size:12px; color:#444; margin-bottom:8px;">
-    Protocolo: <strong>'.htmlspecialchars($p['protocolo']).'</strong> &nbsp;•&nbsp;
-    Status: <strong>'.str_replace('_',' ',htmlspecialchars($p['status'])).'</strong>
+    Protocolo: <strong>'.htmlspecialchars($p['protocolo'], ENT_QUOTES, 'UTF-8').'</strong> &nbsp;•&nbsp;
+    Data: <strong>'.htmlspecialchars($dataFmt, ENT_QUOTES, 'UTF-8').'</strong>
   </div>
   <hr style="border:0; height:1px; background:#999; margin:4px 0 8px 0;">
 ';
