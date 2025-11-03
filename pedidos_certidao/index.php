@@ -102,48 +102,136 @@ try {
     // silencioso  
 }  
 
-/* ============================================================  
-   1) Busca dataset para listar (já com pendência de API)  
-   ============================================================ */  
-$stmt = $conn->query("  
-  SELECT p.*,  
-         (SELECT COUNT(*) FROM pedidos_certidao_status_log s WHERE s.pedido_id = p.id) as logs,  
-         (SELECT COUNT(*) FROM api_outbox o  
-           WHERE o.protocolo = p.protocolo  
-             AND o.token_publico = p.token_publico  
-             AND o.delivered_at IS NULL) AS pend_api,  
-         (SELECT MAX(o.last_error) FROM api_outbox o  
-           WHERE o.protocolo = p.protocolo  
-             AND o.token_publico = p.token_publico  
-             AND o.delivered_at IS NULL) AS last_api_error  
-    FROM pedidos_certidao p  
-ORDER BY p.criado_em DESC  
-");  
-$pedidos = $stmt->fetchAll(PDO::FETCH_ASSOC);  
+/* ============================================================
+   1) Busca dataset para listar (carrega SÓ HOJE por padrão)
+   - Suporta filtros via GET (?protocolo=&status=&atr=&tipo=&req=&portador=&de=dd/mm/aaaa&ate=dd/mm/aaaa)
+   ============================================================ */
+function brDateToMysqlDate(?string $s): ?string {
+    $s = trim((string)$s);
+    if (!$s) return null;
+    // esperado dd/mm/aaaa
+    $parts = explode('/', $s);
+    if (count($parts) !== 3) return null;
+    [$d,$m,$y] = $parts;
+    if (!checkdate((int)$m,(int)$d,(int)$y)) return null;
+    return sprintf('%04d-%02d-%02d', $y, $m, $d);
+}
 
-/* Lista de tipos disponíveis para o filtro (distinct) */  
-$tipos = [];  
-try {  
-    $tq = $conn->query("SELECT DISTINCT tipo FROM pedidos_certidao WHERE tipo IS NOT NULL AND tipo <> '' ORDER BY tipo ASC");  
-    $tipos = $tq->fetchAll(PDO::FETCH_COLUMN);  
-} catch (Throwable $e) {  
-    $tipos = [];  
-}  
+// Captura filtros da URL
+$f = [
+  'protocolo' => $_GET['protocolo']   ?? '',
+  'status'    => $_GET['status']      ?? '',
+  'atr'       => $_GET['atr']         ?? '',
+  'tipo'      => $_GET['tipo']        ?? '',
+  'req'       => $_GET['req']         ?? '',
+  'portador'  => $_GET['portador']    ?? '',
+  'de'        => $_GET['de']          ?? '',
+  'ate'       => $_GET['ate']         ?? ''
+];
 
-/* Estatísticas rápidas */  
-$stats = [  
-    'total' => count($pedidos),  
-    'pendente' => 0,  
-    'em_andamento' => 0,  
-    'emitida' => 0,  
-    'entregue' => 0,  
-    'cancelada' => 0  
-];  
-foreach ($pedidos as $p) {  
-    if (isset($stats[$p['status']])) {  
-        $stats[$p['status']]++;  
-    }  
-}  
+// Monta WHERE dinamicamente
+$wheres = [];
+$params = [];
+
+if ($f['protocolo'] !== '') {
+  $wheres[] = 'p.protocolo LIKE :protocolo';
+  $params[':protocolo'] = '%'.$f['protocolo'].'%';
+}
+if ($f['status'] !== '') {
+  $wheres[] = 'p.status = :status';
+  $params[':status'] = $f['status'];
+}
+if ($f['atr'] !== '') {
+  $wheres[] = 'p.atribuicao = :atr';
+  $params[':atr'] = $f['atr'];
+}
+if ($f['tipo'] !== '') {
+  $wheres[] = 'p.tipo = :tipo';
+  $params[':tipo'] = $f['tipo'];
+}
+if ($f['req'] !== '') {
+  $wheres[] = 'p.requerente_nome LIKE :req';
+  $params[':req'] = '%'.$f['req'].'%';
+}
+if ($f['portador'] !== '') {
+  $wheres[] = 'p.portador_nome LIKE :portador';
+  $params[':portador'] = '%'.$f['portador'].'%';
+}
+
+// Datas (de/ate em dd/mm/aaaa)
+$deMysql  = brDateToMysqlDate($f['de']);
+$ateMysql = brDateToMysqlDate($f['ate']);
+if ($deMysql && $ateMysql) {
+  $wheres[] = 'p.criado_em BETWEEN :deIni AND :ateFim';
+  $params[':deIni']  = $deMysql.' 00:00:00';
+  $params[':ateFim'] = $ateMysql.' 23:59:59';
+} elseif ($deMysql) {
+  $wheres[] = 'p.criado_em >= :deIni';
+  $params[':deIni'] = $deMysql.' 00:00:00';
+} elseif ($ateMysql) {
+  $wheres[] = 'p.criado_em <= :ateFim';
+  $params[':ateFim'] = $ateMysql.' 23:59:59';
+}
+
+// Se NENHUM filtro foi informado, carrega só HOJE (index-friendly: intervalo)
+$nenhumFiltro =
+  $f['protocolo']==='' && $f['status']==='' && $f['atr']==='' && $f['tipo']==='' &&
+  $f['req']==='' && $f['portador']==='' && !$deMysql && !$ateMysql;
+
+if ($nenhumFiltro) {
+  $wheres[] = 'p.criado_em >= CURRENT_DATE AND p.criado_em < (CURRENT_DATE + INTERVAL 1 DAY)';
+}
+
+// Monta SQL
+$sql = "
+  SELECT p.*,
+         (SELECT COUNT(*) FROM pedidos_certidao_status_log s WHERE s.pedido_id = p.id) as logs,
+         (SELECT COUNT(*) FROM api_outbox o
+            WHERE o.protocolo = p.protocolo
+              AND o.token_publico = p.token_publico
+              AND o.delivered_at IS NULL) AS pend_api,
+         (SELECT MAX(o.last_error) FROM api_outbox o
+            WHERE o.protocolo = p.protocolo
+              AND o.token_publico = p.token_publico
+              AND o.delivered_at IS NULL) AS last_api_error
+    FROM pedidos_certidao p
+";
+
+if ($wheres) {
+  $sql .= " WHERE " . implode(' AND ', $wheres);
+}
+
+$sql .= " ORDER BY p.criado_em DESC";
+
+$stmt = $conn->prepare($sql);
+foreach ($params as $k=>$v) { $stmt->bindValue($k, $v); }
+$stmt->execute();
+$pedidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+/* Lista de tipos disponíveis para o filtro (distinct) */
+$tipos = [];
+try {
+  $tq = $conn->query("SELECT DISTINCT tipo FROM pedidos_certidao WHERE tipo IS NOT NULL AND tipo <> '' ORDER BY tipo ASC");
+  $tipos = $tq->fetchAll(PDO::FETCH_COLUMN);
+} catch (Throwable $e) {
+  $tipos = [];
+}
+
+/* Estatísticas rápidas */
+$stats = [
+  'total' => count($pedidos),
+  'pendente' => 0,
+  'em_andamento' => 0,
+  'emitida' => 0,
+  'entregue' => 0,
+  'cancelada' => 0
+];
+foreach ($pedidos as $p) {
+  if (isset($stats[$p['status']])) {
+    $stats[$p['status']]++;
+  }
+}
+
 ?>  
 
 <!DOCTYPE html>  
@@ -1992,37 +2080,46 @@ $(function(){
   $('#btnAplicar').on('click', function(){
     const $btn = $(this);
     const originalText = $btn.html();
-    
+
     $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Aplicando...');
-    
-    setTimeout(function(){
-      applyFilters();
-      $btn.prop('disabled', false).html(originalText);
-    }, 300);
+
+    // Coleta valores dos filtros
+    const qs = new URLSearchParams();
+
+    const protocolo = $('#f_protocolo').val().trim();
+    const status    = $('#f_status').val();
+    const atr       = $('#f_atr').val().trim();
+    const tipo      = $('#f_tipo').val().trim();
+    const req       = $('#f_req').val().trim();
+    const portador  = $('#f_portador').val().trim();
+    const de        = $('#f_de').val().trim();
+    const ate       = $('#f_ate').val().trim();
+
+    if (protocolo) qs.set('protocolo', protocolo);
+    if (status)    qs.set('status', status);
+    if (atr)       qs.set('atr', atr);
+    if (tipo)      qs.set('tipo', tipo);
+    if (req)       qs.set('req', req);
+    if (portador)  qs.set('portador', portador);
+    if (de)        qs.set('de', de);     // dd/mm/aaaa (convertido no PHP)
+    if (ate)       qs.set('ate', ate);   // dd/mm/aaaa
+
+    // Recarrega a página com os filtros (server-side)
+    const base = window.location.pathname; // .../pedidos_certidao/index.php
+    const url  = qs.toString() ? `${base}?${qs.toString()}` : base;
+    window.location.href = url;
   });
 
   $('#btnLimpar').on('click', function(){
     const $btn = $(this);
     const originalText = $btn.html();
-    
     $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Limpando...');
-    
-    $('#f_protocolo,#f_tipo,#f_req,#f_portador,#f_de,#f_ate').val('');
-    $('#f_status,#f_atr').val('');
-    
-    if (table){
-      $('#globalSearch').val('');
-      table.search('');
-      removeCustomFilter('date');
-      removeCustomFilter('people');
-      table.columns().search('');
-      table.draw();
-    }
-    
-    setTimeout(function(){
-      $btn.prop('disabled', false).html(originalText);
-    }, 300);
+
+    // Volta ao padrão (somente hoje): sem querystring
+    const base = window.location.pathname;
+    window.location.href = base;
   });
+
 
   // ===================== REENVIO API =====================
   $(document).on('click', '.btn-reenviar-api', function(){
@@ -2230,28 +2327,27 @@ $(function(){
     }
   });
 
-  // ===================== CONSOLE SIGNATURE =====================
-  // console.log(
-  //   '%c📋 Sistema de Pedidos de Certidão',
-  //   'font-size: 20px; font-weight: bold; color: #6366f1; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);'
-  // );
-  // console.log(
-  //   '%cDesenvolvido com excelência • backupcloud.site • ' + new Date().getFullYear(),
-  //   'font-size: 12px; color: #8b949e;'
-  // );
-  // console.log(
-  //   '%cAtalhos de teclado:\n' +
-  //   '• Alt + K: Buscar\n' +
-  //   '• Alt + N: Novo pedido\n' +
-  //   '• Escape: Limpar busca',
-  //   'font-size: 11px; color: #6c757d; font-family: monospace;'
-  // );
+  // ===================== RESTORE FILTERS FROM URL =====================
+  (function restoreFiltersFromURL(){
+    const sp = new URLSearchParams(window.location.search);
+    const map = {
+      'protocolo': '#f_protocolo',
+      'status':    '#f_status',
+      'atr':       '#f_atr',
+      'tipo':      '#f_tipo',
+      'req':       '#f_req',
+      'portador':  '#f_portador',
+      'de':        '#f_de',
+      'ate':       '#f_ate'
+    };
+    Object.keys(map).forEach(k => {
+      if (sp.has(k)) {
+        const sel = map[k];
+        $(sel).val(sp.get(k));
+      }
+    });
+  })();
 
-  // ===================== PERFORMANCE MONITORING =====================
-  // if (window.performance && window.performance.timing) {
-  //   const loadTime = window.performance.timing.domContentLoadedEventEnd - window.performance.timing.navigationStart;
-  //   console.log(`%c⚡ Página carregada em ${loadTime}ms`, 'color: #10b981; font-weight: bold;');
-  // }
 });
 
 // ===================== SWEETALERT2 CUSTOM STYLING =====================
