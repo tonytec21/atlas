@@ -1524,6 +1524,9 @@ body.dark-mode footer .footer-content a:hover {
         </div>  
         <div>  
           <h1>Pedidos de Certidão</h1>  
+           <p class="mb-0" style="color:var(--text-tertiary); font-size:14px;">
+            Exibindo pedidos de <strong>hoje</strong> por padrão. Use os filtros para buscar outros períodos ou status.
+          </p>
         </div>  
       </div>  
 
