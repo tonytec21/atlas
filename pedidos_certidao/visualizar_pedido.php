@@ -1274,6 +1274,9 @@ body.dark-mode footer .footer-content a:hover {
               <?php endif; ?>  
               <a class="btn btn-sm btn-outline-dark" href="gerar_recibo_pedido.php?id=<?=urlencode($id)?>" target="_blank" rel="noopener">  
                 <i class="mdi mdi-receipt-text"></i> Abrir Recibo  
+              </a> 
+              <a class="btn btn-sm btn-outline-dark" href="gerar_recibo_pedido_termica.php?id=<?=urlencode($id)?>" target="_blank" rel="noopener">  
+                <i class="mdi mdi-receipt-text"></i> Recibo Termico  
               </a>  
             </div>  
           </div>  
