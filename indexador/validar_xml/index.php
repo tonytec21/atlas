@@ -395,10 +395,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h3 class="m-0">
                 <i class="mdi mdi-file-xml-outline"></i> Validação de Arquivo XML - CRC
             </h3>
-            <span class="muted">
-                <?= $resultado['tipo_ato']==='casamento' ? 'Tipo detectado: Casamento' : ($resultado['tipo_ato']==='obito' ? 'Tipo detectado: Óbito' : ($resultado['tipo_ato']==='nascimento' ? 'Tipo detectado: Nascimento' : 'Tipo: não identificado')) ?>
-                • Compatível com <span class="kbd">.xml</span>
-            </span>
+             <a href="../index.php" class="btn btn-secondary">
+                <i class="fa fa-file-export" aria-hidden="true"></i> Indexador
+            </a>
         </div>
 
         <!-- Upload -->

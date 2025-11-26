@@ -374,6 +374,21 @@ try {
 
         .btn-modern{ border-radius:14px; height:46px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:600; }
 
+        .validator-header{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:16px;
+            margin-bottom:10px;
+        }
+        @media (max-width:576px){
+            .validator-header{
+                flex-direction:column;
+                align-items:flex-start;
+                gap:8px;
+            }
+        }
+
         /* ==== KPIs ==== */
         .kpi-grid{ display:grid; grid-template-columns: repeat(4,1fr); grid-gap:12px; margin-top:6px; }
         @media (max-width:992px){ .kpi-grid{ grid-template-columns: repeat(2,1fr); } }
@@ -402,9 +417,14 @@ try {
 <?php include(__DIR__ . '/../menu.php'); ?>
 
 <div class="main-container">
-    <h1 class="page-title"></h1>
+<h1 class="page-title"></h1>
     <div class="title-divider"></div>
-
+    <div class="validator-header">
+        <h1 class="page-title"></h1>
+        <a href="validar_xml/index.php" class="btn btn-success btn-modern">
+            <i class="fa fa-check-square-o"></i> Validar XML CRC
+        </a>
+    </div>
     <!-- ===================== DASHBOARD / GRÁFICOS ===================== -->
     <div class="dashboard">
         <div class="dash-card">
