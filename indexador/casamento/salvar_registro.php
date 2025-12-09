@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $forcar           = isset($_POST['forcar']);
 
     $tiposValidos   = array('CIVIL','RELIGIOSO');
-    $regimesValidos = array('COMUNHAO_PARCIAL','COMUNHAO_UNIVERSAL','PARTICIPACAO_FINAL_AQUESTOS','SEPARACAO_BENS');
+    $regimesValidos = array('COMUNHAO_PARCIAL','COMUNHAO_UNIVERSAL','PARTICIPACAO_FINAL_AQUESTOS','SEPARACAO_BENS','SEPARACAO_LEGAL_BENS','OUTROS','IGNORADO');
 
     if (!in_array($tipo_casamento, $tiposValidos, true)) {
         echo json_encode(['status'=>'error','message'=>'Tipo de casamento inválido.']); exit;

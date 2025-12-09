@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($id<=0) { echo json_encode(['status'=>'error','message'=>'ID inválido.']); exit; }
 
     $tiposValidos   = ['CIVIL','RELIGIOSO'];
-    $regimesValidos = ['COMUNHAO_PARCIAL','COMUNHAO_UNIVERSAL','PARTICIPACAO_FINAL_AQUESTOS','SEPARACAO_BENS'];
+    $regimesValidos = ['COMUNHAO_PARCIAL','COMUNHAO_UNIVERSAL','PARTICIPACAO_FINAL_AQUESTOS','SEPARACAO_BENS','SEPARACAO_LEGAL_BENS','OUTROS','IGNORADO'];
     if (!in_array($tipo_casamento,$tiposValidos,true))   { echo json_encode(['status'=>'error','message'=>'Tipo inválido.']); exit; }
     if (!in_array($regime_bens,$regimesValidos,true))    { echo json_encode(['status'=>'error','message'=>'Regime inválido.']); exit; }
 
