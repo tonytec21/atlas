@@ -388,6 +388,9 @@ date_default_timezone_set('America/Sao_Paulo');
           <option value="COMUNHAO_UNIVERSAL">Comunhão Universal</option>
           <option value="PARTICIPACAO_FINAL_AQUESTOS">Participação Final nos Aqüestros</option>
           <option value="SEPARACAO_BENS">Separação de Bens</option>
+          <option value="SEPARACAO_LEGAL_BENS">Separação Legal de Bens</option>
+          <option value="OUTROS">Outros</option>
+          <option value="IGNORADO">Ignorado</option>
         </select>
       </div>
       <div class="col-6 col-lg-3 mb-2">
@@ -527,6 +530,9 @@ date_default_timezone_set('America/Sao_Paulo');
                     <option value="COMUNHAO_UNIVERSAL">Comunhão Universal</option>
                     <option value="PARTICIPACAO_FINAL_AQUESTOS">Participação Final nos Aqüestros</option>
                     <option value="SEPARACAO_BENS">Separação de Bens</option>
+                    <option value="SEPARACAO_LEGAL_BENS">Separação Legal de Bens</option>
+                    <option value="OUTROS">Outros</option>
+                    <option value="IGNORADO">Ignorado</option>
                   </select>
                 </div>
                 <div class="form-group col-12 col-md-4">
@@ -643,6 +649,9 @@ date_default_timezone_set('America/Sao_Paulo');
                     <option value="COMUNHAO_UNIVERSAL">Comunhão Universal</option>
                     <option value="PARTICIPACAO_FINAL_AQUESTOS">Participação Final nos Aqüestros</option>
                     <option value="SEPARACAO_BENS">Separação de Bens</option>
+                    <option value="SEPARACAO_LEGAL_BENS">Separação Legal de Bens</option>
+                    <option value="OUTROS">Outros</option>
+                    <option value="IGNORADO">Ignorado</option>
                   </select>
                 </div>
                 <div class="col-md-3">
