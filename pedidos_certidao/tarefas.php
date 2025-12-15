@@ -410,6 +410,13 @@ if ($isAjax) {
       $df = trim((string)($_GET['data_fim'] ?? ''));
       $pr = trim((string)($_GET['protocolo'] ?? ''));
 
+      // novos:
+      $os  = trim((string)($_GET['os_numero'] ?? ''));
+      $tp  = trim((string)($_GET['tipo'] ?? ''));
+      $lv  = trim((string)($_GET['livro'] ?? ''));
+      $fl  = trim((string)($_GET['folha'] ?? ''));
+      $tr  = trim((string)($_GET['termo'] ?? ''));
+
       if ($di !== '') {
         $where[] = "t.criado_em >= :di";
         $bind[':di'] = $di . ' 00:00:00';
@@ -422,6 +429,40 @@ if ($isAjax) {
         $where[] = "p.protocolo LIKE :pr";
         $bind[':pr'] = '%' . $pr . '%';
       }
+
+      // ===== novos filtros =====
+      if ($os !== '') {
+        if (ctype_digit($os)) {
+          $where[] = "p.ordem_servico_id = :os";
+          $bind[':os'] = (int)$os;
+        } else {
+          $where[] = "CAST(p.ordem_servico_id AS CHAR) LIKE :oslk";
+          $bind[':oslk'] = '%' . $os . '%';
+        }
+      }
+
+      if ($tp !== '') {
+        $where[] = "p.tipo LIKE :tp";
+        $bind[':tp'] = '%' . $tp . '%';
+      }
+
+      // livro/folha/termo dentro do referencias_json
+      if ($lv !== '') {
+        $where[] = "(p.referencias_json IS NOT NULL AND p.referencias_json <> '' AND JSON_VALID(p.referencias_json)
+                    AND JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json,'$.livro')) LIKE :lv)";
+        $bind[':lv'] = '%' . $lv . '%';
+      }
+      if ($fl !== '') {
+        $where[] = "(p.referencias_json IS NOT NULL AND p.referencias_json <> '' AND JSON_VALID(p.referencias_json)
+                    AND JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json,'$.folha')) LIKE :fl)";
+        $bind[':fl'] = '%' . $fl . '%';
+      }
+      if ($tr !== '') {
+        $where[] = "(p.referencias_json IS NOT NULL AND p.referencias_json <> '' AND JSON_VALID(p.referencias_json)
+                    AND JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json,'$.termo')) LIKE :tr)";
+        $bind[':tr'] = '%' . $tr . '%';
+      }
+
 
       $wsql = $where ? ("WHERE ".implode(" AND ", $where)) : '';
 
@@ -444,6 +485,14 @@ if ($isAjax) {
       $dataIni   = trim((string)($_GET['data_ini'] ?? ''));
       $dataFim   = trim((string)($_GET['data_fim'] ?? ''));
       $protocolo = trim((string)($_GET['protocolo'] ?? ''));
+
+      // novos:
+      $osNumero  = trim((string)($_GET['os_numero'] ?? ''));
+      $tipoPed   = trim((string)($_GET['tipo'] ?? ''));
+      $livro     = trim((string)($_GET['livro'] ?? ''));
+      $folha     = trim((string)($_GET['folha'] ?? ''));
+      $termo     = trim((string)($_GET['termo'] ?? ''));
+
 
       // Se não for admin/controle, FORÇA listar apenas as tarefas do próprio usuário
       if (!$adminOuControle) {
@@ -471,6 +520,39 @@ if ($isAjax) {
         $bind[':pr'] = '%' . $protocolo . '%';
       }
 
+      // ===== novos filtros =====
+      if ($osNumero !== '') {
+        if (ctype_digit($osNumero)) {
+          $where[] = "p.ordem_servico_id = :os";
+          $bind[':os'] = (int)$osNumero;
+        } else {
+          $where[] = "CAST(p.ordem_servico_id AS CHAR) LIKE :oslk";
+          $bind[':oslk'] = '%' . $osNumero . '%';
+        }
+      }
+
+      if ($tipoPed !== '') {
+        $where[] = "p.tipo LIKE :tp";
+        $bind[':tp'] = '%' . $tipoPed . '%';
+      }
+
+      if ($livro !== '') {
+        $where[] = "(p.referencias_json IS NOT NULL AND p.referencias_json <> '' AND JSON_VALID(p.referencias_json)
+                    AND JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json,'$.livro')) LIKE :lv)";
+        $bind[':lv'] = '%' . $livro . '%';
+      }
+      if ($folha !== '') {
+        $where[] = "(p.referencias_json IS NOT NULL AND p.referencias_json <> '' AND JSON_VALID(p.referencias_json)
+                    AND JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json,'$.folha')) LIKE :fl)";
+        $bind[':fl'] = '%' . $folha . '%';
+      }
+      if ($termo !== '') {
+        $where[] = "(p.referencias_json IS NOT NULL AND p.referencias_json <> '' AND JSON_VALID(p.referencias_json)
+                    AND JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json,'$.termo')) LIKE :tr)";
+        $bind[':tr'] = '%' . $termo . '%';
+      }
+
+
       $wsql = $where ? ("WHERE ".implode(" AND ", $where)) : ""; 
 
       $sql = "SELECT 
@@ -480,7 +562,73 @@ if ($isAjax) {
           e.nome AS equipe_nome, 
           p.protocolo,
           p.tipo               AS pedido_tipo,
-          p.ordem_servico_id   AS os_numero
+          p.ordem_servico_id   AS os_numero,
+
+          /* ====== EXTRA: referências do pedido (JSON) ====== */
+          CASE 
+            WHEN p.referencias_json IS NULL OR p.referencias_json = '' THEN NULL
+            WHEN JSON_VALID(p.referencias_json) 
+              THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.nome_registrado')), '')
+            ELSE NULL 
+          END AS pedido_nome_registrado,
+
+          CASE 
+            WHEN p.referencias_json IS NULL OR p.referencias_json = '' THEN NULL
+            WHEN JSON_VALID(p.referencias_json) 
+              THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.nome_noivo')), '')
+            ELSE NULL 
+          END AS pedido_nome_noivo,
+
+          CASE 
+            WHEN p.referencias_json IS NULL OR p.referencias_json = '' THEN NULL
+            WHEN JSON_VALID(p.referencias_json) 
+              THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.nome_noiva')), '')
+            ELSE NULL 
+          END AS pedido_nome_noiva,
+
+          CASE 
+            WHEN p.referencias_json IS NULL OR p.referencias_json = '' THEN NULL
+            WHEN JSON_VALID(p.referencias_json) THEN
+              COALESCE(
+                NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.nome_registrado')), ''),
+                NULLIF(CONCAT_WS(' & ',
+                  NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.nome_noivo')), ''),
+                  NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.nome_noiva')), '')
+                ), '')
+              )
+            ELSE NULL
+          END AS pedido_nome_exibicao,
+
+          CASE 
+            WHEN p.referencias_json IS NULL OR p.referencias_json = '' THEN NULL
+            WHEN JSON_VALID(p.referencias_json) THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.livro')), '')
+            ELSE NULL 
+          END AS pedido_livro,
+
+          CASE 
+            WHEN p.referencias_json IS NULL OR p.referencias_json = '' THEN NULL
+            WHEN JSON_VALID(p.referencias_json) THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.folha')), '')
+            ELSE NULL 
+          END AS pedido_folha,
+
+          CASE 
+            WHEN p.referencias_json IS NULL OR p.referencias_json = '' THEN NULL
+            WHEN JSON_VALID(p.referencias_json) THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.termo')), '')
+            ELSE NULL 
+          END AS pedido_termo,
+
+          CASE 
+            WHEN p.referencias_json IS NULL OR p.referencias_json = '' THEN NULL
+            WHEN JSON_VALID(p.referencias_json) THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.ano')), '')
+            ELSE NULL 
+          END AS pedido_ano,
+
+          CASE 
+            WHEN p.referencias_json IS NULL OR p.referencias_json = '' THEN NULL
+            WHEN JSON_VALID(p.referencias_json) THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(p.referencias_json, '$.cartorio_origem')), '')
+            ELSE NULL 
+          END AS pedido_cartorio_origem
+
         FROM tarefas_pedido t  
         LEFT JOIN funcionarios f ON f.id = t.funcionario_id  
         LEFT JOIN equipes e ON e.id = t.equipe_id  
@@ -493,7 +641,7 @@ if ($isAjax) {
             WHEN 'concluida' THEN 3  
             ELSE 4  
             END,  
-            t.atualizado_em DESC, t.criado_em DESC"; 
+            t.atualizado_em DESC, t.criado_em DESC";
       $st = $conn->prepare($sql);  
       $st->execute($bind);  
       J(['success'=>true,'data'=>$st->fetchAll(PDO::FETCH_ASSOC)]);  
@@ -2007,6 +2155,20 @@ body {
   background-image: linear-gradient(0deg, rgba(239, 68, 68, 0.08), transparent);
 }
 
+/* ===== Loading Spinner ===== */
+.fa-spin {
+  animation: fa-spin 1s infinite linear;
+}
+
+@keyframes fa-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 </style>  
 </head>  
 <body>  
@@ -2089,33 +2251,62 @@ body {
           </div>
 
           <!-- Protocolo -->
-          <div class="col-md-3">
-            <label class="form-label">
-              <i class="fas fa-file-alt"></i> Protocolo
-            </label>
-            <input type="text" class="form-control" id="f_protocolo" placeholder="Ex.: 12345/2025">
-          </div>
+            <div class="col-md-3">
+              <label class="form-label">
+                <i class="fas fa-file-alt"></i> Protocolo
+              </label>
+              <input type="text" class="form-control" id="f_protocolo" placeholder="Ex.: 12345/2025">
+            </div>
 
-          <!-- Classificação -->
-          <div class="col-md-2">
-            <label class="form-label">
-              <i class="fas fa-sort"></i> Classificar por
-            </label>
-            <select class="form-select" id="sort_by">
-              <option value="ordem">Ordem (nº O.S.)</option>
-              <option value="data">Data (criação)</option>
-              <option value="tipo">Tipo</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">
-              <i class="fas fa-arrow-up-wide-short"></i> Direção
-            </label>
-            <select class="form-select" id="sort_dir">
-              <option value="asc">Crescente</option>
-              <option value="desc">Decrescente</option>
-            </select>
-          </div>
+            <!-- Nº O.S. -->
+            <div class="col-md-2">
+              <label class="form-label">
+                <i class="fas fa-hashtag"></i> Nº O.S.
+              </label>
+              <input type="text" class="form-control" id="f_os_numero" placeholder="Ex.: 10234">
+            </div>
+
+            <!-- Tipo do pedido -->
+            <div class="col-md-3">
+              <label class="form-label">
+                <i class="fas fa-tag"></i> Tipo
+              </label>
+              <input type="text" class="form-control" id="f_tipo" placeholder="Ex.: Nascimento, Casamento...">
+            </div>
+
+            <!-- Livro / Folha / Termo -->
+            <div class="col-md-4">
+              <label class="form-label">
+                <i class="fas fa-book"></i> Livro / Folha / Termo
+              </label>
+              <div class="d-flex gap-2">
+                <input type="text" class="form-control" id="f_livro" placeholder="Livro">
+                <input type="text" class="form-control" id="f_folha" placeholder="Folha">
+                <input type="text" class="form-control" id="f_termo" placeholder="Termo">
+              </div>
+            </div>
+
+            <!-- Classificação -->
+            <div class="col-md-2">
+              <label class="form-label">
+                <i class="fas fa-sort"></i> Classificar por
+              </label>
+              <select class="form-select" id="sort_by">
+                <option value="ordem">Ordem (nº O.S.)</option>
+                <option value="data">Data (criação)</option>
+                <option value="tipo">Tipo</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">
+                <i class="fas fa-arrow-up-wide-short"></i> Direção
+              </label>
+              <select class="form-select" id="sort_dir">
+                <option value="asc">Crescente</option>
+                <option value="desc">Decrescente</option>
+              </select>
+            </div>
+
 
         </div>  
         
@@ -2262,12 +2453,12 @@ body {
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
-      <div class="modal-body" id="logBody">
+     <div class="modal-body" id="logBody">
         <div class="text-center py-3">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Carregando...</span>
+          <div class="d-flex justify-content-center align-items-center mb-2">
+            <i class="fas fa-circle-notch fa-spin" style="font-size: 32px; color: var(--brand-primary);"></i>
           </div>
-          <p class="text-secondary mt-2">Carregando histórico...</p>
+          <p class="text-secondary mt-2 mb-0">Carregando histórico...</p>
         </div>
       </div>
       <div class="modal-footer">
@@ -2373,15 +2564,24 @@ function bindFiltros() {
   });
 
   $("#btnLimpar").on('click', function() {
-    $('#f_equipe').val('');
-    $('#f_func').empty().append('<option value="">Todos os Funcionários</option>');
-    $('#f_status').val('');
-    $('#f_data_ini').val('');
-    $('#f_data_fim').val('');
-    $('#f_protocolo').val('');
-    carregarContadores();
-    carregarKanban();
-  });
+  $('#f_equipe').val('');
+  $('#f_func').empty().append('<option value="">Todos os Funcionários</option>');
+  $('#f_status').val('');
+  $('#f_data_ini').val('');
+  $('#f_data_fim').val('');
+  $('#f_protocolo').val('');
+
+  // novos filtros:
+  $('#f_os_numero').val('');
+  $('#f_tipo').val('');
+  $('#f_livro').val('');
+  $('#f_folha').val('');
+  $('#f_termo').val('');
+
+  carregarContadores();
+  carregarKanban();
+});
+
 
   $("#f_equipe").on('change', function() {
     carregarFuncionarios($(this).val());
@@ -2431,9 +2631,17 @@ function paramsFiltro() {
     status: $('#f_status').val(),
     data_ini: $('#f_data_ini').val(),      // YYYY-MM-DD
     data_fim: $('#f_data_fim').val(),      // YYYY-MM-DD
-    protocolo: $('#f_protocolo').val()
+    protocolo: $('#f_protocolo').val(),
+
+    // novos filtros:
+    os_numero: $('#f_os_numero').val(),
+    tipo: $('#f_tipo').val(),
+    livro: $('#f_livro').val(),
+    folha: $('#f_folha').val(),
+    termo: $('#f_termo').val()
   };
 }
+
 
 // ===================== CARREGAR CONTADORES =====================
 function carregarContadores() {
@@ -2443,8 +2651,16 @@ function carregarContadores() {
     funcionario_id: $('#f_func').val(),
     data_ini: $('#f_data_ini').val(),
     data_fim: $('#f_data_fim').val(),
-    protocolo: $('#f_protocolo').val()
+    protocolo: $('#f_protocolo').val(),
+
+    // novos filtros:
+    os_numero: $('#f_os_numero').val(),
+    tipo: $('#f_tipo').val(),
+    livro: $('#f_livro').val(),
+    folha: $('#f_folha').val(),
+    termo: $('#f_termo').val()
   };
+
 
   $.getJSON('tarefas.php', p, function(r) {
     if (!r.success) return;
@@ -2503,14 +2719,14 @@ function carregarKanban() {
     cancelada: $('#col_cancelada')
   };
 
-  // Mostra loading em todas as colunas
+ // Mostra loading em todas as colunas
   Object.values(cols).forEach($c => {
     $c.empty().append(`
       <div class="text-center text-secondary py-3">
-        <div class="spinner-border spinner-border-sm" role="status">
-          <span class="visually-hidden">Carregando...</span>
+        <div class="d-flex justify-content-center align-items-center mb-2">
+          <i class="fas fa-circle-notch fa-spin" style="font-size: 24px; color: var(--brand-primary);"></i>
         </div>
-        <p class="mt-2 mb-0" style="font-size: 13px;">Carregando tarefas...</p>
+        <p class="mb-0" style="font-size: 13px;">Carregando tarefas...</p>
       </div>
     `);
   });
@@ -2691,6 +2907,49 @@ function renderCard(t) {
           <i class="fas fa-hashtag"></i>
           <span>O.S.: <strong>${t.os_numero ? escapeHtml(t.os_numero) : '—'}</strong></span>
         </div>
+
+        <div class="task-meta-item">
+          <i class="fas fa-id-card"></i>
+          <span>
+            ${t.pedido_nome_registrado
+              ? `Registrado: <strong>${escapeHtml(t.pedido_nome_registrado)}</strong>`
+              : ((t.pedido_nome_noivo || t.pedido_nome_noiva || t.pedido_nome_exibicao)
+                  ? `Noivo/Noiva: <strong>${escapeHtml(t.pedido_nome_exibicao || '')}</strong>`
+                  : `Nome: <strong>—</strong>`
+                )
+            }
+          </span>
+        </div>
+
+        ${(t.pedido_livro || t.pedido_folha || t.pedido_termo || t.pedido_ano) ? `
+          <div class="task-meta-item">
+            <i class="fas fa-book"></i>
+            <span>
+              Livro: 
+              <strong>
+                ${escapeHtml(t.pedido_livro || '—')}
+              </strong>
+            </span> | <span>
+              Folha: 
+              <strong>
+                ${escapeHtml(t.pedido_folha || '—')}
+              </strong>
+            </span> | <span>
+              Termo: 
+              <strong>
+                ${escapeHtml(t.pedido_termo || '—')}
+              </strong>
+            </span>
+          </div>
+        ` : ''}
+
+        ${t.pedido_cartorio_origem ? `
+          <div class="task-meta-item">
+            <i class="fas fa-map-marker-alt"></i>
+            <span>Cartório: <strong>${escapeHtml(t.pedido_cartorio_origem)}</strong></span>
+          </div>
+        ` : ''}
+
 
         <div class="task-meta-item">
           <i class="fas fa-calendar"></i>
@@ -2983,10 +3242,10 @@ $('#formReatribuir').on('submit', function(e) {
 function openLog(id) {
   $('#logBody').html(`
     <div class="text-center py-3">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Carregando...</span>
+      <div class="d-flex justify-content-center align-items-center mb-2">
+        <i class="fas fa-circle-notch fa-spin" style="font-size: 32px; color: var(--brand-primary);"></i>
       </div>
-      <p class="text-secondary mt-2">Carregando histórico...</p>
+      <p class="text-secondary mt-2 mb-0">Carregando histórico...</p>
     </div>
   `);
 
