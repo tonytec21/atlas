@@ -216,7 +216,7 @@ function ensureSchemaDistribuicao(PDO $conn) {
     pedido_id INT NOT NULL,  
     equipe_id INT NOT NULL,  
     funcionario_id INT NULL,  
-    status ENUM('pendente','em_andamento','concluida','cancelada') NOT NULL DEFAULT 'pendente',  
+    status ENUM('pendente','em_andamento','concluida','cancelada','suspensa') NOT NULL DEFAULT 'pendente',
     observacao VARCHAR(500) NULL,  
     criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,  
     atualizado_em DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,  
@@ -227,6 +227,35 @@ function ensureSchemaDistribuicao(PDO $conn) {
     INDEX idx_equipe (equipe_id),  
     INDEX idx_status (status)  
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");  
+
+  // ===== MIGRAÇÃO: Adiciona 'suspensa' ao ENUM se ainda não existir =====
+  try {
+    // Verifica se a coluna status já contém 'suspensa'
+    $checkEnum = $conn->query("
+      SELECT COLUMN_TYPE 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'tarefas_pedido' 
+        AND COLUMN_NAME = 'status'
+    ");
+    
+    if ($checkEnum && $row = $checkEnum->fetch(PDO::FETCH_ASSOC)) {
+      $columnType = $row['COLUMN_TYPE'];
+      
+      // Se 'suspensa' não está presente no ENUM, executa o ALTER
+      if (stripos($columnType, 'suspensa') === false) {
+        $conn->exec("
+          ALTER TABLE tarefas_pedido 
+          MODIFY COLUMN status ENUM('pendente','em_andamento','concluida','cancelada','suspensa') 
+          NOT NULL DEFAULT 'pendente'
+        ");
+      }
+    }
+  } catch (PDOException $e) {
+    // Se der erro, não bloqueia a execução (a tabela pode não existir ainda)
+    error_log("Aviso: Não foi possível verificar/atualizar ENUM da coluna status: " . $e->getMessage());
+  }
+  // ===== FIM DA MIGRAÇÃO =====
 
   // log de mudanças da tarefa (auditoria)  
   $conn->exec("CREATE TABLE IF NOT EXISTS tarefas_pedido_log (  
@@ -242,7 +271,7 @@ function ensureSchemaDistribuicao(PDO $conn) {
     INDEX idx_tarefa (tarefa_id),  
     INDEX idx_acao (acao)  
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");  
-}  
+}
 
 try {  
   $conn = getDatabaseConnection();  
@@ -473,7 +502,7 @@ if ($isAjax) {
           GROUP BY t.status";
       $st = $conn->prepare($sql);  
       $st->execute($bind);  
-      $out = ['pendente'=>0,'em_andamento'=>0,'concluida'=>0,'cancelada'=>0];  
+      $out = ['pendente'=>0,'em_andamento'=>0,'concluida'=>0,'cancelada'=>0,'suspensa'=>0];  
       foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r){ $out[$r['status']] = (int)$r['qtd']; }  
       J(['success'=>true,'data'=>$out]);  
     }
@@ -638,8 +667,10 @@ if ($isAjax) {
             CASE t.status   
             WHEN 'pendente' THEN 1  
             WHEN 'em_andamento' THEN 2  
-            WHEN 'concluida' THEN 3  
-            ELSE 4  
+            WHEN 'suspensa' THEN 3
+            WHEN 'concluida' THEN 4  
+            WHEN 'cancelada' THEN 5
+            ELSE 6  
             END,  
             t.atualizado_em DESC, t.criado_em DESC";
       $st = $conn->prepare($sql);  
@@ -653,7 +684,7 @@ if ($isAjax) {
       $obs  = trim((string)($_POST['observacao'] ?? ''));
       $user = $_SESSION['username'] ?? 'sistema';
 
-      if (!$id || !in_array($novo, ['pendente','em_andamento','concluida','cancelada'], true)) {
+      if (!$id || !in_array($novo, ['pendente','em_andamento','concluida','cancelada','suspensa'], true)) {
         J(['success'=>false,'error'=>'Parâmetros inválidos.']);
       }
 
@@ -1145,7 +1176,7 @@ try {
   --brand-error: #ef4444;  
   --brand-info: #06b6d4;  
   
-  /* Status Colors */  
+/* Status Colors */  
   --status-pendente: #0ea5e9;  
   --status-pendente-bg: rgba(14, 165, 233, 0.12);  
   --status-em-andamento: #f59e0b;  
@@ -1154,6 +1185,8 @@ try {
   --status-concluida-bg: rgba(16, 185, 129, 0.12);  
   --status-cancelada: #ef4444;  
   --status-cancelada-bg: rgba(239, 68, 68, 0.12);  
+  --status-suspensa: #8b5cf6;  
+  --status-suspensa-bg: rgba(139, 92, 246, 0.12);
   
   /* Gradients */  
   --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);  
@@ -1573,7 +1606,15 @@ body {
   background: var(--status-cancelada);  
 }  
 
-.stat-label {  
+.stat-card.suspensa {  
+  color: #8b5cf6;  
+}  
+
+.stat-card.suspensa::before {  
+  background: #8b5cf6;  
+}  
+
+.stat-label { 
   font-size: 13px;  
   font-weight: 700;  
   text-transform: uppercase;  
@@ -1599,10 +1640,10 @@ body {
 /* ===================== KANBAN ===================== */  
 .kanban {  
   display: grid;  
-  grid-template-columns: repeat(4, minmax(0, 1fr));  
+  grid-template-columns: repeat(5, minmax(0, 1fr));  
   gap: var(--space-md);  
   animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s backwards;  
-}  
+}
 
 .kanban-col {  
   background: var(--gradient-surface);  
@@ -1672,6 +1713,10 @@ body {
 
 .col-cancelada .kanban-col-title {  
   color: var(--status-cancelada);  
+}  
+
+.col-suspensa .kanban-col-title {  
+  color: #8b5cf6;  
 }  
 
 .col-body {  
@@ -2029,11 +2074,17 @@ body {
 .mb-3 { margin-bottom: 1rem !important; }  
 
 /* ===================== RESPONSIVE ===================== */  
+@media (max-width: 1400px) {  
+  .kanban {  
+    grid-template-columns: repeat(3, minmax(0, 1fr));  
+  }  
+}
+
 @media (max-width: 1200px) {  
   .kanban {  
     grid-template-columns: repeat(2, minmax(0, 1fr));  
   }  
-}  
+} 
 
 @media (max-width: 768px) {  
   .kanban {  
@@ -2234,6 +2285,7 @@ body {
               <option value="">Todos os Status</option>  
               <option value="pendente">Pendente</option>  
               <option value="em_andamento">Em Andamento</option>  
+              <option value="suspensa">Suspensa</option>  
               <option value="concluida">Concluída</option>  
               <option value="cancelada">Cancelada</option>  
             </select>  
@@ -2350,9 +2402,16 @@ body {
         </div>  
         <div class="stat-value" id="c_cancelada">0</div>  
       </div>  
+
+      <div class="stat-card suspensa">  
+        <div class="stat-label">  
+          <i class="fas fa-pause-circle"></i> Suspensas  
+        </div>  
+        <div class="stat-value" id="c_suspensa">0</div>  
+      </div>  
     </div>  
 
-    <!-- KANBAN BOARD -->  
+    <!-- KANBAN BOARD --> 
     <div class="kanban" id="kanban">  
       <!-- Coluna Pendente -->  
       <div class="kanban-col col-pendente" data-status="pendente">  
@@ -2387,7 +2446,7 @@ body {
         <div class="col-body" id="col_concluida"></div>  
       </div>  
       
-      <!-- Coluna Cancelada -->  
+     <!-- Coluna Cancelada -->  
       <div class="kanban-col col-cancelada" data-status="cancelada">  
         <div class="kanban-col-header">  
           <div class="kanban-col-title">  
@@ -2397,10 +2456,21 @@ body {
         </div>  
         <div class="col-body" id="col_cancelada"></div>  
       </div>  
+
+      <!-- Coluna Suspensa -->  
+      <div class="kanban-col col-suspensa" data-status="suspensa">  
+        <div class="kanban-col-header">  
+          <div class="kanban-col-title">  
+            <i class="fas fa-pause-circle"></i> Suspensas  
+          </div>  
+          <span class="kanban-col-count" id="count_suspensa">0</span>  
+        </div>  
+        <div class="col-body" id="col_suspensa"></div>  
+      </div>  
     </div>  
 
   </div>  
-</main>  
+</main>
 
 <!-- Modal Reatribuir -->
 <div class="modal fade" id="modalReatribuir" tabindex="-1" aria-hidden="true">
@@ -2531,7 +2601,8 @@ function initializeSortable() {
         'pendente': 'Pendente',
         'em_andamento': 'Em Andamento',
         'concluida': 'Concluída',
-        'cancelada': 'Cancelada'
+        'cancelada': 'Cancelada',
+        'suspensa': 'Suspensa'
       };
       
       Swal.fire({
@@ -2670,12 +2741,14 @@ function carregarContadores() {
     $('#c_em_andamento').text(r.data.em_andamento || 0);
     $('#c_concluida').text(r.data.concluida || 0);
     $('#c_cancelada').text(r.data.cancelada || 0);
+    $('#c_suspensa').text(r.data.suspensa || 0);
 
     // Atualiza badges das colunas
     $('#count_pendente').text(r.data.pendente || 0);
     $('#count_em_andamento').text(r.data.em_andamento || 0);
     $('#count_concluida').text(r.data.concluida || 0);
     $('#count_cancelada').text(r.data.cancelada || 0);
+    $('#count_suspensa').text(r.data.suspensa || 0);
   });
 }
 
@@ -2716,7 +2789,8 @@ function carregarKanban() {
     pendente: $('#col_pendente'),
     em_andamento: $('#col_em_andamento'),
     concluida: $('#col_concluida'),
-    cancelada: $('#col_cancelada')
+    cancelada: $('#col_cancelada'),
+    suspensa: $('#col_suspensa')
   };
 
  // Mostra loading em todas as colunas
@@ -2763,7 +2837,8 @@ function carregarKanban() {
       pendente: [],
       em_andamento: [],
       concluida: [],
-      cancelada: []
+      cancelada: [],
+      suspensa: []
     };
 
     r.data.forEach(t => {
@@ -2852,6 +2927,16 @@ function renderCard(t) {
       </button>
     `;
   }
+
+  if (t.status !== 'suspensa') {
+    actionButtons += `
+      <button class="btn btn-sm btn-outline-light" 
+              onclick="mudarStatusComConfirmacao(${t.id}, 'suspensa')" 
+              title="Suspender tarefa">
+        <i class="fas fa-pause"></i>
+      </button>
+    `;
+  }
   
   if (t.status !== 'concluida') {
     actionButtons += `
@@ -2873,7 +2958,7 @@ function renderCard(t) {
     `;
   }
 
-  const slaEligible = (t.status === 'pendente' || t.status === 'em_andamento');
+  const slaEligible = (t.status === 'pendente' || t.status === 'em_andamento' || t.status === 'suspensa');
   const slaCls = slaEligible ? slaClassFromCreated(t.criado_em) : '';
 
   return `
@@ -2998,14 +3083,16 @@ function mudarStatusComConfirmacao(id, novoStatus) {
     'pendente': 'Pendente',
     'em_andamento': 'Em Andamento',
     'concluida': 'Concluída',
-    'cancelada': 'Cancelada'
+    'cancelada': 'Cancelada',
+    'suspensa': 'Suspensa'
   };
 
   const statusIcons = {
     'pendente': 'clock',
     'em_andamento': 'spinner',
     'concluida': 'check-circle',
-    'cancelada': 'times-circle'
+    'cancelada': 'times-circle',
+    'suspensa': 'pause-circle'
   };
 
   Swal.fire({
