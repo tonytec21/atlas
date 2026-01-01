@@ -54,8 +54,9 @@ function getAccessToken($authUrl, $username, $password, $client_id, $grant_type)
 }
 
 // Função para mapear código de ato para URL e obter código de tabela de custas
-function getAtoData($codAto) {
-    $map = [
+function getAtoData($codAto, $anoTabela = '2026') {
+    // Mapa 2025 (atual)
+    $map2025 = [
         '13.30' => ['/selo/notas/atos-em-geral', '0520250101'],
         '14.12' => ['/selo/civil/atos-em-geral', '0120250101'],
         '15.22' => ['/selo/rtdpj/atos-em-geral', '0420250101'],
@@ -64,7 +65,21 @@ function getAtoData($codAto) {
         '18.13' => ['/selo/maritimo/atos-em-geral', '0620250101'],
     ];
 
-    return isset($map[$codAto]) ? $map[$codAto] : null;
+    // Mapa 2026 (novo)
+    $map2026 = [
+        '13.30' => ['/selo/notas/atos-em-geral', '0520260101'],
+        '14.12' => ['/selo/civil/atos-em-geral', '0120260101'],
+        '15.22' => ['/selo/rtdpj/atos-em-geral', '0420260101'],
+        '16.39' => ['/selo/imovel/atos-em-geral', '0220260101'],
+        '17.9'  => ['/selo/protesto/atos-em-geral', '0320260101'],
+        '18.13' => ['/selo/maritimo/atos-em-geral', '0620260101'],
+    ];
+
+    // Escolhe o mapa (padrão 2026)
+    $anoTabela = ($anoTabela === '2025') ? '2025' : '2026';
+    $map = ($anoTabela === '2025') ? $map2025 : $map2026;
+
+    return $map[$codAto] ?? null;
 }
 
 $token = getAccessToken($authUrl, $username, $password, $client_id, $grant_type);
@@ -86,16 +101,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $folha = $_POST["folha"] ?? '';
     $termo = $_POST["termo"] ?? '';
 
+    // NOVO: tabela de custas (padrão 2026)
+    $tabelaCustas = $_POST["tabela_custas"] ?? '2026';
+
     // Isenção
     $isentoValue = !empty($_POST['isento']); // checkbox
     $motivoIsencao = trim($_POST['motivo_isencao'] ?? '');
 
     // Obter URL específica do ato e código de tabela de custas
-    $atoData = getAtoData($ato);
+    $atoData = getAtoData($ato, $tabelaCustas);
     if ($atoData === null) {
         echo json_encode(['error' => 'Código de ato inválido.']);
         exit;
     }
+
 
     $fullUrl = $seloBaseUrl . $atoData[0];
     $codigoTabelaCusta = $atoData[1];

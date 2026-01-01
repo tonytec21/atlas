@@ -256,12 +256,12 @@ $selos_arquivamentos->close();
       <div class="col-12 col-lg-6">
         <label for="ato">Ato</label>
         <select id="ato" name="ato" class="form-control" required>
-          <option value="13.30">13.30 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
-          <option value="14.12">14.12 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
-          <option value="15.22">15.22 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
-          <option value="16.39">16.39 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
-          <option value="17.9">17.9 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,42</option>
-          <option value="18.13">18.13 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
+          <option value="13.30">13.30 - Arquivamento, por folha do documento</option>
+          <option value="14.12">14.12 - Arquivamento, por folha do documento</option>
+          <option value="15.22">15.22 - Arquivamento, por folha do documento</option>
+          <option value="16.39">16.39 - Arquivamento, por folha do documento</option>
+          <option value="17.9">17.9 - Arquivamento, por folha do documento</option>
+          <option value="18.13">18.13 - Arquivamento, por folha do documento</option>
         </select>
       </div>
 
@@ -272,6 +272,15 @@ $selos_arquivamentos->close();
       <div class="col-md-6" style="display:none;">
         <label for="partes">Partes</label>
         <input id="partes" name="partes" class="form-control" required />
+      </div>
+
+      <!-- NOVO: selecionar tabela de custas -->
+      <div class="col-6 col-md-3 col-lg-2">
+        <label for="tabela_custas">Tabela</label>
+        <select id="tabela_custas" name="tabela_custas" class="form-control">
+          <option value="2026" selected>2026</option>
+          <option value="2025">2025</option>
+        </select>
       </div>
 
       <div class="col-6 col-md-3 col-lg-2">
@@ -326,12 +335,12 @@ $selos_arquivamentos->close();
     <div class="col-12 col-lg-6">
         <label for="ato">Ato</label>
         <select id="ato" name="ato" class="form-control" required>
-        <option value="13.30">13.30 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
-        <option value="14.12">14.12 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
-        <option value="15.22">15.22 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
-        <option value="16.39">16.39 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
-        <option value="17.9">17.9 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,42</option>
-        <option value="18.13">18.13 - Arquivamento, por folha do documento, os emolumentos serão: R$ 6,55</option>
+        <option value="13.30">13.30 - Arquivamento, por folha do documento</option>
+        <option value="14.12">14.12 - Arquivamento, por folha do documento</option>
+        <option value="15.22">15.22 - Arquivamento, por folha do documento</option>
+        <option value="16.39">16.39 - Arquivamento, por folha do documento</option>
+        <option value="17.9">17.9 - Arquivamento, por folha do documento</option>
+        <option value="18.13">18.13 - Arquivamento, por folha do documento</option>
         </select>
     </div>
 
@@ -342,6 +351,15 @@ $selos_arquivamentos->close();
     <div class="col-md-6" style="display:none;">
         <label for="partes">Partes</label>
         <input id="partes" name="partes" class="form-control" required />
+    </div>
+
+    <!-- NOVO: selecionar tabela de custas -->
+    <div class="col-6 col-md-3 col-lg-2">
+      <label for="tabela_custas">Tabela</label>
+      <select id="tabela_custas" name="tabela_custas" class="form-control">
+        <option value="2026" selected>2026</option>
+        <option value="2025">2025</option>
+      </select>
     </div>
 
     <div class="col-6 col-md-3 col-lg-2">
