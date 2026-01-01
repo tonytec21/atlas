@@ -103,6 +103,13 @@ if (isset($_GET['id'])) {
     $os_items_result = $os_items_query->get_result();
     $ordem_servico_itens = $os_items_result->fetch_all(MYSQLI_ASSOC);
 
+    // Verificar se deve mostrar FERRFIS (somente se algum item tiver valor > 0)
+    $show_ferrfis = false;
+    foreach ($ordem_servico_itens as $it) {
+        $v = floatval($it['ferrfis'] ?? 0);
+        if ($v > 0) { $show_ferrfis = true; break; }
+    }
+
     // Obter informações do criador
     $criado_por = $ordem_servico['criado_por'];
     $user_query = $conn->prepare("SELECT nome_completo, cargo FROM funcionarios WHERE usuario = ?");
@@ -160,7 +167,7 @@ if (isset($_GET['id'])) {
     $serventia = $serventia_result->fetch_assoc()['razao_social'];
 
     $pdf = new PDF('P', 'mm', array(80, 297));
-    $pdf->SetMargins(1, 1, 10);
+    $pdf->SetMargins(2, 1, 2);
     $pdf->setCriadoPor($criado_por_nome);
     $pdf->setServentia($serventia);
     $pdf->AddPage();
@@ -173,167 +180,170 @@ if (isset($_GET['id'])) {
     $pdf->writeHTML('<div style="text-align: center;">RECIBO DE PAGAMENTO Nº.: ' . $os_id . '</div>', true, false, true, false, '');
     $pdf->Ln(0);
 
-    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->SetFont('helvetica', 'B', 10);
     $pdf->writeHTML('<div style="text-align: center;">'. $ordem_servico['descricao_os'] .'</div>', true, false, true, false, '');
     $pdf->Ln(1);
 
-    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->SetFont('helvetica', 'B', 10);
     $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? '<br>CPF/CNPJ: ' . maskCpfCnpj($ordem_servico['cpf_cliente']) : '';
     $pdf->writeHTML('<div style="text-align: left;">APRESENTANTE: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
     $pdf->Ln(0);
 
-    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->SetFont('helvetica', 'B', 10);
     $data_recibo = date('d/m/Y - H:i'); 
     $pdf->writeHTML('<div style="text-align: left;">'.'DATA DO RECIBO: '. $data_recibo .'</div>', true, false, true, false, '');
     $pdf->Ln(0);
     
-    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->SetFont('helvetica', 'B', 10);
     $pdf->writeHTML('<div style="text-align: left;">VALOR PAGO: R$ ' . number_format($total_pagamentos, 2, ',', '.') . '</div>', true, false, true, false, '');
     $pdf->Ln(0);
 
-    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->SetFont('helvetica', 'B', 10);
     if ($ordem_servico['base_de_calculo'] >= 0.001) {
         $pdf->writeHTML('<div style="text-align: left;">'.'BASE DE CÁLCULO: R$ '. number_format($ordem_servico['base_de_calculo'], 2, ',', '.') .'</div>', true, false, true, false, '');
         $pdf->Ln(0);
     }
     
-    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->SetFont('helvetica', 'B', 10);
     if (!empty($ordem_servico['observacoes'])) {
         $pdf->writeHTML('<div style="text-align: justify;">'.'<b>OBS:</b> '. $ordem_servico['observacoes'] .'</div>', true, false, true, false, '');
         $pdf->Ln(2);
     }
 
-    // Adicionar informações sobre os pagamentos realizados
+    // ================== PAGAMENTOS REALIZADOS ==================
     $pdf->Ln(2);
-    $pdf->SetFont('helvetica', 'B', 9);
-    $pdf->writeHTML('<div style="text-align: center; margin-top: 10px;"><b>PAGAMENTOS REALIZADOS</b></div>', true, false, true, false, '');
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->writeHTML('<div style="text-align: center;"><b>PAGAMENTOS REALIZADOS</b></div>', true, false, true, false, '');
     $pdf->Ln(1);
 
-    // Função para adicionar o cabeçalho da tabela de pagamentos
-    function adicionarCabecalhoTabelaPagamentos() {
-        return '<table border="0.1" cellpadding="4">
-            <thead>
-                <tr>
-                    <th style="width: 40%; text-align: center; font-size: 7.5px;"><b>DATA</b></th>
-                    <th style="width: 30%; text-align: center; font-size: 7.5px;"><b>FORMA DE PAGAMENTO</b></th>
-                    <th style="width: 30%; text-align: center; font-size: 7.5px;"><b>VALOR</b></th>
-                </tr>
-            </thead>
-            <tbody>';
-    }
+    // Linha separadora
+    $pdf->writeHTML('<div style="text-align: center; font-size: 6px;">------------------------------------------------</div>', true, false, true, false, '');
 
-    $html_pagamentos = adicionarCabecalhoTabelaPagamentos();
+    // Cabeçalho dos pagamentos (sem borda)
+    $pdf->SetFont('helvetica', 'B', 10);
+    $html_pag_header = '<table cellpadding="0" cellspacing="0">
+        <tr>
+            <td style="width: 38%; text-align: left;">DATA</td>
+            <td style="width: 32%; text-align: left;">FORMA</td>
+            <td style="width: 30%; text-align: right;">VALOR</td>
+        </tr>
+    </table>';
+    $pdf->writeHTML($html_pag_header, true, false, true, false, '');
 
+    // Itens de pagamento
+    $pdf->SetFont('helvetica', '', 10);
     foreach ($pagamentos as $pagamento) {
-        $data_pagamento = date('d/m/Y - H:i', strtotime($pagamento['data_pagamento']));
-        $rowHtmlPagamento = '<tr>
-            <td style="width: 40%; font-size: 7.5px;">' . $data_pagamento . '</td>
-            <td style="width: 30%; font-size: 7.5px;">' . $pagamento['forma_de_pagamento'] . '</td>
-            <td style="width: 30%; font-size: 7.5px;">R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.') . '</td>
-        </tr>';
-
-        // Verificar a posição atual e adicionar uma nova página se necessário
-        if ($pdf->GetY() + 30 > $pdf->getPageHeight() - 30) {
-            $html_pagamentos .= '</tbody></table>';
-            $pdf->writeHTML($html_pagamentos, true, false, true, false, '');
+        $data_pagamento = date('d/m/Y H:i', strtotime($pagamento['data_pagamento']));
+        $html_pag_row = '<table cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="width: 38%; text-align: left;">' . $data_pagamento . '</td>
+                <td style="width: 32%; text-align: left;">' . $pagamento['forma_de_pagamento'] . '</td>
+                <td style="width: 30%; text-align: right;">R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.') . '</td>
+            </tr>
+        </table>';
+        
+        // Verificar quebra de página
+        if ($pdf->GetY() + 10 > $pdf->getPageHeight() - 20) {
             $pdf->AddPage();
-            $html_pagamentos = adicionarCabecalhoTabelaPagamentos() . $rowHtmlPagamento;
-        } else {
-            $html_pagamentos .= $rowHtmlPagamento;
+            $pdf->SetY(5);
         }
+        $pdf->writeHTML($html_pag_row, true, false, true, false, '');
     }
 
-    $html_pagamentos .= '</tbody></table>';
-    $pdf->writeHTML($html_pagamentos, true, false, true, false, '');
-
-    // Adicionar as informações dos itens da OS
-    $pdf->SetFont('helvetica', 'B', 9);
-    $pdf->writeHTML('<div style="text-align: center; margin-top: 10px;"><b>ITENS</b></div>', true, false, true, false, '');
+    // ================== ITENS DA OS ==================
+    $pdf->Ln(1);
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->writeHTML('<div style="text-align: center;"><b>ITENS</b></div>', true, false, true, false, '');
     $pdf->Ln(1);
 
-    // Adicionar o cabeçalho da tabela de itens apenas uma vez
-    $html = '<table border="0.1" cellpadding="2">
-        <thead>
-            <tr>
-                <th style="width: 20%; text-align: center; font-size: 8px;"><b>ATO</b></th>
-                <th style="width: 10%; text-align: center; font-size: 8px;"><b>QTD</b></th>
-                <th style="width: 29%; text-align: center; font-size: 8px;"><b>DESCRIÇÃO</b></th>
-                <th style="width: 20%; text-align: center; font-size: 8px;"><b>EMOL</b></th>
-                <th style="width: 21%; text-align: center; font-size: 8px;"><b>TOTAL</b></th>
-            </tr>
-        </thead>
-        <tbody>';
+    // Linha separadora
+    $pdf->writeHTML('<div style="text-align: center; font-size: 6px;">------------------------------------------------</div>', true, false, true, false, '');
 
+    // Acumuladores
+    $total_emolumentos = 0;
     $total_ferc = 0;
     $total_femp = 0;
     $total_fadep = 0;
+    $total_ferrfis = 0;
+    $total_geral = 0;
 
+    // Processar cada item
+    $pdf->SetFont('helvetica', '', 10);
     foreach ($ordem_servico_itens as $index => $item) {
-        $total_ferc += $item['ferc'];
-        $total_femp += $item['femp'];
-        $total_fadep += $item['fadep'];
+        // Acumular totais
+        $total_emolumentos += floatval($item['emolumentos']);
+        $total_ferc += floatval($item['ferc']);
+        $total_femp += floatval($item['femp']);
+        $total_fadep += floatval($item['fadep']);
+        $total_ferrfis += floatval($item['ferrfis'] ?? 0);
+        $total_geral += floatval($item['total']);
 
-        $rowHtml = '<tr>
-            <td style="width: 20%; font-size: 8px;">' . $item['ato'] . '</td>
-            <td style="width: 10%; font-size: 8px;">' . $item['quantidade'] . '</td>
-            <td style="width: 29%; font-size: 8px;">' . $item['descricao'] . '</td>
-            <td style="width: 20%; font-size: 8px;">' . number_format($item['emolumentos'], 2, ',', '.') . '</td>
-            <td style="width: 21%; font-size: 8px;">' . number_format($item['total'], 2, ',', '.') . '</td>
-        </tr>';
-
-        // Verificar a posição atual e adicionar uma nova página se necessário
-        if ($pdf->GetY() + 30 > $pdf->getPageHeight() - 30) {
-            $html .= '</tbody></table>';
-            $pdf->writeHTML($html, true, false, true, false, '');
+        // Verificar quebra de página antes de adicionar o item
+        if ($pdf->GetY() + 12 > $pdf->getPageHeight() - 20) {
             $pdf->AddPage();
-            $pdf->SetY(10);
-            $html = '<table border="0.1" cellpadding="2">
-                <thead>
-                    <tr>
-                        <th style="width: 20%; text-align: center; font-size: 8px;"><b>ATO</b></th>
-                        <th style="width: 10%; text-align: center; font-size: 8px;"><b>QTD</b></th>
-                        <th style="width: 29%; text-align: center; font-size: 8px;"><b>DESCRIÇÃO</b></th>
-                        <th style="width: 20%; text-align: center; font-size: 8px;"><b>EMOL</b></th>
-                        <th style="width: 21%; text-align: center; font-size: 8px;"><b>TOTAL</b></th>
-                    </tr>
-                </thead>
-                <tbody>' . $rowHtml;
-        } else {
-            $html .= $rowHtml;
+            $pdf->SetY(5);
         }
+
+        // Linha 1: ATO + QTD + DESCRIÇÃO (com quebra de linha automática)
+        $ato = $item['ato'];
+        $qtd = $item['quantidade'];
+        $descricao = $item['descricao'];
+        
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->writeHTML('<div style="line-height: 1.1;"><b>ATO ' . $ato . ' (x' . $qtd . ')</b> - ' . $descricao . '</div>', true, false, true, false, '');
+
+        // Linha 2: Valores (EMOL, FERC, FADEP, FEMP, FERRFIS, TOTAL) - sem espaço extra
+        $pdf->SetFont('helvetica', '', 10);
+        
+        // Montar linha de valores dinamicamente
+        $valores = [];
+        $valores[] = 'EMOL: ' . number_format($item['emolumentos'], 2, ',', '.');
+        $valores[] = 'FERC: ' . number_format($item['ferc'], 2, ',', '.');
+        $valores[] = 'FADEP: ' . number_format($item['fadep'], 2, ',', '.');
+        $valores[] = 'FEMP: ' . number_format($item['femp'], 2, ',', '.');
+        
+        if ($show_ferrfis) {
+            $valores[] = 'FERRFIS: ' . number_format($item['ferrfis'] ?? 0, 2, ',', '.');
+        }
+        
+        $valores[] = '<b>TOTAL: ' . number_format($item['total'], 2, ',', '.') . '</b>';
+        
+        $pdf->writeHTML('<div style="font-size: 10px; line-height: 1.1;">' . implode(' | ', $valores) . '</div>', true, false, true, false, '');
+        
+        // Espaçamento entre itens (maior que entre elementos do mesmo item)
+        $pdf->Ln(2);
     }
 
-    $html .= '</tbody></table>';
-    $pdf->writeHTML($html, true, false, true, false, '');
-    $pdf->Ln(-4);
+    // Linha separadora
+    $pdf->writeHTML('<div style="text-align: center; font-size: 6px;">------------------------------------------------</div>', true, false, true, false, '');
 
-    // Adicionar a informação de criado por
-    $pdf->SetFont('helvetica', 'I', 8);
-    $pdf->writeHTML('<div style="text-align: center;">Criado por: ' . $pdf->getCriadoPor() . '</div>', true, false, true, false, '');
-    $pdf->Ln(2);
+    // ================== SOMATÓRIOS ==================
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->writeHTML('<div style="text-align: center;"><b>SOMATÓRIO</b></div>', true, false, true, false, '');
 
-    // Adicionar os somatórios de FERC, FEMP e FADEP
-    $pdf->SetFont('helvetica', '', 8);
-    $pdf->writeHTML('<div style="text-align: left;">FERC: R$ ' . number_format($total_ferc, 2, ',', '.') . '</div>', true, false, true, false, '');
-    $pdf->Ln(1);
-    $pdf->writeHTML('<div style="text-align: left;">FEMP: R$ ' . number_format($total_femp, 2, ',', '.') . '</div>', true, false, true, false, '');
-    $pdf->Ln(1);
-    $pdf->writeHTML('<div style="text-align: left;">FADEP: R$ ' . number_format($total_fadep, 2, ',', '.') . '</div>', true, false, true, false, '');
-    $pdf->Ln(-13);
+    $pdf->SetFont('helvetica', '', 10);
+    
+    // Somatórios em formato compacto
+    $pdf->writeHTML('<div style="line-height: 1.2;">EMOL: R$ ' . number_format($total_emolumentos, 2, ',', '.') . ' | FERC: R$ ' . number_format($total_ferc, 2, ',', '.') . '</div>', true, false, true, false, '');
+    $pdf->writeHTML('<div style="line-height: 1.2;">FADEP: R$ ' . number_format($total_fadep, 2, ',', '.') . ' | FEMP: R$ ' . number_format($total_femp, 2, ',', '.') . '</div>', true, false, true, false, '');
 
-    $pdf->SetFont('helvetica', 'B', 9);
-    $pdf->SetRightMargin(7);
-    $pdf->writeHTML('<div style="text-align: right;">Valor Total: R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.') . '</div>', true, false, true, false, '');
-    $pdf->Ln(1);
+    // FERRFIS se houver
+    if ($show_ferrfis) {
+        $pdf->writeHTML('<div style="line-height: 1.2;">FERRFIS: R$ ' . number_format($total_ferrfis, 2, ',', '.') . '</div>', true, false, true, false, '');
+    }
 
-    $pdf->SetFont('helvetica', 'B', 9);
-    $pdf->writeHTML('<div style="text-align: right;">Dep. Prévio: R$ ' . number_format($total_pagamentos, 2, ',', '.') . '</div>', true, false, true, false, '');
-    $pdf->Ln(1);
+    // Linha separadora
+    $pdf->writeHTML('<div style="text-align: center; font-size: 6px;">------------------------------------------------</div>', true, false, true, false, '');
+
+    // ================== TOTAIS FINAIS ==================
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->writeHTML('<div style="text-align: right; line-height: 1.3;">Valor Total: R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.') . '</div>', true, false, true, false, '');
+
+    $pdf->writeHTML('<div style="text-align: right; line-height: 1.3;">Dep. Prévio: R$ ' . number_format($total_pagamentos, 2, ',', '.') . '</div>', true, false, true, false, '');
 
     // Adicionar valor de repasse credor se houver
     if ($total_repasses > 0) {
-        $pdf->writeHTML('<div style="text-align: right;">Repasse Credor: R$ ' . number_format($total_repasses, 2, ',', '.') . '</div>', true, false, true, false, '');
-        $pdf->Ln(1);
+        $pdf->writeHTML('<div style="text-align: right; line-height: 1.3;">Repasse Credor: R$ ' . number_format($total_repasses, 2, ',', '.') . '</div>', true, false, true, false, '');
     }
 
     // Calcular saldo a restituir subtraindo o valor devolvido e o repasse credor
@@ -341,23 +351,29 @@ if (isset($_GET['id'])) {
 
     // Adicionar o saldo com a condição
     if ($saldo_a_restituir > 0) {
-        $pdf->writeHTML('<div style="text-align: right;">Valor a Restituir: R$ ' . number_format($saldo_a_restituir, 2, ',', '.') . '</div>', true, false, true, false, '');
+        $pdf->writeHTML('<div style="text-align: right; line-height: 1.3;">Valor a Restituir: R$ ' . number_format($saldo_a_restituir, 2, ',', '.') . '</div>', true, false, true, false, '');
     } elseif ($saldo < 0) {
-        $pdf->writeHTML('<div style="text-align: right;">Valor a Pagar: R$ ' . number_format(abs($saldo), 2, ',', '.') . '</div>', true, false, true, false, '');
+        $pdf->writeHTML('<div style="text-align: right; line-height: 1.3;">Valor a Pagar: R$ ' . number_format(abs($saldo), 2, ',', '.') . '</div>', true, false, true, false, '');
     }
 
     // Adicionar valor devolvido se houver
     if ($total_devolucoes > 0) {
-        $pdf->writeHTML('<div style="text-align: right;">Valor Restituído: R$ ' . number_format($total_devolucoes, 2, ',', '.') . '</div>', true, false, true, false, '');
+        $pdf->writeHTML('<div style="text-align: right; line-height: 1.3;">Valor Restituído: R$ ' . number_format($total_devolucoes, 2, ',', '.') . '</div>', true, false, true, false, '');
     }
 
-    $pdf->Ln(5);
+    $pdf->Ln(3);
+
+    // Informação de criado por
+    $pdf->SetFont('helvetica', 'I', 8);
+    $pdf->writeHTML('<div style="text-align: center;">Criado por: ' . $pdf->getCriadoPor() . '</div>', true, false, true, false, '');
+    
+    $pdf->Ln(3);
 
     // Adicionar a linha de assinatura
-    $pdf->Cell(0, 4, '__________________________________', 0, 1, 'C');
-    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->Cell(0, 4, '________________________________', 0, 1, 'C');
+    $pdf->SetFont('helvetica', 'B', 10);
     $pdf->Cell(0, 4, $logged_in_user_nome, 0, 1, 'C');
-    $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetFont('helvetica', '', 10);
     $pdf->Cell(0, 4, $logged_in_user_cargo, 0, 1, 'C');
 
     $pdf->Output('Recibo de Pagamento nº ' . $os_id . '.pdf', 'I');

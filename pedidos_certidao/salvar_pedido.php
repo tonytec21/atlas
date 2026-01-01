@@ -123,6 +123,7 @@ function ensureSchema(PDO $conn){
     ferc DECIMAL(12,2) NOT NULL DEFAULT 0,
     fadep DECIMAL(12,2) NOT NULL DEFAULT 0,
     femp DECIMAL(12,2) NOT NULL DEFAULT 0,
+    ferrfis DECIMAL(12,2) NOT NULL DEFAULT 0,
     total DECIMAL(12,2) NOT NULL DEFAULT 0,
     ordem_exibicao INT NOT NULL DEFAULT 1,
     INDEX idx_os_item (ordem_servico_id),
@@ -552,14 +553,15 @@ try {
     $os_id = $conn->lastInsertId();
 
     $stmtItem = $conn->prepare("INSERT INTO ordens_de_servico_itens
-        (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, ordem_exibicao)
-         VALUES (:os,:ato,:qtd,:descleg,:descr,:em,:fe,:fa,:fm,:tot,:ordem)");
+        (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, ordem_exibicao)
+         VALUES (:os,:ato,:qtd,:descleg,:descr,:em,:fe,:fa,:fm,:ff,:tot,:ordem)");
 
     foreach($itens as $it){
       $em  = br_money_to_decimal($it['emolumentos'] ?? 0);
       $fe  = br_money_to_decimal($it['ferc'] ?? 0);
       $fa  = br_money_to_decimal($it['fadep'] ?? 0);
       $fm  = br_money_to_decimal($it['femp'] ?? 0);
+      $ff  = br_money_to_decimal($it['ferrfis'] ?? 0);
       $tot = br_money_to_decimal($it['total'] ?? 0);
       $stmtItem->execute([
         ':os'    => $os_id,
@@ -571,6 +573,7 @@ try {
         ':fe'    => $fe,
         ':fa'    => $fa,
         ':fm'    => $fm,
+        ':ff'    => $ff,
         ':tot'   => $tot,
         ':ordem' => (int)$it['ordem_exibicao']
       ]);

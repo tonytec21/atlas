@@ -101,6 +101,13 @@ if (isset($_GET['id'])) {
     $os_items_result = $os_items_query->get_result();
     $ordem_servico_itens = $os_items_result->fetch_all(MYSQLI_ASSOC);
 
+    // Verificar se deve mostrar a coluna FERRFIS (somente se algum item tiver valor > 0)
+    $show_ferrfis = false;
+    foreach ($ordem_servico_itens as $it) {
+        $v = floatval($it['ferrfis'] ?? 0);
+        if ($v > 0) { $show_ferrfis = true; break; }
+    }
+
     // Obter informações do criador
     $criado_por = $ordem_servico['criado_por'];
     $user_query = $conn->prepare("SELECT nome_completo, cargo FROM funcionarios WHERE usuario = ?");
@@ -210,18 +217,25 @@ if (isset($_GET['id'])) {
     $pdf->Ln(1);
 
     // Função para adicionar o cabeçalho da tabela de itens
-    function adicionarCabecalhoTabelaItens(&$pdf) {
+    function adicionarCabecalhoTabelaItens(&$pdf, $show_ferrfis = false) {
+        // Se mostrar FERRFIS, reduzir a largura da DESCRIÇÃO para caber
+        $descricaoWidth = $show_ferrfis ? '29%' : '35%';
+        $ferrfisTh = $show_ferrfis 
+            ? '<th style="width: 6%; text-align: center; font-size: 7.5px;"><b>FERRFIS</b></th>'
+            : '';
+        
         $html = '<table border="0.1" cellpadding="4">
             <thead>
                 <tr>
                     <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>ATO</b></th>
                     <th style="width: 5%; text-align: center; font-size: 7.5px;"><b>QTD</b></th>
                     <th style="width: 8%; text-align: center; font-size: 7px;"><b>DESC. LEGAL %</b></th>
-                    <th style="width: 35%; text-align: center; font-size: 7.5px;"><b>DESCRIÇÃO</b></th>
+                    <th style="width: '.$descricaoWidth.'; text-align: center; font-size: 7.5px;"><b>DESCRIÇÃO</b></th>
                     <th style="width: 10%; text-align: center; font-size: 7.5px;"><b>EMOL</b></th>
                     <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>FERC</b></th>
                     <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>FADEP</b></th>
                     <th style="width: 8%; text-align: center; font-size: 7.5px;"><b>FEMP</b></th>
+                    '.$ferrfisTh.'
                     <th style="width: 10%; text-align: center; font-size: 7.5px;"><b>TOTAL</b></th>
                 </tr>
             </thead>
@@ -229,18 +243,26 @@ if (isset($_GET['id'])) {
         return $html;
     }
 
-    $html = adicionarCabecalhoTabelaItens($pdf);
+    $html = adicionarCabecalhoTabelaItens($pdf, $show_ferrfis);
+    
+    // Definir largura da descrição baseado em $show_ferrfis
+    $descricaoWidth = $show_ferrfis ? '29%' : '35%';
 
     foreach ($ordem_servico_itens as $index => $item) {
+        $ferrfisTd = $show_ferrfis 
+            ? '<td style="width: 6%; font-size: 7.5px;">R$ ' . number_format($item['ferrfis'] ?? 0, 2, ',', '.') . '</td>'
+            : '';
+        
         $rowHtml = '<tr>
             <td style="width: 8%; font-size: 7.5px;">' . $item['ato'] . '</td>
             <td style="width: 5%; font-size: 7.5px;">' . $item['quantidade'] . '</td>
             <td style="width: 8%; font-size: 7.5px;">' . $item['desconto_legal'] . '</td>
-            <td style="width: 35%; font-size: 7px;">' . $item['descricao'] . '</td>
+            <td style="width: '.$descricaoWidth.'; font-size: 7px;">' . $item['descricao'] . '</td>
             <td style="width: 10%; font-size: 7.5px;">R$ ' . number_format($item['emolumentos'], 2, ',', '.') . '</td>
             <td style="width: 8%; font-size: 7.5px;">R$ ' . number_format($item['ferc'], 2, ',', '.') . '</td>
             <td style="width: 8%; font-size: 7.5px;">R$ ' . number_format($item['fadep'], 2, ',', '.') . '</td>
             <td style="width: 8%; font-size: 7.5px;">R$ ' . number_format($item['femp'], 2, ',', '.') . '</td>
+            '.$ferrfisTd.'
             <td style="width: 10%; font-size: 7.5px;">R$ ' . number_format($item['total'], 2, ',', '.') . '</td>
         </tr>';
 
@@ -249,7 +271,7 @@ if (isset($_GET['id'])) {
             $html .= '</tbody></table>';
             $pdf->writeHTML($html, true, false, true, false, '');
             $pdf->AddPage();
-            $html = adicionarCabecalhoTabelaItens($pdf) . $rowHtml;
+            $html = adicionarCabecalhoTabelaItens($pdf, $show_ferrfis) . $rowHtml;
         } else {
             $html .= $rowHtml;
         }

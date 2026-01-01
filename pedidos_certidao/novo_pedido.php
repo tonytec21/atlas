@@ -915,10 +915,16 @@ body.dark-mode footer .footer-content a:hover {
             <input type="text" class="form-control" id="femp" name="femp" readonly>
           </div>
           <div class="form-group col-md-2">
+            <label for="ferrfis">FERRFIS:</label>
+            <input type="text" class="form-control" id="ferrfis" name="ferrfis" readonly>
+          </div>
+          <div class="form-group col-md-2">
             <label for="total">Total:</label>
             <input type="text" class="form-control" id="total" name="total" readonly>
           </div>
-          <div class="form-group col-md-2 d-flex align-items-end">
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-12 d-flex align-items-end">
             <button type="button" class="btn btn-success w-100" onclick="adicionarItemOS()">
               <i class="fa fa-plus"></i> Adicionar à OS
             </button>
@@ -940,6 +946,7 @@ body.dark-mode footer .footer-content a:hover {
                   <th>FERC</th>
                   <th>FADEP</th>
                   <th>FEMP</th>
+                  <th>FERRFIS</th>
                   <th>Total</th>
                   <th></th>
                 </tr>
@@ -1558,19 +1565,21 @@ function buscarAto(){
       let ferc = parseFloat(resp.FERC) * quantidade;
       let fadep = parseFloat(resp.FADEP) * quantidade;
       let femp = parseFloat(resp.FEMP) * quantidade;
+      let ferrfis = parseFloat(resp.FERRFIS || 0) * quantidade;
 
       const fator = (1 - (descontoLegal/100));
-      emolumentos*=fator; ferc*=fator; fadep*=fator; femp*=fator;
+      emolumentos*=fator; ferc*=fator; fadep*=fator; femp*=fator; ferrfis*=fator;
 
-      if (ATOS_SEM_VALOR.includes(String(ato).trim())) { emolumentos=ferc=fadep=femp=0; }
+      if (ATOS_SEM_VALOR.includes(String(ato).trim())) { emolumentos=ferc=fadep=femp=ferrfis=0; }
 
-      const total = emolumentos + ferc + fadep + femp;
+      const total = emolumentos + ferc + fadep + femp + ferrfis;
 
       $('#descricao').val(resp.DESCRICAO);
       $('#emolumentos').val(emolumentos.toFixed(2).replace('.',','));
       $('#ferc').val(ferc.toFixed(2).replace('.',','));
       $('#fadep').val(fadep.toFixed(2).replace('.',','));
       $('#femp').val(femp.toFixed(2).replace('.',','));
+      $('#ferrfis').val(ferrfis.toFixed(2).replace('.',','));
       $('#total').val(total.toFixed(2).replace('.',','));
     }catch(e){ toast('error','Erro ao processar o ato.'); }
   }, 'json').fail(function(xhr){ console.error(xhr.responseText); toast('error','Erro ao buscar ato.'); });
@@ -1579,7 +1588,7 @@ function buscarAto(){
 function adicionarAtoManual(){
   $('#ato').val('0');
   $('#descricao').prop('readonly',false).val('');
-  $('#emolumentos,#ferc,#fadep,#femp').prop('readonly',false).val('0,00');
+  $('#emolumentos,#ferc,#fadep,#femp,#ferrfis').prop('readonly',false).val('0,00');
   $('#total').prop('readonly',false).val('0,00'); // permitir digitar o total do ato manual
 }
 
@@ -1597,10 +1606,11 @@ function adicionarItemOS(){
   const ferc = toFloat($('#ferc').val());
   const fadep = toFloat($('#fadep').val());
   const femp = toFloat($('#femp').val());
+  const ferrfis = toFloat($('#ferrfis').val());
   let totalTyped = toFloat($('#total').val());
 
   // Se o usuário digitou um TOTAL manual válido, prioriza-o; senão, calcula a partir das partes
-  let total = !isNaN(totalTyped) && totalTyped > 0 ? totalTyped : (emol+ferc+fadep+femp);
+  let total = !isNaN(totalTyped) && totalTyped > 0 ? totalTyped : (emol+ferc+fadep+femp+ferrfis);
 
   const codigoAto = String(ato||'').trim();
   const isExcecao = ATOS_SEM_VALOR.includes(codigoAto);
@@ -1619,6 +1629,7 @@ function adicionarItemOS(){
       <td>${fmt(totalPart(ferc))}</td>
       <td>${fmt(totalPart(fadep))}</td>
       <td>${fmt(totalPart(femp))}</td>
+      <td>${fmt(totalPart(ferrfis))}</td>
       <td>${fmt(total)}</td>
       <td>
         <button type="button" class="btn btn-sm btn-warning" onclick="marcarItemIsento(this)">
@@ -1635,7 +1646,7 @@ function adicionarItemOS(){
   // limpa campos do topo
   $('#ato').val(''); $('#quantidade').val('1'); $('#desconto_legal').val('0');
   $('#descricao').val('').prop('readonly',true);
-  $('#emolumentos,#ferc,#fadep,#femp').val('').prop('readonly',true);
+  $('#emolumentos,#ferc,#fadep,#femp,#ferrfis').val('').prop('readonly',true);
   $('#total').val('').prop('readonly',true);
 }
 
@@ -1643,8 +1654,8 @@ window.marcarItemIsento = function(btn){
   const $tr = $(btn).closest('tr');
   const $tds = $tr.find('td');
 
-  // 1) Zera os valores EMOL., FERC, FADEP, FEMP, TOTAL (colunas 5..9)
-  for (let i = 5; i <= 9; i++) {
+  // 1) Zera os valores EMOL., FERC, FADEP, FEMP, FERRFIS, TOTAL (colunas 5..10)
+  for (let i = 5; i <= 10; i++) {
     $tds.eq(i).text(fmt(0));
   }
 
@@ -1698,23 +1709,23 @@ function atualizarISS(){
         <tr id="ISS_ROW" data-tipo="iss">
           <td>${ordem}</td><td>ISS</td><td>1</td><td>0%</td>
           <td>${escapeHtml(ISS_CONFIG.descricao)}</td>
-          <td>${fmt(valorISS)}</td><td>0,00</td><td>0,00</td><td>0,00</td>
+          <td>${fmt(valorISS)}</td><td>0,00</td><td>0,00</td><td>0,00</td><td>0,00</td>
           <td>${fmt(valorISS)}</td>
           <td><span class="text-muted"><i class="fa fa-lock"></i></span></td>
         </tr>
       `);
     } else {
       linha.find('td').eq(5).text(fmt(valorISS));
-      linha.find('td').eq(9).text(fmt(valorISS));
+      linha.find('td').eq(10).text(fmt(valorISS));
     }
   } else {
     $('#ISS_ROW').remove();
   }
 
-  // total geral (coluna index 9)
+  // total geral (coluna index 10 agora, pois adicionamos FERRFIS)
   let totalOS = 0;
   $('#itensTable tr').each(function(){
-    const t = toFloat($(this).find('td').eq(9).text());
+    const t = toFloat($(this).find('td').eq(10).text());
     totalOS += isNaN(t)?0:t;
   });
   $('#total_os').val(fmt(totalOS));
@@ -1738,6 +1749,7 @@ function carregarModeloSelecionado(idModelo){
         const ferc        = parseFloat((item.ferc        || '0').replace(',', '.'));
         const fadep       = parseFloat((item.fadep       || '0').replace(',', '.'));
         const femp        = parseFloat((item.femp        || '0').replace(',', '.'));
+        const ferrfis     = parseFloat((item.ferrfis     || '0').replace(',', '.'));
         const total       = parseFloat((item.total       || '0').replace(',', '.'));
         const ordem       = $('#itensTable tr').length + 1;
         $('#itensTable').append(`
@@ -1751,6 +1763,7 @@ function carregarModeloSelecionado(idModelo){
             <td>${fmt(ferc)}</td>
             <td>${fmt(fadep)}</td>
             <td>${fmt(femp)}</td>
+            <td>${fmt(ferrfis)}</td>
             <td>${fmt(total)}</td>
             <td>
               <button type="button" class="btn btn-sm btn-warning" onclick="marcarItemIsento(this)">
@@ -1810,7 +1823,8 @@ function gatherFormData(){
         ferc:        tds.eq(6).text(),
         fadep:       tds.eq(7).text(),
         femp:        tds.eq(8).text(),
-        total:       tds.eq(9).text(),
+        ferrfis:     tds.eq(9).text(),
+        total:       tds.eq(10).text(),
         ordem_exibicao: (idx+1)
       });
     });

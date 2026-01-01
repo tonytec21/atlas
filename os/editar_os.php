@@ -62,7 +62,7 @@ try {
     $itens = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Inserir itens da OS na tabela de logs
-    $stmt = $conn->prepare("INSERT INTO logs_ordens_de_servico_itens (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, quantidade_liquidada, status, ordem_exibicao) VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :total, :quantidade_liquidada, :status, :ordem_exibicao)");
+    $stmt = $conn->prepare("INSERT INTO logs_ordens_de_servico_itens (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, quantidade_liquidada, status, ordem_exibicao) VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :ferrfis, :total, :quantidade_liquidada, :status, :ordem_exibicao)");
     
     foreach ($itens as $item) {
         $stmt->bindParam(':ordem_servico_id', $log_os_id);
@@ -74,6 +74,8 @@ try {
         $stmt->bindParam(':ferc', $item['ferc']);
         $stmt->bindParam(':fadep', $item['fadep']);
         $stmt->bindParam(':femp', $item['femp']);
+        $ferrfis_value = isset($item['ferrfis']) ? $item['ferrfis'] : 0;
+        $stmt->bindParam(':ferrfis', $ferrfis_value);
         $stmt->bindParam(':total', $item['total']);
         $stmt->bindParam(':quantidade_liquidada', $item['quantidade_liquidada']);
         $stmt->bindParam(':status', $item['status']);
@@ -865,10 +867,16 @@ try {
                     <input type="text" class="form-control" id="femp" name="femp" readonly>  
                 </div>  
                 <div class="form-group col-md-2">  
+                    <label for="ferrfis">FERRFIS:</label>  
+                    <input type="text" class="form-control" id="ferrfis" name="ferrfis" readonly>  
+                </div>  
+                <div class="form-group col-md-2">  
                     <label for="total">Total:</label>  
                     <input type="text" class="form-control" id="total" name="total" required readonly>  
                 </div>  
-                <div class="form-group col-md-2" style="margin-top: 32px;">  
+            </div>  
+            <div class="form-row">  
+                <div class="form-group col-md-12" style="margin-top: 20px;">  
                     <button type="button" style="width: 100%" class="btn btn-success" onclick="adicionarItem()">  
                         <i class="fa fa-plus" aria-hidden="true"></i> Adicionar à OS  
                     </button>  
@@ -894,6 +902,7 @@ try {
                             <th>FERC</th>  
                             <th>FADEP</th>  
                             <th>FEMP</th>  
+                            <th>FERRFIS</th>  
                             <th>Total</th>  
                             <th>Qtd Liquidada</th>  
                             <th>Ações</th>  
@@ -914,6 +923,7 @@ try {
                                 <td><?php echo number_format($item['ferc'], 2, ',', '.'); ?></td>  
                                 <td><?php echo number_format($item['fadep'], 2, ',', '.'); ?></td>  
                                 <td><?php echo number_format($item['femp'], 2, ',', '.'); ?></td>  
+                                <td><?php echo number_format(isset($item['ferrfis']) ? $item['ferrfis'] : 0, 2, ',', '.'); ?></td>  
                                 <td><?php echo number_format($item['total'], 2, ',', '.'); ?></td>  
                                 <td><?php echo $item['quantidade_liquidada']; ?></td>  
                                 <td>  
@@ -1031,6 +1041,10 @@ try {
                         <div class="valor-item">  
                             <span class="valor-label">FEMP</span>  
                             <span class="valor-value">R$ <?php echo number_format($item['femp'], 2, ',', '.'); ?></span>  
+                        </div>  
+                        <div class="valor-item">  
+                            <span class="valor-label">FERRFIS</span>  
+                            <span class="valor-value">R$ <?php echo number_format(isset($item['ferrfis']) ? $item['ferrfis'] : 0, 2, ',', '.'); ?></span>  
                         </div>  
                     </div>  
 
@@ -1209,7 +1223,7 @@ function atualizarISS () {
 
     /* Atualiza valores da linha existente */
     $linhaISS.find('td').eq(5).text(valorISS.toFixed(2).replace('.', ','));
-    $linhaISS.find('td').eq(9).text(valorISS.toFixed(2).replace('.', ','));
+    $linhaISS.find('td').eq(10).text(valorISS.toFixed(2).replace('.', ','));
 
     /* Recalcula o total geral depois da alteração */
     calcularTotalOS();
@@ -1255,7 +1269,7 @@ $(document).ready(function() {
         }
     }).blur(); // Chamar a função quando o campo perde o foco
 
-    $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #total').mask('#.##0,00', {reverse: true});
+    $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').mask('#.##0,00', {reverse: true});
 
     // Apresentante: bloquear aspas/apóstrofos ao digitar e sanitizar colas
     $('#cliente')
@@ -1316,16 +1330,18 @@ function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
                             var ferc = response.FERC * quantidade;
                             var fadep = response.FADEP * quantidade;
                             var femp = response.FEMP * quantidade;
+                            var ferrfis = (response.FERRFIS || 0) * quantidade;
 
                             var desconto = descontoLegal / 100;
                             emolumentos *= (1 - desconto);
                             ferc *= (1 - desconto);
                             fadep *= (1 - desconto);
                             femp *= (1 - desconto);
+                            ferrfis *= (1 - desconto);
 
                             /* ───────── EXCEÇÃO: zerar valores se o ato estiver na lista ───────── */
                             if (ATOS_SEM_VALOR.includes(ato.trim())) {
-                                emolumentos = ferc = fadep = femp = 0;
+                                emolumentos = ferc = fadep = femp = ferrfis = 0;
                             }
 
                             callback({
@@ -1334,7 +1350,8 @@ function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
                                 ferc: ferc.toFixed(2).replace('.', ','),
                                 fadep: fadep.toFixed(2).replace('.', ','),
                                 femp: femp.toFixed(2).replace('.', ','),
-                                total: (emolumentos + ferc + fadep + femp).toFixed(2).replace('.', ',')
+                                ferrfis: ferrfis.toFixed(2).replace('.', ','),
+                                total: (emolumentos + ferc + fadep + femp + ferrfis).toFixed(2).replace('.', ',')
                             });
                         }
                     },
@@ -1365,6 +1382,7 @@ function buscarAto() {
         $('#ferc').val(values.ferc);
         $('#fadep').val(values.fadep);
         $('#femp').val(values.femp);
+        $('#ferrfis').val(values.ferrfis);
         $('#total').val(values.total);
     });
 }
@@ -1388,6 +1406,7 @@ function adicionarISS() {
     var ferc = 0;
     var fadep = 0;
     var femp = 0;
+    var ferrfis = 0;
     var total = valorISS;
 
     $.ajax({
@@ -1403,6 +1422,7 @@ function adicionarISS() {
             ferc: ferc,
             fadep: fadep,
             femp: femp,
+            ferrfis: ferrfis,
             total: total
         },
         success: function(response) {
@@ -1417,6 +1437,7 @@ function adicionarISS() {
                         '<td>' + desconto_legal + '%</td>' +
                         '<td>' + descricao + '</td>' +
                         '<td>' + valorISS.toFixed(2).replace('.', ',') + '</td>' +
+                        '<td>0,00</td>' +
                         '<td>0,00</td>' +
                         '<td>0,00</td>' +
                         '<td>0,00</td>' +
@@ -1452,6 +1473,7 @@ function adicionarAtoManual() {
     $('#ferc').val('0,00').prop('readonly', false);
     $('#fadep').val('0,00').prop('readonly', false);
     $('#femp').val('0,00').prop('readonly', false);
+    $('#ferrfis').val('0,00').prop('readonly', false);
     $('#total').prop('readonly', false);
 }
 
@@ -1465,6 +1487,7 @@ function adicionarItem() {
     var ferc = parseFloat($('#ferc').val().replace(/\./g, '').replace(',', '.')) || 0;
     var fadep = parseFloat($('#fadep').val().replace(/\./g, '').replace(',', '.')) || 0;
     var femp = parseFloat($('#femp').val().replace(/\./g, '').replace(',', '.')) || 0;
+    var ferrfis = parseFloat($('#ferrfis').val().replace(/\./g, '').replace(',', '.')) || 0;
     var total = parseFloat($('#total').val().replace(/\./g, '').replace(',', '.')) || 0;
 
     const codigoAto = ato.trim();
@@ -1488,6 +1511,7 @@ function adicionarItem() {
             ferc: ferc,
             fadep: fadep,
             femp: femp,
+            ferrfis: ferrfis,
             total: total
         },
         success: function(response) {
@@ -1496,7 +1520,7 @@ function adicionarItem() {
                 if (res.error) {
                     showAlert(res.error, 'error');
                 } else {
-                    adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos.toFixed(2).replace('.', ','), ferc.toFixed(2).replace('.', ','), fadep.toFixed(2).replace('.', ','), femp.toFixed(2).replace('.', ','), total.toFixed(2).replace('.', ','));
+                    adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos.toFixed(2).replace('.', ','), ferc.toFixed(2).replace('.', ','), fadep.toFixed(2).replace('.', ','), femp.toFixed(2).replace('.', ','), ferrfis.toFixed(2).replace('.', ','), total.toFixed(2).replace('.', ','));
                     atualizarISS();          // recalcula ou cria o ISS
                     calcularTotalOS();       // soma geral
                     showAlert('Item adicionado com sucesso!', 'success', true);
@@ -1553,6 +1577,7 @@ function salvarNovaQuantidade() {
                 ferc: parseFloat(values.ferc.replace(',', '.')),
                 fadep: parseFloat(values.fadep.replace(',', '.')),
                 femp: parseFloat(values.femp.replace(',', '.')),
+                ferrfis: parseFloat(values.ferrfis.replace(',', '.')),
                 total: parseFloat(values.total.replace(',', '.'))
             },
             success: function(response) {
@@ -1567,11 +1592,12 @@ function salvarNovaQuantidade() {
                         row.find('td').eq(6).text(values.ferc);
                         row.find('td').eq(7).text(values.fadep);
                         row.find('td').eq(8).text(values.femp);
-                        row.find('td').eq(9).text(values.total);
+                        row.find('td').eq(9).text(values.ferrfis);
+                        row.find('td').eq(10).text(values.total);
 
                         if (novaQuantidade === quantidadeLiquidada) {
                             row.data('status', 'liquidado');
-                            row.find('td').eq(10).text('liquidado');
+                            row.find('td').eq(11).text('liquidado');
                             $.ajax({
                                 url: 'atualizar_status_item.php',
                                 type: 'POST',
@@ -1698,7 +1724,7 @@ function calcularTotalOS() {
     var totalOS = 0;
 
     $('#itensTable tr').each(function() {
-        var total = parseFloat($(this).find('td').eq(9).text().replace(/\./g, '').replace(',', '.')) || 0;
+        var total = parseFloat($(this).find('td').eq(10).text().replace(/\./g, '').replace(',', '.')) || 0;
         totalOS += total;
     });
 
@@ -1745,7 +1771,7 @@ function calcularTotalOS() {
 }
 
 
-function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos, ferc, fadep, femp, total) {
+function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total) {
     var item = '<tr>' +
         '<td>#</td>' + // Nova coluna para o índice #
         '<td>' + ato + '</td>' + // Coluna "Ato"
@@ -1756,6 +1782,7 @@ function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, e
         '<td>' + ferc + '</td>' + // Coluna "FERC"
         '<td>' + fadep + '</td>' + // Coluna "FADEP"
         '<td>' + femp + '</td>' + // Coluna "FEMP"
+        '<td>' + ferrfis + '</td>' + // Coluna "FERRFIS"
         '<td>' + total + '</td>' + // Coluna "Total"
         '<td>0</td>' + // Coluna "Qtd Liquidada" (0 para novos itens)
         '<td>' +
@@ -1836,106 +1863,6 @@ function salvarOS() {
             console.log('Resposta do servidor:', xhr.responseText);
             showAlert('Erro ao atualizar a Ordem de Serviço', 'error');
         }
-    });
-}
-</script>
-<script>
-function alterarQuantidade(button) {
-    var row = $(button).closest('tr');
-    var quantidadeLiquidada = parseInt(row.data('quantidade-liquidada'));
-    var status = row.data('status');
-
-    // Ajuste para pegar a nova quantidade (coluna 3) e demais informações da tabela
-    $('#novaQuantidade').val(row.find('td').eq(2).text());
-    $('#quantidadeLiquidada').val(quantidadeLiquidada);
-    $('#statusItem').val(status);
-    $('#alterarQuantidadeModal').modal('show');
-    $('#alterarQuantidadeForm').data('row', row);
-}
-
-function salvarNovaQuantidade() {
-    var novaQuantidade = parseInt($('#novaQuantidade').val());
-    var quantidadeLiquidada = parseInt($('#quantidadeLiquidada').val());
-    var statusItem = $('#statusItem').val();
-
-    if (novaQuantidade < quantidadeLiquidada) {
-        showAlert('A nova quantidade não pode ser menor que a quantidade já liquidada (' + quantidadeLiquidada + ').', 'error');
-        return;
-    }
-
-    var row = $('#alterarQuantidadeForm').data('row');
-    var item_id = row.data('item-id');
-    var ato = row.find('td').eq(1).text();
-    var descontoLegal = parseFloat(row.find('td').eq(3).text().replace('%', ''));
-
-    buscarAtoPorQuantidade(ato, novaQuantidade, descontoLegal, function(values) {
-        $.ajax({
-            url: 'atualizar_quantidade_item.php',
-            type: 'POST',
-            data: {
-                item_id: item_id,
-                quantidade: novaQuantidade,
-                emolumentos: parseFloat(values.emolumentos.replace(',', '.')),
-                ferc: parseFloat(values.ferc.replace(',', '.')),
-                fadep: parseFloat(values.fadep.replace(',', '.')),
-                femp: parseFloat(values.femp.replace(',', '.')),
-                total: parseFloat(values.total.replace(',', '.'))
-            },
-            success: function(response) {
-                try {
-                    var res = JSON.parse(response);
-                    if (res.error) {
-                        showAlert(res.error, 'error');
-                    } else {
-                        row.find('td').eq(2).text(novaQuantidade);
-                        row.find('td').eq(4).text(values.descricao);
-                        row.find('td').eq(5).text(values.emolumentos);
-                        row.find('td').eq(6).text(values.ferc);
-                        row.find('td').eq(7).text(values.fadep);
-                        row.find('td').eq(8).text(values.femp);
-                        row.find('td').eq(9).text(values.total);
-
-                        if (novaQuantidade === quantidadeLiquidada) {
-                            row.data('status', 'liquidado');
-                            row.find('td').eq(10).text('liquidado');
-                            $.ajax({
-                                url: 'atualizar_status_item.php',
-                                type: 'POST',
-                                data: {
-                                    item_id: row.data('item-id'),
-                                    status: 'liquidado'
-                                },
-                                success: function(response) {
-                                    try {
-                                        var res = JSON.parse(response);
-                                        if (res.error) {
-                                            showAlert(res.error, 'error');
-                                        }
-                                    } catch (e) {
-                                        showAlert('Erro ao processar a resposta do servidor.', 'error');
-                                    }
-                                },
-                                error: function(xhr, status, error) {
-                                    showAlert('Erro ao atualizar o status do item', 'error');
-                                }
-                            });
-                        }
-
-                        // Recalcular o total da OS
-                        atualizarISS();
-                        calcularTotalOS();
-
-                        $('#alterarQuantidadeModal').modal('hide');
-                        showAlert('Quantidade atualizada com sucesso!', 'success');
-                    }
-                } catch (e) {
-                    showAlert('Erro ao processar a resposta do servidor.', 'error');
-                }
-            },
-            error: function(xhr, status, error) {
-                showAlert('Erro ao atualizar a quantidade do item', 'error');
-            }
-        });
     });
 }
 

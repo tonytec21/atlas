@@ -14,6 +14,20 @@ if (!isset($conn)) {
     die("Erro ao conectar ao banco de dados");
 }
 
+// ========== VERIFICAR E ADICIONAR COLUNA FERRFIS SE NÃO EXISTIR ==========
+// Tabela atos_liquidados
+$checkColumn = $conn->query("SHOW COLUMNS FROM atos_liquidados LIKE 'ferrfis'");
+if ($checkColumn && $checkColumn->num_rows == 0) {
+    $conn->query("ALTER TABLE atos_liquidados ADD COLUMN ferrfis DECIMAL(10,2) DEFAULT 0.00 AFTER femp");
+}
+
+// Tabela atos_manuais_liquidados
+$checkColumn2 = $conn->query("SHOW COLUMNS FROM atos_manuais_liquidados LIKE 'ferrfis'");
+if ($checkColumn2 && $checkColumn2->num_rows == 0) {
+    $conn->query("ALTER TABLE atos_manuais_liquidados ADD COLUMN ferrfis DECIMAL(10,2) DEFAULT 0.00 AFTER femp");
+}
+// ========================================================================
+
 /* ===================== CONTROLE DO BOTÃO "PAGAMENTOS" POR JSON ===================== */
 // Lê a flag no JSON (usa o mesmo configuracao.json já usado no projeto)
 $__configPath = __DIR__ . '/../style/config_os.json';
@@ -1140,7 +1154,11 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         <i class="fa fa-paperclip" aria-hidden="true"></i> Anexos  
                     </button>  
                 </div>  
-                <?php if ($ordem_servico['status'] !== 'Cancelado'): ?>
+                <?php 
+                $anoOS = date('Y', strtotime($ordem_servico['data_criacao']));
+                $anoAtual = date('Y');
+                if ($ordem_servico['status'] !== 'Cancelado' && $anoOS === $anoAtual): 
+                ?>
                     <div class="col-auto">  
                         <button type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()">  
                             <i class="fa fa-pencil" aria-hidden="true"></i> Editar OS  
@@ -1328,6 +1346,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <th>FERC</th>  
                             <th>FADEP</th>  
                             <th>FEMP</th>  
+                            <th>FERRFIS</th>  
                             <th>Total</th>  
                             <th>Qtd Liquidada</th>  
                             <th>Status</th>  
@@ -1346,6 +1365,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <td><?php echo number_format($item['ferc'], 2, ',', '.'); ?></td>  
                             <td><?php echo number_format($item['fadep'], 2, ',', '.'); ?></td>  
                             <td><?php echo number_format($item['femp'], 2, ',', '.'); ?></td>  
+                            <td><?php echo number_format($item['ferrfis'] ?? 0, 2, ',', '.'); ?></td>  
                             <td><?php echo number_format($item['total'], 2, ',', '.'); ?></td>  
                             <td><?php echo $item['quantidade_liquidada']; ?></td>  
                             <td>  
@@ -1459,6 +1479,10 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <span class="valor-label">FEMP</span>
                             <span class="valor-value">R$ <?php echo number_format($item['femp'], 2, ',', '.'); ?></span>
                         </div>
+                        <div class="valor-item">
+                            <span class="valor-label">FERRFIS</span>
+                            <span class="valor-value">R$ <?php echo number_format($item['ferrfis'] ?? 0, 2, ',', '.'); ?></span>
+                        </div>
                     </div>
 
                     <!-- Total -->
@@ -1506,6 +1530,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <th>FERC</th>  
                             <th>FADEP</th>  
                             <th>FEMP</th>  
+                            <th>FERRFIS</th>  
                             <th>Total</th>  
                             <th>Usuário</th>  
                             <th>Data</th>  
@@ -1528,6 +1553,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                                 <td><?php echo 'R$ ' . number_format((float)($log['ferc'] ?? 0), 2, ',', '.'); ?></td>  
                                 <td><?php echo 'R$ ' . number_format((float)($log['fadep'] ?? 0), 2, ',', '.'); ?></td>  
                                 <td><?php echo 'R$ ' . number_format((float)($log['femp'] ?? 0), 2, ',', '.'); ?></td>  
+                                <td><?php echo 'R$ ' . number_format((float)($log['ferrfis'] ?? 0), 2, ',', '.'); ?></td>  
                                 <td><?php echo 'R$ ' . number_format((float)($log['total'] ?? 0), 2, ',', '.'); ?></td>  
                                 <td><?php echo htmlspecialchars($log['funcionario'] ?? ''); ?></td>  
                                 <td><?php echo $dataFmt; ?></td>  
@@ -1593,6 +1619,10 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <div class="valor-item">
                                 <span class="valor-label">FEMP</span>
                                 <span class="valor-value">R$ <?php echo number_format((float)($log['femp'] ?? 0), 2, ',', '.'); ?></span>
+                            </div>
+                            <div class="valor-item">
+                                <span class="valor-label">FERRFIS</span>
+                                <span class="valor-value">R$ <?php echo number_format((float)($log['ferrfis'] ?? 0), 2, ',', '.'); ?></span>
                             </div>
                         </div>
 

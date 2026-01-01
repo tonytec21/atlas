@@ -15,6 +15,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Iniciar transação
         $conn->begin_transaction();
 
+        // ========== VERIFICAR E ADICIONAR COLUNA FERRFIS SE NÃO EXISTIR ==========
+        // Tabela atos_liquidados
+        $checkColumn = $conn->query("SHOW COLUMNS FROM atos_liquidados LIKE 'ferrfis'");
+        if ($checkColumn->num_rows == 0) {
+            $conn->query("ALTER TABLE atos_liquidados ADD COLUMN ferrfis DECIMAL(10,2) DEFAULT 0.00 AFTER femp");
+        }
+
+        // Tabela atos_manuais_liquidados
+        $checkColumn2 = $conn->query("SHOW COLUMNS FROM atos_manuais_liquidados LIKE 'ferrfis'");
+        if ($checkColumn2->num_rows == 0) {
+            $conn->query("ALTER TABLE atos_manuais_liquidados ADD COLUMN ferrfis DECIMAL(10,2) DEFAULT 0.00 AFTER femp");
+        }
+        // ========================================================================
+
         // Buscar item atual
         $stmt = $conn->prepare("SELECT * FROM ordens_de_servico_itens WHERE id = ?");
         $stmt->bind_param("i", $item_id);
@@ -37,7 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($os_result->num_rows > 0) {
             $os_data = $os_result->fetch_assoc();
             $ano_criacao = date('Y', strtotime($os_data['data_criacao']));
-            $tabela_emolumentos = ($ano_criacao == 2024) ? 'tabela_emolumentos_2024' : 'tabela_emolumentos';
+            $ano_atual = date('Y');
+            
+            // Se for do ano corrente, usa tabela_emolumentos; caso contrário, usa tabela_emolumentos_[ANO]
+            $tabela_emolumentos = ($ano_criacao == $ano_atual) ? 'tabela_emolumentos' : 'tabela_emolumentos_' . $ano_criacao;
         } else {
             throw new Exception('Ordem de Serviço não encontrada.');
         }
@@ -47,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $ferc_valor = 0;
         $fadep_valor = 0;
         $femp_valor = 0;
+        $ferrfis_valor = 0;
         $total_valor = 0;
 
         // Verificar se o ato é válido
@@ -68,12 +86,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $ferc_valor = isset($emolumentos['FERC']) ? floatval($emolumentos['FERC']) * $quantidade_liquidar : 0;
                 $fadep_valor = isset($emolumentos['FADEP']) ? floatval($emolumentos['FADEP']) * $quantidade_liquidar : 0;
                 $femp_valor = isset($emolumentos['FEMP']) ? floatval($emolumentos['FEMP']) * $quantidade_liquidar : 0;
+                $ferrfis_valor = isset($emolumentos['FERRFIS']) ? floatval($emolumentos['FERRFIS']) * $quantidade_liquidar : 0;
                 $total_valor = isset($emolumentos['TOTAL']) ? floatval($emolumentos['TOTAL']) * $quantidade_liquidar : 0;
             } else {
                 $emolumentos_valor = floatval($item['emolumentos']) * $quantidade_liquidar;
                 $ferc_valor = floatval($item['ferc']) * $quantidade_liquidar;
                 $fadep_valor = floatval($item['fadep']) * $quantidade_liquidar;
                 $femp_valor = floatval($item['femp']) * $quantidade_liquidar;
+                $ferrfis_valor = isset($item['ferrfis']) ? floatval($item['ferrfis']) * $quantidade_liquidar : 0;
                 $total_valor = floatval($item['total']) * $quantidade_liquidar;
             }
 
@@ -84,12 +104,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $ferc_valor *= (1 - $desconto_legal / 100);
                 $fadep_valor *= (1 - $desconto_legal / 100);
                 $femp_valor *= (1 - $desconto_legal / 100);
+                $ferrfis_valor *= (1 - $desconto_legal / 100);
                 $total_valor *= (1 - $desconto_legal / 100);
             }
 
-            if ($emolumentos_valor > 0 || $ferc_valor > 0 || $fadep_valor > 0 || $femp_valor > 0 || $total_valor > 0) {
-                $stmt = $conn->prepare("INSERT INTO atos_liquidados (ordem_servico_id, ato, quantidade_liquidada, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, funcionario, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("isisssssssss",
+            if ($emolumentos_valor > 0 || $ferc_valor > 0 || $fadep_valor > 0 || $femp_valor > 0 || $ferrfis_valor > 0 || $total_valor > 0) {
+                $stmt = $conn->prepare("INSERT INTO atos_liquidados (ordem_servico_id, ato, quantidade_liquidada, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, funcionario, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("isissssssssss",
                     $item['ordem_servico_id'],
                     $item['ato'],
                     $quantidade_liquidar,
@@ -99,6 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $ferc_valor,
                     $fadep_valor,
                     $femp_valor,
+                    $ferrfis_valor,
                     $total_valor,
                     $_SESSION['username'],
                     $status
@@ -111,10 +133,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $ferc_valor = floatval($item['ferc']) * $quantidade_liquidar;
             $fadep_valor = floatval($item['fadep']) * $quantidade_liquidar;
             $femp_valor = floatval($item['femp']) * $quantidade_liquidar;
+            $ferrfis_valor = isset($item['ferrfis']) ? floatval($item['ferrfis']) * $quantidade_liquidar : 0;
             $total_valor = floatval($item['total']) * $quantidade_liquidar;
 
-            $stmt = $conn->prepare("INSERT INTO atos_manuais_liquidados (ordem_servico_id, ato, quantidade_liquidada, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, funcionario, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("isisssssssss",
+            $stmt = $conn->prepare("INSERT INTO atos_manuais_liquidados (ordem_servico_id, ato, quantidade_liquidada, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, funcionario, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("isissssssssss",
                 $item['ordem_servico_id'],
                 $item['ato'],
                 $quantidade_liquidar,
@@ -124,6 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $ferc_valor,
                 $fadep_valor,
                 $femp_valor,
+                $ferrfis_valor,
                 $total_valor,
                 $_SESSION['username'],
                 $status

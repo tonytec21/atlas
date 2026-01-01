@@ -4,6 +4,17 @@ checkSession();
 include(__DIR__ . '/db_connection.php');  
 date_default_timezone_set('America/Sao_Paulo');  
 
+// ===================== AUTO UPDATE - Adiciona coluna FERRFIS se não existir =====================
+try {
+    $conn = getDatabaseConnection();
+    $checkColumn = $conn->query("SHOW COLUMNS FROM ordens_de_servico_itens LIKE 'ferrfis'");
+    if ($checkColumn->rowCount() == 0) {
+        $conn->exec("ALTER TABLE ordens_de_servico_itens ADD COLUMN ferrfis DECIMAL(10,2) DEFAULT 0.00 AFTER femp");
+    }
+} catch (PDOException $e) {
+    // Silently ignore if table doesn't exist yet
+}
+
 $issConfig     = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);  
 $issAtivo      = !empty($issConfig['ativo']);  
 $issPercentual = isset($issConfig['percentual']) ? (float)$issConfig['percentual'] : 0;  
@@ -760,10 +771,17 @@ $atosSemValor = json_decode(
                     <input type="text" class="form-control" id="femp" name="femp" readonly>  
                 </div>  
                 <div class="form-group col-md-2">  
+                    <label for="ferrfis">FERRFIS:</label>  
+                    <input type="text" class="form-control" id="ferrfis" name="ferrfis" readonly>  
+                </div>  
+                <div class="form-group col-md-2">  
                     <label for="total">Total:</label>  
                     <input type="text" class="form-control" id="total" name="total" required readonly>  
                 </div>  
-                <div class="form-group col-md-2" style="margin-top: 29px;">  
+            </div>  
+
+            <div class="form-row">  
+                <div class="form-group col-md-12" style="margin-top: 10px;">  
                     <button type="submit" style="width: 100%" class="btn btn-success">  
                         <i class="fa fa-plus" aria-hidden="true"></i> Adicionar à OS  
                     </button>  
@@ -789,6 +807,7 @@ $atosSemValor = json_decode(
                             <th>FERC</th>  
                             <th>FADEP</th>  
                             <th>FEMP</th>  
+                            <th>FERRFIS</th>  
                             <th>Total</th>  
                             <th>Ações</th>  
                         </tr>  
@@ -898,7 +917,8 @@ $atosSemValor = json_decode(
             const ferc = $tr.find('td').eq(6).text();  
             const fadep = $tr.find('td').eq(7).text();  
             const femp = $tr.find('td').eq(8).text();  
-            const total = $tr.find('td').eq(9).text();  
+            const ferrfis = $tr.find('td').eq(9).text();  
+            const total = $tr.find('td').eq(10).text();  
             const isISS = $tr.attr('id') === 'ISS_ROW';  
 
             const cardClass = isISS ? 'item-card iss-card' : 'item-card';  
@@ -948,6 +968,10 @@ $atosSemValor = json_decode(
                         <div class="valor-item">  
                             <span class="valor-label">FEMP</span>  
                             <span class="valor-value">R$ ${femp}</span>  
+                        </div>  
+                        <div class="valor-item">  
+                            <span class="valor-label">FERRFIS</span>  
+                            <span class="valor-value">R$ ${ferrfis}</span>  
                         </div>  
                     </div>  
 
@@ -1002,7 +1026,7 @@ $atosSemValor = json_decode(
     // ===================== REMOVER ITEM POR ÍNDICE =====================  
     function removerItemPorIndice(index) {  
         const $row = $('#itensTable tr').eq(index);  
-        const totalItem = parseFloat($row.find('td').eq(9).text().replace(/\./g, '').replace(',', '.')) || 0;  
+        const totalItem = parseFloat($row.find('td').eq(10).text().replace(/\./g, '').replace(',', '.')) || 0;  
 
         var totalOS = parseFloat($('#total_os').val().replace(/\./g, '').replace(',', '.')) || 0;  
         totalOS -= totalItem;  
@@ -1097,7 +1121,7 @@ $atosSemValor = json_decode(
             .on('blur', updateSalvarButtonState);  
 
         // Máscaras de valores  
-        $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #total').mask('#.##0,00', {reverse: true});  
+        $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').mask('#.##0,00', {reverse: true});  
 
         // Submit do formulário  
         $('#osForm').on('submit', function(e) {  
@@ -1111,6 +1135,7 @@ $atosSemValor = json_decode(
             var ferc = parseFloat($('#ferc').val().replace(/\./g, '').replace(',', '.')) || 0;  
             var fadep = parseFloat($('#fadep').val().replace(/\./g, '').replace(',', '.')) || 0;  
             var femp = parseFloat($('#femp').val().replace(/\./g, '').replace(',', '.')) || 0;  
+            var ferrfis = parseFloat($('#ferrfis').val().replace(/\./g, '').replace(',', '.')) || 0;  
             var total = parseFloat($('#total').val().replace(/\./g, '').replace(',', '.')) || 0;  
 
             if (isNaN(emolumentos)) {  
@@ -1138,6 +1163,7 @@ $atosSemValor = json_decode(
                 '<td>' + ferc.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' + fadep.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' + femp.toFixed(2).replace('.', ',') + '</td>' +  
+                '<td>' + ferrfis.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' + total.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' +
                 '<button type="button" class="btn btn-warning btn-sm" onclick="marcarItemIsento(this)">' +
@@ -1163,6 +1189,7 @@ $atosSemValor = json_decode(
             $('#ferc').val('');  
             $('#fadep').val('');  
             $('#femp').val('');  
+            $('#ferrfis').val('');  
             $('#total').val('');  
 
             $('#descricao').prop('readonly', true);  
@@ -1170,6 +1197,7 @@ $atosSemValor = json_decode(
             $('#ferc').prop('readonly', true);  
             $('#fadep').prop('readonly', true);  
             $('#femp').prop('readonly', true);  
+            $('#ferrfis').prop('readonly', true);  
             $('#total').prop('readonly', true);  
         });  
 
@@ -1224,15 +1252,17 @@ $atosSemValor = json_decode(
                         var ferc = parseFloat(response.FERC) * quantidade;  
                         var fadep = parseFloat(response.FADEP) * quantidade;  
                         var femp = parseFloat(response.FEMP) * quantidade;  
+                        var ferrfis = parseFloat(response.FERRFIS || 0) * quantidade;  
 
                         var desconto = descontoLegal / 100;  
                         emolumentos = emolumentos * (1 - desconto);  
                         ferc = ferc * (1 - desconto);  
                         fadep = fadep * (1 - desconto);  
                         femp = femp * (1 - desconto);  
+                        ferrfis = ferrfis * (1 - desconto);  
 
                         if (ATOS_SEM_VALOR.includes(ato.trim())) {  
-                            emolumentos = ferc = fadep = femp = 0;  
+                            emolumentos = ferc = fadep = femp = ferrfis = 0;  
                         }  
 
                         $('#descricao').val(response.DESCRICAO);  
@@ -1240,7 +1270,8 @@ $atosSemValor = json_decode(
                         $('#ferc').val(ferc.toFixed(2).replace('.', ','));  
                         $('#fadep').val(fadep.toFixed(2).replace('.', ','));  
                         $('#femp').val(femp.toFixed(2).replace('.', ','));  
-                        $('#total').val((emolumentos + ferc + fadep + femp).toFixed(2).replace('.', ','));  
+                        $('#ferrfis').val(ferrfis.toFixed(2).replace('.', ','));  
+                        $('#total').val((emolumentos + ferc + fadep + femp + ferrfis).toFixed(2).replace('.', ','));  
                     } catch (e) {  
                         showAlert('Erro ao processar os dados do ato.', 'error');  
                     }  
@@ -1280,13 +1311,14 @@ $atosSemValor = json_decode(
                         <td>0,00</td>  
                         <td>0,00</td>  
                         <td>0,00</td>  
+                        <td>0,00</td>  
                         <td>${valorISS.toFixed(2).replace('.', ',')}</td>  
                         <td><span class="text-muted" title="Item fixo">  
                                 <i class="fa fa-lock"></i></span></td>  
                     </tr>`);  
             } else {  
                 $linhaISS.find('td').eq(5).text(valorISS.toFixed(2).replace('.', ','));  
-                $linhaISS.find('td').eq(9).text(valorISS.toFixed(2).replace('.', ','));  
+                $linhaISS.find('td').eq(10).text(valorISS.toFixed(2).replace('.', ','));  
             }  
         } else {  
             $('#ISS_ROW').remove();  
@@ -1294,7 +1326,7 @@ $atosSemValor = json_decode(
 
         let totalOS = 0;  
         $('#itensTable tr').each(function () {  
-            totalOS += parseFloat($(this).find('td').eq(9).text()  
+            totalOS += parseFloat($(this).find('td').eq(10).text()  
                                   .replace(/\./g, '').replace(',', '.')) || 0;  
         });  
         $('#total_os').val(totalOS.toFixed(2).replace('.', ','));  
@@ -1310,13 +1342,14 @@ $atosSemValor = json_decode(
         $('#ferc').val('0,00').prop('readonly', false);  
         $('#fadep').val('0,00').prop('readonly', false);  
         $('#femp').val('0,00').prop('readonly', false);  
+        $('#ferrfis').val('0,00').prop('readonly', false);  
         $('#total').prop('readonly', false);  
     }  
 
     // ===================== REMOVER ITEM =====================
     function removerItem(button) {  
         var row = $(button).closest('tr');  
-        var totalItem = parseFloat(row.find('td').eq(9).text().replace(/\./g, '').replace(',', '.')) || 0;  
+        var totalItem = parseFloat(row.find('td').eq(10).text().replace(/\./g, '').replace(',', '.')) || 0;  
 
         var totalOS = parseFloat($('#total_os').val().replace(/\./g, '').replace(',', '.')) || 0;  
         totalOS -= totalItem;  
@@ -1334,8 +1367,8 @@ $atosSemValor = json_decode(
         const $tr = $(btn).closest('tr');
         const $tds = $tr.find('td');
 
-        // 1) Zera os valores (colunas 5..9: Emol., FERC, FADEP, FEMP, Total)
-        for (let i = 5; i <= 9; i++) {
+        // 1) Zera os valores (colunas 5..10: Emol., FERC, FADEP, FEMP, FERRFIS, Total)
+        for (let i = 5; i <= 10; i++) {
             $tds.eq(i).text('0,00');
         }
 
@@ -1387,7 +1420,8 @@ $atosSemValor = json_decode(
             var ferc = $(this).find('td').eq(6).text().replace(/\./g, '').replace(',', '.');  
             var fadep = $(this).find('td').eq(7).text().replace(/\./g, '').replace(',', '.');  
             var femp = $(this).find('td').eq(8).text().replace(/\./g, '').replace(',', '.');  
-            var total = $(this).find('td').eq(9).text().replace(/\./g, '').replace(',', '.');  
+            var ferrfis = $(this).find('td').eq(9).text().replace(/\./g, '').replace(',', '.');  
+            var total = $(this).find('td').eq(10).text().replace(/\./g, '').replace(',', '.');  
             var ordem_exibicao = index + 1;  
 
             itens.push({  
@@ -1399,6 +1433,7 @@ $atosSemValor = json_decode(
                 ferc: ferc,  
                 fadep: fadep,  
                 femp: femp,  
+                ferrfis: ferrfis,  
                 total: total,  
                 ordem_exibicao: ordem_exibicao  
             });  
@@ -1506,6 +1541,7 @@ $atosSemValor = json_decode(
                         const ferc        = parseFloat((item.ferc        || '0').replace(',', '.'));
                         const fadep       = parseFloat((item.fadep       || '0').replace(',', '.'));
                         const femp        = parseFloat((item.femp        || '0').replace(',', '.'));
+                        const ferrfis     = parseFloat((item.ferrfis     || '0').replace(',', '.'));
                         const total       = parseFloat((item.total       || '0').replace(',', '.'));
 
                         const ordemExibicao = $('#itensTable tr').length + 1;
@@ -1521,6 +1557,7 @@ $atosSemValor = json_decode(
                                 <td>${ferc.toFixed(2).replace('.', ',')}</td>
                                 <td>${fadep.toFixed(2).replace('.', ',')}</td>
                                 <td>${femp.toFixed(2).replace('.', ',')}</td>
+                                <td>${ferrfis.toFixed(2).replace('.', ',')}</td>
                                 <td>${total.toFixed(2).replace('.', ',')}</td>
                                 <td>
                                     <button type="button" class="btn btn-warning btn-sm" onclick="marcarItemIsento(this)">

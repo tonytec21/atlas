@@ -25,6 +25,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     try {
         $conn = getDatabaseConnection();
 
+        // ===================== AUTO UPDATE - Adiciona coluna FERRFIS se não existir =====================
+        $checkColumn = $conn->query("SHOW COLUMNS FROM ordens_de_servico_itens LIKE 'ferrfis'");
+        if ($checkColumn->rowCount() == 0) {
+            $conn->exec("ALTER TABLE ordens_de_servico_itens ADD COLUMN ferrfis DECIMAL(10,2) DEFAULT 0.00 AFTER femp");
+        }
+
         // Inicia a transação
         $conn->beginTransaction();
 
@@ -43,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $os_id = $conn->lastInsertId();
 
         $stmt = $conn->prepare("INSERT INTO ordens_de_servico_itens 
-            (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total, ordem_exibicao) 
-            VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :total, :ordem_exibicao)");
+            (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, ordem_exibicao) 
+            VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :ferrfis, :total, :ordem_exibicao)");
         
         foreach ($itens as $item) {
             $ordem_servico_id = $os_id;
@@ -56,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $ferc = str_replace(',', '.', $item['ferc']);
             $fadep = str_replace(',', '.', $item['fadep']);
             $femp = str_replace(',', '.', $item['femp']);
+            $ferrfis = str_replace(',', '.', $item['ferrfis'] ?? '0');
             $total = str_replace(',', '.', $item['total']);
             $ordem_exibicao = $item['ordem_exibicao']; 
         
@@ -68,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bindParam(':ferc', $ferc);
             $stmt->bindParam(':fadep', $fadep);
             $stmt->bindParam(':femp', $femp);
+            $stmt->bindParam(':ferrfis', $ferrfis);
             $stmt->bindParam(':total', $total);
             $stmt->bindParam(':ordem_exibicao', $ordem_exibicao); 
             $stmt->execute();

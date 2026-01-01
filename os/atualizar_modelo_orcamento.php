@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     try {
         $conn = getDatabaseConnection();
+        ensureFerrfisColumnExists($conn);
         $conn->beginTransaction();
 
         // Atualiza o modelo principal
@@ -38,8 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Insere itens novamente
         $stmtItem = $conn->prepare("
             INSERT INTO modelos_de_orcamento_itens 
-            (modelo_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total)
-            VALUES (:modelo_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :total)
+            (modelo_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total)
+            VALUES (:modelo_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :ferrfis, :total)
         ");
 
         foreach ($itens as $item) {
@@ -52,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $ferc           = str_replace(',', '.', $item['ferc']);
             $fadep          = str_replace(',', '.', $item['fadep']);
             $femp           = str_replace(',', '.', $item['femp']);
+            $ferrfis        = str_replace(',', '.', ($item['ferrfis'] ?? '0'));
             $total          = str_replace(',', '.', $item['total']);
 
             $stmtItem->bindParam(':modelo_id', $modelo_id);
@@ -63,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmtItem->bindParam(':ferc', $ferc);
             $stmtItem->bindParam(':fadep', $fadep);
             $stmtItem->bindParam(':femp', $femp);
+            $stmtItem->bindParam(':ferrfis', $ferrfis);
             $stmtItem->bindParam(':total', $total);
 
             $stmtItem->execute();

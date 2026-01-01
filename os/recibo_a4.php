@@ -152,8 +152,24 @@ if (isset($_GET['id'])) {
         $v = str_replace(',', '.', (string)($it['desconto_legal'] ?? ''));
         if ($v !== '' && floatval($v) > 0) { $show_desc_legal = true; break; }
     }
-    // largura da coluna DESCRIÇÃO (absorve os 8% se esconder o desconto)
-    $descricaoWidth = $show_desc_legal ? '35%' : '43%';
+    
+    // Verificar se deve mostrar a coluna FERRFIS (somente se algum item tiver valor > 0)
+    $show_ferrfis = false;
+    foreach ($ordem_servico_itens as $it) {
+        $v = floatval($it['ferrfis'] ?? 0);
+        if ($v > 0) { $show_ferrfis = true; break; }
+    }
+    
+    // largura da coluna DESCRIÇÃO (absorve os 8% se esconder o desconto e/ou ferrfis)
+    if ($show_desc_legal && $show_ferrfis) {
+        $descricaoWidth = '29%';
+    } elseif ($show_desc_legal && !$show_ferrfis) {
+        $descricaoWidth = '35%';
+    } elseif (!$show_desc_legal && $show_ferrfis) {
+        $descricaoWidth = '37%';
+    } else {
+        $descricaoWidth = '43%';
+    }
 
     // Criador
     $criado_por = $ordem_servico['criado_por'];
@@ -258,36 +274,42 @@ if (isset($_GET['id'])) {
     $pdf->writeHTML('<div style="text-align: center; margin-top: 20px;"><b>ITENS DA ORDEM DE SERVIÇO</b></div>', true, false, true, false, '');
     $pdf->Ln(0);
 
-    function adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth) {
+    function adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth, $show_ferrfis = false) {
         $descTh = $show_desc_legal
             ? '<th style="width: 8%; text-align: center; font-size: 8px;"><b>DESC. LEGAL %</b></th>'
+            : '';
+        
+        $ferrfisTh = $show_ferrfis
+            ? '<th style="width: 8%; text-align: center; font-size: 8px;"><b>FERRFIS</b></th>'
             : '';
 
         $html = '<table border="0.1" cellpadding="4">
             <thead>
                 <tr>
-                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>ATO</b></th>
-                    <th style="width: 5%; text-align: center; font-size: 8.5px;"><b>QTD</b></th>'
+                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>ATO</b></th>
+                    <th style="width: 5%; text-align: center; font-size: 8px;"><b>QTD</b></th>'
                     . $descTh .
-                '<th style="width: '.$descricaoWidth.'; text-align: center; font-size: 8.5px;"><b>DESCRIÇÃO</b></th>
-                    <th style="width: 10%; text-align: center; font-size: 8.5px;"><b>EMOL</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>FERC</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>FADEP</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>FEMP</b></th>
-                    <th style="width: 10%; text-align: center; font-size: 8.5px;"><b>TOTAL</b></th>
+                '<th style="width: '.$descricaoWidth.'; text-align: center; font-size: 8px;"><b>DESCRIÇÃO</b></th>
+                    <th style="width: 9%; text-align: center; font-size: 8px;"><b>EMOL</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>FERC</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>FADEP</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>FEMP</b></th>
+                    '.$ferrfisTh.'
+                    <th style="width: 9%; text-align: center; font-size: 8px;"><b>TOTAL</b></th>
                 </tr>
             </thead>
             <tbody>';
         return $html;
     }
 
-    $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth);
+    $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth, $show_ferrfis);
 
     // Acumuladores
     $total_emolumentos = 0.0; // será exibido na coluna FERJ
     $total_ferc = 0.0;
     $total_fadep = 0.0;
     $total_femp = 0.0;
+    $total_ferrfis = 0.0;
     $total_geral = 0.0;
     $total_outros = 0.0; // TOTAL apenas dos itens com ATO = 0
     $total_iss = 0.0;    // TOTAL apenas dos itens com ATO = 'ISS'
@@ -296,17 +318,22 @@ if (isset($_GET['id'])) {
         $descTd = $show_desc_legal
             ? '<td style="width: 8%; font-size: 8.5px;">' . $item['desconto_legal'] . '</td>'
             : '';
+        
+        $ferrfisTd = $show_ferrfis
+            ? '<td style="width: 8%; font-size: 8px;">R$ ' . number_format($item['ferrfis'] ?? 0, 2, ',', '.') . '</td>'
+            : '';
 
         $rowHtml = '<tr>
-            <td style="width: 8%; font-size: 8.5px;">' . $item['ato'] . '</td>
-            <td style="width: 5%; font-size: 8.5px;">' . $item['quantidade'] . '</td>'
+            <td style="width: 8%; font-size: 8px;">' . $item['ato'] . '</td>
+            <td style="width: 5%; font-size: 8px;">' . $item['quantidade'] . '</td>'
             . $descTd .
         '<td style="width: '.$descricaoWidth.'; font-size: 8px;">' . $item['descricao'] . '</td>
-            <td style="width: 10%; font-size: 8.5px;">R$ ' . number_format($item['emolumentos'], 2, ',', '.') . '</td>
-            <td style="width: 8%; font-size: 8.5px;">R$ ' . number_format($item['ferc'], 2, ',', '.') . '</td>
-            <td style="width: 8%; font-size: 8.5px;">R$ ' . number_format($item['fadep'], 2, ',', '.') . '</td>
-            <td style="width: 8%; font-size: 8.5px;">R$ ' . number_format($item['femp'], 2, ',', '.') . '</td>
-            <td style="width: 10%; font-size: 8.5px;">R$ ' . number_format($item['total'], 2, ',', '.') . '</td>
+            <td style="width: 9%; font-size: 8px;">R$ ' . number_format($item['emolumentos'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8px;">R$ ' . number_format($item['ferc'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8px;">R$ ' . number_format($item['fadep'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8px;">R$ ' . number_format($item['femp'], 2, ',', '.') . '</td>
+            '.$ferrfisTd.'
+            <td style="width: 9%; font-size: 8px;">R$ ' . number_format($item['total'], 2, ',', '.') . '</td>
         </tr>';
 
         // Somatórios
@@ -314,6 +341,7 @@ if (isset($_GET['id'])) {
         $total_ferc  += (float)$item['ferc'];
         $total_fadep += (float)$item['fadep'];
         $total_femp  += (float)$item['femp'];
+        $total_ferrfis += (float)($item['ferrfis'] ?? 0);
         $total_geral += (float)$item['total'];
 
         // OUTROS = somente atos com ATO == 0
@@ -333,7 +361,7 @@ if (isset($_GET['id'])) {
         $html .= '</tbody></table>';
         $pdf->writeHTML($html, true, false, true, false, '');
         $pdf->AddPage();
-        $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth) . $rowHtml;
+        $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth, $show_ferrfis) . $rowHtml;
         } else {
             $html .= $rowHtml;
         }
@@ -354,6 +382,9 @@ if (isset($_GET['id'])) {
         ['label' => 'FEMP',  'value' => $total_femp],
         ['label' => 'FADEP', 'value' => $total_fadep],
     ];
+    if ($show_ferrfis) {
+        $columns[] = ['label' => 'FERRFIS', 'value' => $total_ferrfis];
+    }
     if ($total_iss > 0) {
         $columns[] = ['label' => 'ISS', 'value' => $total_iss];
     }

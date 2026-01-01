@@ -3,6 +3,31 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
+
+/**
+ * Garante que a coluna FERRFIS exista na tabela modelos_de_orcamento_itens.
+ * (Evita esquecer de rodar update no banco)
+ */
+try {
+    $connCheck = getDatabaseConnection();
+    $stmtCol = $connCheck->prepare("
+        SELECT COUNT(*) 
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'modelos_de_orcamento_itens'
+          AND COLUMN_NAME = 'ferrfis'
+    ");
+    $stmtCol->execute();
+    $colExists = (int)$stmtCol->fetchColumn() > 0;
+
+    if (!$colExists) {
+        $connCheck->exec("ALTER TABLE modelos_de_orcamento_itens ADD COLUMN ferrfis DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER femp");
+    }
+} catch (PDOException $e) {
+    // Não interrompe a tela (apenas loga)
+    error_log('Erro ao garantir coluna ferrfis em modelos_de_orcamento_itens: ' . $e->getMessage());
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -885,6 +910,19 @@ date_default_timezone_set('America/Sao_Paulo');
                         </div>
                         <div class="col-md-2 col-6">
                             <div class="form-group">
+                                <label for="ferrfis">
+                                    <i class="mdi mdi-cash"></i> FERRFIS
+                                </label>
+                                <input type="text" 
+                                       class="form-control text-money" 
+                                       id="ferrfis" 
+                                       name="ferrfis" 
+                                       placeholder="0,00"
+                                       readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6">
+                            <div class="form-group">
                                 <label for="total">
                                     <i class="mdi mdi-cash-multiple"></i> Total
                                 </label>
@@ -921,6 +959,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                     <th><i class="mdi mdi-cash"></i> FERC</th>
                                     <th><i class="mdi mdi-cash"></i> FADEP</th>
                                     <th><i class="mdi mdi-cash"></i> FEMP</th>
+                                    <th><i class="mdi mdi-cash"></i> FERRFIS</th>
                                     <th><i class="mdi mdi-cash-multiple"></i> Total</th>
                                     <th><i class="mdi mdi-cog"></i> Ações</th>
                                 </tr>
@@ -983,6 +1022,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <th><i class="mdi mdi-cash"></i> FERC</th>
                                 <th><i class="mdi mdi-cash"></i> FADEP</th>
                                 <th><i class="mdi mdi-cash"></i> FEMP</th>
+                                <th><i class="mdi mdi-cash"></i> FERRFIS</th>
                                 <th><i class="mdi mdi-cash-multiple"></i> Total</th>
                             </tr>
                         </thead>
@@ -1084,9 +1124,13 @@ function syncTableAndCards() {
                     <span class="item-card-label">FEMP</span>
                     <span class="item-card-value text-money">R$ ${tds.eq(7).text()}</span>
                 </div>
+                <div class="item-card-field">
+                    <span class="item-card-label">FERRFIS</span>
+                    <span class="item-card-value text-money">R$ ${tds.eq(8).text()}</span>
+                </div>
                 <div class="item-card-field" style="grid-column: 1 / -1;">
                     <span class="item-card-label">Total</span>
-                    <span class="item-card-value text-money" style="font-size: 18px; color: var(--brand-success);">R$ ${tds.eq(8).text()}</span>
+                    <span class="item-card-value text-money" style="font-size: 18px; color: var(--brand-success);">R$ ${tds.eq(9).text()}</span>
                 </div>
             </div>
             <div class="item-card-actions">
@@ -1120,7 +1164,7 @@ $(document).ready(function() {
     carregarModelos();
     
     // Máscaras
-    $('#emolumentos, #ferc, #fadep, #femp, #total').mask('#.##0,00', {reverse: true});
+    $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').mask('#.##0,00', {reverse: true});
     
     // Sanitizar campo ato
     $('#ato').on('input', function() {
@@ -1163,20 +1207,23 @@ function buscarAto() {
                     let ferc       = parseFloat(response.FERC || 0)        * quantidade;
                     let fadep      = parseFloat(response.FADEP || 0)       * quantidade;
                     let femp       = parseFloat(response.FEMP || 0)        * quantidade;
+                    let ferrfis    = parseFloat(response.FERRFIS || 0)     * quantidade;
 
                     const desconto = descontoLegal / 100;
                     emolumentos *= (1 - desconto);
                     ferc        *= (1 - desconto);
                     fadep       *= (1 - desconto);
                     femp        *= (1 - desconto);
+                    ferrfis     *= (1 - desconto);
 
-                    const total = emolumentos + ferc + fadep + femp;
+                    const total = emolumentos + ferc + fadep + femp + ferrfis;
 
                     $('#descricao_item').val(response.DESCRICAO || '').prop('readonly', true);
                     $('#emolumentos').val(formatMoney(emolumentos)).prop('readonly', true);
                     $('#ferc').val(formatMoney(ferc)).prop('readonly', true);
                     $('#fadep').val(formatMoney(fadep)).prop('readonly', true);
                     $('#femp').val(formatMoney(femp)).prop('readonly', true);
+                    $('#ferrfis').val(formatMoney(ferrfis)).prop('readonly', true);
                     $('#total').val(formatMoney(total)).prop('readonly', true);
                 } catch (e) {
                     showAlert('Erro ao processar os dados do ato.', 'error');
@@ -1201,6 +1248,7 @@ function adicionarAtoManual() {
     $('#ferc').val('0,00').prop('readonly', false);
     $('#fadep').val('0,00').prop('readonly', false);
     $('#femp').val('0,00').prop('readonly', false);
+    $('#ferrfis').val('0,00').prop('readonly', false);
     $('#total').val('').prop('readonly', false);
     $('#quantidade').val('1');
 
@@ -1220,6 +1268,7 @@ function adicionarItemTabela() {
     const ferc          = $('#ferc').val() || '0,00';
     const fadep         = $('#fadep').val() || '0,00';
     const femp          = $('#femp').val() || '0,00';
+    const ferrfis       = $('#ferrfis').val() || '0,00';
     const total         = $('#total').val().trim();
 
     // Validações
@@ -1246,6 +1295,7 @@ function adicionarItemTabela() {
         <td>${ferc}</td>
         <td>${fadep}</td>
         <td>${femp}</td>
+        <td>${ferrfis}</td>
         <td>${total}</td>
         <td>
             <button type="button" class="btn btn-delete btn-sm" onclick="removerItem(this)">
@@ -1268,10 +1318,11 @@ function adicionarItemTabela() {
     $('#ferc').val('');
     $('#fadep').val('');
     $('#femp').val('');
+    $('#ferrfis').val('');
     $('#total').val('');
 
     // Retorna campos ao readonly
-    $('#descricao_item, #emolumentos, #ferc, #fadep, #femp, #total').prop('readonly', true);
+    $('#descricao_item, #emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').prop('readonly', true);
 
     // Focus no campo ato
     $('#ato').focus();
@@ -1308,7 +1359,8 @@ function salvarModelo() {
             ferc:           tds.eq(5).text(),
             fadep:          tds.eq(6).text(),
             femp:           tds.eq(7).text(),
-            total:          tds.eq(8).text()
+            ferrfis:        tds.eq(8).text(),
+            total:          tds.eq(9).text()
         };
         itens.push(item);
     });
@@ -1410,6 +1462,7 @@ function visualizarModelo(id) {
                         <td class="text-money">R$ ${formatMoney(item.ferc)}</td>
                         <td class="text-money">R$ ${formatMoney(item.fadep)}</td>
                         <td class="text-money">R$ ${formatMoney(item.femp)}</td>
+                        <td class="text-money">R$ ${formatMoney(item.ferrfis || 0)}</td>
                         <td class="text-money">R$ ${formatMoney(item.total)}</td>
                     </tr>`;
                     $('#tabelaItensVisualizar tbody').append(row);
@@ -1451,6 +1504,10 @@ function visualizarModelo(id) {
                             <div class="item-card-field">
                                 <span class="item-card-label">FEMP</span>
                                 <span class="item-card-value text-money">R$ ${formatMoney(item.femp)}</span>
+                            </div>
+                            <div class="item-card-field">
+                                <span class="item-card-label">FERRFIS</span>
+                                <span class="item-card-value text-money">R$ ${formatMoney(item.ferrfis || 0)}</span>
                             </div>
                             <div class="item-card-field" style="grid-column: 1 / -1;">
                                 <span class="item-card-label">Total</span>
@@ -1513,6 +1570,7 @@ function editarModelo(id) {
                         <td>${item.ferc}</td>
                         <td>${item.fadep}</td>
                         <td>${item.femp}</td>
+                        <td>${(item.ferrfis !== undefined && item.ferrfis !== null) ? item.ferrfis : '0,00'}</td>
                         <td>${item.total}</td>
                         <td>
                             <button type="button" class="btn btn-delete btn-sm" onclick="removerItem(this)">

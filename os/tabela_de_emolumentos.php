@@ -33,6 +33,9 @@ include(__DIR__ . '/db_connection.php');
             --brand-warning: #f59e0b;
             --brand-error: #ef4444;
             --brand-info: #06b6d4;
+            --brand-purple: #8b5cf6;
+            --brand-pink: #ec4899;
+            --brand-orange: #f97316;
 
             --text-primary: #111827;
             --text-secondary: #4b5563;
@@ -50,6 +53,8 @@ include(__DIR__ . '/db_connection.php');
             --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
             --gradient-info: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
             --gradient-secondary: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            --gradient-purple: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
 
             --shadow: 0 1px 3px rgba(16,24,40,.1), 0 1px 2px rgba(16,24,40,.06);
             --shadow-md: 0 4px 6px -1px rgba(16,24,40,.1), 0 2px 4px -1px rgba(16,24,40,.06);
@@ -98,7 +103,7 @@ include(__DIR__ . '/db_connection.php');
         }
 
         .container {  
-            max-width: 1400px;
+            max-width: 1600px;
         }
 
         /* ===================== PAGE HERO ===================== */
@@ -123,6 +128,17 @@ include(__DIR__ . '/db_connection.php');
             border-radius: 50%;
         }
 
+        .page-hero::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: 10%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
         .title-row {
             display: flex;
             align-items: center;
@@ -132,22 +148,37 @@ include(__DIR__ . '/db_connection.php');
             z-index: 1;
         }
 
+        .title-icon {
+            width: 64px;
+            height: 64px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
         .title-icon i {  
-        font-size: 32px;  
-        color: var(--text-primary);  
-        position: relative;  
-        z-index: 1;  
+            font-size: 32px;  
+            color: var(--text-primary);  
         }  
 
-        .dark-mode .title-icon {
-        color: white; 
-        }
+        .dark-mode .title-icon i {  
+            color: white;  
+        } 
 
         .page-hero h1 {
             font-size: 32px;
             font-weight: 800;
             margin: 0;
             letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .dark-mode .page-hero h1 {
+            color: white;
         }
 
         .page-hero .subtitle {
@@ -155,6 +186,14 @@ include(__DIR__ . '/db_connection.php');
             opacity: 0.95;
             margin-top: 8px;
             line-height: 1.5;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dark-mode  .page-hero .subtitle {
+            color: rgba(255,255,255,0.9);
         }
 
         /* ===================== TOOLBAR ===================== */
@@ -263,6 +302,16 @@ include(__DIR__ . '/db_connection.php');
             color: var(--brand-primary);
         }
 
+        .btn-warning {
+            background: var(--gradient-warning);
+            color: white;
+        }
+
+        .btn-purple {
+            background: var(--gradient-purple);
+            color: white;
+        }
+
         /* ===================== TABLE MODERN ===================== */
         .table-card {
             padding: 0;
@@ -272,6 +321,11 @@ include(__DIR__ . '/db_connection.php');
         .table-header {
             padding: var(--space-lg);
             border-bottom: 2px solid var(--border-primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--space-md);
         }
 
         .table-title {
@@ -292,6 +346,7 @@ include(__DIR__ . '/db_connection.php');
 
         .table-responsive {
             padding: var(--space-lg);
+            overflow-x: auto;
         }
 
         .table {
@@ -307,7 +362,7 @@ include(__DIR__ . '/db_connection.php');
             font-size: 11px;
             letter-spacing: 0.05em;
             color: var(--text-secondary);
-            padding: 16px;
+            padding: 14px 12px;
             white-space: nowrap;
             vertical-align: middle;
         }
@@ -322,25 +377,59 @@ include(__DIR__ . '/db_connection.php');
         }
 
         .table tbody td {
-            padding: 16px;
+            padding: 14px 12px;
             color: var(--text-primary);
             vertical-align: middle;
+            font-size: 14px;
         }
 
         .money-column {
             text-align: right !important;
             font-weight: 600;
             font-variant-numeric: tabular-nums;
+            white-space: nowrap;
         }
 
         .ato-badge {
             display: inline-block;
-            padding: 4px 12px;
-            background: white;
-            color: var(--brand-primary);
+            padding: 6px 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             border-radius: 999px;
             font-weight: 700;
             font-size: 13px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .dark-mode .ato-badge {
+            background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+        }
+
+        /* Colunas de valores com cores diferenciadas */
+        .value-emolumentos {
+            color: var(--brand-primary);
+        }
+
+        .value-ferc {
+            color: var(--brand-success);
+        }
+
+        .value-fadep {
+            color: var(--brand-info);
+        }
+
+        .value-femp {
+            color: var(--brand-warning);
+        }
+
+        .value-ferrfis {
+            color: var(--brand-purple);
+        }
+
+        .value-total {
+            color: var(--brand-primary);
+            font-weight: 800;
+            font-size: 15px;
         }
 
         /* ===================== DATATABLE CUSTOMIZATION ===================== */
@@ -483,8 +572,19 @@ include(__DIR__ . '/db_connection.php');
             color: var(--brand-info);
         }
 
+        .stat-icon.warning {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--brand-warning);
+        }
+
+        .stat-icon.purple {
+            background: rgba(139, 92, 246, 0.12);
+            color: var(--brand-purple);
+        }
+
         .stat-content {
             flex: 1;
+            min-width: 0;
         }
 
         .stat-label {
@@ -493,15 +593,53 @@ include(__DIR__ . '/db_connection.php');
             color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .stat-value {
-            font-size: 24px;
+            font-size: 14px;
             font-weight: 800;
             color: var(--text-primary);
             line-height: 1;
             margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
+
+        /* ===================== LEGEND ===================== */
+        .legend-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: var(--space-md);
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-md);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.emolumentos { background: var(--brand-primary); }
+        .legend-dot.ferc { background: var(--brand-success); }
+        .legend-dot.fadep { background: var(--brand-info); }
+        .legend-dot.femp { background: var(--brand-warning); }
+        .legend-dot.ferrfis { background: var(--brand-purple); }
 
         /* ===================== ANIMATIONS ===================== */
         @keyframes fadeInUp {
@@ -515,7 +653,22 @@ include(__DIR__ . '/db_connection.php');
             }
         }
 
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+
         /* ===================== RESPONSIVE ===================== */
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
         @media (max-width: 992px) {
             .dataTables_wrapper .dataTables_filter input {
                 width: 100%;
@@ -535,7 +688,18 @@ include(__DIR__ . '/db_connection.php');
             .title-icon {
                 width: 52px;
                 height: 52px;
+            }
+
+            .title-icon i {
                 font-size: 26px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stat-value {
+                font-size: 18px;
             }
         }
 
@@ -563,6 +727,20 @@ include(__DIR__ . '/db_connection.php');
             .toolbar-actions .btn {
                 flex: 1;
             }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .table-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .legend-container {
+                flex-direction: column;
+                gap: 8px;
+            }
         }
 
         /* ===================== EMPTY STATE ===================== */
@@ -576,6 +754,11 @@ include(__DIR__ . '/db_connection.php');
             font-size: 64px;
             opacity: 0.3;
             margin-bottom: var(--space-md);
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            margin-bottom: var(--space-lg);
         }
 
         /* ===================== SCROLL TO TOP ===================== */
@@ -607,6 +790,54 @@ include(__DIR__ . '/db_connection.php');
         #scrollTop.show {
             opacity: 1;
         }
+
+        /* ===================== TOOLTIP ===================== */
+        .tooltip-custom {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip-custom::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            z-index: 100;
+            box-shadow: var(--shadow-md);
+        }
+
+        .tooltip-custom:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* ===================== PRINT STYLES ===================== */
+        @media print {
+            .page-hero, .filter-card, .toolbar-actions, #scrollTop, .dt-buttons {
+                display: none !important;
+            }
+
+            .table-card {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+
+            .table thead th {
+                background: #f5f5f5 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
     </style>  
 </head>
 <body class="light-mode">  
@@ -618,7 +849,7 @@ include(__DIR__ . '/db_connection.php');
         $vDesc = isset($_GET['descricao']) ? htmlspecialchars($_GET['descricao']) : '';
         $vAtrib = isset($_GET['atribuicao']) ? htmlspecialchars($_GET['atribuicao']) : '';
 
-        // Preparar query
+        // Preparar query - Atualizado para incluir FERRFIS
         try {
             $conn = getDatabaseConnection();  
             $conditions = [];  
@@ -637,7 +868,8 @@ include(__DIR__ . '/db_connection.php');
                 $params[':atribuicao'] = $_GET['atribuicao'] . '.%';  
             }  
 
-            $sql = 'SELECT ID, ATO, DESCRICAO, EMOLUMENTOS, FERC, FADEP, FEMP, TOTAL FROM tabela_emolumentos';  
+            // Query atualizada com FERRFIS
+            $sql = 'SELECT ID, ATO, DESCRICAO, EMOLUMENTOS, FERC, FADEP, FEMP, FERRFIS, TOTAL FROM tabela_emolumentos';  
             if ($conditions) {  
                 $sql .= ' WHERE ' . implode(' AND ', $conditions);  
             }  
@@ -650,15 +882,23 @@ include(__DIR__ . '/db_connection.php');
             $stmt->execute();  
             $emolumentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Calcular estatísticas
+            // Calcular estatísticas - incluindo FERRFIS
             $totalRegistros = count($emolumentos);
             $somaTotal = array_sum(array_column($emolumentos, 'TOTAL'));
             $somaEmolumentos = array_sum(array_column($emolumentos, 'EMOLUMENTOS'));
+            $somaFerc = array_sum(array_column($emolumentos, 'FERC'));
+            $somaFadep = array_sum(array_column($emolumentos, 'FADEP'));
+            $somaFemp = array_sum(array_column($emolumentos, 'FEMP'));
+            $somaFerrfis = array_sum(array_column($emolumentos, 'FERRFIS'));
         } catch (Exception $e) {
             $emolumentos = [];
             $totalRegistros = 0;
             $somaTotal = 0;
             $somaEmolumentos = 0;
+            $somaFerc = 0;
+            $somaFadep = 0;
+            $somaFemp = 0;
+            $somaFerrfis = 0;
         }
     ?>
 
@@ -679,6 +919,9 @@ include(__DIR__ . '/db_connection.php');
                         </div>
                     </div>
                     <div class="toolbar-actions" style="margin-left: auto;">
+                        <button type="button" class="btn btn-secondary" onclick="window.print()">
+                            <i class="mdi mdi-printer"></i> Imprimir
+                        </button>
                         <a href="index.php" class="btn btn-secondary">
                             <i class="mdi mdi-file-document-multiple"></i> Ordens de Serviço
                         </a>
@@ -699,17 +942,53 @@ include(__DIR__ . '/db_connection.php');
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon success">
-                        <i class="mdi mdi-cash-multiple"></i>
+                    <div class="stat-icon primary">
+                        <i class="mdi mdi-cash"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-label">Soma dos Emolumentos</div>
+                        <div class="stat-label">Emolumentos</div>
                         <div class="stat-value">R$ <?php echo number_format($somaEmolumentos, 2, ',', '.'); ?></div>
                     </div>
                 </div>
                 <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="mdi mdi-bank"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">FERC</div>
+                        <div class="stat-value">R$ <?php echo number_format($somaFerc, 2, ',', '.'); ?></div>
+                    </div>
+                </div>
+                <div class="stat-card">
                     <div class="stat-icon info">
-                        <i class="mdi mdi-calculator"></i>
+                        <i class="mdi mdi-account-group"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">FADEP</div>
+                        <div class="stat-value">R$ <?php echo number_format($somaFadep, 2, ',', '.'); ?></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="mdi mdi-gavel"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">FEMP</div>
+                        <div class="stat-value">R$ <?php echo number_format($somaFemp, 2, ',', '.'); ?></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon purple">
+                        <i class="mdi mdi-shield-check"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">FERRFIS</div>
+                        <div class="stat-value">R$ <?php echo number_format($somaFerrfis, 2, ',', '.'); ?></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="mdi mdi-calculator-variant"></i>
                     </div>
                     <div class="stat-content">
                         <div class="stat-label">Valor Total</div>
@@ -787,22 +1066,50 @@ include(__DIR__ . '/db_connection.php');
             <!-- ===================== TABLE CARD ===================== -->
             <div class="table-card">
                 <div class="table-header">
-                    <h5 class="table-title">
-                        <i class="mdi mdi-table-large"></i>
-                        Resultados da Consulta
-                    </h5>
-                    <div class="table-subtitle">
-                        <?php 
-                        if ($totalRegistros > 0) {
-                            echo "Exibindo <strong>{$totalRegistros}</strong> " . ($totalRegistros == 1 ? 'registro' : 'registros');
-                        } else {
-                            echo "Nenhum registro encontrado";
-                        }
-                        ?>
+                    <div>
+                        <h5 class="table-title">
+                            <i class="mdi mdi-table-large"></i>
+                            Resultados da Consulta
+                        </h5>
+                        <div class="table-subtitle">
+                            <?php 
+                            if ($totalRegistros > 0) {
+                                echo "Exibindo <strong>{$totalRegistros}</strong> " . ($totalRegistros == 1 ? 'registro' : 'registros');
+                            } else {
+                                echo "Nenhum registro encontrado";
+                            }
+                            ?>
+                        </div>
                     </div>
                 </div>
 
                 <?php if ($totalRegistros > 0): ?>
+                <!-- Legenda das colunas -->
+                <div style="padding: var(--space-lg); padding-bottom: 0;">
+                    <div class="legend-container">
+                        <div class="legend-item">
+                            <span class="legend-dot emolumentos"></span>
+                            <span>Emolumentos</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot ferc"></span>
+                            <span class="tooltip-custom" data-tooltip="Fundo Especial do Registro Civil">FERC</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot fadep"></span>
+                            <span class="tooltip-custom" data-tooltip="Fundo de Apoio ao Desenvolvimento Profissional">FADEP</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot femp"></span>
+                            <span class="tooltip-custom" data-tooltip="Fundo Especial do Ministério Público">FEMP</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot ferrfis"></span>
+                            <span class="tooltip-custom" data-tooltip="Fundo Especial de Reaparelhamento e Modernização da Fiscalização">FERRFIS</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-responsive">
                     <table id="resultadosTabela" class="table table-hover nowrap" style="width:100%">
                         <thead>
@@ -810,10 +1117,11 @@ include(__DIR__ . '/db_connection.php');
                                 <th><i class="mdi mdi-pound"></i> Ato</th>
                                 <th><i class="mdi mdi-text"></i> Descrição</th>
                                 <th class="money-column"><i class="mdi mdi-cash"></i> Emolumentos</th>
-                                <th class="money-column"><i class="mdi mdi-cash"></i> FERC</th>
-                                <th class="money-column"><i class="mdi mdi-cash"></i> FADEP</th>
-                                <th class="money-column"><i class="mdi mdi-cash"></i> FEMP</th>
-                                <th class="money-column"><i class="mdi mdi-cash-multiple"></i> Total</th>
+                                <th class="money-column"><i class="mdi mdi-bank"></i> FERC</th>
+                                <th class="money-column"><i class="mdi mdi-account-group"></i> FADEP</th>
+                                <th class="money-column"><i class="mdi mdi-gavel"></i> FEMP</th>
+                                <th class="money-column"><i class="mdi mdi-shield-check"></i> FERRFIS</th>
+                                <th class="money-column"><i class="mdi mdi-calculator-variant"></i> Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -827,17 +1135,31 @@ include(__DIR__ . '/db_connection.php');
                                     <td>
                                         <span class="ato-badge"><?php echo htmlspecialchars($emolumento['ATO']); ?></span>
                                     </td>
-                                    <td style="white-space: normal;"><?php echo htmlspecialchars($emolumento['DESCRICAO']); ?></td>
-                                    <td class="money-column"><?php echo $fmt($emolumento['EMOLUMENTOS']); ?></td>
-                                    <td class="money-column"><?php echo $fmt($emolumento['FERC']); ?></td>
-                                    <td class="money-column"><?php echo $fmt($emolumento['FADEP']); ?></td>
-                                    <td class="money-column"><?php echo $fmt($emolumento['FEMP']); ?></td>
-                                    <td class="money-column"><?php echo $fmt($emolumento['TOTAL']); ?></td>
+                                    <td style="white-space: normal; max-width: 400px;"><?php echo htmlspecialchars($emolumento['DESCRICAO']); ?></td>
+                                    <td class="money-column value-emolumentos"><?php echo $fmt($emolumento['EMOLUMENTOS']); ?></td>
+                                    <td class="money-column value-ferc"><?php echo $fmt($emolumento['FERC']); ?></td>
+                                    <td class="money-column value-fadep"><?php echo $fmt($emolumento['FADEP']); ?></td>
+                                    <td class="money-column value-femp"><?php echo $fmt($emolumento['FEMP']); ?></td>
+                                    <td class="money-column value-ferrfis"><?php echo $fmt($emolumento['FERRFIS']); ?></td>
+                                    <td class="money-column value-total"><?php echo $fmt($emolumento['TOTAL']); ?></td>
                                 </tr>
                                 <?php  
                             }
                             ?>
                         </tbody>
+                        <tfoot>
+                            <tr style="background: var(--bg-tertiary); font-weight: bold;">
+                                <td colspan="2" style="text-align: right;">
+                                    <strong>TOTAIS:</strong>
+                                </td>
+                                <td class="money-column value-emolumentos">R$ <?php echo number_format($somaEmolumentos, 2, ',', '.'); ?></td>
+                                <td class="money-column value-ferc">R$ <?php echo number_format($somaFerc, 2, ',', '.'); ?></td>
+                                <td class="money-column value-fadep">R$ <?php echo number_format($somaFadep, 2, ',', '.'); ?></td>
+                                <td class="money-column value-femp">R$ <?php echo number_format($somaFemp, 2, ',', '.'); ?></td>
+                                <td class="money-column value-ferrfis">R$ <?php echo number_format($somaFerrfis, 2, ',', '.'); ?></td>
+                                <td class="money-column value-total">R$ <?php echo number_format($somaTotal, 2, ',', '.'); ?></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
                 <?php else: ?>
@@ -855,7 +1177,7 @@ include(__DIR__ . '/db_connection.php');
     </div>
 
     <!-- ===================== SCROLL TO TOP ===================== -->
-    <button id="scrollTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+    <button id="scrollTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" aria-label="Voltar ao topo">
         <i class="mdi mdi-arrow-up"></i>
     </button>
 
@@ -893,6 +1215,22 @@ include(__DIR__ . '/db_connection.php');
             }
         });
 
+        // ===================== KEYBOARD SHORTCUTS =====================
+        document.addEventListener('keydown', function(e) {
+            // Ctrl + F para focar no campo de pesquisa
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                document.getElementById('ato').focus();
+            }
+            // Escape para limpar filtros
+            if (e.key === 'Escape') {
+                const activeElement = document.activeElement;
+                if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT') {
+                    activeElement.blur();
+                }
+            }
+        });
+
         // ===================== INIT =====================
         $(document).ready(function() {
             // Carregar modo dark/light
@@ -907,6 +1245,13 @@ include(__DIR__ . '/db_connection.php');
             // Sanitizar campo "ato" enquanto digita
             $('#ato').on('input', function() {
                 this.value = this.value.replace(/[^0-9.]/g, '');
+            });
+
+            // Submeter formulário com Enter
+            $('#pesquisarForm input').on('keypress', function(e) {
+                if (e.which === 13) {
+                    $('#pesquisarForm').submit();
+                }
             });
 
             // Inicializar DataTable apenas se houver registros
@@ -933,6 +1278,7 @@ include(__DIR__ . '/db_connection.php');
                         text: '<i class="mdi mdi-file-excel"></i> Excel',
                         titleAttr: 'Exportar para Excel',
                         className: 'btn btn-success',
+                        title: 'Tabela de Emolumentos - Atlas',
                         exportOptions: { 
                             columns: ':visible',
                             format: {
@@ -981,8 +1327,33 @@ include(__DIR__ . '/db_connection.php');
                 columnDefs: [
                     { responsivePriority: 1, targets: 0 },  // Ato
                     { responsivePriority: 2, targets: 1 },  // Descrição
-                    { responsivePriority: 3, targets: -1 }  // Total
-                ]
+                    { responsivePriority: 3, targets: -1 }, // Total
+                    { responsivePriority: 4, targets: 2 },  // Emolumentos
+                    { responsivePriority: 5, targets: 3 },  // FERC
+                    { responsivePriority: 6, targets: 4 },  // FADEP
+                    { responsivePriority: 7, targets: 5 },  // FEMP
+                    { responsivePriority: 8, targets: 6 }   // FERRFIS
+                ],
+                drawCallback: function() {
+                    // Animação suave ao carregar linhas
+                    $(this.api().table().body()).find('tr').each(function(index) {
+                        $(this).css({
+                            'animation': 'fadeInUp 0.3s ease forwards',
+                            'animation-delay': (index * 0.02) + 's',
+                            'opacity': '0'
+                        });
+                    });
+                }
+            });
+
+            // Highlight de linha ao clicar
+            $('#resultadosTabela tbody').on('click', 'tr', function() {
+                if ($(this).hasClass('selected')) {
+                    $(this).removeClass('selected');
+                } else {
+                    table.$('tr.selected').removeClass('selected');
+                    $(this).addClass('selected');
+                }
             });
             <?php endif; ?>
 

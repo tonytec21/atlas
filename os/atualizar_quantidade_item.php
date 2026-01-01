@@ -10,6 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $ferc = $_POST['ferc'];
     $fadep = $_POST['fadep'];
     $femp = $_POST['femp'];
+    $ferrfis = isset($_POST['ferrfis']) ? $_POST['ferrfis'] : 0;
     $total = $_POST['total'];
 
     try {
@@ -38,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Atualiza os valores do item
         $stmt = $conn->prepare("
             UPDATE ordens_de_servico_itens 
-            SET quantidade = :quantidade, emolumentos = :emolumentos, ferc = :ferc, fadep = :fadep, femp = :femp, total = :total 
+            SET quantidade = :quantidade, emolumentos = :emolumentos, ferc = :ferc, fadep = :fadep, femp = :femp, ferrfis = :ferrfis, total = :total 
             WHERE id = :id
         ");
         $stmt->bindParam(':quantidade', $quantidade);
@@ -46,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bindParam(':ferc', $ferc);
         $stmt->bindParam(':fadep', $fadep);
         $stmt->bindParam(':femp', $femp);
+        $stmt->bindParam(':ferrfis', $ferrfis);
         $stmt->bindParam(':total', $total);
         $stmt->bindParam(':id', $item_id);
         $stmt->execute();

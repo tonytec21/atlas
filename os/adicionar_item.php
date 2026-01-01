@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $ferc = $_POST['ferc'];
     $fadep = $_POST['fadep'];
     $femp = $_POST['femp'];
+    $ferrfis = isset($_POST['ferrfis']) ? $_POST['ferrfis'] : 0;
     $total = $_POST['total'];
 
     try {
@@ -22,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $conn->beginTransaction();
 
         // Adiciona o item na tabela `ordens_de_servico_itens`
-        $stmt = $conn->prepare("INSERT INTO ordens_de_servico_itens (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, total) VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :total)");
+        $stmt = $conn->prepare("INSERT INTO ordens_de_servico_itens (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total) VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :ferrfis, :total)");
         $stmt->bindParam(':ordem_servico_id', $os_id);
         $stmt->bindParam(':ato', $ato);
         $stmt->bindParam(':quantidade', $quantidade);
@@ -32,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bindParam(':ferc', $ferc);
         $stmt->bindParam(':fadep', $fadep);
         $stmt->bindParam(':femp', $femp);
+        $stmt->bindParam(':ferrfis', $ferrfis);
         $stmt->bindParam(':total', $total);
         $stmt->execute();
 

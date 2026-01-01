@@ -174,8 +174,26 @@ if (isset($_GET['id'])) {
         $v = str_replace(',', '.', (string)($it['desconto_legal'] ?? ''));
         if ($v !== '' && floatval($v) > 0) { $show_desc_legal = true; break; }
     }
-    // largura da coluna DESCRIÇÃO (absorve os 8% se esconder o desconto)
-    $descricaoWidth = $show_desc_legal ? '35%' : '43%';
+    
+    // Verificar se deve mostrar a coluna FERRFIS (somente se algum item tiver valor > 0)
+    $show_ferrfis = false;
+    foreach ($ordem_servico_itens as $it) {
+        $v = floatval($it['ferrfis'] ?? 0);
+        if ($v > 0) { $show_ferrfis = true; break; }
+    }
+    
+    // largura da coluna DESCRIÇÃO (absorve os 8% se esconder o desconto e/ou ferrfis)
+    // Base: 35% com desc_legal, 43% sem desc_legal
+    // Se mostrar ferrfis, reduz 6%
+    if ($show_desc_legal && $show_ferrfis) {
+        $descricaoWidth = '29%';
+    } elseif ($show_desc_legal && !$show_ferrfis) {
+        $descricaoWidth = '35%';
+    } elseif (!$show_desc_legal && $show_ferrfis) {
+        $descricaoWidth = '37%';
+    } else {
+        $descricaoWidth = '43%';
+    }
 
     // Obter informações do criador
     $criado_por = $ordem_servico['criado_por'];
@@ -287,34 +305,43 @@ if (isset($_GET['id'])) {
     $pdf->Ln(1);
 
     // Função para adicionar o cabeçalho da tabela de itens (dinâmico)
-    function adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth) {
+    function adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth, $show_ferrfis = false) {
         $descTh = $show_desc_legal
             ? '<th style="width: 8%; text-align: center; font-size: 7px;"><b>DESC. LEGAL %</b></th>'
+            : '';
+        
+        $ferrfisTh = $show_ferrfis
+            ? '<th style="width: 8%; text-align: center; font-size: 8px;"><b>FERRFIS</b></th>'
             : '';
 
         $html = '<table border="0.1" cellpadding="4">
             <thead>
                 <tr>
-                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>ATO</b></th>
-                    <th style="width: 5%; text-align: center; font-size: 8.5px;"><b>QTD</b></th>'
+                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>ATO</b></th>
+                    <th style="width: 5%; text-align: center; font-size: 8px;"><b>QTD</b></th>'
                     . $descTh .
                 '<th style="width: '.$descricaoWidth.'; text-align: center; font-size: 8.5px;"><b>DESCRIÇÃO</b></th>
-                    <th style="width: 10%; text-align: center; font-size: 8.5px;"><b>EMOL</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>FERC</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>FADEP</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 8.5px;"><b>FEMP</b></th>
-                    <th style="width: 10%; text-align: center; font-size: 8.5px;"><b>TOTAL</b></th>
+                    <th style="width: 9%; text-align: center; font-size: 8px;"><b>EMOL</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>FERC</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>FADEP</b></th>
+                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>FEMP</b></th>
+                    '.$ferrfisTh.'
+                    <th style="width: 9%; text-align: center; font-size: 8px;"><b>TOTAL</b></th>
                 </tr>
             </thead>
             <tbody>';
         return $html;
     }
 
-    $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth);
+    $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth, $show_ferrfis);
 
     foreach ($ordem_servico_itens as $index => $item) {
         $descTd = $show_desc_legal
             ? '<td style="width: 8%; font-size: 8.5px;">' . $item['desconto_legal'] . '</td>'
+            : '';
+        
+        $ferrfisTd = $show_ferrfis
+            ? '<td style="width: 8%; font-size: 8px;">R$ ' . number_format($item['ferrfis'] ?? 0, 2, ',', '.') . '</td>'
             : '';
 
         $rowHtml = '<tr>
@@ -322,11 +349,12 @@ if (isset($_GET['id'])) {
             <td style="width: 5%; font-size: 8.5px;">' . $item['quantidade'] . '</td>'
             . $descTd .
         '<td style="width: '.$descricaoWidth.'; font-size: 8px;">' . $item['descricao'] . '</td>
-            <td style="width: 10%; font-size: 8.5px;">R$ ' . number_format($item['emolumentos'], 2, ',', '.') . '</td>
-            <td style="width: 8%; font-size: 8.5px;">R$ ' . number_format($item['ferc'], 2, ',', '.') . '</td>
-            <td style="width: 8%; font-size: 8.5px;">R$ ' . number_format($item['fadep'], 2, ',', '.') . '</td>
-            <td style="width: 8%; font-size: 8.5px;">R$ ' . number_format($item['femp'], 2, ',', '.') . '</td>
-            <td style="width: 10%; font-size: 8.5px;">R$ ' . number_format($item['total'], 2, ',', '.') . '</td>
+            <td style="width: 9%; font-size: 8px;">R$ ' . number_format($item['emolumentos'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8px;">R$ ' . number_format($item['ferc'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8px;">R$ ' . number_format($item['fadep'], 2, ',', '.') . '</td>
+            <td style="width: 8%; font-size: 8px;">R$ ' . number_format($item['femp'], 2, ',', '.') . '</td>
+            '.$ferrfisTd.'
+            <td style="width: 9%; font-size: 8px;">R$ ' . number_format($item['total'], 2, ',', '.') . '</td>
         </tr>';
 
 
@@ -335,7 +363,7 @@ if (isset($_GET['id'])) {
             $html .= '</tbody></table>';
             $pdf->writeHTML($html, true, false, true, false, '');
             $pdf->AddPage();
-            $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth) . $rowHtml;
+            $html = adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth, $show_ferrfis) . $rowHtml;
         } else {
             $html .= $rowHtml;
         }
