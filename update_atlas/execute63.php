@@ -809,73 +809,45 @@ $output = ob_get_clean();
     <script src="script/toastr.min.js"></script>
 
     <script>
-toastr.options = {
-    "closeButton": true,
-    "debug": false,
-    "newestOnTop": true,
-    "progressBar": true,
-    "positionClass": "toast-bottom-left",
-    "preventDuplicates": true,
-    "onclick": null,
-    "showDuration": "300",
-    "hideDuration": "1000",
-    "timeOut": "5000",
-    "extendedTimeOut": "1200",
-    "showEasing": "swing",
-    "hideEasing": "linear",
-    "showMethod": "fadeIn",
-    "hideMethod": "fadeOut"
-};
+        // Configuração básica do Toastr
+        toastr.options = {
+            "closeButton": true,
+            "debug": false,
+            "newestOnTop": true,
+            "progressBar": true,
+            "positionClass": "toast-bottom-left",
+            "preventDuplicates": true,
+            "onclick": null,
+            "showDuration": "300",
+            "hideDuration": "1000",
+            "timeOut": "5000",
+            "extendedTimeOut": "1000",
+            "showEasing": "swing",
+            "hideEasing": "linear",
+            "showMethod": "fadeIn",
+            "hideMethod": "fadeOut"
+        };
 
-function verificarAtualizacoes() {
-    toastr.info('Verificando atualizações...');
+        // Função para verificar as atualizações
+        function verificarAtualizacoes() {
+            // Exibe a mensagem inicial de verificação
+            toastr.info('Verificando atualizações...');
 
-    setTimeout(() => {
-        const status     = <?php echo json_encode($status); ?>;
-        const mensagem   = <?php echo json_encode($mensagem); ?>;
-        const missingQtd = <?php echo json_encode(count($missingAtos)); ?>;
-
-        if (status === 'success') {
-            toastr.success(mensagem);
-
-            if (missingQtd > 0) {
-                toastr.warning('Atenção: existem ATOS sem tarifa na tabela de emolumentos. Veja o log abaixo.');
-            }
-
-            // ✅ Recarrega automaticamente após 3 segundos
+            // Simula o retorno da mensagem de verificação após 2 segundos
             setTimeout(() => {
-                // força recarregar sem cache
-                window.location.reload(true);
-            }, 3000);
-
-        } else if (status === 'error') {
-            toastr.error(mensagem);
-
-            // ❌ por padrão NÃO recarrega em erro (pra você ver o log)
-            // Se quiser recarregar mesmo assim, descomente:
-            /*
-            setTimeout(() => {
-                window.location.reload(true);
-            }, 8000);
-            */
-
-        } else if (status === 'warning') {
-            toastr.warning(mensagem);
-
-            // opcional: recarregar também em warning
-            /*
-            setTimeout(() => {
-                window.location.reload(true);
-            }, 5000);
-            */
-
-        } else {
-            toastr.info(mensagem);
+                const mensagem = "<?php echo $mensagem; ?>";
+                if (mensagem.includes('sucesso')) {
+                    toastr.success(mensagem);
+                } else if (mensagem.includes('Erro')) {
+                    toastr.error(mensagem);
+                } else {
+                    toastr.info(mensagem);
+                }
+            }, 2000);
         }
-    }, 1200);
-}
 
-window.onload = verificarAtualizacoes;
-</script>
+        // Chama a função de verificação ao carregar a página
+        window.onload = verificarAtualizacoes;
+    </script>
 </body>
 </html>
