@@ -99,68 +99,19 @@ function recalcularItens(PDO $conn, string $itensTable, string $emolTable): int
 }
 
 /**
- * Atualiza o atualizacao.json SEM destruir estrutura existente.
- * - Mantém chaves que já existirem
- * - Tenta achar um array "executados/aplicados/historico/updates_log" e appendar
- * - Atualiza "ultima_execucao/ultima_versao/last_applied/last_update" se existirem; se não, cria "ultima_execucao"
+ * Atualiza o atualizacao.json no formato EXATO:
+ * {"atualizacao":64}
  */
-function atualizarAtualizacaoJson(string $jsonPath, int $versao, string $status, string $mensagem, array $extra = []): void
+function atualizarAtualizacaoJson(string $jsonPath, int $versao): void
 {
-    $now = date('c');
-    $registro = array_merge([
-        'versao'       => $versao,
-        'arquivo'      => "execute{$versao}.php",
-        'status'       => $status,
-        'mensagem'     => $mensagem,
-        'executado_em' => $now,
-    ], $extra);
-
-    $data = [];
-    if (file_exists($jsonPath)) {
-        $raw = file_get_contents($jsonPath);
-        $decoded = json_decode($raw, true);
-        if (is_array($decoded)) $data = $decoded;
-    }
-
-    // Atualiza chave de "última" se existir, senão cria uma padrão
-    $keysLast = ['ultima_execucao', 'ultima_versao', 'last_applied', 'last_update', 'ultima_atualizacao'];
-    $foundLastKey = false;
-    foreach ($keysLast as $k) {
-        if (array_key_exists($k, $data)) {
-            $data[$k] = $versao;
-            $foundLastKey = true;
-        }
-    }
-    if (!$foundLastKey) {
-        $data['ultima_execucao'] = $versao;
-    }
-
-    // Procura um array de log existente
-    $logKeys = ['executados', 'aplicados', 'historico', 'updates_log', 'updates'];
-    $logKeyFound = null;
-    foreach ($logKeys as $k) {
-        if (isset($data[$k]) && is_array($data[$k])) {
-            $logKeyFound = $k;
-            break;
-        }
-    }
-    if (!$logKeyFound) {
-        $logKeyFound = 'executados';
-        if (!isset($data[$logKeyFound]) || !is_array($data[$logKeyFound])) {
-            $data[$logKeyFound] = [];
-        }
-    }
-
-    $data[$logKeyFound][] = $registro;
-
-    // Garante pasta
     $dir = dirname($jsonPath);
-    if (!is_dir($dir)) @mkdir($dir, 0775, true);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
 
-    file_put_contents(
-        $jsonPath,
-        json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-    );
+    // Mantém exatamente o formato esperado (sem pretty print / sem newline)
+    $conteudo = '{"atualizacao":' . (int)$versao . '}';
+    file_put_contents($jsonPath, $conteudo);
 }
 
 // ---------------- EXECUÇÃO ----------------
@@ -201,14 +152,8 @@ try {
     $status = 'success';
     $mensagem = "Execute64 concluído com sucesso! Itens recalculados: {$updatedRows}.";
 
-    // Atualiza atualizacao.json (sucesso)
-    atualizarAtualizacaoJson($ARQUIVO_ATUALIZACAO_JSON, $VERSAO_EXECUTE, $status, $mensagem, [
-        'tabela_itens'       => $TABELA_ITENS,
-        'tabela_emolumentos' => $TABELA_EMOLUMENTOS,
-        'itens_recalculados' => $updatedRows,
-        'atos_faltando_qtd'  => count($missingAtos),
-        'atos_faltando'      => $missingAtos,
-    ]);
+    // Atualiza atualizacao.json (somente contador)
+    atualizarAtualizacaoJson($ARQUIVO_ATUALIZACAO_JSON, $VERSAO_EXECUTE);
 
     echo "OK! Recalculo finalizado.\n";
     echo "Tabela de emolumentos: {$TABELA_EMOLUMENTOS}\n";
@@ -230,13 +175,7 @@ try {
     $status = 'error';
     $mensagem = "Erro no Execute64: " . $e->getMessage();
 
-    // Atualiza atualizacao.json (erro)
-    try {
-        atualizarAtualizacaoJson($ARQUIVO_ATUALIZACAO_JSON, $VERSAO_EXECUTE, $status, $mensagem);
-    } catch (Throwable $ignored) {
-        // não interrompe a tela por falha de log
-    }
-
+    // Importante: em erro, NÃO mexe no atualizacao.json (mantém o contador anterior)
     echo "ERRO: " . $e->getMessage() . "\n";
 }
 
