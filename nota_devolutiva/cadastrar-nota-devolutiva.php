@@ -20,7 +20,8 @@ include(__DIR__ . '/db_connection2.php');
     <script src="../script/jquery-3.5.1.min.js"></script>  
     <script src="../script/bootstrap.min.js"></script>  
     <script src="../script/sweetalert2.js"></script>  
-    <?php include(__DIR__ . '/style_nota.php'); ?>   
+    <?php include(__DIR__ . '/style_nota.php'); ?>
+    <?php include(__DIR__ . '/style_nota_extra.php'); ?>   
 </head>  
 <body class="light-mode">  
 <?php include(__DIR__ . '/../menu.php'); ?>  

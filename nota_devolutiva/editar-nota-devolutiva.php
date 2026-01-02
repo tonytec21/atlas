@@ -12,7 +12,8 @@ include(__DIR__ . '/db_connection2.php');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">  
     <title>Atlas - Editar Nota Devolutiva</title>  
     <?php include(__DIR__ . '/complementos_edicao/links.php'); ?> 
-    <?php include(__DIR__ . '/style_nota.php'); ?>  
+    <?php include(__DIR__ . '/style_nota.php'); ?>
+    <?php include(__DIR__ . '/style_nota_extra.php'); ?>  
 </head>  
 <body class="light-mode">  
 <?php include(__DIR__ . '/../menu.php'); ?>  

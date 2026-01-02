@@ -106,18 +106,18 @@
                             }  
                         ?>  
                         <tr>  
-                            <td><?php echo htmlspecialchars($nota['numero']); ?></td>  
-                            <td><?php echo date('d/m/Y', strtotime($nota['data'])); ?></td>  
-                            <td><?php echo htmlspecialchars($nota['titulo']); ?></td>  
-                            <td><?php echo htmlspecialchars($nota['apresentante']); ?></td>  
-                            <td><?php echo htmlspecialchars($nota['cpf_cnpj'] ?? ''); ?></td>  
-                            <td><?php echo htmlspecialchars($nota['protocolo']); ?></td>  
-                            <td><span class="status-badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($status); ?></span></td>  
-                            <td>  
-                                <button class="btn btn-info btn-sm" onclick="viewNota('<?php echo $nota['numero']; ?>')">  
+                            <td data-label="Número"><?php echo htmlspecialchars($nota['numero']); ?></td>  
+                            <td data-label="Data"><?php echo date('d/m/Y', strtotime($nota['data'])); ?></td>  
+                            <td data-label="Título" title="<?php echo htmlspecialchars($nota['titulo']); ?>"><?php echo htmlspecialchars($nota['titulo']); ?></td>  
+                            <td data-label="Apresentante"><?php echo htmlspecialchars($nota['apresentante']); ?></td>  
+                            <td data-label="CPF/CNPJ"><?php echo htmlspecialchars($nota['cpf_cnpj'] ?? ''); ?></td>  
+                            <td data-label="Protocolo"><?php echo htmlspecialchars($nota['protocolo']); ?></td>  
+                            <td data-label="Status"><span class="status-badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($status); ?></span></td>  
+                            <td data-label="Ações">  
+                                <button class="btn btn-info btn-sm" onclick="viewNota('<?php echo $nota['numero']; ?>')" title="Visualizar">  
                                     <i class="fa fa-eye"></i>  
                                 </button>  
-                                <button class="btn btn-edit btn-sm" onclick="editNota('<?php echo $nota['numero']; ?>')">  
+                                <button class="btn btn-edit btn-sm" onclick="editNota('<?php echo $nota['numero']; ?>')" title="Editar">  
                                     <i class="fa fa-pencil"></i>  
                                 </button>  
                             </td>  
