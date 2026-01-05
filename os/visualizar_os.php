@@ -1154,11 +1154,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         <i class="fa fa-paperclip" aria-hidden="true"></i> Anexos  
                     </button>  
                 </div>  
-                <?php 
-                $anoOS = date('Y', strtotime($ordem_servico['data_criacao']));
-                $anoAtual = date('Y');
-                if ($ordem_servico['status'] !== 'Cancelado' && $anoOS === $anoAtual): 
-                ?>
+                <?php if ($ordem_servico['status'] !== 'Cancelado'): ?>
                     <div class="col-auto">  
                         <button type="button" class="btn btn-edit2 btn-sm" onclick="editarOS()">  
                             <i class="fa fa-pencil" aria-hidden="true"></i> Editar OS  

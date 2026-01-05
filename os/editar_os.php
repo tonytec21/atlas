@@ -1312,7 +1312,8 @@ function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
             if (response.error) {
                 showAlert(response.error, 'error');
             } else {
-                var tabela_emolumentos = (response.ano_criacao == 2024) ? 'tabela_emolumentos_2024' : 'tabela_emolumentos';
+                var ano_atual = new Date().getFullYear();
+                var tabela_emolumentos = (response.ano_criacao == ano_atual) ? 'tabela_emolumentos' : 'tabela_emolumentos_' + response.ano_criacao;
 
                 // Buscar dados do ato na tabela apropriada
                 $.ajax({

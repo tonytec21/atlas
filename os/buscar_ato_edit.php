@@ -13,8 +13,21 @@ if (isset($_GET['ato']) && isset($_GET['tabela'])) {
     try {
         $conn = getDatabaseConnection();
 
+        // Monta a lista de tabelas permitidas dinamicamente
+        $ano_atual = date('Y');
+        $tabelas_permitidas = ['tabela_emolumentos']; // Tabela do ano corrente
+        
+        // Adiciona tabelas de anos anteriores (de 2024 até o ano anterior ao atual)
+        // Exemplo: em 2026, permite tabela_emolumentos_2024 e tabela_emolumentos_2025
+        for ($ano = 2024; $ano < $ano_atual; $ano++) {
+            $tabelas_permitidas[] = 'tabela_emolumentos_' . $ano;
+        }
+        
+        // Também adiciona o ano atual como tabela específica (caso exista)
+        $tabelas_permitidas[] = 'tabela_emolumentos_' . $ano_atual;
+
         // Verifica se a tabela é permitida para evitar SQL Injection
-        if (!in_array($tabela, ['tabela_emolumentos', 'tabela_emolumentos_2024'])) {
+        if (!in_array($tabela, $tabelas_permitidas)) {
             throw new Exception('Tabela inválida.');
         }
 
