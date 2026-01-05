@@ -101,7 +101,8 @@ try {
                 r.ferj           AS ferj,
                 r.fadep          AS fadep,
                 r.ferc           AS ferc,
-                r.femp           AS femp,  
+                r.femp           AS femp,
+                r.ferrfis        AS ferrfis,  
                 r.total          AS total
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
@@ -129,7 +130,8 @@ try {
                 r.ferj           AS ferj,
                 r.fadep          AS fadep,
                 r.ferc           AS ferc,
-                r.femp           AS femp,  
+                r.femp           AS femp,
+                r.ferrfis        AS ferrfis,  
                 r.total          AS total
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
@@ -236,7 +238,8 @@ try {
                 r.ferj           AS ferj,
                 r.fadep          AS fadep,
                 r.ferc           AS ferc,
-                r.femp           AS femp,                                
+                r.femp           AS femp, 
+                r.ferrfis        AS ferrfis,                                
                 r.total          AS total
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
@@ -266,7 +269,8 @@ try {
                 r.ferj           AS ferj,
                 r.fadep          AS fadep,
                 r.ferc           AS ferc,
-                r.femp           AS femp,                                
+                r.femp           AS femp,
+                r.ferrfis        AS ferrfis,                                
                 r.total          AS total
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 

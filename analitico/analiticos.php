@@ -29,6 +29,7 @@ try {
             fadep            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
             ferc             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
             femp             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+            ferrfis          DECIMAL(14,2) NOT NULL DEFAULT 0.00,
             selo_valor       DECIMAL(14,2) NOT NULL DEFAULT 0.00,
             total            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
             arquivo_origem   VARCHAR(255) NULL,
@@ -270,10 +271,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $sql = "
         INSERT INTO relatorios_analiticos
         (seq_linha, cartorio, numero_selo, ato, usuario, isento, cancelado, diferido, selagem, operacao, tipo,
-         emolumentos, ferj, fadep, ferc, femp, selo_valor, total, arquivo_origem, uploaded_by, created_at, updated_at)
+         emolumentos, ferj, fadep, ferc, femp, ferrfis, selo_valor, total, arquivo_origem, uploaded_by, created_at, updated_at)
         VALUES
         (:seq_linha, :cartorio, :numero_selo, :ato, :usuario, :isento, :cancelado, :diferido, :selagem, :operacao, :tipo,
-         :emolumentos, :ferj, :fadep, :ferc, :femp, :selo_valor, :total, :arquivo_origem, :uploaded_by, NOW(), NULL)
+         :emolumentos, :ferj, :fadep, :ferc, :femp, :ferrfis, :selo_valor, :total, :arquivo_origem, :uploaded_by, NOW(), NULL)
         ON DUPLICATE KEY UPDATE
             cartorio = VALUES(cartorio),
             ato = VALUES(ato),
@@ -289,6 +290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             fadep = VALUES(fadep),
             ferc = VALUES(ferc),
             femp = VALUES(femp),
+            ferrfis = VALUES(ferrfis),
             selo_valor = VALUES(selo_valor),
             total = VALUES(total),
             arquivo_origem = VALUES(arquivo_origem),
@@ -297,8 +299,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     ";
     $stmt = $conn->prepare($sql);
 
-    $ROW_HEADERS = 16;
-    $ROW_DATA    = 17;
+    $ROW_HEADERS = 17;
+    $ROW_DATA    = 18;
 
     for ($i = 0; $i < $totalFiles; $i++) {
         $name = $_FILES['relatorios']['name'][$i];
@@ -319,7 +321,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             $expectedHeaders = [
                 '#','Cartório','Nº do Selo','Ato','Usuário','Isento','Cancelado','Diferido','Selagem','Operação','Tipo',
-                'Emolumentos','FERJ','FADEP','FERC','FEMP','Selo','Total'
+                'Emolumentos','FERJ','FADEP','FERC','FEMP','FERRFIS','Selo','Total'
             ];
             $headersOk = true;
             $headersRead = [];
@@ -333,7 +335,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             }
             if (!$headersOk) {
-                $summary['errors'][] = "Cabeçalho inesperado em '{$name}'. Verifique se os títulos estão na linha 16.";
+                $summary['errors'][] = "Cabeçalho inesperado em '{$name}'. Verifique se os títulos estão na linha 17.";
                 continue;
             }
 
@@ -366,8 +368,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $fadep      = toMoney(readCell($sheet, 14, $row));
                 $ferc       = toMoney(readCell($sheet, 15, $row));
                 $femp       = toMoney(readCell($sheet, 16, $row));
-                $seloValor  = toMoney(readCell($sheet, 17, $row));
-                $total      = toMoney(readCell($sheet, 18, $row));
+                $ferrfis    = toMoney(readCell($sheet, 17, $row));
+                $seloValor  = toMoney(readCell($sheet, 18, $row));
+                $total      = toMoney(readCell($sheet, 19, $row));
 
                 if ($seqLinha === '') {
                     $stmt->bindValue(':seq_linha', null, PDO::PARAM_NULL);
@@ -400,6 +403,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt->bindValue(':fadep',          $fadep);
                 $stmt->bindValue(':ferc',           $ferc);
                 $stmt->bindValue(':femp',           $femp);
+                $stmt->bindValue(':ferrfis',        $ferrfis);
                 $stmt->bindValue(':selo_valor',     $seloValor);
                 $stmt->bindValue(':total',          $total);
                 $stmt->bindValue(':arquivo_origem', $name);
@@ -2361,6 +2365,12 @@ function openDetailModal(item) {
             <i class="fas fa-university"></i> FEMP  
           </div>  
           <div class="detail-value money">R$ ${parseFloat(item.femp || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>  
+        </div> 
+        <div class="detail-item">  
+          <div class="detail-label">  
+            <i class="fas fa-university"></i> FERRFIS  
+          </div>  
+          <div class="detail-value money">R$ ${parseFloat(item.ferrfis || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>  
         </div>  
         <div class="detail-item">  
           <div class="detail-label">  

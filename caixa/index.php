@@ -48,6 +48,7 @@ date_default_timezone_set('America/Sao_Paulo');
                 fadep            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
                 ferc             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
                 femp             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                ferrfis          DECIMAL(14,2) NOT NULL DEFAULT 0.00,
                 selo_valor       DECIMAL(14,2) NOT NULL DEFAULT 0.00,
                 total            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
                 arquivo_origem   VARCHAR(255) NULL,
@@ -705,7 +706,8 @@ date_default_timezone_set('America/Sao_Paulo');
                                             <th>FERJ</th>
                                             <th>FADEP</th>
                                             <th>FERC</th>
-                                            <th>FERC</th>
+                                            <th>FEMP</th>
+                                            <th>FERRFIS</th>
                                             <th>TOTAL</th>
                                         </tr>
                                     </thead>
@@ -1663,6 +1665,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <td>${formatCurrency(s.fadep)}</td>
                                 <td>${formatCurrency(s.ferc)}</td>
                                 <td>${formatCurrency(s.femp)}</td>
+                                <td>${formatCurrency(s.ferrfis)}</td>
                                 <td>${formatCurrency(s.total)}</td>
                             </tr>
                         `);
