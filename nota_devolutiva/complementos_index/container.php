@@ -64,8 +64,8 @@
             <h5>Resultados da Pesquisa</h5>  
             <table class="table table-striped table-bordered" id="tabelaResultados" style="zoom: 90%">  
                 <thead>  
-                    <tr>  
-                        <th>Número</th>  
+                    <tr>
+                        <th>ID | Número</th>  
                         <th>Data</th>  
                         <th>Título</th>  
                         <th>Apresentante</th>  
@@ -105,8 +105,8 @@
                                     $statusClass = 'status-pendente';  
                             }  
                         ?>  
-                        <tr>  
-                            <td data-label="Número"><?php echo htmlspecialchars($nota['numero']); ?></td>  
+                        <tr>
+                            <td data-label="Número"><?php echo htmlspecialchars($nota['id']); ?> | <?php echo htmlspecialchars($nota['numero']); ?></td>  
                             <td data-label="Data"><?php echo date('d/m/Y', strtotime($nota['data'])); ?></td>  
                             <td data-label="Título" title="<?php echo htmlspecialchars($nota['titulo']); ?>"><?php echo htmlspecialchars($nota['titulo']); ?></td>  
                             <td data-label="Apresentante"><?php echo htmlspecialchars($nota['apresentante']); ?></td>  
