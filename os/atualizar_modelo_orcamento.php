@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     try {
         $conn = getDatabaseConnection();
-        ensureFerrfisColumnExists($conn);
+        // ensureFerrfisColumnExists($conn);
         $conn->beginTransaction();
 
         // Atualiza o modelo principal
