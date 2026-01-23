@@ -95,27 +95,80 @@ function gerarMatricula($conn, $livro, $folha, $termo, $data_registro) {
 
 /**
  * Função para remover acentos de uma string
+ * Utiliza múltiplos métodos para garantir compatibilidade
  */
 function removerAcentos($string) {
+    if (empty($string)) {
+        return $string;
+    }
+    
+    // Método 1: Usando transliterator se disponível (mais confiável)
+    if (function_exists('transliterator_transliterate')) {
+        $result = transliterator_transliterate('NFD; [:Nonspacing Mark:] Remove; NFC', $string);
+        if ($result !== false) {
+            return $result;
+        }
+    }
+    
+    // Método 2: Usando iconv se disponível
+    if (function_exists('iconv')) {
+        $result = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $string);
+        if ($result !== false) {
+            return $result;
+        }
+    }
+    
+    // Método 3: Substituição manual (fallback)
     $acentos = [
-        'À'=>'A', 'Á'=>'A', 'Â'=>'A', 'Ã'=>'A', 'Ä'=>'A', 'Å'=>'A',
-        'à'=>'a', 'á'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a',
+        // Maiúsculas
+        'À'=>'A', 'Á'=>'A', 'Â'=>'A', 'Ã'=>'A', 'Ä'=>'A', 'Å'=>'A', 'Æ'=>'AE',
         'È'=>'E', 'É'=>'E', 'Ê'=>'E', 'Ë'=>'E',
-        'è'=>'e', 'é'=>'e', 'ê'=>'e', 'ë'=>'e',
         'Ì'=>'I', 'Í'=>'I', 'Î'=>'I', 'Ï'=>'I',
-        'ì'=>'i', 'í'=>'i', 'î'=>'i', 'ï'=>'i',
-        'Ò'=>'O', 'Ó'=>'O', 'Ô'=>'O', 'Õ'=>'O', 'Ö'=>'O',
-        'ò'=>'o', 'ó'=>'o', 'ô'=>'o', 'õ'=>'o', 'ö'=>'o',
+        'Ò'=>'O', 'Ó'=>'O', 'Ô'=>'O', 'Õ'=>'O', 'Ö'=>'O', 'Ø'=>'O',
         'Ù'=>'U', 'Ú'=>'U', 'Û'=>'U', 'Ü'=>'U',
+        'Ç'=>'C', 'Ñ'=>'N',
+        'Ý'=>'Y', 'Ÿ'=>'Y',
+        'Ž'=>'Z', 'Š'=>'S',
+        'Đ'=>'D', 'Ð'=>'D',
+        // Minúsculas
+        'à'=>'a', 'á'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a', 'æ'=>'ae',
+        'è'=>'e', 'é'=>'e', 'ê'=>'e', 'ë'=>'e',
+        'ì'=>'i', 'í'=>'i', 'î'=>'i', 'ï'=>'i',
+        'ò'=>'o', 'ó'=>'o', 'ô'=>'o', 'õ'=>'o', 'ö'=>'o', 'ø'=>'o',
         'ù'=>'u', 'ú'=>'u', 'û'=>'u', 'ü'=>'u',
-        'Ç'=>'C', 'ç'=>'c',
-        'Ñ'=>'N', 'ñ'=>'n',
-        'Ý'=>'Y', 'ý'=>'y', 'ÿ'=>'y',
-        'Ž'=>'Z', 'ž'=>'z',
-        'Š'=>'S', 'š'=>'s'
+        'ç'=>'c', 'ñ'=>'n',
+        'ý'=>'y', 'ÿ'=>'y',
+        'ž'=>'z', 'š'=>'s',
+        'đ'=>'d', 'ð'=>'d',
+        // Caracteres especiais comuns em nomes brasileiros
+        '´'=>'', '`'=>'', '^'=>'', '~'=>'', '¨'=>''
     ];
     
     return strtr($string, $acentos);
+}
+
+/**
+ * Função para normalizar nome de cidade para comparação
+ * Remove acentos, converte para maiúsculas e normaliza espaços
+ */
+function normalizarNomeCidade($nome) {
+    if (empty($nome)) {
+        return '';
+    }
+    
+    // Converter para maiúsculas
+    $nome = mb_strtoupper(trim($nome), 'UTF-8');
+    
+    // Remover acentos
+    $nome = removerAcentos($nome);
+    
+    // Normalizar espaços (múltiplos espaços para um único)
+    $nome = preg_replace('/\s+/', ' ', $nome);
+    
+    // Remover caracteres especiais mantendo apenas letras, números e espaços
+    $nome = preg_replace('/[^A-Z0-9\s]/', '', $nome);
+    
+    return trim($nome);
 }
 
 /**
@@ -125,7 +178,8 @@ function removerAcentos($string) {
 function consultarCodigoIBGE($cidadeUF) {
     global $ibgeCidadeCache;
     
-    $cacheKey = mb_strtoupper(trim($cidadeUF), 'UTF-8');
+    // Normalizar a chave do cache para evitar duplicatas
+    $cacheKey = normalizarNomeCidade($cidadeUF);
     if (isset($ibgeCidadeCache[$cacheKey])) {
         return $ibgeCidadeCache[$cacheKey];
     }
@@ -140,8 +194,9 @@ function consultarCodigoIBGE($cidadeUF) {
     $nomeCidade = trim($partes[0]);
     $uf = trim($partes[count($partes) - 1]); // Pega o último elemento como UF
     
-    $nomeCidadeNormalizado = removerAcentos(mb_strtoupper($nomeCidade, 'UTF-8'));
-    $ufNormalizado = mb_strtoupper($uf, 'UTF-8');
+    // Normalizar nome da cidade para comparação
+    $nomeCidadeNormalizado = normalizarNomeCidade($nomeCidade);
+    $ufNormalizado = mb_strtoupper(trim($uf), 'UTF-8');
     
     // Validar se UF tem 2 caracteres
     if (strlen($ufNormalizado) !== 2) {
@@ -175,9 +230,9 @@ function consultarCodigoIBGE($cidadeUF) {
             return null;
         }
         
-        // Procurar a cidade pelo nome (comparação exata sem acentos)
+        // Procurar a cidade pelo nome (comparação exata normalizada)
         foreach ($municipios as $municipio) {
-            $nomeMunicipioNormalizado = removerAcentos(mb_strtoupper($municipio['nome'], 'UTF-8'));
+            $nomeMunicipioNormalizado = normalizarNomeCidade($municipio['nome']);
             
             if ($nomeMunicipioNormalizado === $nomeCidadeNormalizado) {
                 $codigoIBGE = (string)$municipio['id'];
@@ -186,16 +241,28 @@ function consultarCodigoIBGE($cidadeUF) {
             }
         }
         
-        // Se não encontrou exato, tentar busca parcial (similar_text)
+        // Se não encontrou exato, tentar busca por similaridade
         $melhorMatch = null;
         $melhorSimilaridade = 0;
         
         foreach ($municipios as $municipio) {
-            $nomeMunicipioNormalizado = removerAcentos(mb_strtoupper($municipio['nome'], 'UTF-8'));
+            $nomeMunicipioNormalizado = normalizarNomeCidade($municipio['nome']);
             
+            // Calcular similaridade
             similar_text($nomeCidadeNormalizado, $nomeMunicipioNormalizado, $percentual);
             
-            if ($percentual > 80 && $percentual > $melhorSimilaridade) {
+            // Também verificar se um contém o outro (para casos como "SAO LUIS" vs "SAO LUIS DO MARANHAO")
+            $contemNome = (strpos($nomeMunicipioNormalizado, $nomeCidadeNormalizado) !== false) ||
+                          (strpos($nomeCidadeNormalizado, $nomeMunicipioNormalizado) !== false);
+            
+            if ($contemNome && strlen($nomeCidadeNormalizado) >= 4) {
+                // Se contém o nome e tem pelo menos 4 caracteres, considerar match
+                $codigoIBGE = (string)$municipio['id'];
+                $ibgeCidadeCache[$cacheKey] = $codigoIBGE;
+                return $codigoIBGE;
+            }
+            
+            if ($percentual > 85 && $percentual > $melhorSimilaridade) {
                 $melhorSimilaridade = $percentual;
                 $melhorMatch = (string)$municipio['id'];
             }
@@ -236,6 +303,35 @@ function processarNaturalidade($valor) {
     // Se for apenas números, é o código IBGE direto
     if (apenasNumeros($valor)) {
         return [$valor, null];
+    }
+    
+    // Substituir hífen por espaço no nome da cidade (antes da barra ou hífen separador de UF)
+    // Exemplo: "SANTA-INES/MA" -> "SANTA INES/MA"
+    // Primeiro, separamos cidade e UF
+    $partes = preg_split('/[\/]/', $valor);
+    if (count($partes) >= 2) {
+        // Se tem barra, substitui hífen por espaço apenas na parte da cidade
+        $nomeCidadeOriginal = trim($partes[0]);
+        $uf = trim($partes[count($partes) - 1]);
+        $nomeCidadeSemHifen = str_replace('-', ' ', $nomeCidadeOriginal);
+        $valor = $nomeCidadeSemHifen . '/' . $uf;
+    } else {
+        // Se não tem barra, tenta separar por hífen (pode ser CIDADE-UF)
+        $partes = explode('-', $valor);
+        if (count($partes) >= 2) {
+            // Verifica se o último elemento é uma UF (2 caracteres)
+            $ultimoElemento = trim($partes[count($partes) - 1]);
+            if (strlen($ultimoElemento) === 2) {
+                // O último é a UF, junta o resto como nome da cidade com espaços
+                $uf = $ultimoElemento;
+                array_pop($partes);
+                $nomeCidadeSemHifen = implode(' ', array_map('trim', $partes));
+                $valor = $nomeCidadeSemHifen . '/' . $uf;
+            } else {
+                // Não é UF, apenas substitui todos os hífens por espaços
+                $valor = str_replace('-', ' ', $valor);
+            }
+        }
     }
     
     // Se contém letras, é o nome da cidade - consultar API do IBGE

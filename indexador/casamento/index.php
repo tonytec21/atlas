@@ -341,6 +341,7 @@ date_default_timezone_set('America/Sao_Paulo');
         <div class="ph-actions">
           <a href="../index.php" class="btn btn-soft"><i class="fa fa-home"></i> Central de Acesso</a>
           <a href="../carga_crc/exportar_carga_casamento.php" class="btn btn-soft"><i class="fa fa-file-export"></i> Exportar carga CRC</a>
+          <a href="indexador_xlsx.php" class="btn btn-soft" style="background: linear-gradient(135deg, rgba(233, 30, 99, 0.15) 0%, rgba(156, 39, 176, 0.1) 100%); border-color: rgba(233, 30, 99, 0.3); color: #c2185b;"><i class="fa fa-file-excel"></i> Indexar em Lote</a>
           <button class="btn btn-success" data-toggle="modal" data-target="#modalCadastro"><i class="fa fa-plus"></i> Novo Registro</button>
         </div>
       </div>
