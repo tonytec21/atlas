@@ -438,11 +438,11 @@ body {
         <div class="mb-3 tipo-planilha-group">  
           <label class="font-weight-bold d-block mb-2">Tipo de planilha</label>  
           <div class="custom-control custom-radio custom-control-inline mb-1">  
-            <input type="radio" id="tipoSimples" name="tipo_planilha" class="custom-control-input" value="simples" checked>  
+            <input type="radio" id="tipoSimples" name="tipo_planilha" class="custom-control-input" value="simples">  
             <label class="custom-control-label" for="tipoSimples">Simples</label>  
           </div>  
           <div class="custom-control custom-radio custom-control-inline mb-1">  
-            <input type="radio" id="tipoCompleta" name="tipo_planilha" class="custom-control-input" value="completa">  
+            <input type="radio" id="tipoCompleta" name="tipo_planilha" class="custom-control-input" value="completa" checked>  
             <label class="custom-control-label" for="tipoCompleta">Completa</label>  
           </div>  
           <div class="mt-1">  
