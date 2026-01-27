@@ -4,6 +4,9 @@ checkSession();
 include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
 
+// Verificar se é administrador
+$isAdmin = isset($_SESSION['nivel_de_acesso']) && $_SESSION['nivel_de_acesso'] === 'administrador';
+
 // Buscar todos os livros distintos  
 $query_livros = "SELECT DISTINCT livro FROM indexador_obito WHERE status = 'A' ORDER BY livro ASC";  
 $result_livros = mysqli_query($conn, $query_livros);  
@@ -448,8 +451,14 @@ while($row = mysqli_fetch_assoc($result_livros)) {
                                         </button>
                                         <button type="button" class="btn btn-edit btn-sm" onclick="editarRegistro(this)" data-id="' . $row['id'] . '">
                                             <i class="fas fa-edit"></i>
-                                        </button>
-                                      </td>';
+                                        </button>';
+                                if ($isAdmin) {
+                                    echo '
+                                        <button type="button" class="btn btn-danger btn-sm btn-delete" onclick="removerRegistro(' . $row['id'] . ')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>';
+                                }
+                                echo '</td>';
                                 echo '</tr>';
                             }
                         } else {
@@ -1590,6 +1599,56 @@ $("#formEditObito").on("submit", function (e) {
         }
     });
 });
+
+// =================== Remover Registro (somente admin) ===================
+function removerRegistro(id) {
+    Swal.fire({
+        title: 'Tem certeza?',
+        text: 'Você realmente deseja excluir este registro?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sim, excluir',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                type: 'POST',
+                url: 'remover_registro.php',
+                data: { id: id },
+                dataType: 'json',
+                success: function(response) {
+                    if (response && response.status === 'success') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Registro removido com sucesso.',
+                            confirmButtonText: 'Ok'
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: (response && response.message) ? response.message : 'Ocorreu um problema ao remover o registro.',
+                            confirmButtonText: 'Ok'
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: 'Ocorreu um problema ao remover o registro.',
+                        confirmButtonText: 'Ok'
+                    });
+                }
+            });
+        }
+    });
+}
 </script>
 </body>
 </html>

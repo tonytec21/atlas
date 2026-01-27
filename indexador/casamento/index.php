@@ -128,6 +128,10 @@ date_default_timezone_set('America/Sao_Paulo');
     }
     .btn-action:hover{ filter: brightness(.98); }
 
+    .btn-delete {
+      margin-left: 5px;
+    }
+
     /* =====================================================================
        TABELA / CARDS
     ====================================================================== */
@@ -788,6 +792,9 @@ date_default_timezone_set('America/Sao_Paulo');
      Caminho do viewer do PDF.js
   ============================================================ */
   const PDFJS_VIEWER_PATH = '../../provimentos/pdfjs/web/viewer.html';
+  
+  // Variável de nível de acesso do usuário
+  var isAdmin = <?php echo (isset($_SESSION['nivel_de_acesso']) && $_SESSION['nivel_de_acesso'] === 'administrador') ? 'true' : 'false'; ?>;
 
   // =================== Helpers de Data (DD/MM/AAAA) ===================
   function isDateBR(str){ return /^(\d{2})\/(\d{2})\/(\d{4})$/.test(String(str || "").trim()); }
@@ -879,6 +886,7 @@ date_default_timezone_set('America/Sao_Paulo');
         + '  <div class="rc-actions">'
         + '    <button class="btn btn-info btn-action btn-view" title="Visualizar" data-id="'+ r.id +'"><i class="fa fa-eye"></i></button>'
         + '    <button class="btn btn-primary btn-action btn-edit" title="Editar" data-id="'+ r.id +'"><i class="fa fa-pencil"></i></button>'
+        + (isAdmin ? '    <button class="btn btn-danger btn-action btn-delete" title="Remover Registro" data-id="'+ r.id +'"><i class="fa fa-trash"></i></button>' : '')
         + '  </div>'
         + '</div>';
       $c.append(html);
@@ -909,6 +917,7 @@ date_default_timezone_set('America/Sao_Paulo');
         + '  <td>'
         + '    <button class="btn btn-info btn-action btn-view" title="Visualizar" data-id="'+ r.id +'"><i class="fa fa-eye"></i></button>'
         + '    <button class="btn btn-primary btn-action btn-edit" title="Editar" data-id="'+ r.id +'"><i class="fa fa-pencil"></i></button>'
+        + (isAdmin ? '    <button class="btn btn-danger btn-action btn-delete" title="Remover Registro" data-id="'+ r.id +'"><i class="fa fa-trash"></i></button>' : '')
         + '  </td>'
         + '</tr>';
       $tb.append(tr);
@@ -1364,6 +1373,58 @@ date_default_timezone_set('America/Sao_Paulo');
           }
         }
       });
+    });
+  });
+
+  // =================== Remover Registro (somente admin) ===================
+  $(document).on('click', '.btn-delete', function() {
+    var registryId = $(this).data('id');
+
+    Swal.fire({
+      title: 'Tem certeza?',
+      text: 'Você realmente deseja excluir este registro?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Sim, excluir',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        $.ajax({
+          type: 'POST',
+          url: 'remover_registro.php',
+          data: { id: registryId },
+          dataType: 'json',
+          success: function(response) {
+            if (response && response.status === 'success') {
+              Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: 'Registro removido com sucesso.',
+                confirmButtonText: 'Ok'
+              }).then(() => {
+                location.reload();
+              });
+            } else {
+              Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: (response && response.message) ? response.message : 'Ocorreu um problema ao remover o registro.',
+                confirmButtonText: 'Ok'
+              });
+            }
+          },
+          error: function(xhr, status, error) {
+            Swal.fire({
+              icon: 'error',
+              title: 'Erro',
+              text: 'Ocorreu um problema ao remover o registro.',
+              confirmButtonText: 'Ok'
+            });
+          }
+        });
+      }
     });
   });
 
