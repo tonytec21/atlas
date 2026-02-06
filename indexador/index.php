@@ -421,9 +421,14 @@ try {
     <div class="title-divider"></div>
     <div class="validator-header">
         <h1 class="page-title"></h1>
-        <a href="validar_xml/index.php" class="btn btn-success btn-modern">
-            <i class="fa fa-check-square-o"></i> Validar XML CRC
-        </a>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <a href="relatorio_detalhado.php" class="btn btn-primary btn-modern">
+                <i class="fa fa-bar-chart"></i> Relatório Detalhado
+            </a>
+            <a href="validar_xml/index.php" class="btn btn-success btn-modern">
+                <i class="fa fa-check-square-o"></i> Validar XML CRC
+            </a>
+        </div>
     </div>
     <!-- ===================== DASHBOARD / GRÁFICOS ===================== -->
     <div class="dashboard">
