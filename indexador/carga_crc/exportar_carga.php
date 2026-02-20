@@ -425,9 +425,9 @@ date_default_timezone_set('America/Sao_Paulo');
                             if (!empty($_POST['data_cadastro_inicio'])) $where[] = "data_cadastro >= '" . $_POST['data_cadastro_inicio'] . "'";  
                             if (!empty($_POST['data_cadastro_fim'])) $where[] = "data_cadastro <= '" . $_POST['data_cadastro_fim'] . "'";  
                             if (!empty($_POST['nome_registrado'])) $where[] = "nome_registrado LIKE '%" . $conn->real_escape_string($_POST['nome_registrado']) . "%'";  
-                            if (!empty($_POST['termo'])) $where[] = "termo LIKE '%" . $conn->real_escape_string($_POST['termo']) . "%'";  
-                            if (!empty($_POST['livro'])) $where[] = "livro LIKE '%" . $conn->real_escape_string($_POST['livro']) . "%'";  
-                            if (!empty($_POST['matricula'])) $where[] = "matricula LIKE '%" . $conn->real_escape_string($_POST['matricula']) . "%'";  
+                            if (!empty($_POST['termo'])) $where[] = "termo = '" . $conn->real_escape_string($_POST['termo']) . "'";  
+                            if (!empty($_POST['livro'])) $where[] = "livro = '" . $conn->real_escape_string($_POST['livro']) . "'";  
+                            if (!empty($_POST['matricula'])) $where[] = "matricula = '" . $conn->real_escape_string($_POST['matricula']) . "'";  
 
                             $whereSQL = count($where) > 0 ? 'WHERE ' . implode(' AND ', $where) . " AND status = 'ativo'" : "WHERE status = 'ativo'";  
                             $query = "SELECT * FROM indexador_nascimento $whereSQL";  

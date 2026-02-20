@@ -294,9 +294,9 @@ date_default_timezone_set('America/Sao_Paulo');
                             if (!empty($_POST['data_registro_fim']))    $where[] = "data_registro <= '" . $conn->real_escape_string($_POST['data_registro_fim']) . "'";  
                             if (!empty($_POST['data_casamento_inicio'])) $where[] = "data_casamento >= '" . $conn->real_escape_string($_POST['data_casamento_inicio']) . "'";  
                             if (!empty($_POST['data_casamento_fim']))    $where[] = "data_casamento <= '" . $conn->real_escape_string($_POST['data_casamento_fim']) . "'";  
-                            if (!empty($_POST['livro']))  $where[] = "livro LIKE '%"  . $conn->real_escape_string($_POST['livro'])  . "%'";  
-                            if (!empty($_POST['termo']))  $where[] = "termo LIKE '%"  . $conn->real_escape_string($_POST['termo'])  . "%'";  
-                            if (!empty($_POST['matricula'])) $where[] = "matricula LIKE '%" . $conn->real_escape_string($_POST['matricula']) . "%'";  
+                            if (!empty($_POST['livro']))  $where[] = "livro = '"  . $conn->real_escape_string($_POST['livro'])  . "'";  
+                            if (!empty($_POST['termo']))  $where[] = "termo = '"  . $conn->real_escape_string($_POST['termo'])  . "'";  
+                            if (!empty($_POST['matricula'])) $where[] = "matricula = '" . $conn->real_escape_string($_POST['matricula']) . "'";  
                             if (!empty($_POST['nome_conjuge'])) {  
                                 $n = $conn->real_escape_string($_POST['nome_conjuge']);  
                                 $where[] = "(conjuge1_nome LIKE '%$n%' OR conjuge2_nome LIKE '%$n%')";  

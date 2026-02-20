@@ -405,10 +405,10 @@ date_default_timezone_set('America/Sao_Paulo');
                             if (!empty($_POST['data_registro_inicio'])) $where[] = "data_registro >= '" . $conn->real_escape_string($_POST['data_registro_inicio']) . "'";
                             if (!empty($_POST['data_registro_fim'])) $where[] = "data_registro <= '" . $conn->real_escape_string($_POST['data_registro_fim']) . "'";
                             if (!empty($_POST['nome_registrado'])) $where[] = "nome_registrado LIKE '%" . $conn->real_escape_string($_POST['nome_registrado']) . "%'";
-                            if (!empty($_POST['matricula'])) $where[] = "matricula LIKE '%" . $conn->real_escape_string($_POST['matricula']) . "%'";
-                            if (!empty($_POST['livro'])) $where[] = "livro LIKE '%" . $conn->real_escape_string($_POST['livro']) . "%'";
-                            if (!empty($_POST['folha'])) $where[] = "folha LIKE '%" . $conn->real_escape_string($_POST['folha']) . "%'";
-                            if (!empty($_POST['termo'])) $where[] = "termo LIKE '%" . $conn->real_escape_string($_POST['termo']) . "%'";
+                            if (!empty($_POST['matricula'])) $where[] = "matricula = '" . $conn->real_escape_string($_POST['matricula']) . "'";
+                            if (!empty($_POST['livro'])) $where[] = "livro = '" . $conn->real_escape_string($_POST['livro']) . "'";
+                            if (!empty($_POST['folha'])) $where[] = "folha = '" . $conn->real_escape_string($_POST['folha']) . "'";
+                            if (!empty($_POST['termo'])) $where[] = "termo = '" . $conn->real_escape_string($_POST['termo']) . "'";
 
                             $sql = "SELECT * FROM indexador_obito WHERE " . implode(" AND ", $where);
                             $result = $conn->query($sql);
