@@ -242,14 +242,18 @@ date_default_timezone_set('America/Sao_Paulo');
                         <input type="text" id="livro" name="livro" class="form-control">  
                     </div>  
                     <div class="col-md-2 mb-2">  
-                        <label for="termo" class="form-label">Termo</label>  
-                        <input type="text" id="termo" name="termo" class="form-control">  
+                        <label for="termo_inicio" class="form-label">Termo Inicial</label>  
+                        <input type="text" id="termo_inicio" name="termo_inicio" class="form-control">  
                     </div>  
-                    <div class="col-md-4 mb-4">  
+                    <div class="col-md-2 mb-2">  
+                        <label for="termo_fim" class="form-label">Termo Final</label>  
+                        <input type="text" id="termo_fim" name="termo_fim" class="form-control">  
+                    </div>  
+                    <div class="col-md-3 mb-3">  
                         <label for="nome_conjuge" class="form-label">Nome do Cônjuge (1 ou 2)</label>  
                         <input type="text" id="nome_conjuge" name="nome_conjuge" class="form-control" placeholder="Ex.: MARIA SILVA">  
                     </div>  
-                    <div class="col-md-4 mb-3">  
+                    <div class="col-md-3 mb-3">  
                         <label for="matricula" class="form-label">Matrícula</label>  
                         <input type="text" id="matricula" name="matricula" class="form-control">  
                     </div>  
@@ -295,7 +299,14 @@ date_default_timezone_set('America/Sao_Paulo');
                             if (!empty($_POST['data_casamento_inicio'])) $where[] = "data_casamento >= '" . $conn->real_escape_string($_POST['data_casamento_inicio']) . "'";  
                             if (!empty($_POST['data_casamento_fim']))    $where[] = "data_casamento <= '" . $conn->real_escape_string($_POST['data_casamento_fim']) . "'";  
                             if (!empty($_POST['livro']))  $where[] = "livro = '"  . $conn->real_escape_string($_POST['livro'])  . "'";  
-                            if (!empty($_POST['termo']))  $where[] = "termo = '"  . $conn->real_escape_string($_POST['termo'])  . "'";  
+                            if (!empty($_POST['termo_inicio']) && !empty($_POST['termo_fim'])) {
+                                $where[] = "CAST(termo AS UNSIGNED) >= " . intval($_POST['termo_inicio']);
+                                $where[] = "CAST(termo AS UNSIGNED) <= " . intval($_POST['termo_fim']);
+                            } elseif (!empty($_POST['termo_inicio'])) {
+                                $where[] = "CAST(termo AS UNSIGNED) = " . intval($_POST['termo_inicio']);
+                            } elseif (!empty($_POST['termo_fim'])) {
+                                $where[] = "CAST(termo AS UNSIGNED) = " . intval($_POST['termo_fim']);
+                            }
                             if (!empty($_POST['matricula'])) $where[] = "matricula = '" . $conn->real_escape_string($_POST['matricula']) . "'";  
                             if (!empty($_POST['nome_conjuge'])) {  
                                 $n = $conn->real_escape_string($_POST['nome_conjuge']);  

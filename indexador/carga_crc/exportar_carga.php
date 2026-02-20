@@ -374,10 +374,14 @@ date_default_timezone_set('America/Sao_Paulo');
                         <input type="text" id="livro" name="livro" class="form-control">  
                     </div>  
                     <div class="col-md-2 mb-2">  
-                        <label for="termo" class="form-label">Termo</label>  
-                        <input type="text" id="termo" name="termo" class="form-control">  
+                        <label for="termo_inicio" class="form-label">Termo Inicial</label>  
+                        <input type="text" id="termo_inicio" name="termo_inicio" class="form-control">  
                     </div>  
-                    <div class="col-md-5 mb-5">  
+                    <div class="col-md-2 mb-2">  
+                        <label for="termo_fim" class="form-label">Termo Final</label>  
+                        <input type="text" id="termo_fim" name="termo_fim" class="form-control">  
+                    </div>  
+                    <div class="col-md-3 mb-3">  
                         <label for="nome_registrado" class="form-label">Nome do Registrado</label>  
                         <input type="text" id="nome_registrado" name="nome_registrado" class="form-control">  
                     </div>  
@@ -425,7 +429,14 @@ date_default_timezone_set('America/Sao_Paulo');
                             if (!empty($_POST['data_cadastro_inicio'])) $where[] = "data_cadastro >= '" . $_POST['data_cadastro_inicio'] . "'";  
                             if (!empty($_POST['data_cadastro_fim'])) $where[] = "data_cadastro <= '" . $_POST['data_cadastro_fim'] . "'";  
                             if (!empty($_POST['nome_registrado'])) $where[] = "nome_registrado LIKE '%" . $conn->real_escape_string($_POST['nome_registrado']) . "%'";  
-                            if (!empty($_POST['termo'])) $where[] = "termo = '" . $conn->real_escape_string($_POST['termo']) . "'";  
+                            if (!empty($_POST['termo_inicio']) && !empty($_POST['termo_fim'])) {
+                                $where[] = "CAST(termo AS UNSIGNED) >= " . intval($_POST['termo_inicio']);
+                                $where[] = "CAST(termo AS UNSIGNED) <= " . intval($_POST['termo_fim']);
+                            } elseif (!empty($_POST['termo_inicio'])) {
+                                $where[] = "CAST(termo AS UNSIGNED) = " . intval($_POST['termo_inicio']);
+                            } elseif (!empty($_POST['termo_fim'])) {
+                                $where[] = "CAST(termo AS UNSIGNED) = " . intval($_POST['termo_fim']);
+                            }
                             if (!empty($_POST['livro'])) $where[] = "livro = '" . $conn->real_escape_string($_POST['livro']) . "'";  
                             if (!empty($_POST['matricula'])) $where[] = "matricula = '" . $conn->real_escape_string($_POST['matricula']) . "'";  
 
