@@ -1611,10 +1611,10 @@ body.dark-mode footer .footer-content a:hover {
                                         <i class="fa fa-eye" aria-hidden="true"></i>
                                     </button>
                                     <?php if ($ordem['status'] !== 'Cancelado') : ?>
-                                    <button class="btn btn-success btn-sm action-btn" title="Pagamentos e Devoluções"
+                                    <!-- <button class="btn btn-success btn-sm action-btn" title="Pagamentos e Devoluções"
                                         onclick="abrirPagamentoModal(<?php echo $ordem['id']; ?>, '<?php echo addslashes($ordem['cliente']); ?>', <?php echo $ordem['total_os']; ?>, <?php echo $deposito_previo; ?>, <?php echo $total_liquidado; ?>, <?php echo $total_devolvido; ?>, <?php echo $saldo; ?>, '<?php echo $statusOS; ?>')">
                                         <i class="fa fa-money" aria-hidden="true"></i>
-                                    </button>
+                                    </button> -->
                                     <?php endif; ?>
                                     <button type="button" title="Imprimir OS" class="btn btn-primary btn-sm action-btn" onclick="verificarTimbrado(<?php echo $ordem['id']; ?>)"><i class="fa fa-print" aria-hidden="true"></i></button>
                                     <button class="<?php echo $botaoAnexoClasses; ?>" title="Anexos" onclick="abrirAnexoModal(<?php echo $ordem['id']; ?>)">
