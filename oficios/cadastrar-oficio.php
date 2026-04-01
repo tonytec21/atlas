@@ -86,6 +86,11 @@ $atlasConn->close();
 // Usuário logado
 $loggedUser = $_SESSION['username'];
 
+// Gerar identificador do diretório de imagens para este ofício
+// Formato: "NUMERO_ANO" (ex: "25_2025")
+$proximoNumero = getNextOficioNumber($conn);
+$uploadDirToken = str_replace('/', '_', $proximoNumero);
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -329,6 +334,9 @@ include(__DIR__ . '/../menu.php');
                         <button type="button" class="btn-atlas-table btn-atlas-table-edit" onclick="AtlasTableHelper.openEdit(CKEDITOR.instances.corpo)">
                             <i class="fa fa-pencil"></i> Editar Tabela
                         </button>
+                        <button type="button" class="btn-atlas-table btn-atlas-table-img" onclick="AtlasTableHelper.openImage(CKEDITOR.instances.corpo)">
+                            <i class="fa fa-picture-o"></i> Inserir Imagem
+                        </button>
                     </div>
                     <textarea class="form-control" id="corpo" name="corpo" rows="10" required></textarea>
                 </div>
@@ -412,6 +420,8 @@ include(__DIR__ . '/../menu.php');
 
     <script>
         $(document).ready(function() {
+            // Token do diretório de imagens deste ofício
+            AtlasTableHelper.uploadDirToken = '<?php echo $uploadDirToken; ?>';
             // Inicializar o CKEditor com suporte avançado a tabelas
             AtlasTableHelper.initEditor('corpo');
 

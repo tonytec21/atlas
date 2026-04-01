@@ -113,6 +113,9 @@ include(__DIR__ . '/../menu.php');
                         <button type="button" class="btn-atlas-table btn-atlas-table-edit" onclick="AtlasTableHelper.openEdit(CKEDITOR.instances.corpo)">
                             <i class="fa fa-pencil"></i> Editar Tabela
                         </button>
+                        <button type="button" class="btn-atlas-table btn-atlas-table-img" onclick="AtlasTableHelper.openImage(CKEDITOR.instances.corpo)">
+                            <i class="fa fa-picture-o"></i> Inserir Imagem
+                        </button>
                     </div>
                     <textarea class="form-control" id="corpo" name="corpo" rows="10" required><?php echo htmlspecialchars($oficioData['corpo']); ?></textarea>
                 </div>
@@ -152,6 +155,8 @@ include(__DIR__ . '/../menu.php');
 <script>
 
     $(document).ready(function() {
+        // Token do diretório de imagens deste ofício
+        AtlasTableHelper.uploadDirToken = '<?php echo str_replace("/", "_", $numero); ?>';
         // Inicializar o CKEditor com suporte avançado a tabelas
         AtlasTableHelper.initEditor('corpo');
 

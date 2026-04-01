@@ -16,11 +16,20 @@
        INICIALIZAÇÃO DO CKEDITOR
        ============================================================== */
 
+    TH.uploadDirToken = ''; // será definido pela página PHP
+
     TH.initEditor = function (elementId, extraCfg) {
+        // Montar URL de upload com token do diretório
+        var uploadUrl = 'upload_image.php';
+        if (TH.uploadDirToken) {
+            uploadUrl += '?dir_token=' + encodeURIComponent(TH.uploadDirToken);
+        }
+
         var cfg = {
             extraPlugins: 'htmlwriter',
             allowedContent: true,
-            filebrowserUploadUrl: '/uploader/upload.php',
+            filebrowserUploadUrl: uploadUrl,
+            filebrowserImageUploadUrl: uploadUrl,
             filebrowserUploadMethod: 'form',
             scayt_autoStartup: true,
             scayt_sLang: 'pt_BR',
@@ -30,7 +39,7 @@
                 { name: 'basic', items: ['Bold', 'Italic', 'Underline', 'Strike', '-', 'RemoveFormat'] },
                 { name: 'para', items: ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent', '-', 'Blockquote', '-', 'JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock'] },
                 { name: 'styles', items: ['Format', 'FontSize'] },
-                { name: 'insert', items: ['Table', 'HorizontalRule', 'SpecialChar'] },
+                { name: 'insert', items: ['Image', 'Table', 'HorizontalRule', 'SpecialChar'] },
                 { name: 'tools', items: ['Maximize', 'Source'] }
             ],
             on: {
@@ -584,7 +593,11 @@
         return 'table{border-collapse:collapse!important;width:100%!important;margin:10px 0!important;font-size:12px;table-layout:fixed}' +
             'td,th{border:1px solid #333!important;padding:6px 8px!important;vertical-align:middle;word-wrap:break-word;overflow:hidden}' +
             'th{background:#f0f0f0!important;font-weight:bold!important;text-align:center}' +
-            '.atlas-tw{position:relative;width:100%}';
+            '.atlas-tw{position:relative;width:100%}' +
+            'img{max-width:100%;height:auto;}' +
+            'img.atlas-img-left{float:left;margin:0 12px 8px 0}' +
+            'img.atlas-img-right{float:right;margin:0 0 8px 12px}' +
+            'img.atlas-img-center{display:block;margin:8px auto}';
     }
 
     /* ==============================================================
@@ -686,6 +699,221 @@
         var l = [];
         for (var i = 0; i < cols; i++) l.push('Coluna ' + (i + 1));
         return l;
+    }
+
+    /* ==============================================================
+       INSERIR IMAGEM
+       ============================================================== */
+
+    TH.openImage = function (editorInstance) {
+        var body =
+            '<div class="atlas-tbl-row">' +
+                '<div class="atlas-tbl-field" style="flex:1;">' +
+                    '<label>Enviar imagem do computador:</label>' +
+                    '<div class="atlas-img-upload-area" id="_aiUploadArea">' +
+                        '<input type="file" id="_aiFile" accept="image/*" style="display:none;">' +
+                        '<div id="_aiUploadLabel" style="cursor:pointer;padding:18px;text-align:center;border:2px dashed #ccc;border-radius:8px;color:#888;transition:all 0.2s;" ' +
+                            'onclick="document.getElementById(\'_aiFile\').click()">' +
+                            '<i class="fa fa-cloud-upload" style="font-size:1.6rem;display:block;margin-bottom:6px;color:#0d6efd;"></i>' +
+                            'Clique aqui ou arraste uma imagem<br><small>JPG, PNG, GIF \u2014 M\u00e1x. 5MB</small>' +
+                        '</div>' +
+                        '<div id="_aiProgress" style="display:none;text-align:center;padding:14px;color:#0d6efd;">' +
+                            '<i class="fa fa-spinner fa-spin"></i> Enviando...' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="atlas-tbl-row" style="align-items:center;">' +
+                '<div class="atlas-tbl-field" style="flex:1;">' +
+                    '<label>Ou cole a URL da imagem:</label>' +
+                    '<input type="text" id="_aiUrl" placeholder="https://..." style="width:100%;border:1px solid #ccc;border-radius:6px;padding:6px 10px;font-size:0.88rem;">' +
+                '</div>' +
+            '</div>' +
+            '<div id="_aiPreviewWrap" style="display:none;margin-top:10px;">' +
+                '<label style="font-size:0.82rem;font-weight:600;color:#555;">Pr\u00e9-visualiza\u00e7\u00e3o:</label>' +
+                '<div style="text-align:center;padding:10px;background:#f8f9fa;border-radius:6px;border:1px solid #e0e0e0;margin-top:4px;">' +
+                    '<img id="_aiPreview" src="" style="max-width:100%;max-height:200px;border-radius:4px;">' +
+                '</div>' +
+            '</div>' +
+            '<div class="atlas-tbl-row" style="margin-top:12px;">' +
+                '<div class="atlas-tbl-field">' +
+                    '<label>Largura no documento:</label>' +
+                    '<div style="display:flex;align-items:center;gap:8px;">' +
+                        '<input type="range" id="_aiWidth" min="10" max="100" value="80" style="flex:1;min-width:140px;" oninput="document.getElementById(\'_aiWidthVal\').textContent=this.value+\'%\'">' +
+                        '<span id="_aiWidthVal" style="font-weight:700;color:#0d6efd;min-width:40px;">80%</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="atlas-tbl-field">' +
+                    '<label>Alinhamento:</label>' +
+                    '<select id="_aiAlign" style="border:1px solid #ccc;border-radius:6px;padding:5px 10px;height:34px;font-size:0.88rem;">' +
+                        '<option value="center">Centralizado</option>' +
+                        '<option value="left">Esquerda</option>' +
+                        '<option value="right">Direita</option>' +
+                    '</select>' +
+                '</div>' +
+            '</div>' +
+            '<p class="atlas-tbl-tip"><i class="fa fa-info-circle"></i> A imagem ser\u00e1 inserida no corpo do of\u00edcio e aparecer\u00e1 no PDF impresso.</p>';
+
+        var footer =
+            '<button type="button" class="btn btn-secondary" id="_aiCancelBtn">Cancelar</button>' +
+            '<button type="button" class="btn btn-primary" id="_aiInsertBtn" disabled><i class="fa fa-check"></i> Inserir Imagem</button>';
+
+        var modal = _createModal('atlasImageModal', 'Inserir Imagem', body, footer);
+        modal._editor = editorInstance;
+        modal._imageUrl = '';
+
+        // Evento do input file
+        var fileInput = document.getElementById('_aiFile');
+        fileInput.addEventListener('change', function () {
+            if (this.files && this.files[0]) _uploadImage(this.files[0]);
+        });
+
+        // Drag & drop
+        var uploadArea = document.getElementById('_aiUploadLabel');
+        uploadArea.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            this.style.borderColor = '#0d6efd';
+            this.style.background = '#f0f4ff';
+        });
+        uploadArea.addEventListener('dragleave', function (e) {
+            e.preventDefault();
+            this.style.borderColor = '#ccc';
+            this.style.background = '';
+        });
+        uploadArea.addEventListener('drop', function (e) {
+            e.preventDefault();
+            this.style.borderColor = '#ccc';
+            this.style.background = '';
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                _uploadImage(e.dataTransfer.files[0]);
+            }
+        });
+
+        // URL manual
+        var urlInput = document.getElementById('_aiUrl');
+        urlInput.addEventListener('input', function () {
+            var url = this.value.trim();
+            if (url && (url.indexOf('http') === 0 || url.indexOf('data:image') === 0)) {
+                _setImagePreview(url);
+            }
+        });
+        urlInput.addEventListener('paste', function () {
+            var self = this;
+            setTimeout(function () {
+                var url = self.value.trim();
+                if (url) _setImagePreview(url);
+            }, 100);
+        });
+
+        // Botões
+        document.getElementById('_aiCancelBtn').addEventListener('click', function () { _closeModal('atlasImageModal'); });
+        document.getElementById('_aiInsertBtn').addEventListener('click', function () { _doInsertImage(); });
+    };
+
+    function _uploadImage(file) {
+        // Validar tipo
+        if (!file.type.match(/^image\/(jpeg|png|gif|bmp|webp)$/)) {
+            alert('Formato n\u00e3o permitido. Use JPG, PNG ou GIF.');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Arquivo muito grande. M\u00e1ximo 5MB.');
+            return;
+        }
+
+        var form = new FormData();
+        form.append('upload', file);
+        if (TH.uploadDirToken) {
+            form.append('dir_token', TH.uploadDirToken);
+        }
+
+        document.getElementById('_aiUploadLabel').style.display = 'none';
+        document.getElementById('_aiProgress').style.display = 'block';
+
+        var uploadUrl = 'upload_image.php';
+        if (TH.uploadDirToken) {
+            uploadUrl += '?dir_token=' + encodeURIComponent(TH.uploadDirToken);
+        }
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl, true);
+        xhr.onload = function () {
+            document.getElementById('_aiProgress').style.display = 'none';
+            document.getElementById('_aiUploadLabel').style.display = 'block';
+
+            if (xhr.status === 200) {
+                try {
+                    var resp = JSON.parse(xhr.responseText);
+                    if (resp.status === 'success' && resp.url) {
+                        _setImagePreview(resp.url);
+                        document.getElementById('_aiUrl').value = resp.url;
+                    } else {
+                        alert(resp.message || 'Erro ao enviar imagem.');
+                    }
+                } catch (e) {
+                    alert('Erro ao processar resposta do servidor.');
+                }
+            } else {
+                alert('Erro no upload. C\u00f3digo: ' + xhr.status);
+            }
+        };
+        xhr.onerror = function () {
+            document.getElementById('_aiProgress').style.display = 'none';
+            document.getElementById('_aiUploadLabel').style.display = 'block';
+            alert('Erro de conex\u00e3o ao enviar a imagem.');
+        };
+        xhr.send(form);
+    }
+
+    function _setImagePreview(url) {
+        var modal = document.getElementById('atlasImageModal');
+        if (modal) modal._imageUrl = url;
+
+        var preview = document.getElementById('_aiPreview');
+        var wrap = document.getElementById('_aiPreviewWrap');
+        var insertBtn = document.getElementById('_aiInsertBtn');
+
+        preview.src = url;
+        wrap.style.display = 'block';
+        insertBtn.disabled = false;
+
+        // Erro no carregamento
+        preview.onerror = function () {
+            wrap.style.display = 'none';
+            insertBtn.disabled = true;
+        };
+    }
+
+    function _doInsertImage() {
+        var modal = document.getElementById('atlasImageModal');
+        if (!modal || !modal._editor || !modal._imageUrl) return;
+
+        var editor = modal._editor;
+        var url = modal._imageUrl;
+        var width = parseInt(document.getElementById('_aiWidth').value) || 80;
+        var align = document.getElementById('_aiAlign').value;
+
+        // Montar HTML da imagem
+        var style = 'max-width:' + width + '%;height:auto;';
+        var wrapStyle = '';
+
+        if (align === 'center') {
+            wrapStyle = 'text-align:center;';
+        } else if (align === 'left') {
+            style += 'float:left;margin:0 12px 8px 0;';
+        } else if (align === 'right') {
+            style += 'float:right;margin:0 0 8px 12px;';
+        }
+
+        var html;
+        if (align === 'center') {
+            html = '<p style="' + wrapStyle + '"><img src="' + _escHtml(url) + '" style="' + style + '" alt="imagem"></p>';
+        } else {
+            html = '<img src="' + _escHtml(url) + '" style="' + style + '" alt="imagem">';
+        }
+
+        editor.insertHtml(html);
+        _closeModal('atlasImageModal');
     }
 
 })();

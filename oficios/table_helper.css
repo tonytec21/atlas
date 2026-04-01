@@ -169,6 +169,12 @@
 }
 .btn-atlas-table-edit:hover { background: #198754; color: #fff; }
 
+.btn-atlas-table-img {
+    border-color: #6f42c1;
+    color: #6f42c1;
+}
+.btn-atlas-table-img:hover { background: #6f42c1; color: #fff; }
+
 /* ---- Editor de larguras (Edit Table) ---- */
 .atlas-col-editor { margin-top: 6px; }
 .atlas-col-editor-title {
