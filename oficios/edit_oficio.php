@@ -64,6 +64,8 @@ $atlasConn->close();
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <script src="../ckeditor/ckeditor.js"></script>
+    <link rel="stylesheet" href="table_helper.css">
+    <script src="table_helper.js"></script>
     <style>
         .cke_notification_warning { display: none !important; }
     </style>
@@ -104,6 +106,14 @@ include(__DIR__ . '/../menu.php');
                 </div>
                 <div class="form-group">
                     <label for="corpo">Corpo do Ofício:</label>
+                    <div class="atlas-tbl-actions">
+                        <button type="button" class="btn-atlas-table" onclick="AtlasTableHelper.openInsert(CKEDITOR.instances.corpo)">
+                            <i class="fa fa-plus"></i> Inserir Tabela
+                        </button>
+                        <button type="button" class="btn-atlas-table btn-atlas-table-edit" onclick="AtlasTableHelper.openEdit(CKEDITOR.instances.corpo)">
+                            <i class="fa fa-pencil"></i> Editar Tabela
+                        </button>
+                    </div>
                     <textarea class="form-control" id="corpo" name="corpo" rows="10" required><?php echo htmlspecialchars($oficioData['corpo']); ?></textarea>
                 </div>
                 <div class="form-row">
@@ -142,15 +152,8 @@ include(__DIR__ . '/../menu.php');
 <script>
 
     $(document).ready(function() {
-        // Inicializar o CKEditor com corretor ortográfico
-        CKEDITOR.replace('corpo', {
-            extraPlugins: 'htmlwriter',
-            allowedContent: true,
-            filebrowserUploadUrl: '/uploader/upload.php',
-            filebrowserUploadMethod: 'form',
-            scayt_autoStartup: true,
-            scayt_sLang: 'pt_BR'
-        });
+        // Inicializar o CKEditor com suporte avançado a tabelas
+        AtlasTableHelper.initEditor('corpo');
 
         // Preencher automaticamente o campo de cargo ao selecionar um assinante
         $('#assinante').on('change', function() {

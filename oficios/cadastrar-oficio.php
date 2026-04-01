@@ -103,6 +103,8 @@ $loggedUser = $_SESSION['username'];
     <script src="../script/jquery-3.5.1.min.js"></script>
     <script src="../script/bootstrap.min.js"></script>
     <script src="../script/sweetalert2.js"></script>
+    <link rel="stylesheet" href="table_helper.css">
+    <script src="table_helper.js"></script>
     <style>
         .cke_notification_warning { display: none !important; }
         .btn-info {
@@ -320,6 +322,14 @@ include(__DIR__ . '/../menu.php');
                 </div>
                 <div class="form-group">
                     <label for="corpo">Corpo do Ofício:</label>
+                    <div class="atlas-tbl-actions">
+                        <button type="button" class="btn-atlas-table" onclick="AtlasTableHelper.openInsert(CKEDITOR.instances.corpo)">
+                            <i class="fa fa-plus"></i> Inserir Tabela
+                        </button>
+                        <button type="button" class="btn-atlas-table btn-atlas-table-edit" onclick="AtlasTableHelper.openEdit(CKEDITOR.instances.corpo)">
+                            <i class="fa fa-pencil"></i> Editar Tabela
+                        </button>
+                    </div>
                     <textarea class="form-control" id="corpo" name="corpo" rows="10" required></textarea>
                 </div>
                 <div class="form-row">
@@ -402,15 +412,8 @@ include(__DIR__ . '/../menu.php');
 
     <script>
         $(document).ready(function() {
-            // Inicializar o CKEditor com corretor ortográfico
-            CKEDITOR.replace('corpo', {
-                extraPlugins: 'htmlwriter',
-                allowedContent: true,
-                filebrowserUploadUrl: '/uploader/upload.php',
-                filebrowserUploadMethod: 'form',
-                scayt_autoStartup: true, // Habilitar o corretor ortográfico automaticamente
-                scayt_sLang: 'pt_BR' // Definir o idioma do corretor ortográfico para português brasileiro
-            });
+            // Inicializar o CKEditor com suporte avançado a tabelas
+            AtlasTableHelper.initEditor('corpo');
 
             // Preencher automaticamente o campo de cargo ao selecionar um assinante
             $('#assinante').on('change', function() {
@@ -654,17 +657,7 @@ window.usarModelo = function(numero) {
     });  
 };  
 
-// Inicialização do CKEditor quando o documento estiver pronto  
-$(document).ready(function() {  
-    CKEDITOR.replace('corpo', {  
-        extraPlugins: 'htmlwriter',  
-        allowedContent: true,  
-        filebrowserUploadUrl: '/uploader/upload.php',  
-        filebrowserUploadMethod: 'form',  
-        scayt_autoStartup: true,  
-        scayt_sLang: 'pt_BR'  
-    });  
-});
+// CKEditor já inicializado via AtlasTableHelper no script anterior
 </script>
 <?php
 include(__DIR__ . '/../rodape.php');

@@ -1,5 +1,6 @@
 <?php
 require('tcpdf/tcpdf.php');
+require('table_pdf_helper.php');
 
 // Carregar o número do ofício
 $numero = isset($_GET['numero']) ? $_GET['numero'] : 0;
@@ -181,46 +182,11 @@ $pdf->SetFont('helvetica', 'B', 12);
 $pdf->writeHTML('<div style="text-align: justify;">' . ('Assunto: ' . $oficioData['assunto']) . '</div>', true, false, true, false, '');
 $pdf->Ln(8);
 
-// Agora processar o corpo do ofício, separando os <p> e <blockquote>
+// Processar o corpo do ofício com suporte avançado a tabelas
 $pdf->SetFont('helvetica', '', 12);
 
-// Decodificar o conteúdo HTML do banco de dados
-$conteudoOficio = html_entity_decode($oficioData['corpo']);
-
-// Usar preg_split para dividir o conteúdo em <p>, <blockquote> e <table>
-$partes = preg_split('/(<blockquote>.*?<\/blockquote>|<table.*?<\/table>)/is', $conteudoOficio, -1, PREG_SPLIT_DELIM_CAPTURE);
-
-// Iterar sobre as partes do conteúdo e processá-las individualmente
-foreach ($partes as $parte) {
-    // Verificar se é um <blockquote>
-    if (preg_match('/<blockquote>(.*?)<\/blockquote>/is', $parte, $matches)) {
-        // Processar o blockquote
-        $pdf->Ln(-6);
-        $pdf->SetX(60);
-        $blockquoteWidth = $pdf->getPageWidth() - 60 - $pdf->getMargins()['right'] - 1;
-        $pdf->SetFont('helvetica', 'I', 12);
-        $pdf->MultiCell($blockquoteWidth, 5, strip_tags($matches[1]), 0, 'J', false, 1);
-        $pdf->SetY($pdf->GetY() + 3);
-    }
-    // Verificar se é uma <table>
-    elseif (preg_match('/<table.*?<\/table>/is', $parte)) {
-        // Renderizar a tabela diretamente com o HTML completo
-        $pdf->SetFont('helvetica', '', 12);
-        $pdf->writeHTML($parte, true, false, true, false, '');
-        $pdf->Ln(5);
-    } else {
-        // Processar normalmente os conteúdos fora de <blockquote> e <table>
-        if (preg_match_all('/<p>(.*?)<\/p>/is', $parte, $matchesParagrafo)) {
-            foreach ($matchesParagrafo[1] as $paragrafoTexto) {
-                $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $paragrafoTexto . '</div>', true, false, true, false);
-                $pdf->Ln(5);
-            }
-        } else {
-            $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $parte . '</div>', true, false, true, false);
-            $pdf->Ln(5);
-        }
-    }
-}
+// Largura de conteúdo: página A4 (210mm) - margens (25mm + 25mm) = 160mm
+renderCorpoOficioPdf($pdf, $oficioData['corpo'], 160);
 
 // Assinatura
 $pdf->SetFont('helvetica', '', 12);

@@ -1,0 +1,255 @@
+/* =========================================
+   Atlas Table Helper - Estilos
+   ========================================= */
+
+/* ---- Modal overlay ---- */
+.atlas-tbl-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.atlas-tbl-box {
+    background: #fff;
+    border-radius: 10px;
+    width: 620px;
+    max-width: 96vw;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.22);
+    overflow: hidden;
+}
+.atlas-tbl-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f7f8fa;
+}
+.atlas-tbl-header h5 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #2c3e50;
+}
+.atlas-tbl-header h5 i { margin-right: 8px; color: #0d6efd; }
+.atlas-tbl-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #888;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+.atlas-tbl-close:hover { color: #dc3545; background: #fee; }
+
+.atlas-tbl-body {
+    padding: 18px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+.atlas-tbl-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background: #f7f8fa;
+}
+
+/* ---- Form elements ---- */
+.atlas-tbl-row {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 14px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+.atlas-tbl-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.atlas-tbl-field label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #555;
+}
+.atlas-tbl-field input[type="number"],
+.atlas-tbl-field select {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 0.88rem;
+    height: 34px;
+    outline: none;
+    min-width: 78px;
+    transition: border-color 0.2s;
+}
+.atlas-tbl-field select { min-width: 190px; }
+.atlas-tbl-field input:focus,
+.atlas-tbl-field select:focus { border-color: #0d6efd; box-shadow: 0 0 0 2px rgba(13,110,253,0.12); }
+
+.atlas-tbl-chk {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    height: 34px;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+.atlas-tbl-chk input { width: 16px; height: 16px; cursor: pointer; }
+
+/* ---- Preview ---- */
+.atlas-tbl-preview-wrap { margin-top: 8px; }
+.atlas-tbl-preview-wrap > label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #555;
+    display: block;
+    margin-bottom: 5px;
+}
+.atlas-tbl-preview {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px;
+    background: #fafbfc;
+    max-height: 180px;
+    overflow: auto;
+}
+
+/* ---- Tip ---- */
+.atlas-tbl-tip {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: #e7f3ff;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: #0c5460;
+    border-left: 3px solid #0d6efd;
+}
+.atlas-tbl-tip i { color: #0d6efd; margin-right: 4px; }
+
+/* ---- Botões ao lado do editor ---- */
+.atlas-tbl-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+.btn-atlas-table {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+    border: 1px solid #0d6efd;
+    color: #0d6efd;
+    padding: 5px 13px;
+    border-radius: 6px;
+    font-size: 0.83rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+.btn-atlas-table:hover { background: #0d6efd; color: #fff; }
+.btn-atlas-table i { font-size: 0.95rem; }
+
+.btn-atlas-table-edit {
+    border-color: #198754;
+    color: #198754;
+}
+.btn-atlas-table-edit:hover { background: #198754; color: #fff; }
+
+/* ---- Editor de larguras (Edit Table) ---- */
+.atlas-col-editor { margin-top: 6px; }
+.atlas-col-editor-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 8px;
+}
+.atlas-col-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+.atlas-col-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #333;
+    min-width: 80px;
+}
+.atlas-col-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: #dee2e6;
+    border-radius: 3px;
+    outline: none;
+}
+.atlas-col-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #0d6efd;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.atlas-col-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #0d6efd;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.atlas-col-pct {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0d6efd;
+    min-width: 42px;
+    text-align: right;
+}
+.atlas-col-bar-bg {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+.atlas-col-bar-fill {
+    height: 100%;
+    background: #0d6efd;
+    border-radius: 4px;
+    transition: width 0.15s;
+}
+.atlas-no-table-msg {
+    padding: 20px;
+    text-align: center;
+    color: #888;
+    font-size: 0.9rem;
+}
+.atlas-no-table-msg i {
+    display: block;
+    font-size: 2rem;
+    margin-bottom: 8px;
+    color: #ccc;
+}
