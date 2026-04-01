@@ -29,6 +29,11 @@ function getNextOficioNumber($conn) {
     return $nextSequence . '/' . $currentYear;
 }
 
+// Gerar identificador do diretório de imagens para este ofício ANTES do POST
+// Formato: "NUMERO_ANO" (ex: "25_2025")
+$proximoNumero = getNextOficioNumber($conn);
+$uploadDirToken = str_replace('/', '_', $proximoNumero);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $numero = getNextOficioNumber($conn);
     $destinatario = $conn->real_escape_string($_POST['destinatario']);
@@ -85,11 +90,6 @@ $atlasConn->close();
 
 // Usuário logado
 $loggedUser = $_SESSION['username'];
-
-// Gerar identificador do diretório de imagens para este ofício
-// Formato: "NUMERO_ANO" (ex: "25_2025")
-$proximoNumero = getNextOficioNumber($conn);
-$uploadDirToken = str_replace('/', '_', $proximoNumero);
 
 ?>
 <!DOCTYPE html>
