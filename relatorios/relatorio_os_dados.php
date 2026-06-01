@@ -301,9 +301,11 @@ try {
                 os.id, os.cliente, os.cpf_cliente, os.data_criacao, os.total_os, os.status,
                 COALESCE(p.dep, 0)                              AS depositado,
                 COALESCE(a.cons, 0) + COALESCE(am.cons, 0)      AS consumido,
+                COALESCE(r.rep, 0)                              AS repassado,
                 COALESCE(d.dev, 0)                              AS devolvido,
                 COALESCE(p.dep, 0)
                   - (COALESCE(a.cons, 0) + COALESCE(am.cons, 0))
+                  - COALESCE(r.rep, 0)
                   - COALESCE(d.dev, 0)                          AS saldo
             FROM ordens_de_servico os
             INNER JOIN (
@@ -319,6 +321,10 @@ try {
                 FROM atos_manuais_liquidados GROUP BY ordem_servico_id
             ) am ON am.ordem_servico_id = os.id
             LEFT JOIN (
+                SELECT ordem_de_servico_id, SUM(total_repasse) AS rep
+                FROM repasse_credor WHERE status = 'ativo' GROUP BY ordem_de_servico_id
+            ) r  ON r.ordem_de_servico_id = os.id
+            LEFT JOIN (
                 SELECT ordem_de_servico_id, SUM(total_devolucao) AS dev
                 FROM devolucao_os GROUP BY ordem_de_servico_id
             ) d  ON d.ordem_de_servico_id = os.id
@@ -330,11 +336,12 @@ try {
     $listaDep = runQuery($conn, $sqlDep, $typesDep, $paramsDep);
 
     // Totais do depósito prévio
-    $depTotais = ['total_saldo'=>0,'total_depositado'=>0,'total_consumido'=>0,'total_devolvido'=>0,'qtd_os'=>0];
+    $depTotais = ['total_saldo'=>0,'total_depositado'=>0,'total_consumido'=>0,'total_repassado'=>0,'total_devolvido'=>0,'qtd_os'=>0];
     foreach ($listaDep as $row) {
         $depTotais['total_saldo']       += (float)$row['saldo'];
         $depTotais['total_depositado']  += (float)$row['depositado'];
         $depTotais['total_consumido']   += (float)$row['consumido'];
+        $depTotais['total_repassado']   += (float)$row['repassado'];
         $depTotais['total_devolvido']   += (float)$row['devolvido'];
         $depTotais['qtd_os']++;
     }

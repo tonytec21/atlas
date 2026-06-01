@@ -506,6 +506,12 @@ if ($resFunc) {
                     </div>
                     <div class="col-6 col-md">
                         <div class="dep-stat">
+                            <div class="rotulo">Repassado ao credor</div>
+                            <div class="valor" id="depRepassado">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md">
+                        <div class="dep-stat">
                             <div class="rotulo">Devolvido</div>
                             <div class="valor" id="depDevolvido">—</div>
                         </div>
@@ -521,6 +527,7 @@ if ($resFunc) {
                             <th>Criada em</th>
                             <th class="text-end">Depositado</th>
                             <th class="text-end">Consumido</th>
+                            <th class="text-end">Repassado</th>
                             <th class="text-end">Devolvido</th>
                             <th class="text-end">Saldo</th>
                         </tr></thead>
@@ -799,6 +806,7 @@ if ($resFunc) {
         $('#depQtd').text(fmtNum.format(+t.qtd_os || 0));
         $('#depDepositado').text(fmtBRL.format(+t.total_depositado || 0));
         $('#depConsumido').text(fmtBRL.format(+t.total_consumido || 0));
+        $('#depRepassado').text(fmtBRL.format(+t.total_repassado || 0));
         $('#depDevolvido').text(fmtBRL.format(+t.total_devolvido || 0));
 
         if (dtDep){ dtDep.destroy(); $('#tabelaDeposito tbody').empty(); }
@@ -812,11 +820,12 @@ if ($resFunc) {
                 '<td data-order="'+escapeHtml(d.data_criacao||'')+'">'+dataBR+'</td>' +
                 '<td class="text-end text-money" data-order="'+(+d.depositado)+'">'+fmtBRL.format(+d.depositado)+'</td>' +
                 '<td class="text-end text-money" data-order="'+(+d.consumido)+'">'+fmtBRL.format(+d.consumido)+'</td>' +
+                '<td class="text-end text-money" data-order="'+(+(d.repassado||0))+'">'+fmtBRL.format(+(d.repassado||0))+'</td>' +
                 '<td class="text-end text-money" data-order="'+(+d.devolvido)+'">'+fmtBRL.format(+d.devolvido)+'</td>' +
                 '<td class="text-end text-money saldo-pos" data-order="'+(+d.saldo)+'">'+fmtBRL.format(+d.saldo)+'</td></tr>');
         });
         dtDep = $('#tabelaDeposito').DataTable({
-            order:[[7,'desc']], pageLength:10, language:{ url:DT_LANG },
+            order:[[8,'desc']], pageLength:10, language:{ url:DT_LANG },
             dom:'Bfrtip', buttons:['copyHtml5','excelHtml5','pdfHtml5','print']
         });
     }
