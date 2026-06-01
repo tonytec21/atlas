@@ -282,8 +282,11 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
             </div>
 
             <div class="form-row">
-                <div class="form-group col-md-12 d-flex align-items-end">
+                <div class="form-group col-md-6 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary btn-block"><i class="fa fa-filter"></i> Filtrar</button>
+                </div>
+                <div class="form-group col-md-6 d-flex align-items-end">
+                    <a href="index.php" class="btn btn-secondary btn-block"><i class="fa fa-arrow-left"></i> Voltar ao modo normal</a>
                 </div>
             </div>
         </form>
@@ -355,9 +358,6 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
 
                         <div class="card-footer-eq">
                             <div class="card-actions">
-                                <button title="Ver Depósitos do Período" class="btn btn-success btn-sm" onclick="event.stopPropagation(); verDepositosPeriodo('<?= $data_inicial ?>','<?= $data_final ?>','<?= htmlspecialchars($funcionarioSelected, ENT_QUOTES) ?>')">
-                                    <i class="fa fa-list" aria-hidden="true"></i> Depósitos do Período
-                                </button>
                                 <a href="imprimir_fechamento_caixa_unificado_periodo.php?data_inicial=<?= urlencode($data_inicial) ?>&data_final=<?= urlencode($data_final) ?>&funcionario=<?= urlencode($funcionarioSelected) ?>" target="_blank" title="Imprimir Fechamento do Período" class="btn btn-primary btn-sm" onclick="event.stopPropagation();">
                                     <i class="fa fa-file-pdf-o"></i> Imprimir
                                 </a>
@@ -792,6 +792,12 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
         const icon=fechado?'fa-lock':'fa-unlock-alt';
         $('#modalStatusPillPeriodo').html(`<span class="badge-status ${statusClass}"><i class="fa ${icon}"></i> ${statusText}</span>`);
 
+        // Destrói as DataTables ANTES de esvaziar/repreencher as tabelas (evita "parentNode of null")
+        ['#tabelaAtos','#tabelaAtosManuais','#tabelaPagamentos','#tabelaTotalPorTipo','#tabelaDevolucoes','#tabelaSaidas','#tabelaDepositos','#tabelaSaldoTransportado'].forEach(function(sel){
+          if ($.fn.dataTable.isDataTable(sel)) { try { $(sel).DataTable().clear().destroy(); } catch(e){} }
+        });
+        window.dtAtos = null; window.dtAtosManuais = null;
+
         function setCard(sel,val){
           const el=$(sel).closest('.col-md-3'); const v=parseFloat(val||0);
           if (v>0){ $(sel).text(formatCurrency(v)); el.show(); } else { $(sel).text('R$ 0,00'); el.hide(); }
@@ -1017,12 +1023,9 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
         });
         $('#totalSaldoTransportado').text(formatCurrency(totTr));
 
-        // Abre modal + inicializa DataTables
+        // Abre modal + inicializa DataTables das tabelas simples
+        // (dtAtos e dtAtosManuais já foram inicializadas acima, com seus filtros/handlers)
         $('#detalhesModalPeriodo').modal('show');
-        if (window.dtAtos) window.dtAtos.destroy();
-        window.dtAtos = $('#tabelaAtos').DataTable({language:{url:"../style/Portuguese-Brasil.json"}, destroy:true, pageLength:10, order:[]});
-        if (window.dtAtosManuais) window.dtAtosManuais.destroy();
-        window.dtAtosManuais = $('#tabelaAtosManuais').DataTable({language:{url:"../style/Portuguese-Brasil.json"}, destroy:true, pageLength:10, order:[]});
         $('#tabelaPagamentos').DataTable({language:{url:"../style/Portuguese-Brasil.json"}, destroy:true, pageLength:10, order:[]});
         $('#tabelaTotalPorTipo').DataTable({language:{url:"../style/Portuguese-Brasil.json"}, destroy:true, pageLength:10, order:[]});
         $('#tabelaDevolucoes').DataTable({language:{url:"../style/Portuguese-Brasil.json"}, destroy:true, pageLength:10, order:[]});
