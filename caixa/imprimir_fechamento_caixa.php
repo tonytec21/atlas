@@ -6,25 +6,37 @@ include(__DIR__ . '/db_connection.php');
 
 date_default_timezone_set('America/Sao_Paulo');
 
-if (!isset($_GET['id'])) {
-    die('ID do caixa não informado.');
-}
-
-$id_caixa = intval($_GET['id']);
 $conn = getDatabaseConnection();
 
-$stmt = $conn->prepare('SELECT * FROM caixa WHERE id = :id');
-$stmt->execute([':id' => $id_caixa]);
-$caixa = $stmt->fetch(PDO::FETCH_ASSOC);
+if (isset($_GET['id']) && $_GET['id'] !== '') {
+    // Modo padrão: fechamento a partir de um registro de caixa
+    $id_caixa = intval($_GET['id']);
+    $stmt = $conn->prepare('SELECT * FROM caixa WHERE id = :id');
+    $stmt->execute([':id' => $id_caixa]);
+    $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$caixa) {
-    die('Caixa não encontrado.');
+    if (!$caixa) {
+        die('Caixa não encontrado.');
+    }
+
+    $data = $caixa['data_caixa'];
+    $funcionario = $caixa['funcionario'];
+    $tipo = $caixa['tipo'] ?? 'normal';
+    $saldoInicial = floatval($caixa['saldo_inicial']);
+} elseif (isset($_GET['funcionario'], $_GET['data']) && $_GET['funcionario'] !== '' && $_GET['data'] !== '') {
+    // Modo sem caixa aberto: gera o fechamento por funcionário + data
+    // (ex.: o usuário apenas liquidou atos e não abriu caixa / não há valores).
+    $data = $_GET['data'];
+    $funcionario = $_GET['funcionario'];
+    $tipo = 'normal';
+    // Se existir um caixa para essa data/funcionário, aproveita o saldo inicial; senão, 0.
+    $stmt = $conn->prepare('SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
+    $stmt->execute([':data' => $data, ':funcionario' => $funcionario]);
+    $c = $stmt->fetch(PDO::FETCH_ASSOC);
+    $saldoInicial = $c ? floatval($c['saldo_inicial']) : 0.0;
+} else {
+    die('Informe o caixa (id) ou o funcionário e a data.');
 }
-
-$data = $caixa['data_caixa'];
-$funcionario = $caixa['funcionario'];
-$tipo = $caixa['tipo'] ?? 'normal';
-$saldoInicial = floatval($caixa['saldo_inicial']);
 
 $params = [':data' => $data];
 if ($tipo !== 'unificado') {
@@ -104,6 +116,13 @@ $origemSaldoInicial = fetchData(
     [':funcionario' => $funcionario, ':data' => $data]
 );
 
+$repasseCredor = fetchData(
+    'SELECT rc.ordem_de_servico_id, rc.cliente, rc.funcionario, rc.data_repasse, rc.forma_repasse, rc.total_repasse
+     FROM repasse_credor rc
+     WHERE ' . ($tipo === 'unificado' ? '' : 'rc.funcionario = :funcionario AND ') . 'DATE(rc.data_repasse) = :data AND rc.status = "ativo"',
+    $params
+);
+
 $totalAtos = array_sum(array_column($atos, 'total'));
 $totalAtosManuais = array_sum(array_column($atosManuais, 'total'));
 
@@ -121,6 +140,7 @@ $totalDevolucoesEspecie = array_sum(
 $totalSaidas = array_sum(array_column($saidas, 'valor_saida'));
 $totalDepositos = array_sum(array_column($depositos, 'valor_do_deposito'));
 $totalSaldoTransportado = array_sum(array_column($saldoTransportado, 'valor_transportado'));
+$totalRepasseCredor = array_sum(array_column($repasseCredor, 'total_repasse'));
 
 $totalRecebidoEmEspecie = $totalPorForma['Espécie'] ?? 0;
 
@@ -180,6 +200,7 @@ $cards = [
     'Saídas e Despesas' => $totalSaidas,
     'Depósito do Caixa' => $totalDepositos,
     'Saldo Transportado' => $totalSaldoTransportado,
+    'Repasse a Credores' => $totalRepasseCredor,
     'Total em Caixa' => $totalEmCaixa
 ];
 
@@ -194,6 +215,7 @@ $cardColors = [
     'Saídas e Despesas' => '#dc3545',
     'Depósito do Caixa' => '#17a2b8',
     'Saldo Transportado' => '#34495e',
+    'Repasse a Credores' => '#64748b',
     'Total em Caixa' => '#343a40'
 ];
 
@@ -386,6 +408,19 @@ renderTable($pdf, 'Saldo Transportado',
         ucfirst(strtolower($s['status']))
     ], $saldoTransportado),
     ['DATA CAIXA'=>'20%', 'DATA TRANSPORTE'=>'20%', 'VALOR (R$)'=>'20%', 'FUNCIONÁRIO'=>'20%', 'STATUS'=>'20%']
+);
+
+renderTable($pdf, 'Repasse a Credores',
+    ['O.S', 'CLIENTE', 'FUNCIONÁRIO', 'DATA', 'FORMA', 'VALOR (R$)'],
+    array_map(fn($r) => [
+        $r['ordem_de_servico_id'],
+        $r['cliente'],
+        $r['funcionario'],
+        date('d/m/Y', strtotime($r['data_repasse'])),
+        $r['forma_repasse'],
+        number_format($r['total_repasse'], 2, ',', '.')
+    ], $repasseCredor),
+    ['O.S'=>'8%', 'CLIENTE'=>'30%', 'FUNCIONÁRIO'=>'22%', 'DATA'=>'13%', 'FORMA'=>'12%', 'VALOR (R$)'=>'15%']
 );
 
 // ================== Gráfico ==================

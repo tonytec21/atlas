@@ -94,6 +94,13 @@ $saldoInicial = fetchData(
     $params
 );
 
+$repasseCredor = fetchData(
+    'SELECT rc.ordem_de_servico_id, rc.cliente, rc.funcionario, rc.data_repasse, rc.forma_repasse, rc.total_repasse
+    FROM repasse_credor rc
+    WHERE DATE(rc.data_repasse) = :data AND rc.status = "ativo"',
+    $params
+);
+
 // ================= Calcular totais =================
 $totalAtos = array_sum(array_column($atos, 'total'));
 $totalAtosManuais = array_sum(array_column($atosManuais, 'total'));
@@ -123,6 +130,7 @@ $totalSaidas = array_sum(array_column($saidas, 'valor_saida'));
 $totalDepositos = array_sum(array_column($depositos, 'valor_do_deposito'));
 $totalSaldoTransportado = array_sum(array_column($saldoTransportado, 'valor_transportado'));
 $totalSaldoInicial = array_sum(array_column($saldoInicial, 'saldo_inicial'));
+$totalRepasseCredor = array_sum(array_column($repasseCredor, 'total_repasse'));
 
 $totalRecebidoEmEspecie = $totalPorForma['Espécie'] ?? 0;
 
@@ -177,6 +185,7 @@ $cards = [
     'Saídas e Despesas' => $totalSaidas,
     'Depósito do Caixa' => $totalDepositos,
     'Saldo Transportado' => $totalSaldoTransportado,
+    'Repasse a Credores' => $totalRepasseCredor,
     'Total em Caixa' => $totalEmCaixa
 ];
 
@@ -191,6 +200,7 @@ $cardColors = [
     'Saídas e Despesas' => '#dc3545',
     'Depósito do Caixa' => '#17a2b8',
     'Saldo Transportado' => '#34495e',
+    'Repasse a Credores' => '#64748b',
     'Total em Caixa' => '#343a40'
 ];
 
@@ -367,6 +377,19 @@ renderTable($pdf, 'Saldo Transportado',
         ucfirst(strtolower($s['status']))
     ], $saldoTransportado),
     ['DATA CAIXA'=>'20%', 'DATA TRANSPORTE'=>'20%', 'VALOR (R$)'=>'15%', 'FUNCIONÁRIO'=>'25%', 'STATUS'=>'20%']
+);
+
+renderTable($pdf, 'Repasse a Credores',
+    ['O.S', 'CLIENTE', 'FUNCIONÁRIO', 'DATA', 'FORMA', 'VALOR (R$)'],
+    array_map(fn($r) => [
+        $r['ordem_de_servico_id'],
+        $r['cliente'],
+        $r['funcionario'],
+        date('d/m/Y', strtotime($r['data_repasse'])),
+        $r['forma_repasse'],
+        number_format($r['total_repasse'], 2, ',', '.')
+    ], $repasseCredor),
+    ['O.S'=>'8%', 'CLIENTE'=>'30%', 'FUNCIONÁRIO'=>'22%', 'DATA'=>'13%', 'FORMA'=>'12%', 'VALOR (R$)'=>'15%']
 );
 
 // ================= Gráfico =================

@@ -289,6 +289,31 @@ try {
         $atos_isentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /* ---------------- Repasse a credores (Protesto) — somente ativos ----------------
+       Unificado: por data. Individual: por funcionário + data.
+       É um valor recebido e repassado diretamente ao credor (não é faturamento),
+       mas movimenta o caixa, então deve constar no fechamento. */
+    if ($tipo === 'unificado') {
+        $sql = 'SELECT rc.ordem_de_servico_id, rc.cliente, rc.funcionario, rc.data_repasse, rc.total_repasse, rc.forma_repasse
+                FROM repasse_credor rc
+                WHERE rc.status = "ativo" AND DATE(rc.data_repasse) = :data';
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+    } else {
+        $sql = 'SELECT rc.ordem_de_servico_id, rc.cliente, rc.funcionario, rc.data_repasse, rc.total_repasse, rc.forma_repasse
+                FROM repasse_credor rc
+                WHERE rc.status = "ativo" AND DATE(rc.data_repasse) = :data AND rc.funcionario = :funcionario';
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+        $stmt->bindParam(':funcionario', $funcionarios);
+    }
+    $stmt->execute();
+    $repasseCredor = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $totalRepasseCredor = array_reduce($repasseCredor, function($carry, $item) {
+        return $carry + floatval($item['total_repasse']);
+    }, 0.0);
+
     $totalAtos = array_reduce($atos, function($carry, $item) {
         return $carry + floatval($item['total']);
     }, 0.0);
@@ -397,7 +422,11 @@ try {
         'totalSelos' => $totalSelos,
 
         // NOVO: total dos Atos Isentos (usado no card do front)
-        'totalAtosIsentos' => isset($totalAtosIsentos) ? $totalAtosIsentos : 0.0
+        'totalAtosIsentos' => isset($totalAtosIsentos) ? $totalAtosIsentos : 0.0,
+
+        // NOVO: Repasse a credores (Protesto)
+        'repasseCredor' => isset($repasseCredor) ? $repasseCredor : [],
+        'totalRepasseCredor' => isset($totalRepasseCredor) ? $totalRepasseCredor : 0.0
     ]);
 } catch (Exception $e) {
     echo json_encode(['error' => $e->getMessage()]);
