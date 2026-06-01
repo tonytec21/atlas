@@ -101,3 +101,21 @@ RELATÓRIO DE TAREFAS (unifica DUAS fontes de tarefas)
     certidão não possuem prazo, então não entram na contagem de atrasadas.
   - "Responsável" do pedido = atualizado_por (ou criado_por, se vazio).
   - O cálculo é leve (as duas tabelas são pequenas) e feito sob demanda.
+
+============================================================
+NOVO: REPASSE A CREDORES (PROTESTO)
+============================================================
+Os valores de repasse ao credor do protesto são recebidos pela serventia,
+mas NÃO lhe pertencem (são repassados diretamente ao credor). Portanto:
+
+• NÃO entram no faturamento (Emolumentos / Valor total). O faturamento já é
+  calculado apenas a partir dos atos liquidados — a tabela repasse_credor é um
+  fluxo separado, então o faturamento nunca incluiu esses valores.
+• Passam a aparecer em OPÇÃO SEPARADA:
+   - KPI "Repasse a credores" (cinza, rotulado "Não é faturamento");
+   - Painel "Repasse a credores (Protesto)" com total repassado, nº de repasses,
+     quebra por forma de repasse e a tabela (O.S., cliente, funcionário, data,
+     forma, valor) — exportável.
+
+Fonte: tabela repasse_credor (status = 'ativo'). O filtro de período usa a
+data do repasse (data_repasse) e respeita o funcionário selecionado.

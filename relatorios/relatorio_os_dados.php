@@ -339,6 +339,58 @@ try {
         $depTotais['qtd_os']++;
     }
 
+    /* ---------------- Repasse a credores (Protesto) ----------------
+       Valores recebidos e repassados DIRETAMENTE ao credor (protesto).
+       NÃO compõem o faturamento da serventia — tabela própria repasse_credor.
+       Filtro de data sobre data_repasse; respeita o funcionário selecionado. */
+    $whereRep  = ["rc.status = 'ativo'"];
+    $typesRep  = '';
+    $paramsRep = [];
+    if ($ini !== null) {
+        $whereRep[] = 'rc.data_repasse >= ?';
+        $typesRep  .= 's';
+        $paramsRep[] = $ini . ' 00:00:00';
+    }
+    if ($fim !== null) {
+        $fimMais1Rep = (new DateTime($fim))->modify('+1 day')->format('Y-m-d');
+        $whereRep[] = 'rc.data_repasse < ?';
+        $typesRep  .= 's';
+        $paramsRep[] = $fimMais1Rep . ' 00:00:00';
+    }
+    if ($funcionario !== 'todos' && $funcionario !== '') {
+        $whereRep[] = 'TRIM(rc.funcionario) = ?';
+        $typesRep  .= 's';
+        $paramsRep[] = trim($funcionario);
+    }
+    $whereRepSql = 'WHERE ' . implode(' AND ', $whereRep);
+
+    $sqlRep = "
+        SELECT rc.id, rc.ordem_de_servico_id, rc.cliente,
+               TRIM(rc.funcionario) AS funcionario,
+               rc.data_repasse, rc.total_repasse, rc.forma_repasse
+        FROM repasse_credor rc
+        $whereRepSql
+        ORDER BY rc.data_repasse DESC
+    ";
+    $listaRep = runQuery($conn, $sqlRep, $typesRep, $paramsRep);
+
+    $repTotais = ['total'=>0,'qtd'=>0];
+    $repForma = []; $repFunc = [];
+    foreach ($listaRep as $row) {
+        $v = (float)$row['total_repasse'];
+        $repTotais['total'] += $v;
+        $repTotais['qtd']++;
+        $fk = $row['forma_repasse'] ?: '—';
+        $repForma[$fk] = ($repForma[$fk] ?? 0) + $v;
+        $rfk = $row['funcionario'] ?: '—';
+        $repFunc[$rfk] = ($repFunc[$rfk] ?? 0) + $v;
+    }
+    $repFormaArr = [];
+    foreach ($repForma as $k=>$v) $repFormaArr[] = ['forma'=>$k,'total'=>$v];
+    $repFuncArr = [];
+    foreach ($repFunc as $k=>$v) $repFuncArr[] = ['funcionario'=>$k,'total'=>$v];
+    usort($repFuncArr, function($a,$b){ return ($b['total'] <=> $a['total']); });
+
     /* ---------------- Resposta ---------------- */
     echo json_encode([
         'ok'            => true,
@@ -352,6 +404,12 @@ try {
             'usa_periodo' => $dep_periodo,
             'totais'      => $depTotais,
             'lista'       => $listaDep,
+        ],
+        'repasseCredor' => [
+            'totais'        => $repTotais,
+            'porForma'      => $repFormaArr,
+            'porFuncionario'=> $repFuncArr,
+            'lista'         => $listaRep,
         ],
     ], JSON_UNESCAPED_UNICODE);
 

@@ -189,7 +189,7 @@ if ($resFunc) {
         /* ===================== KPIs ===================== */
         .card-dashboard{ height:auto; min-height:150px; border-radius:16px; }
         .card-dashboard .card-title{ font-size:.88rem; }
-        .card-dashboard .card-value{ font-size: clamp(1.15rem, 3.2vw, 1.65rem); white-space:nowrap; }
+        .card-dashboard .card-value{ font-size: clamp(1rem, 2.4vw, 1.42rem); white-space:nowrap; }
         .card-sub{ font-size:.74rem; opacity:.9; color: rgba(255,255,255,.85); }
 
         /* ===================== Gráficos ===================== */
@@ -269,6 +269,9 @@ if ($resFunc) {
         .switch-dep label{ font-size:.82rem; color:var(--rel-muted); cursor:pointer; }
         .saldo-pos{ color:#1ca35a; font-weight:700; }
         body.dark-mode .saldo-pos{ color:#34d399; }
+        /* KPI de repasse (não é faturamento) */
+        .bg-slate{ background:linear-gradient(135deg,#64748b,#94a3b8); }
+        body.dark-mode .bg-slate{ background:linear-gradient(135deg,#475569,#64748b); }
 
         /* ===================== Dark: ajustes finos próprios ===================== */
         body.dark-mode .alert-warning{
@@ -415,7 +418,7 @@ if ($resFunc) {
             </div>
 
             <!-- ====================== KPIs ====================== -->
-            <div class="row row-cols-2 row-cols-lg-5 g-3 mb-4">
+            <div class="row row-cols-2 row-cols-lg-6 g-3 mb-4">
                 <div class="col">
                     <div class="card card-dashboard bg-blue"><div class="card-body">
                         <h5 class="card-title">Faturamento</h5>
@@ -430,6 +433,14 @@ if ($resFunc) {
                         <div class="card-value" id="kpiTotal">—</div>
                         <div class="card-sub">Emolumentos + fundos</div>
                         <div class="card-icon"><i class="fa fa-database"></i></div>
+                    </div></div>
+                </div>
+                <div class="col" id="kpiRepasseCol">
+                    <div class="card card-dashboard bg-slate"><div class="card-body">
+                        <h5 class="card-title">Repasse a credores</h5>
+                        <div class="card-value" id="kpiRepasse">—</div>
+                        <div class="card-sub">Não é faturamento</div>
+                        <div class="card-icon"><i class="fa fa-exchange"></i></div>
                     </div></div>
                 </div>
                 <div class="col">
@@ -512,6 +523,41 @@ if ($resFunc) {
                             <th class="text-end">Consumido</th>
                             <th class="text-end">Devolvido</th>
                             <th class="text-end">Saldo</th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ====================== Repasse a credores (Protesto) ====================== -->
+            <div class="panel mb-4" id="painelRepasse" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <p class="secao-titulo mb-0">Repasse a credores (Protesto)</p>
+                </div>
+                <p class="secao-sub mb-3"><i class="fa fa-info-circle"></i> Valores recebidos e repassados diretamente ao credor. <strong>Não compõem o faturamento da serventia.</strong></p>
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md">
+                        <div class="dep-stat destaque" style="background:linear-gradient(135deg,#64748b,#94a3b8);">
+                            <div class="rotulo">Total repassado</div>
+                            <div class="valor" id="repTotal">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md">
+                        <div class="dep-stat"><div class="rotulo">Repasses</div><div class="valor" id="repQtd">—</div></div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="dep-stat"><div class="rotulo">Por forma de repasse</div><div class="valor" id="repFormas" style="font-size:.92rem; white-space:normal;">—</div></div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle w-100" id="tabelaRepasse">
+                        <thead><tr>
+                            <th>O.S.</th>
+                            <th>Cliente</th>
+                            <th>Funcionário</th>
+                            <th>Data</th>
+                            <th>Forma</th>
+                            <th class="text-end">Valor repassado</th>
                         </tr></thead>
                         <tbody></tbody>
                     </table>
@@ -619,7 +665,7 @@ if ($resFunc) {
     const PALETA = ['#4e73df','#1cc88a','#36b9cc','#f6c23e','#e74a3b','#9b59b6','#858796','#fd7e14'];
 
     let charts = {};
-    let dtFunc = null, dtAtos = null, dtDep = null;
+    let dtFunc = null, dtAtos = null, dtDep = null, dtRep = null;
     const DT_LANG = 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json';
 
     if (window.Chart) { Chart.defaults.font.family = 'Inter, system-ui, -apple-system, sans-serif'; }
@@ -697,6 +743,7 @@ if ($resFunc) {
         $('#kpiAtos').text(fmtNum.format(+k.qtd_atos));
         $('#kpiOS').text(fmtNum.format(+k.qtd_os));
         $('#kpiFunc').text(fmtNum.format(+k.qtd_funcionarios));
+        $('#kpiRepasse').text(fmtBRL.format(+(resp.repasseCredor && resp.repasseCredor.totais ? resp.repasseCredor.totais.total : 0)));
         $('#avisoSemDados').toggle(+k.qtd_atos === 0);
 
         renderAtribuicao(resp.porAtribuicao, base);
@@ -704,6 +751,44 @@ if ($resFunc) {
         renderFuncionarios(resp.porFuncionario, base);
         renderAtos(resp.porAto, base);
         renderDeposito(resp.depositoPrevio);
+        renderRepasse(resp.repasseCredor);
+    }
+
+    /* ----------------- Repasse a credores ----------------- */
+    function renderRepasse(rp){
+        const t = (rp && rp.totais) ? rp.totais : {total:0, qtd:0};
+        const temRepasse = (+t.qtd > 0);
+
+        // Só exibe o KPI e o painel se houver repasse no período filtrado
+        $('#kpiRepasseCol').toggle(temRepasse);
+        $('#painelRepasse').toggle(temRepasse);
+
+        if (!temRepasse){
+            if (dtRep){ dtRep.destroy(); dtRep = null; $('#tabelaRepasse tbody').empty(); }
+            return;
+        }
+
+        $('#kpiRepasse').text(fmtBRL.format(+t.total || 0));
+        $('#repTotal').text(fmtBRL.format(+t.total || 0));
+        $('#repQtd').text(fmtNum.format(+t.qtd || 0));
+        const formas = (rp.porForma || []).map(function(f){ return escapeHtml(f.forma) + ': ' + fmtBRL.format(+f.total); });
+        $('#repFormas').html(formas.length ? formas.join(' &nbsp;•&nbsp; ') : '—');
+
+        if (dtRep){ dtRep.destroy(); $('#tabelaRepasse tbody').empty(); }
+        const tbody = $('#tabelaRepasse tbody');
+        (rp.lista || []).forEach(function(d){
+            tbody.append('<tr>' +
+                '<td>#'+escapeHtml(d.ordem_de_servico_id)+'</td>' +
+                '<td>'+escapeHtml(d.cliente)+'</td>' +
+                '<td>'+escapeHtml(d.funcionario || '—')+'</td>' +
+                '<td data-order="'+escapeHtml(d.data_repasse||'')+'">'+brDataHora(d.data_repasse)+'</td>' +
+                '<td>'+escapeHtml(d.forma_repasse || '—')+'</td>' +
+                '<td class="text-end text-money" data-order="'+(+d.total_repasse)+'">'+fmtBRL.format(+d.total_repasse)+'</td></tr>');
+        });
+        dtRep = $('#tabelaRepasse').DataTable({
+            order:[[3,'desc']], pageLength:10, language:{ url:DT_LANG },
+            dom:'Bfrtip', buttons:['copyHtml5','excelHtml5','pdfHtml5','print']
+        });
     }
 
     /* ----------------- Depósito prévio ----------------- */
