@@ -410,6 +410,34 @@ if ($rf) { while ($r = $rf->fetch_assoc()) { $funcionarios[] = $r; } }
                 <div class="col"><div class="card card-dashboard bg-purple"><div class="card-body"><h5 class="card-title">Conclusão</h5><div class="card-value" id="kpiTaxa">—</div><div class="card-sub">Taxa (excl. canc.)</div><div class="card-icon"><i class="fa fa-percent"></i></div></div></div></div>
             </div>
 
+            <!-- Tarefas em aberto (independente dos filtros) -->
+            <div class="panel mb-4" id="painelAberto">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <p class="secao-titulo mb-0">Tarefas em aberto</p>
+                    <span class="badge-fonte" style="background:#e7edff;color:#3754b5;">Independente dos filtros</span>
+                </div>
+                <p class="secao-sub mb-3"><i class="fa fa-info-circle"></i> Todas as tarefas pendentes e em andamento (das duas fontes), para ver o que está pendente sem precisar filtrar.</p>
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md">
+                        <div class="dep-stat destaque" style="background:linear-gradient(135deg,#f6c23e,#f4a62a);">
+                            <div class="rotulo">Em aberto</div><div class="valor" id="abTotal">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md"><div class="dep-stat"><div class="rotulo">Pendentes</div><div class="valor" id="abPend">—</div></div></div>
+                    <div class="col-6 col-md"><div class="dep-stat"><div class="rotulo">Em andamento</div><div class="valor" id="abAnd">—</div></div></div>
+                    <div class="col-6 col-md"><div class="dep-stat"><div class="rotulo">Atrasadas</div><div class="valor" id="abAtr" style="color:#e74a3b;">—</div></div></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle w-100" id="tabelaAberto">
+                        <thead><tr>
+                            <th>Fonte</th><th>Ref.</th><th>Título</th><th>Categoria/Tipo</th>
+                            <th>Responsável</th><th>Prioridade</th><th>Criada em</th><th>Prazo</th><th>Status</th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Donut + Série -->
             <div class="row g-3 mb-4">
                 <div class="col-12 col-lg-4"><div class="panel"><p class="secao-titulo mb-3">Distribuição por status</p><div class="chart-box-sm"><canvas id="chartStatus"></canvas></div></div></div>
@@ -457,7 +485,7 @@ if ($rf) { while ($r = $rf->fetch_assoc()) { $funcionarios[] = $r; } }
     const fmtNum = new Intl.NumberFormat('pt-BR');
     const ST_COR = {'Pendente':'#f6c23e','Em andamento':'#4e73df','Concluída':'#1cc88a','Cancelada':'#858796'};
     const DT_LANG = 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json';
-    let charts = {}, dtTar = null;
+    let charts = {}, dtTar = null, dtAberto = null;
     if (window.Chart){ Chart.defaults.font.family = 'Inter, system-ui, -apple-system, sans-serif'; }
 
     function cssVar(n){ return getComputedStyle(document.body).getPropertyValue(n).trim(); }
@@ -500,6 +528,7 @@ if ($rf) { while ($r = $rf->fetch_assoc()) { $funcionarios[] = $r; } }
         $('#avisoSemDados').toggle(k.total===0);
         renderStatus(resp.porStatus); renderSerie(resp.serie); renderFonte(resp.fonteStatus);
         renderResp(resp.porResponsavel); renderCategoria(resp.porCategoria); renderTabela(resp.lista);
+        renderAberto(resp.emAberto);
     }
 
     function renderStatus(dados){
@@ -563,6 +592,36 @@ if ($rf) { while ($r = $rf->fetch_assoc()) { $funcionarios[] = $r; } }
                 scales:{ x:{ grid:{display:false} }, y:{ grid:{color:gridColor()}, ticks:{ callback:v=>fmtNum.format(v), precision:0 } } } }
         });
     }
+    function renderAberto(ab){
+        ab = ab || {totais:{total:0,pendentes:0,em_andamento:0,atrasadas:0}, lista:[]};
+        const t = ab.totais || {};
+        $('#abTotal').text(fmtNum.format(+t.total||0));
+        $('#abPend').text(fmtNum.format(+t.pendentes||0));
+        $('#abAnd').text(fmtNum.format(+t.em_andamento||0));
+        $('#abAtr').text(fmtNum.format(+t.atrasadas||0));
+
+        if(dtAberto){ dtAberto.destroy(); $('#tabelaAberto tbody').empty(); }
+        const tb=$('#tabelaAberto tbody');
+        (ab.lista||[]).forEach(function(l){
+            const fonteCls = l.fonte==='Tarefa' ? 'fonte-tarefa' : 'fonte-pedido';
+            const prio = (l.prioridade && l.prioridade!=='—') ? '<span class="badge-prio '+prioClass(l.prioridade)+'">'+escapeHtml(l.prioridade)+'</span>' : '<span class="text-muted">—</span>';
+            const prazo = l.prazo ? (brData(l.prazo) + (l.atrasada?'<span class="tag-atraso">em atraso</span>':'')) : '<span class="text-muted">—</span>';
+            tb.append('<tr class="'+(l.atrasada?'linha-atraso':'')+'">' +
+                '<td><span class="badge-fonte '+fonteCls+'">'+escapeHtml(l.fonte)+'</span></td>' +
+                '<td>'+escapeHtml(l.ref)+'</td>' +
+                '<td>'+escapeHtml(l.titulo)+'</td>' +
+                '<td>'+escapeHtml(l.categoria)+'</td>' +
+                '<td>'+escapeHtml(l.responsavel)+'</td>' +
+                '<td>'+prio+'</td>' +
+                '<td data-order="'+escapeHtml(l.data_criacao||'')+'">'+brData(l.data_criacao)+'</td>' +
+                '<td data-order="'+escapeHtml(l.prazo||'')+'">'+prazo+'</td>' +
+                '<td><span class="badge-st '+stClass(l.status_norm)+'">'+escapeHtml(l.status)+'</span></td>' +
+                '</tr>');
+        });
+        dtAberto = $('#tabelaAberto').DataTable({ order:[], pageLength:10, language:{url:DT_LANG},
+            dom:'Bfrtip', buttons:['copyHtml5','excelHtml5','pdfHtml5','print'] });
+    }
+
     function renderTabela(lista){
         if(dtTar){ dtTar.destroy(); $('#tabelaTarefas tbody').empty(); }
         const tb=$('#tabelaTarefas tbody');

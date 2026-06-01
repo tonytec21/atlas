@@ -223,6 +223,78 @@ try {
     ksort($serie);
     $serieArr = array_values($serie);
 
+    /* ------------------- Tarefas em aberto (INDEPENDENTE DOS FILTROS) -------------------
+       Sempre lista TODAS as tarefas pendentes / em andamento (não concluídas e não
+       canceladas) das duas fontes, sem aplicar nenhum filtro, para dar a visão do que
+       está pendente sem precisar filtrar. */
+    $emAberto = [];
+
+    // Tarefas internas em aberto (status diferente de concluída/cancelada)
+    $resAb = $conn->query("
+        SELECT t.id, t.titulo,
+               COALESCE(NULLIF(c.titulo,''), t.categoria) AS categoria,
+               t.funcionario_responsavel AS responsavel,
+               t.status AS status_orig,
+               t.nivel_de_prioridade AS prioridade,
+               t.data_criacao, t.data_limite, t.data_conclusao
+        FROM tarefas t
+        LEFT JOIN categorias c ON c.id = t.categoria
+        WHERE LOWER(TRIM(t.status)) NOT IN ('concluida','concluída','cancelada')
+    ");
+    if ($resAb) {
+        while ($r = $resAb->fetch_assoc()) {
+            $label = statusLabel('Tarefa', $r['status_orig']);
+            $norm  = statusNorm($label);
+            if (!in_array($norm, ['Pendente','Em andamento'])) continue;
+            $atras = (!empty($r['data_limite']) && (new DateTime($r['data_limite'])) < $agora);
+            $emAberto[] = [
+                'fonte'=>'Tarefa', 'ref'=>'#'.$r['id'], 'titulo'=>$r['titulo'] ?: '(sem título)',
+                'categoria'=>$r['categoria'] ?: '—', 'responsavel'=>trim($r['responsavel']) ?: '—',
+                'status'=>$label, 'status_norm'=>$norm, 'prioridade'=>$r['prioridade'] ?: '—',
+                'data_criacao'=>$r['data_criacao'], 'prazo'=>$r['data_limite'], 'atrasada'=>$atras,
+            ];
+        }
+    }
+
+    // Pedidos de certidão em aberto (pendente / em_andamento)
+    $resAb2 = $conn->query("
+        SELECT p.id, p.protocolo, p.tipo, p.atribuicao, p.requerente_nome,
+               COALESCE(NULLIF(p.atualizado_por,''), p.criado_por) AS responsavel,
+               p.status AS status_orig, p.criado_em
+        FROM pedidos_certidao p
+        WHERE p.status IN ('pendente','em_andamento')
+    ");
+    if ($resAb2) {
+        while ($r = $resAb2->fetch_assoc()) {
+            $label = statusLabel('Pedido', $r['status_orig']);
+            $norm  = statusNorm($label);
+            $titulo = trim(($r['tipo'] ?: 'Certidão').' — '.($r['requerente_nome'] ?: ''));
+            $emAberto[] = [
+                'fonte'=>'Pedido de Certidão', 'ref'=>$r['protocolo'] ?: ('#'.$r['id']),
+                'titulo'=>$titulo, 'categoria'=>$r['tipo'] ?: ($r['atribuicao'] ?: '—'),
+                'responsavel'=>trim($r['responsavel']) ?: '—', 'status'=>$label, 'status_norm'=>$norm,
+                'prioridade'=>'—', 'data_criacao'=>$r['criado_em'], 'prazo'=>null, 'atrasada'=>false,
+            ];
+        }
+    }
+
+    // Ordena: atrasadas primeiro, depois por prioridade, depois mais antigas primeiro
+    $prioRank = ['Crítica'=>0,'Alta'=>1,'Média'=>2,'Baixa'=>3,'—'=>4];
+    usort($emAberto, function($a,$b) use ($prioRank){
+        if ($a['atrasada'] !== $b['atrasada']) return $a['atrasada'] ? -1 : 1;
+        $pa = $prioRank[$a['prioridade']] ?? 4; $pb = $prioRank[$b['prioridade']] ?? 4;
+        if ($pa !== $pb) return $pa - $pb;
+        return strcmp((string)$a['data_criacao'], (string)$b['data_criacao']);
+    });
+
+    $abTotais = ['total'=>0,'pendentes'=>0,'em_andamento'=>0,'atrasadas'=>0];
+    foreach ($emAberto as $l) {
+        $abTotais['total']++;
+        if ($l['status_norm'] === 'Pendente') $abTotais['pendentes']++;
+        elseif ($l['status_norm'] === 'Em andamento') $abTotais['em_andamento']++;
+        if ($l['atrasada']) $abTotais['atrasadas']++;
+    }
+
     echo json_encode([
         'ok'           => true,
         'periodo'      => ['inicio'=>$ini,'fim'=>$fim,'preset'=>$preset],
@@ -234,6 +306,7 @@ try {
         'porCategoria' => $porCatArr,
         'serie'        => $serieArr,
         'lista'        => $linhas,
+        'emAberto'     => ['totais'=>$abTotais, 'lista'=>$emAberto],
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
