@@ -1,0 +1,103 @@
+RELATÓRIO DE ORDENS DE SERVIÇO — MÓDULO RECRIADO (v2)
+======================================================
+
+ARQUIVOS
+  • relatorio_os.php        -> página (filtros + KPIs + gráficos + tabelas)
+  • relatorio_os_dados.php  -> backend AJAX (JSON) com todas as agregações
+
+INSTALAÇÃO
+  Copie os 2 arquivos para  atlas/relatorios/  (substitui o relatorio_os.php antigo).
+  Sem novas dependências: usa Bootstrap, jQuery, Chart.js (../script/chart.js) e
+  DataTables, já presentes no projeto.
+
+NOVIDADES DA v2 (estética / responsividade / dark mode)
+  • 100% responsivo: grid fluido de filtros, KPIs 2/linha no celular, gráficos e
+    tabelas adaptáveis (tabelas com rolagem horizontal no mobile).
+  • Dark mode corrigido: a página agora lê o tema do usuário (tabela modo_usuario,
+    igual ao menu.php) e aplica a classe correta no <body>. Todo o tema usa
+    variáveis CSS (--rel-*), e os gráficos Chart.js são re-tematizados ao alternar
+    claro/escuro pelo botão do menu (sem precisar recarregar).
+  • Layout reorganizado: cartão de filtros com cabeçalho, seções com título e
+    barra de destaque, painéis arredondados e gráfico extra de "Top atos".
+
+FONTE DOS DADOS
+  atos_liquidados + atos_manuais_liquidados.
+  Faturamento (serventia) = SUM(emolumentos).  Valor total = SUM(total).
+  Seletor "Base do faturamento" alterna Emolumentos x Valor total sem reconsultar.
+
+ATRIBUIÇÃO (2 primeiros dígitos do código do ato)
+  13 Notas | 14 Registro Civil | 15 RTD e RCPJ | 16 Registro de Imóveis
+  17 Protesto | 18 Contratos Marítimos | (demais) Outros
+
+FILTROS
+  Período (Hoje/Ontem/7 dias/Semana/Mês/Mês passado/Ano/Personalizado/Todo o período),
+  Status, Atribuição, Funcionário, Código do ato (prefixo) e granularidade da série.
+
+SAÍDAS
+  5 KPIs; faturamento por atribuição (rosca + tabela com totais); evolução no
+  período (barras de faturamento + linha de quantidade); desempenho dos
+  funcionários (2 gráficos top-10 + tabela exportável); atos mais liquidados
+  (gráfico top-8 + tabela exportável: copiar/Excel/PDF/imprimir).
+
+------------------------------------------------------------
+NOVO: DEPÓSITO PRÉVIO (saldo não consumido)
+------------------------------------------------------------
+Seção própria (logo abaixo dos KPIs) que mostra o valor depositado e ainda
+NÃO consumido na liquidação dos atos.
+
+Cálculo do saldo por O.S. (cumulativo, de toda a vida da O.S.):
+    saldo = SUM(pagamento_os.total_pagamento)
+          - SUM(atos_liquidados.total + atos_manuais_liquidados.total)
+          - SUM(devolucao_os.total_devolucao)
+
+• Considera apenas O.S. que receberam depósito (pagamento) e com saldo > 0.
+• Exclui O.S. canceladas.
+• Por padrão o saldo é calculado SEM recorte de data (senão o consumo ficaria
+  parcial e o saldo, incorreto). Há um interruptor "Filtrar pela data de criação
+  da O.S." que, quando ligado, restringe a LISTAGEM às O.S. criadas no período
+  selecionado nos filtros (o cálculo do saldo continua cumulativo/correto).
+
+Exibe: Saldo disponível (destaque), nº de O.S. com saldo, total depositado,
+total consumido em atos, total devolvido, e a tabela "quais O.S. estão em
+depósito prévio ainda com saldo" (O.S., cliente, CPF/CNPJ, data, depositado,
+consumido, devolvido, saldo) — ordenável e exportável (copiar/Excel/PDF/imprimir).
+
+============================================================
+CENTRAL DE RELATÓRIOS (index.php) + RELATÓRIO DE TAREFAS
+============================================================
+ARQUIVOS desta entrega:
+  • index.php                     -> Central de Relatórios (recriada)
+  • relatorio_tarefas.php         -> Relatório de Tarefas (recriado)
+  • relatorio_tarefas_dados.php   -> backend AJAX (JSON) das tarefas
+
+INDEX (Central de Relatórios)
+  Estética nova alinhada aos relatórios (mesmo tema + dark mode corrigido lendo
+  modo_usuario), cards com ícones em gradiente, chips de categoria, busca e
+  reordenação por arrastar (mantém save_order.php / load_order.php).
+  Cards: Relatório de Tarefas, Relatório de O.S., Livro de Depósito Prévio e
+  Contas a Pagar (marcado "Em breve").
+
+RELATÓRIO DE TAREFAS (unifica DUAS fontes de tarefas)
+  1) tarefas            (sistema interno)
+  2) pedidos_certidao   (pedidos de certidão — também são tarefas)
+
+  Normalização de status (esquema comum):
+    Tarefa:  pendente->Pendente | concluida->Concluída | cancelada->Cancelada
+    Pedido:  pendente->Pendente | em_andamento->Em andamento |
+             emitida/entregue->Concluída | cancelada->Cancelada
+  (o status original/traduzido aparece na tabela; o normalizado alimenta KPIs/gráficos)
+
+  Filtros: Período (presets/personalizado/todo o período), Fonte (Todas/Tarefas/
+  Pedidos), Status, Responsável, Prioridade e granularidade da série.
+
+  Saídas: 6 KPIs (Total, Pendentes, Em andamento, Concluídas, Atrasadas, Taxa de
+  conclusão); donut por status; série Criadas x Concluídas; barras empilhadas por
+  fonte x status; produtividade por responsável (total x concluídas); por
+  categoria/tipo; e a tabela unificada com badges de fonte, prioridade e status,
+  com destaque para itens em atraso (exportável: copiar/Excel/PDF/imprimir).
+
+  Observações:
+  - "Atraso" só se aplica às tarefas internas (têm prazo/data_limite). Pedidos de
+    certidão não possuem prazo, então não entram na contagem de atrasadas.
+  - "Responsável" do pedido = atualizado_por (ou criado_por, se vazio).
+  - O cálculo é leve (as duas tabelas são pequenas) e feito sob demanda.
