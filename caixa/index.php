@@ -144,14 +144,16 @@ date_default_timezone_set('America/Sao_Paulo');
 
                     <!-- NOVO: Filtro secundário de período -->
                     <div class="form-group col-md-4">
-                        <label for="periodo">Período Rápido:</label>
+                        <label for="periodo">Período:</label>
                         <select class="form-control" id="periodo" name="periodo">
-                            <option value="hoje" <?php echo $selectedPeriodo==='hoje'?'selected':''; ?>>Hoje</option>
-                            <option value="ultimos7" <?php echo $selectedPeriodo==='ultimos7'?'selected':''; ?>>Últimos 7 dias</option>
-                            <option value="ultimoMes" <?php echo $selectedPeriodo==='ultimoMes'?'selected':''; ?>>Último mês (30 dias)</option>
+                            <option value="hoje" <?php echo $selectedPeriodo==='hoje'?'selected':''; ?>>Hoje (diário)</option>
+                            <option value="semanal" <?php echo $selectedPeriodo==='semanal'?'selected':''; ?>>Esta semana</option>
+                            <option value="mensal" <?php echo $selectedPeriodo==='mensal'?'selected':''; ?>>Este mês</option>
+                            <option value="anual" <?php echo $selectedPeriodo==='anual'?'selected':''; ?>>Este ano</option>
+                            <option value="personalizado" <?php echo $selectedPeriodo==='personalizado'?'selected':''; ?>>Personalizado (datas abaixo)</option>
                             <option value="todos" <?php echo $selectedPeriodo==='todos'?'selected':''; ?>>Todos</option>
                         </select>
-                        <small class="text-muted">Dica: escolher um período aqui preenche as datas abaixo.</small>
+                        <small class="text-muted">Filtra os caixas listados. Marque "Modo de visualização" abaixo para gerar um relatório unificado do período.</small>
                     </div>
 
                     <div class="form-group col-md-2">
@@ -164,18 +166,22 @@ date_default_timezone_set('America/Sao_Paulo');
                     </div>
                 </div>
 
+                <?php if ($user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxoDeCaixa): ?>
+                <div class="form-check mb-2" style="padding-left:1.6rem;">
+                    <input type="checkbox" class="form-check-input" id="modo_visualizacao" name="modo_visualizacao" value="1" <?php echo (isset($_GET['modo_visualizacao']) && $_GET['modo_visualizacao']=='1') ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="modo_visualizacao">
+                        <strong>Modo de visualização</strong> — consolida as datas dos caixas do período em um único caixa (com funcionário "Todos", unifica também os funcionários), abrindo o card, o modal e o relatório unificados. Apenas consulta: sem cadastro de depósitos, saídas ou fechamentos.
+                    </label>
+                </div>
+                <?php endif; ?>
+
                 <div class="row mb-3">
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-6">
                         <button type="submit" style="width: 100%;" class="btn btn-primary">
                             <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
                         </button>
                     </div>
-                    <div class="col-12 col-md-4">
-                        <button type="button" style="width: 100%;" class="btn btn-secondary" onclick="window.location.href='../os/index.php'">
-                            <i class="fa fa-search" aria-hidden="true"></i> Pesquisar OS
-                        </button>
-                    </div>
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-6">
                         <button type="button" style="width: 100%;" class="btn btn-success" onclick="window.location.href='../analitico/analiticos.php'">
                             <i class="fa fa-file-excel-o" aria-hidden="true"></i> Relatório Analítico (XLSX)
                         </button>
@@ -245,10 +251,75 @@ date_default_timezone_set('America/Sao_Paulo');
                         $params[':ini30'] = $ultimo30;
                         $params[':fim30'] = $hoje;
                         $filtered = true;
+                    } elseif ($selectedPeriodo === 'semanal') {
+                        $conditions[] = 'DATE(data) BETWEEN :iniSem AND :fimSem';
+                        $params[':iniSem'] = date('Y-m-d', strtotime('monday this week'));
+                        $params[':fimSem'] = date('Y-m-d', strtotime('sunday this week'));
+                        $filtered = true;
+                    } elseif ($selectedPeriodo === 'mensal') {
+                        $conditions[] = 'DATE(data) BETWEEN :iniMes AND :fimMes';
+                        $params[':iniMes'] = date('Y-m-01');
+                        $params[':fimMes'] = date('Y-m-t');
+                        $filtered = true;
+                    } elseif ($selectedPeriodo === 'anual') {
+                        $conditions[] = 'DATE(data) BETWEEN :iniAno AND :fimAno';
+                        $params[':iniAno'] = date('Y-01-01');
+                        $params[':fimAno'] = date('Y-12-31');
+                        $filtered = true;
                     } else {
-                        // "todos": sem restrição adicional de data
+                        // "todos" / "personalizado" sem datas: sem restrição adicional de data
                     }
                 }
+
+                // ===== Datas efetivas do período (para o relatório unificado) =====
+                if ($temIntervaloManual) {
+                    $periodoIni = !empty($_GET['data_inicial']) ? $_GET['data_inicial'] : null;
+                    $periodoFim = !empty($_GET['data_final'])   ? $_GET['data_final']   : null;
+                    if ($periodoIni && !$periodoFim) $periodoFim = $hoje;
+                    if ($periodoFim && !$periodoIni) $periodoIni = $periodoFim;
+                } else {
+                    switch ($selectedPeriodo) {
+                        case 'hoje':      $periodoIni = $periodoFim = $hoje; break;
+                        case 'semanal':   $periodoIni = date('Y-m-d', strtotime('monday this week')); $periodoFim = date('Y-m-d', strtotime('sunday this week')); break;
+                        case 'mensal':    $periodoIni = date('Y-m-01'); $periodoFim = date('Y-m-t'); break;
+                        case 'anual':     $periodoIni = date('Y-01-01'); $periodoFim = date('Y-12-31'); break;
+                        case 'ultimos7':  $periodoIni = $ultimo7;  $periodoFim = $hoje; break;
+                        case 'ultimoMes': $periodoIni = $ultimo30; $periodoFim = $hoje; break;
+                        default:          $periodoIni = null; $periodoFim = null; // todos
+                    }
+                }
+
+                // ===== Modo de visualização: OPÇÃO explícita (padrão = modo operacional antigo) =====
+                // Quando marcado, abre o "Caixa Unificado (Período)", que consolida AS DATAS dos caixas
+                // do período (e, com funcionário = todos, consolida funcionários E datas) — card, modal e relatório.
+                $modoVisualizacao = (isset($_GET['modo_visualizacao']) && $_GET['modo_visualizacao'] == '1')
+                    && ($user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxoDeCaixa);
+                $redirecionarPeriodo = false;
+
+                if ($modoVisualizacao) {
+                    echo '<script>window.MODO_VISUALIZACAO = true; window.__skipAbrirCaixa = true;'
+                        .'document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("btnTransportarSaldo"); if(b){b.style.display="none";}});'
+                        .'</script>';
+                }
+
+                if ($modoVisualizacao && $periodoIni && $periodoFim) {
+                    // Funcionário específico => consolida as datas dele.
+                    // "todos"/"caixa_unificado" => consolida TODOS os funcionários E todas as datas.
+                    $funcParam = (isset($_GET['funcionario']) && $_GET['funcionario'] !== ''
+                        && $_GET['funcionario'] !== 'caixa_unificado' && $_GET['funcionario'] !== 'todos')
+                        ? $_GET['funcionario'] : 'todos';
+                    $urlPeriodo = 'unificado_periodo.php?funcionario='.urlencode($funcParam)
+                                .'&data_inicial='.urlencode($periodoIni).'&data_final='.urlencode($periodoFim);
+                    echo '<div class="col-12"><div class="alert alert-info"><i class="fa fa-eye" aria-hidden="true"></i> '
+                        .'Abrindo o <strong>Caixa Unificado do Período</strong> (consolida as datas dos caixas)…</div></div>';
+                    echo '<script>window.location.replace('.json_encode($urlPeriodo).');</script>';
+                    $redirecionarPeriodo = true;
+                } elseif ($modoVisualizacao) {
+                    echo '<div class="col-12"><div class="alert alert-warning"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> '
+                        .'Para o modo de visualização, selecione um período (semana, mês, ano) ou um intervalo de datas.</div></div>';
+                }
+
+                if (!$redirecionarPeriodo) {
 
                 if ($isUnificado) {
                     $sql = 'SELECT 
@@ -470,17 +541,25 @@ date_default_timezone_set('America/Sao_Paulo');
                                         <div class="card-actions">';
 
                     if (!$isUnificado) {
-                        echo '          <button title="Saídas e Despesas" class="btn btn-delete btn-sm btn-icon" onclick="event.stopPropagation(); cadastrarSaida(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
+                        // Ações operacionais só fora do modo de visualização
+                        if (!$modoVisualizacao) {
+                            echo '          <button title="Saídas e Despesas" class="btn btn-delete btn-sm btn-icon" onclick="event.stopPropagation(); cadastrarSaida(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
                                         <i class="fa fa-sign-out" aria-hidden="true"></i>
                                     </button>
                                     <button title="Depósito do Caixa" class="btn btn-success btn-sm btn-icon" onclick="event.stopPropagation(); cadastrarDeposito(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
                                         <i class="fa fa-university" aria-hidden="true"></i>
                                     </button>';
-                        if ($idCaixa) {
-                            echo '<a href="imprimir_fechamento_caixa.php?id='.urlencode($idCaixa).'" target="_blank" title="Imprimir Fechamento" class="btn btn-primary btn-sm btn-icon" onclick="event.stopPropagation();">
-                                    <i class="fa fa-file-pdf-o"></i>
-                                  </a>';
                         }
+                        // Botão de impressão do fechamento — sempre disponível (consulta/relatório).
+                        // Com caixa aberto usa o id; sem caixa (ex.: só liquidou atos) usa funcionário + data.
+                        if ($idCaixa) {
+                            $printUrl = 'imprimir_fechamento_caixa.php?id='.urlencode($idCaixa);
+                        } else {
+                            $printUrl = 'imprimir_fechamento_caixa.php?funcionario='.urlencode($funcionariosList).'&data='.urlencode($data);
+                        }
+                        echo '<a href="'.$printUrl.'" target="_blank" title="Imprimir Fechamento" class="btn btn-primary btn-sm btn-icon" onclick="event.stopPropagation();">
+                                <i class="fa fa-file-pdf-o"></i>
+                              </a>';
                     } else {
                         echo '      <button title="Ver Depósitos do Caixa" class="btn btn-success btn-sm btn-icon" onclick="event.stopPropagation(); verDepositosCaixa(\''.$data.'\')">
                                     <i class="fa fa-list" aria-hidden="true"></i>
@@ -492,8 +571,8 @@ date_default_timezone_set('America/Sao_Paulo');
 
                     echo '          </div>';
 
-                    // Botão de Fechamento (cadeado dourado) — aciona o mesmo fluxo do modal de Depósito
-                    if (!$isUnificado) {
+                    // Botão de Fechamento (cadeado dourado) — só fora do modo de visualização
+                    if (!$isUnificado && !$modoVisualizacao) {
                         $disabledLock = $isClosed ? 'disabled' : '';
                         echo '<button class="btn btn-lock btn-sm btn-icon" '.$disabledLock.' title="Fechar caixa" onclick="event.stopPropagation(); fecharCaixaRapido(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
                                 <i class="fa fa-lock"></i>
@@ -505,6 +584,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             </div>
                         </div>';
                 }
+                } // fim if(!$redirecionarPeriodo) — em modo de visualização não lista por dia
                 ?>
             </div><!-- /cardsResultados -->
         </div>
@@ -588,6 +668,14 @@ date_default_timezone_set('America/Sao_Paulo');
                             <div class="card text-white bg-primary mb-3">
                                 <div class="card-header">Total em Selos</div>
                                 <div class="card-body"><h5 class="card-title" id="cardTotalSelos">R$ 0,00</h5></div>
+                            </div>
+                        </div>
+
+                        <!-- NOVO: Repasse a Credores (Protesto) -->
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
+                            <div class="card text-white mb-3" style="background-color:#64748b;">
+                                <div class="card-header">Repasse a Credores</div>
+                                <div class="card-body"><h5 class="card-title" id="cardRepasseCredor">R$ 0,00</h5></div>
                             </div>
                         </div>
 
@@ -715,6 +803,29 @@ date_default_timezone_set('America/Sao_Paulo');
                                 </table>
                             </div>
                             <h6 class="total-label">Total em Selos: <span id="totalSelos">R$ 0,00</span></h6>
+                        </div>
+                    </div>
+
+                    <!-- NOVO: REPASSE A CREDORES (PROTESTO) — só aparece quando houver -->
+                    <div class="card mb-3" id="listaRepasseCredorWrap" style="display:none;">
+                        <div class="card-header table-title text-center"><b>REPASSE A CREDORES (PROTESTO)</b></div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="tabelaRepasseCredor" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>
+                                            <th>Nº OS</th>
+                                            <th>Cliente</th>
+                                            <th>Data</th>
+                                            <th>Forma</th>
+                                            <th>Valor repassado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesRepasseCredor"></tbody>
+                                </table>
+                            </div>
+                            <h6 class="total-label">Total Repasse a Credores: <span id="totalRepasseCredor">R$ 0,00</span></h6>
                         </div>
                     </div>
 
@@ -1464,6 +1575,9 @@ date_default_timezone_set('America/Sao_Paulo');
                     // NOVO: Card Total em Selos
                     toggleCard('#cardTotalSelos', detalhes.totalSelos);
 
+                    // NOVO: Card Repasse a Credores (só aparece quando houver)
+                    toggleCard('#cardRepasseCredor', detalhes.totalRepasseCredor);
+
                     toggleCard('#cardSaldoTransportado', detalhes.totalSaldoTransportado);
                     toggleCard('#cardSaldoInicial', detalhes.saldoInicial);
 
@@ -1674,6 +1788,27 @@ date_default_timezone_set('America/Sao_Paulo');
                     // mantém o card em sincronia (caso tabela seja paginada/filtrada no futuro)
                     $('#cardTotalSelos').text(formatCurrency(totalSelos));
 
+                    // NOVO: Repasse a Credores (Protesto) — lista só aparece quando houver
+                    var totalRepasseCredor = 0;
+                    $('#detalhesRepasseCredor').empty();
+                    var repasseLista = detalhes.repasseCredor || [];
+                    repasseLista.forEach(function(rc) {
+                        totalRepasseCredor += parseFloat(rc.total_repasse || 0);
+                        $('#detalhesRepasseCredor').append(`
+                            <tr>
+                                <td>${rc.funcionario || ''}</td>
+                                <td>${rc.ordem_de_servico_id}</td>
+                                <td>${rc.cliente || ''}</td>
+                                <td>${rc.data_repasse ? formatDateForDisplay(String(rc.data_repasse).split(' ')[0]) : ''}</td>
+                                <td>${rc.forma_repasse || ''}</td>
+                                <td>${formatCurrency(rc.total_repasse)}</td>
+                            </tr>
+                        `);
+                    });
+                    $('#totalRepasseCredor').text(formatCurrency(totalRepasseCredor));
+                    $('#cardRepasseCredor').text(formatCurrency(totalRepasseCredor));
+                    $('#listaRepasseCredorWrap').toggle(repasseLista.length > 0);
+
                     // Saldo Transportado
                     var totalSaldoTransportado = 0;
                     $('#detalhesSaldoTransportado').empty();
@@ -1738,6 +1873,9 @@ date_default_timezone_set('America/Sao_Paulo');
 
                     // NOVO: tabela de Selos
                     $('#tabelaSelos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+
+                    // NOVO: tabela de Repasse a Credores
+                    $('#tabelaRepasseCredor').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
 
                     $('#tabelaSaldoTransportado').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
                 },
