@@ -34,6 +34,28 @@ usort($responsaveis, function($a, $b){ return strcasecmp($a, $b); });
 /* Rótulo amigável: se o valor gravado for um usuário conhecido, mostra o nome completo. */
 $mapNome = [];
 foreach ($funcionarios as $f) { $mapNome[mb_strtolower($f['usuario'])] = $f['nome_completo'] ?: $f['usuario']; }
+
+/* Status REAIS disponíveis (rótulos), para filtros específicos além dos grupos amplos.
+   Mesma normalização de rótulo usada no backend (relatorio_tarefas_dados.php). */
+function lblTarefa($o){
+    $o = mb_strtolower(trim($o));
+    if ($o === 'concluida' || $o === 'concluída') return 'Concluída';
+    if ($o === 'cancelada') return 'Cancelada';
+    if ($o === 'pendente')  return 'Pendente';
+    return $o === '' ? 'Pendente' : (mb_strtoupper(mb_substr($o,0,1)).mb_substr($o,1));
+}
+function lblPedido($o){
+    $o = mb_strtolower(trim($o));
+    $m = ['pendente'=>'Pendente','em_andamento'=>'Em andamento','emitida'=>'Emitida','entregue'=>'Entregue','cancelada'=>'Cancelada'];
+    return $m[$o] ?? ($o === '' ? '' : (mb_strtoupper(mb_substr($o,0,1)).mb_substr($o,1)));
+}
+$statusLabels = [];
+$rs = $conn->query("SELECT DISTINCT TRIM(status) AS s FROM tarefas WHERE TRIM(COALESCE(status,'')) <> ''");
+if ($rs) { while ($x = $rs->fetch_assoc()) { $statusLabels[lblTarefa($x['s'])] = true; } }
+$rs2 = $conn->query("SELECT DISTINCT TRIM(status) AS s FROM pedidos_certidao WHERE TRIM(COALESCE(status,'')) <> ''");
+if ($rs2) { while ($x = $rs2->fetch_assoc()) { $lbl = lblPedido($x['s']); if ($lbl !== '') $statusLabels[$lbl] = true; } }
+$statusLabels = array_keys($statusLabels);
+usort($statusLabels, function($a, $b){ return strcasecmp($a, $b); });
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -374,10 +396,19 @@ foreach ($funcionarios as $f) { $mapNome[mb_strtolower($f['usuario'])] = $f['nom
                             <label class="form-label">Status</label>
                             <select id="fStatus" class="form-select form-select-sm">
                                 <option value="todos">Todos</option>
-                                <option value="pendente">Pendente</option>
-                                <option value="andamento">Em andamento</option>
-                                <option value="concluida">Concluída</option>
-                                <option value="cancelada">Cancelada</option>
+                                <optgroup label="Grupos">
+                                    <option value="pendente">Pendentes</option>
+                                    <option value="andamento">Em andamento</option>
+                                    <option value="concluida">Concluídas (todas)</option>
+                                    <option value="cancelada">Canceladas</option>
+                                </optgroup>
+                                <?php if (!empty($statusLabels)): ?>
+                                <optgroup label="Status específicos">
+                                    <?php foreach ($statusLabels as $sl): ?>
+                                        <option value="<?= htmlspecialchars($sl) ?>"><?= htmlspecialchars($sl) ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                                <?php endif; ?>
                             </select>
                         </div>
                         <div class="campo">

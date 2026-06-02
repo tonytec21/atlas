@@ -63,7 +63,9 @@ function statusLabel($fonte, $orig) {
 }
 function statusNorm($label) {
     // agrupa para KPIs/gráficos
+    $l = mb_strtolower(trim($label));
     if (in_array($label, ['Concluída','Emitida','Entregue'])) return 'Concluída';
+    if (strpos($l, 'finaliz') !== false) return 'Concluída'; // ex.: "Finalizado sem prática do ato"
     if ($label === 'Em andamento') return 'Em andamento';
     if ($label === 'Cancelada')    return 'Cancelada';
     return 'Pendente';
@@ -160,7 +162,15 @@ try {
     /* --------------------- Filtros pós-normalização --------------------- */
     $mapStatus = ['pendente'=>'Pendente','andamento'=>'Em andamento','concluida'=>'Concluída','cancelada'=>'Cancelada'];
     $linhas = array_values(array_filter($linhas, function($l) use ($status,$responsavel,$prioridade,$mapStatus){
-        if ($status !== 'todos' && isset($mapStatus[$status]) && $l['status_norm'] !== $mapStatus[$status]) return false;
+        if ($status !== 'todos' && $status !== '') {
+            if (isset($mapStatus[$status])) {
+                // grupo amplo -> compara pelo status normalizado
+                if ($l['status_norm'] !== $mapStatus[$status]) return false;
+            } else {
+                // status específico (rótulo exato) -> filtro preciso
+                if (mb_strtolower($l['status']) !== mb_strtolower($status)) return false;
+            }
+        }
         if ($responsavel !== 'todos' && $responsavel !== '' && mb_strtolower($l['responsavel']) !== mb_strtolower($responsavel)) return false;
         if ($prioridade !== 'todas' && $l['prioridade'] !== $prioridade) return false;
         return true;
