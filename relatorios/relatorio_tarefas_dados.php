@@ -20,7 +20,7 @@ $data_inicio   = $_GET['data_inicio']   ?? '';
 $data_fim      = $_GET['data_fim']      ?? '';
 $fonte         = $_GET['fonte']         ?? 'todas';   // todas | tarefas | pedidos
 $status        = $_GET['status']        ?? 'todos';   // todos | pendente | andamento | concluida | cancelada
-$responsavel   = $_GET['responsavel']   ?? 'todos';
+$responsavel   = trim($_GET['responsavel'] ?? 'todos');
 $prioridade    = $_GET['prioridade']    ?? 'todas';
 $granularidade = $_GET['granularidade'] ?? 'dia';
 

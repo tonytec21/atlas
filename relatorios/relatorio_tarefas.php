@@ -20,6 +20,20 @@ $mq->close();
 $funcionarios = [];
 $rf = $conn->query("SELECT usuario, nome_completo FROM funcionarios WHERE status='ativo' ORDER BY nome_completo");
 if ($rf) { while ($r = $rf->fetch_assoc()) { $funcionarios[] = $r; } }
+
+/* Responsáveis REAIS presentes nos dados — garante que o filtro case com o que está
+   gravado em tarefas.funcionario_responsavel e em pedidos_certidao (atualizado_por/criado_por). */
+$responsaveis = [];
+$rr = $conn->query("SELECT DISTINCT TRIM(funcionario_responsavel) AS r FROM tarefas WHERE funcionario_responsavel IS NOT NULL AND TRIM(funcionario_responsavel) <> ''");
+if ($rr) { while ($x = $rr->fetch_assoc()) { $responsaveis[$x['r']] = true; } }
+$rr2 = $conn->query("SELECT DISTINCT TRIM(COALESCE(NULLIF(atualizado_por,''), criado_por)) AS r FROM pedidos_certidao WHERE TRIM(COALESCE(NULLIF(atualizado_por,''), criado_por)) <> ''");
+if ($rr2) { while ($x = $rr2->fetch_assoc()) { if (!empty($x['r'])) $responsaveis[$x['r']] = true; } }
+$responsaveis = array_keys($responsaveis);
+usort($responsaveis, function($a, $b){ return strcasecmp($a, $b); });
+
+/* Rótulo amigável: se o valor gravado for um usuário conhecido, mostra o nome completo. */
+$mapNome = [];
+foreach ($funcionarios as $f) { $mapNome[mb_strtolower($f['usuario'])] = $f['nome_completo'] ?: $f['usuario']; }
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -370,8 +384,8 @@ if ($rf) { while ($r = $rf->fetch_assoc()) { $funcionarios[] = $r; } }
                             <label class="form-label">Responsável</label>
                             <select id="fResponsavel" class="form-select form-select-sm">
                                 <option value="todos">Todos</option>
-                                <?php foreach ($funcionarios as $f): ?>
-                                    <option value="<?= htmlspecialchars($f['usuario']) ?>"><?= htmlspecialchars($f['nome_completo'] ?: $f['usuario']) ?></option>
+                                <?php foreach ($responsaveis as $r): $lbl = $mapNome[mb_strtolower($r)] ?? $r; ?>
+                                    <option value="<?= htmlspecialchars($r) ?>"><?= htmlspecialchars($lbl) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
