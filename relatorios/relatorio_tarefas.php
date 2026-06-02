@@ -424,25 +424,12 @@ foreach ($funcionarios as $f) { $mapNome[mb_strtolower($f['usuario'])] = $f['nom
                 <div class="col"><div class="card card-dashboard bg-purple"><div class="card-body"><h5 class="card-title">Conclusão</h5><div class="card-value" id="kpiTaxa">—</div><div class="card-sub">Taxa (excl. canc.)</div><div class="card-icon"><i class="fa fa-percent"></i></div></div></div></div>
             </div>
 
-            <!-- Tarefas em aberto (independente dos filtros) -->
-            <div class="panel mb-4" id="painelAberto">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                    <p class="secao-titulo mb-0">Tarefas em aberto</p>
-                    <span class="badge-fonte" style="background:#e7edff;color:#3754b5;">Independente dos filtros</span>
-                </div>
-                <p class="secao-sub mb-3"><i class="fa fa-info-circle"></i> Todas as tarefas pendentes e em andamento (das duas fontes), para ver o que está pendente sem precisar filtrar.</p>
-                <div class="row g-3 mb-3">
-                    <div class="col-6 col-md">
-                        <div class="dep-stat destaque" style="background:linear-gradient(135deg,#f6c23e,#f4a62a);">
-                            <div class="rotulo">Em aberto</div><div class="valor" id="abTotal">—</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md"><div class="dep-stat"><div class="rotulo">Pendentes</div><div class="valor" id="abPend">—</div></div></div>
-                    <div class="col-6 col-md"><div class="dep-stat"><div class="rotulo">Em andamento</div><div class="valor" id="abAnd">—</div></div></div>
-                    <div class="col-6 col-md"><div class="dep-stat"><div class="rotulo">Atrasadas</div><div class="valor" id="abAtr" style="color:#e74a3b;">—</div></div></div>
-                </div>
+            <!-- Tabela (resultado do filtro) -->
+            <div class="panel mb-4">
+                <p class="secao-titulo mb-3">Tarefas (lista unificada)</p>
+                <div class="chart-box-xs mb-3"><canvas id="chartCategoria"></canvas></div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle w-100" id="tabelaAberto">
+                    <table class="table table-hover align-middle w-100" id="tabelaTarefas">
                         <thead><tr>
                             <th>Fonte</th><th>Ref.</th><th>Título</th><th>Categoria/Tipo</th>
                             <th>Responsável</th><th>Prioridade</th><th>Criada em</th><th>Prazo</th><th>Status</th>
@@ -464,12 +451,25 @@ foreach ($funcionarios as $f) { $mapNome[mb_strtolower($f['usuario'])] = $f['nom
                 <div class="col-12 col-lg-6"><div class="panel"><p class="secao-titulo mb-3">Produtividade por responsável</p><div class="chart-box-sm"><canvas id="chartResp"></canvas></div></div></div>
             </div>
 
-            <!-- Tabela -->
-            <div class="panel mb-5">
-                <p class="secao-titulo mb-3">Tarefas (lista unificada)</p>
-                <div class="chart-box-xs mb-3"><canvas id="chartCategoria"></canvas></div>
+            <!-- Tarefas em aberto (independente dos filtros) -->
+            <div class="panel mb-5" id="painelAberto">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <p class="secao-titulo mb-0">Tarefas em aberto</p>
+                    <span class="badge-fonte" style="background:#e7edff;color:#3754b5;">Independente dos filtros</span>
+                </div>
+                <p class="secao-sub mb-3"><i class="fa fa-info-circle"></i> Todas as tarefas pendentes e em andamento (das duas fontes), para ver o que está pendente sem precisar filtrar.</p>
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md">
+                        <div class="dep-stat destaque" style="background:linear-gradient(135deg,#f6c23e,#f4a62a);">
+                            <div class="rotulo">Em aberto</div><div class="valor" id="abTotal">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md"><div class="dep-stat"><div class="rotulo">Pendentes</div><div class="valor" id="abPend">—</div></div></div>
+                    <div class="col-6 col-md"><div class="dep-stat"><div class="rotulo">Em andamento</div><div class="valor" id="abAnd">—</div></div></div>
+                    <div class="col-6 col-md"><div class="dep-stat"><div class="rotulo">Atrasadas</div><div class="valor" id="abAtr" style="color:#e74a3b;">—</div></div></div>
+                </div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle w-100" id="tabelaTarefas">
+                    <table class="table table-hover align-middle w-100" id="tabelaAberto">
                         <thead><tr>
                             <th>Fonte</th><th>Ref.</th><th>Título</th><th>Categoria/Tipo</th>
                             <th>Responsável</th><th>Prioridade</th><th>Criada em</th><th>Prazo</th><th>Status</th>
