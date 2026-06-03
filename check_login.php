@@ -72,7 +72,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: login.php?error=2'); // Usuário inativo
                 exit;
             }
-            
+
+            // Verificação em duas etapas (2FA): se ativada para este usuário,
+            // não conclui o login agora — guarda um login pendente e segue para a 2ª etapa.
+            if (!empty($user['tfa_enabled']) && !empty($user['tfa_secret'])) {
+                $_SESSION['tfa_pending'] = [
+                    'username'        => $username,
+                    'nome_completo'   => $user['nome_completo'],
+                    'cargo'           => $user['cargo'],
+                    'nivel_de_acesso' => $user['nivel_de_acesso'],
+                    'status'          => $user['status'],
+                    'secret'          => $user['tfa_secret'],
+                    'ts'              => time(),
+                ];
+                header('Location: verificar-2fa.php');
+                exit;
+            }
+
             // Login bem-sucedido
             $_SESSION['username'] = $username;
             $_SESSION['nome_completo'] = $user['nome_completo'];

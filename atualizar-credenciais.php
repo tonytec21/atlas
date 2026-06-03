@@ -255,6 +255,71 @@ body.dark-mode .title-icon{ background:#262f3b; color:#c7d2fe; }
       </form>
     </div>
 
+    <!-- CARD: VERIFICAÇÃO EM DUAS ETAPAS (2FA) ---------------------------- -->
+    <div class="cred-card mt-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap" style="gap:10px;">
+        <div>
+          <h2 style="font-size:1.05rem;font-weight:800;margin:0;"><i class="fa fa-shield"></i> Verificação em duas etapas (2FA)</h2>
+          <div class="muted" style="font-size:.9rem;">Proteja seu login com um código de 6 dígitos do Google Authenticator ou Microsoft Authenticator.</div>
+        </div>
+        <span id="tfaBadge" class="badge <?php echo !empty($funcionario['tfa_enabled']) ? 'badge-success' : 'badge-secondary'; ?>" style="font-size:.85rem;padding:.5em .8em;">
+          <?php echo !empty($funcionario['tfa_enabled']) ? 'Ativada' : 'Desativada'; ?>
+        </span>
+      </div>
+
+      <hr>
+
+      <!-- DESATIVADA: botão ativar -->
+      <div id="tfaOff" style="<?php echo !empty($funcionario['tfa_enabled']) ? 'display:none;' : ''; ?>">
+        <button type="button" id="btnAtivar2fa" class="btn btn-gradient"><i class="fa fa-lock"></i> Ativar verificação em duas etapas</button>
+      </div>
+
+      <!-- ATIVADA: desativar com código -->
+      <div id="tfaOn" style="<?php echo !empty($funcionario['tfa_enabled']) ? '' : 'display:none;'; ?>">
+        <p class="muted" style="font-size:.9rem;margin-bottom:8px;">A verificação está ativa. Para desativar, informe um código atual do aplicativo.</p>
+        <div class="row">
+          <div class="col-md-4 mb-2">
+            <input type="text" class="form-control text-center" id="codeDesativar" inputmode="numeric" maxlength="6" placeholder="Código de 6 dígitos">
+          </div>
+          <div class="col-md-4 mb-2">
+            <button type="button" id="btnDesativar2fa" class="btn btn-outline-danger btn-block py-2"><i class="fa fa-unlock"></i> Desativar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETUP: QR + chave + confirmação -->
+      <div id="tfaSetup" style="display:none; margin-top:14px;">
+        <div class="row">
+          <div class="col-md-5 text-center mb-3">
+            <div id="tfaQr" style="display:inline-block; background:#fff; padding:10px; border-radius:12px;"></div>
+          </div>
+          <div class="col-md-7">
+            <ol style="padding-left:18px;">
+              <li>Abra o <strong>Google Authenticator</strong> ou o <strong>Microsoft Authenticator</strong>.</li>
+              <li>Toque em adicionar conta e escaneie o QR Code ao lado.</li>
+              <li>Sem câmera? Digite esta chave manualmente:</li>
+            </ol>
+            <div class="input-group mb-3" style="max-width:320px;">
+              <input type="text" class="form-control" id="tfaSecret" readonly>
+              <div class="input-group-append">
+                <button class="btn btn-eye" type="button" id="btnCopySecret" title="Copiar chave"><i class="fa fa-copy"></i></button>
+              </div>
+            </div>
+            <label for="codeAtivar">Digite o código gerado para confirmar:</label>
+            <div class="row">
+              <div class="col-7 mb-2">
+                <input type="text" class="form-control text-center" id="codeAtivar" inputmode="numeric" maxlength="6" placeholder="6 dígitos">
+              </div>
+              <div class="col-5 mb-2">
+                <button type="button" id="btnConfirmar2fa" class="btn btn-gradient btn-block"><i class="fa fa-check"></i> Confirmar</button>
+              </div>
+            </div>
+            <button type="button" id="btnCancelarSetup" style="background:none;border:none;color:var(--muted);padding:0;">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -262,6 +327,7 @@ body.dark-mode .title-icon{ background:#262f3b; color:#c7d2fe; }
 <script src="script/bootstrap.min.js"></script>
 <script src="script/jquery.mask.min.js"></script>
 <script src="script/sweetalert2.js"></script>
+<script src="script/qrcode.min.js"></script>
 <script>
   // Alternar senha/confirmar (mostrar/ocultar)
   function bindToggle(btnId, inputId){
@@ -306,6 +372,65 @@ body.dark-mode .title-icon{ background:#262f3b; color:#c7d2fe; }
       $(form).addClass('was-validated');
     });
   });
+</script>
+
+<!-- Verificação em duas etapas (2FA) -->
+<script>
+(function(){
+  function gerarQR(uri){
+    $('#tfaQr').empty();
+    new QRCode(document.getElementById('tfaQr'), {
+      text: uri, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M
+    });
+  }
+  function soDigitos(el){ el.value = el.value.replace(/\D/g,'').slice(0,6); }
+
+  $('#codeAtivar, #codeDesativar').on('input', function(){ soDigitos(this); });
+
+  $('#btnAtivar2fa').on('click', function(){
+    $.post('2fa/tfa_setup.php', { action:'iniciar' }, null, 'json')
+      .done(function(r){
+        if(!r || !r.ok){ Swal.fire('Erro', (r && r.erro) || 'Falha ao iniciar.', 'error'); return; }
+        $('#tfaSecret').val(r.secret);
+        gerarQR(r.otpauth);
+        $('#tfaOff').hide(); $('#tfaSetup').show();
+        $('#codeAtivar').focus();
+      })
+      .fail(function(){ Swal.fire('Erro','Falha de comunicação com o servidor.','error'); });
+  });
+
+  $('#btnCancelarSetup').on('click', function(){
+    $('#tfaSetup').hide(); $('#tfaOff').show(); $('#codeAtivar').val('');
+  });
+
+  $('#btnCopySecret').on('click', function(){
+    var s = document.getElementById('tfaSecret');
+    s.select(); s.setSelectionRange(0, 99999);
+    try { document.execCommand('copy'); } catch(e){}
+  });
+
+  $('#btnConfirmar2fa').on('click', function(){
+    $.post('2fa/tfa_setup.php', { action:'ativar', code: $('#codeAtivar').val() }, null, 'json')
+      .done(function(r){
+        if(!r || !r.ok){ Swal.fire('Erro', (r && r.erro) || 'Código inválido.', 'error'); return; }
+        Swal.fire({ icon:'success', title:'2FA ativada', text:'A verificação em duas etapas foi ativada com sucesso.', timer:2600, showConfirmButton:false });
+        $('#tfaSetup').hide(); $('#tfaOn').show();
+        $('#tfaBadge').removeClass('badge-secondary').addClass('badge-success').text('Ativada');
+      })
+      .fail(function(){ Swal.fire('Erro','Falha de comunicação com o servidor.','error'); });
+  });
+
+  $('#btnDesativar2fa').on('click', function(){
+    $.post('2fa/tfa_setup.php', { action:'desativar', code: $('#codeDesativar').val() }, null, 'json')
+      .done(function(r){
+        if(!r || !r.ok){ Swal.fire('Erro', (r && r.erro) || 'Não foi possível desativar.', 'error'); return; }
+        Swal.fire({ icon:'success', title:'2FA desativada', timer:2000, showConfirmButton:false });
+        $('#tfaOn').hide(); $('#tfaOff').show(); $('#codeDesativar').val('');
+        $('#tfaBadge').removeClass('badge-success').addClass('badge-secondary').text('Desativada');
+      })
+      .fail(function(){ Swal.fire('Erro','Falha de comunicação com o servidor.','error'); });
+  });
+})();
 </script>
 
 <?php if (isset($successMessage) || isset($errorMessage)) : ?>
