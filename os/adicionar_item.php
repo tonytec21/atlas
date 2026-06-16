@@ -36,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bindParam(':ferrfis', $ferrfis);
         $stmt->bindParam(':total', $total);
         $stmt->execute();
+        $novoItemId = $conn->lastInsertId();
 
         // Atualiza o total da OS na tabela `ordens_de_servico`
         $stmt = $conn->prepare("UPDATE ordens_de_servico SET total_os = total_os + :total WHERE id = :id");
@@ -46,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Confirma a transação
         $conn->commit();
 
-        echo json_encode(['success' => true]);
+        echo json_encode(['success' => true, 'id' => isset($novoItemId) ? $novoItemId : null]);
     } catch (PDOException $e) {
         // Desfaz a transação em caso de erro
         $conn->rollBack();

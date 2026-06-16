@@ -204,14 +204,16 @@ foreach ($devolucoes as $devolucao) {
     $total_devolucoes += $devolucao['total_devolucao'];
 }
 
-// Calcular total dos repasses
+// Calcular total dos repasses e montar a lista
 $total_repasses = 0;
-$repasse_query = $conn->prepare("SELECT total_repasse FROM repasse_credor WHERE ordem_de_servico_id = ?");
+$repasses = array();
+$repasse_query = $conn->prepare("SELECT id, total_repasse, forma_repasse, data_repasse, funcionario FROM repasse_credor WHERE ordem_de_servico_id = ? ORDER BY id DESC");
 $repasse_query->bind_param("i", $os_id);
 $repasse_query->execute();
 $repasse_result = $repasse_query->get_result();
 while ($repasse = $repasse_result->fetch_assoc()) {
     $total_repasses += $repasse['total_repasse'];
+    $repasses[] = $repasse;
 }
 
 // Calcular valor líquido pago
@@ -219,6 +221,36 @@ $valor_pago_liquido = $total_pagamentos - $total_devolucoes;
 
 // Calcular saldo
 $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
+
+// ===== Saldo em espécie no caixa do dia do funcionário (para devoluções em espécie) =====
+$func_atual_caixa    = $_SESSION['username'] ?? '';
+$hoje_caixa          = date('Y-m-d');
+$tem_caixa_aberto    = false;
+$saldo_especie_caixa = 0.0;
+if ($func_atual_caixa !== '') {
+    $cxq = $conn->prepare("SELECT saldo_inicial FROM caixa WHERE DATE(data_caixa) = ? AND funcionario = ? LIMIT 1");
+    $cxq->bind_param("ss", $hoje_caixa, $func_atual_caixa);
+    $cxq->execute();
+    $cxr = $cxq->get_result();
+    if ($cxr && $cxr->num_rows > 0) {
+        $tem_caixa_aberto = true;
+        $saldo_inicial_cx = (float)($cxr->fetch_assoc()['saldo_inicial'] ?? 0);
+
+        $q1 = $conn->prepare("SELECT COALESCE(SUM(total_pagamento),0) s FROM pagamento_os WHERE funcionario=? AND DATE(data_pagamento)=? AND forma_de_pagamento='Espécie'");
+        $q1->bind_param("ss", $func_atual_caixa, $hoje_caixa); $q1->execute(); $rec_esp = (float)$q1->get_result()->fetch_assoc()['s'];
+
+        $q2 = $conn->prepare("SELECT COALESCE(SUM(total_devolucao),0) s FROM devolucao_os WHERE funcionario=? AND DATE(data_devolucao)=? AND forma_devolucao='Espécie'");
+        $q2->bind_param("ss", $func_atual_caixa, $hoje_caixa); $q2->execute(); $dev_esp = (float)$q2->get_result()->fetch_assoc()['s'];
+
+        $q3 = $conn->prepare("SELECT COALESCE(SUM(valor_saida),0) s FROM saidas_despesas WHERE funcionario=? AND DATE(data)=? AND status='ativo'");
+        $q3->bind_param("ss", $func_atual_caixa, $hoje_caixa); $q3->execute(); $sai_esp = (float)$q3->get_result()->fetch_assoc()['s'];
+
+        $q4 = $conn->prepare("SELECT COALESCE(SUM(valor_do_deposito),0) s FROM deposito_caixa WHERE funcionario=? AND DATE(data_caixa)=? AND status='ativo'");
+        $q4->bind_param("ss", $func_atual_caixa, $hoje_caixa); $q4->execute(); $dep_esp = (float)$q4->get_result()->fetch_assoc()['s'];
+
+        $saldo_especie_caixa = $saldo_inicial_cx + $rec_esp - $dev_esp - $sai_esp - $dep_esp;
+    }
+}
 
 $temItensNaoLiquidados = false;
 foreach ($ordem_servico_itens as $item) {
@@ -279,6 +311,7 @@ usort($logs_liquidacao, function($a, $b){
 $pedido_id = null;
 $pedido_token = null;
 $pedido_protocolo = null;
+$pedido_status_atual = null;
 
 
 // Procura "Protocolo: XXXXX" nas observações (aceita letras, números e hifens)
@@ -303,6 +336,68 @@ if (!empty($ordem_servico['observacoes']) &&
     // Em caso de não achar, garante variável definida
     if (!isset($pedido_status_atual)) { $pedido_status_atual = null; }
 
+}
+
+// Fallback: rastreio vinculado pela O.S. (criado automaticamente ao salvar a O.S.,
+// que não grava "Protocolo:" nas observações). Busca por ordem_servico_id.
+$pedido_retirado_por = null;
+if (empty($pedido_id)) {
+    $stmtPedOs = $conn->prepare("SELECT id, protocolo, token_publico, status, retirado_por
+                                 FROM pedidos_certidao WHERE ordem_servico_id = ? ORDER BY id DESC LIMIT 1");
+    $stmtPedOs->bind_param("i", $os_id);
+    if ($stmtPedOs->execute()) {
+        $resPedOs = $stmtPedOs->get_result();
+        if ($rowPo = $resPedOs->fetch_assoc()) {
+            $pedido_id           = (int)$rowPo['id'];
+            $pedido_protocolo    = $rowPo['protocolo'];
+            $pedido_token        = $rowPo['token_publico'];
+            $pedido_status_atual = $rowPo['status'];
+            $pedido_retirado_por = $rowPo['retirado_por'];
+        }
+    }
+    $stmtPedOs->close();
+} else {
+    // já temos o pedido por protocolo; busca o retirado_por para exibição
+    $stmtRet = $conn->prepare("SELECT retirado_por FROM pedidos_certidao WHERE id = ? LIMIT 1");
+    $stmtRet->bind_param("i", $pedido_id);
+    if ($stmtRet->execute()) {
+        $resRet = $stmtRet->get_result();
+        if ($rowRet = $resRet->fetch_assoc()) { $pedido_retirado_por = $rowRet['retirado_por']; }
+    }
+    $stmtRet->close();
+}
+$os_entregue = ($pedido_status_atual === 'entregue');
+
+// Dados da entrega já registrada (para pré-preencher o modal na edição)
+$tem_entrega_registrada = false;
+$entrega_recebido_por = $pedido_retirado_por;
+$entrega_recebido_doc = '';
+$entrega_observacoes  = '';
+try {
+    $stmtEnt = @$conn->prepare("SELECT recebido_por, recebido_doc, observacoes FROM os_entregas WHERE ordem_servico_id = ? LIMIT 1");
+    if ($stmtEnt) {
+        $stmtEnt->bind_param("i", $os_id);
+        if ($stmtEnt->execute()) {
+            $resEnt = $stmtEnt->get_result();
+            if ($rowEnt = $resEnt->fetch_assoc()) {
+                $tem_entrega_registrada = true;
+                $entrega_recebido_por = $rowEnt['recebido_por'] ?: $entrega_recebido_por;
+                $entrega_recebido_doc = (string)($rowEnt['recebido_doc'] ?? '');
+                $entrega_observacoes  = (string)($rowEnt['observacoes'] ?? '');
+            }
+        }
+        $stmtEnt->close();
+    }
+} catch (Throwable $eEnt) { /* tabela pode não existir ainda */ }
+
+// A entrega é considerada concluída se há registro local em os_entregas
+// (prova autoritativa, gravada mesmo que o status do rastreio falhe/divirja)
+// OU se o status do pedido de rastreio é 'entregue'.
+if ($tem_entrega_registrada) {
+    $os_entregue = true;
+    if (empty($entrega_recebido_por) && !empty($pedido_retirado_por)) {
+        $entrega_recebido_por = $pedido_retirado_por;
+    }
 }
 
 // Sinalizadores para JS
@@ -379,6 +474,39 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
             --border-primary: #374151;  
             --border-secondary: #4b5563;  
         }  
+
+        /* Modais customizados (.ent-modal) — Entregar / Cancelar O.S. */
+        .ent-modal .ent-form{ text-align:left; }
+        .ent-modal .ent-group{ margin-bottom:14px; }
+        .ent-modal .ent-desc{ font-size:.85rem; color:#6b7280; margin:0 0 12px; }
+        .ent-modal .ent-label{ display:flex; align-items:center; gap:6px; font-size:.82rem; font-weight:600; color:#374151; margin-bottom:5px; }
+        .ent-modal .ent-label i{ color:#16a34a; width:14px; text-align:center; }
+        .ent-modal .ent-req{ color:#a80f1e; }
+        .ent-modal .ent-input{ width:100%; box-sizing:border-box; padding:10px 12px; font-size:14px; color:#111827; border:1px solid #e2e8f0; border-radius:10px; outline:none; background:#fff; transition:border-color .15s, box-shadow .15s; }
+        .ent-modal .ent-input:focus{ border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.15); }
+        .ent-modal .ent-help{ font-size:.72rem; color:#94a3b8; margin-top:4px; }
+        .ent-modal textarea.ent-input{ resize:vertical; min-height:64px; }
+        .swal2-actions.ent-actions{ gap:10px !important; margin-top:6px !important; width:100% !important; flex-wrap:nowrap !important; box-sizing:border-box; }
+        .ent-btn{ flex:1 1 0 !important; min-width:0 !important; height:44px !important; padding:0 14px !important; border-radius:10px !important; font-size:14px !important; font-weight:600 !important; margin:0 !important; display:inline-flex !important; align-items:center !important; justify-content:center !important; gap:7px !important; box-shadow:none !important; transition:all .15s ease !important; white-space:nowrap; }
+        .ent-btn-confirm{ background:#16a34a !important; color:#fff !important; border:0 !important; }
+        .ent-btn-confirm:hover{ background:#15803d !important; transform:translateY(-1px); }
+        .ent-btn-danger{ background:#dc2626 !important; color:#fff !important; border:0 !important; }
+        .ent-btn-danger:hover{ background:#b91c1c !important; transform:translateY(-1px); }
+        .ent-btn-cancel{ background:#fff !important; color:#475569 !important; border:1px solid #e2e8f0 !important; }
+        .ent-btn-cancel:hover{ background:#f1f5f9 !important; color:#0f172a !important; border-color:#cbd5e1 !important; }
+        /* dark mode */
+        body.dark-mode .swal2-popup.ent-modal{ background:#1f2937; }
+        body.dark-mode .ent-modal .swal2-title{ color:#f9fafb; }
+        body.dark-mode .ent-modal .swal2-html-container{ color:#e5e7eb; }
+        body.dark-mode .ent-modal .swal2-validation-message{ background:#3f1d1d; color:#fecaca; }
+        body.dark-mode .ent-modal .ent-label{ color:#e5e7eb; }
+        body.dark-mode .ent-modal .ent-desc{ color:#9ca3af; }
+        body.dark-mode .ent-modal .ent-input{ background:#111827; color:#f9fafb; border-color:#374151; }
+        body.dark-mode .ent-modal .ent-input::placeholder{ color:#6b7280; }
+        body.dark-mode .ent-modal .ent-input:focus{ border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.25); }
+        body.dark-mode .ent-modal .ent-help{ color:#9ca3af; }
+        body.dark-mode .ent-modal .ent-btn-cancel{ background:#374151 !important; color:#e5e7eb !important; border-color:#4b5563 !important; }
+        body.dark-mode .ent-modal .ent-btn-cancel:hover{ background:#4b5563 !important; color:#fff !important; border-color:#6b7280 !important; }
 
         /* ===================== BADGES STATUS ===================== */  
         .situacao-pago, .situacao-ativo, .situacao-cancelado, .situacao-isento {  
@@ -1326,6 +1454,42 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                 </button>
                 <?php endif; ?>
 
+                <?php if ($todos_itens_liquidados): ?>
+                <style>
+                  .entrega-cluster{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+                  .entrega-cluster .e-item{height:40px;display:inline-flex;align-items:center;gap:8px;border-radius:10px;font-size:.85rem;font-weight:600;line-height:1;padding:0 16px;border:0;transition:all .18s ease;white-space:nowrap;text-decoration:none}
+                  .entrega-cluster .e-item i{font-size:.95rem}
+                  .entrega-cluster .e-chip{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 2px 6px rgba(22,163,74,.30)}
+                  .entrega-cluster .e-chip .e-dot{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.22);display:inline-flex;align-items:center;justify-content:center}
+                  .entrega-cluster .e-chip .e-dot i{font-size:.8rem}
+                  .entrega-cluster .e-deliver{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(22,163,74,.30)}
+                  .entrega-cluster .e-deliver:hover{filter:brightness(1.05);transform:translateY(-1px);box-shadow:0 4px 12px rgba(22,163,74,.40)}
+                  .entrega-cluster .e-guide{background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(15,118,110,.30)}
+                  .entrega-cluster .e-guide:hover{filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,118,110,.42);color:#fff}
+                  .entrega-cluster .e-edit{width:40px;padding:0;justify-content:center;background:#fff;border:1px solid #e2e8f0;color:#64748b;cursor:pointer}
+                  .entrega-cluster .e-edit:hover{background:#f1f5f9;color:#0f172a;border-color:#cbd5e1;transform:translateY(-1px)}
+                </style>
+                <div class="entrega-cluster" aria-label="Entrega">
+                    <?php if (!$os_entregue): ?>
+                    <button type="button" class="e-item e-deliver" id="btnEntregarOS" onclick="marcarEntregue()">
+                        <i class="fa fa-handshake-o"></i> Entregar ao Cliente
+                    </button>
+                    <?php else: ?>
+                    <?php $recebedor_chip = $pedido_retirado_por ?: $entrega_recebido_por; ?>
+                    <span class="e-item e-chip" title="<?php echo $recebedor_chip ? 'Recebido por ' . htmlspecialchars($recebedor_chip) : 'Entregue ao cliente'; ?>">
+                        <span class="e-dot"><i class="fa fa-check"></i></span>
+                        <?php echo $recebedor_chip ? 'Entregue a ' . htmlspecialchars($recebedor_chip) : 'Entregue'; ?>
+                    </span>
+                    <button type="button" class="e-item e-edit" onclick="marcarEntregue()" title="Atualizar dados de entrega">
+                        <i class="fa fa-pencil"></i>
+                    </button>
+                    <button type="button" class="e-item e-guide" id="btnGuiaEntrega" onclick="imprimirGuiaEntrega()">
+                        <i class="fa fa-file-text-o"></i> Guia de Entrega
+                    </button>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+
             </div>
 
             <!-- TABELA DESKTOP -->
@@ -1802,6 +1966,82 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         </tbody>  
                     </table>  
                 </div>  
+
+                <?php if (count($devolucoes) > 0): ?>
+                <h6 class="section-title">Devoluções realizadas</h6>
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered table-modern">
+                        <thead>
+                            <tr>
+                                <th>Forma de Devolução</th>
+                                <th>Valor</th>
+                                <th>Data</th>
+                                <th>Funcionário</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="devolucoesTable">
+                            <?php foreach ($devolucoes as $dev):
+                                $dataDevBr    = date('d/m/Y H:i', strtotime($dev['data_devolucao']));
+                                $isTodayDev   = (date('Y-m-d', strtotime($dev['data_devolucao'])) === date('Y-m-d'));
+                                $canDeleteDev = !$has_liquidated && $isTodayDev;
+                            ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($dev['forma_devolucao']); ?></td>
+                                <td><?php echo 'R$ ' . number_format($dev['total_devolucao'], 2, ',', '.'); ?></td>
+                                <td><?php echo $dataDevBr; ?></td>
+                                <td><?php echo htmlspecialchars($dev['funcionario']); ?></td>
+                                <td>
+                                    <?php if ($canDeleteDev): ?>
+                                        <button type="button" title="Excluir devolução" class="btn btn-delete btn-sm" onclick="confirmarRemocaoDevolucao(<?php echo $dev['id']; ?>)">
+                                            <i class="fa fa-trash" aria-hidden="true"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+
+                <?php if (count($repasses) > 0): ?>
+                <h6 class="section-title">Repasses realizados</h6>
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered table-modern">
+                        <thead>
+                            <tr>
+                                <th>Forma de Repasse</th>
+                                <th>Valor</th>
+                                <th>Data</th>
+                                <th>Funcionário</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repassesTable">
+                            <?php foreach ($repasses as $rep):
+                                $dataRepBr    = date('d/m/Y H:i', strtotime($rep['data_repasse']));
+                                $isTodayRep   = (date('Y-m-d', strtotime($rep['data_repasse'])) === date('Y-m-d'));
+                                $canDeleteRep = !$has_liquidated && $isTodayRep;
+                            ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($rep['forma_repasse']); ?></td>
+                                <td><?php echo 'R$ ' . number_format($rep['total_repasse'], 2, ',', '.'); ?></td>
+                                <td><?php echo $dataRepBr; ?></td>
+                                <td><?php echo htmlspecialchars($rep['funcionario']); ?></td>
+                                <td>
+                                    <?php if ($canDeleteRep): ?>
+                                        <button type="button" title="Excluir repasse" class="btn btn-delete btn-sm" onclick="confirmarRemocaoRepasse(<?php echo $rep['id']; ?>)">
+                                            <i class="fa fa-trash" aria-hidden="true"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
             </div>  
 
             <div class="modal-footer">  
@@ -1813,7 +2053,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
 
 <!-- ===================== MODAL DE REPASSE ===================== -->  
 <div class="modal fade modal-modern" id="repasseModal" tabindex="-1" role="dialog" aria-labelledby="repasseModalLabel" aria-hidden="true">  
-    <div class="modal-dialog modal-dialog-centered" role="document">  
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">  
         <div class="modal-content">  
             <div class="modal-header modern">  
                 <div class="d-flex align-items-center">  
@@ -1823,23 +2063,50 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                 <button type="button" class="btn-close modern" data-dismiss="modal" aria-label="Close">&times;</button>  
             </div>  
             <div class="modal-body">  
-                <div class="form-group">  
-                    <label for="forma_repasse">Forma de Repasse</label>  
-                    <select class="form-control" id="forma_repasse">  
-                        <option value="">Selecione</option>  
-                        <option value="Espécie">Espécie</option>  
-                        <option value="PIX">PIX</option>  
-                        <option value="Transferência Bancária">Transferência Bancária</option>  
-                        <option value="Boleto">Boleto</option>  
-                    </select>  
-                </div>  
-                <div class="form-group">  
-                    <label for="valor_repasse">Valor do Repasse</label>  
-                    <input type="text" class="form-control" id="valor_repasse" placeholder="0,00">  
-                </div>  
-                <button type="button" class="btn btn-primary w-100" onclick="salvarRepasse()">  
-                    <i class="fa fa-save"></i> Salvar Repasse  
-                </button>  
+                <!-- Resumo de valores -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Saldo Disponível p/ Repasse</div>
+                        <input type="text" class="form-control" value="<?php echo 'R$ ' . number_format(max(0, $saldo), 2, ',', '.'); ?>" readonly>
+                    </div>
+                    <?php if ($total_repasses > 0): ?>
+                    <div class="stat-card">
+                        <div class="stat-label">Total já Repassado</div>
+                        <input type="text" class="form-control" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>
+                    </div>
+                    <?php endif; ?>
+                </div>
+
+                <h6 class="section-title">Dados do repasse</h6>
+                <div class="form-grid">
+                    <div class="form-group">  
+                        <label for="forma_repasse">Forma de Repasse</label>  
+                        <select class="form-control" id="forma_repasse">  
+                            <option value="">Selecione</option>  
+                            <option value="Espécie">Espécie</option>  
+                            <option value="PIX">PIX</option>  
+                            <option value="Transferência Bancária">Transferência Bancária</option>  
+                            <option value="Boleto">Boleto</option>  
+                        </select>  
+                    </div>  
+                    <div class="form-group">  
+                        <label for="valor_repasse">Valor do Repasse</label>  
+                        <div class="input-group">
+                            <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+                            <input type="text" class="form-control" id="valor_repasse" placeholder="0,00">  
+                        </div>
+                    </div>  
+                    <div class="grid-span-2">
+                        <small class="text-muted">
+                            <i class="fa fa-info-circle"></i> Não é permitido repassar mais do que o saldo disponível da O.S.
+                        </small>
+                    </div>
+                    <div class="grid-span-2">
+                        <button type="button" id="btnSalvarRepasse" class="btn btn-primary w-100" onclick="salvarRepasse()">  
+                            <i class="fa fa-save"></i> Salvar Repasse  
+                        </button>  
+                    </div>
+                </div>
             </div>  
             <div class="modal-footer">  
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>  
@@ -1874,7 +2141,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
 
 <!-- ===================== MODAL DE DEVOLUÇÃO ===================== -->  
 <div class="modal fade modal-modern" id="devolucaoModal" tabindex="-1" role="dialog" aria-labelledby="devolucaoModalLabel" aria-hidden="true">  
-    <div class="modal-dialog modal-dialog-centered" role="document">  
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">  
         <div class="modal-content">  
             <div class="modal-header modern">  
                 <div class="d-flex align-items-center">  
@@ -1884,22 +2151,58 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                 <button type="button" class="btn-close modern" data-dismiss="modal" aria-label="Close">&times;</button>  
             </div>  
             <div class="modal-body">  
-                <div class="form-group">  
-                    <label for="forma_devolucao">Forma de Devolução</label>  
-                    <select class="form-control" id="forma_devolucao">  
-                        <option value="">Selecione</option>  
-                        <option value="Espécie">Espécie</option>  
-                        <option value="PIX">PIX</option>  
-                        <option value="Transferência Bancária">Transferência Bancária</option>  
-                    </select>  
-                </div>  
-                <div class="form-group">  
-                    <label for="valor_devolucao">Valor da Devolução</label>  
-                    <input type="text" class="form-control" id="valor_devolucao" placeholder="0,00">  
-                </div>  
-                <button type="button" class="btn btn-primary w-100" onclick="salvarDevolucao()">  
-                    <i class="fa fa-save"></i> Salvar Devolução  
-                </button>  
+                <!-- Resumo de valores -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Depósito Prévio</div>
+                        <input type="text" class="form-control" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>
+                    </div>
+                    <?php if ($total_devolucoes > 0): ?>
+                    <div class="stat-card">
+                        <div class="stat-label">Já Devolvido</div>
+                        <input type="text" class="form-control" value="<?php echo 'R$ ' . number_format($total_devolucoes, 2, ',', '.'); ?>" readonly>
+                    </div>
+                    <?php endif; ?>
+                    <div class="stat-card">
+                        <div class="stat-label">Disponível p/ Devolução</div>
+                        <input type="text" class="form-control" value="<?php echo 'R$ ' . number_format(max(0, $valor_pago_liquido - $total_liquidado), 2, ',', '.'); ?>" readonly>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Saldo em Espécie (Caixa)</div>
+                        <input type="text" class="form-control" id="saldo_especie_caixa_modal"
+                               value="<?php echo $tem_caixa_aberto ? ('R$ ' . number_format($saldo_especie_caixa, 2, ',', '.')) : 'Sem caixa aberto'; ?>" readonly>
+                    </div>
+                </div>
+
+                <h6 class="section-title">Dados da devolução</h6>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="forma_devolucao">Forma de Devolução</label>
+                        <select class="form-control" id="forma_devolucao">
+                            <option value="">Selecione</option>
+                            <option value="Espécie">Espécie</option>
+                            <option value="PIX">PIX</option>
+                            <option value="Transferência Bancária">Transferência Bancária</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="valor_devolucao">Valor da Devolução</label>
+                        <div class="input-group">
+                            <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+                            <input type="text" class="form-control" id="valor_devolucao" placeholder="0,00">
+                        </div>
+                    </div>
+                    <div class="grid-span-2">
+                        <small id="dev_especie_hint" class="text-muted" style="display:none;">
+                            <i class="fa fa-info-circle"></i> Em espécie, os centavos devem terminar em <b>0</b> ou <b>5</b> e há verificação de saldo disponível no caixa.
+                        </small>
+                    </div>
+                    <div class="grid-span-2">
+                        <button type="button" id="btnSalvarDevolucao" class="btn btn-primary w-100" onclick="salvarDevolucao()">
+                            <i class="fa fa-save"></i> Salvar Devolução
+                        </button>
+                    </div>
+                </div>
             </div>  
             <div class="modal-footer">  
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>  
@@ -2120,6 +2423,9 @@ var quantidadeLiquidadaAtual = 0;
 const OS_STATUS_SERVER   = <?php echo json_encode($ordem_servico['status']); ?>; // "Ativo" | "Cancelado"
 const TOTAL_OS           = parseFloat('<?php echo $ordem_servico['total_os']; ?>');
 const TOTAL_DEVOLUCOES   = parseFloat('<?php echo $total_devolucoes; ?>');
+const SALDO_ESPECIE_CAIXA = parseFloat('<?php echo $saldo_especie_caixa; ?>');
+const TEM_CAIXA_ABERTO    = <?php echo $tem_caixa_aberto ? 'true' : 'false'; ?>;
+const TOTAL_LIQUIDADO_JS  = parseFloat('<?php echo $total_liquidado; ?>');
 const TOTAL_REPASSES     = parseFloat('<?php echo $total_repasses; ?>');
 const ISENTO_SERVER = <?php echo $isIsento ? 'true' : 'false'; ?>;
 
@@ -2226,12 +2532,13 @@ function refreshOsHeaderAndStats() {
         // Só prossegue se existe pedido identificado e todos os atos estão liquidados
         if (!PED_ID || !PED_PROTO || !ALL_DONE) return;
 
-        // Se já estiver emitida/cancelada no servidor, nem mostra
+        // Só sugere quando o status na API for "pendente" ou "em_andamento".
+        // Se já estiver "emitida", "entregue" ou "cancelada", não mostra (emitida vem antes de entregue).
         const serverStatus = (typeof PEDIDO_STATUS_ATUAL !== 'undefined' && PEDIDO_STATUS_ATUAL) 
             ? ('' + PEDIDO_STATUS_ATUAL).toLowerCase()
             : null;
 
-        if (serverStatus === 'emitida' || serverStatus === 'cancelada') return;
+        if (serverStatus !== 'pendente' && serverStatus !== 'em_andamento') return;
 
         // Status sugerido local (fallback se não houver função externa)
         const statusSugerido = (typeof sugerirStatusPedido === 'function') 
@@ -2799,38 +3106,58 @@ $(document).ready(function() {
         $('#devolucaoModal').modal('show');
     }
 
+    // Mostra a dica de espécie conforme a forma selecionada
+    $(document).on('change', '#forma_devolucao', function () {
+        $('#dev_especie_hint').toggle($(this).val() === 'Espécie');
+    });
+
     // Função para salvar devolução
     function salvarDevolucao() {
+        var btn = $('#btnSalvarDevolucao');
         var formaDevolucao = $('#forma_devolucao').val();
-        var valorDevolucao = parseFloat($('#valor_devolucao').val().replace('.', '').replace(',', '.'));
+        var valorDevolucao = parseFloat(($('#valor_devolucao').val() || '').replace(/\./g, '').replace(',', '.'));
         var valorPago = parseFloat('<?php echo $valor_pago_liquido; ?>');
-        var valorMaximoDevolucao = valorPago - parseFloat('<?php echo $total_liquidado; ?>');
+        var valorMaximoDevolucao = valorPago - TOTAL_LIQUIDADO_JS;
 
         if (formaDevolucao === "") {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro!',
-                text: 'Por favor, selecione uma forma de devolução.',
-                confirmButtonText: 'OK'
-            });
+            Swal.fire({ icon: 'error', title: 'Erro!', text: 'Por favor, selecione uma forma de devolução.', confirmButtonText: 'OK' });
             return;
         }
 
         if (isNaN(valorDevolucao) || valorDevolucao <= 0 || valorDevolucao > valorMaximoDevolucao + 0.01) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro!',
-                text: 'Por favor, insira um valor válido para a devolução que não seja maior que o saldo disponível.',
-                confirmButtonText: 'OK'
-            });
+            Swal.fire({ icon: 'error', title: 'Erro!', text: 'Insira um valor válido para a devolução que não seja maior que o saldo disponível para devolução.', confirmButtonText: 'OK' });
             return;
         }
 
-        var osId = <?php echo $os_id; ?>;
-        var cliente = '<?php echo $ordem_servico['cliente']; ?>';
-        var totalOs = '<?php echo $ordem_servico['total_os']; ?>';
-        var funcionario = '<?php echo $_SESSION['username']; ?>';
+        // Regras específicas para devolução em ESPÉCIE
+        if (formaDevolucao === 'Espécie') {
+            var centavos = Math.round((valorDevolucao * 100) % 100);
+            if (centavos % 5 !== 0) {
+                Swal.fire({ icon: 'error', title: 'Valor inválido', text: 'Em espécie, os centavos devem terminar em 0 ou 5.', confirmButtonText: 'OK' });
+                return;
+            }
+            if (!TEM_CAIXA_ABERTO) {
+                Swal.fire({ icon: 'error', title: 'Sem caixa aberto', text: 'Você não possui caixa aberto hoje. Não é possível realizar uma devolução em espécie.', confirmButtonText: 'OK' });
+                return;
+            }
+            if (valorDevolucao > SALDO_ESPECIE_CAIXA + 0.001) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Saldo insuficiente em caixa',
+                    html: 'Não há saldo em espécie suficiente no seu caixa para esta devolução.<br>Disponível em espécie: <b>R$ ' +
+                          SALDO_ESPECIE_CAIXA.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</b>',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+        }
 
+        var osId = <?php echo $os_id; ?>;
+        var cliente = '<?php echo addslashes($ordem_servico['cliente']); ?>';
+        var totalOs = '<?php echo $ordem_servico['total_os']; ?>';
+        var funcionario = '<?php echo addslashes($_SESSION['username']); ?>';
+
+        btn.prop('disabled', true);
         $.ajax({
             url: 'salvar_devolucao.php',
             type: 'POST',
@@ -2843,22 +3170,106 @@ $(document).ready(function() {
                 funcionario: funcionario
             },
             success: function(response) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Sucesso!',
-                    text: 'Devolução salva com sucesso!',
-                    confirmButtonText: 'OK'
-                }).then(() => {
-                    $('#devolucaoModal').modal('hide');
-                    window.location.reload();
-                });
+                var r = (response && typeof response === 'object') ? response : null;
+                if (r === null) { try { r = JSON.parse(response); } catch (e) { r = null; } }
+                if (r && r.success) {
+                    Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Devolução salva com sucesso!', confirmButtonText: 'OK' })
+                        .then(() => { $('#devolucaoModal').modal('hide'); window.location.reload(); });
+                } else {
+                    btn.prop('disabled', false);
+                    var msg = (r && r.error)
+                        ? r.error
+                        : ('Não foi possível salvar a devolução.' + ((typeof response === 'string' && response.trim() !== '') ? '<br><small style="color:#888">Detalhe: ' + String(response).replace(/</g,'&lt;').substring(0, 300) + '</small>' : ''));
+                    Swal.fire({ icon: 'error', title: 'Erro!', html: msg, confirmButtonText: 'OK' });
+                }
             },
             error: function(xhr, status, error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro!',
-                    text: 'Erro ao salvar devolução: ' + error,
-                    confirmButtonText: 'OK'
+                btn.prop('disabled', false);
+                Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao salvar devolução: ' + error, confirmButtonText: 'OK' });
+            }
+        });
+    }
+
+    // Excluir devolução (mesmas regras dos pagamentos: não após liquidação e só no dia atual)
+    function confirmarRemocaoDevolucao(devolucaoId) {
+        if (<?php echo $has_liquidated ? 'true' : 'false'; ?>) {
+            Swal.fire({ icon: 'error', title: 'Erro!', text: 'Não é possível excluir devoluções após a liquidação de atos.', confirmButtonText: 'OK' });
+            return;
+        }
+        Swal.fire({
+            title: 'Tem certeza?',
+            text: 'Deseja realmente excluir esta devolução?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sim, excluir!',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: 'remover_devolucao.php',
+                    type: 'POST',
+                    data: { devolucao_id: devolucaoId },
+                    success: function(response) {
+                        var r = (response && typeof response === 'object') ? response : null;
+                        if (r === null) { try { r = JSON.parse(response); } catch (e) { r = null; } }
+                        if (r && r.success) {
+                            Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Devolução excluída com sucesso!', confirmButtonText: 'OK' })
+                                .then(() => window.location.reload());
+                        } else {
+                            var msg = (r && r.error)
+                                ? r.error
+                                : ('Não foi possível excluir a devolução.' + ((typeof response === 'string' && response.trim() !== '') ? '<br><small style="color:#888">Detalhe: ' + String(response).replace(/</g,'&lt;').substring(0, 300) + '</small>' : ''));
+                            Swal.fire({ icon: 'error', title: 'Erro!', html: msg, confirmButtonText: 'OK' });
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao excluir devolução.', confirmButtonText: 'OK' });
+                    }
+                });
+            }
+        });
+    }
+
+
+    // Excluir repasse (mesmas regras dos pagamentos: não após liquidação e só no dia atual)
+    function confirmarRemocaoRepasse(repasseId) {
+        if (<?php echo $has_liquidated ? 'true' : 'false'; ?>) {
+            Swal.fire({ icon: 'error', title: 'Erro!', text: 'Não é possível excluir repasses após a liquidação de atos.', confirmButtonText: 'OK' });
+            return;
+        }
+        Swal.fire({
+            title: 'Tem certeza?',
+            text: 'Deseja realmente excluir este repasse?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sim, excluir!',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: 'remover_repasse.php',
+                    type: 'POST',
+                    data: { repasse_id: repasseId },
+                    success: function(response) {
+                        var r = (response && typeof response === 'object') ? response : null;
+                        if (r === null) { try { r = JSON.parse(response); } catch (e) { r = null; } }
+                        if (r && r.success) {
+                            Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Repasse excluído com sucesso!', confirmButtonText: 'OK' })
+                                .then(() => window.location.reload());
+                        } else {
+                            var msg = (r && r.error)
+                                ? r.error
+                                : ('Não foi possível excluir o repasse.' + ((typeof response === 'string' && response.trim() !== '') ? '<br><small style="color:#888">Detalhe: ' + String(response).replace(/</g,'&lt;').substring(0, 300) + '</small>' : ''));
+                            Swal.fire({ icon: 'error', title: 'Erro!', html: msg, confirmButtonText: 'OK' });
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao excluir repasse.', confirmButtonText: 'OK' });
+                    }
                 });
             }
         });
@@ -2989,24 +3400,47 @@ $(document).ready(function() {
             return;
         }
 
-        // Exibir confirmação com SweetAlert2
+        // Modal de cancelamento com MOTIVO OBRIGATÓRIO
         Swal.fire({
-            title: 'Tem certeza?',
-            text: "Tem certeza de que deseja cancelar esta Ordem de Serviço? Esta ação não pode ser desfeita.",
+            title: 'Cancelar Ordem de Serviço',
+            width: 480,
+            html:
+                '<div class="ent-form">' +
+                '  <p class="ent-desc">Esta ação não pode ser desfeita. Informe o motivo do cancelamento:</p>' +
+                '  <div class="ent-group">' +
+                '    <label class="ent-label" for="cancel_motivo"><i class="fa fa-comment-o"></i> Motivo do cancelamento <span class="ent-req">*</span></label>' +
+                '    <textarea id="cancel_motivo" class="ent-input" placeholder="Descreva o motivo do cancelamento..."></textarea>' +
+                '  </div>' +
+                '</div>',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Sim, cancelar',
-            cancelButtonText: 'Não, manter'
+            confirmButtonText: '<i class="fa fa-ban"></i> Confirmar cancelamento',
+            cancelButtonText: 'Voltar',
+            reverseButtons: true,
+            buttonsStyling: false,
+            focusConfirm: false,
+            customClass: {
+                popup: 'ent-modal',
+                actions: 'ent-actions',
+                confirmButton: 'ent-btn ent-btn-danger',
+                cancelButton: 'ent-btn ent-btn-cancel'
+            },
+            didOpen: () => { const t = document.getElementById('cancel_motivo'); if (t) t.focus(); },
+            preConfirm: () => {
+                const m = (document.getElementById('cancel_motivo').value || '').trim();
+                if (!m) { Swal.showValidationMessage('Informe o motivo do cancelamento.'); return false; }
+                return { motivo: m };
+            }
         }).then((result) => {
             if (result.isConfirmed) {
+                const motivoCancelamento = result.value.motivo;
                 // Realizar o cancelamento da OS
                 $.ajax({
                     url: 'cancelar_os.php',
                     type: 'POST',
                     data: {
-                        os_id: <?php echo $os_id; ?>
+                        os_id: <?php echo $os_id; ?>,
+                        motivo: motivoCancelamento
                     },
                     success: function(response) {
                         try {
@@ -3293,6 +3727,153 @@ $(document).ready(function() {
             } else {
                 confirmarLiquidacaoTudo();
             }
+        }
+
+        function validarCPF(cpf) {
+            cpf = (cpf || '').replace(/\D/g, '');
+            if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+            let soma = 0;
+            for (let i = 0; i < 9; i++) soma += parseInt(cpf.charAt(i)) * (10 - i);
+            let resto = (soma * 10) % 11; if (resto === 10 || resto === 11) resto = 0;
+            if (resto !== parseInt(cpf.charAt(9))) return false;
+            soma = 0;
+            for (let i = 0; i < 10; i++) soma += parseInt(cpf.charAt(i)) * (11 - i);
+            resto = (soma * 10) % 11; if (resto === 10 || resto === 11) resto = 0;
+            return resto === parseInt(cpf.charAt(10));
+        }
+
+        function validarCNPJ(cnpj) {
+            cnpj = (cnpj || '').replace(/\D/g, '');
+            if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false;
+            let tamanho = 12, numeros = cnpj.substring(0, tamanho), digitos = cnpj.substring(tamanho), soma = 0, pos = tamanho - 7;
+            for (let i = tamanho; i >= 1; i--) { soma += parseInt(numeros.charAt(tamanho - i)) * pos--; if (pos < 2) pos = 9; }
+            let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+            if (resultado !== parseInt(digitos.charAt(0))) return false;
+            tamanho = 13; numeros = cnpj.substring(0, tamanho); soma = 0; pos = tamanho - 7;
+            for (let i = tamanho; i >= 1; i--) { soma += parseInt(numeros.charAt(tamanho - i)) * pos--; if (pos < 2) pos = 9; }
+            resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+            return resultado === parseInt(digitos.charAt(1));
+        }
+
+        function validarDocumentoBR(doc) {
+            doc = (doc || '').replace(/\D/g, '');
+            if (doc.length === 11) return validarCPF(doc);
+            if (doc.length === 14) return validarCNPJ(doc);
+            return false;
+        }
+
+        function imprimirGuiaEntrega() {
+            window.open('guia_entrega.php?id=<?php echo $os_id; ?>', '_blank');
+        }
+
+        function marcarEntregue() {
+            const entRecebido = <?php echo json_encode($entrega_recebido_por ?? ''); ?>;
+            const entDoc      = <?php echo json_encode($entrega_recebido_doc ?? ''); ?>;
+            const entObs      = <?php echo json_encode($entrega_observacoes ?? ''); ?>;
+            Swal.fire({
+                title: 'Entregar ao cliente',
+                width: 480,
+                html:
+                    '<div class="ent-form">' +
+                    '  <div class="ent-group">' +
+                    '    <label class="ent-label" for="ent_recebido"><i class="fa fa-user"></i> Recebido por <span class="ent-req">*</span></label>' +
+                    '    <input id="ent_recebido" class="ent-input" placeholder="Nome de quem recebeu" autocomplete="off">' +
+                    '  </div>' +
+                    '  <div class="ent-group">' +
+                    '    <label class="ent-label" for="ent_doc"><i class="fa fa-id-card-o"></i> CPF / CNPJ do receptor</label>' +
+                    '    <input id="ent_doc" class="ent-input" placeholder="Somente números" inputmode="numeric" autocomplete="off" maxlength="18">' +
+                    '    <div class="ent-help">Opcional &mdash; se informado, precisa ser um documento válido.</div>' +
+                    '  </div>' +
+                    '  <div class="ent-group">' +
+                    '    <label class="ent-label" for="ent_obs"><i class="fa fa-comment-o"></i> Observações</label>' +
+                    '    <textarea id="ent_obs" class="ent-input" placeholder="Ex.: entregue via portador..."></textarea>' +
+                    '    <div class="ent-help">Opcional.</div>' +
+                    '  </div>' +
+                    '</div>',
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: '<i class="fa fa-check"></i> Confirmar entrega',
+                cancelButtonText: 'Cancelar',
+                reverseButtons: true,
+                buttonsStyling: false,
+                customClass: {
+                    popup: 'ent-modal',
+                    actions: 'ent-actions',
+                    confirmButton: 'ent-btn ent-btn-confirm',
+                    cancelButton: 'ent-btn ent-btn-cancel'
+                },
+                didOpen: () => {
+                    const elNome = document.getElementById('ent_recebido');
+                    const elDoc  = document.getElementById('ent_doc');
+                    const elObs  = document.getElementById('ent_obs');
+                    // Pré-preenche com o que já foi salvo (inclusive o CPF/CNPJ para correção)
+                    if (elNome) elNome.value = entRecebido || '';
+                    if (elDoc)  elDoc.value  = (entDoc || '').replace(/\D/g, '');
+                    if (elObs)  elObs.value  = entObs || '';
+                    // Máscara dinâmica CPF/CNPJ (formata também o valor já preenchido)
+                    if (window.jQuery && jQuery.fn.mask) {
+                        const comportamento = function (val) {
+                            return val.replace(/\D/g, '').length <= 11 ? '000.000.000-009' : '00.000.000/0000-00';
+                        };
+                        const opcoes = {
+                            onKeyPress: function (val, e, field, options) {
+                                field.mask(comportamento.apply({}, arguments), options);
+                            }
+                        };
+                        jQuery('#ent_doc').mask(comportamento, opcoes);
+                    }
+                    if (elNome) elNome.focus();
+                },
+                preConfirm: () => {
+                    const nome = (document.getElementById('ent_recebido').value || '').trim();
+                    if (!nome) { Swal.showValidationMessage('Informe o nome de quem recebeu.'); return false; }
+                    const docDigitos = (document.getElementById('ent_doc').value || '').replace(/\D/g, '');
+                    if (docDigitos !== '' && !validarDocumentoBR(docDigitos)) {
+                        Swal.showValidationMessage('CPF/CNPJ inválido. Verifique o documento informado.');
+                        return false;
+                    }
+                    return {
+                        recebido_por: nome,
+                        recebido_doc: docDigitos, // envia somente números
+                        observacoes:  (document.getElementById('ent_obs').value || '').trim()
+                    };
+                }
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+                const dados = result.value;
+                Swal.fire({ title: 'Registrando entrega...', allowOutsideClick: false, customClass: { popup: 'ent-modal' }, didOpen: () => Swal.showLoading() });
+                $.ajax({
+                    url: 'entregar_os.php',
+                    method: 'POST',
+                    dataType: 'json',
+                    data: {
+                        csrf: CSRF_PEDIDOS,
+                        os_id: <?php echo $os_id; ?>,
+                        recebido_por: dados.recebido_por,
+                        recebido_doc: dados.recebido_doc,
+                        observacoes:  dados.observacoes
+                    }
+                }).done((resp) => {
+                    if (resp && resp.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Entrega registrada!',
+                            text: 'Status do rastreio atualizado para "Entregue".',
+                            showCancelButton: true,
+                            confirmButtonText: 'Emitir Guia de Entrega',
+                            cancelButtonText: 'Fechar',
+                            customClass: { popup: 'ent-modal' }
+                        }).then((r) => {
+                            if (r.isConfirmed) { imprimirGuiaEntrega(); }
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire('Erro', (resp && resp.error) ? resp.error : 'Não foi possível registrar a entrega.', 'error');
+                    }
+                }).fail(() => {
+                    Swal.fire('Erro', 'Falha de comunicação ao registrar a entrega.', 'error');
+                });
+            });
         }
 
         function confirmarLiquidacaoTudo() {

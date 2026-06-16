@@ -566,7 +566,7 @@ try {
   $conn->prepare("
     INSERT INTO pedidos_certidao_status_log (pedido_id, status_anterior, novo_status, observacao, usuario, ip, user_agent)
     VALUES (?,?,?,?,?,?,?)
-  ")->execute([$id, $anterior, $novo, ($observacao ?: null), $username, $clientIpDisp, $uaSummary]);
+  ")->execute([$id, $anterior, $novo, (($novo === 'cancelada' && $cancelado_motivo) ? $cancelado_motivo : ($observacao ?: null)), $username, $clientIpDisp, $uaSummary]);
 
   /* =================== SINCRONIZAÇÃO DE TAREFAS =================== */
   $novoStatusTarefa = mapPedidoToTarefaStatus($novo);
@@ -594,15 +594,19 @@ try {
   /* ================================================================ */
 
   // === Payload FLAT compatível com ingest.php ===
+  // Observação enviada à API como TEXTO. No cancelamento, usa o motivo informado.
+  $observacaoApi = ($novo === 'cancelada')
+    ? (($cancelado_motivo !== null && $cancelado_motivo !== '') ? $cancelado_motivo : $observacao)
+    : $observacao;
+
   $body = [
     'topic'          => 'status_atualizado',
     'protocolo'      => $p['protocolo'],
     'token_publico'  => $p['token_publico'],
     'status'         => $novo,
     'atualizado_em'  => date('c'),
-    'observacao'     => $observacao ? true : false,
-    // campos extras (opcionais)
-    'observacao_text'=> $observacao ?: null,
+    'observacao'     => ($observacaoApi !== '' ? $observacaoApi : null),
+    'cancelado_motivo'=> ($novo === 'cancelada' ? ($cancelado_motivo ?: null) : null),
     'pedido_id'      => (int)$p['id'],
     'ordem_servico_id'=> (int)$p['ordem_servico_id']
   ];

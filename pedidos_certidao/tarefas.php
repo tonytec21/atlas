@@ -688,6 +688,11 @@ if ($isAjax) {
         J(['success'=>false,'error'=>'Parâmetros inválidos.']);
       }
 
+      // Motivo é OBRIGATÓRIO ao cancelar
+      if ($novo === 'cancelada' && $obs === '') {
+        J(['success'=>false,'error'=>'Informe o motivo do cancelamento.']);
+      }
+
       $conn->beginTransaction();
 
       // Carrega status atual da tarefa + pedido + status da O.S. (com lock)
@@ -815,11 +820,12 @@ if ($novoPedidoStatus !== null && $pedidoId > 0) {
       $stUpdPed = $conn->prepare("
         UPDATE pedidos_certidao
            SET status = ?,
+               cancelado_motivo = CASE WHEN ? = 'cancelada' THEN ? ELSE cancelado_motivo END,
                atualizado_por = ?,
                atualizado_em = NOW()
          WHERE id = ?
       ");
-      $stUpdPed->execute([$novoPedidoStatus, $user, $pedidoId]);
+      $stUpdPed->execute([$novoPedidoStatus, $novoPedidoStatus, ($obs ?: null), $user, $pedidoId]);
       $atualizouPedido = true;
     }
   }
@@ -845,8 +851,8 @@ if ($novoPedidoStatus !== null && $pedidoId > 0) {
       'token_publico'   => (string)($row['pedido_token_publico'] ?? ''),
       'status'          => $novoPedidoStatus,
       'atualizado_em'   => date('c'),
-      'observacao'      => $obs ? true : false,
-      'observacao_text' => $obs ?: null,
+      'observacao'      => ($obs !== '' ? $obs : null),
+      'cancelado_motivo'=> ($novoPedidoStatus === 'cancelada' ? ($obs ?: null) : null),
       'pedido_id'       => (int)$pedidoId,
       'ordem_servico_id'=> (int)($row['os_id'] ?? 0),
     ];
@@ -2605,18 +2611,26 @@ function initializeSortable() {
         'suspensa': 'Suspensa'
       };
       
+      const isCancelDnd = (newStatus === 'cancelada');
       Swal.fire({
         title: 'Confirmar Mudança?',
-        html: `Alterar status da tarefa para <strong>${statusNames[newStatus]}</strong>?`,
+        html: `Alterar status da tarefa para <strong>${statusNames[newStatus]}</strong>?` + (isCancelDnd ? '<p style="font-size:13px;color:#6b7280;margin-top:8px;">Informe o motivo do cancelamento abaixo.</p>' : ''),
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#6366f1',
         cancelButtonColor: '#6b7280',
         confirmButtonText: '<i class="fas fa-check"></i> Sim, alterar',
-        cancelButtonText: '<i class="fas fa-times"></i> Cancelar'
+        cancelButtonText: '<i class="fas fa-times"></i> Cancelar',
+        input: isCancelDnd ? 'textarea' : undefined,
+        inputPlaceholder: isCancelDnd ? 'Motivo do cancelamento (obrigatório)' : undefined,
+        inputValidator: isCancelDnd ? (value) => {
+          if (!value || !value.trim()) {
+            return 'Informe o motivo do cancelamento.';
+          }
+        } : undefined
       }).then((result) => {
         if (result.isConfirmed) {
-          mudarStatus(id, newStatus, '');
+          mudarStatus(id, newStatus, (result.value || ''));
         } else {
           // Reverte a mudança
           carregarKanban();
@@ -3095,12 +3109,15 @@ function mudarStatusComConfirmacao(id, novoStatus) {
     'suspensa': 'pause-circle'
   };
 
+  const isCancel = (novoStatus === 'cancelada');
+
   Swal.fire({
     title: 'Confirmar Mudança?',
     html: `
       <div style="text-align: center;">
         <i class="fas fa-${statusIcons[novoStatus]}" style="font-size: 48px; color: var(--brand-primary); margin-bottom: 16px;"></i>
         <p>Alterar status da tarefa para <strong>${statusNames[novoStatus]}</strong>?</p>
+        ${isCancel ? '<p style="font-size:13px;color:#6b7280;margin-top:8px;">Informe o motivo do cancelamento abaixo.</p>' : ''}
       </div>
     `,
     icon: 'question',
@@ -3110,10 +3127,15 @@ function mudarStatusComConfirmacao(id, novoStatus) {
     confirmButtonText: '<i class="fas fa-check"></i> Sim, alterar',
     cancelButtonText: '<i class="fas fa-times"></i> Cancelar',
     input: 'textarea',
-    inputPlaceholder: 'Observação (opcional)',
+    inputPlaceholder: isCancel ? 'Motivo do cancelamento (obrigatório)' : 'Observação (opcional)',
     inputAttributes: {
-      'aria-label': 'Adicione uma observação'
-    }
+      'aria-label': isCancel ? 'Motivo do cancelamento' : 'Adicione uma observação'
+    },
+    inputValidator: isCancel ? (value) => {
+      if (!value || !value.trim()) {
+        return 'Informe o motivo do cancelamento.';
+      }
+    } : undefined
   }).then((result) => {
     if (result.isConfirmed) {
       mudarStatus(id, novoStatus, result.value || '');

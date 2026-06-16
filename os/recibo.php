@@ -96,6 +96,26 @@ if (isset($_GET['id'])) {
     $os_result = $os_query->get_result();
     $ordem_servico = $os_result->fetch_assoc();
 
+    // ===== Rastreio: busca protocolo/token vinculado a esta O.S. (para o QR Code) =====
+    $rastreioProtocolo = null;
+    $rastreioToken     = null;
+    $rastreioUrl       = null;
+    try {
+        $rq = $conn->prepare("SELECT protocolo, token_publico FROM pedidos_certidao WHERE ordem_servico_id = ? ORDER BY id DESC LIMIT 1");
+        $rq->bind_param("i", $os_id);
+        $rq->execute();
+        $rRes = $rq->get_result();
+        if ($rRes && ($rRow = $rRes->fetch_assoc())) {
+            $rastreioProtocolo = $rRow['protocolo'];
+            $rastreioToken     = $rRow['token_publico'];
+            $apiCfg = @json_decode(@file_get_contents(__DIR__ . '/../pedidos_certidao/api_secrets.json'), true) ?: [];
+            $publicBase = $apiCfg['public_base'] ?? 'https://sistemaatlas.com.br';
+            $rastreioUrl = rtrim($publicBase, '/') . '/' . $rastreioProtocolo;
+        }
+    } catch (Throwable $eRastreio) {
+        $rastreioUrl = null;
+    }
+
     // Obter dados de itens da OS ordenados pela coluna ordem_exibicao
     $os_items_query = $conn->prepare("SELECT * FROM ordens_de_servico_itens WHERE ordem_servico_id = ? ORDER BY ordem_exibicao ASC");
     $os_items_query->bind_param("i", $os_id);
@@ -375,6 +395,29 @@ if (isset($_GET['id'])) {
     $pdf->Cell(0, 4, $logged_in_user_nome, 0, 1, 'C');
     $pdf->SetFont('helvetica', '', 10);
     $pdf->Cell(0, 4, $logged_in_user_cargo, 0, 1, 'C');
+
+    // ===== QR Code de rastreio da O.S. =====
+    if (!empty($rastreioUrl)) {
+        $pdf->Ln(3);
+        $pdf->Cell(0, 0, '', 'T', 1, 'L');
+        $pdf->Ln(2);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->MultiCell(0, 5, 'Rastreie esta Ordem de Serviço:', 0, 'C', false, 1);
+
+        $qrSize = 32;
+        $x = ($pdf->getPageWidth() - $qrSize) / 2;
+        $y = $pdf->GetY() + 1;
+        $style = ['border' => 0, 'padding' => 0, 'fgcolor' => [0, 0, 0], 'bgcolor' => false];
+        $pdf->write2DBarcode($rastreioUrl, 'QRCODE,H', $x, $y, $qrSize, $qrSize, $style, 'N');
+        $pdf->SetY($y + $qrSize + 1);
+
+        $pdf->SetFont('helvetica', '', 8);
+        $pdf->SetTextColor(80, 80, 80);
+        $pdf->MultiCell(0, 5, 'Aponte a camera do celular para o QR Code', 0, 'C', false, 1);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->MultiCell(0, 5, 'Ou acesse: ' . $rastreioUrl, 0, 'C', false, 1);
+    }
 
     $pdf->Output('Recibo de Pagamento nº ' . $os_id . '.pdf', 'I');
 } else {

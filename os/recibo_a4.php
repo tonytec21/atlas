@@ -39,6 +39,11 @@ function maskCpfCnpj($valor){
     return $result;
 }
 
+// Título de seção (apenas texto em negrito, sem fundo)
+function secaoBar($titulo){
+    return '<div style="text-align:center; font-size:11px;"><b>'.$titulo.'</b></div>';
+}
+
 // Configurar a classe PDF
 class PDF extends TCPDF
 {
@@ -218,6 +223,22 @@ if (isset($_GET['id'])) {
     $repasses_result = $repasses_query->get_result();
     $total_repasses = $repasses_result->fetch_assoc()['total_repasses'];
 
+    // ===== Rastreio: protocolo/token vinculado a esta O.S. (para o QR Code) =====
+    $rastreioUrl = null;
+    try {
+        $rq = $conn->prepare("SELECT protocolo, token_publico FROM pedidos_certidao WHERE ordem_servico_id = ? ORDER BY id DESC LIMIT 1");
+        $rq->bind_param("i", $os_id);
+        $rq->execute();
+        $rRes = $rq->get_result();
+        if ($rRes && ($rRow = $rRes->fetch_assoc())) {
+            $apiCfg = @json_decode(@file_get_contents(__DIR__ . '/../pedidos_certidao/api_secrets.json'), true) ?: [];
+            $publicBase = $apiCfg['public_base'] ?? 'https://sistemaatlas.com.br';
+            $rastreioUrl = rtrim($publicBase, '/') . '/' . $rRow['protocolo'];
+        }
+    } catch (Throwable $eRastreio) {
+        $rastreioUrl = null;
+    }
+
     // Início do PDF
     $pdf = new PDF();
     $pdf->SetMargins(12, 40, 10);
@@ -238,64 +259,84 @@ if (isset($_GET['id'])) {
         }
     }
 
-    $pdf->SetFont('helvetica', 'B', 10);
-    $pdf->writeHTML('<div style="text-align: center;">RECIBO Nº.: ' . $os_id . '</div>', true, false, true, false, '');
+    // ===== Cabeçalho do recibo =====
+    $statusLabel = $isCanceled ? ' — CANCELADA' : '';
+    $pdf->SetFont('helvetica', 'B', 13);
+    $pdf->writeHTML('<div style="text-align:center; font-size:13px;"><b>RECIBO DE PAGAMENTO Nº '.$os_id.$statusLabel.'</b></div>', true, false, true, false, '');
     $pdf->Ln(1);
 
-    $pdf->SetFont('helvetica', '', 9);
-    $pdf->writeHTML('<div style="text-align: center;">'. $ordem_servico['descricao_os'] .'</div>', true, false, true, false, '');
-    $pdf->Ln(3);
-
-    $pdf->SetFont('helvetica', '', 9);
-    $pdf->SetMargins(10, 40, 10);
-    $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? ' - CPF/CNPJ: ' . maskCpfCnpj($ordem_servico['cpf_cliente']) : '';
-    $pdf->writeHTML('<div style="text-align: left;">Apresentante: ' . $ordem_servico['cliente'] . $cpf_cnpj_text . '</div>', true, false, true, false, '');
-    $pdf->Ln(1);
-
-    $pdf->SetFont('helvetica', '', 9);
-    $data_criacao = date('d/m/Y - H:i', strtotime($ordem_servico['data_criacao']));
-    $pdf->writeHTML('<div style="text-align: left;">'.'Data: '. $data_criacao .'</div>', true, false, true, false, '');
-    $pdf->Ln(1);
-
-    $pdf->SetFont('helvetica', '', 9);
-    if ($ordem_servico['base_de_calculo'] >= 0.001) {
-        $pdf->writeHTML('<div style="text-align: left;">'.'Base de Cálculo: R$ '. number_format($ordem_servico['base_de_calculo'], 2, ',', '.') .'</div>', true, false, true, false, '');
-        $pdf->Ln(1);
-    }
-    
-    $pdf->SetFont('helvetica', '', 9);
-    if (!empty($ordem_servico['observacoes'])) {
-        $pdf->writeHTML('<div style="text-align: justify;">'.'<b>OBS:</b> '. $ordem_servico['observacoes'] .'</div>', true, false, true, false, '');
+    if (!empty($ordem_servico['descricao_os'])) {
+        $pdf->writeHTML('<div style="text-align:center; font-size:9px; color:#555555;">'. $ordem_servico['descricao_os'] .'</div>', true, false, true, false, '');
         $pdf->Ln(2);
     }
 
+    // ===== Dados da O.S. (caixa) =====
+    $pdf->SetMargins(10, 40, 10);
+    $cpf_cnpj_text = !empty($ordem_servico['cpf_cliente']) ? maskCpfCnpj($ordem_servico['cpf_cliente']) : '—';
+    $data_criacao  = date('d/m/Y - H:i', strtotime($ordem_servico['data_criacao']));
+    $baseCalc = ($ordem_servico['base_de_calculo'] >= 0.001)
+        ? 'R$ '. number_format($ordem_servico['base_de_calculo'], 2, ',', '.')
+        : '—';
+
+    $obsRow = '';
+    if (!empty($ordem_servico['observacoes'])) {
+        $obsRow = '<tr>
+          <td style="width:16%; background-color:#f2f2f2; font-size:8.5px;"><b>OBS</b></td>
+          <td colspan="3" style="font-size:8.5px; text-align:justify;">'. $ordem_servico['observacoes'] .'</td>
+        </tr>';
+    }
+
+    $pdf->writeHTML('
+      <table border="0.1" cellpadding="4" width="100%">
+        <thead>
+        <tr>
+          <td style="width:16%; background-color:#f2f2f2; font-size:8.5px;"><b>Apresentante</b></td>
+          <td style="width:54%; font-size:8.5px;">'. $ordem_servico['cliente'] .'</td>
+          <td style="width:14%; background-color:#f2f2f2; font-size:8.5px;"><b>Data</b></td>
+          <td style="width:16%; font-size:8.5px;">'. $data_criacao .'</td>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td style="width:16%; background-color:#f2f2f2; font-size:8.5px;"><b>CPF/CNPJ</b></td>
+          <td style="width:54%; font-size:8.5px;">'. $cpf_cnpj_text .'</td>
+          <td style="width:14%; background-color:#f2f2f2; font-size:8.5px;"><b>Base Cálc.</b></td>
+          <td style="width:16%; font-size:8.5px;">'. $baseCalc .'</td>
+        </tr>
+        '. $obsRow .'
+        </tbody>
+      </table>', true, false, true, false, '');
+    $pdf->Ln(1);
+
     // ITENS
     $pdf->SetFont('helvetica', '', 10);
-    $pdf->writeHTML('<div style="text-align: center; margin-top: 20px;"><b>ITENS DA ORDEM DE SERVIÇO</b></div>', true, false, true, false, '');
+    $pdf->Ln(1);
+    $pdf->writeHTML(secaoBar('ITENS DA ORDEM DE SERVIÇO'), true, false, true, false, '');
     $pdf->Ln(0);
 
     function adicionarCabecalhoTabelaItens($show_desc_legal, $descricaoWidth, $show_ferrfis = false) {
+        $ths = 'text-align:center; font-size:8px; background-color:#a80f1e; color:#ffffff;';
         $descTh = $show_desc_legal
-            ? '<th style="width: 8%; text-align: center; font-size: 8px;"><b>DESC. LEGAL %</b></th>'
-            : '';
-        
-        $ferrfisTh = $show_ferrfis
-            ? '<th style="width: 8%; text-align: center; font-size: 8px;"><b>FERRFIS</b></th>'
+            ? '<th style="width:8%; '.$ths.'"><b>DESC. LEGAL %</b></th>'
             : '';
 
-        $html = '<table border="0.1" cellpadding="4">
+        $ferrfisTh = $show_ferrfis
+            ? '<th style="width:8%; '.$ths.'"><b>FERRFIS</b></th>'
+            : '';
+
+        $html = '<table border="0.1" cellpadding="4" width="100%">
             <thead>
                 <tr>
-                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>ATO</b></th>
-                    <th style="width: 5%; text-align: center; font-size: 8px;"><b>QTD</b></th>'
+                    <th style="width:8%; '.$ths.'"><b>ATO</b></th>
+                    <th style="width:5%; '.$ths.'"><b>QTD</b></th>'
                     . $descTh .
-                '<th style="width: '.$descricaoWidth.'; text-align: center; font-size: 8px;"><b>DESCRIÇÃO</b></th>
-                    <th style="width: 9%; text-align: center; font-size: 8px;"><b>EMOL</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>FERC</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>FADEP</b></th>
-                    <th style="width: 8%; text-align: center; font-size: 8px;"><b>FEMP</b></th>
+                '<th style="width:'.$descricaoWidth.'; '.$ths.'"><b>DESCRIÇÃO</b></th>
+                    <th style="width:9%; '.$ths.'"><b>EMOL</b></th>
+                    <th style="width:8%; '.$ths.'"><b>FERC</b></th>
+                    <th style="width:8%; '.$ths.'"><b>FADEP</b></th>
+                    <th style="width:8%; '.$ths.'"><b>FEMP</b></th>
                     '.$ferrfisTh.'
-                    <th style="width: 9%; text-align: center; font-size: 8px;"><b>TOTAL</b></th>
+                    <th style="width:9%; '.$ths.'"><b>TOTAL</b></th>
                 </tr>
             </thead>
             <tbody>';
@@ -371,9 +412,9 @@ if (isset($_GET['id'])) {
     $pdf->writeHTML($html, true, false, true, false, '');
 
     // ===== TÍTULO + TABELA DE SOMATÓRIOS (colunas dinâmicas) =====
-    $pdf->Ln(0);
-    $pdf->SetFont('helvetica', 'B', 10);
-    $pdf->writeHTML('<div style="text-align:center; margin-top: 6px;"><b>SOMATÓRIO DOS VALORES (ITENS)</b></div>', true, false, true, false, '');
+    $pdf->Ln(1);
+    $pdf->writeHTML(secaoBar('SOMATÓRIO DOS VALORES (ITENS)'), true, false, true, false, '');
+    $pdf->Ln(1);
 
     // Monta colunas dinamicamente
     $columns = [
@@ -401,12 +442,15 @@ if (isset($_GET['id'])) {
     $thead = '';
     $tbody = '';
     foreach ($columns as $col) {
-        $thead .= '<th style="width: '.sprintf('%.2f', $colWidth).'%; text-align:center; font-size:8.5px;">'.$col['label'].'</th>';
-        $tbody .= '<td style="width: '.sprintf('%.2f', $colWidth).'%; text-align:center; font-size:8.5px;font-weight:normal;">R$ '.number_format((float)$col['value'], 2, ',', '.').'</td>';
+        $isTotal = ($col['label'] === 'TOTAL');
+        $thBg = $isTotal ? '#7d0b16' : '#a80f1e';
+        $tdBg = $isTotal ? 'background-color:#f7e6e8; ' : '';
+        $thead .= '<th style="width: '.sprintf('%.2f', $colWidth).'%; text-align:center; font-size:8.5px; background-color:'.$thBg.'; color:#ffffff;"><b>'.$col['label'].'</b></th>';
+        $tbody .= '<td style="width: '.sprintf('%.2f', $colWidth).'%; text-align:center; font-size:8.5px; '.$tdBg.'"><b>R$ '.number_format((float)$col['value'], 2, ',', '.').'</b></td>';
     }
 
     $sumTableHtml = '
-    <table border="0.1" cellpadding="4">
+    <table border="0.1" cellpadding="4" width="100%">
         <thead>
             <tr>'.$thead.'</tr>
         </thead>
@@ -420,17 +464,18 @@ if (isset($_GET['id'])) {
 
     // PAGAMENTOS
     $pdf->SetFont('helvetica', '', 10);
-    $pdf->writeHTML('<div style="text-align: center; margin-top: 10px;"><b>PAGAMENTOS REALIZADOS</b></div>', true, false, true, false, '');
+    $pdf->writeHTML(secaoBar('PAGAMENTOS REALIZADOS'), true, false, true, false, '');
     $pdf->Ln(1);
 
     function adicionarCabecalhoTabelaPagamentos() {
-        return '<table border="0.1" cellpadding="4">
+        $ths = 'text-align:center; font-size:8.5px; background-color:#a80f1e; color:#ffffff;';
+        return '<table border="0.1" cellpadding="4" width="100%">
             <thead>
                 <tr>
-                    <th style="width: 15%; text-align: center; font-size: 8.5px;"><b>DATA</b></th>
-                    <th style="width: 40%; text-align: center; font-size: 8.5px;"><b>CLIENTE</b></th>
-                    <th style="width: 25%; text-align: center; font-size: 8.5px;"><b>FORMA DE PAGAMENTO</b></th>
-                    <th style="width: 20%; text-align: center; font-size: 8.5px;"><b>VALOR</b></th>
+                    <th style="width:15%; '.$ths.'"><b>DATA</b></th>
+                    <th style="width:40%; '.$ths.'"><b>CLIENTE</b></th>
+                    <th style="width:25%; '.$ths.'"><b>FORMA DE PAGAMENTO</b></th>
+                    <th style="width:20%; '.$ths.'"><b>VALOR</b></th>
                 </tr>
             </thead>
             <tbody>';
@@ -457,16 +502,47 @@ if (isset($_GET['id'])) {
         }
     }
 
+    // TOTAL PAGO como última linha da própria tabela de pagamentos
+    $html_pagamentos .= '<tr>
+        <td colspan="3" style="text-align:right; font-size:9px; background-color:#f2f2f2;"><b>TOTAL PAGO</b></td>
+        <td style="width:20%; text-align:center; font-size:9px; background-color:#f7e6e8;"><b>R$ '. number_format($total_pagamentos, 2, ',', '.') .'</b></td>
+    </tr>';
     $html_pagamentos .= '</tbody></table>';
     $pdf->writeHTML($html_pagamentos, true, false, true, false, '');
 
     // Assinatura
-    $pdf->Ln(5);
+    $pdf->Ln(8);
+    $pdf->SetFont('helvetica', '', 9);
     $pdf->Cell(0, 4, '__________________________________', 0, 1, 'C');
     $pdf->SetFont('helvetica', 'B', 9);
     $pdf->Cell(0, 4, $logged_in_user_nome, 0, 1, 'C');
     $pdf->SetFont('helvetica', '', 9);
     $pdf->Cell(0, 4, $logged_in_user_cargo, 0, 1, 'C');
+
+    // ===== QR Code de rastreio da O.S. =====
+    if (!empty($rastreioUrl)) {
+        // Quebra de página se o bloco do QR (~48mm) não couber
+        if ($pdf->GetY() + 48 > $pdf->getPageHeight() - 20) {
+            $pdf->AddPage();
+        }
+        $pdf->Ln(6);
+        $pdf->writeHTML(secaoBar('RASTREAMENTO DA ORDEM DE SERVIÇO'), true, false, true, false, '');
+        $pdf->Ln(2);
+
+        $qrSize = 34;
+        $x = ($pdf->getPageWidth() - $qrSize) / 2;
+        $y = $pdf->GetY() + 1;
+        $style = ['border' => 0, 'padding' => 0, 'fgcolor' => [0, 0, 0], 'bgcolor' => false];
+        $pdf->write2DBarcode($rastreioUrl, 'QRCODE,H', $x, $y, $qrSize, $qrSize, $style, 'N');
+        $pdf->SetY($y + $qrSize + 1);
+
+        $pdf->SetFont('helvetica', '', 8);
+        $pdf->SetTextColor(80, 80, 80);
+        $pdf->MultiCell(0, 4, 'Aponte a câmera do celular para o QR Code', 0, 'C', false, 1);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->MultiCell(0, 4, 'Ou acesse: ' . $rastreioUrl, 0, 'C', false, 1);
+    }
 
     $pdf->Output('Recibo nº ' . $os_id . '.pdf', 'I');
 } else {

@@ -154,6 +154,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $conn->commit();
+
+        // ===== Rastreio: O.S. inteira liquidada -> 'emitida' (best-effort) =====
+        try {
+            require_once(__DIR__ . '/../pedidos_certidao/os_rastreio_lib.php');
+            $pdoRastreio = os_rastreio_pdo();
+            $usuarioR = isset($_SESSION['username']) ? $_SESSION['username'] : 'sistema';
+            os_rastreio_sync_liquidacao($pdoRastreio, (int)$os_id, $usuarioR);
+        } catch (Throwable $eR) {
+            error_log('[liquidar_os][rastreio] ' . $eR->getMessage());
+        }
+
         echo json_encode(['success' => true]);
     } catch (Exception $e) {
         $conn->rollback();

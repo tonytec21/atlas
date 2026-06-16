@@ -83,6 +83,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Confirma a transação
         $conn->commit();
 
+        // ===== Rastreio: cria o pedido vinculado à O.S. e envia à API (best-effort) =====
+        try {
+            require_once(__DIR__ . '/../pedidos_certidao/os_rastreio_lib.php');
+            os_rastreio_criar_para_os($conn, $os_id, [
+                'usuario' => isset($_SESSION['username']) ? $_SESSION['username'] : null
+            ]);
+        } catch (Throwable $eRastreio) {
+            error_log('[salvar_os][rastreio] ' . $eRastreio->getMessage());
+        }
+
         // Modificação para retornar o ID da OS criada
         echo json_encode(['success' => true, 'id' => $os_id]);
     } catch (PDOException $e) {

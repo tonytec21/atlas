@@ -169,7 +169,7 @@ try {
       $API_KEY     = $apiConfig['api_key']     ?? null;  
       $HMAC_SECRET = $apiConfig['hmac_secret'] ?? null;  
 
-      $payload = ['protocolo'=>$pedido['protocolo'],'token_publico'=>$pedido['token_publico'],'status'=>'cancelada','atualizado_em'=>date('c'),'observacao'=>true];  
+      $payload = ['protocolo'=>$pedido['protocolo'],'token_publico'=>$pedido['token_publico'],'status'=>'cancelada','atualizado_em'=>date('c'),'observacao'=>'Cancelamento de O.S','cancelado_motivo'=>'Cancelamento de O.S'];  
       $timestamp = (int) round(microtime(true) * 1000);  
       $requestId = bin2hex(random_bytes(12));  
       $signature = null;  
@@ -1272,6 +1272,9 @@ body.dark-mode footer .footer-content a:hover {
                 <i class="mdi mdi-file-document-outline"></i> Abrir O.S.  
               </a>  
               <?php endif; ?>  
+              <a class="btn btn-sm btn-outline-primary" href="gerar_requerimento.php?id=<?=urlencode($id)?>" target="_blank" rel="noopener">  
+                <i class="mdi mdi-file-document-edit-outline"></i> Imprimir Requerimento  
+              </a>
               <a class="btn btn-sm btn-outline-dark" href="gerar_recibo_pedido.php?id=<?=urlencode($id)?>" target="_blank" rel="noopener">  
                 <i class="mdi mdi-receipt-text"></i> Abrir Recibo  
               </a> 
@@ -1722,6 +1725,25 @@ $(function(){
       }
     }
     // Se não há O.S., segue sem exigir pagamento (pedido isento)
+
+    // Validação obrigatória conforme o status escolhido
+    const novoStatusSel = $novo.val();
+    if (novoStatusSel === 'cancelada') {
+      const motivoVal = ($motivo.val() || '').trim();
+      if (!motivoVal) {
+        Swal.fire({ icon: 'warning', title: 'Motivo obrigatório', text: 'Informe o motivo do cancelamento para prosseguir.' });
+        $motivo.focus();
+        return false;
+      }
+    }
+    if (novoStatusSel === 'entregue') {
+      const retiradoVal = ($retirado.val() || '').trim();
+      if (!retiradoVal) {
+        Swal.fire({ icon: 'warning', title: 'Campo obrigatório', text: 'Informe quem retirou a certidão.' });
+        $retirado.focus();
+        return false;
+      }
+    }
 
     const fd = new FormData(this);
     const btn = $(this).find('button[type="submit"]');

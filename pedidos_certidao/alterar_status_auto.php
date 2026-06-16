@@ -382,8 +382,7 @@ try {
     'token_publico'  => $p['token_publico'],
     'status'         => $novo,
     'atualizado_em'  => date('c'),
-    'observacao'     => $observacao ? true : false,
-    'observacao_text'=> $observacao ?: null,
+    'observacao'     => ($observacao !== '' ? $observacao : null),
     'pedido_id'      => (int)$p['id'],
     'ordem_servico_id'=> (int)$p['ordem_servico_id']
   ];

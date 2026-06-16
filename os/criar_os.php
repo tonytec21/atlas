@@ -38,7 +38,7 @@ $atosSemValor = json_decode(
     <link rel="stylesheet" href="../style/css/style.css">  
     <link rel="icon" href="../style/img/favicon.png" type="image/png">  
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">  
-    <link rel="stylesheet" href="../style/sweetalert2.min.css">  
+    <link rel="stylesheet" href="../style/css/sweetalert2.min.css">  
     <style>  
         /* ===================== DESIGN SYSTEM ===================== */  
         :root {  
@@ -654,6 +654,40 @@ $atosSemValor = json_decode(
             opacity: 1;  
             transform: scale(1.1);  
         }  
+        /* Células editáveis no orçamento (quantidade e descrição) */
+        td.qtd-edit, td.desc-edit {
+            cursor: text;
+            position: relative;
+            border-bottom: 1px dashed #9aa6b2;
+            min-width: 60px;
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            user-select: text !important;
+        }
+        /* Evita seleção de texto durante o arraste apenas nas células NÃO editáveis */
+        #itensTable td:not(.qtd-edit):not(.desc-edit) {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        td.qtd-edit:hover, td.desc-edit:hover {
+            background: rgba(99,102,241,.08);
+        }
+        td.qtd-edit:focus, td.desc-edit:focus {
+            outline: 2px solid #6366F1;
+            outline-offset: -2px;
+            background: rgba(99,102,241,.06);
+        }
+        td.qtd-edit::after {
+            content: "\f040"; /* fa-pencil */
+            font-family: FontAwesome;
+            font-size: 10px;
+            color: #9aa6b2;
+            margin-left: 6px;
+            opacity: .7;
+        }
     </style>  
 </head>  
 <body>  
@@ -749,7 +783,7 @@ $atosSemValor = json_decode(
             <div class="form-row">  
                 <div class="form-group col-md-12">  
                     <label for="descricao">Descrição:</label>  
-                    <input type="text" class="form-control" id="descricao" name="descricao" required readonly>  
+                    <input type="text" class="form-control" id="descricao" name="descricao" required>  
                 </div>  
             </div>  
 
@@ -1044,12 +1078,16 @@ $atosSemValor = json_decode(
         // Sortable na tabela desktop  
         $("#itensTable").sortable({  
             placeholder: "ui-state-highlight",  
+            // Não inicia o arraste ao clicar nas células editáveis / botões
+            cancel: 'input,textarea,button,select,option,a,[contenteditable="true"],.qtd-edit,.desc-edit',  
             update: function(event, ui) {  
                 atualizarOrdemExibicao();  
                 atualizarCardsMobile();  
             }  
         });  
-        $("#itensTable").disableSelection();  
+        // OBS: não usar $("#itensTable").disableSelection() — ele bloqueia a edição
+        // in-line (contenteditable). A não-seleção durante o arraste é feita via CSS
+        // apenas nas células NÃO editáveis (regra td:not(.qtd-edit):not(.desc-edit)).
 
         // Carregar modelos  
         $.ajax({  
@@ -1152,13 +1190,18 @@ $atosSemValor = json_decode(
                 showAlert("Por favor, preencha o Valor Total do ato antes de adicionar à O.S.", 'error');  
                 return;  
             }  
-            
-            var item = '<tr>' +  
+
+            // Valores UNITÁRIos (já com desconto) — usados para recalcular ao alterar a quantidade
+            var q0 = (quantidade > 0) ? quantidade : 1;
+            var uEmol = emolumentos / q0, uFerc = ferc / q0, uFadep = fadep / q0,
+                uFemp = femp / q0, uFerrfis = ferrfis / q0, uTotal = total / q0;
+
+            var item = '<tr data-uemol="' + uEmol + '" data-uferc="' + uFerc + '" data-ufadep="' + uFadep + '" data-ufemp="' + uFemp + '" data-uferrfis="' + uFerrfis + '" data-utotal="' + uTotal + '">' +  
                 '<td>' + ordemExibicao + '</td>' +   
                 '<td>' + ato + '</td>' +  
-                '<td>' + quantidade + '</td>' +  
+                '<td class="qtd-edit" contenteditable="true" title="Clique para alterar a quantidade">' + quantidade + '</td>' +  
                 '<td>' + descontoLegal + '%</td>' +  
-                '<td>' + descricao + '</td>' +  
+                '<td class="desc-edit" contenteditable="true" title="Clique para editar a descrição">' + descricao + '</td>' +  
                 '<td>' + emolumentos.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' + ferc.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' + fadep.toFixed(2).replace('.', ',') + '</td>' +  
@@ -1192,7 +1235,6 @@ $atosSemValor = json_decode(
             $('#ferrfis').val('');  
             $('#total').val('');  
 
-            $('#descricao').prop('readonly', true);  
             $('#emolumentos').prop('readonly', true);  
             $('#ferc').prop('readonly', true);  
             $('#fadep').prop('readonly', true);  
@@ -1212,6 +1254,29 @@ $atosSemValor = json_decode(
 
         updateSalvarButtonState();  
     });  
+
+    // ===================== RECALCULAR QUANTIDADE (in-line) =====================
+    // Usa os valores unitários (data-*) guardados na linha para recalcular
+    // Emolumentos/FERC/FADEP/FEMP/FERRFIS/Total conforme a nova quantidade.
+    function recalcularQuantidadeLinha($tr) {
+        if (!$tr || !$tr.length || $tr.attr('id') === 'ISS_ROW') return;
+        var $q = $tr.find('td').eq(2);
+        var q = parseInt(($q.text() || '').replace(/[^0-9]/g, ''), 10);
+        if (!q || q < 1) { q = 1; }
+        $q.text(q); // normaliza o conteúdo (só o número)
+
+        var mapa = { 5: 'uemol', 6: 'uferc', 7: 'ufadep', 8: 'ufemp', 9: 'uferrfis', 10: 'utotal' };
+        for (var idx in mapa) {
+            if (!mapa.hasOwnProperty(idx)) continue;
+            var unit = parseFloat($tr.attr('data-' + mapa[idx])) || 0;
+            var valor = unit * q;
+            $tr.find('td').eq(parseInt(idx, 10)).text(valor.toFixed(2).replace('.', ','));
+        }
+
+        atualizarISS();            // recalcula ISS e o Valor Total da OS a partir da tabela
+        atualizarCardsMobile();
+        updateSalvarButtonState();
+    }
 
     // ===================== ATUALIZAR ORDEM EXIBIÇÃO =====================  
     function atualizarOrdemExibicao() {  
@@ -1371,6 +1436,8 @@ $atosSemValor = json_decode(
         for (let i = 5; i <= 10; i++) {
             $tds.eq(i).text('0,00');
         }
+        // Zera também os valores unitários, para que alterar a quantidade mantenha zero
+        $tr.attr({ 'data-uemol':0, 'data-uferc':0, 'data-ufadep':0, 'data-ufemp':0, 'data-uferrfis':0, 'data-utotal':0 });
 
         // 2) Anexa " (isento)" ao código do ato (coluna 1) caso ainda não exista
         const $tdAto = $tds.eq(1);
@@ -1546,13 +1613,26 @@ $atosSemValor = json_decode(
 
                         const ordemExibicao = $('#itensTable tr').length + 1;
 
+                        // Valores UNITÁRIos (já com desconto) p/ recalcular ao alterar a quantidade
+                        const qtdNum = parseInt(item.quantidade, 10);
+                        const q0 = (qtdNum > 0) ? qtdNum : 1;
+                        const uEmol = emolumentos / q0, uFerc = ferc / q0, uFadep = fadep / q0,
+                              uFemp = femp / q0, uFerrfis = ferrfis / q0, uTotal = total / q0;
+
+                        // O ato "ISS" é automático/dinâmico — não permitir editar quantidade/descrição
+                        const isISS = String(item.ato || '').trim().toUpperCase() === 'ISS';
+                        const attrQtd  = isISS ? '' : ' class="qtd-edit" contenteditable="true" title="Clique para alterar a quantidade"';
+                        const attrDesc = isISS ? '' : ' class="desc-edit" contenteditable="true" title="Clique para editar a descrição"';
+                        const dataU    = isISS ? '' :
+                            ` data-uemol="${uEmol}" data-uferc="${uFerc}" data-ufadep="${uFadep}" data-ufemp="${uFemp}" data-uferrfis="${uFerrfis}" data-utotal="${uTotal}"`;
+
                         const row = `
-                            <tr>
+                            <tr${dataU}>
                                 <td>${ordemExibicao}</td>
                                 <td>${item.ato}</td>
-                                <td>${item.quantidade}</td>
+                                <td${attrQtd}>${item.quantidade}</td>
                                 <td>${item.desconto_legal}%</td>
-                                <td>${item.descricao}</td>
+                                <td${attrDesc}>${item.descricao}</td>
                                 <td>${emolumentos.toFixed(2).replace('.', ',')}</td>
                                 <td>${ferc.toFixed(2).replace('.', ',')}</td>
                                 <td>${fadep.toFixed(2).replace('.', ',')}</td>
@@ -1584,6 +1664,49 @@ $atosSemValor = json_decode(
             }
         });
     }
+</script>
+
+<!-- Edição in-line no orçamento (quantidade e descrição) — vinculado de forma independente -->
+<script>
+(function(){
+  // Recalcula a quantidade ao sair da célula (ou Enter). Usa window.recalcularQuantidadeLinha
+  // definida no script principal; se por algum motivo não existir, faz um fallback local.
+  function recalcLinha($tr){
+    if (typeof window.recalcularQuantidadeLinha === 'function') {
+      window.recalcularQuantidadeLinha($tr);
+      return;
+    }
+    // Fallback (mesma lógica), caso o script principal não tenha carregado a função
+    if (!$tr || !$tr.length || $tr.attr('id') === 'ISS_ROW') return;
+    var $q = $tr.find('td').eq(2);
+    var q = parseInt(($q.text() || '').replace(/[^0-9]/g, ''), 10);
+    if (!q || q < 1) { q = 1; }
+    $q.text(q);
+    var mapa = { 5:'uemol', 6:'uferc', 7:'ufadep', 8:'ufemp', 9:'uferrfis', 10:'utotal' };
+    for (var idx in mapa) {
+      if (!mapa.hasOwnProperty(idx)) continue;
+      var unit = parseFloat($tr.attr('data-' + mapa[idx])) || 0;
+      $tr.find('td').eq(parseInt(idx, 10)).text((unit * q).toFixed(2).replace('.', ','));
+    }
+    if (typeof atualizarISS === 'function') atualizarISS();
+    if (typeof atualizarCardsMobile === 'function') atualizarCardsMobile();
+    if (typeof updateSalvarButtonState === 'function') updateSalvarButtonState();
+  }
+
+  // Delegação a partir do document: funciona para qualquer linha (atual ou futura),
+  // independentemente do bloco $(document).ready principal.
+  $(document)
+    .on('keydown', '#itensTable td.qtd-edit, #itensTable td.desc-edit', function(e){
+      if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); $(this).blur(); }
+    })
+    .on('focusout', '#itensTable td.qtd-edit', function(){
+      recalcLinha($(this).closest('tr'));
+    })
+    .on('focusout', '#itensTable td.desc-edit', function(){
+      if (typeof atualizarCardsMobile === 'function') atualizarCardsMobile();
+      if (typeof updateSalvarButtonState === 'function') updateSalvarButtonState();
+    });
+})();
 </script>
 
 <?php

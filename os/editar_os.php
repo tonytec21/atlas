@@ -757,6 +757,23 @@ try {
         .table-modern tbody tr, .item-card {  
             animation: fadeInUp 0.3s ease;  
         }  
+
+        /* Célula de descrição editável in-line */
+        td.desc-edit {
+            cursor: text;
+            border-bottom: 1px dashed #9aa6b2;
+            min-width: 80px;
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            user-select: text !important;
+        }
+        td.desc-edit:hover { background: rgba(99,102,241,.08); }
+        td.desc-edit:focus { outline: 2px solid #6366F1; outline-offset: -2px; background: rgba(99,102,241,.06); }
+        /* Evita seleção ao arrastar nas demais células */
+        #itensTable td:not(.desc-edit) {
+            -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+        }
     </style>  
 </head>  
 <body>  
@@ -845,7 +862,7 @@ try {
             <div class="form-row">  
                 <div class="form-group col-md-12">  
                     <label for="descricao">Descrição:</label>  
-                    <input type="text" class="form-control" id="descricao" name="descricao" required readonly>  
+                    <input type="text" class="form-control" id="descricao" name="descricao" required>  
                 </div>  
             </div>  
 
@@ -918,7 +935,7 @@ try {
                                 <td><?php echo $item['ato']; ?></td>  
                                 <td><?php echo $item['quantidade']; ?></td>  
                                 <td><?php echo $item['desconto_legal']; ?>%</td>  
-                                <td><?php echo $item['descricao']; ?></td>  
+                                <td <?php if ($item['ato'] !== 'ISS') echo 'class="desc-edit" contenteditable="true" title="Clique para editar a descrição"'; ?>><?php echo $item['descricao']; ?></td>  
                                 <td><?php echo number_format($item['emolumentos'], 2, ',', '.'); ?></td>  
                                 <td><?php echo number_format($item['ferc'], 2, ',', '.'); ?></td>  
                                 <td><?php echo number_format($item['fadep'], 2, ',', '.'); ?></td>  
@@ -938,6 +955,12 @@ try {
                                         <i class="fa fa-pencil" aria-hidden="true"></i>  
                                     </button>  
                                     <?php if ($item['status'] === null): ?>  
+                                        <?php if ($item['ato'] !== 'ISS'): ?>  
+                                            <?php $jaIsento = (stripos($item['ato'], '(isento)') !== false); ?>  
+                                            <button type="button" class="btn btn-warning btn-sm" onclick="marcarItemIsento(this)" <?php echo $jaIsento ? 'disabled' : ''; ?>>  
+                                                <i class="fa fa-ban"></i> <?php echo $jaIsento ? 'Isento' : 'Ato Isento'; ?>  
+                                            </button>  
+                                        <?php endif; ?>  
                                         <button type="button" class="btn btn-delete btn-sm" onclick="removerItem(this)">  
                                             <i class="fa fa-trash" aria-hidden="true"></i>  
                                         </button>  
@@ -1160,12 +1183,14 @@ try {
     // Tornar as linhas da tabela arrastáveis
     $("#itensTable").sortable({
         placeholder: "ui-state-highlight",
+        // Não inicia arraste ao clicar na célula de descrição (edição in-line) / botões
+        cancel: 'input,textarea,button,select,option,a,[contenteditable="true"],.desc-edit',
         update: function(event, ui) {
             salvarOrdemExibicao(); // Função que será chamada após reordenar
         }
     });
 
-    $("#itensTable").disableSelection();
+    // OBS: não usar disableSelection() — ele bloqueia a edição in-line (contenteditable).
 });
 
 function salvarOrdemExibicao() {
@@ -1521,7 +1546,7 @@ function adicionarItem() {
                 if (res.error) {
                     showAlert(res.error, 'error');
                 } else {
-                    adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos.toFixed(2).replace('.', ','), ferc.toFixed(2).replace('.', ','), fadep.toFixed(2).replace('.', ','), femp.toFixed(2).replace('.', ','), ferrfis.toFixed(2).replace('.', ','), total.toFixed(2).replace('.', ','));
+                    adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos.toFixed(2).replace('.', ','), ferc.toFixed(2).replace('.', ','), fadep.toFixed(2).replace('.', ','), femp.toFixed(2).replace('.', ','), ferrfis.toFixed(2).replace('.', ','), total.toFixed(2).replace('.', ','), res.id);
                     atualizarISS();          // recalcula ou cria o ISS
                     calcularTotalOS();       // soma geral
                     showAlert('Item adicionado com sucesso!', 'success', true);
@@ -1641,6 +1666,60 @@ function salvarNovaQuantidade() {
 }
 
 
+
+function marcarItemIsento(button) {
+    var $btn = $(button);
+    var $tr  = $btn.closest('tr');
+    if ($tr.attr('id') === 'ISS_ROW') return; // ISS nunca é isento
+
+    var itemId = $tr.data('item-id');
+
+    function aplicarIsentoNoDOM() {
+        var $tds = $tr.find('td');
+        // Zera os valores (colunas 5..10: Emol., FERC, FADEP, FEMP, FERRFIS, Total)
+        for (var i = 5; i <= 10; i++) { $tds.eq(i).text('0,00'); }
+        // Marca o ato como "(isento)" na coluna do Ato (índice 1)
+        var $tdAto = $tds.eq(1);
+        var atoTxt = ($tdAto.text() || '').trim();
+        if (!/\(isento\)$/i.test(atoTxt)) { $tdAto.text(atoTxt + ' (isento)'); }
+        // Desabilita o botão para evitar reaplicações
+        $btn.prop('disabled', true).html('<i class="fa fa-ban"></i> Isento');
+        // Recalcula ISS e total (persiste o total via calcularTotalOS)
+        atualizarISS();
+        calcularTotalOS();
+    }
+
+    Swal.fire({
+        title: 'Marcar como isento?',
+        text: 'Os valores deste ato serão zerados.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#f6c23e',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sim, isentar',
+        cancelButtonText: 'Cancelar'
+    }).then(function(result){
+        if (!result.isConfirmed) return;
+
+        // Item ainda não persistido (sem id): aplica só no DOM
+        if (!itemId) { aplicarIsentoNoDOM(); return; }
+
+        $.ajax({
+            url: 'marcar_item_isento.php',
+            type: 'POST',
+            dataType: 'json',
+            data: { os_id: $('#os_id').val(), item_id: itemId },
+            success: function(res){
+                if (res && res.error) { showAlert(res.error, 'error'); return; }
+                aplicarIsentoNoDOM();
+            },
+            error: function(xhr){
+                console.log('Erro ao isentar:', xhr && xhr.responseText);
+                showAlert('Erro ao marcar o ato como isento.', 'error');
+            }
+        });
+    });
+}
 
 function removerItem(button) {
     var row = $(button).closest('tr');
@@ -1772,13 +1851,13 @@ function calcularTotalOS() {
 }
 
 
-function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total) {
-    var item = '<tr>' +
+function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, itemId) {
+    var item = '<tr data-item-id="' + (itemId || '') + '">' +
         '<td>#</td>' + // Nova coluna para o índice #
         '<td>' + ato + '</td>' + // Coluna "Ato"
         '<td>' + quantidade + '</td>' + // Coluna "Quantidade"
         '<td>' + descontoLegal + '%</td>' + // Coluna "Desconto Legal"
-        '<td>' + descricao + '</td>' + // Coluna "Descrição"
+        '<td class="desc-edit" contenteditable="true" title="Clique para editar a descrição">' + descricao + '</td>' + // Coluna "Descrição" (editável)
         '<td>' + emolumentos + '</td>' + // Coluna "Emolumentos"
         '<td>' + ferc + '</td>' + // Coluna "FERC"
         '<td>' + fadep + '</td>' + // Coluna "FADEP"
@@ -1787,6 +1866,7 @@ function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, e
         '<td>' + total + '</td>' + // Coluna "Total"
         '<td>0</td>' + // Coluna "Qtd Liquidada" (0 para novos itens)
         '<td>' +
+            '<button type="button" class="btn btn-warning btn-sm" onclick="marcarItemIsento(this)"><i class="fa fa-ban"></i> Ato Isento</button> ' +
             '<button type="button" class="btn btn-edit btn-sm" onclick="alterarQuantidade(this)"><i class="fa fa-pencil" aria-hidden="true"></i></button>' +
             '<button type="button" class="btn btn-danger btn-sm" onclick="removerItem(this)">Remover</button>' +
         '</td>' +
@@ -1875,6 +1955,46 @@ $('#alterarQuantidadeModal').on('hidden.bs.modal', function () {
     }, 900); // 1000 milissegundos = 1 segundo
 });
 
+</script>
+
+<!-- Edição in-line da descrição dos atos (persiste no servidor ao sair da célula) -->
+<script>
+(function(){
+  // Enter confirma (sai da célula)
+  $(document).on('keydown', '#itensTable td.desc-edit', function(e){
+    if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); $(this).blur(); }
+  });
+
+  // Ao sair da célula, persiste a nova descrição (se o item já existir no banco)
+  $(document).on('focusout', '#itensTable td.desc-edit', function(){
+    var $td = $(this);
+    var $tr = $td.closest('tr');
+    if ($tr.attr('id') === 'ISS_ROW') return; // ISS não é editável
+
+    var itemId = $tr.attr('data-item-id');
+    var novaDescricao = ($td.text() || '').trim();
+    var osId = $('#os_id').val();
+
+    if (typeof atualizarCardsMobile === 'function') atualizarCardsMobile();
+
+    // Item ainda sem id (não persistido) — nada a salvar no servidor
+    if (!itemId) return;
+
+    $.ajax({
+      url: 'atualizar_descricao_item.php',
+      type: 'POST',
+      dataType: 'json',
+      data: { os_id: osId, item_id: itemId, descricao: novaDescricao },
+      success: function(r){
+        if (r && r.error) { showAlert(r.error, 'error'); }
+      },
+      error: function(xhr){
+        console.log('Erro ao salvar descrição:', xhr && xhr.responseText);
+        showAlert('Erro ao salvar a descrição do ato.', 'error');
+      }
+    });
+  });
+})();
 </script>
 
 <?php
