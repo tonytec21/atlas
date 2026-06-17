@@ -390,6 +390,11 @@ function ensureTable($conn) {
         $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colNome) . "'");
         if ($c && $c->num_rows === 0) { $conn->query("ALTER TABLE memoriais_mapeados " . $ddl); }
     }
+    // matricula_sucessora pode conter VÁRIAS matrículas (desmembramento) — alarga uma única vez
+    $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE 'matricula_sucessora'");
+    if ($c && ($col = $c->fetch_assoc()) && stripos($col['Type'], 'varchar(120)') !== false) {
+        $conn->query("ALTER TABLE memoriais_mapeados MODIFY matricula_sucessora VARCHAR(600) NULL DEFAULT NULL");
+    }
 }
 
 /**
@@ -1893,6 +1898,18 @@ if (isset($_POST['acao'])) {
   .morto-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(120,130,145,.18);color:#8893a3;margin-left:4px;vertical-align:middle;text-decoration:none}
   .desmembra-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(13,148,136,.16);color:#0d9488;margin-left:4px;vertical-align:middle;text-decoration:none}
   .situacao-edit{margin-top:6px;padding-top:11px;border-top:1px solid var(--line)}
+  /* Multi-entrada de matrículas (chips) */
+  .chips{display:flex;flex-wrap:wrap;gap:5px;min-height:24px;margin-bottom:6px}
+  .chips-vazio{font-family:var(--mono);font-size:10px;color:var(--faint);font-style:italic}
+  .chip{display:inline-flex;align-items:center;gap:5px;background:rgba(13,148,136,.14);color:#0d9488;
+    font-family:var(--mono);font-size:11px;padding:2px 4px 2px 8px;border-radius:6px;border:1px solid rgba(13,148,136,.3)}
+  .chip-x{background:none;border:none;color:#0d9488;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;border-radius:4px}
+  .chip-x:hover{background:rgba(13,148,136,.2)}
+  .chips-add{display:flex;gap:6px}
+  .chips-add input{flex:1}
+  .btn-ghost-sm{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:8px;
+    padding:0 12px;font-size:11px;cursor:pointer;white-space:nowrap}
+  .btn-ghost-sm:hover{border-color:#0d9488;color:#0d9488}
   /* Aviso de matrícula encerrada no cadastro */
   .enc-info{margin-bottom:11px;padding:10px 12px;border:1px solid rgba(120,130,145,.35);border-left:3px solid #8893a3;border-radius:9px;background:rgba(120,130,145,.10)}
   .enc-info-h{display:flex;align-items:center;gap:6px;font-family:var(--disp);font-size:12.5px;font-weight:600;color:var(--ink)}
@@ -2281,7 +2298,14 @@ if (isset($_POST['acao'])) {
           </select>
         </div>
         <div id="ed-enc-extra" style="display:none">
-          <div class="fld"><label class="field-label">Matrícula sucessora (nova matrícula originada)</label><input id="ed-sucessora" type="text" placeholder="Ex.: 12.345"></div>
+          <div class="fld">
+            <label class="field-label" id="ed-suc-label">Matrículas sucessoras (originadas)</label>
+            <div id="ed-sucessora-chips" class="chips"></div>
+            <div class="chips-add">
+              <input id="ed-sucessora-input" type="text" placeholder="Digite a matrícula e tecle Enter">
+              <button type="button" id="ed-sucessora-add" class="btn-ghost-sm">+ Adicionar</button>
+            </div>
+          </div>
           <p class="cor-hint" id="ed-sit-hint"></p>
         </div>
       </div>
@@ -2869,8 +2893,8 @@ async function verTodos(){
             });
             // exceção: se o trecho cobre ~toda a matrícula-mãe, ela fica "morta" por completo
             let mae=null;
-            if(itens[i].motivo_situacao==='desmembramento' && normMat(itens[i].matricula_sucessora)===normMat(itens[j].numero_matricula)) mae=itens[i];
-            else if(itens[j].motivo_situacao==='desmembramento' && normMat(itens[j].matricula_sucessora)===normMat(itens[i].numero_matricula)) mae=itens[j];
+            if(itens[i].motivo_situacao==='desmembramento' && listaMat(itens[i].matricula_sucessora).includes(normMat(itens[j].numero_matricula))) mae=itens[i];
+            else if(itens[j].motivo_situacao==='desmembramento' && listaMat(itens[j].matricula_sucessora).includes(normMat(itens[i].numero_matricula))) mae=itens[j];
             if(mae && mae.area_ha>0 && (areaHa/mae.area_ha)>=0.98 && mae._poly){
               mae._poly.setOptions({strokeColor:'#9aa3ad',strokeOpacity:.4,strokeWeight:1,fillColor:'#9aa3ad',fillOpacity:.05,zIndex:0});
             }
@@ -2919,12 +2943,12 @@ function corValida(c){
 }
 function imovelMorto(it){ return !!(it && it.situacao === 'encerrada'); }
 function normMat(s){ return (s==null?'':String(s)).replace(/[^0-9a-zA-Z]/g,'').toLowerCase(); }
-/* A e B têm relação de desmembramento? (uma aponta a outra como matrícula sucessora) */
+function listaMat(s){ return (s==null?'':String(s)).split(',').map(x=>normMat(x)).filter(Boolean); }
+/* A e B têm relação de desmembramento? (uma lista a outra como matrícula sucessora) */
 function ehDesmembramentoPar(a,b){
   const an=normMat(a.numero_matricula), bn=normMat(b.numero_matricula);
-  const as=normMat(a.matricula_sucessora), bs=normMat(b.matricula_sucessora);
-  return (a.motivo_situacao==='desmembramento' && as && as===bn) ||
-         (b.motivo_situacao==='desmembramento' && bs && bs===an);
+  return (a.motivo_situacao==='desmembramento' && bn && listaMat(a.matricula_sucessora).includes(bn)) ||
+         (b.motivo_situacao==='desmembramento' && an && listaMat(b.matricula_sucessora).includes(an));
 }
 function corBaseImovel(it){
   if(imovelMorto(it)) return '#9aa3ad';                 // cinza "morto"
@@ -3162,18 +3186,34 @@ function abrirEdicao(id){
   if(it.motivo_situacao==='desmembramento') sitSel='desmembramento';
   else if(it.situacao==='encerrada' || it.motivo_situacao==='unificacao') sitSel='unificacao';
   document.getElementById('ed-situacao').value = sitSel;
-  document.getElementById('ed-sucessora').value = it.matricula_sucessora || '';
+  edSucList = (it.matricula_sucessora||'').split(',').map(s=>s.trim()).filter(Boolean);
+  edRenderSucChips();
   edToggleEnc();
   document.getElementById('modal-edit').classList.add('show');
+}
+let edSucList = [];
+function edRenderSucChips(){
+  const wrap=document.getElementById('ed-sucessora-chips'); if(!wrap) return;
+  if(!edSucList.length){ wrap.innerHTML='<span class="chips-vazio">nenhuma matrícula adicionada</span>'; return; }
+  wrap.innerHTML = edSucList.map((m,idx)=>`<span class="chip">${escapeHtml(m)}<button type="button" data-i="${idx}" class="chip-x" title="Remover">×</button></span>`).join('');
+  wrap.querySelectorAll('.chip-x').forEach(b=>b.onclick=()=>{ edSucList.splice(+b.dataset.i,1); edRenderSucChips(); });
+}
+function edAddSuc(){
+  const inp=document.getElementById('ed-sucessora-input'); if(!inp) return;
+  const v=inp.value.trim(); if(!v) return;
+  if(!edSucList.some(x=>normMat(x)===normMat(v))) edSucList.push(v);
+  inp.value=''; inp.focus(); edRenderSucChips();
 }
 function edToggleEnc(){
   const v = document.getElementById('ed-situacao').value;
   const ex = document.getElementById('ed-enc-extra');
   const hint = document.getElementById('ed-sit-hint');
+  const lab = document.getElementById('ed-suc-label');
   if(ex) ex.style.display = (v==='ativa') ? 'none' : 'block';
+  if(lab) lab.textContent = (v==='unificacao') ? 'Matrícula sucessora (em que foi unificada)' : 'Matrículas sucessoras (originadas do desmembramento)';
   if(hint){
     if(v==='unificacao') hint.innerHTML = 'A matrícula é <b>encerrada por completo</b> (apagada/"morta") e não gera sobreposição, pois deu origem à nova matrícula.';
-    else if(v==='desmembramento') hint.innerHTML = 'A matrícula-mãe <b>permanece ativa</b>. Apenas o <b>trecho</b> coincidente com a nova matrícula é destacado como "morto" e não gera sobreposição.';
+    else if(v==='desmembramento') hint.innerHTML = 'A matrícula-mãe <b>permanece ativa</b>. Cada <b>trecho</b> coincidente com uma matrícula originada é destacado como "morto" e não gera sobreposição. Você pode adicionar <b>quantas matrículas</b> saíram dela.';
     else hint.textContent='';
   }
 }
@@ -3195,7 +3235,7 @@ async function salvarEdicao(){
   await post({acao:'salvar_situacao', id,
     situacao: situacao,
     motivo_situacao: motivo,
-    matricula_sucessora: document.getElementById('ed-sucessora').value.trim()
+    matricula_sucessora: edSucList.join(', ')
   });
   fecharEdicao(); carregarLista(); if(modo==='overview') verTodos(); setStatus('ok','Dados do imóvel atualizados.');
 }
@@ -3291,22 +3331,24 @@ function mostrarEncInfo(reg){
   const corpo=document.getElementById('enc-info-corpo');
   if(!box) return;
   const ico=box.querySelector('.enc-ico');
-  const suc=((reg&&reg.matricula_sucessora)||'').trim();
+  const lista=((reg&&reg.matricula_sucessora)||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const sucTxt = lista.map(m=>'<b>'+escapeHtml(m)+'</b>').join(', ');
   if(reg && reg.situacao==='encerrada'){
     box.classList.remove('desmembra');
     if(ico) ico.textContent='✝';
     tit.textContent='Matrícula encerrada por unificação';
-    corpo.innerHTML = (suc ? ('Esta matrícula foi <b>unificada</b> e deu origem à matrícula <b>'+escapeHtml(suc)+'</b>.')
-                           : 'Esta matrícula foi <b>unificada</b> em uma nova matrícula.')
+    corpo.innerHTML = (sucTxt ? ('Esta matrícula foi <b>unificada</b> e deu origem à matrícula '+sucTxt+'.')
+                              : 'Esta matrícula foi <b>unificada</b> em uma nova matrícula.')
       + '<br><span class="enc-mut">Imóvel "morto": não gera sobreposição no mapa.</span>';
     box.style.display='block';
   } else if(reg && reg.motivo_situacao==='desmembramento'){
     box.classList.add('desmembra');
     if(ico) ico.textContent='✂';
-    tit.textContent='Desmembramento — trecho destacado';
-    corpo.innerHTML = (suc ? ('Um <b>trecho</b> desta matrícula originou a matrícula <b>'+escapeHtml(suc)+'</b>.')
-                           : 'Um <b>trecho</b> desta matrícula foi desmembrado em nova matrícula.')
-      + '<br><span class="enc-mut">A matrícula-mãe permanece <b>ativa</b>; apenas o trecho coincidente fica "morto" e sem sobreposição.</span>';
+    tit.textContent='Desmembramento — trecho(s) destacado(s)';
+    const plural = lista.length>1;
+    corpo.innerHTML = (sucTxt ? ((plural?'Trechos desta matrícula originaram as matrículas ':'Um trecho desta matrícula originou a matrícula ')+sucTxt+'.')
+                              : 'Trecho(s) desta matrícula foram desmembrados em novas matrículas.')
+      + '<br><span class="enc-mut">A matrícula-mãe permanece <b>ativa</b>; apenas o(s) trecho(s) coincidente(s) ficam "mortos" e sem sobreposição.</span>';
     box.style.display='block';
   } else {
     box.classList.remove('desmembra');
@@ -3443,6 +3485,8 @@ function verificarPertencimento(geo){
   // Modal de edição
   const es=document.getElementById('ed-salvar'); if(es) es.addEventListener('click', salvarEdicao);
   const esit=document.getElementById('ed-situacao'); if(esit) esit.addEventListener('change', edToggleEnc);
+  const eadd=document.getElementById('ed-sucessora-add'); if(eadd) eadd.addEventListener('click', edAddSuc);
+  const einp=document.getElementById('ed-sucessora-input'); if(einp) einp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); edAddSuc(); } });
   const ec=document.getElementById('ed-cancelar'); if(ec) ec.addEventListener('click', fecharEdicao);
   const eov=document.getElementById('modal-edit'); if(eov) eov.addEventListener('click', e=>{ if(e.target===eov) fecharEdicao(); });
 
