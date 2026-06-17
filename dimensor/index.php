@@ -1111,12 +1111,27 @@ function gerarRelatorioSobreposicaoPDF($dados) {
         $pdf->MultiCell(0, 6, 'Os ' . $totalImoveis . ' imóveis cadastrados não apresentam interseção de áreas conforme as coordenadas registradas.', 0, 'L');
     } else {
         $n = 0;
+        // rótulos: matrícula em destaque (quando houver) + identificação
+        $linhaImovel = function ($mat, $nome) {
+            $parts = [];
+            if ($mat !== '') $parts[] = '<b>Matrícula ' . htmlspecialchars($mat, ENT_QUOTES, 'UTF-8') . '</b>';
+            if ($nome !== '' && $nome !== '—') $parts[] = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
+            if (empty($parts)) $parts[] = '—';
+            return implode('<br>', $parts);
+        };
+        $capImovel = function ($mat, $nome) {
+            if ($mat !== '' && $nome !== '' && $nome !== '—') return 'Mat. ' . $mat . ' (' . $nome . ')';
+            if ($mat !== '') return 'Mat. ' . $mat;
+            return ($nome !== '' ? $nome : '—');
+        };
         foreach ($overlaps as $o) {
             $n++;
             $a = isset($o['a']) ? $o['a'] : [];
             $b = isset($o['b']) ? $o['b'] : [];
             $nomeA = isset($a['identificador']) ? $a['identificador'] : '—';
             $nomeB = isset($b['identificador']) ? $b['identificador'] : '—';
+            $matA  = isset($a['numero_matricula']) ? trim((string)$a['numero_matricula']) : '';
+            $matB  = isset($b['numero_matricula']) ? trim((string)$b['numero_matricula']) : '';
             $areaA = isset($a['area_ha']) ? (float)$a['area_ha'] : 0;
             $areaB = isset($b['area_ha']) ? (float)$b['area_ha'] : 0;
             $areaO = isset($o['area_ha']) ? (float)$o['area_ha'] : 0;
@@ -1134,8 +1149,8 @@ function gerarRelatorioSobreposicaoPDF($dados) {
                 <td width="50%"><b>Imóvel A</b></td><td width="50%"><b>Imóvel B</b></td>
               </tr>
               <tr>
-                <td>' . htmlspecialchars($nomeA, ENT_QUOTES, 'UTF-8') . '<br><small style="color:#666;">Área total: ' . $br($areaA, 4) . ' ha</small></td>
-                <td>' . htmlspecialchars($nomeB, ENT_QUOTES, 'UTF-8') . '<br><small style="color:#666;">Área total: ' . $br($areaB, 4) . ' ha</small></td>
+                <td>' . $linhaImovel($matA, $nomeA) . '<br><small style="color:#666;">Área total: ' . $br($areaA, 4) . ' ha</small></td>
+                <td>' . $linhaImovel($matB, $nomeB) . '<br><small style="color:#666;">Área total: ' . $br($areaB, 4) . ' ha</small></td>
               </tr>
             </table>
             <table cellpadding="4" border="0.5" style="border-color:#cccccc;">
@@ -1155,8 +1170,8 @@ function gerarRelatorioSobreposicaoPDF($dados) {
             if ($imgOv !== false) {
                 $pdf->Ln(1);
                 $pdf->SetFont('helvetica', 'B', 8);
-                $pdf->Cell(0, 5, 'Mapa: ' . htmlspecialchars($nomeA, ENT_QUOTES, 'UTF-8') . ' (azul) · '
-                    . htmlspecialchars($nomeB, ENT_QUOTES, 'UTF-8') . ' (amarelo) · sobreposição (vermelho)', 0, 1, 'L');
+                $pdf->Cell(0, 5, 'Mapa: ' . $capImovel($matA, $nomeA) . ' (azul) · '
+                    . $capImovel($matB, $nomeB) . ' (amarelo) · sobreposição (vermelho)', 0, 1, 'L');
                 pdfColocarImagem($pdf, $imgOv, 182, 360 / 640);
             }
 
@@ -2804,8 +2819,8 @@ function totalDistintos(overlaps){
 /* ---- envia um conjunto de sobreposições para o PDF (nova aba) ---- */
 function gerarRelatorioComDados(overlaps, total){
   const lean = overlaps.map(o=>({
-    a:{id:o.a.id, identificador:o.a.identificador, area_ha:o.a.area_ha},
-    b:{id:o.b.id, identificador:o.b.identificador, area_ha:o.b.area_ha},
+    a:{id:o.a.id, identificador:o.a.identificador, numero_matricula:o.a.numero_matricula, area_ha:o.a.area_ha},
+    b:{id:o.b.id, identificador:o.b.identificador, numero_matricula:o.b.numero_matricula, area_ha:o.b.area_ha},
     area_ha:o.area_ha, centro:o.centro, rings:o.rings
   }));
   const dados = JSON.stringify({ total_imoveis: total, overlaps: lean });
