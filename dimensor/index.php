@@ -381,6 +381,10 @@ function ensureTable($conn) {
         'onr_importation_id'    => "ADD COLUMN onr_importation_id VARCHAR(80) NULL DEFAULT NULL",
         'onr_status'            => "ADD COLUMN onr_status VARCHAR(60) NULL DEFAULT NULL",
         'onr_enviado_em'        => "ADD COLUMN onr_enviado_em DATETIME NULL DEFAULT NULL",
+        // ---- Ciclo de vida da matrícula (encerramento) ----
+        'situacao'             => "ADD COLUMN situacao VARCHAR(20) NOT NULL DEFAULT 'ativa'",
+        'motivo_situacao'      => "ADD COLUMN motivo_situacao VARCHAR(20) NULL DEFAULT NULL",
+        'matricula_sucessora'  => "ADD COLUMN matricula_sucessora VARCHAR(120) NULL DEFAULT NULL",
     ];
     foreach ($novas as $colNome => $ddl) {
         $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colNome) . "'");
@@ -1324,6 +1328,24 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'salvar_situacao') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
+            $sit = (($_POST['situacao'] ?? '') === 'encerrada') ? 'encerrada' : 'ativa';
+            $mot = null; $suc = null;
+            if ($sit === 'encerrada') {
+                $m = $_POST['motivo_situacao'] ?? '';
+                $mot = in_array($m, ['unificacao', 'desmembramento'], true) ? $m : null;
+                $s = trim((string)($_POST['matricula_sucessora'] ?? ''));
+                $suc = ($s !== '') ? $s : null;
+            }
+            $stmt = $conn->prepare("UPDATE memoriais_mapeados SET situacao=?, motivo_situacao=?, matricula_sucessora=? WHERE id=?");
+            $stmt->bind_param('sssi', $sit, $mot, $suc, $id);
+            $stmt->execute();
+            echo json_encode(['ok' => true, 'id' => $id, 'situacao' => $sit, 'motivo_situacao' => $mot, 'matricula_sucessora' => $suc], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($acao === 'onr_config_get') {
             $cfg = onrConfigLer();
             // não devolve o token inteiro por segurança — apenas máscara + se está configurado
@@ -1462,7 +1484,8 @@ if (isset($_POST['acao'])) {
                         area_ha, perimetro_m, centro_lat, centro_lng, cor, cor_opacidade,
                         numero_matricula, proprietario, cpf, tipo_imovel,
                         onr_status, onr_importation_id, onr_numero_prenotacao, onr_classificacao,
-                        onr_nivel_publicidade, onr_descricao, criado_em
+                        onr_nivel_publicidade, onr_descricao,
+                        situacao, motivo_situacao, matricula_sucessora, criado_em
                  FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 1000"
             );
             $rows = [];
@@ -1484,7 +1507,8 @@ if (isset($_POST['acao'])) {
             // Devolve todos os polígonos (lat/lng) para a visão geral e detecção de sobreposição
             $res = $conn->query(
                 "SELECT id, identificador, tipo_identificador, origem, area_ha, cor, cor_opacidade,
-                        numero_matricula, proprietario, tipo_imovel, coordenadas_wgs84
+                        numero_matricula, proprietario, tipo_imovel,
+                        situacao, motivo_situacao, matricula_sucessora, coordenadas_wgs84
                  FROM memoriais_mapeados ORDER BY id"
             );
             $itens = [];
@@ -1506,6 +1530,9 @@ if (isset($_POST['acao'])) {
                         'numero_matricula' => $row['numero_matricula'],
                         'proprietario' => $row['proprietario'],
                         'tipo_imovel' => $row['tipo_imovel'],
+                        'situacao' => $row['situacao'] ?? 'ativa',
+                        'motivo_situacao' => $row['motivo_situacao'],
+                        'matricula_sucessora' => $row['matricula_sucessora'],
                         'pts' => $pts,
                     ];
                 }
@@ -1579,6 +1606,7 @@ if (isset($_POST['acao'])) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1727,6 +1755,8 @@ if (isset($_POST['acao'])) {
   .kml-zone:hover,.kml-zone.drag{border-color:var(--red-bright);color:var(--ink);background:rgba(168,15,30,.05)}
   .kml-zone b{color:var(--ink);font-weight:600}
   .kml-zone.loaded{border-style:solid;border-color:rgba(47,170,106,.4);color:#7fd9a8}
+  .kml-zone.lote{margin-top:8px}
+  .kml-zone.lote:hover,.kml-zone.lote.drag{border-color:#0d9488;color:var(--ink);background:rgba(13,148,136,.06)}
 
   /* Cabeçalho da lista + botão ver todos */
   .saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -1814,6 +1844,10 @@ if (isset($_POST['acao'])) {
     font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;
     border:1px solid rgba(226,52,47,.65);white-space:nowrap;pointer-events:none;
     text-shadow:0 1px 2px rgba(0,0,0,.85);letter-spacing:.2px}
+  .map-chip.hover{transform:translate(-50%,calc(-50% - 20px));background:rgba(13,148,136,.96);
+    border-color:rgba(255,255,255,.35);font-family:var(--disp);font-weight:600;letter-spacing:.1px;
+    box-shadow:0 4px 14px rgba(0,0,0,.4);animation:chipFade .14s ease-out}
+  @keyframes chipFade{from{opacity:0;transform:translate(-50%,calc(-50% - 12px))}to{opacity:1;transform:translate(-50%,calc(-50% - 20px))}}
   .overlay{position:absolute;inset:0;display:grid;place-items:center;z-index:4;color:var(--faint);
     font-family:var(--mono);font-size:12px;text-align:center;pointer-events:none}
   ::-webkit-scrollbar{width:9px;height:9px}
@@ -1853,6 +1887,17 @@ if (isset($_POST['acao'])) {
   .item .it-onr.enviado{color:#1d4ed8}
   .onr-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:var(--line);color:var(--faint);margin-left:4px;vertical-align:middle}
   .onr-badge.env{background:rgba(29,78,216,.16);color:#1d4ed8}
+  /* Matrícula encerrada ("morta") */
+  .item.morto{opacity:.6}
+  .item.morto .nm{text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:var(--faint)}
+  .morto-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(120,130,145,.18);color:#8893a3;margin-left:4px;vertical-align:middle;text-decoration:none}
+  .situacao-edit{margin-top:6px;padding-top:11px;border-top:1px solid var(--line)}
+  /* Aviso de matrícula encerrada no cadastro */
+  .enc-info{margin-bottom:11px;padding:10px 12px;border:1px solid rgba(120,130,145,.35);border-left:3px solid #8893a3;border-radius:9px;background:rgba(120,130,145,.10)}
+  .enc-info-h{display:flex;align-items:center;gap:6px;font-family:var(--disp);font-size:12.5px;font-weight:600;color:var(--ink)}
+  .enc-ico{color:#8893a3;font-size:13px}
+  .enc-info-b{margin-top:5px;font-size:11.5px;line-height:1.55;color:var(--ink)}
+  .enc-mut{color:var(--faint);font-family:var(--mono);font-size:9.5px}
   /* ===== Slider de intensidade ===== */
   .op-wrap{display:flex;align-items:center;gap:10px;margin-top:11px}
   .op-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);flex:none}
@@ -1939,6 +1984,11 @@ if (isset($_POST['acao'])) {
       <p class="label">Memorial descritivo</p>
       <textarea id="memorial" spellcheck="false"
         placeholder="Cole o memorial com coordenadas em graus, minutos e segundos (ex.: longitude -46°53'11,184&quot; e latitude -4°8'33,962&quot;)…"></textarea>
+
+      <div class="enc-info" id="enc-info" style="display:none">
+        <div class="enc-info-h"><span class="enc-ico">✝</span> <b id="enc-info-titulo">Matrícula encerrada</b></div>
+        <div class="enc-info-b" id="enc-info-corpo"></div>
+      </div>
 
       <div class="form-grid">
         <div class="fld grid-2">
@@ -2088,6 +2138,12 @@ if (isset($_POST['acao'])) {
         <span id="kml-zone-label">Importar arquivo <b>KML</b></span>
       </div>
 
+      <div class="kml-zone lote" id="kml-lote-zone">
+        <input type="file" id="kml-lote-file" accept=".kml,application/vnd.google-earth.kml+xml" multiple hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1"></rect><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
+        <span id="kml-lote-label">Cadastro em lote — vários <b>KML</b></span>
+      </div>
+
       <div class="status" id="status"></div>
 
       <div class="stats" id="stats" style="display:none">
@@ -2211,6 +2267,28 @@ if (isset($_POST['acao'])) {
       </div>
       <div class="fld"><label class="field-label">Proprietário</label><input id="ed-proprietario" type="text"></div>
       <div class="fld"><label class="field-label">CPF do proprietário</label><input id="ed-cpf" type="text" maxlength="14"></div>
+
+      <div class="situacao-edit">
+        <div class="fld">
+          <label class="field-label">Situação da matrícula</label>
+          <select id="ed-situacao">
+            <option value="ativa">Ativa</option>
+            <option value="encerrada">Encerrada (deu origem a outra)</option>
+          </select>
+        </div>
+        <div id="ed-enc-extra" style="display:none">
+          <div class="modal-row">
+            <div class="fld"><label class="field-label">Motivo</label>
+              <select id="ed-motivo">
+                <option value="unificacao">Unificação</option>
+                <option value="desmembramento">Desmembramento</option>
+              </select>
+            </div>
+            <div class="fld"><label class="field-label">Matrícula sucessora</label><input id="ed-sucessora" type="text" placeholder="Nova matrícula originada"></div>
+          </div>
+          <p class="cor-hint">Imóveis encerrados são desenhados apagados ("mortos") e <b>não geram sobreposição</b>, pois deram origem à nova matrícula.</p>
+        </div>
+      </div>
     </div>
     <div class="modal-f">
       <button class="btn-ghost" id="ed-cancelar2" onclick="fecharEdicao()">Cancelar</button>
@@ -2266,10 +2344,10 @@ function initMap(){
 
   // Rótulo flutuante (chip) sobre o polígono — definido aqui pois depende da API já carregada
   LabelOverlay = class extends google.maps.OverlayView {
-    constructor(position, text){ super(); this.position=position; this.text=text; this.div=null; this.setMap(map); }
+    constructor(position, text, cls){ super(); this.position=position; this.text=text; this.cls=cls||''; this.div=null; this.setMap(map); }
     onAdd(){
       const d=document.createElement('div');
-      d.className='map-chip'; d.textContent=this.text;
+      d.className='map-chip'+(this.cls?(' '+this.cls):''); d.textContent=this.text;
       this.div=d; this.getPanes().floatPane.appendChild(d);
     }
     draw(){
@@ -2296,10 +2374,47 @@ function addLabel(pos, text){
   labelOverlays.push(ov);
   return ov;
 }
-function limparLabels(){ labelOverlays.forEach(l=>l.setMap(null)); labelOverlays=[]; }
+function limparLabels(){ labelOverlays.forEach(l=>l.setMap(null)); labelOverlays=[]; ocultarHoverTip(); }
+
+/* Tooltip de identificação exibido ao pousar o mouse ~2s sobre o imóvel */
+let hoverTip=null, hoverTimer=null;
+function ocultarHoverTip(){ if(hoverTimer){ clearTimeout(hoverTimer); hoverTimer=null; } if(hoverTip){ hoverTip.setMap(null); hoverTip=null; } }
+function agendarHoverTip(pos, text){
+  if(!text) return;
+  if(hoverTimer) clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(()=>{
+    if(hoverTip){ hoverTip.setMap(null); hoverTip=null; }
+    hoverTip = new LabelOverlay(new google.maps.LatLng(pos.lat, pos.lng), text, 'hover');
+  }, 2000);
+}
 
 function fmt(n,d){ return Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
-function setStatus(type,msg){ const el=document.getElementById('status'); el.className='status '+type; el.innerHTML=msg; }
+function swalTema(){
+  const dark = document.body.classList.contains('dark-mode');
+  return { background: dark ? '#161c24' : '#ffffff', color: dark ? '#e6edf3' : '#1f2733' };
+}
+function stripTags(s){ const d=document.createElement('div'); d.innerHTML=s; return d.textContent||d.innerText||''; }
+function swalToast(icon, title){
+  if(typeof Swal==='undefined') return;
+  Swal.fire(Object.assign({
+    toast:true, position:'top-end', timer: icon==='error'?4800:2800, timerProgressBar:true,
+    showConfirmButton:false, icon:icon, title:title
+  }, swalTema()));
+}
+async function swalConfirm(titulo, texto, confirmar){
+  if(typeof Swal==='undefined') return window.confirm(texto||titulo);
+  const r = await Swal.fire(Object.assign({
+    title:titulo, text:texto||'', icon:'question', showCancelButton:true,
+    confirmButtonText:confirmar||'Confirmar', cancelButtonText:'Cancelar',
+    confirmButtonColor:'#a80f1e', cancelButtonColor:'#6b7785', reverseButtons:true
+  }, swalTema()));
+  return r.isConfirmed;
+}
+function setStatus(type,msg){
+  const el=document.getElementById('status'); if(el){ el.className='status '+type; el.innerHTML=msg; }
+  if(type==='err') swalToast('error', stripTags(msg));
+  else if(type==='ok') swalToast('success', stripTags(msg));
+}
 
 function limparSingle(){
   if(polygon){ polygon.setMap(null); polygon=null; }
@@ -2308,6 +2423,7 @@ function limparSingle(){
   imovelEditandoId=null;
   const cb=document.getElementById('cor-box'); if(cb) cb.style.display='none';
   if(typeof onrSetAtivo==='function'){ onrSetAtivo(null); document.querySelectorAll('[data-onr]').forEach(el=>el.value=''); onrPreencherGeometria({area_ha:null,perimetro_m:null}); }
+  const ei=document.getElementById('enc-info'); if(ei) ei.style.display='none';
 }
 function limparOverview(){
   overviewPolys.forEach(p=>p.setMap(null)); overviewPolys=[];
@@ -2411,6 +2527,46 @@ kmlFile.onchange = e=>{ if(e.target.files[0]) lerArquivoKml(e.target.files[0]); 
 ['dragover','dragenter'].forEach(ev=>kmlZone.addEventListener(ev,e=>{e.preventDefault();kmlZone.classList.add('drag');}));
 ['dragleave','drop'].forEach(ev=>kmlZone.addEventListener(ev,e=>{e.preventDefault();kmlZone.classList.remove('drag');}));
 kmlZone.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) lerArquivoKml(f); });
+
+/* ---- Cadastro em lote: vários arquivos KML (1 imóvel por arquivo) ---- */
+const kmlLoteZone = document.getElementById('kml-lote-zone');
+const kmlLoteFile = document.getElementById('kml-lote-file');
+if(kmlLoteZone && kmlLoteFile){
+  kmlLoteZone.onclick = ()=> kmlLoteFile.click();
+  kmlLoteFile.onchange = e=>{ if(e.target.files && e.target.files.length) lerLoteKml(e.target.files); e.target.value=''; };
+  ['dragover','dragenter'].forEach(ev=>kmlLoteZone.addEventListener(ev,e=>{e.preventDefault();kmlLoteZone.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev=>kmlLoteZone.addEventListener(ev,e=>{e.preventDefault();kmlLoteZone.classList.remove('drag');}));
+  kmlLoteZone.addEventListener('drop', e=>{ const fs=e.dataTransfer.files; if(fs && fs.length) lerLoteKml(fs); });
+}
+// Define se o nome do arquivo é "número de matrícula" (só dígitos e separadores . - / espaço)
+function nomeEhMatricula(nome){
+  return /[0-9]/.test(nome) && /^[0-9.\-\/\s]+$/.test(nome);
+}
+async function lerLoteKml(files){
+  const arr = Array.from(files).filter(f=>/\.kml$/i.test(f.name));
+  if(!arr.length){ setStatus('err','Selecione um ou mais arquivos .kml.'); return; }
+  const lbl = document.getElementById('kml-lote-label');
+  let ok=0; const falhas=[];
+  for(let i=0;i<arr.length;i++){
+    const f=arr[i];
+    if(lbl) lbl.innerHTML = `Importando <b>${i+1}/${arr.length}</b>…`;
+    setStatus('warn', `Cadastro em lote: ${i+1}/${arr.length}…`);
+    try{
+      const txt = await f.text();
+      const base = f.name.replace(/\.kml$/i,'').trim();
+      const params = { acao:'salvar', origem:'kml', memorial: txt };
+      if(nomeEhMatricula(base)) params.numero_matricula = base; else params.identificador = base;
+      const r = await post(params);
+      if(r && r.ok) ok++; else falhas.push(base+': '+((r&&r.erro)||'falha'));
+    }catch(e){ falhas.push(f.name+': erro de leitura'); }
+  }
+  if(lbl) lbl.innerHTML = 'Cadastro em lote — vários <b>KML</b>';
+  let msg = `Lote KML: ${ok} de ${arr.length} cadastrado(s).`;
+  if(falhas.length) msg += ' Não cadastrados: ' + falhas.slice(0,4).join(' | ') + (falhas.length>4?' …':'');
+  setStatus(falhas.length?'warn':'ok', msg);
+  carregarLista();
+  if(modo==='overview') verTodos();
+}
 
 function resetKmlZone(){
   kmlZone.classList.remove('loaded');
@@ -2603,7 +2759,7 @@ function estiloImovel(it){
   const base = corBaseImovel(it);
   it._poly.setOptions(sel
     ? {strokeColor:'#f59e0b', strokeWeight:2.5, fillColor:'#f59e0b', fillOpacity:.30, zIndex:3}
-    : {strokeColor:base, strokeWeight:1.5, fillColor:base, fillOpacity:opacidadeImovel(it), zIndex:1});
+    : {strokeColor:base, strokeOpacity:strokeOpacImovel(it), strokeWeight:imovelMorto(it)?1:1.5, fillColor:base, fillOpacity:opacidadeImovel(it), zIndex:imovelMorto(it)?0:1});
 }
 function atualizarSelBar(){
   const n=selecionados.size;
@@ -2671,8 +2827,8 @@ async function verTodos(){
   itens.forEach(it=>{
     const path = it.pts.map(p=>({lat:p[0],lng:p[1]}));
     const base = corBaseImovel(it);
-    const poly = new google.maps.Polygon({paths:path,strokeColor:base,strokeOpacity:.9,
-      strokeWeight:1.5,fillColor:base,fillOpacity:opacidadeImovel(it),map:map,zIndex:1});
+    const poly = new google.maps.Polygon({paths:path,strokeColor:base,strokeOpacity:strokeOpacImovel(it),
+      strokeWeight:imovelMorto(it)?1:1.5,fillColor:base,fillOpacity:opacidadeImovel(it),map:map,zIndex:imovelMorto(it)?0:1});
     it._poly = poly;
     poly.addListener('click',(e)=>{
       const ctrl = ctrlAtivo || (e && e.domEvent && (e.domEvent.ctrlKey || e.domEvent.metaKey));
@@ -2682,7 +2838,14 @@ async function verTodos(){
     poly.addListener('rightclick',()=>toggleSelecao(it));
     overviewPolys.push(poly);
     it._bbox = bboxOf(it.pts);
-    addLabel(centroidOf(it.pts), it.identificador);   // nome/matrícula no mapa
+    const centro = centroidOf(it.pts);
+    // rótulo padrão: somente o número da matrícula, se existir
+    const mat = (it.numero_matricula||'').trim();
+    if(mat) addLabel(centro, mat);
+    // identificação do imóvel: só ao pousar o mouse ~2s
+    poly.addListener('mouseover', ()=> agendarHoverTip(centro, it.identificador));
+    poly.addListener('mousemove', ()=> { if(!hoverTip && !hoverTimer) agendarHoverTip(centro, it.identificador); });
+    poly.addListener('mouseout',  ()=> ocultarHoverTip());
     path.forEach(pt=>bounds.extend(pt));
   });
   map.fitBounds(bounds,40);
@@ -2691,6 +2854,8 @@ async function verTodos(){
   const overlaps = [];
   for(let i=0;i<itens.length;i++){
     for(let j=i+1;j<itens.length;j++){
+      // matrículas encerradas (unificação/desmembramento) deram origem a algo novo: não geram sobreposição
+      if(imovelMorto(itens[i]) || imovelMorto(itens[j])) continue;
       if(!bboxOverlap(itens[i]._bbox, itens[j]._bbox)) continue;
       try{
         const a = turf.polygon([ringLngLat(itens[i].pts)]);
@@ -2740,12 +2905,18 @@ function corValida(c){
   if(r>=150 && g<=90 && b<=90) return false; // bloqueia vermelho (reservado a sobreposições)
   return true;
 }
-function corBaseImovel(it){ return (it && corValida(it.cor)) ? it.cor : COR_PADRAO; }
+function imovelMorto(it){ return !!(it && it.situacao === 'encerrada'); }
+function corBaseImovel(it){
+  if(imovelMorto(it)) return '#9aa3ad';                 // cinza "morto"
+  return (it && corValida(it.cor)) ? it.cor : COR_PADRAO;
+}
 function opacidadeImovel(it){
+  if(imovelMorto(it)) return 0.05;                      // bem apagado
   let o = (it && it.cor_opacidade!=null) ? parseFloat(it.cor_opacidade) : OPACIDADE_PADRAO;
   if(isNaN(o)) o = OPACIDADE_PADRAO;
   return Math.max(OPAC_MIN, Math.min(OPAC_MAX, o));
 }
+function strokeOpacImovel(it){ return imovelMorto(it) ? 0.4 : 0.9; }
 function swatchesHTML(atual){
   const a=(atual||'').toLowerCase();
   return PALETA_CORES.map(c=>`<button type="button" class="cor-sw${a===c?' sel':''}" style="background:${c}" title="${c}" data-cor="${c}"></button>`).join('');
@@ -2900,15 +3071,18 @@ function renderLista(){
     const tag = it.tipo_imovel ? `<span class="tag ${it.tipo_imovel==='rural'?'rural':'urb'}">${it.tipo_imovel}</span>` : '';
     const enviado = String(it.onr_enviado)==='1';
     const pronto  = String(it.onr_pronto)==='1';
+    const morto   = it.situacao==='encerrada';
+    const motivoTxt = it.motivo_situacao==='desmembramento' ? 'desmembrada' : (it.motivo_situacao==='unificacao' ? 'unificada' : 'encerrada');
+    const mortoBadge = morto ? `<span class="morto-badge" title="${it.matricula_sucessora?('Sucessora: '+escapeHtml(it.matricula_sucessora)):'Matrícula encerrada'}">✝ ${motivoTxt}</span>` : '';
     const statusTxt = it.onr_status ? escapeHtml(it.onr_status) : (enviado?'ENVIADO':'');
     const onrBadge = statusTxt ? `<span class="onr-badge ${enviado?'env':''}">${statusTxt}</span>` : '';
     const onrBtn = enviado
       ? `<button class="it-onr enviado" data-act="status" title="Consultar status na ONR">⟳</button>`
       : `<button class="it-onr" data-act="enviar" title="${pronto?'Enviar ao Mapa ONR':'Faltam dados ONR para enviar'}" ${pronto?'':'disabled'}>➤</button>`;
-    return `<div class="item" data-id="${it.id}">
+    return `<div class="item${morto?' morto':''}" data-id="${it.id}">
       ${corDot}
       <div class="info">
-        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')}</div>
+        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}</div>
         <div class="mt">${sub.join(' · ')||meta} ${onrBadge}</div>
       </div>
       ${tag}
@@ -2919,7 +3093,7 @@ function renderLista(){
   }).join('');
   wrap.querySelectorAll('.item').forEach(el=>{
     const id = el.dataset.id;
-    el.querySelector('.del').onclick = async (e)=>{ e.stopPropagation(); if(!confirm('Excluir este imóvel?'))return; await post({acao:'excluir', id}); carregarLista(); if(modo==='overview') verTodos(); };
+    el.querySelector('.del').onclick = async (e)=>{ e.stopPropagation(); if(!(await swalConfirm('Excluir imóvel?','Esta ação não pode ser desfeita.','Excluir')))return; await post({acao:'excluir', id}); carregarLista(); if(modo==='overview') verTodos(); };
     el.querySelector('.it-edit').onclick = (e)=>{ e.stopPropagation(); abrirEdicao(id); };
     const onrB = el.querySelector('.it-onr');
     if(onrB) onrB.onclick = (e)=>{ e.stopPropagation(); if(onrB.dataset.act==='status') consultarStatusOnr(id); else enviarOnr(id); };
@@ -2946,6 +3120,7 @@ async function carregarImovel(id){
   desenhar(res.geo, reg.identificador);
   abrirCorPainel(id, reg.cor, reg.cor_opacidade);
   preencherOnr(reg); onrPreencherGeometria(res.geo); onrSetAtivo(id, reg.identificador);
+  mostrarEncInfo(reg);
   document.getElementById('btn-save').disabled=false;
   setStatus('ok', `Carregado: ${reg.identificador} (${res.geo.num_vertices} vértices).`);
   abrirPainelMobile();
@@ -2961,7 +3136,15 @@ function abrirEdicao(id){
   document.getElementById('ed-proprietario').value = it.proprietario||'';
   document.getElementById('ed-cpf').value = it.cpf||'';
   document.getElementById('ed-tipo').value = it.tipo_imovel||'';
+  document.getElementById('ed-situacao').value = (it.situacao==='encerrada')?'encerrada':'ativa';
+  document.getElementById('ed-motivo').value = it.motivo_situacao || 'unificacao';
+  document.getElementById('ed-sucessora').value = it.matricula_sucessora || '';
+  edToggleEnc();
   document.getElementById('modal-edit').classList.add('show');
+}
+function edToggleEnc(){
+  const enc = document.getElementById('ed-situacao').value === 'encerrada';
+  const ex = document.getElementById('ed-enc-extra'); if(ex) ex.style.display = enc ? 'block' : 'none';
 }
 function fecharEdicao(){ document.getElementById('modal-edit').classList.remove('show'); }
 async function salvarEdicao(){
@@ -2974,7 +3157,13 @@ async function salvarEdicao(){
     tipo_imovel: document.getElementById('ed-tipo').value
   });
   if(!r.ok){ setStatus('err', r.erro||'Falha ao atualizar.'); return; }
-  fecharEdicao(); carregarLista(); setStatus('ok','Dados do imóvel atualizados.');
+  // salva a situação (ativa/encerrada) do mesmo modal
+  await post({acao:'salvar_situacao', id,
+    situacao: document.getElementById('ed-situacao').value,
+    motivo_situacao: document.getElementById('ed-motivo').value,
+    matricula_sucessora: document.getElementById('ed-sucessora').value.trim()
+  });
+  fecharEdicao(); carregarLista(); if(modo==='overview') verTodos(); setStatus('ok','Dados do imóvel atualizados.');
 }
 
 /* ===================== DADOS ONR (carga p/ Mapa do Registro de Imóveis) ===================== */
@@ -3019,7 +3208,7 @@ async function salvarOnr(){
 
 /* ---- Envio à ONR ---- */
 async function enviarOnr(id){
-  if(!confirm('Enviar este imóvel ao Mapa do Registro de Imóveis (ONR)?')) return;
+  if(!(await swalConfirm('Enviar à ONR?','Enviar este imóvel ao Mapa do Registro de Imóveis (ONR)?','Enviar'))) return;
   setStatus('warn','Enviando à ONR… (gerando shapefile e transmitindo)');
   const r = await post({acao:'enviar_onr', id});
   if(!r.ok){ setStatus('err', r.mensagem||'Falha no envio.'); carregarLista(); return; }
@@ -3036,7 +3225,7 @@ async function consultarStatusOnr(id){
 async function enviarTodosOnr(){
   const prontos = (imoveisCache||[]).filter(it=> String(it.onr_pronto)==='1' && String(it.onr_enviado)!=='1').length;
   if(prontos===0){ setStatus('warn','Nenhum imóvel pronto para envio (faltam dados ONR ou já enviados).'); return; }
-  if(!confirm('Enviar '+prontos+' imóvel(is) pronto(s) à ONR?')) return;
+  if(!(await swalConfirm('Enviar em lote?','Enviar '+prontos+' imóvel(is) pronto(s) à ONR?','Enviar todos'))) return;
   setStatus('warn','Enviando '+prontos+' imóvel(is) à ONR…');
   const r = await post({acao:'enviar_onr_lote'});
   if(!r.ok){ setStatus('err','Falha no envio em lote.'); return; }
@@ -3060,6 +3249,33 @@ async function salvarConfigOnr(){
   const r = await post({acao:'onr_config_save', base_url, token});
   if(!r.ok){ setStatus('err', r.mensagem||'Falha ao salvar configuração.'); return; }
   fecharConfigOnr(); setStatus('ok','Configuração da API ONR salva.');
+}
+
+function mostrarEncInfo(reg){
+  const box=document.getElementById('enc-info');
+  const tit=document.getElementById('enc-info-titulo');
+  const corpo=document.getElementById('enc-info-corpo');
+  if(!box) return;
+  if(reg && reg.situacao==='encerrada'){
+    const motivo = reg.motivo_situacao==='desmembramento' ? 'desmembramento'
+                 : (reg.motivo_situacao==='unificacao' ? 'unificação' : null);
+    tit.textContent = motivo ? ('Matrícula encerrada por '+motivo) : 'Matrícula encerrada';
+    const suc = (reg.matricula_sucessora||'').trim();
+    let html;
+    if(reg.motivo_situacao==='unificacao')
+      html = suc ? ('Esta matrícula foi <b>unificada</b> e deu origem à matrícula <b>'+escapeHtml(suc)+'</b>.')
+                 : 'Esta matrícula foi <b>unificada</b> em uma nova matrícula.';
+    else if(reg.motivo_situacao==='desmembramento')
+      html = suc ? ('Área <b>desmembrada</b> que originou a matrícula <b>'+escapeHtml(suc)+'</b>.')
+                 : 'Área <b>desmembrada</b> em uma nova matrícula.';
+    else
+      html = suc ? ('Deu origem à matrícula <b>'+escapeHtml(suc)+'</b>.') : 'Matrícula encerrada.';
+    html += '<br><span class="enc-mut">Imóvel "morto": não gera sobreposição no mapa.</span>';
+    corpo.innerHTML = html;
+    box.style.display='block';
+  } else {
+    box.style.display='none';
+  }
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -3190,6 +3406,7 @@ function verificarPertencimento(geo){
 
   // Modal de edição
   const es=document.getElementById('ed-salvar'); if(es) es.addEventListener('click', salvarEdicao);
+  const esit=document.getElementById('ed-situacao'); if(esit) esit.addEventListener('change', edToggleEnc);
   const ec=document.getElementById('ed-cancelar'); if(ec) ec.addEventListener('click', fecharEdicao);
   const eov=document.getElementById('modal-edit'); if(eov) eov.addEventListener('click', e=>{ if(e.target===eov) fecharEdicao(); });
 
