@@ -1825,6 +1825,14 @@ if (isset($_POST['acao'])) {
   .legend .sw.over{background:rgba(226,52,47,.5);border:1px solid var(--red-bright)}
   .legend .sw.sel{background:rgba(245,158,11,.45);border:1px solid #f59e0b}
   .ov-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.4;padding:8px 15px 0}
+  .ov-search{display:flex;gap:6px;padding:8px 10px 2px}
+  .ov-search input{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+    font-size:12px;padding:7px 9px;font-family:var(--disp);outline:none}
+  .ov-search input:focus{border-color:#0d9488}
+  .ov-search input::placeholder{color:var(--faint)}
+  .ov-search button{flex:none;width:30px;height:34px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:8px;color:var(--faint);font-size:16px;line-height:1;cursor:pointer}
+  .ov-search button:hover{border-color:var(--red-bright);color:var(--red-bright)}
   .ov-overlaps{overflow-y:auto;padding:8px 10px}
   .ov-overlaps .ttl{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
     color:var(--faint);padding:4px 5px 8px}
@@ -2276,6 +2284,10 @@ if (isset($_POST['acao'])) {
         <span><i class="sw over"></i>Sobreposição</span>
       </div>
       <div class="ov-hint" id="ov-hint">Ctrl+clique (ou clique direito) nos imóveis para selecionar · clique numa sobreposição para o relatório dela</div>
+      <div class="ov-search">
+        <input type="text" id="ov-busca" placeholder="Filtrar por matrícula ou identificação...">
+        <button id="ov-busca-clear" title="Limpar filtro">×</button>
+      </div>
       <div class="ov-overlaps" id="ov-overlaps"></div>
       <div class="ov-foot">
         <button class="btn-report" id="btn-relatorio">Gerar relatório de sobreposição (PDF)</button>
@@ -2804,12 +2816,19 @@ function gerarRelatorioComDados(overlaps, total){
   document.body.appendChild(f); f.submit(); document.body.removeChild(f);
 }
 
-/* relatório completo (todas as sobreposições) */
+/* relatório do conjunto exibido (todas ou filtradas por imóvel) */
 function gerarRelatorio(){
   if(modo!=='overview'){ setStatus('warn','Abra "Ver todos no mapa" antes de gerar o relatório.'); return; }
-  if(!overlapsAtuais.length){ setStatus('warn','Não há sobreposições para relatar.'); return; }
-  gerarRelatorioComDados(overlapsAtuais, totalImoveisAtual);
+  const lista = (overlapsExibidos && overlapsExibidos.length!==undefined) ? overlapsExibidos : overlapsAtuais;
+  if(!lista.length){ setStatus('warn','Não há sobreposições para relatar (verifique o filtro).'); return; }
+  gerarRelatorioComDados(lista, totalDistintos(lista));
 }
+(function(){
+  const b=document.getElementById('ov-busca');
+  if(b) b.addEventListener('input', filtrarOverlaps);
+  const c=document.getElementById('ov-busca-clear');
+  if(c) c.addEventListener('click', ()=>{ const bb=document.getElementById('ov-busca'); if(bb){ bb.value=''; bb.focus(); } filtrarOverlaps(); });
+})();
 
 /* ocultar / reexibir o painel (sem sair do overview) */
 document.getElementById('ov-hide').onclick = ()=>{
@@ -2956,8 +2975,8 @@ async function verTodos(){
           });
           const c = turf.centroid(inter).geometry.coordinates;
           overlaps.push({
-            a:{id:itens[i].id, identificador:itens[i].identificador, area_ha:itens[i].area_ha, pts:itens[i].pts},
-            b:{id:itens[j].id, identificador:itens[j].identificador, area_ha:itens[j].area_ha, pts:itens[j].pts},
+            a:{id:itens[i].id, identificador:itens[i].identificador, numero_matricula:itens[i].numero_matricula, area_ha:itens[i].area_ha, pts:itens[i].pts},
+            b:{id:itens[j].id, identificador:itens[j].identificador, numero_matricula:itens[j].numero_matricula, area_ha:itens[j].area_ha, pts:itens[j].pts},
             area_ha:areaHa, centro:{lat:c[1],lng:c[0]}, rings:rings
           });
         }
@@ -3135,28 +3154,57 @@ function infoImovel(it){
   setStatus('ok', `<b>${escapeHtml(it.identificador)}</b> — ${fmt(it.area_ha,2)} ha (${it.origem}).`);
 }
 
+let overlapsExibidos = [];
 function renderOverviewPanel(total, overlaps){
   const panel=document.getElementById('overview-panel');
   panel.classList.add('show');
-  document.getElementById('ov-sub').textContent =
-    `${total} imóveis · ${overlaps.length} sobreposição(ões)`;
+  const busca=document.getElementById('ov-busca'); if(busca) busca.value='';
+  filtrarOverlaps();
+}
+function filtrarOverlaps(){
+  const termoRaw = (document.getElementById('ov-busca')?.value || '').trim();
+  const termo = termoRaw.toLowerCase();
+  const norm = s => (s==null?'':String(s)).toLowerCase();
+  const normD = s => (s==null?'':String(s)).replace(/[^0-9a-z]/gi,'').toLowerCase();
+  let lista = overlapsAtuais;
+  if(termo){
+    const td = normD(termoRaw);
+    lista = overlapsAtuais.filter(o=>{
+      const campos=[o.a.identificador,o.a.numero_matricula,o.b.identificador,o.b.numero_matricula];
+      const txt = campos.some(c=>norm(c).includes(termo));
+      const doc = td && [o.a.numero_matricula,o.b.numero_matricula].some(c=>normD(c) && normD(c).includes(td));
+      return txt || doc;
+    });
+  }
+  overlapsExibidos = lista;
+  const sub=document.getElementById('ov-sub');
+  if(sub) sub.textContent = termo
+    ? `${lista.length} de ${overlapsAtuais.length} sobreposição(ões) · filtro "${termoRaw}"`
+    : `${totalImoveisAtual} imóveis · ${overlapsAtuais.length} sobreposição(ões)`;
+  // rótulo do botão de relatório
+  const btn=document.getElementById('btn-relatorio');
+  if(btn) btn.textContent = termo ? 'Gerar relatório do imóvel filtrado (PDF)' : 'Gerar relatório de sobreposição (PDF)';
+  desenharListaOverlaps(lista, termoRaw);
+}
+function desenharListaOverlaps(overlaps, termo){
   const box=document.getElementById('ov-overlaps');
   if(!overlaps.length){
-    box.innerHTML='<div class="ov-none">✓ Nenhuma sobreposição entre os imóveis exibidos.</div>';
+    box.innerHTML = '<div class="ov-none">'+(termo ? '✓ Nenhuma sobreposição para "'+escapeHtml(termo)+'".' : '✓ Nenhuma sobreposição entre os imóveis exibidos.')+'</div>';
     return;
   }
-  overlaps.sort((x,y)=>y.area_ha-x.area_ha);
-  box.innerHTML = '<div class="ttl">Sobreposições</div>' + overlaps.map((o,i)=>`
+  const lista = overlaps.slice().sort((x,y)=>y.area_ha-x.area_ha);
+  const rotulo = o => escapeHtml((o.numero_matricula? o.numero_matricula+' — ':'')+(o.identificador||'')) || escapeHtml(o.identificador||'(sem id)');
+  box.innerHTML = '<div class="ttl">Sobreposições</div>' + lista.map((o,i)=>`
     <div class="ov-row" data-i="${i}">
       <button class="row-rep" data-i="${i}">relatório</button>
-      <div class="pair">${escapeHtml(o.a.identificador)} <span style="color:var(--faint)">⨯</span> ${escapeHtml(o.b.identificador)}</div>
+      <div class="pair">${rotulo(o.a)} <span style="color:var(--faint)">⨯</span> ${rotulo(o.b)}</div>
       <div class="amt">${fmt(o.area_ha,4)} ha sobrepostos</div>
     </div>`).join('');
   box.querySelectorAll('.ov-row').forEach(row=>{
-    row.onclick=()=>{ const o=overlaps[+row.dataset.i]; map.panTo(o.centro); map.setZoom(15); };
+    row.onclick=()=>{ const o=lista[+row.dataset.i]; map.panTo(o.centro); map.setZoom(15); };
   });
   box.querySelectorAll('.row-rep').forEach(btn=>{
-    btn.onclick=(e)=>{ e.stopPropagation(); const o=overlaps[+btn.dataset.i]; gerarRelatorioComDados([o], 2); };
+    btn.onclick=(e)=>{ e.stopPropagation(); const o=lista[+btn.dataset.i]; gerarRelatorioComDados([o], 2); };
   });
 }
 
