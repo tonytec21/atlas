@@ -1618,7 +1618,7 @@ if (isset($_POST['acao'])) {
 <style>
   :root{
     --bg:#f4f6f9; --panel:#ffffff; --panel-2:#f4f6f9; --line:#e3e8ee;
-    --ink:#1f2733; --muted:#6b7785; --faint:#9aa6b2;
+    --ink:#1f2733; --muted:#475569; --faint:#64748b;
     --red:#a80f1e; --red-bright:#cf1626; --red-soft:rgba(168,15,30,.10);
     --green:#1f9d57; --amber:#c8881f;
     --red-text:#a80f1e; --green-text:#14743f; --amber-text:#8a5d00;
