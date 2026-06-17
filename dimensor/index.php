@@ -1722,6 +1722,22 @@ if (isset($_POST['acao'])) {
   .ip-row{display:flex;gap:8px;font-size:11.5px;line-height:1.35}
   .ip-k{flex:none;width:78px;color:#64748b;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px}
   .ip-v{flex:1;color:#1f2733;font-weight:600;word-break:break-word}
+  /* Dialog do mapa (InfoWindow) no modo escuro */
+  body.dark-mode .gm-style .gm-style-iw-c,
+  body.dark-mode .gm-style .gm-style-iw-d{background:#161c24 !important}
+  body.dark-mode .gm-style .gm-style-iw-d{overflow:auto !important}
+  body.dark-mode .gm-style .gm-style-iw-t::after{background:linear-gradient(45deg,#161c24 50%,rgba(0,0,0,0) 51%) !important}
+  body.dark-mode .gm-style .gm-style-iw-tc::after{background:#161c24 !important}
+  body.dark-mode .gm-style .gm-style-iw-c button img,
+  body.dark-mode .gm-style .gm-ui-hover-effect img{filter:invert(1) brightness(1.6) !important}
+  body.dark-mode .cor-pop{color:#e7edf3}
+  body.dark-mode .cor-pop-sub{color:#8b97a4}
+  body.dark-mode .cor-pop-lbl{color:#8b97a4}
+  body.dark-mode .ip-box{background:#1c242e;border-color:#283038}
+  body.dark-mode .ip-k{color:#8b97a4}
+  body.dark-mode .ip-v{color:#e7edf3}
+  body.dark-mode .cor-pop-clear{background:#1c242e;border-color:#283038;color:#e2342f}
+  body.dark-mode .cor-pop-clear:hover{background:#2a1a1c;border-color:#a80f1e}
   .cor-pop-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#9aa6b2;margin-bottom:6px}
   .cor-pop-grid{display:grid;grid-template-columns:repeat(6,22px);gap:6px}
   .cor-pop .cor-sw{width:22px;height:22px;aspect-ratio:auto;min-height:0}
@@ -1920,6 +1936,19 @@ if (isset($_POST['acao'])) {
   .btn-ghost-sm{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:8px;
     padding:0 12px;font-size:11px;cursor:pointer;white-space:nowrap}
   .btn-ghost-sm:hover{border-color:#0d9488;color:#0d9488}
+  /* Lista de proprietários (vários, PF/PJ) */
+  .prop-list{display:flex;flex-direction:column;gap:7px}
+  .prop-row{display:flex;gap:6px;align-items:center}
+  .prop-row .prop-nome{flex:1.3}
+  .prop-doc-wrap{flex:1;position:relative;display:flex;align-items:center}
+  .prop-doc-wrap .prop-doc{width:100%;padding-right:64px}
+  .prop-doc-badge{position:absolute;right:8px;font-family:var(--mono);font-size:8.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);pointer-events:none}
+  .prop-doc-badge.ok{color:#1f9d57}
+  .prop-doc-badge.bad{color:#cf1626}
+  .prop-doc.doc-ok{border-color:rgba(31,157,87,.55)}
+  .prop-doc.doc-bad{border-color:rgba(207,22,38,.6)}
+  .prop-del{flex:none;width:32px;height:34px;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--faint);font-size:16px;line-height:1;cursor:pointer}
+  .prop-del:hover{border-color:#cf1626;color:#cf1626}
   /* Aviso de matrícula encerrada no cadastro */
   .enc-info{margin-bottom:11px;padding:10px 12px;border:1px solid rgba(120,130,145,.35);border-left:3px solid #8893a3;border-radius:9px;background:rgba(120,130,145,.10)}
   .enc-info-h{display:flex;align-items:center;gap:6px;font-family:var(--disp);font-size:12.5px;font-weight:600;color:var(--ink)}
@@ -2295,8 +2324,11 @@ if (isset($_POST['acao'])) {
           <select id="ed-tipo"><option value="">—</option><option value="urbano">Urbano</option><option value="rural">Rural</option></select>
         </div>
       </div>
-      <div class="fld"><label class="field-label">Proprietário</label><input id="ed-proprietario" type="text"></div>
-      <div class="fld"><label class="field-label">CPF do proprietário</label><input id="ed-cpf" type="text" maxlength="14"></div>
+      <div class="fld grid-2">
+        <label class="field-label">Proprietários (pessoa física ou jurídica)</label>
+        <div id="ed-prop-list" class="prop-list"></div>
+        <button type="button" id="ed-prop-add" class="btn-ghost-sm" style="margin-top:7px">+ Adicionar proprietário</button>
+      </div>
 
       <div class="situacao-edit">
         <div class="fld">
@@ -3205,14 +3237,99 @@ async function carregarImovel(id){
 }
 
 /* ---- edição inline (modal) ---- */
+/* ===================== PROPRIETÁRIOS (vários, PF/PJ) + máscara CPF/CNPJ ===================== */
+function soDigitos(v){ return (v||'').replace(/\D/g,''); }
+function fmtCPF(d){
+  d=d.slice(0,11); let o=d;
+  if(d.length>3) o=d.slice(0,3)+'.'+d.slice(3);
+  if(d.length>6) o=d.slice(0,3)+'.'+d.slice(3,6)+'.'+d.slice(6);
+  if(d.length>9) o=d.slice(0,3)+'.'+d.slice(3,6)+'.'+d.slice(6,9)+'-'+d.slice(9,11);
+  return o;
+}
+function fmtCNPJ(d){
+  d=d.slice(0,14); let o=d;
+  if(d.length>2) o=d.slice(0,2)+'.'+d.slice(2);
+  if(d.length>5) o=d.slice(0,2)+'.'+d.slice(2,5)+'.'+d.slice(5);
+  if(d.length>8) o=d.slice(0,2)+'.'+d.slice(2,5)+'.'+d.slice(5,8)+'/'+d.slice(8);
+  if(d.length>12) o=d.slice(0,2)+'.'+d.slice(2,5)+'.'+d.slice(5,8)+'/'+d.slice(8,12)+'-'+d.slice(12,14);
+  return o;
+}
+function mascaraDoc(v){ const d=soDigitos(v).slice(0,14); return d.length<=11 ? fmtCPF(d) : fmtCNPJ(d); }
+function validaCPF(v){
+  const c=soDigitos(v); if(c.length!==11 || /^(\d)\1{10}$/.test(c)) return false;
+  let s=0; for(let i=0;i<9;i++) s+=+c[i]*(10-i);
+  let d1=11-(s%11); if(d1>=10) d1=0; if(d1!==+c[9]) return false;
+  s=0; for(let i=0;i<10;i++) s+=+c[i]*(11-i);
+  let d2=11-(s%11); if(d2>=10) d2=0; return d2===+c[10];
+}
+function validaCNPJ(v){
+  const c=soDigitos(v); if(c.length!==14 || /^(\d)\1{13}$/.test(c)) return false;
+  const calc=(base)=>{ let len=base.length,pos=len-7,sum=0;
+    for(let i=len;i>=1;i--){ sum+=+base[len-i]*pos--; if(pos<2)pos=9; }
+    const r=sum%11; return r<2?0:11-r; };
+  if(calc(c.substring(0,12))!==+c[12]) return false;
+  return calc(c.substring(0,13))===+c[13];
+}
+function docTipo(v){ const d=soDigitos(v); return d.length<=11 ? 'CPF' : 'CNPJ'; }
+function docValido(v){ const d=soDigitos(v); if(d.length===11) return validaCPF(d); if(d.length===14) return validaCNPJ(d); return null; }
+
+let edProps = [];
+function edRenderProps(){
+  const wrap=document.getElementById('ed-prop-list'); if(!wrap) return;
+  if(!edProps.length) edProps=[{nome:'',doc:''}];
+  wrap.innerHTML = edProps.map((p,i)=>`
+    <div class="prop-row" data-i="${i}">
+      <input class="prop-nome" data-i="${i}" type="text" placeholder="Nome / Razão social" value="${escapeHtml(p.nome||'')}">
+      <div class="prop-doc-wrap">
+        <input class="prop-doc" data-i="${i}" type="text" inputmode="numeric" maxlength="18" placeholder="CPF ou CNPJ" value="${escapeHtml(p.doc||'')}">
+        <span class="prop-doc-badge" data-i="${i}"></span>
+      </div>
+      <button type="button" class="prop-del" data-i="${i}" title="Remover">×</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.prop-nome').forEach(inp=> inp.addEventListener('input', e=>{ edProps[+e.target.dataset.i].nome = e.target.value; }));
+  wrap.querySelectorAll('.prop-doc').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const i=+e.target.dataset.i;
+      e.target.value = mascaraDoc(e.target.value);
+      edProps[i].doc = e.target.value;
+      edAtualizaBadge(i);
+    });
+    edAtualizaBadge(+inp.dataset.i);
+  });
+  wrap.querySelectorAll('.prop-del').forEach(b=> b.addEventListener('click', ()=>{
+    edProps.splice(+b.dataset.i,1); if(!edProps.length) edProps=[{nome:'',doc:''}]; edRenderProps();
+  }));
+}
+function edAtualizaBadge(i){
+  const wrap=document.getElementById('ed-prop-list'); if(!wrap) return;
+  const inp=wrap.querySelector('.prop-doc[data-i="'+i+'"]');
+  const badge=wrap.querySelector('.prop-doc-badge[data-i="'+i+'"]');
+  if(!inp||!badge) return;
+  const d=soDigitos(inp.value); const v=docValido(inp.value);
+  inp.classList.remove('doc-ok','doc-bad');
+  if(d.length===0){ badge.textContent=''; badge.className='prop-doc-badge'; return; }
+  const tipo=docTipo(inp.value);
+  if(v===true){ inp.classList.add('doc-ok'); badge.textContent=tipo+' ✓'; badge.className='prop-doc-badge ok'; }
+  else if(v===false){ inp.classList.add('doc-bad'); badge.textContent=tipo+' inválido'; badge.className='prop-doc-badge bad'; }
+  else { badge.textContent=tipo+'…'; badge.className='prop-doc-badge'; }
+}
+function edAddProp(){ edProps.push({nome:'',doc:''}); edRenderProps();
+  const wrap=document.getElementById('ed-prop-list'); if(wrap){ const ins=wrap.querySelectorAll('.prop-nome'); if(ins.length) ins[ins.length-1].focus(); }
+}
+
 function abrirEdicao(id){
   const it = imoveisCache.find(x=>String(x.id)===String(id));
   if(!it) return;
   document.getElementById('ed-id').value = it.id;
   document.getElementById('ed-identificador').value = it.identificador||'';
   document.getElementById('ed-matricula').value = it.numero_matricula||'';
-  document.getElementById('ed-proprietario').value = it.proprietario||'';
-  document.getElementById('ed-cpf').value = it.cpf||'';
+  // proprietários (nomes e documentos separados por vírgula, pareados por posição)
+  const nomes=(it.proprietario||'').split(',').map(s=>s.trim());
+  const docs=(it.cpf||'').split(',').map(s=>s.trim());
+  edProps=[]; const n=Math.max(nomes.length, docs.length);
+  for(let k=0;k<n;k++){ const nm=nomes[k]||'', dc=docs[k]?mascaraDoc(docs[k]):''; if(nm||dc) edProps.push({nome:nm, doc:dc}); }
+  if(!edProps.length) edProps=[{nome:'',doc:''}];
+  edRenderProps();
   document.getElementById('ed-tipo').value = it.tipo_imovel||'';
   let sitSel='ativa';
   if(it.motivo_situacao==='desmembramento') sitSel='desmembramento';
@@ -3252,11 +3369,17 @@ function edToggleEnc(){
 function fecharEdicao(){ document.getElementById('modal-edit').classList.remove('show'); }
 async function salvarEdicao(){
   const id = document.getElementById('ed-id').value;
+  // proprietários: coleta, valida documentos e junta por vírgula (alinhados por posição)
+  const props = edProps.map(p=>({nome:(p.nome||'').trim(), doc:(p.doc||'').trim()})).filter(p=>p.nome||p.doc);
+  const invalidos = props.filter(p=>p.doc && docValido(p.doc)===false);
+  if(invalidos.length){ setStatus('err','Documento inválido: '+invalidos.map(p=>p.doc).join(', ')+'. Corrija para salvar.'); return; }
+  const proprietario = props.map(p=>p.nome).join(', ');
+  const cpf = props.map(p=>p.doc).join(', ');
   const r = await post({acao:'atualizar_imovel', id,
     identificador: document.getElementById('ed-identificador').value.trim(),
     numero_matricula: document.getElementById('ed-matricula').value.trim(),
-    proprietario: document.getElementById('ed-proprietario').value.trim(),
-    cpf: document.getElementById('ed-cpf').value.trim(),
+    proprietario: proprietario,
+    cpf: cpf,
     tipo_imovel: document.getElementById('ed-tipo').value
   });
   if(!r.ok){ setStatus('err', r.erro||'Falha ao atualizar.'); return; }
@@ -3517,6 +3640,11 @@ function verificarPertencimento(geo){
   // Modal de edição
   const es=document.getElementById('ed-salvar'); if(es) es.addEventListener('click', salvarEdicao);
   const esit=document.getElementById('ed-situacao'); if(esit) esit.addEventListener('change', edToggleEnc);
+  const epadd=document.getElementById('ed-prop-add'); if(epadd) epadd.addEventListener('click', edAddProp);
+  // máscara CPF/CNPJ no campo do formulário principal
+  const cpfMain=document.getElementById('cpf');
+  if(cpfMain){ cpfMain.setAttribute('inputmode','numeric'); cpfMain.setAttribute('maxlength','18');
+    cpfMain.addEventListener('input', ()=>{ cpfMain.value = mascaraDoc(cpfMain.value); }); }
   const eadd=document.getElementById('ed-sucessora-add'); if(eadd) eadd.addEventListener('click', edAddSuc);
   const einp=document.getElementById('ed-sucessora-input'); if(einp) einp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); edAddSuc(); } });
   const ec=document.getElementById('ed-cancelar'); if(ec) ec.addEventListener('click', fecharEdicao);
