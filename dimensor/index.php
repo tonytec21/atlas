@@ -1722,6 +1722,13 @@ if (isset($_POST['acao'])) {
   .ip-row{display:flex;gap:8px;font-size:11.5px;line-height:1.35}
   .ip-k{flex:none;width:78px;color:#64748b;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px}
   .ip-v{flex:1;color:#1f2733;font-weight:600;word-break:break-word}
+  /* Acordeão das opções de cor no popup */
+  .cor-pop-acc{margin-top:2px}
+  .cor-pop-acc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;margin-bottom:0;padding:3px 0;user-select:none}
+  .cor-pop-acc>summary::-webkit-details-marker{display:none}
+  .cor-pop-acc>summary::after{content:'▾';margin-left:auto;font-size:11px;transition:transform .2s}
+  .cor-pop-acc[open]>summary::after{transform:rotate(180deg)}
+  .cor-pop-acc>summary:hover{color:#0d9488}
   /* Dialog do mapa (InfoWindow) no modo escuro */
   body.dark-mode .gm-style .gm-style-iw-c,
   body.dark-mode .gm-style .gm-style-iw-d{background:#161c24 !important}
@@ -3036,11 +3043,13 @@ function abrirSeletorCor(it, e){
   infoWinCor.setContent(`<div class="cor-pop" id="cor-pop">
     <div class="cor-pop-t">Informações do imóvel</div>
     <div class="ip-box">${infoImovelHTML(it)}</div>
-    <div class="cor-pop-lbl">Cor de destaque</div>
-    <div class="cor-pop-grid">${swatchesHTML(atual)}</div>
-    <div class="cor-pop-lbl" style="margin-top:9px">Intensidade</div>
-    <input type="range" id="cor-pop-op" class="op-range" min="${OPAC_MIN}" max="${OPAC_MAX}" step="0.01" value="${op}">
-    <button type="button" class="cor-pop-clear" id="cor-pop-clear">Remover destaque</button>
+    <details class="cor-pop-acc">
+      <summary class="cor-pop-lbl cor-pop-acc-sum">Cor de destaque</summary>
+      <div class="cor-pop-grid" style="margin-top:8px">${swatchesHTML(atual)}</div>
+      <div class="cor-pop-lbl" style="margin-top:9px">Intensidade</div>
+      <input type="range" id="cor-pop-op" class="op-range" min="${OPAC_MIN}" max="${OPAC_MAX}" step="0.01" value="${op}">
+      <button type="button" class="cor-pop-clear" id="cor-pop-clear">Remover destaque</button>
+    </details>
   </div>`);
   infoWinCor.setPosition((e && e.latLng) ? e.latLng : centroidOf(it.pts));
   infoWinCor.open(map);
