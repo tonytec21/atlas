@@ -656,7 +656,19 @@ function onrHttp($method, $url, $token, $jsonBody = null, $putFile = null) {
     $headers = [];
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    // XAMPP/Windows costuma não ter CA bundle configurado -> HTTPS falha (HTTP 0).
+    // Usa o cacert.pem ao lado deste arquivo, se existir; caso contrário não verifica o par.
+    $ca = __DIR__ . '/cacert.pem';
+    if (is_file($ca)) {
+        curl_setopt($ch, CURLOPT_CAINFO, $ca);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+    } else {
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    }
     if ($token) $headers[] = 'Authorization: Bearer ' . $token;
     if ($jsonBody !== null) {
         $headers[] = 'Content-Type: application/json';
@@ -669,10 +681,11 @@ function onrHttp($method, $url, $token, $jsonBody = null, $putFile = null) {
     if ($headers) curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     $body = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $errno = curl_errno($ch);
     $err  = curl_error($ch);
     curl_close($ch);
     $json = json_decode((string)$body, true);
-    return ['code' => $code, 'body' => $body, 'json' => $json, 'erro' => $err];
+    return ['code' => $code, 'body' => $body, 'json' => $json, 'erro' => $err, 'errno' => $errno];
 }
 // Executa o fluxo completo de envio de um imóvel; retorna ['ok'=>bool,'mensagem','importation_id','status']
 function onrEnviarImovel($conn, $id) {
@@ -714,7 +727,11 @@ function onrEnviarImovel($conn, $id) {
     ];
     $r1 = onrHttp('POST', $base . 'api/v1/poligonos/gerar-url-importacao', $token, $payload);
     if ($r1['code'] < 200 || $r1['code'] >= 300 || empty($r1['json']['data']['importation_id'])) {
-        $msg = $r1['json']['mensagem'] ?? ($r1['json']['message'] ?? ('HTTP ' . $r1['code']));
+        if ((int)$r1['code'] === 0) {
+            $detalhe = $r1['erro'] !== '' ? $r1['erro'] : 'sem resposta do servidor';
+            return ['ok' => false, 'mensagem' => 'Não foi possível conectar à API ONR (' . $detalhe . '). Verifique a URL base, a internet do servidor e o certificado SSL (cacert.pem).'];
+        }
+        $msg = $r1['json']['mensagem'] ?? ($r1['json']['message'] ?? ('HTTP ' . $r1['code'] . ($r1['erro'] ? ' — ' . $r1['erro'] : '')));
         return ['ok' => false, 'mensagem' => 'Erro ao gerar URLs: ' . $msg];
     }
     $importId = $r1['json']['data']['importation_id'];
@@ -727,13 +744,18 @@ function onrEnviarImovel($conn, $id) {
         if (!isset($arqs[$ext]) || $upUrl === '') continue;
         $rp = onrHttp('PUT', $upUrl, null, null, $arqs[$ext]);
         if ($rp['code'] < 200 || $rp['code'] >= 300) {
-            return ['ok' => false, 'mensagem' => "Falha no upload de $fn (HTTP {$rp['code']})."];
+            $d = ((int)$rp['code'] === 0 && $rp['erro'] !== '') ? $rp['erro'] : ('HTTP ' . $rp['code']);
+            return ['ok' => false, 'mensagem' => "Falha no upload de $fn ($d)."];
         }
     }
 
     // Passo 3: confirmar
     $r3 = onrHttp('POST', $base . 'api/v1/poligonos/confirmar', $token, ['importation_id' => $importId]);
     if ($r3['code'] < 200 || $r3['code'] >= 300) {
+        if ((int)$r3['code'] === 0) {
+            $d = $r3['erro'] !== '' ? $r3['erro'] : 'sem resposta do servidor';
+            return ['ok' => false, 'mensagem' => 'Não foi possível confirmar na API ONR (' . $d . ').', 'importation_id' => $importId];
+        }
         $msg = $r3['json']['mensagem'] ?? ($r3['json']['message'] ?? ('HTTP ' . $r3['code']));
         return ['ok' => false, 'mensagem' => 'Erro ao confirmar: ' . $msg, 'importation_id' => $importId];
     }
