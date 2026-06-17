@@ -3200,6 +3200,27 @@ function filtrarOverlaps(){
   const btn=document.getElementById('btn-relatorio');
   if(btn) btn.textContent = termo ? 'Gerar relatório do imóvel filtrado (PDF)' : 'Gerar relatório de sobreposição (PDF)';
   desenharListaOverlaps(lista, termoRaw);
+  agendarFocoBusca(termoRaw);
+}
+let buscaFocusTimer=null;
+function agendarFocoBusca(termoRaw){
+  if(buscaFocusTimer) clearTimeout(buscaFocusTimer);
+  if(!termoRaw || termoRaw.length<2) return;
+  buscaFocusTimer = setTimeout(()=>focarImovelBusca(termoRaw), 450);
+}
+function focarImovelBusca(termoRaw){
+  if(modo!=='overview' || !itensOverview || !itensOverview.length) return;
+  const termo = termoRaw.toLowerCase();
+  const td = normMat(termoRaw);
+  const matches = itensOverview.filter(it=>{
+    const txt = [it.identificador, it.numero_matricula].some(c=>(c==null?'':String(c)).toLowerCase().includes(termo));
+    const doc = td && normMat(it.numero_matricula) && normMat(it.numero_matricula).includes(td);
+    return txt || doc;
+  });
+  if(!matches.length) return;
+  const b = new google.maps.LatLngBounds();
+  matches.forEach(it=>{ (it.pts||[]).forEach(p=>b.extend({lat:p[0],lng:p[1]})); });
+  if(!b.isEmpty()) map.fitBounds(b, 70);
 }
 function desenharListaOverlaps(overlaps, termo){
   const box=document.getElementById('ov-overlaps');
