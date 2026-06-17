@@ -1,0 +1,2568 @@
+<?php
+/* =====================================================================
+ *  index.php (Atlas Dimensor)  —  Sistema Atlas
+ *  Lê memoriais descritivos com coordenadas geográficas em GMS
+ *  (graus/minutos/segundos), mapeia no Google Maps e grava no banco
+ *  identificando o imóvel por nome ou número de matrícula.
+ *
+ *  Endpoints (POST acao=...):
+ *    - processar : parseia o memorial e devolve pontos/área/perímetro
+ *    - salvar    : grava o memorial mapeado na tabela memoriais_mapeados
+ *    - listar    : lista memoriais já salvos
+ *    - carregar  : devolve um memorial salvo pelo id
+ *    - excluir   : remove um memorial salvo
+ * ===================================================================== */
+
+// ----- Integração com o Atlas: protege por sessão e usa a conexão mysqli padrão -----
+require_once __DIR__ . '/session_check.php';
+checkSession();                              // redireciona para ../login.php se não autenticado
+require_once __DIR__ . '/db_connection2.php'; // fornece $conn (mysqli), padrão do Atlas
+
+// Fuso horário do Maranhão (UTC-3, sem horário de verão) — corrige a data/hora dos relatórios.
+date_default_timezone_set('America/Fortaleza');
+
+/* ---------- Chave do Google Maps ---------- */
+// Chave do mapa dinâmico (navegador). Pode ter restrição por "referer".
+define('GMAPS_KEY', 'AIzaSyCeFWemOC1xUDqaZlSAu0yGYp8zJWQqpyk');
+// Chave do Static Maps (usado pelo SERVIDOR ao gerar o PDF). Se a chave acima
+// tiver restrição por referer, ela NÃO funciona no servidor — crie/use aqui uma
+// chave sem restrição de referer (ou com restrição por IP do servidor) e com a
+// "Maps Static API" habilitada no Google Cloud.
+define('GMAPS_STATIC_KEY', 'AIzaSyD_uaOpwEVncDlEqhZ56fxjmVjySRl2h_0');
+
+/* ---------- Diagnóstico do Static Maps: acesse dimensor/index.php?diag_staticmap=1 ---------- */
+if (isset($_GET['diag_staticmap'])) {
+    header('Content-Type: text/plain; charset=UTF-8');
+    $url = 'https://maps.googleapis.com/maps/api/staticmap?center=-4.14,-46.9&zoom=12&size=400x200&maptype=hybrid&key=' . GMAPS_STATIC_KEY;
+    echo "Teste de geração de imagem do mapa (lado servidor)\n";
+    echo str_repeat('-', 60) . "\n";
+    echo "URL:\n$url\n\n";
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true]);
+        $data = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $ctype = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        echo "cURL: disponível\n";
+        echo "HTTP status: $code\n";
+        echo "Content-Type: $ctype\n";
+        echo "Erro cURL: " . ($err !== '' ? $err : '(nenhum)') . "\n";
+        echo "Tamanho da resposta: " . strlen((string)$data) . " bytes\n\n";
+        if (strpos($ctype, 'image') !== false) {
+            echo "RESULTADO: OK — o Google retornou uma IMAGEM. O relatório deve exibir o mapa.\n";
+        } else {
+            echo "RESULTADO: FALHA — o Google NÃO retornou imagem. Mensagem recebida:\n\n";
+            echo substr((string)$data, 0, 3000) . "\n";
+        }
+    } else {
+        echo "cURL: INDISPONÍVEL\n";
+        echo "allow_url_fopen: " . (ini_get('allow_url_fopen') ? 'on' : 'OFF (impede o download da imagem)') . "\n";
+        $data = @file_get_contents($url);
+        echo "Tamanho da resposta: " . strlen((string)$data) . " bytes\n";
+    }
+    exit;
+}
+
+/* ====================================================================
+ *  BIBLIOTECA DE COORDENADAS
+ * ==================================================================== */
+
+/** Normaliza codificação e símbolos (°, ', ") do texto do memorial. */
+function normalizeGeoText($text) {
+    if (function_exists('mb_check_encoding') && !mb_check_encoding($text, 'UTF-8')) {
+        $text = mb_convert_encoding($text, 'UTF-8', 'UTF-8, Windows-1252, ISO-8859-1');
+    }
+    $text = str_replace(["\xC2\xBA", "\xC2\xB0", "&deg;", "&#176;", "&ordm;", "&#186;"], '°', $text);
+    $text = str_replace(["\xE2\x80\x98", "\xE2\x80\x99", "\xC2\xB4", "`", "\xE2\x80\xB2"], "'", $text);
+    $text = str_replace(["\xE2\x80\x9C", "\xE2\x80\x9D", "\xE2\x80\xB3", "''"], '"', $text);
+    return $text;
+}
+
+/** Converte Graus/Minutos/Segundos para grau decimal. */
+function dmsToDecimal($deg, $min, $sec) {
+    $negative = strpos((string)$deg, '-') !== false;
+    $d = abs((float) str_replace(',', '.', preg_replace('/[^\d.,\-]/', '', (string)$deg)));
+    $m = (float) str_replace(',', '.', (string)$min);
+    $s = (float) str_replace(',', '.', (string)$sec);
+    $dec = $d + ($m / 60.0) + ($s / 3600.0);
+    return $negative ? -$dec : $dec;
+}
+
+/** Extrai todos os valores GMS rotulados por "long..." ou "lat...". */
+function extractByLabel($text, $label) {
+    $re = '/' . $label . '(?:itude)?\.?\s*(-?\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"/iu';
+    preg_match_all($re, $text, $m, PREG_SET_ORDER);
+    $out = [];
+    foreach ($m as $x) {
+        $out[] = dmsToDecimal($x[1], $x[2], $x[3]);
+    }
+    return $out;
+}
+
+/**
+ * Extrai coordenadas geográficas (lat/lng) do memorial.
+ * Longitudes e latitudes são extraídas de forma independente e pareadas
+ * por índice — robusto a variações de espaçamento e do conector.
+ */
+function extractGeoCoordinates($rawText) {
+    $t = normalizeGeoText($rawText);
+    $lons = extractByLabel($t, 'long');
+    $lats = extractByLabel($t, 'lat');
+    $n = min(count($lons), count($lats));
+    $pts = [];
+    for ($i = 0; $i < $n; $i++) {
+        $lat = $lats[$i];
+        $lng = $lons[$i];
+        if ($lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) {
+            $pts[] = [$lat, $lng];
+        }
+    }
+    return ['pts' => $pts, 'lon_count' => count($lons), 'lat_count' => count($lats)];
+}
+
+/** Projeção geográfica -> UTM (Transversa de Mercator, SIRGAS2000/WGS84). */
+function geoToUTM($lat, $lon, $zone = 23) {
+    $a = 6378137.0; $f = 1 / 298.257223563; $k0 = 0.9996;
+    $e2 = $f * (2 - $f); $ep2 = $e2 / (1 - $e2);
+    $lon0 = deg2rad(($zone - 1) * 6 - 180 + 3);
+    $latR = deg2rad($lat); $lonR = deg2rad($lon);
+    $N = $a / sqrt(1 - $e2 * sin($latR) ** 2);
+    $T = tan($latR) ** 2; $C = $ep2 * cos($latR) ** 2;
+    $A = cos($latR) * ($lonR - $lon0);
+    $M = $a * ((1 - $e2 / 4 - 3 * $e2 ** 2 / 64 - 5 * $e2 ** 3 / 256) * $latR
+        - (3 * $e2 / 8 + 3 * $e2 ** 2 / 32 + 45 * $e2 ** 3 / 1024) * sin(2 * $latR)
+        + (15 * $e2 ** 2 / 256 + 45 * $e2 ** 3 / 1024) * sin(4 * $latR)
+        - (35 * $e2 ** 3 / 3072) * sin(6 * $latR));
+    $east = $k0 * $N * ($A + (1 - $T + $C) * $A ** 3 / 6
+        + (5 - 18 * $T + $T ** 2 + 72 * $C - 58 * $ep2) * $A ** 5 / 120) + 500000.0;
+    $north = $k0 * ($M + $N * tan($latR) * ($A ** 2 / 2
+        + (5 - $T + 9 * $C + 4 * $C ** 2) * $A ** 4 / 24
+        + (61 - 58 * $T + $T ** 2 + 600 * $C - 330 * $ep2) * $A ** 6 / 720));
+    if ($lat < 0) $north += 10000000.0;
+    return [$east, $north];
+}
+
+/** Área do polígono em hectares (fórmula de Gauss sobre coordenadas UTM). */
+function polygonAreaHa($pts) {
+    $u = array_map(function ($p) { return geoToUTM($p[0], $p[1]); }, $pts);
+    $a = 0; $k = count($u);
+    for ($i = 0; $i < $k; $i++) {
+        $j = ($i + 1) % $k;
+        $a += $u[$i][0] * $u[$j][1] - $u[$j][0] * $u[$i][1];
+    }
+    return abs($a) / 2.0 / 10000.0;
+}
+
+function haversine($a, $b) {
+    $R = 6378137; $d2r = M_PI / 180;
+    $dLat = ($b[0] - $a[0]) * $d2r; $dLon = ($b[1] - $a[1]) * $d2r;
+    $s = sin($dLat / 2) ** 2 + cos($a[0] * $d2r) * cos($b[0] * $d2r) * sin($dLon / 2) ** 2;
+    return 2 * $R * asin(sqrt($s));
+}
+
+/** Perímetro do polígono fechado, em metros. */
+function polygonPerimeterM($pts) {
+    $p = 0; $k = count($pts);
+    for ($i = 0; $i < $k; $i++) {
+        $j = ($i + 1) % $k;
+        $p += haversine($pts[$i], $pts[$j]);
+    }
+    return $p;
+}
+
+/** Núcleo: monta o pacote de dados a partir de uma lista de pontos [[lat,lng],...]. */
+function buildGeoDataFromPoints($pts) {
+    if (count($pts) < 3) {
+        return ['ok' => false, 'num_vertices' => count($pts)];
+    }
+    $utm = array_map(function ($p) { return geoToUTM($p[0], $p[1]); }, $pts);
+    $cenLat = array_sum(array_column($pts, 0)) / count($pts);
+    $cenLng = array_sum(array_column($pts, 1)) / count($pts);
+
+    $wgs84Str = implode(' ', array_map(function ($p) {
+        return number_format($p[0], 8, '.', '') . ',' . number_format($p[1], 8, '.', '');
+    }, $pts));
+    $utmStr = implode(' ', array_map(function ($u) {
+        return number_format($u[0], 2, '.', '') . ',' . number_format($u[1], 2, '.', '');
+    }, $utm));
+
+    return [
+        'ok' => true,
+        'pts' => $pts,                       // [[lat,lng], ...] para o Google Maps
+        'num_vertices' => count($pts),
+        'area_ha' => polygonAreaHa($pts),
+        'perimetro_m' => polygonPerimeterM($pts),
+        'centro_lat' => $cenLat,
+        'centro_lng' => $cenLng,
+        'coordenadas_wgs84' => $wgs84Str,
+        'coordenadas_utm' => $utmStr,        // formato "east,north ..."
+    ];
+}
+
+/** Monta o pacote a partir do texto de um memorial descritivo (GMS). */
+function buildGeoData($memorial) {
+    $res = extractGeoCoordinates($memorial);
+    $data = buildGeoDataFromPoints($res['pts']);
+    $data['lon_count'] = $res['lon_count'];
+    $data['lat_count'] = $res['lat_count'];
+    return $data;
+}
+
+/** Reconstrói o pacote a partir da string "lat,lng lat,lng ..." gravada no banco. */
+function buildGeoDataFromWgs84($str) {
+    $pts = [];
+    foreach (preg_split('/\s+/', trim((string)$str)) as $par) {
+        if ($par === '') continue;
+        $xy = explode(',', $par);
+        if (count($xy) >= 2 && is_numeric($xy[0]) && is_numeric($xy[1])) {
+            $pts[] = [(float)$xy[0], (float)$xy[1]];
+        }
+    }
+    return buildGeoDataFromPoints($pts);
+}
+
+/**
+ * Lê um arquivo KML e devolve os placemarks: [['nome'=>..., 'pts'=>[[lat,lng],...]], ...].
+ * KML usa a ordem "longitude,latitude,altitude" — invertida em relação ao mapa.
+ */
+function parseKml($kml) {
+    $kml = normalizeGeoText($kml);
+    $placemarks = [];
+
+    // Captura cada <Placemark> ... </Placemark> (case-insensitive, multiline)
+    if (preg_match_all('/<Placemark\b[^>]*>(.*?)<\/Placemark>/is', $kml, $pmMatches)) {
+        foreach ($pmMatches[1] as $bloco) {
+            // nome do placemark
+            $nome = '';
+            if (preg_match('/<name\b[^>]*>(.*?)<\/name>/is', $bloco, $nm)) {
+                $nome = trim(html_entity_decode(strip_tags($nm[1]), ENT_QUOTES, 'UTF-8'));
+            }
+            // todos os blocos de <coordinates> dentro do placemark (anel externo)
+            if (preg_match('/<coordinates\b[^>]*>(.*?)<\/coordinates>/is', $bloco, $cm)) {
+                $pts = parseKmlCoordinates($cm[1]);
+                if (count($pts) >= 3) {
+                    $placemarks[] = ['nome' => $nome, 'pts' => $pts];
+                }
+            }
+        }
+    }
+
+    // Fallback: KML sem <Placemark> explícito, só com <coordinates>
+    if (empty($placemarks) && preg_match_all('/<coordinates\b[^>]*>(.*?)<\/coordinates>/is', $kml, $all)) {
+        foreach ($all[1] as $i => $bloco) {
+            $pts = parseKmlCoordinates($bloco);
+            if (count($pts) >= 3) {
+                $placemarks[] = ['nome' => 'Polígono ' . ($i + 1), 'pts' => $pts];
+            }
+        }
+    }
+
+    return $placemarks;
+}
+
+/** Converte o conteúdo de <coordinates> (lon,lat[,alt] separados por espaço) em [[lat,lng],...]. */
+function parseKmlCoordinates($raw) {
+    $pts = [];
+    $tokens = preg_split('/\s+/', trim($raw));
+    foreach ($tokens as $tok) {
+        if ($tok === '') continue;
+        $c = explode(',', $tok);
+        if (count($c) < 2) continue;
+        $lng = (float)$c[0];   // KML: longitude primeiro
+        $lat = (float)$c[1];
+        if ($lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) {
+            $pts[] = [$lat, $lng];
+        }
+    }
+    // remove o vértice de fechamento repetido (KML fecha o anel: 1º == último)
+    if (count($pts) > 3) {
+        $a = $pts[0]; $b = end($pts);
+        if (abs($a[0] - $b[0]) < 1e-9 && abs($a[1] - $b[1]) < 1e-9) {
+            array_pop($pts);
+        }
+    }
+    return $pts;
+}
+
+/** Processa uma fonte (memorial ou kml) e devolve o pacote de geometria. */
+function processarFonte($origem, $conteudo) {
+    if ($origem === 'kml') {
+        $pm = parseKml($conteudo);
+        if (empty($pm)) return ['ok' => false, 'num_vertices' => 0];
+        return buildGeoDataFromPoints($pm[0]['pts']);
+    }
+    return buildGeoData($conteudo);
+}
+
+/* ====================================================================
+ *  BANCO DE DADOS
+ * ==================================================================== */
+
+function ensureTable($conn) {
+    $sql = "CREATE TABLE IF NOT EXISTS memoriais_mapeados (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        identificador VARCHAR(255) NOT NULL,
+        tipo_identificador VARCHAR(20) NOT NULL DEFAULT 'nome',
+        origem VARCHAR(20) NOT NULL DEFAULT 'memorial',
+        imovel_id INT NULL,
+        memorial_descritivo MEDIUMTEXT,
+        num_vertices INT,
+        area_ha DECIMAL(16,4),
+        perimetro_m DECIMAL(16,2),
+        centro_lat DECIMAL(12,8),
+        centro_lng DECIMAL(12,8),
+        coordenadas_wgs84 MEDIUMTEXT,
+        coordenadas_utm MEDIUMTEXT,
+        cor VARCHAR(20) NULL DEFAULT NULL,
+        cor_opacidade DECIMAL(3,2) NULL DEFAULT NULL,
+        numero_matricula VARCHAR(60) NULL DEFAULT NULL,
+        proprietario VARCHAR(180) NULL DEFAULT NULL,
+        cpf VARCHAR(20) NULL DEFAULT NULL,
+        tipo_imovel VARCHAR(12) NULL DEFAULT NULL,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+    $conn->query($sql);
+
+    // Compatibilidade: adiciona a coluna 'origem' se a tabela já existia sem ela
+    $col = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE 'origem'");
+    if ($col && $col->num_rows === 0) {
+        $conn->query("ALTER TABLE memoriais_mapeados ADD COLUMN origem VARCHAR(20) NOT NULL DEFAULT 'memorial' AFTER tipo_identificador");
+    }
+
+    // Compatibilidade: coluna 'cor' (destaque do imóvel no mapa)
+    $colCor = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE 'cor'");
+    if ($colCor && $colCor->num_rows === 0) {
+        $conn->query("ALTER TABLE memoriais_mapeados ADD COLUMN cor VARCHAR(20) NULL DEFAULT NULL");
+    }
+
+    // Compatibilidade: campos de cadastro do imóvel + intensidade da cor
+    $novas = [
+        'numero_matricula' => "ADD COLUMN numero_matricula VARCHAR(60) NULL DEFAULT NULL",
+        'proprietario'     => "ADD COLUMN proprietario VARCHAR(180) NULL DEFAULT NULL",
+        'cpf'              => "ADD COLUMN cpf VARCHAR(20) NULL DEFAULT NULL",
+        'tipo_imovel'      => "ADD COLUMN tipo_imovel VARCHAR(12) NULL DEFAULT NULL",
+        'cor_opacidade'    => "ADD COLUMN cor_opacidade DECIMAL(3,2) NULL DEFAULT NULL",
+    ];
+    foreach ($novas as $colNome => $ddl) {
+        $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colNome) . "'");
+        if ($c && $c->num_rows === 0) { $conn->query("ALTER TABLE memoriais_mapeados " . $ddl); }
+    }
+}
+
+/** Tenta localizar um imóvel existente pela matrícula. */
+function findImovelIdByMatricula($conn, $matricula) {
+    try {
+        // O Atlas usa a coluna 'numero' em cadastro_de_imoveis; outros sistemas usam
+        // 'numero_matricula'. Detecta qual coluna existe para vincular o imóvel.
+        $coluna = null;
+        foreach (array('numero_matricula', 'numero', 'matricula') as $cand) {
+            $chk = @$conn->query("SHOW COLUMNS FROM cadastro_de_imoveis LIKE '" . $conn->real_escape_string($cand) . "'");
+            if ($chk && $chk->num_rows > 0) { $coluna = $cand; break; }
+        }
+        if ($coluna === null) return null;
+
+        $stmt = $conn->prepare("SELECT id FROM cadastro_de_imoveis WHERE `$coluna` = ? LIMIT 1");
+        if (!$stmt) return null;
+        $stmt->bind_param('s', $matricula);
+        $stmt->execute();
+        $r = $stmt->get_result();
+        $row = $r ? $r->fetch_assoc() : null;
+        return $row ? (int)$row['id'] : null;
+    } catch (Throwable $e) {
+        // Se a tabela/coluna não existir neste ambiente, apenas não vincula o imóvel.
+        return null;
+    }
+}
+
+/** Insere um imóvel mapeado e devolve o id gerado. */
+function inserirMemorial($conn, $identificador, $tipo, $origem, $imovelId, $fonte, $data, $numMatricula = '', $proprietario = '', $cpf = '', $tipoImovel = '') {
+    $nm = ($numMatricula !== '') ? $numMatricula : null;
+    $pr = ($proprietario !== '') ? $proprietario : null;
+    $cp = ($cpf !== '') ? $cpf : null;
+    $ti = in_array($tipoImovel, ['urbano', 'rural'], true) ? $tipoImovel : null;
+    $stmt = $conn->prepare(
+        "INSERT INTO memoriais_mapeados
+         (identificador, tipo_identificador, origem, imovel_id, memorial_descritivo,
+          num_vertices, area_ha, perimetro_m, centro_lat, centro_lng,
+          coordenadas_wgs84, coordenadas_utm,
+          numero_matricula, proprietario, cpf, tipo_imovel)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    $stmt->bind_param(
+        'sssisiddddssssss',
+        $identificador, $tipo, $origem, $imovelId, $fonte,
+        $data['num_vertices'], $data['area_ha'], $data['perimetro_m'],
+        $data['centro_lat'], $data['centro_lng'],
+        $data['coordenadas_wgs84'], $data['coordenadas_utm'],
+        $nm, $pr, $cp, $ti
+    );
+    $stmt->execute();
+    return $stmt->insert_id;
+}
+
+/* ====================================================================
+ *  RELATÓRIO DE SOBREPOSIÇÃO (PDF / TCPDF)
+ * ==================================================================== */
+
+/** Codifica um número no algoritmo de polyline do Google. */
+function encodePolylineNumber($num) {
+    $num = $num << 1;
+    if ($num < 0) $num = ~$num;
+    $chunks = '';
+    while ($num >= 0x20) {
+        $chunks .= chr((0x20 | ($num & 0x1f)) + 63);
+        $num >>= 5;
+    }
+    $chunks .= chr($num + 63);
+    return $chunks;
+}
+
+/** Codifica uma lista de pontos [[lat,lng],...] em polyline (encurta a URL do Static Maps). */
+function encodePolyline($points) {
+    $result = ''; $prevLat = 0; $prevLng = 0;
+    foreach ($points as $p) {
+        $lat = (int) round($p[0] * 1e5);
+        $lng = (int) round($p[1] * 1e5);
+        $result .= encodePolylineNumber($lat - $prevLat);
+        $result .= encodePolylineNumber($lng - $prevLng);
+        $prevLat = $lat; $prevLng = $lng;
+    }
+    return $result;
+}
+
+/** Fecha o anel (1º vértice == último) para o preenchimento do polígono. */
+function closeRing($pts) {
+    if (count($pts) < 2) return $pts;
+    $f = $pts[0]; $l = end($pts);
+    if (abs($f[0] - $l[0]) > 1e-12 || abs($f[1] - $l[1]) > 1e-12) $pts[] = $f;
+    return $pts;
+}
+
+/** Monta a URL do Google Static Maps com imóvel A, imóvel B e a sobreposição destacada. */
+function staticMapUrlSobreposicao($polyA, $polyB, $rings, $key) {
+    $params = ['size=640x360', 'scale=2', 'maptype=hybrid', 'format=png'];
+    if ($polyA && count($polyA) >= 3) {
+        $v = 'color:0x3b82f6ff|weight:2|fillcolor:0x3b82f633|enc:' . encodePolyline(closeRing($polyA));
+        $params[] = 'path=' . rawurlencode($v);
+    }
+    if ($polyB && count($polyB) >= 3) {
+        $v = 'color:0xeab308ff|weight:2|fillcolor:0xeab30833|enc:' . encodePolyline(closeRing($polyB));
+        $params[] = 'path=' . rawurlencode($v);
+    }
+    if (is_array($rings)) {
+        foreach ($rings as $ring) {
+            if (count($ring) >= 3) {
+                $v = 'color:0xe2342fff|weight:2|fillcolor:0xe2342fcc|enc:' . encodePolyline(closeRing($ring));
+                $params[] = 'path=' . rawurlencode($v);
+            }
+        }
+    }
+    $params[] = 'key=' . $key;
+    return 'https://maps.googleapis.com/maps/api/staticmap?' . implode('&', $params);
+}
+
+/** Busca os bytes de uma imagem por URL (cURL ou file_get_contents). */
+function fetchImageBytes($url, &$erro = null) {
+    $erro = '';
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12,
+            CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
+        ]);
+        $data = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $ctype = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $cerr = curl_error($ch);
+        curl_close($ch);
+        if ($data !== false && $code === 200 && strpos($ctype, 'image') !== false) return $data;
+        if ($cerr !== '') { $erro = 'cURL: ' . $cerr; }
+        elseif ($code !== 200) { $erro = 'HTTP ' . $code . ($data ? ' — ' . substr(strip_tags((string)$data), 0, 120) : ''); }
+        else { $erro = 'resposta sem imagem (' . $ctype . ')'; }
+        return false;
+    }
+    if (!ini_get('allow_url_fopen')) { $erro = 'allow_url_fopen desligado'; return false; }
+    $ctx = stream_context_create(['http' => ['timeout' => 12]]);
+    $data = @file_get_contents($url, false, $ctx);
+    if ($data === false) { $erro = 'file_get_contents falhou'; return false; }
+    return $data;
+}
+
+/** Busca texto (JSON/GeoJSON) por URL — usado para as malhas/municípios do IBGE. */
+function httpGetText($url, &$erro = null) {
+    $erro = '';
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 25,
+            CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTPHEADER => ['Accept: application/json, application/vnd.geo+json'],
+            CURLOPT_USERAGENT => 'Atlas-Mapeador/1.0',
+        ]);
+        $data = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $cerr = curl_error($ch);
+        curl_close($ch);
+        if ($data !== false && $code >= 200 && $code < 300) return $data;
+        if ($cerr !== '') { $erro = 'cURL: ' . $cerr; }
+        else { $erro = 'HTTP ' . $code . ($data ? ' — ' . substr(strip_tags((string)$data), 0, 200) : ''); }
+        return false;
+    }
+    if (!ini_get('allow_url_fopen')) { $erro = 'allow_url_fopen desligado'; return false; }
+    $ctx = stream_context_create(['http' => ['timeout' => 25, 'header' => "Accept: application/json\r\n"]]);
+    $data = @file_get_contents($url, false, $ctx);
+    if ($data === false) { $erro = 'file_get_contents falhou'; return false; }
+    return $data;
+}
+
+/** Coloca uma imagem (binário PNG) no PDF, respeitando a quebra de página. */
+function pdfColocarImagem($pdf, $imgData, $w = 182, $ratio = 0.5625) {
+    if ($imgData === false || $imgData === null) return false;
+    $h = $w * $ratio;
+    if ($pdf->GetY() + $h > $pdf->getPageHeight() - 18) $pdf->AddPage();
+    $tmp = tempnam(sys_get_temp_dir(), 'sm') . '.png';
+    file_put_contents($tmp, $imgData);
+    $pdf->Image($tmp, 14, $pdf->GetY(), $w, 0, 'PNG');
+    $pdf->SetY($pdf->GetY() + $h + 3);
+    @unlink($tmp);
+    return true;
+}
+
+/** Mapa geral: todos os imóveis (azul) + regiões de sobreposição (vermelho). */
+function staticMapUrlGeral($imoveisById, $allRings, $key) {
+    $base = 'https://maps.googleapis.com/maps/api/staticmap?size=640x420&scale=2&maptype=hybrid&format=png';
+    $paths = '';
+    // regiões de sobreposição primeiro (sempre incluídas)
+    if (is_array($allRings)) {
+        foreach ($allRings as $ring) {
+            if (count($ring) >= 3) {
+                $paths .= '&path=' . rawurlencode('color:0xe2342fff|weight:2|fillcolor:0xe2342fcc|enc:' . encodePolyline(closeRing($ring)));
+            }
+        }
+    }
+    // contornos dos imóveis (limita o tamanho da URL ~8000 chars)
+    foreach ($imoveisById as $pts) {
+        if (count($pts) < 3) continue;
+        $p = '&path=' . rawurlencode('color:0x3b82f6ff|weight:2|fillcolor:0x3b82f622|enc:' . encodePolyline(closeRing($pts)));
+        if (strlen($base . $paths . $p) > 8000) break;
+        $paths .= $p;
+    }
+    return $base . $paths . '&key=' . $key;
+}
+
+/** Lê os pontos [[lat,lng],...] de um imóvel pelo id. */
+function ptsById($conn, $id) {
+    $stmt = $conn->prepare("SELECT coordenadas_wgs84 FROM memoriais_mapeados WHERE id = ?");
+    if (!$stmt) return [];
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $r = $stmt->get_result();
+    $row = $r ? $r->fetch_assoc() : null;
+    if (!$row) return [];
+    $pts = [];
+    foreach (preg_split('/\s+/', trim((string)$row['coordenadas_wgs84'])) as $par) {
+        if ($par === '') continue;
+        $xy = explode(',', $par);
+        if (count($xy) >= 2) $pts[] = [(float)$xy[0], (float)$xy[1]];
+    }
+    return $pts;
+}
+
+function gerarRelatorioSobreposicaoPDF($dados) {
+    // TCPDF compartilhado do Atlas (mesma instância usada por recibo/guia em os/)
+    if (file_exists(__DIR__ . '/../oficios/tcpdf/tcpdf.php')) {
+        require_once __DIR__ . '/../oficios/tcpdf/tcpdf.php';
+    } else {
+        require_once __DIR__ . '/tcpdf/tcpdf.php';
+    }
+
+    if (!class_exists('RelatorioSobrepPDF')) {
+        class RelatorioSobrepPDF extends TCPDF {
+            public function Header() {
+                // Timbrado FORÇADO a 100% da folha (estica para A4, ignorando a proporção da imagem).
+                $timbrado = __DIR__ . '/../style/img/timbrado.png';
+                if (@file_exists($timbrado)) {
+                    $pw = $this->getPageWidth();
+                    $ph = $this->getPageHeight();
+                    // O fitBlock do TCPDF encolhe a imagem para caber nas margens; por isso zeramos
+                    // temporariamente margens e quebra de página só para desenhar o timbrado em página cheia.
+                    $oldL = $this->lMargin; $oldR = $this->rMargin; $oldT = $this->tMargin;
+                    $oldB = $this->bMargin; $oldAPB = $this->AutoPageBreak;
+                    $this->lMargin = 0; $this->rMargin = 0; $this->tMargin = 0;
+                    $this->SetAutoPageBreak(false, 0);
+                    // type '' = autodetecta o formato (caso o timbrado seja trocado por JPG etc.)
+                    @$this->Image($timbrado, 0, 0, $pw, $ph, '', '', '', false, 300, '', false, false, 0, false, false, false);
+                    // restaura o estado original para o conteúdo
+                    $this->lMargin = $oldL; $this->rMargin = $oldR; $this->tMargin = $oldT;
+                    $this->SetAutoPageBreak($oldAPB, $oldB);
+                } else {
+                    // Fallback: barra vermelha caso o timbrado não exista neste ambiente
+                    $this->SetFillColor(168, 15, 30);
+                    $this->Rect(0, 0, $this->getPageWidth(), 24, 'F');
+                    $this->SetTextColor(255, 255, 255);
+                    $this->SetFont('helvetica', 'B', 14);
+                    $this->SetXY(14, 6);
+                    $this->Cell(0, 8, 'RELATÓRIO DE SOBREPOSIÇÃO DE IMÓVEIS', 0, 1, 'L');
+                    $this->SetTextColor(0, 0, 0);
+                }
+            }
+            public function Footer() {
+                // Rodapé técnico posicionado acima do endereço do timbrado (que fica no pé da folha)
+                $this->SetY(-22);
+                $this->SetFont('helvetica', '', 7);
+                $this->SetTextColor(120, 120, 120);
+                $this->Cell(0, 5, 'Emitido em ' . date('d/m/Y H:i') . ' — Atlas Dimensor / Sistema Atlas', 0, 0, 'L');
+                $this->Cell(0, 5, 'Página ' . $this->getAliasNumPage() . ' de ' . $this->getAliasNbPages(), 0, 0, 'R');
+            }
+        }
+    }
+
+    $overlaps = isset($dados['overlaps']) && is_array($dados['overlaps']) ? $dados['overlaps'] : [];
+    $totalImoveis = isset($dados['total_imoveis']) ? (int)$dados['total_imoveis'] : 0;
+    $br = function ($v, $d = 2) { return number_format((float)$v, $d, ',', '.'); };
+
+    // Carrega os polígonos apenas dos imóveis envolvidos nas sobreposições do relatório
+    global $conn;
+    $imoveisById = [];
+    if ($conn) {
+        $ids = [];
+        foreach ($overlaps as $o) {
+            if (isset($o['a']['id'])) $ids[(int)$o['a']['id']] = true;
+            if (isset($o['b']['id'])) $ids[(int)$o['b']['id']] = true;
+        }
+        foreach (array_keys($ids) as $id) {
+            $pts = ptsById($conn, $id);
+            if (count($pts) >= 3) $imoveisById[$id] = $pts;
+        }
+    }
+
+    $areaTotal = 0;
+    foreach ($overlaps as $o) { $areaTotal += isset($o['area_ha']) ? (float)$o['area_ha'] : 0; }
+
+    $pdf = new RelatorioSobrepPDF('P', 'mm', 'A4', true, 'UTF-8');
+    $pdf->SetCreator('Sistema Atlas');
+    $pdf->SetTitle('Relatório de Sobreposição de Imóveis');
+    $pdf->setHeaderMargin(0);       // timbrado encosta no topo da folha
+    $pdf->setFooterMargin(26);      // reserva o pé da folha para o rodapé do timbrado
+    $pdf->setImageScale(1);
+    $pdf->SetMargins(14, 42, 14);   // topo 42 para limpar o cabeçalho do timbrado
+    $pdf->SetAutoPageBreak(true, 28);// fundo 28 para o conteúdo não invadir o rodapé do timbrado
+    $pdf->AddPage();
+
+    // ---- Título do relatório (no corpo, pois o cabeçalho agora é o timbrado) ----
+    $titulo = '<div style="text-align:center">'
+        . '<span style="font-size:15px;font-weight:bold;color:#a80f1e">RELATÓRIO DE SOBREPOSIÇÃO DE IMÓVEIS</span><br>'
+        . '<span style="font-size:9px;color:#555555">Análise técnica para verificação e correção — Sistema Atlas</span>'
+        . '</div><br>';
+    $pdf->writeHTML($titulo, true, false, true, false, '');
+
+    // ---- Resumo ----
+    $resumo = '
+    <style>
+      .box { border:1px solid #d9d9d9; background:#f6f6f6; }
+      td { font-family:helvetica; }
+      .k { color:#555; }
+      .v { font-weight:bold; }
+    </style>
+    <table cellpadding="5" class="box">
+      <tr>
+        <td width="33%"><span class="k">Data da análise</span><br><span class="v">' . date('d/m/Y H:i') . '</span></td>
+        <td width="33%"><span class="k">Imóveis analisados</span><br><span class="v">' . $totalImoveis . '</span></td>
+        <td width="34%"><span class="k">Sobreposições detectadas</span><br><span class="v" style="color:#a80f1e">' . count($overlaps) . '</span></td>
+      </tr>
+      <tr>
+        <td colspan="3"><span class="k">Área total sobreposta</span> &nbsp; <span class="v">' . $br($areaTotal, 4) . ' ha</span> &nbsp;(' . $br($areaTotal * 10000, 2) . ' m²)</td>
+      </tr>
+    </table><br>';
+    $pdf->writeHTML($resumo, true, false, true, false, '');
+
+    // ---- Imagem do mapa geral (imóveis + sobreposições) ----
+    if (!empty($overlaps) && !empty($imoveisById)) {
+        $allRings = [];
+        foreach ($overlaps as $o) {
+            if (!empty($o['rings']) && is_array($o['rings'])) {
+                foreach ($o['rings'] as $r) $allRings[] = $r;
+            }
+        }
+        $erroImg = '';
+        $imgGeral = fetchImageBytes(staticMapUrlGeral($imoveisById, $allRings, GMAPS_STATIC_KEY), $erroImg);
+        if ($imgGeral !== false) {
+            $pdf->SetFont('helvetica', 'B', 9);
+            $pdf->Cell(0, 5, 'Mapa geral — imóveis (azul) e sobreposições (vermelho)', 0, 1, 'L');
+            pdfColocarImagem($pdf, $imgGeral, 182, 420 / 640);
+            $pdf->Ln(2);
+        } else {
+            $pdf->SetFont('helvetica', '', 8);
+            $pdf->SetTextColor(168, 15, 30);
+            $pdf->MultiCell(0, 5, 'Mapa indisponível (' . $erroImg . '). Habilite a "Maps Static API" no Google Cloud e use, em GMAPS_STATIC_KEY, uma chave sem restrição de referer (o servidor não envia referer).', 0, 'L');
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->Ln(2);
+        }
+    }
+
+    if (empty($overlaps)) {
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->SetTextColor(20, 120, 60);
+        $pdf->Ln(4);
+        $pdf->Cell(0, 8, 'Nenhuma sobreposição detectada entre os imóveis analisados.', 0, 1, 'L');
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->MultiCell(0, 6, 'Os ' . $totalImoveis . ' imóveis cadastrados não apresentam interseção de áreas conforme as coordenadas registradas.', 0, 'L');
+    } else {
+        $n = 0;
+        foreach ($overlaps as $o) {
+            $n++;
+            $a = isset($o['a']) ? $o['a'] : [];
+            $b = isset($o['b']) ? $o['b'] : [];
+            $nomeA = isset($a['identificador']) ? $a['identificador'] : '—';
+            $nomeB = isset($b['identificador']) ? $b['identificador'] : '—';
+            $areaA = isset($a['area_ha']) ? (float)$a['area_ha'] : 0;
+            $areaB = isset($b['area_ha']) ? (float)$b['area_ha'] : 0;
+            $areaO = isset($o['area_ha']) ? (float)$o['area_ha'] : 0;
+            $cen   = isset($o['centro']) ? $o['centro'] : ['lat' => 0, 'lng' => 0];
+            $cenUtm = geoToUTM((float)$cen['lat'], (float)$cen['lng']);
+            $pctA = $areaA > 0 ? ($areaO / $areaA * 100) : 0;
+            $pctB = $areaB > 0 ? ($areaO / $areaB * 100) : 0;
+
+            $bloco = '
+            <table cellpadding="4">
+              <tr><td><span style="background-color:#a80f1e;color:#fff;font-weight:bold;">&nbsp; SOBREPOSIÇÃO ' . $n . ' &nbsp;</span></td></tr>
+            </table>
+            <table cellpadding="4" border="0.5" style="border-color:#cccccc;">
+              <tr style="background-color:#f0f0f0;">
+                <td width="50%"><b>Imóvel A</b></td><td width="50%"><b>Imóvel B</b></td>
+              </tr>
+              <tr>
+                <td>' . htmlspecialchars($nomeA, ENT_QUOTES, 'UTF-8') . '<br><small style="color:#666;">Área total: ' . $br($areaA, 4) . ' ha</small></td>
+                <td>' . htmlspecialchars($nomeB, ENT_QUOTES, 'UTF-8') . '<br><small style="color:#666;">Área total: ' . $br($areaB, 4) . ' ha</small></td>
+              </tr>
+            </table>
+            <table cellpadding="4" border="0.5" style="border-color:#cccccc;">
+              <tr>
+                <td width="34%"><span style="color:#555;">Área sobreposta</span><br><b style="color:#a80f1e;">' . $br($areaO, 4) . ' ha</b> (' . $br($areaO * 10000, 2) . ' m²)</td>
+                <td width="33%"><span style="color:#555;">% sobre A / B</span><br><b>' . $br($pctA, 1) . '% / ' . $br($pctB, 1) . '%</b></td>
+                <td width="33%"><span style="color:#555;">Centro (UTM 23S)</span><br><b>E ' . $br($cenUtm[0], 2) . ' &nbsp; N ' . $br($cenUtm[1], 2) . '</b></td>
+              </tr>
+            </table>';
+            $pdf->writeHTML($bloco, true, false, true, false, '');
+
+            // Imagem da sobreposição (A azul · B amarelo · sobreposição vermelha)
+            $rings = isset($o['rings']) && is_array($o['rings']) ? $o['rings'] : [];
+            $polyA = isset($a['id']) && isset($imoveisById[(int)$a['id']]) ? $imoveisById[(int)$a['id']] : null;
+            $polyB = isset($b['id']) && isset($imoveisById[(int)$b['id']]) ? $imoveisById[(int)$b['id']] : null;
+            $imgOv = fetchImageBytes(staticMapUrlSobreposicao($polyA, $polyB, $rings, GMAPS_STATIC_KEY));
+            if ($imgOv !== false) {
+                $pdf->Ln(1);
+                $pdf->SetFont('helvetica', 'B', 8);
+                $pdf->Cell(0, 5, 'Mapa: ' . htmlspecialchars($nomeA, ENT_QUOTES, 'UTF-8') . ' (azul) · '
+                    . htmlspecialchars($nomeB, ENT_QUOTES, 'UTF-8') . ' (amarelo) · sobreposição (vermelho)', 0, 1, 'L');
+                pdfColocarImagem($pdf, $imgOv, 182, 360 / 640);
+            }
+
+            // Vértices da região de sobreposição (lat/lng + UTM)
+            $vtx = '<table cellpadding="3" border="0.5" style="border-color:#dddddd;"><tr style="background-color:#f0f0f0;">'
+                 . '<td width="10%"><b>V</b></td><td width="22%"><b>Latitude</b></td><td width="22%"><b>Longitude</b></td>'
+                 . '<td width="23%"><b>UTM E</b></td><td width="23%"><b>UTM N</b></td></tr>';
+            $iv = 0;
+            foreach ($rings as $ring) {
+                foreach ($ring as $pt) {
+                    $iv++;
+                    $lat = (float)$pt[0]; $lng = (float)$pt[1];
+                    $u = geoToUTM($lat, $lng);
+                    $vtx .= '<tr><td>' . $iv . '</td><td>' . $br($lat, 6) . '</td><td>' . $br($lng, 6) . '</td>'
+                          . '<td>' . $br($u[0], 2) . '</td><td>' . $br($u[1], 2) . '</td></tr>';
+                }
+            }
+            $vtx .= '</table>';
+            $pdf->SetFont('helvetica', 'B', 8);
+            $pdf->Ln(1);
+            $pdf->Cell(0, 5, 'Vértices da região de sobreposição', 0, 1, 'L');
+            $pdf->writeHTML($vtx, true, false, true, false, '');
+
+            // Espaço para parecer do engenheiro
+            $pdf->Ln(1);
+            $pdf->SetFont('helvetica', 'B', 8);
+            $pdf->Cell(0, 5, 'Parecer técnico / correção:', 0, 1, 'L');
+            $pdf->SetDrawColor(200, 200, 200);
+            $y = $pdf->GetY();
+            $pdf->Rect(14, $y, $pdf->getPageWidth() - 28, 18);
+            $pdf->Ln(22);
+        }
+
+        // Assinatura
+        $pdf->Ln(4);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->Cell(0, 6, '____________________________________________', 0, 1, 'C');
+        $pdf->Cell(0, 5, 'Responsável Técnico (Engenheiro / Agrimensor)', 0, 1, 'C');
+    }
+
+    $pdf->Output('relatorio_sobreposicao.pdf', 'I');
+}
+
+/* ====================================================================
+ *  ROTEAMENTO DE AÇÕES (AJAX)
+ * ==================================================================== */
+
+if (isset($_POST['acao'])) {
+
+    /* ----- Relatório de sobreposição em PDF (saída binária, antes do header JSON) ----- */
+    if ($_POST['acao'] === 'relatorio_sobreposicao') {
+        $dados = json_decode(isset($_POST['dados']) ? (string)$_POST['dados'] : '{}', true);
+        if (!is_array($dados)) $dados = [];
+        gerarRelatorioSobreposicaoPDF($dados);
+        exit;
+    }
+
+    header('Content-Type: application/json; charset=UTF-8');
+    ensureTable($conn);
+    $acao = $_POST['acao'];
+
+    try {
+        if ($acao === 'ibge_municipios') {
+            $uf = strtoupper(preg_replace('/[^A-Za-z]/', '', (string)($_POST['uf'] ?? '')));
+            if ($uf === '') { echo json_encode(['ok' => false, 'erro' => 'UF não informada.']); exit; }
+            $url = 'https://servicodados.ibge.gov.br/api/v1/localidades/estados/' . rawurlencode($uf) . '/municipios?orderBy=nome';
+            $err = '';
+            $json = httpGetText($url, $err);
+            if ($json === false) { echo json_encode(['ok' => false, 'erro' => 'Falha ao consultar o IBGE: ' . $err]); exit; }
+            $arr = json_decode($json, true);
+            if (!is_array($arr)) { echo json_encode(['ok' => false, 'erro' => 'Resposta inválida do IBGE.']); exit; }
+            $out = [];
+            foreach ($arr as $m) {
+                if (isset($m['id'], $m['nome'])) $out[] = ['id' => (int)$m['id'], 'nome' => (string)$m['nome']];
+            }
+            echo json_encode(['ok' => true, 'municipios' => $out], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'ibge_malha') {
+            $mun = preg_replace('/\D/', '', (string)($_POST['municipio'] ?? ''));
+            if ($mun === '') { echo json_encode(['ok' => false, 'erro' => 'Município não informado.']); exit; }
+            $q = (int)($_POST['qualidade'] ?? 4); if ($q < 1 || $q > 4) $q = 4;
+            // ATENÇÃO: o '+' em "vnd.geo+json" precisa ir codificado (%2B), senão o IBGE
+            // interpreta como espaço e devolve HTTP 400.
+            $url = 'https://servicodados.ibge.gov.br/api/v3/malhas/municipios/' . rawurlencode($mun)
+                 . '?formato=application/vnd.geo%2Bjson&qualidade=' . $q;
+            $err = '';
+            $geo = httpGetText($url, $err);
+            if ($geo === false) {
+                // tenta novamente sem o parâmetro de qualidade (alguns ambientes recusam a combinação)
+                $url2 = 'https://servicodados.ibge.gov.br/api/v3/malhas/municipios/' . rawurlencode($mun)
+                      . '?formato=application/vnd.geo%2Bjson';
+                $err2 = '';
+                $geo = httpGetText($url2, $err2);
+                if ($geo === false) { echo json_encode(['ok' => false, 'erro' => 'Falha ao obter o limite no IBGE: ' . $err]); exit; }
+            }
+            $gj = json_decode($geo, true);
+            if (!is_array($gj) || !isset($gj['type'])) { echo json_encode(['ok' => false, 'erro' => 'GeoJSON inválido do IBGE.']); exit; }
+            echo json_encode(['ok' => true, 'geojson' => $gj], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'processar') {
+            $memorial = isset($_POST['memorial']) ? (string)$_POST['memorial'] : '';
+            $data = buildGeoData($memorial);
+            echo json_encode($data, JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'processar_kml') {
+            $kml = isset($_POST['kml']) ? (string)$_POST['kml'] : '';
+            $pm = parseKml($kml);
+            if (empty($pm)) {
+                echo json_encode(['ok' => false, 'erro' => 'Nenhum polígono encontrado no arquivo KML.']);
+                exit;
+            }
+            $saida = [];
+            foreach ($pm as $p) {
+                $geo = buildGeoDataFromPoints($p['pts']);
+                if ($geo['ok']) {
+                    $geo['nome'] = $p['nome'];
+                    $saida[] = $geo;
+                }
+            }
+            echo json_encode(['ok' => true, 'total' => count($saida), 'placemarks' => $saida], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'salvar') {
+            $origem      = ($_POST['origem'] ?? 'memorial') === 'kml' ? 'kml' : 'memorial';
+            $fonte       = isset($_POST['memorial']) ? (string)$_POST['memorial'] : '';
+            $identificador = trim(isset($_POST['identificador']) ? (string)$_POST['identificador'] : '');
+            $numMatricula  = trim(isset($_POST['numero_matricula']) ? (string)$_POST['numero_matricula'] : '');
+            $proprietario  = trim(isset($_POST['proprietario']) ? (string)$_POST['proprietario'] : '');
+            $cpf           = trim(isset($_POST['cpf']) ? (string)$_POST['cpf'] : '');
+            $tipoImovel    = ($_POST['tipo_imovel'] ?? '') === 'rural' ? 'rural' : (($_POST['tipo_imovel'] ?? '') === 'urbano' ? 'urbano' : '');
+
+            // Identificação principal: usa o campo informado; se vazio, cai para a matrícula
+            if ($identificador === '' && $numMatricula !== '') $identificador = $numMatricula;
+            if ($identificador === '') {
+                echo json_encode(['ok' => false, 'erro' => 'Informe ao menos a identificação do imóvel ou o número da matrícula.']);
+                exit;
+            }
+            $tipo = ($numMatricula !== '') ? 'matricula' : 'nome';
+
+            $data = processarFonte($origem, $fonte);
+            if (!$data['ok']) {
+                echo json_encode(['ok' => false, 'erro' => 'A fonte não gerou um polígono válido (mínimo 3 vértices).']);
+                exit;
+            }
+
+            $imovelId = ($numMatricula !== '') ? findImovelIdByMatricula($conn, $numMatricula) : null;
+            $novoId = inserirMemorial($conn, $identificador, $tipo, $origem, $imovelId, $fonte, $data, $numMatricula, $proprietario, $cpf, $tipoImovel);
+
+            echo json_encode([
+                'ok' => true,
+                'id' => $novoId,
+                'imovel_id' => $imovelId,
+                'mensagem' => 'Imóvel "' . $identificador . '" gravado com ' . $data['num_vertices'] . ' vértices.'
+                    . ($imovelId ? ' Vinculado ao cadastro (id ' . $imovelId . ').' : '')
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'atualizar_imovel') {
+            $id            = (int)($_POST['id'] ?? 0);
+            $identificador = trim((string)($_POST['identificador'] ?? ''));
+            $numMatricula  = trim((string)($_POST['numero_matricula'] ?? ''));
+            $proprietario  = trim((string)($_POST['proprietario'] ?? ''));
+            $cpf           = trim((string)($_POST['cpf'] ?? ''));
+            $tipoImovel    = ($_POST['tipo_imovel'] ?? '') === 'rural' ? 'rural' : (($_POST['tipo_imovel'] ?? '') === 'urbano' ? 'urbano' : '');
+            if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
+            if ($identificador === '' && $numMatricula !== '') $identificador = $numMatricula;
+            if ($identificador === '') { echo json_encode(['ok' => false, 'erro' => 'Informe a identificação ou a matrícula.']); exit; }
+
+            $tipo = ($numMatricula !== '') ? 'matricula' : 'nome';
+            $imovelId = ($numMatricula !== '') ? findImovelIdByMatricula($conn, $numMatricula) : null;
+            $nm = $numMatricula !== '' ? $numMatricula : null;
+            $pr = $proprietario !== '' ? $proprietario : null;
+            $cp = $cpf !== '' ? $cpf : null;
+            $ti = in_array($tipoImovel, ['urbano', 'rural'], true) ? $tipoImovel : null;
+
+            $stmt = $conn->prepare("UPDATE memoriais_mapeados SET identificador=?, tipo_identificador=?, numero_matricula=?, proprietario=?, cpf=?, tipo_imovel=?, imovel_id=? WHERE id=?");
+            $stmt->bind_param('ssssssii', $identificador, $tipo, $nm, $pr, $cp, $ti, $imovelId, $id);
+            $stmt->execute();
+            echo json_encode(['ok' => true, 'id' => $id, 'imovel_id' => $imovelId], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'serventia_municipio') {
+            $raw = '';
+            try {
+                $r = @$conn->query("SELECT cidade FROM cadastro_serventia WHERE cidade IS NOT NULL AND cidade <> '' ORDER BY id LIMIT 1");
+                if ($r && $row = $r->fetch_assoc()) { $raw = trim((string)$row['cidade']); }
+            } catch (Throwable $e) { $raw = ''; }
+            // O cadastro pode trazer a UF junto: "Zé Doca-MA", "Zé Doca - MA", "Zé Doca/MA", "Zé Doca, MA".
+            $nome = $raw; $uf = 'MA';
+            if ($raw !== '' && preg_match('/^(.*?)\s*[-\/,]\s*([A-Za-z]{2})$/u', $raw, $m)) {
+                $nome = trim($m[1]);
+                $uf   = strtoupper($m[2]);
+            }
+            echo json_encode(['ok' => true, 'cidade' => $nome, 'uf' => $uf, 'origem' => $raw], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'salvar_kml_lote') {
+            $kml = isset($_POST['kml']) ? (string)$_POST['kml'] : '';
+            $nomes = isset($_POST['nomes']) ? json_decode((string)$_POST['nomes'], true) : [];
+            $tipos = isset($_POST['tipos']) ? json_decode((string)$_POST['tipos'], true) : [];
+            if (!is_array($nomes)) $nomes = [];
+            if (!is_array($tipos)) $tipos = [];
+
+            $pm = parseKml($kml);
+            if (empty($pm)) {
+                echo json_encode(['ok' => false, 'erro' => 'Nenhum polígono encontrado no KML.']);
+                exit;
+            }
+            $salvos = 0; $nomesSalvos = [];
+            foreach ($pm as $i => $p) {
+                $geo = buildGeoDataFromPoints($p['pts']);
+                if (!$geo['ok']) continue;
+
+                $nome = isset($nomes[$i]) ? trim((string)$nomes[$i]) : '';
+                if ($nome === '') $nome = $p['nome'] !== '' ? $p['nome'] : ('Imóvel KML ' . ($i + 1));
+                $tipo = (isset($tipos[$i]) && $tipos[$i] === 'matricula') ? 'matricula' : 'nome';
+                $imovelId = ($tipo === 'matricula') ? findImovelIdByMatricula($conn, $nome) : null;
+
+                inserirMemorial($conn, $nome, $tipo, 'kml', $imovelId, '', $geo);
+                $salvos++; $nomesSalvos[] = $nome;
+            }
+            echo json_encode(['ok' => true, 'salvos' => $salvos, 'nomes' => $nomesSalvos], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'listar') {
+            $res = $conn->query(
+                "SELECT id, identificador, tipo_identificador, origem, imovel_id, num_vertices,
+                        area_ha, perimetro_m, centro_lat, centro_lng, cor, cor_opacidade,
+                        numero_matricula, proprietario, cpf, tipo_imovel, criado_em
+                 FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 1000"
+            );
+            $rows = [];
+            while ($res && $row = $res->fetch_assoc()) { $rows[] = $row; }
+            echo json_encode(['ok' => true, 'itens' => $rows], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'listar_geo') {
+            // Devolve todos os polígonos (lat/lng) para a visão geral e detecção de sobreposição
+            $res = $conn->query(
+                "SELECT id, identificador, tipo_identificador, origem, area_ha, cor, cor_opacidade,
+                        numero_matricula, proprietario, tipo_imovel, coordenadas_wgs84
+                 FROM memoriais_mapeados ORDER BY id"
+            );
+            $itens = [];
+            while ($res && $row = $res->fetch_assoc()) {
+                $pts = [];
+                foreach (preg_split('/\s+/', trim((string)$row['coordenadas_wgs84'])) as $par) {
+                    if ($par === '') continue;
+                    $xy = explode(',', $par);
+                    if (count($xy) >= 2) $pts[] = [(float)$xy[0], (float)$xy[1]];
+                }
+                if (count($pts) >= 3) {
+                    $itens[] = [
+                        'id' => (int)$row['id'],
+                        'identificador' => $row['identificador'],
+                        'origem' => $row['origem'],
+                        'area_ha' => (float)$row['area_ha'],
+                        'cor' => $row['cor'],
+                        'cor_opacidade' => $row['cor_opacidade'] !== null ? (float)$row['cor_opacidade'] : null,
+                        'numero_matricula' => $row['numero_matricula'],
+                        'proprietario' => $row['proprietario'],
+                        'tipo_imovel' => $row['tipo_imovel'],
+                        'pts' => $pts,
+                    ];
+                }
+            }
+            echo json_encode(['ok' => true, 'itens' => $itens], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'salvar_cor') {
+            $id = (int)($_POST['id'] ?? 0);
+            $cor = strtolower(trim((string)($_POST['cor'] ?? '')));
+            if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
+            // Aceita apenas hex (#rrggbb) ou vazio (limpar). NUNCA aceita tons de vermelho (reservado a sobreposição).
+            if ($cor !== '') {
+                if (!preg_match('/^#[0-9a-f]{6}$/', $cor)) { echo json_encode(['ok' => false, 'erro' => 'Cor inválida.']); exit; }
+                $r = hexdec(substr($cor, 1, 2)); $g = hexdec(substr($cor, 3, 2)); $b = hexdec(substr($cor, 5, 2));
+                if ($r >= 150 && $g <= 90 && $b <= 90) { echo json_encode(['ok' => false, 'erro' => 'O vermelho é reservado para sobreposições.']); exit; }
+            }
+            $valor = ($cor === '') ? null : $cor;
+            // Intensidade (opacidade do preenchimento): limitada entre 0.08 e 0.55 para não fechar o mapa
+            $op = null;
+            if (isset($_POST['opacidade']) && $_POST['opacidade'] !== '') {
+                $op = (float)$_POST['opacidade'];
+                if ($op < 0.08) $op = 0.08;
+                if ($op > 0.55) $op = 0.55;
+            }
+            $stmt = $conn->prepare("UPDATE memoriais_mapeados SET cor = ?, cor_opacidade = ? WHERE id = ?");
+            $stmt->bind_param('sdi', $valor, $op, $id);
+            $stmt->execute();
+            echo json_encode(['ok' => true, 'id' => $id, 'cor' => $valor, 'cor_opacidade' => $op], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'carregar') {
+            $id = (int)($_POST['id'] ?? 0);
+            $stmt = $conn->prepare("SELECT * FROM memoriais_mapeados WHERE id = ?");
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            $r = $stmt->get_result();
+            $row = $r ? $r->fetch_assoc() : null;
+            if (!$row) { echo json_encode(['ok' => false, 'erro' => 'Registro não encontrado.']); exit; }
+            // reconstrói a geometria a partir das coordenadas gravadas (independe da origem)
+            $data = buildGeoDataFromWgs84($row['coordenadas_wgs84']);
+            echo json_encode(['ok' => true, 'registro' => $row, 'geo' => $data], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'excluir') {
+            $id = (int)($_POST['id'] ?? 0);
+            $stmt = $conn->prepare("DELETE FROM memoriais_mapeados WHERE id = ?");
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            echo json_encode(['ok' => true]);
+            exit;
+        }
+
+        echo json_encode(['ok' => false, 'erro' => 'Ação desconhecida.']);
+        exit;
+
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'erro' => 'Erro no servidor: ' . $e->getMessage()]);
+        exit;
+    }
+}
+
+?>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas Dimensor — Atlas</title>
+<link rel="icon" href="../style/img/favicon.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --panel-2:#f4f6f9; --line:#e3e8ee;
+    --ink:#1f2733; --muted:#6b7785; --faint:#9aa6b2;
+    --red:#a80f1e; --red-bright:#cf1626; --red-soft:rgba(168,15,30,.10);
+    --green:#1f9d57; --amber:#c8881f;
+    --red-text:#a80f1e; --green-text:#14743f; --amber-text:#8a5d00;
+    --ov-bg:rgba(255,255,255,.97); --ov-shadow:0 12px 34px rgba(16,24,40,.16);
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+    --disp:'Inter','Space Grotesk',system-ui,sans-serif;
+    --atlas-header:60px;
+  }
+  /* Tema escuro do Atlas (body.dark-mode) — sobrescreve as variáveis do mapeador */
+  body.dark-mode{
+    --bg:#0e1217; --panel:#161c24; --panel-2:#1c242e; --line:#283038;
+    --ink:#e7edf3; --muted:#8b97a4; --faint:#5d6975;
+    --red:#a80f1e; --red-bright:#e2342f; --red-soft:rgba(168,15,30,.16);
+    --green:#2faa6a; --amber:#d99a2b;
+    --red-text:#f0a3a3; --green-text:#7fd9a8; --amber-text:#e9c07a;
+    --ov-bg:rgba(16,20,26,.94); --ov-shadow:0 12px 34px rgba(0,0,0,.46);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  /* App do mapeador ocupa a área abaixo do header fixo do Atlas */
+  .mapeador-shell{position:fixed;top:var(--header-height,60px);left:0;right:0;bottom:0;
+    font-family:var(--disp);background:var(--bg);color:var(--ink);
+    display:grid;grid-template-columns:420px 1fr;overflow:hidden;z-index:1}
+  .panel{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  .head{padding:18px 22px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .back-atlas{flex:none;font-size:11px;font-weight:600;font-family:var(--mono);color:var(--muted);
+    text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;white-space:nowrap;transition:all .15s}
+  .back-atlas:hover{color:var(--ink);border-color:var(--red-bright)}
+  .brand{display:flex;align-items:center;gap:11px}
+  .mark{width:30px;height:30px;border-radius:7px;flex:none;
+    background:linear-gradient(135deg,#0d9488 0%,#1d4ed8 100%);display:grid;place-items:center;
+    box-shadow:0 2px 10px rgba(13,148,136,.4)}
+  .mark svg{width:17px;height:17px}
+  .brand h1{font-size:15px;font-weight:600;margin:0;line-height:1.1}
+  .brand p{margin:2px 0 0;font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .body{padding:18px 22px;overflow-y:auto;flex:1;min-height:0}
+  .label{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;
+    color:var(--faint);margin:0 0 8px}
+  textarea,input,select{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);
+    border-radius:9px;padding:10px 12px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .15s}
+  textarea{height:140px;resize:vertical;line-height:1.5;font-size:11.5px}
+  textarea:focus,input:focus,select:focus{border-color:var(--red-bright)}
+  .row{display:grid;grid-template-columns:1fr 130px;gap:9px;margin-top:14px}
+  .field-label{font-size:11px;color:var(--muted);margin:0 0 5px;font-family:var(--mono)}
+  .actions{display:flex;gap:9px;margin-top:13px}
+  button{font-family:var(--disp);cursor:pointer;border:none;border-radius:8px;font-size:13px;font-weight:500;
+    transition:filter .15s,background .15s,border-color .15s,color .15s}
+  .btn-primary{flex:1;background:var(--red);color:#fff;padding:11px;box-shadow:0 2px 12px var(--red-soft)}
+  .btn-primary:hover{filter:brightness(1.12)}
+  .btn-primary:disabled{opacity:.5;cursor:default;filter:none}
+  .btn-save{flex:1;background:var(--green);color:#06140c;padding:11px;font-weight:600}
+  .btn-save:hover{filter:brightness(1.08)}
+  .btn-save:disabled{opacity:.4;cursor:default;filter:none}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line);padding:11px 14px}
+  .btn-ghost:hover{border-color:var(--red-bright);color:var(--ink)}
+  .status{margin-top:13px;font-family:var(--mono);font-size:11.5px;padding:9px 12px;border-radius:8px;line-height:1.45;display:none}
+  .muni-box{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
+  .muni-label{display:flex;align-items:center;gap:7px;color:var(--faint)}
+  .muni-row{display:flex;gap:9px;margin-top:2px}
+  #muni-status{margin-top:10px}
+  /* Selo de pertencimento sobre o mapa */
+  .muni-badge{position:absolute;left:14px;bottom:120px;z-index:5;display:none;max-width:340px;
+    font-family:var(--mono);font-size:11.5px;font-weight:600;line-height:1.35;padding:8px 12px;border-radius:9px;
+    backdrop-filter:blur(10px);box-shadow:var(--ov-shadow);border:1px solid var(--line)}
+  .muni-badge.dentro{background:rgba(31,157,87,.16);border-color:rgba(31,157,87,.5);color:var(--green-text)}
+  .muni-badge.parcial{background:rgba(200,136,31,.16);border-color:rgba(200,136,31,.5);color:var(--amber-text)}
+  .muni-badge.fora{background:var(--red-soft);border-color:rgba(168,15,30,.5);color:var(--red-text)}
+  /* Estilo do limite municipal desenhado (legenda) */
+  .legend .sw.muni{background:rgba(37,99,235,.25);border:1px solid #2563eb}
+  /* Seletor de cor de destaque (painel) */
+  .cor-box{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
+  .cor-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:4px}
+  .cor-sw{width:100%;aspect-ratio:1/1;min-height:24px;border-radius:7px;border:2px solid transparent;cursor:pointer;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);transition:transform .1s;padding:0}
+  .cor-sw:hover{transform:scale(1.08)}
+  .cor-sw.sel{border-color:var(--ink);box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+  .cor-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.45;margin-top:9px}
+  /* Popup de cor sobre o mapa (InfoWindow — bolha branca) */
+  .cor-pop{font-family:var(--disp);min-width:200px;color:#1f2733}
+  .cor-pop-t{font-size:13px;font-weight:700;line-height:1.2}
+  .cor-pop-sub{font-size:11px;color:#6b7785;margin:1px 0 9px}
+  .cor-pop-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#9aa6b2;margin-bottom:6px}
+  .cor-pop-grid{display:grid;grid-template-columns:repeat(6,22px);gap:6px}
+  .cor-pop .cor-sw{width:22px;height:22px;aspect-ratio:auto;min-height:0}
+  .cor-pop-clear{margin-top:11px;width:100%;font-family:var(--disp);font-size:11px;font-weight:600;color:#a80f1e;
+    background:#fff;border:1px solid #e3e8ee;border-radius:7px;padding:6px;cursor:pointer}
+  .cor-pop-clear:hover{background:#faf0f1;border-color:#a80f1e}
+  .status.ok{display:block;background:rgba(31,157,87,.10);color:var(--green-text);border:1px solid rgba(31,157,87,.30)}
+  .status.err{display:block;background:var(--red-soft);color:var(--red-text);border:1px solid rgba(168,15,30,.30)}
+  .status.warn{display:block;background:rgba(200,136,31,.12);color:var(--amber-text);border:1px solid rgba(200,136,31,.35)}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+  .stat{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 13px}
+  .stat .v{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.5px}
+  .stat .u{font-size:12px;color:var(--faint);font-weight:400}
+  .stat .k{font-size:10px;color:var(--muted);margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px}
+  .saved{margin-top:24px}
+  .saved h3{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);margin:0 0 10px}
+  .item{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
+  .item:hover{border-color:var(--red-bright);background:rgba(168,15,30,.06)}
+  .item.sel{border-color:#f59e0b;background:rgba(245,158,11,.12)}
+  .item.sel .ic{background:#f59e0b}
+  .item .ic{width:7px;height:7px;border-radius:2px;background:var(--red-bright);flex:none}
+  .item .info{flex:1;min-width:0}
+  .item .nm{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .mt{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+  .item .tag{font-family:var(--mono);font-size:9px;letter-spacing:.5px;padding:2px 6px;border-radius:4px;
+    background:rgba(139,151,164,.14);color:var(--muted);text-transform:uppercase}
+  .item .tag.mat{background:var(--red-soft);color:#f0a3a3}
+  .item .del{background:transparent;border:none;color:var(--faint);font-size:15px;padding:2px 6px;border-radius:5px}
+  .item .del:hover{color:var(--red-bright);background:rgba(226,52,47,.1)}
+  .empty-list{font-family:var(--mono);font-size:11px;color:var(--faint);padding:6px 2px}
+  .map-wrap{position:relative;min-width:0}
+  #map{position:absolute;inset:0;background:#0a0d11}
+  .readout{position:absolute;left:14px;bottom:80px;z-index:5;background:rgba(14,18,23,.86);
+    backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:9px;padding:9px 13px;
+    font-family:var(--mono);font-size:11px;color:var(--muted);display:none}
+  .readout b{color:var(--ink);font-weight:500}
+  .readout .dot{color:var(--red-bright)}
+
+  /* KML import */
+  .kml-zone{margin-top:11px;display:flex;align-items:center;gap:9px;padding:11px 13px;border:1px dashed var(--line);
+    border-radius:9px;color:var(--muted);cursor:pointer;font-size:12.5px;transition:border-color .15s,color .15s,background .15s}
+  .kml-zone:hover,.kml-zone.drag{border-color:var(--red-bright);color:var(--ink);background:rgba(168,15,30,.05)}
+  .kml-zone b{color:var(--ink);font-weight:600}
+  .kml-zone.loaded{border-style:solid;border-color:rgba(47,170,106,.4);color:#7fd9a8}
+
+  /* Cabeçalho da lista + botão ver todos */
+  .saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .saved-head h3{margin:0}
+  .mini-btn{font-family:var(--mono);font-size:10px;letter-spacing:.5px;padding:6px 10px;background:transparent;
+    border:1px solid var(--line);color:var(--muted);border-radius:6px}
+  .mini-btn:hover{border-color:var(--red-bright);color:var(--ink)}
+  .mini-btn.active{background:var(--red-soft);border-color:var(--red-bright);color:#f0a3a3}
+
+  /* Painel de visão geral / sobreposições */
+  .overview-panel{position:absolute;top:60px;right:14px;z-index:6;width:280px;max-height:calc(100% - 74px);
+    display:none;flex-direction:column;background:var(--ov-bg);color:var(--ink);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:11px;overflow:hidden;box-shadow:var(--ov-shadow)}
+  .overview-panel.show{display:flex}
+  .overview-panel.dragging{transition:none;cursor:grabbing}
+  .ovh{display:flex;align-items:flex-start;justify-content:space-between;padding:13px 15px;border-bottom:1px solid var(--line);
+    cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
+  .ovh:active{cursor:grabbing}
+  .ovh-title{font-size:13px;font-weight:600}
+  .ovh-sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px}
+  .ov-close{background:transparent;border:none;color:var(--faint);font-size:18px;line-height:1;padding:0 2px;border-radius:5px}
+  .ov-close:hover{color:var(--red-bright)}
+  .legend{display:flex;gap:16px;padding:10px 15px;border-bottom:1px solid var(--line);font-family:var(--mono);
+    font-size:10.5px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .legend .sw{width:13px;height:9px;border-radius:2px;display:inline-block}
+  .legend .sw.normal{background:rgba(91,150,230,.35);border:1px solid #5b96e6}
+  .legend .sw.over{background:rgba(226,52,47,.5);border:1px solid var(--red-bright)}
+  .legend .sw.sel{background:rgba(245,158,11,.45);border:1px solid #f59e0b}
+  .ov-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.4;padding:8px 15px 0}
+  .ov-overlaps{overflow-y:auto;padding:8px 10px}
+  .ov-overlaps .ttl{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--faint);padding:4px 5px 8px}
+  .ov-row{padding:9px 11px;border:1px solid rgba(226,52,47,.25);background:rgba(226,52,47,.06);border-radius:8px;
+    margin-bottom:7px;cursor:pointer;transition:background .15s}
+  .ov-row:hover{background:rgba(226,52,47,.13)}
+  .ov-row .pair{font-size:12px;font-weight:500;line-height:1.35}
+  .ov-row .amt{font-family:var(--mono);font-size:10.5px;color:var(--red-text);margin-top:3px}
+  .ov-none{font-family:var(--mono);font-size:11px;color:var(--green-text);padding:10px 6px}
+  .ov-foot{padding:11px;border-top:1px solid var(--line)}
+
+  /* Botão flutuante para reexibir o painel */
+  .ov-reopen{position:absolute;top:60px;right:14px;z-index:6;display:none;align-items:center;gap:8px;
+    background:var(--ov-bg);backdrop-filter:blur(10px);border:1px solid var(--line);color:var(--ink);
+    border-radius:9px;padding:9px 13px;font-size:12px;font-weight:500;box-shadow:var(--ov-shadow)}
+  .ov-reopen:hover{border-color:var(--red-bright)}
+  .ov-reopen.show{display:flex}
+
+  /* Barra de seleção (Ctrl+clique) */
+  .sel-bar{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:7;display:none;
+    align-items:center;gap:12px;background:rgba(14,18,23,.94);backdrop-filter:blur(10px);
+    border:1px solid #f59e0b;border-radius:11px;padding:9px 12px 9px 16px;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+  .sel-bar.show{display:flex}
+  .sel-count{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .sel-count b{color:#f59e0b;font-size:14px}
+  .sel-rep{background:var(--red);color:#fff;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:500}
+  .sel-rep:hover{filter:brightness(1.12)}
+  .sel-clear{background:transparent;border:1px solid var(--line);color:var(--muted);padding:8px 12px;border-radius:8px;font-size:12px}
+  .sel-clear:hover{border-color:#f59e0b;color:var(--ink)}
+
+  /* Botão de relatório por sobreposição na linha */
+  .ov-row{position:relative}
+  .ov-row .row-rep{position:absolute;top:8px;right:8px;background:rgba(168,15,30,.85);border:none;color:#fff;
+    font-family:var(--mono);font-size:9px;letter-spacing:.4px;padding:4px 7px;border-radius:5px;opacity:0;transition:opacity .12s}
+  .ov-row:hover .row-rep{opacity:1}
+  .ov-row .row-rep:hover{background:var(--red-bright)}
+  .btn-report{width:100%;background:var(--red);color:#fff;padding:10px;border-radius:8px;font-size:12.5px;
+    font-weight:500;box-shadow:0 2px 12px var(--red-soft)}
+  .btn-report:hover{filter:brightness(1.12)}
+
+  /* Painel de importação KML (nomear cada imóvel) */
+  .kml-panel{width:320px}
+  .kml-rows{overflow-y:auto;padding:9px 11px;flex:1}
+  .kml-row{padding:9px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--panel-2)}
+  .kml-row.sel{border-color:var(--red-bright)}
+  .kml-row .top{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .kml-row .idx{font-family:var(--mono);font-size:10px;color:var(--red-bright);font-weight:600;flex:none}
+  .kml-row .meta{font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-left:auto}
+  .kml-row .inp{display:grid;grid-template-columns:1fr 96px;gap:7px}
+  .kml-row input,.kml-row select{padding:7px 9px;font-size:11.5px;border-radius:7px}
+  .kml-foot{padding:11px;border-top:1px solid var(--line)}
+
+  /* Rótulo (nome/matrícula) sobre o polígono no mapa */
+  .map-chip{position:absolute;transform:translate(-50%,-50%);background:rgba(14,18,23,.82);color:#fff;
+    font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;
+    border:1px solid rgba(226,52,47,.65);white-space:nowrap;pointer-events:none;
+    text-shadow:0 1px 2px rgba(0,0,0,.85);letter-spacing:.2px}
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;z-index:4;color:var(--faint);
+    font-family:var(--mono);font-size:12px;text-align:center;pointer-events:none}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}
+  ::-webkit-scrollbar-thumb:hover{background:#3a444f}
+  /* ===== Largura do painel (mais enxuta) ===== */
+  .mapeador-shell{grid-template-columns:360px 1fr}
+  .panel{transition:width .3s ease, opacity .25s ease}
+  /* ===== Formulário de cadastro ===== */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px 12px;margin-top:6px}
+  .fld{display:flex;flex-direction:column;min-width:0}
+  .fld .field-label{margin:0 0 5px}
+  .grid-2{grid-column:1 / -1}
+  /* ===== Busca ===== */
+  .search-wrap{position:relative;margin:4px 0 10px}
+  .search-ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
+  #busca{width:100%;padding:9px 30px 9px 32px;background:var(--bg);border:1px solid var(--line);border-radius:9px;
+    color:var(--ink);font-family:var(--disp);font-size:13px;outline:none}
+  #busca:focus{border-color:var(--red-bright)}
+  .search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;
+    color:var(--faint);font-size:18px;cursor:pointer;line-height:1;padding:0 4px}
+  .search-clear:hover{color:var(--red-bright)}
+  /* ===== Itens da lista ===== */
+  .item-dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+  .item-dot.vazio{background:var(--line)}
+  .item .it-edit{background:transparent;border:none;color:var(--faint);font-size:14px;cursor:pointer;padding:2px 5px;border-radius:6px;flex:none}
+  .item .it-edit:hover{color:var(--red-bright);background:var(--red-soft)}
+  .tag.urb{background:rgba(37,99,235,.14);color:#2563eb;border:1px solid rgba(37,99,235,.3)}
+  .tag.rural{background:rgba(22,163,74,.14);color:#16a34a;border:1px solid rgba(22,163,74,.3)}
+  /* ===== Slider de intensidade ===== */
+  .op-wrap{display:flex;align-items:center;gap:10px;margin-top:11px}
+  .op-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);flex:none}
+  .op-range{-webkit-appearance:none;appearance:none;flex:1;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--line),var(--muted));outline:none;cursor:pointer}
+  .op-range::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--red);
+    border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);cursor:pointer}
+  .op-range::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--red);border:2px solid #fff;cursor:pointer}
+  .cor-pop .op-range{width:100%;margin:2px 0}
+  /* ===== Botão recolher painel ===== */
+  .toggle-panel{position:absolute;top:50%;left:12px;transform:translateY(-50%);z-index:7;width:30px;height:46px;display:flex;align-items:center;justify-content:center;
+    background:var(--ov-bg);border:1px solid var(--line);border-radius:9px;color:var(--ink);cursor:pointer;box-shadow:var(--ov-shadow);backdrop-filter:blur(10px)}
+  .toggle-panel:hover{border-color:var(--red-bright)}
+  .toggle-panel .ic-expand{display:none}
+  body.panel-collapsed .panel{width:0;min-width:0;border-right:none;overflow:hidden;opacity:0;pointer-events:none}
+  body.panel-collapsed .mapeador-shell{grid-template-columns:0 1fr}
+  body.panel-collapsed .toggle-panel .ic-collapse{display:none}
+  body.panel-collapsed .toggle-panel .ic-expand{display:block}
+  /* ===== Modal de edição ===== */
+  .modal-ov{position:fixed;inset:0;z-index:1200;background:rgba(8,12,18,.55);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;padding:18px}
+  .modal-ov.show{display:flex}
+  .modal-card{width:100%;max-width:440px;background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;animation:modalIn .18s ease}
+  @keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+  .modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line)}
+  .modal-h h3{margin:0;font-size:15px;font-weight:600}
+  .modal-x{background:none;border:none;color:var(--faint);font-size:22px;line-height:1;cursor:pointer}
+  .modal-x:hover{color:var(--red-bright)}
+  .modal-b{padding:18px;display:flex;flex-direction:column;gap:12px}
+  .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal-f{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);justify-content:flex-end}
+  .modal-f .btn-primary,.modal-f .btn-ghost{width:auto;padding:9px 16px}
+  /* ===== FAB + backdrop (mobile) ===== */
+  .fab-panel{display:none;position:fixed;right:16px;bottom:92px;z-index:1100;width:52px;height:52px;border-radius:50%;
+    background:var(--red);color:#fff;border:none;box-shadow:0 6px 20px rgba(168,15,30,.45);cursor:pointer;align-items:center;justify-content:center}
+  .panel-backdrop{display:none;position:fixed;inset:0;z-index:899;background:rgba(8,12,18,.5)}
+  body.panel-open .panel-backdrop{display:block}
+  /* ===== Responsivo ===== */
+  @media (max-width:880px){
+    .mapeador-shell{grid-template-columns:1fr}
+    .panel{position:fixed;top:var(--header-height,60px);bottom:0;left:0;width:88%;max-width:380px;z-index:900;
+      transform:translateX(-102%);transition:transform .28s ease;border-right:1px solid var(--line);box-shadow:6px 0 30px rgba(0,0,0,.3)}
+    body.panel-open .panel{transform:none}
+    body.panel-collapsed .mapeador-shell{grid-template-columns:1fr}
+    .fab-panel{display:flex}
+    .toggle-panel{display:none}
+  }
+  @media (max-width:420px){
+    .fab-panel{bottom:84px;right:14px}
+    .modal-row{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<?php include(__DIR__ . '/../menu.php'); ?>
+<script>
+  // O menu.php injeta um <body class="$mode"> que o navegador ignora (body aninhado);
+  // aplicamos o modo salvo ao body real para que o tema (dark/light) chegue ao mapeador.
+  (function(){
+    var m = '<?php echo (isset($mode) && $mode === "dark-mode") ? "dark-mode" : "light-mode"; ?>';
+    document.body.classList.remove('dark-mode','light-mode');
+    document.body.classList.add(m);
+  })();
+</script>
+<div class="mapeador-shell">
+  <div class="panel">
+    <div class="head">
+      <div class="brand">
+        <div class="mark">
+          <svg viewBox="0 0 24 24" fill="#fff" stroke="none">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Atlas Dimensor</h1>
+          <p>GMS · Google Maps · Atlas</p>
+        </div>
+      </div>
+      <a href="../index.php" class="back-atlas" title="Voltar ao Atlas">← Atlas</a>
+    </div>
+
+    <div class="body">
+      <p class="label">Memorial descritivo</p>
+      <textarea id="memorial" spellcheck="false"
+        placeholder="Cole o memorial com coordenadas em graus, minutos e segundos (ex.: longitude -46°53'11,184&quot; e latitude -4°8'33,962&quot;)…"></textarea>
+
+      <div class="form-grid">
+        <div class="fld grid-2">
+          <label class="field-label">Identificação do imóvel</label>
+          <input id="identificador" type="text" placeholder="Ex.: Lote 12 — Fazenda Boa Vista">
+        </div>
+        <div class="fld">
+          <label class="field-label">Nº da matrícula</label>
+          <input id="numero_matricula" type="text" placeholder="Ex.: 12.345">
+        </div>
+        <div class="fld">
+          <label class="field-label">Tipo do imóvel</label>
+          <select id="tipo_imovel">
+            <option value="">— selecione —</option>
+            <option value="urbano">Urbano</option>
+            <option value="rural">Rural</option>
+          </select>
+        </div>
+        <div class="fld grid-2">
+          <label class="field-label">Proprietário</label>
+          <input id="proprietario" type="text" placeholder="Nome do proprietário">
+        </div>
+        <div class="fld grid-2">
+          <label class="field-label">CPF do proprietário</label>
+          <input id="cpf" type="text" placeholder="000.000.000-00" maxlength="14">
+        </div>
+      </div>
+      <input type="hidden" id="tipo_identificador" value="nome">
+
+      <div class="actions">
+        <button class="btn-primary" id="btn-map">Mapear</button>
+        <button class="btn-save" id="btn-save" disabled>Gravar no banco</button>
+      </div>
+
+      <div class="muni-box">
+        <p class="label muni-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+          Limite do município (IBGE)
+        </p>
+        <div class="muni-row">
+          <div style="flex:0 0 80px">
+            <p class="field-label">UF</p>
+            <select id="muni-uf">
+              <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option>
+              <option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option>
+              <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
+              <option value="MA" selected>MA</option><option value="MT">MT</option><option value="MS">MS</option>
+              <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option>
+              <option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option>
+              <option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option>
+              <option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+              <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:0">
+            <p class="field-label">Município</p>
+            <select id="muni-list"><option value="">Carregando…</option></select>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn-ghost" id="btn-muni-mostrar" style="flex:1">Mostrar limite no mapa</button>
+          <button class="btn-ghost" id="btn-muni-ocultar" style="display:none">Ocultar</button>
+        </div>
+        <div class="status" id="muni-status"></div>
+      </div>
+
+      <div class="kml-zone" id="kml-zone">
+        <input type="file" id="kml-file" accept=".kml,application/vnd.google-earth.kml+xml" hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+        <span id="kml-zone-label">Importar arquivo <b>KML</b></span>
+      </div>
+
+      <div class="status" id="status"></div>
+
+      <div class="stats" id="stats" style="display:none">
+        <div class="stat"><div class="v" id="s-vtx">—</div><div class="k">Vértices</div></div>
+        <div class="stat"><div class="v" id="s-area">—<span class="u"> ha</span></div><div class="k">Área (UTM 23S)</div></div>
+        <div class="stat"><div class="v" id="s-per">—<span class="u"> km</span></div><div class="k">Perímetro</div></div>
+        <div class="stat"><div class="v" id="s-cen" style="font-size:12px">—</div><div class="k">Centro lat,lng</div></div>
+      </div>
+
+      <div class="cor-box" id="cor-box" style="display:none">
+        <p class="label muni-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path></svg>
+          Cor de destaque do imóvel
+        </p>
+        <div class="cor-grid" id="cor-grid"></div>
+        <div class="op-wrap">
+          <span class="op-lbl">Intensidade</span>
+          <input type="range" id="cor-op" class="op-range" min="0.08" max="0.55" step="0.01" value="0.18">
+        </div>
+        <button type="button" class="btn-ghost" id="cor-clear" style="margin-top:8px;width:100%">Remover destaque</button>
+        <p class="cor-hint">Dica: clique sobre um imóvel no mapa (em "Ver todos") para destacá-lo também. O vermelho é reservado a sobreposições.</p>
+      </div>
+
+      <div class="saved">
+        <div class="saved-head">
+          <h3>Imóveis gravados</h3>
+          <button class="mini-btn" id="btn-todos">Ver todos no mapa</button>
+        </div>
+        <div class="search-wrap">
+          <svg class="search-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="busca" type="text" placeholder="Buscar por matrícula, proprietário, identificação…">
+          <button id="busca-clear" class="search-clear" title="Limpar" style="display:none">×</button>
+        </div>
+        <div id="saved-list"><div class="empty-list">Carregando…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <button id="btn-toggle-panel" class="toggle-panel" title="Mostrar/ocultar painel" aria-label="Mostrar ou ocultar painel">
+      <svg class="ic-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      <svg class="ic-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
+    <div class="overlay" id="overlay">Clique em <span style="color:var(--red-bright);margin:0 4px">Mapear</span> para visualizar o imóvel</div>
+    <div class="readout" id="readout"><span class="dot">◆</span> <b id="ro-name">Imóvel</b> &nbsp;·&nbsp; <span id="ro-area"></span> ha</div>
+    <div class="muni-badge" id="muni-badge"></div>
+
+    <div class="overview-panel" id="overview-panel">
+      <div class="ovh">
+        <div>
+          <div class="ovh-title">Visão geral</div>
+          <div class="ovh-sub" id="ov-sub">—</div>
+        </div>
+        <button class="ov-close" id="ov-hide" title="Ocultar painel">–</button>
+      </div>
+      <div class="legend">
+        <span><i class="sw normal"></i>Imóvel</span>
+        <span><i class="sw sel"></i>Selecionado</span>
+        <span><i class="sw over"></i>Sobreposição</span>
+      </div>
+      <div class="ov-hint" id="ov-hint">Ctrl+clique (ou clique direito) nos imóveis para selecionar · clique numa sobreposição para o relatório dela</div>
+      <div class="ov-overlaps" id="ov-overlaps"></div>
+      <div class="ov-foot">
+        <button class="btn-report" id="btn-relatorio">Gerar relatório de sobreposição (PDF)</button>
+      </div>
+    </div>
+
+    <button class="ov-reopen" id="ov-reopen" title="Mostrar painel de imóveis e sobreposições">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+      <span>Imóveis e sobreposições</span>
+    </button>
+
+    <div class="sel-bar" id="sel-bar">
+      <span class="sel-count"><b id="sel-n">0</b> selecionado(s)</span>
+      <button class="sel-rep" id="sel-relatorio">Relatório dos selecionados</button>
+      <button class="sel-clear" id="sel-limpar">Limpar</button>
+    </div>
+
+    <div class="overview-panel kml-panel" id="kml-panel">
+      <div class="ovh">
+        <div>
+          <div class="ovh-title">Importar do KML</div>
+          <div class="ovh-sub" id="kml-sub">—</div>
+        </div>
+        <button class="ov-close" id="kml-close" title="Cancelar">×</button>
+      </div>
+      <div class="kml-rows" id="kml-rows"></div>
+      <div class="kml-foot">
+        <button class="btn-save" id="btn-import-lote" style="width:100%">Gravar imóveis</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /.mapeador-shell -->
+
+<!-- Botão flutuante p/ abrir o painel no mobile -->
+<button id="fab-panel" class="fab-panel" title="Imóveis e cadastro" aria-label="Abrir painel">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+</button>
+<div id="panel-backdrop" class="panel-backdrop"></div>
+
+<!-- Modal: editar dados do imóvel -->
+<div id="modal-edit" class="modal-ov">
+  <div class="modal-card">
+    <div class="modal-h">
+      <h3>Editar dados do imóvel</h3>
+      <button class="modal-x" id="ed-cancelar" title="Fechar">×</button>
+    </div>
+    <input type="hidden" id="ed-id">
+    <div class="modal-b">
+      <div class="fld"><label class="field-label">Identificação do imóvel</label><input id="ed-identificador" type="text"></div>
+      <div class="modal-row">
+        <div class="fld"><label class="field-label">Nº da matrícula</label><input id="ed-matricula" type="text"></div>
+        <div class="fld"><label class="field-label">Tipo</label>
+          <select id="ed-tipo"><option value="">—</option><option value="urbano">Urbano</option><option value="rural">Rural</option></select>
+        </div>
+      </div>
+      <div class="fld"><label class="field-label">Proprietário</label><input id="ed-proprietario" type="text"></div>
+      <div class="fld"><label class="field-label">CPF do proprietário</label><input id="ed-cpf" type="text" maxlength="14"></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" id="ed-cancelar2" onclick="fecharEdicao()">Cancelar</button>
+      <button class="btn-primary" id="ed-salvar">Salvar alterações</button>
+    </div>
+  </div>
+</div>
+<?php include(__DIR__ . '/../rodape.php'); ?>
+
+<script>
+let map;
+let polygon = null, vertexMarkers = [];      // modo single
+let overviewPolys = [], overlapPolys = [];   // modo visão geral
+let labelOverlays = [];                       // rótulos nome/matrícula no mapa
+let kmlPlacemarks = [];                       // placemarks do KML em importação
+let overlapsAtuais = [], totalImoveisAtual = 0; // dados para o relatório de sobreposição
+let selecionados = new Set();                    // ids de imóveis selecionados (Ctrl+clique)
+let itensOverview = [];                           // itens exibidos na visão geral (com refs de polígono)
+let ctrlAtivo = false;                            // estado da tecla Ctrl/Cmd
+document.addEventListener('keydown', e=>{ if(e.key==='Control'||e.key==='Meta'||e.ctrlKey||e.metaKey) ctrlAtivo=true; });
+document.addEventListener('keyup',   e=>{ if(e.key==='Control'||e.key==='Meta') ctrlAtivo=false; });
+window.addEventListener('blur', ()=>{ ctrlAtivo=false; });
+let lastGeo = null, origemAtual = 'memorial', kmlRaw = '';
+let modo = 'single';
+let LabelOverlay = null;
+
+function initMap(){
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: {lat:-4.14, lng:-46.9}, zoom: 13,
+    mapTypeId: 'hybrid',                       // mapa real (satélite + rótulos)
+    mapTypeControl: true, streetViewControl: false, fullscreenControl: true,
+    backgroundColor:'#0a0d11'
+  });
+
+  // Rótulo flutuante (chip) sobre o polígono — definido aqui pois depende da API já carregada
+  LabelOverlay = class extends google.maps.OverlayView {
+    constructor(position, text){ super(); this.position=position; this.text=text; this.div=null; this.setMap(map); }
+    onAdd(){
+      const d=document.createElement('div');
+      d.className='map-chip'; d.textContent=this.text;
+      this.div=d; this.getPanes().floatPane.appendChild(d);
+    }
+    draw(){
+      if(!this.div) return;
+      const p=this.getProjection().fromLatLngToDivPixel(this.position);
+      this.div.style.left=p.x+'px'; this.div.style.top=p.y+'px';
+    }
+    setText(t){ this.text=t; if(this.div) this.div.textContent=t; }
+    onRemove(){ if(this.div){ this.div.remove(); this.div=null; } }
+  };
+
+  carregarLista();
+  verTodos();   // abre a visão geral com todos os imóveis ao entrar
+}
+window.initMap = initMap;
+
+function centroidOf(pts){
+  let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
+  return {lat:la/pts.length, lng:ln/pts.length};
+}
+function addLabel(pos, text){
+  if(!text) return null;
+  const ov = new LabelOverlay(new google.maps.LatLng(pos.lat, pos.lng), text);
+  labelOverlays.push(ov);
+  return ov;
+}
+function limparLabels(){ labelOverlays.forEach(l=>l.setMap(null)); labelOverlays=[]; }
+
+function fmt(n,d){ return Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function setStatus(type,msg){ const el=document.getElementById('status'); el.className='status '+type; el.innerHTML=msg; }
+
+function limparSingle(){
+  if(polygon){ polygon.setMap(null); polygon=null; }
+  vertexMarkers.forEach(m=>m.setMap(null)); vertexMarkers=[];
+  limparLabels();
+  imovelEditandoId=null;
+  const cb=document.getElementById('cor-box'); if(cb) cb.style.display='none';
+}
+function limparOverview(){
+  overviewPolys.forEach(p=>p.setMap(null)); overviewPolys=[];
+  overlapPolys.forEach(p=>p.setMap(null)); overlapPolys=[];
+  limparLabels();
+  selecionados.clear();
+  const sb=document.getElementById('sel-bar'); if(sb) sb.classList.remove('show');
+  const rp=document.getElementById('ov-reopen'); if(rp) rp.classList.remove('show');
+}
+
+async function post(params){
+  const r = await fetch(window.location.pathname, {method:'POST', body:new URLSearchParams(params)});
+  return r.json();
+}
+
+/* ===================== MODO SINGLE ===================== */
+function desenhar(geo, nome){
+  modo='single';
+  document.getElementById('btn-todos').classList.remove('active');
+  document.getElementById('overview-panel').classList.remove('show');
+  document.getElementById('kml-panel').classList.remove('show');
+  limparOverview(); limparSingle();
+  document.getElementById('overlay').style.display='none';
+
+  const path = geo.pts.map(p=>({lat:p[0], lng:p[1]}));
+  polygon = new google.maps.Polygon({
+    paths:path, strokeColor:'#e2342f', strokeOpacity:.95, strokeWeight:2,
+    fillColor:'#a80f1e', fillOpacity:.22, map:map
+  });
+  geo.pts.forEach((p,i)=>{
+    vertexMarkers.push(new google.maps.Marker({
+      position:{lat:p[0],lng:p[1]}, map:map,
+      icon:{path:google.maps.SymbolPath.CIRCLE, scale:4, fillColor:'#0e1217',
+            fillOpacity:1, strokeColor:'#e2342f', strokeWeight:2},
+      title:'V'+(i+1)
+    }));
+  });
+  const b = new google.maps.LatLngBounds();
+  path.forEach(pt=>b.extend(pt)); map.fitBounds(b, 40);
+
+  // rótulo com nome/matrícula no centro do imóvel
+  addLabel({lat:geo.centro_lat, lng:geo.centro_lng}, nome);
+
+  document.getElementById('stats').style.display='grid';
+  document.getElementById('s-vtx').textContent = geo.num_vertices;
+  document.getElementById('s-area').innerHTML = fmt(geo.area_ha,4)+'<span class="u"> ha</span>';
+  document.getElementById('s-per').innerHTML  = fmt(geo.perimetro_m/1000,3)+'<span class="u"> km</span>';
+  document.getElementById('s-cen').textContent = Number(geo.centro_lat).toFixed(5)+', '+Number(geo.centro_lng).toFixed(5);
+
+  const ro=document.getElementById('readout'); ro.style.display='block';
+  document.getElementById('ro-name').textContent = nome || 'Imóvel';
+  document.getElementById('ro-area').textContent = fmt(geo.area_ha,2);
+
+  verificarPertencimento(geo); // confere se o imóvel está dentro do limite municipal carregado
+}
+
+/* ===================== MAPEAR (memorial) ===================== */
+document.getElementById('btn-map').onclick = async ()=>{
+  const memorial = document.getElementById('memorial').value;
+  if(!memorial.trim()){ setStatus('err','Cole um memorial descritivo.'); return; }
+  origemAtual='memorial'; resetKmlZone();
+  setStatus('warn','Processando…');
+  const geo = await post({acao:'processar', memorial});
+  if(!geo.ok){
+    setStatus('err', `Não foi possível formar um polígono. Encontradas ${geo.lon_count||0} longitude(s) e ${geo.lat_count||0} latitude(s) em GMS — mínimo de 3 vértices válidos.`);
+    document.getElementById('btn-save').disabled=true; return;
+  }
+  lastGeo=geo;
+  if(geo.lon_count!==geo.lat_count)
+    setStatus('warn', `${geo.lon_count} longitudes e ${geo.lat_count} latitudes — mapeados ${geo.num_vertices} vértices pareados. Confira o texto.`);
+  else
+    setStatus('ok', `${geo.num_vertices} vértices reconhecidos e mapeados.`);
+  desenhar(geo, document.getElementById('identificador').value.trim());
+  document.getElementById('btn-save').disabled=false;
+};
+
+/* ===================== GRAVAR ===================== */
+document.getElementById('btn-save').onclick = async ()=>{
+  const identificador = document.getElementById('identificador').value.trim();
+  const numero_matricula = document.getElementById('numero_matricula').value.trim();
+  if(!identificador && !numero_matricula){ setStatus('err','Informe a identificação do imóvel ou o número da matrícula.'); return; }
+  const fonte = origemAtual==='kml' ? kmlRaw : document.getElementById('memorial').value;
+  setStatus('warn','Gravando…');
+  const res = await post({acao:'salvar', origem:origemAtual, memorial:fonte,
+    identificador, numero_matricula,
+    proprietario: document.getElementById('proprietario').value.trim(),
+    cpf: document.getElementById('cpf').value.trim(),
+    tipo_imovel: document.getElementById('tipo_imovel').value
+  });
+  if(!res.ok){ setStatus('err', res.erro || 'Falha ao gravar.'); return; }
+  setStatus('ok', res.mensagem);
+  if(res.id){ abrirCorPainel(res.id, null, null); }
+  carregarLista();
+};
+
+/* ===================== IMPORTAÇÃO KML ===================== */
+const kmlZone = document.getElementById('kml-zone');
+const kmlFile = document.getElementById('kml-file');
+kmlZone.onclick = ()=> kmlFile.click();
+kmlFile.onchange = e=>{ if(e.target.files[0]) lerArquivoKml(e.target.files[0]); };
+['dragover','dragenter'].forEach(ev=>kmlZone.addEventListener(ev,e=>{e.preventDefault();kmlZone.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>kmlZone.addEventListener(ev,e=>{e.preventDefault();kmlZone.classList.remove('drag');}));
+kmlZone.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) lerArquivoKml(f); });
+
+function resetKmlZone(){
+  kmlZone.classList.remove('loaded');
+  document.getElementById('kml-zone-label').innerHTML = 'Importar arquivo <b>KML</b>';
+}
+function lerArquivoKml(file){
+  const reader = new FileReader();
+  reader.onload = async ()=>{
+    kmlRaw = reader.result;
+    setStatus('warn','Lendo KML…');
+    const res = await post({acao:'processar_kml', kml:kmlRaw});
+    if(!res.ok){ setStatus('err', res.erro || 'KML inválido.'); return; }
+
+    kmlZone.classList.add('loaded');
+    document.getElementById('kml-zone-label').innerHTML = '<b>'+escapeHtml(file.name)+'</b> · '+res.total+' polígono(s)';
+
+    if(res.total===1){
+      // um imóvel: carrega para revisão e gravação individual
+      origemAtual='kml';
+      const pm=res.placemarks[0];
+      if(pm.nome) document.getElementById('identificador').value=pm.nome;
+      desenhar(pm, pm.nome || document.getElementById('identificador').value.trim());
+      document.getElementById('btn-save').disabled=false;
+      setStatus('ok', `KML lido: ${pm.num_vertices} vértices. Confira o nome e clique em Gravar.`);
+    } else {
+      // vários imóveis: abre painel para nomear cada um antes de gravar
+      origemAtual='kml';
+      abrirPainelKml(res.placemarks);
+      setStatus('ok', `${res.total} imóveis no KML. Nomeie cada um no painel e clique em Gravar.`);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// abre o painel de nomeação dos imóveis do KML (vários polígonos)
+function abrirPainelKml(placemarks){
+  modo='kml';
+  document.getElementById('overview-panel').classList.remove('show');
+  document.getElementById('btn-todos').classList.remove('active');
+  limparSingle(); limparOverview();
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('readout').style.display='none';
+  document.getElementById('stats').style.display='none';
+
+  kmlPlacemarks = placemarks.map((pm,i)=>({
+    pts: pm.pts, area_ha: pm.area_ha, num_vertices: pm.num_vertices,
+    nome: pm.nome || ('Imóvel ' + (i+1)), _poly:null, _label:null
+  }));
+
+  const b = new google.maps.LatLngBounds();
+  kmlPlacemarks.forEach((pm,i)=>{
+    const path = pm.pts.map(p=>({lat:p[0], lng:p[1]}));
+    pm._poly = new google.maps.Polygon({paths:path,strokeColor:'#5b96e6',strokeOpacity:.9,
+      strokeWeight:1.5,fillColor:'#5b96e6',fillOpacity:.15,map:map});
+    overviewPolys.push(pm._poly);
+    pm._label = addLabel(centroidOf(pm.pts), pm.nome);
+    pm._poly.addListener('click',()=>{
+      const el=document.querySelector('.kml-row[data-i="'+i+'"] input'); if(el){ el.focus(); }
+      map.panTo(centroidOf(pm.pts));
+    });
+    path.forEach(pt=>b.extend(pt));
+  });
+  map.fitBounds(b,40);
+
+  const rows = document.getElementById('kml-rows');
+  rows.innerHTML = kmlPlacemarks.map((pm,i)=>`
+    <div class="kml-row" data-i="${i}">
+      <div class="top">
+        <span class="idx">#${i+1}</span>
+        <span class="meta">${pm.num_vertices} vtx · ${fmt(pm.area_ha,2)} ha</span>
+      </div>
+      <div class="inp">
+        <input type="text" value="${escapeHtml(pm.nome)}" placeholder="Nome ou matrícula">
+        <select><option value="nome">Nome</option><option value="matricula">Matrícula</option></select>
+      </div>
+    </div>`).join('');
+
+  rows.querySelectorAll('.kml-row').forEach(row=>{
+    const i = +row.dataset.i;
+    const inp = row.querySelector('input');
+    inp.oninput = ()=>{
+      kmlPlacemarks[i].nome = inp.value;
+      if(kmlPlacemarks[i]._label) kmlPlacemarks[i]._label.setText(inp.value || ('Imóvel '+(i+1)));
+    };
+    inp.onfocus = ()=>{ map.panTo(centroidOf(kmlPlacemarks[i].pts)); };
+  });
+
+  document.getElementById('kml-sub').textContent = kmlPlacemarks.length + ' polígonos · nomeie e grave';
+  document.getElementById('btn-import-lote').textContent = 'Gravar ' + kmlPlacemarks.length + ' imóveis';
+  document.getElementById('kml-panel').classList.add('show');
+}
+
+document.getElementById('kml-close').onclick = ()=>{
+  document.getElementById('kml-panel').classList.remove('show');
+  limparOverview();
+  document.getElementById('overlay').style.display='grid';
+  resetKmlZone();
+};
+
+document.getElementById('btn-import-lote').onclick = async ()=>{
+  if(!kmlPlacemarks.length) return;
+  const nomes=[], tipos=[];
+  document.querySelectorAll('#kml-rows .kml-row').forEach(row=>{
+    const i=+row.dataset.i;
+    nomes[i]=(row.querySelector('input').value||'').trim();
+    tipos[i]=row.querySelector('select').value;
+  });
+  setStatus('warn','Gravando…');
+  const r = await post({acao:'salvar_kml_lote', kml:kmlRaw, nomes:JSON.stringify(nomes), tipos:JSON.stringify(tipos)});
+  if(!r.ok){ setStatus('err', r.erro||'Falha na importação.'); return; }
+  setStatus('ok', `${r.salvos} imóveis gravados do KML.`);
+  document.getElementById('kml-panel').classList.remove('show');
+  carregarLista(); verTodos();
+};
+
+/* ===================== VISÃO GERAL + SOBREPOSIÇÕES ===================== */
+function ringLngLat(pts){
+  const r = pts.map(p=>[p[1],p[0]]);            // turf usa [lng,lat]
+  const f=r[0], l=r[r.length-1];
+  if(f[0]!==l[0]||f[1]!==l[1]) r.push([f[0],f[1]]);
+  return r;
+}
+function bboxOf(pts){
+  let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9;
+  pts.forEach(p=>{ if(p[1]<mnx)mnx=p[1]; if(p[1]>mxx)mxx=p[1]; if(p[0]<mny)mny=p[0]; if(p[0]>mxy)mxy=p[0]; });
+  return [mnx,mny,mxx,mxy];
+}
+function bboxOverlap(a,b){ return !(a[2]<b[0]||b[2]<a[0]||a[3]<b[1]||b[3]<a[1]); }
+function turfToPaths(geom){
+  const out=[];
+  const polys = geom.type==='MultiPolygon' ? geom.coordinates : [geom.coordinates];
+  polys.forEach(poly=>{ out.push(poly[0].map(c=>({lat:c[1],lng:c[0]}))); });
+  return out;
+}
+
+document.getElementById('btn-todos').onclick = ()=>{
+  if(modo==='overview') sairOverview(); else verTodos();
+};
+document.getElementById('btn-relatorio').onclick = gerarRelatorio;
+
+function sairOverview(){
+  modo='single';
+  document.getElementById('btn-todos').classList.remove('active');
+  document.getElementById('overview-panel').classList.remove('show');
+  limparOverview();
+  document.getElementById('overlay').style.display='grid';
+}
+
+/* ---- contagem de imóveis distintos numa lista de sobreposições ---- */
+function totalDistintos(overlaps){
+  const s=new Set(); overlaps.forEach(o=>{ s.add(o.a.id); s.add(o.b.id); }); return s.size;
+}
+
+/* ---- envia um conjunto de sobreposições para o PDF (nova aba) ---- */
+function gerarRelatorioComDados(overlaps, total){
+  const lean = overlaps.map(o=>({
+    a:{id:o.a.id, identificador:o.a.identificador, area_ha:o.a.area_ha},
+    b:{id:o.b.id, identificador:o.b.identificador, area_ha:o.b.area_ha},
+    area_ha:o.area_ha, centro:o.centro, rings:o.rings
+  }));
+  const dados = JSON.stringify({ total_imoveis: total, overlaps: lean });
+  const f = document.createElement('form');
+  f.method='POST'; f.action=window.location.pathname; f.target='_blank';
+  const i1=document.createElement('input'); i1.type='hidden'; i1.name='acao'; i1.value='relatorio_sobreposicao'; f.appendChild(i1);
+  const i2=document.createElement('input'); i2.type='hidden'; i2.name='dados'; i2.value=dados; f.appendChild(i2);
+  document.body.appendChild(f); f.submit(); document.body.removeChild(f);
+}
+
+/* relatório completo (todas as sobreposições) */
+function gerarRelatorio(){
+  if(modo!=='overview'){ setStatus('warn','Abra "Ver todos no mapa" antes de gerar o relatório.'); return; }
+  if(!overlapsAtuais.length){ setStatus('warn','Não há sobreposições para relatar.'); return; }
+  gerarRelatorioComDados(overlapsAtuais, totalImoveisAtual);
+}
+
+/* ocultar / reexibir o painel (sem sair do overview) */
+document.getElementById('ov-hide').onclick = ()=>{
+  document.getElementById('overview-panel').classList.remove('show');
+  if(modo==='overview') document.getElementById('ov-reopen').classList.add('show');
+};
+document.getElementById('ov-reopen').onclick = ()=>{
+  document.getElementById('ov-reopen').classList.remove('show');
+  document.getElementById('overview-panel').classList.add('show');
+};
+
+/* ---- seleção de imóveis (Ctrl+clique) ---- */
+function estiloImovel(it){
+  if(!it._poly) return;
+  const sel = selecionados.has(it.id);
+  const base = corBaseImovel(it);
+  it._poly.setOptions(sel
+    ? {strokeColor:'#f59e0b', strokeWeight:2.5, fillColor:'#f59e0b', fillOpacity:.30, zIndex:3}
+    : {strokeColor:base, strokeWeight:1.5, fillColor:base, fillOpacity:opacidadeImovel(it), zIndex:1});
+}
+function atualizarSelBar(){
+  const n=selecionados.size;
+  document.getElementById('sel-n').textContent=n;
+  document.getElementById('sel-bar').classList.toggle('show', n>0);
+}
+function toggleSelecao(it){
+  if(selecionados.has(it.id)) selecionados.delete(it.id); else selecionados.add(it.id);
+  estiloImovel(it); atualizarSelBar(); sincronizarListaSelecao();
+}
+function limparSelecao(){
+  selecionados.clear();
+  itensOverview.forEach(it=>estiloImovel(it));
+  atualizarSelBar(); sincronizarListaSelecao();
+}
+/* reflete a seleção atual nos itens da lista "Imóveis gravados" */
+function sincronizarListaSelecao(){
+  document.querySelectorAll('#saved-list .item').forEach(el=>{
+    el.classList.toggle('sel', selecionados.has(Number(el.dataset.id)));
+  });
+}
+/* seleciona/desseleciona um imóvel a partir da lista (Ctrl+clique) */
+async function selecionarDaLista(id){
+  id = Number(id);
+  if(modo!=='overview'){ await verTodos(); }   // garante o mapa e as sobreposições calculadas
+  const it = itensOverview.find(x=>Number(x.id)===id);
+  if(it){ toggleSelecao(it); }
+  else {
+    if(selecionados.has(id)) selecionados.delete(id); else selecionados.add(id);
+    atualizarSelBar(); sincronizarListaSelecao();
+  }
+}
+document.getElementById('sel-limpar').onclick = limparSelecao;
+document.getElementById('sel-relatorio').onclick = ()=>{
+  if(!selecionados.size){ setStatus('warn','Selecione imóveis com Ctrl+clique.'); return; }
+  let subset;
+  if(selecionados.size===1)
+    subset = overlapsAtuais.filter(o=> selecionados.has(o.a.id) || selecionados.has(o.b.id));
+  else
+    subset = overlapsAtuais.filter(o=> selecionados.has(o.a.id) && selecionados.has(o.b.id));
+  if(!subset.length){ setStatus('warn','Nenhuma sobreposição entre os imóveis selecionados.'); return; }
+  gerarRelatorioComDados(subset, totalDistintos(subset));
+};
+
+async function verTodos(){
+  modo='overview';
+  document.getElementById('btn-todos').classList.add('active');
+  document.getElementById('kml-panel').classList.remove('show');
+  limparSingle(); limparOverview();
+  itensOverview=[];
+  document.getElementById('readout').style.display='none';
+  document.getElementById('overlay').style.display='none';
+
+  const res = await post({acao:'listar_geo'});
+  if(!res.ok || !res.itens.length){
+    document.getElementById('btn-todos').classList.remove('active');
+    document.getElementById('overlay').style.display='grid';
+    return;
+  }
+  const itens = res.itens;
+  itensOverview = itens;
+  const bounds = new google.maps.LatLngBounds();
+
+  // desenha todos os polígonos
+  itens.forEach(it=>{
+    const path = it.pts.map(p=>({lat:p[0],lng:p[1]}));
+    const base = corBaseImovel(it);
+    const poly = new google.maps.Polygon({paths:path,strokeColor:base,strokeOpacity:.9,
+      strokeWeight:1.5,fillColor:base,fillOpacity:opacidadeImovel(it),map:map,zIndex:1});
+    it._poly = poly;
+    poly.addListener('click',(e)=>{
+      const ctrl = ctrlAtivo || (e && e.domEvent && (e.domEvent.ctrlKey || e.domEvent.metaKey));
+      if(ctrl) toggleSelecao(it); else abrirSeletorCor(it, e);
+    });
+    // clique direito também seleciona (alternativa ao Ctrl, e cobre Mac)
+    poly.addListener('rightclick',()=>toggleSelecao(it));
+    overviewPolys.push(poly);
+    it._bbox = bboxOf(it.pts);
+    addLabel(centroidOf(it.pts), it.identificador);   // nome/matrícula no mapa
+    path.forEach(pt=>bounds.extend(pt));
+  });
+  map.fitBounds(bounds,40);
+
+  // detecção de sobreposição (pré-filtro por bounding box + turf.intersect)
+  const overlaps = [];
+  for(let i=0;i<itens.length;i++){
+    for(let j=i+1;j<itens.length;j++){
+      if(!bboxOverlap(itens[i]._bbox, itens[j]._bbox)) continue;
+      try{
+        const a = turf.polygon([ringLngLat(itens[i].pts)]);
+        const b = turf.polygon([ringLngLat(itens[j].pts)]);
+        const inter = turf.intersect(a,b);
+        if(inter){
+          const areaHa = turf.area(inter)/10000;
+          if(areaHa < 0.0001) continue; // ignora toques de borda
+          const rings = turfToPaths(inter.geometry).map(path=>path.map(pt=>[pt.lat, pt.lng]));
+          turfToPaths(inter.geometry).forEach(path=>{
+            overlapPolys.push(new google.maps.Polygon({paths:path,strokeColor:'#e2342f',
+              strokeOpacity:.95,strokeWeight:1.5,fillColor:'#e2342f',fillOpacity:.5,map:map,zIndex:5,clickable:false}));
+          });
+          const c = turf.centroid(inter).geometry.coordinates;
+          overlaps.push({
+            a:{id:itens[i].id, identificador:itens[i].identificador, area_ha:itens[i].area_ha, pts:itens[i].pts},
+            b:{id:itens[j].id, identificador:itens[j].identificador, area_ha:itens[j].area_ha, pts:itens[j].pts},
+            area_ha:areaHa, centro:{lat:c[1],lng:c[0]}, rings:rings
+          });
+        }
+      }catch(err){ /* polígono inválido: ignora */ }
+    }
+  }
+
+  overlapsAtuais = overlaps;
+  totalImoveisAtual = itens.length;
+  renderOverviewPanel(itens.length, overlaps);
+  setStatus(overlaps.length? 'warn':'ok',
+    overlaps.length? `${overlaps.length} sobreposição(ões) detectada(s) entre ${itens.length} imóveis.`
+                   : `${itens.length} imóveis exibidos. Nenhuma sobreposição detectada.`);
+}
+
+/* ===================== CORES DE DESTAQUE DOS IMÓVEIS ===================== */
+// Paleta — SEM tons de vermelho (reservado p/ sobreposições). Vibrantes + pastéis.
+const PALETA_CORES = [
+  '#2563eb','#0ea5e9','#0891b2','#0d9488','#16a34a','#65a30d',
+  '#ca8a04','#f59e0b','#7c3aed','#6366f1','#c026d3','#db2777',
+  '#93c5fd','#a5f3fc','#99f6e4','#bbf7d0','#d9f99d','#fde68a',
+  '#fed7aa','#c7d2fe','#e9d5ff','#f5d0fe','#fbcfe8','#cbd5e1'
+];
+const COR_PADRAO = '#5b96e6';
+const OPACIDADE_PADRAO = 0.18, OPAC_MIN = 0.08, OPAC_MAX = 0.55;
+
+function corValida(c){
+  if(typeof c!=='string' || !/^#[0-9a-fA-F]{6}$/.test(c)) return false;
+  const r=parseInt(c.substr(1,2),16), g=parseInt(c.substr(3,2),16), b=parseInt(c.substr(5,2),16);
+  if(r>=150 && g<=90 && b<=90) return false; // bloqueia vermelho (reservado a sobreposições)
+  return true;
+}
+function corBaseImovel(it){ return (it && corValida(it.cor)) ? it.cor : COR_PADRAO; }
+function opacidadeImovel(it){
+  let o = (it && it.cor_opacidade!=null) ? parseFloat(it.cor_opacidade) : OPACIDADE_PADRAO;
+  if(isNaN(o)) o = OPACIDADE_PADRAO;
+  return Math.max(OPAC_MIN, Math.min(OPAC_MAX, o));
+}
+function swatchesHTML(atual){
+  const a=(atual||'').toLowerCase();
+  return PALETA_CORES.map(c=>`<button type="button" class="cor-sw${a===c?' sel':''}" style="background:${c}" title="${c}" data-cor="${c}"></button>`).join('');
+}
+
+let infoWinCor = null;
+function abrirSeletorCor(it, e){
+  if(!infoWinCor) infoWinCor = new google.maps.InfoWindow();
+  const atual = corValida(it.cor) ? it.cor.toLowerCase() : '';
+  const op = opacidadeImovel(it);
+  infoWinCor.setContent(`<div class="cor-pop" id="cor-pop">
+    <div class="cor-pop-t">${escapeHtml(it.identificador||'Imóvel')}</div>
+    <div class="cor-pop-sub">${fmt(it.area_ha,2)} ha${it.numero_matricula?(' · Mat. '+escapeHtml(it.numero_matricula)):''}</div>
+    <div class="cor-pop-lbl">Cor de destaque</div>
+    <div class="cor-pop-grid">${swatchesHTML(atual)}</div>
+    <div class="cor-pop-lbl" style="margin-top:9px">Intensidade</div>
+    <input type="range" id="cor-pop-op" class="op-range" min="${OPAC_MIN}" max="${OPAC_MAX}" step="0.01" value="${op}">
+    <button type="button" class="cor-pop-clear" id="cor-pop-clear">Remover destaque</button>
+  </div>`);
+  infoWinCor.setPosition((e && e.latLng) ? e.latLng : centroidOf(it.pts));
+  infoWinCor.open(map);
+  google.maps.event.addListenerOnce(infoWinCor, 'domready', ()=>{
+    const pop = document.getElementById('cor-pop'); if(!pop) return;
+    let corSel = atual;
+    pop.querySelectorAll('.cor-sw').forEach(b=> b.addEventListener('click', ()=>{
+      corSel = b.dataset.cor;
+      pop.querySelectorAll('.cor-sw').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+      const opv = parseFloat(document.getElementById('cor-pop-op').value);
+      window.__setCorImovel(it.id, corSel, opv);
+    }));
+    const opEl = document.getElementById('cor-pop-op');
+    if(opEl) opEl.addEventListener('change', ()=>{ if(corSel) window.__setCorImovel(it.id, corSel, parseFloat(opEl.value)); });
+    const clr = document.getElementById('cor-pop-clear');
+    if(clr) clr.addEventListener('click', ()=>{ corSel=''; window.__setCorImovel(it.id, '', null); });
+  });
+}
+
+// Salva cor + intensidade e recolore ao vivo (visão geral, lista e foco)
+window.__setCorImovel = async function(id, hex, opac){
+  try{
+    const params = {acao:'salvar_cor', id:id, cor:hex};
+    if(opac!=null && !isNaN(opac)) params.opacidade = opac;
+    const r = await post(params);
+    if(!r.ok){ setStatus('err', r.erro || 'Não foi possível salvar a cor.'); return; }
+    const novaCor = r.cor || null;
+    const novaOp = (r.cor_opacidade!=null) ? parseFloat(r.cor_opacidade) : null;
+    const cacheIt = (imoveisCache||[]).find(x=>String(x.id)===String(id));
+    if(cacheIt){ cacheIt.cor = novaCor; cacheIt.cor_opacidade = novaOp; }
+    const ov = (itensOverview||[]).find(x=>x.id===id);
+    if(ov){ ov.cor = novaCor; ov.cor_opacidade = novaOp;
+      if(ov._poly && !selecionados.has(ov.id)){
+        const base = corBaseImovel(ov);
+        ov._poly.setOptions({strokeColor:base, fillColor:base, fillOpacity:opacidadeImovel(ov)});
+      }
+    }
+    if(imovelEditandoId === id){
+      imovelEditandoCor = novaCor; imovelEditandoOpac = novaOp;
+      marcarSwatchPainel(novaCor); ajustarSliderPainel(novaOp);
+      if(polygon){
+        const base = corValida(novaCor) ? novaCor : '#e2342f';
+        polygon.setOptions({strokeColor: base, fillColor: base, fillOpacity: (novaOp!=null?novaOp:0.22)});
+      }
+    }
+    renderLista();
+    setStatus('ok', hex ? 'Cor/intensidade salvas.' : 'Destaque removido.');
+  }catch(e){ setStatus('err','Erro ao salvar a cor.'); }
+};
+
+/* ---- Seletor de cor no painel (ao editar/gravar um imóvel) ---- */
+let imovelEditandoId = null, imovelEditandoCor = null, imovelEditandoOpac = null;
+
+function montarSeletorCorPainel(){
+  const box = document.getElementById('cor-grid'); if(!box) return;
+  box.innerHTML = swatchesHTML('');
+  box.querySelectorAll('.cor-sw').forEach(b=> b.addEventListener('click', ()=>{
+    if(!imovelEditandoId) return;
+    const op = document.getElementById('cor-op');
+    window.__setCorImovel(imovelEditandoId, b.dataset.cor, op?parseFloat(op.value):null);
+  }));
+  const clr = document.getElementById('cor-clear');
+  if(clr) clr.addEventListener('click', ()=>{ if(imovelEditandoId) window.__setCorImovel(imovelEditandoId, '', null); });
+  const op = document.getElementById('cor-op');
+  if(op) op.addEventListener('change', ()=>{ if(imovelEditandoId && imovelEditandoCor) window.__setCorImovel(imovelEditandoId, imovelEditandoCor, parseFloat(op.value)); });
+}
+function marcarSwatchPainel(cor){
+  const box = document.getElementById('cor-grid'); if(!box) return;
+  const c = (cor||'').toLowerCase();
+  box.querySelectorAll('.cor-sw').forEach(b=> b.classList.toggle('sel', b.dataset.cor===c));
+}
+function ajustarSliderPainel(op){ const s=document.getElementById('cor-op'); if(s) s.value = (op!=null&&!isNaN(op))?op:OPACIDADE_PADRAO; }
+function abrirCorPainel(id, cor, opac){
+  imovelEditandoId = id; imovelEditandoCor = corValida(cor)?cor:null; imovelEditandoOpac = (opac!=null)?parseFloat(opac):null;
+  const sec = document.getElementById('cor-box'); if(sec) sec.style.display = id ? 'block' : 'none';
+  marcarSwatchPainel(imovelEditandoCor); ajustarSliderPainel(imovelEditandoOpac);
+  if(polygon && corValida(cor)) polygon.setOptions({strokeColor:cor, fillColor:cor, fillOpacity:(imovelEditandoOpac!=null?imovelEditandoOpac:0.22)});
+}
+
+function infoImovel(it){
+  setStatus('ok', `<b>${escapeHtml(it.identificador)}</b> — ${fmt(it.area_ha,2)} ha (${it.origem}).`);
+}
+
+function renderOverviewPanel(total, overlaps){
+  const panel=document.getElementById('overview-panel');
+  panel.classList.add('show');
+  document.getElementById('ov-sub').textContent =
+    `${total} imóveis · ${overlaps.length} sobreposição(ões)`;
+  const box=document.getElementById('ov-overlaps');
+  if(!overlaps.length){
+    box.innerHTML='<div class="ov-none">✓ Nenhuma sobreposição entre os imóveis exibidos.</div>';
+    return;
+  }
+  overlaps.sort((x,y)=>y.area_ha-x.area_ha);
+  box.innerHTML = '<div class="ttl">Sobreposições</div>' + overlaps.map((o,i)=>`
+    <div class="ov-row" data-i="${i}">
+      <button class="row-rep" data-i="${i}">relatório</button>
+      <div class="pair">${escapeHtml(o.a.identificador)} <span style="color:var(--faint)">⨯</span> ${escapeHtml(o.b.identificador)}</div>
+      <div class="amt">${fmt(o.area_ha,4)} ha sobrepostos</div>
+    </div>`).join('');
+  box.querySelectorAll('.ov-row').forEach(row=>{
+    row.onclick=()=>{ const o=overlaps[+row.dataset.i]; map.panTo(o.centro); map.setZoom(15); };
+  });
+  box.querySelectorAll('.row-rep').forEach(btn=>{
+    btn.onclick=(e)=>{ e.stopPropagation(); const o=overlaps[+btn.dataset.i]; gerarRelatorioComDados([o], 2); };
+  });
+}
+
+/* ===================== LISTA DE SALVOS ===================== */
+let imoveisCache = [];
+async function carregarLista(){
+  const res = await post({acao:'listar'});
+  imoveisCache = (res.ok && res.itens) ? res.itens : [];
+  renderLista();
+}
+function renderLista(){
+  const wrap = document.getElementById('saved-list');
+  const termo = (document.getElementById('busca').value||'').trim().toLowerCase();
+  let itens = imoveisCache;
+  if(termo){
+    itens = itens.filter(it=>[it.identificador,it.numero_matricula,it.proprietario,it.cpf,it.tipo_imovel,it.origem]
+      .some(c=>(c||'').toString().toLowerCase().includes(termo)));
+  }
+  if(!itens.length){
+    wrap.innerHTML = '<div class="empty-list">'+(imoveisCache.length?'Nenhum imóvel encontrado.':'Nenhum imóvel gravado ainda.')+'</div>';
+    return;
+  }
+  wrap.innerHTML = itens.map(it=>{
+    const sub = [];
+    if(it.numero_matricula) sub.push('Mat. '+escapeHtml(it.numero_matricula));
+    if(it.proprietario) sub.push(escapeHtml(it.proprietario));
+    const meta = `${fmt(it.area_ha,2)} ha`;
+    const corDot = corValida(it.cor) ? `<span class="item-dot" style="background:${it.cor}"></span>` : '<span class="item-dot vazio"></span>';
+    const tag = it.tipo_imovel ? `<span class="tag ${it.tipo_imovel==='rural'?'rural':'urb'}">${it.tipo_imovel}</span>` : '';
+    return `<div class="item" data-id="${it.id}">
+      ${corDot}
+      <div class="info">
+        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')}</div>
+        <div class="mt">${sub.join(' · ')||meta}</div>
+      </div>
+      ${tag}
+      <button class="it-edit" title="Editar dados">✎</button>
+      <button class="del" title="Excluir">×</button>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('.item').forEach(el=>{
+    const id = el.dataset.id;
+    el.querySelector('.del').onclick = async (e)=>{ e.stopPropagation(); if(!confirm('Excluir este imóvel?'))return; await post({acao:'excluir', id}); carregarLista(); if(modo==='overview') verTodos(); };
+    el.querySelector('.it-edit').onclick = (e)=>{ e.stopPropagation(); abrirEdicao(id); };
+    el.oncontextmenu = (e)=>{ e.preventDefault(); selecionarDaLista(id); };
+    el.onclick = (e)=>{ if(ctrlAtivo || e.ctrlKey || e.metaKey){ e.preventDefault(); selecionarDaLista(id); return; } carregarImovel(id); };
+  });
+  sincronizarListaSelecao();
+}
+async function carregarImovel(id){
+  const res = await post({acao:'carregar', id});
+  if(!res.ok || !res.geo.ok){ setStatus('err','Não foi possível carregar este registro.'); return; }
+  const reg = res.registro;
+  origemAtual = reg.origem || 'memorial';
+  kmlRaw = origemAtual==='kml' ? (reg.memorial_descritivo||'') : '';
+  document.getElementById('memorial').value = reg.memorial_descritivo || '';
+  document.getElementById('identificador').value = reg.identificador||'';
+  document.getElementById('numero_matricula').value = reg.numero_matricula||'';
+  document.getElementById('proprietario').value = reg.proprietario||'';
+  document.getElementById('cpf').value = reg.cpf||'';
+  document.getElementById('tipo_imovel').value = reg.tipo_imovel||'';
+  document.getElementById('tipo_identificador').value = reg.tipo_identificador||'nome';
+  if(origemAtual==='kml') kmlZone.classList.add('loaded'); else resetKmlZone();
+  lastGeo = res.geo;
+  desenhar(res.geo, reg.identificador);
+  abrirCorPainel(id, reg.cor, reg.cor_opacidade);
+  document.getElementById('btn-save').disabled=false;
+  setStatus('ok', `Carregado: ${reg.identificador} (${res.geo.num_vertices} vértices).`);
+  abrirPainelMobile();
+}
+
+/* ---- edição inline (modal) ---- */
+function abrirEdicao(id){
+  const it = imoveisCache.find(x=>String(x.id)===String(id));
+  if(!it) return;
+  document.getElementById('ed-id').value = it.id;
+  document.getElementById('ed-identificador').value = it.identificador||'';
+  document.getElementById('ed-matricula').value = it.numero_matricula||'';
+  document.getElementById('ed-proprietario').value = it.proprietario||'';
+  document.getElementById('ed-cpf').value = it.cpf||'';
+  document.getElementById('ed-tipo').value = it.tipo_imovel||'';
+  document.getElementById('modal-edit').classList.add('show');
+}
+function fecharEdicao(){ document.getElementById('modal-edit').classList.remove('show'); }
+async function salvarEdicao(){
+  const id = document.getElementById('ed-id').value;
+  const r = await post({acao:'atualizar_imovel', id,
+    identificador: document.getElementById('ed-identificador').value.trim(),
+    numero_matricula: document.getElementById('ed-matricula').value.trim(),
+    proprietario: document.getElementById('ed-proprietario').value.trim(),
+    cpf: document.getElementById('ed-cpf').value.trim(),
+    tipo_imovel: document.getElementById('ed-tipo').value
+  });
+  if(!r.ok){ setStatus('err', r.erro||'Falha ao atualizar.'); return; }
+  fecharEdicao(); carregarLista(); setStatus('ok','Dados do imóvel atualizados.');
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ===================== LIMITE DO MUNICÍPIO (IBGE) ===================== */
+let limiteLayer = null, limiteTurf = null, limiteNome = '';
+
+function muniStatus(cls, msg){
+  const el = document.getElementById('muni-status');
+  if(!el) return;
+  el.className = 'status' + (cls ? ' ' + cls : '');
+  el.textContent = msg || '';
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function normTxt(s){ return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+async function carregarMunicipios(uf, selecionarNome, autoMostrar){
+  const sel = document.getElementById('muni-list');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">Carregando…</option>';
+  try{
+    const r = await post({acao:'ibge_municipios', uf:uf});
+    if(!r.ok){ sel.innerHTML = '<option value="">—</option>'; muniStatus('err', r.erro || 'Falha ao carregar municípios.'); return; }
+    const ops = ['<option value="">Selecione o município…</option>'];
+    (r.municipios||[]).forEach(m=> ops.push('<option value="'+m.id+'">'+escapeHtml(m.nome)+'</option>'));
+    sel.innerHTML = ops.join('');
+    muniStatus('', '');
+    if(selecionarNome){
+      const limpa = selecionarNome.replace(/\s*[-\/,]\s*[A-Za-z]{2}\s*$/, ''); // remove UF residual (ex.: "Zé Doca-MA")
+      const alvo = normTxt(limpa);
+      const opt = Array.from(sel.options).find(o=> o.value && normTxt(o.textContent)===alvo);
+      if(opt){ sel.value = opt.value; if(autoMostrar) mostrarLimite(); }
+      else { muniStatus('warn', 'Município da serventia ("'+selecionarNome+'") não encontrado na UF '+uf+'. Selecione manualmente.'); }
+    }
+  }catch(e){
+    sel.innerHTML = '<option value="">—</option>';
+    muniStatus('err', 'Erro de comunicação ao buscar municípios.');
+  }
+}
+
+function limiteToTurf(gj){
+  if(!gj) return null;
+  if(gj.type==='FeatureCollection'){
+    const feats = (gj.features||[]).filter(f=> f && f.geometry && (f.geometry.type==='Polygon'||f.geometry.type==='MultiPolygon'));
+    if(!feats.length) return null;
+    if(feats.length===1) return feats[0];
+    const polys=[];
+    feats.forEach(f=>{ if(f.geometry.type==='Polygon') polys.push(f.geometry.coordinates); else f.geometry.coordinates.forEach(c=> polys.push(c)); });
+    return {type:'Feature', properties:{}, geometry:{type:'MultiPolygon', coordinates:polys}};
+  }
+  if(gj.type==='Feature') return gj;
+  if(gj.type==='Polygon'||gj.type==='MultiPolygon') return {type:'Feature', properties:{}, geometry:gj};
+  return null;
+}
+
+function ocultarLimite(){
+  if(limiteLayer){ limiteLayer.setMap(null); limiteLayer=null; }
+  limiteTurf=null; limiteNome='';
+  const b=document.getElementById('muni-badge'); if(b) b.style.display='none';
+  const oc=document.getElementById('btn-muni-ocultar'); if(oc) oc.style.display='none';
+}
+
+async function mostrarLimite(){
+  const sel = document.getElementById('muni-list');
+  const id = sel ? sel.value : '';
+  const nome = (sel && sel.selectedIndex>=0) ? sel.options[sel.selectedIndex].textContent : '';
+  if(!id){ muniStatus('warn','Selecione um município.'); return; }
+  muniStatus('', 'Carregando limite do IBGE…');
+  const st=document.getElementById('muni-status'); if(st) st.style.display='block';
+  try{
+    const r = await post({acao:'ibge_malha', municipio:id});
+    if(!r.ok || !r.geojson){ muniStatus('err', r.erro || 'Não foi possível obter o limite.'); return; }
+    ocultarLimite();
+    limiteLayer = new google.maps.Data({map:map});
+    limiteLayer.addGeoJson(r.geojson);
+    limiteLayer.setStyle({fillColor:'#2563eb', fillOpacity:0.06, strokeColor:'#2563eb', strokeOpacity:0.95, strokeWeight:2.5, clickable:false});
+    limiteTurf = limiteToTurf(r.geojson);
+    limiteNome = nome || 'município';
+    const bounds = new google.maps.LatLngBounds();
+    limiteLayer.forEach(f=> f.getGeometry().forEachLatLng(ll=> bounds.extend(ll)));
+    if(!bounds.isEmpty() && modo!=='single') map.fitBounds(bounds, 30);
+    const oc=document.getElementById('btn-muni-ocultar'); if(oc) oc.style.display='';
+    muniStatus('ok', 'Limite de ' + limiteNome + ' carregado.');
+    if(window.__ultimoGeo) verificarPertencimento(window.__ultimoGeo);
+  }catch(e){
+    muniStatus('err', 'Erro ao carregar o limite municipal.');
+  }
+}
+
+function verificarPertencimento(geo){
+  window.__ultimoGeo = geo;
+  const badge = document.getElementById('muni-badge');
+  if(!limiteTurf || !geo || !geo.pts || geo.pts.length<3){ if(badge) badge.style.display='none'; return; }
+  try{
+    const ring = geo.pts.map(p=>[p[1], p[0]]); // turf usa [lng,lat]
+    if(ring[0][0]!==ring[ring.length-1][0] || ring[0][1]!==ring[ring.length-1][1]) ring.push(ring[0]);
+    const prop = turf.polygon([ring]);
+    let within=false, intersects=false;
+    try{ within = turf.booleanWithin(prop, limiteTurf); }catch(e){}
+    try{ intersects = turf.booleanIntersects(prop, limiteTurf); }
+    catch(e){ try{ intersects = turf.booleanPointInPolygon(turf.point([geo.centro_lng, geo.centro_lat]), limiteTurf); }catch(_){} }
+    let cls, txt;
+    if(within){ cls='dentro'; txt='✓ Imóvel DENTRO de '+limiteNome; }
+    else if(intersects){ cls='parcial'; txt='⚠ Imóvel CRUZA o limite de '+limiteNome+' (parte fora)'; }
+    else { cls='fora'; txt='✗ Imóvel FORA de '+limiteNome; }
+    if(badge){ badge.className='muni-badge '+cls; badge.textContent=txt; badge.style.display='block'; }
+    muniStatus(cls==='dentro'?'ok':(cls==='parcial'?'warn':'err'), txt);
+  }catch(e){ if(badge) badge.style.display='none'; }
+}
+
+(async function(){
+  const uf=document.getElementById('muni-uf');
+  if(uf) uf.addEventListener('change', e=> carregarMunicipios(e.target.value));
+  const bm=document.getElementById('btn-muni-mostrar'); if(bm) bm.addEventListener('click', mostrarLimite);
+  const bo=document.getElementById('btn-muni-ocultar'); if(bo) bo.addEventListener('click', ()=>{ ocultarLimite(); muniStatus('', ''); });
+  montarSeletorCorPainel();
+
+  // Município padrão pela serventia (cadastro_serventia.cidade) — recarrega a cada atualização da página
+  let cidade='', ufServ='MA';
+  try{ const s = await post({acao:'serventia_municipio'}); if(s.ok){ cidade=s.cidade||''; ufServ=s.uf||'MA'; } }catch(e){}
+  if(uf && ufServ) uf.value = ufServ;
+  if(uf) await carregarMunicipios(uf.value, cidade, !!cidade); // pré-seleciona e mostra o limite do município padrão
+
+  // Busca na lista
+  const busca=document.getElementById('busca'), bclear=document.getElementById('busca-clear');
+  if(busca){ busca.addEventListener('input', ()=>{ if(bclear) bclear.style.display = busca.value?'block':'none'; renderLista(); }); }
+  if(bclear){ bclear.addEventListener('click', ()=>{ busca.value=''; bclear.style.display='none'; renderLista(); busca.focus(); }); }
+
+  // Modal de edição
+  const es=document.getElementById('ed-salvar'); if(es) es.addEventListener('click', salvarEdicao);
+  const ec=document.getElementById('ed-cancelar'); if(ec) ec.addEventListener('click', fecharEdicao);
+  const eov=document.getElementById('modal-edit'); if(eov) eov.addEventListener('click', e=>{ if(e.target===eov) fecharEdicao(); });
+
+  // Recolher painel / drawer mobile
+  const tg=document.getElementById('btn-toggle-panel'); if(tg) tg.addEventListener('click', togglePainel);
+  const fab=document.getElementById('fab-panel'); if(fab) fab.addEventListener('click', abrirPainelMobile);
+  const back=document.getElementById('panel-backdrop'); if(back) back.addEventListener('click', fecharPainelMobile);
+})();
+
+/* ---- recolher / drawer ---- */
+function togglePainel(){ document.body.classList.toggle('panel-collapsed'); setTimeout(()=>{ if(window.google&&map) google.maps.event.trigger(map,'resize'); }, 320); }
+function abrirPainelMobile(){ if(window.matchMedia('(max-width:880px)').matches) document.body.classList.add('panel-open'); }
+function fecharPainelMobile(){ document.body.classList.remove('panel-open'); }
+
+// ---- Painéis flutuantes arrastáveis (Visão geral / KML) pelo cabeçalho ----
+function tornarArrastavel(painel, handle){
+  if(!painel || !handle) return;
+  let arrastando=false, ox=0, oy=0;
+  function inicio(e){
+    if(e.target.closest('button')) return;           // não arrasta ao clicar em botões do cabeçalho
+    const ev = e.touches ? e.touches[0] : e;
+    const rect = painel.getBoundingClientRect();
+    const pp = painel.offsetParent ? painel.offsetParent.getBoundingClientRect() : {left:0, top:0};
+    painel.style.left  = (rect.left - pp.left) + 'px'; // fixa em left/top preservando a posição atual
+    painel.style.top   = (rect.top  - pp.top)  + 'px';
+    painel.style.right = 'auto';
+    ox = ev.clientX - rect.left;
+    oy = ev.clientY - rect.top;
+    arrastando = true;
+    painel.classList.add('dragging');
+    document.addEventListener('mousemove', mover);
+    document.addEventListener('mouseup', fim);
+    document.addEventListener('touchmove', mover, {passive:false});
+    document.addEventListener('touchend', fim);
+    e.preventDefault();
+  }
+  function mover(e){
+    if(!arrastando) return;
+    const ev = e.touches ? e.touches[0] : e;
+    const pp = painel.offsetParent.getBoundingClientRect();
+    let x = ev.clientX - pp.left - ox;
+    let y = ev.clientY - pp.top  - oy;
+    const maxX = Math.max(0, pp.width  - painel.offsetWidth);
+    const maxY = Math.max(0, pp.height - painel.offsetHeight);
+    x = Math.max(0, Math.min(x, maxX));
+    y = Math.max(0, Math.min(y, maxY));
+    painel.style.left = x + 'px';
+    painel.style.top  = y + 'px';
+    if(e.cancelable) e.preventDefault();
+  }
+  function fim(){
+    arrastando = false;
+    painel.classList.remove('dragging');
+    document.removeEventListener('mousemove', mover);
+    document.removeEventListener('mouseup', fim);
+    document.removeEventListener('touchmove', mover);
+    document.removeEventListener('touchend', fim);
+  }
+  handle.addEventListener('mousedown', inicio);
+  handle.addEventListener('touchstart', inicio, {passive:false});
+}
+(function(){
+  const ov = document.getElementById('overview-panel');
+  if(ov){ tornarArrastavel(ov, ov.querySelector('.ovh')); }
+  const kp = document.getElementById('kml-panel');
+  if(kp){ tornarArrastavel(kp, kp.querySelector('.ovh')); }
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=<?= GMAPS_KEY ?>&callback=initMap&loading=async"></script>
+</body>
+</html>

@@ -80,9 +80,12 @@ try {
     $pdo = getDatabaseConnection();
 
     // 1) Confere se a O.S. existe e está TOTALMENTE liquidada
+    //    Usa o MESMO critério da tela (visualizar_os.php): item liquidado = status 'liquidado'.
+    //    (Antes usava quantidade_liquidada >= quantidade, que diverge quando o status é
+    //     'liquidado' mas quantidade_liquidada está NULL, bloqueando indevidamente a entrega.)
     $st = $pdo->prepare("SELECT
             COUNT(*) AS total,
-            SUM(CASE WHEN quantidade_liquidada >= quantidade THEN 1 ELSE 0 END) AS concluidos
+            SUM(CASE WHEN status = 'liquidado' THEN 1 ELSE 0 END) AS concluidos
           FROM ordens_de_servico_itens WHERE ordem_servico_id = ?");
     $st->execute([$os_id]);
     $r = $st->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'concluidos' => 0];

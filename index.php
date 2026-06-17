@@ -839,6 +839,30 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
     </div>  
         
     <div id="sortable-cards">  
+        <!-- ATLAS DIMENSOR -->  
+        <?php  
+            $configDimensor = __DIR__ . '/dimensor/config_dimensor.json';  
+            if (file_exists($configDimensor)) {  
+                $cfgDim = json_decode(file_get_contents($configDimensor), true);  
+                if (isset($cfgDim['dimensor_ativo']) && $cfgDim['dimensor_ativo'] === 'S') {  
+                    echo '  
+                        <div class="module-card" id="card-dimensor">  
+                            <div class="card-header">  
+                                <span class="card-badge badge-documental">Cartográfico</span>  
+                                <div class="card-icon" style="background:linear-gradient(135deg,#0d9488 0%,#1d4ed8 100%);color:#fff">  
+                                    <i class="fa fa-map-marker"></i>  
+                                </div>  
+                            </div>  
+                            <h3 class="card-title">Atlas Dimensor</h3>  
+                            <p class="card-description">Mapeie memoriais descritivos no mapa, detecte sobreposições entre imóveis e gere relatórios.</p>  
+                            <button class="card-button" style="background:linear-gradient(135deg,#0d9488 0%,#1d4ed8 100%);color:#fff" onclick="window.location.href=\'dimensor/index.php\'">  
+                                <i class="fa fa-arrow-right"></i> Acessar Módulo  
+                            </button>  
+                        </div>';  
+                }  
+            }  
+        ?>  
+        
         <!-- Arquivamentos -->  
         <div class="module-card" id="card-arquivamento">  
             <div class="card-header">  
