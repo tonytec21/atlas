@@ -471,16 +471,18 @@ function salvarCamposOnr($conn, $id, $src) {
 function onrConfigPath() { return __DIR__ . '/config_onr.json'; }
 function onrConfigLer() {
     $p = onrConfigPath();
-    $base = ['base_url' => 'https://www.mapa.onr.org.br/', 'token' => ''];
+    $base = ['base_url' => 'https://mapa.onr.org.br/', 'token' => ''];
     if (is_file($p)) {
         $d = json_decode((string)@file_get_contents($p), true);
         if (is_array($d)) $base = array_merge($base, $d);
     }
+    // Corrige host legado sem registro DNS (www.mapa.onr.org.br -> mapa.onr.org.br)
+    if (!empty($base['base_url'])) $base['base_url'] = preg_replace('#^(https?://)www\.mapa\.onr\.org\.br#i', '$1mapa.onr.org.br', $base['base_url']);
     if ($base['base_url'] !== '' && substr($base['base_url'], -1) !== '/') $base['base_url'] .= '/';
     return $base;
 }
 function onrConfigSalvar($base_url, $token) {
-    $base_url = trim($base_url); if ($base_url === '') $base_url = 'https://www.mapa.onr.org.br/';
+    $base_url = trim($base_url); if ($base_url === '') $base_url = 'https://mapa.onr.org.br/';
     if (substr($base_url, -1) !== '/') $base_url .= '/';
     $data = ['base_url' => $base_url, 'token' => trim($token)];
     return @file_put_contents(onrConfigPath(), json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) !== false;
@@ -658,6 +660,8 @@ function onrHttp($method, $url, $token, $jsonBody = null, $putFile = null) {
     curl_setopt($ch, CURLOPT_TIMEOUT, 120);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
     // XAMPP/Windows costuma não ter CA bundle configurado -> HTTPS falha (HTTP 0).
     // Usa o cacert.pem ao lado deste arquivo, se existir; caso contrário não verifica o par.
     $ca = __DIR__ . '/cacert.pem';
@@ -691,7 +695,12 @@ function onrHttp($method, $url, $token, $jsonBody = null, $putFile = null) {
 function onrEnviarImovel($conn, $id) {
     $cfg = onrConfigLer();
     if (trim($cfg['token']) === '') return ['ok' => false, 'mensagem' => 'Token da API ONR não configurado.'];
-    $base = $cfg['base_url']; $token = $cfg['token'];
+    // normaliza a URL base: precisa de esquema http/https e barra final
+    $base = trim((string)$cfg['base_url']);
+    if ($base === '') return ['ok' => false, 'mensagem' => 'URL base da API ONR não configurada (⚙ Configurar API ONR).'];
+    if (!preg_match('#^https?://#i', $base)) return ['ok' => false, 'mensagem' => 'URL base inválida: deve começar com http:// ou https:// (valor atual: "' . $base . '").'];
+    $base = rtrim($base, '/') . '/';
+    $token = $cfg['token'];
 
     $id = (int)$id;
     $res = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = $id LIMIT 1");
@@ -2593,7 +2602,7 @@ if (isset($_POST['acao'])) {
       <button class="modal-x" onclick="fecharConfigOnr()" title="Fechar">×</button>
     </div>
     <div class="modal-b">
-      <div class="fld"><label class="field-label">BASE_URL</label><input id="cfg-base-url" type="text" placeholder="https://www.mapa.onr.org.br/"></div>
+      <div class="fld"><label class="field-label">BASE_URL</label><input id="cfg-base-url" type="text" placeholder="https://mapa.onr.org.br/"></div>
       <div class="fld"><label class="field-label">Bearer Token (chave da API)</label><input id="cfg-token" type="text" autocomplete="off" placeholder="Cole aqui o Bearer Token"></div>
       <p class="cor-hint">O token é gerado no portal do Mapa ONR (Configurações &gt; Chave API para envio de polígonos) com certificado e-CPF e tem validade de 15 dias. Fica salvo no servidor em <code>dimensor/config_onr.json</code>.</p>
     </div>
@@ -3781,7 +3790,7 @@ async function enviarTodosOnr(){
 /* ---- Configuração da API ONR ---- */
 async function abrirConfigOnr(){
   const r = await post({acao:'onr_config_get'});
-  document.getElementById('cfg-base-url').value = (r.ok? r.base_url : 'https://www.mapa.onr.org.br/');
+  document.getElementById('cfg-base-url').value = (r.ok? r.base_url : 'https://mapa.onr.org.br/');
   const tk = document.getElementById('cfg-token'); tk.value = '';
   tk.placeholder = (r.ok && r.configurado) ? ('Token salvo: '+r.token_mascara+' (em branco mantém)') : 'Cole aqui o Bearer Token';
   document.getElementById('modal-onr-config').classList.add('show');
