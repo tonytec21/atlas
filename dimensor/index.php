@@ -1332,13 +1332,13 @@ if (isset($_POST['acao'])) {
             $id = (int)($_POST['id'] ?? 0);
             if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
             $sit = (($_POST['situacao'] ?? '') === 'encerrada') ? 'encerrada' : 'ativa';
-            $mot = null; $suc = null;
-            if ($sit === 'encerrada') {
-                $m = $_POST['motivo_situacao'] ?? '';
-                $mot = in_array($m, ['unificacao', 'desmembramento'], true) ? $m : null;
-                $s = trim((string)($_POST['matricula_sucessora'] ?? ''));
-                $suc = ($s !== '') ? $s : null;
-            }
+            $m = $_POST['motivo_situacao'] ?? '';
+            $mot = in_array($m, ['unificacao', 'desmembramento'], true) ? $m : null;
+            $s = trim((string)($_POST['matricula_sucessora'] ?? ''));
+            $suc = ($s !== '') ? $s : null;
+            // coerência: unificação encerra a matrícula; desmembramento parcial a mantém ativa
+            if ($mot === 'unificacao') $sit = 'encerrada';
+            if ($sit === 'ativa' && $mot !== 'desmembramento') { $mot = null; $suc = null; }
             $stmt = $conn->prepare("UPDATE memoriais_mapeados SET situacao=?, motivo_situacao=?, matricula_sucessora=? WHERE id=?");
             $stmt->bind_param('sssi', $sit, $mot, $suc, $id);
             $stmt->execute();
@@ -1891,6 +1891,7 @@ if (isset($_POST['acao'])) {
   .item.morto{opacity:.6}
   .item.morto .nm{text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:var(--faint)}
   .morto-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(120,130,145,.18);color:#8893a3;margin-left:4px;vertical-align:middle;text-decoration:none}
+  .desmembra-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(13,148,136,.16);color:#0d9488;margin-left:4px;vertical-align:middle;text-decoration:none}
   .situacao-edit{margin-top:6px;padding-top:11px;border-top:1px solid var(--line)}
   /* Aviso de matrícula encerrada no cadastro */
   .enc-info{margin-bottom:11px;padding:10px 12px;border:1px solid rgba(120,130,145,.35);border-left:3px solid #8893a3;border-radius:9px;background:rgba(120,130,145,.10)}
@@ -1898,6 +1899,8 @@ if (isset($_POST['acao'])) {
   .enc-ico{color:#8893a3;font-size:13px}
   .enc-info-b{margin-top:5px;font-size:11.5px;line-height:1.55;color:var(--ink)}
   .enc-mut{color:var(--faint);font-family:var(--mono);font-size:9.5px}
+  .enc-info.desmembra{border-color:rgba(13,148,136,.4);border-left-color:#0d9488;background:rgba(13,148,136,.08)}
+  .enc-info.desmembra .enc-ico{color:#0d9488}
   /* ===== Slider de intensidade ===== */
   .op-wrap{display:flex;align-items:center;gap:10px;margin-top:11px}
   .op-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);flex:none}
@@ -2273,20 +2276,13 @@ if (isset($_POST['acao'])) {
           <label class="field-label">Situação da matrícula</label>
           <select id="ed-situacao">
             <option value="ativa">Ativa</option>
-            <option value="encerrada">Encerrada (deu origem a outra)</option>
+            <option value="unificacao">Encerrada por unificação</option>
+            <option value="desmembramento">Desmembramento — saiu um trecho</option>
           </select>
         </div>
         <div id="ed-enc-extra" style="display:none">
-          <div class="modal-row">
-            <div class="fld"><label class="field-label">Motivo</label>
-              <select id="ed-motivo">
-                <option value="unificacao">Unificação</option>
-                <option value="desmembramento">Desmembramento</option>
-              </select>
-            </div>
-            <div class="fld"><label class="field-label">Matrícula sucessora</label><input id="ed-sucessora" type="text" placeholder="Nova matrícula originada"></div>
-          </div>
-          <p class="cor-hint">Imóveis encerrados são desenhados apagados ("mortos") e <b>não geram sobreposição</b>, pois deram origem à nova matrícula.</p>
+          <div class="fld"><label class="field-label">Matrícula sucessora (nova matrícula originada)</label><input id="ed-sucessora" type="text" placeholder="Ex.: 12.345"></div>
+          <p class="cor-hint" id="ed-sit-hint"></p>
         </div>
       </div>
     </div>
@@ -2864,6 +2860,22 @@ async function verTodos(){
         if(inter){
           const areaHa = turf.area(inter)/10000;
           if(areaHa < 0.0001) continue; // ignora toques de borda
+          // Desmembramento: o trecho coincidente com a nova matrícula é "morto" (cinza), não conflito.
+          // A matrícula-mãe continua ativa; apenas este trecho fica destacado.
+          if(ehDesmembramentoPar(itens[i], itens[j])){
+            turfToPaths(inter.geometry).forEach(path=>{
+              overlapPolys.push(new google.maps.Polygon({paths:path,strokeColor:'#9aa3ad',
+                strokeOpacity:.55,strokeWeight:1,fillColor:'#9aa3ad',fillOpacity:.5,map:map,zIndex:4,clickable:false}));
+            });
+            // exceção: se o trecho cobre ~toda a matrícula-mãe, ela fica "morta" por completo
+            let mae=null;
+            if(itens[i].motivo_situacao==='desmembramento' && normMat(itens[i].matricula_sucessora)===normMat(itens[j].numero_matricula)) mae=itens[i];
+            else if(itens[j].motivo_situacao==='desmembramento' && normMat(itens[j].matricula_sucessora)===normMat(itens[i].numero_matricula)) mae=itens[j];
+            if(mae && mae.area_ha>0 && (areaHa/mae.area_ha)>=0.98 && mae._poly){
+              mae._poly.setOptions({strokeColor:'#9aa3ad',strokeOpacity:.4,strokeWeight:1,fillColor:'#9aa3ad',fillOpacity:.05,zIndex:0});
+            }
+            continue; // não entra na lista de sobreposições (sem vermelho, sem contagem)
+          }
           const rings = turfToPaths(inter.geometry).map(path=>path.map(pt=>[pt.lat, pt.lng]));
           turfToPaths(inter.geometry).forEach(path=>{
             overlapPolys.push(new google.maps.Polygon({paths:path,strokeColor:'#e2342f',
@@ -2906,6 +2918,14 @@ function corValida(c){
   return true;
 }
 function imovelMorto(it){ return !!(it && it.situacao === 'encerrada'); }
+function normMat(s){ return (s==null?'':String(s)).replace(/[^0-9a-zA-Z]/g,'').toLowerCase(); }
+/* A e B têm relação de desmembramento? (uma aponta a outra como matrícula sucessora) */
+function ehDesmembramentoPar(a,b){
+  const an=normMat(a.numero_matricula), bn=normMat(b.numero_matricula);
+  const as=normMat(a.matricula_sucessora), bs=normMat(b.matricula_sucessora);
+  return (a.motivo_situacao==='desmembramento' && as && as===bn) ||
+         (b.motivo_situacao==='desmembramento' && bs && bs===an);
+}
 function corBaseImovel(it){
   if(imovelMorto(it)) return '#9aa3ad';                 // cinza "morto"
   return (it && corValida(it.cor)) ? it.cor : COR_PADRAO;
@@ -3072,8 +3092,10 @@ function renderLista(){
     const enviado = String(it.onr_enviado)==='1';
     const pronto  = String(it.onr_pronto)==='1';
     const morto   = it.situacao==='encerrada';
-    const motivoTxt = it.motivo_situacao==='desmembramento' ? 'desmembrada' : (it.motivo_situacao==='unificacao' ? 'unificada' : 'encerrada');
-    const mortoBadge = morto ? `<span class="morto-badge" title="${it.matricula_sucessora?('Sucessora: '+escapeHtml(it.matricula_sucessora)):'Matrícula encerrada'}">✝ ${motivoTxt}</span>` : '';
+    const desmembrada = !morto && it.motivo_situacao==='desmembramento';
+    const mortoBadge = morto
+      ? `<span class="morto-badge" title="${it.matricula_sucessora?('Sucessora: '+escapeHtml(it.matricula_sucessora)):'Encerrada por unificação'}">✝ unificada</span>`
+      : (desmembrada ? `<span class="desmembra-badge" title="${it.matricula_sucessora?('Trecho originou a matrícula '+escapeHtml(it.matricula_sucessora)):'Desmembramento'}">✂ desmembrada</span>` : '');
     const statusTxt = it.onr_status ? escapeHtml(it.onr_status) : (enviado?'ENVIADO':'');
     const onrBadge = statusTxt ? `<span class="onr-badge ${enviado?'env':''}">${statusTxt}</span>` : '';
     const onrBtn = enviado
@@ -3136,15 +3158,24 @@ function abrirEdicao(id){
   document.getElementById('ed-proprietario').value = it.proprietario||'';
   document.getElementById('ed-cpf').value = it.cpf||'';
   document.getElementById('ed-tipo').value = it.tipo_imovel||'';
-  document.getElementById('ed-situacao').value = (it.situacao==='encerrada')?'encerrada':'ativa';
-  document.getElementById('ed-motivo').value = it.motivo_situacao || 'unificacao';
+  let sitSel='ativa';
+  if(it.motivo_situacao==='desmembramento') sitSel='desmembramento';
+  else if(it.situacao==='encerrada' || it.motivo_situacao==='unificacao') sitSel='unificacao';
+  document.getElementById('ed-situacao').value = sitSel;
   document.getElementById('ed-sucessora').value = it.matricula_sucessora || '';
   edToggleEnc();
   document.getElementById('modal-edit').classList.add('show');
 }
 function edToggleEnc(){
-  const enc = document.getElementById('ed-situacao').value === 'encerrada';
-  const ex = document.getElementById('ed-enc-extra'); if(ex) ex.style.display = enc ? 'block' : 'none';
+  const v = document.getElementById('ed-situacao').value;
+  const ex = document.getElementById('ed-enc-extra');
+  const hint = document.getElementById('ed-sit-hint');
+  if(ex) ex.style.display = (v==='ativa') ? 'none' : 'block';
+  if(hint){
+    if(v==='unificacao') hint.innerHTML = 'A matrícula é <b>encerrada por completo</b> (apagada/"morta") e não gera sobreposição, pois deu origem à nova matrícula.';
+    else if(v==='desmembramento') hint.innerHTML = 'A matrícula-mãe <b>permanece ativa</b>. Apenas o <b>trecho</b> coincidente com a nova matrícula é destacado como "morto" e não gera sobreposição.';
+    else hint.textContent='';
+  }
 }
 function fecharEdicao(){ document.getElementById('modal-edit').classList.remove('show'); }
 async function salvarEdicao(){
@@ -3157,10 +3188,13 @@ async function salvarEdicao(){
     tipo_imovel: document.getElementById('ed-tipo').value
   });
   if(!r.ok){ setStatus('err', r.erro||'Falha ao atualizar.'); return; }
-  // salva a situação (ativa/encerrada) do mesmo modal
+  // salva a situação: ativa | encerrada(unificação) | desmembramento(parcial, mãe ativa)
+  const sv = document.getElementById('ed-situacao').value;
+  const situacao = (sv==='unificacao') ? 'encerrada' : 'ativa';
+  const motivo = (sv==='unificacao') ? 'unificacao' : (sv==='desmembramento' ? 'desmembramento' : '');
   await post({acao:'salvar_situacao', id,
-    situacao: document.getElementById('ed-situacao').value,
-    motivo_situacao: document.getElementById('ed-motivo').value,
+    situacao: situacao,
+    motivo_situacao: motivo,
     matricula_sucessora: document.getElementById('ed-sucessora').value.trim()
   });
   fecharEdicao(); carregarLista(); if(modo==='overview') verTodos(); setStatus('ok','Dados do imóvel atualizados.');
@@ -3256,24 +3290,26 @@ function mostrarEncInfo(reg){
   const tit=document.getElementById('enc-info-titulo');
   const corpo=document.getElementById('enc-info-corpo');
   if(!box) return;
+  const ico=box.querySelector('.enc-ico');
+  const suc=((reg&&reg.matricula_sucessora)||'').trim();
   if(reg && reg.situacao==='encerrada'){
-    const motivo = reg.motivo_situacao==='desmembramento' ? 'desmembramento'
-                 : (reg.motivo_situacao==='unificacao' ? 'unificação' : null);
-    tit.textContent = motivo ? ('Matrícula encerrada por '+motivo) : 'Matrícula encerrada';
-    const suc = (reg.matricula_sucessora||'').trim();
-    let html;
-    if(reg.motivo_situacao==='unificacao')
-      html = suc ? ('Esta matrícula foi <b>unificada</b> e deu origem à matrícula <b>'+escapeHtml(suc)+'</b>.')
-                 : 'Esta matrícula foi <b>unificada</b> em uma nova matrícula.';
-    else if(reg.motivo_situacao==='desmembramento')
-      html = suc ? ('Área <b>desmembrada</b> que originou a matrícula <b>'+escapeHtml(suc)+'</b>.')
-                 : 'Área <b>desmembrada</b> em uma nova matrícula.';
-    else
-      html = suc ? ('Deu origem à matrícula <b>'+escapeHtml(suc)+'</b>.') : 'Matrícula encerrada.';
-    html += '<br><span class="enc-mut">Imóvel "morto": não gera sobreposição no mapa.</span>';
-    corpo.innerHTML = html;
+    box.classList.remove('desmembra');
+    if(ico) ico.textContent='✝';
+    tit.textContent='Matrícula encerrada por unificação';
+    corpo.innerHTML = (suc ? ('Esta matrícula foi <b>unificada</b> e deu origem à matrícula <b>'+escapeHtml(suc)+'</b>.')
+                           : 'Esta matrícula foi <b>unificada</b> em uma nova matrícula.')
+      + '<br><span class="enc-mut">Imóvel "morto": não gera sobreposição no mapa.</span>';
+    box.style.display='block';
+  } else if(reg && reg.motivo_situacao==='desmembramento'){
+    box.classList.add('desmembra');
+    if(ico) ico.textContent='✂';
+    tit.textContent='Desmembramento — trecho destacado';
+    corpo.innerHTML = (suc ? ('Um <b>trecho</b> desta matrícula originou a matrícula <b>'+escapeHtml(suc)+'</b>.')
+                           : 'Um <b>trecho</b> desta matrícula foi desmembrado em nova matrícula.')
+      + '<br><span class="enc-mut">A matrícula-mãe permanece <b>ativa</b>; apenas o trecho coincidente fica "morto" e sem sobreposição.</span>';
     box.style.display='block';
   } else {
+    box.classList.remove('desmembra');
     box.style.display='none';
   }
 }
