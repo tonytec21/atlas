@@ -1821,7 +1821,7 @@ if (isset($_POST['acao'])) {
     font-size:10.5px;color:var(--muted)}
   .legend span{display:flex;align-items:center;gap:6px}
   .legend .sw{width:13px;height:9px;border-radius:2px;display:inline-block}
-  .legend .sw.normal{background:rgba(91,150,230,.35);border:1px solid #5b96e6}
+  .legend .sw.normal{background:rgba(22,163,74,.35);border:1px solid #16a34a}
   .legend .sw.over{background:rgba(226,52,47,.5);border:1px solid var(--red-bright)}
   .legend .sw.sel{background:rgba(245,158,11,.45);border:1px solid #f59e0b}
   .ov-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.4;padding:8px 15px 0}
@@ -2981,7 +2981,7 @@ const PALETA_CORES = [
   '#93c5fd','#a5f3fc','#99f6e4','#bbf7d0','#d9f99d','#fde68a',
   '#fed7aa','#c7d2fe','#e9d5ff','#f5d0fe','#fbcfe8','#cbd5e1'
 ];
-const COR_PADRAO = '#5b96e6';
+const COR_PADRAO = '#16a34a';
 const OPACIDADE_PADRAO = 0.18, OPAC_MIN = 0.08, OPAC_MAX = 0.55;
 
 function corValida(c){
