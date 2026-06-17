@@ -1512,7 +1512,7 @@ if (isset($_POST['acao'])) {
             // Devolve todos os polígonos (lat/lng) para a visão geral e detecção de sobreposição
             $res = $conn->query(
                 "SELECT id, identificador, tipo_identificador, origem, area_ha, cor, cor_opacidade,
-                        numero_matricula, proprietario, tipo_imovel,
+                        numero_matricula, proprietario, cpf, tipo_imovel,
                         situacao, motivo_situacao, matricula_sucessora, coordenadas_wgs84
                  FROM memoriais_mapeados ORDER BY id"
             );
@@ -1534,6 +1534,7 @@ if (isset($_POST['acao'])) {
                         'cor_opacidade' => $row['cor_opacidade'] !== null ? (float)$row['cor_opacidade'] : null,
                         'numero_matricula' => $row['numero_matricula'],
                         'proprietario' => $row['proprietario'],
+                        'cpf' => $row['cpf'],
                         'tipo_imovel' => $row['tipo_imovel'],
                         'situacao' => $row['situacao'] ?? 'ativa',
                         'motivo_situacao' => $row['motivo_situacao'],
@@ -1716,6 +1717,11 @@ if (isset($_POST['acao'])) {
   .cor-pop{font-family:var(--disp);min-width:200px;color:#1f2733}
   .cor-pop-t{font-size:13px;font-weight:700;line-height:1.2}
   .cor-pop-sub{font-size:11px;color:#6b7785;margin:1px 0 9px}
+  /* Bloco de informações do imóvel no popup do mapa */
+  .ip-box{margin:2px 0 11px;padding:9px 10px;background:#f4f6f9;border:1px solid #e3e8ee;border-radius:8px;display:flex;flex-direction:column;gap:4px}
+  .ip-row{display:flex;gap:8px;font-size:11.5px;line-height:1.35}
+  .ip-k{flex:none;width:78px;color:#64748b;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px}
+  .ip-v{flex:1;color:#1f2733;font-weight:600;word-break:break-word}
   .cor-pop-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#9aa6b2;margin-bottom:6px}
   .cor-pop-grid{display:grid;grid-template-columns:repeat(6,22px);gap:6px}
   .cor-pop .cor-sw{width:22px;height:22px;aspect-ratio:auto;min-height:0}
@@ -1736,6 +1742,10 @@ if (isset($_POST['acao'])) {
   .item:hover{border-color:var(--red-bright);background:rgba(168,15,30,.06)}
   .item.sel{border-color:#f59e0b;background:rgba(245,158,11,.12)}
   .item.sel .ic{background:#f59e0b}
+  .item.destaque{border-color:#0d9488;background:rgba(13,148,136,.12);box-shadow:0 0 0 1px rgba(13,148,136,.35) inset}
+  /* Popup do mapa sempre acima dos rótulos/elementos */
+  .gm-style .gm-style-iw-c,.gm-style .gm-style-iw-t,.gm-style .gm-style-iw{z-index:99999 !important}
+  .map-chip{z-index:1}
   .item .ic{width:7px;height:7px;border-radius:2px;background:var(--red-bright);flex:none}
   .item .info{flex:1;min-width:0}
   .item .nm{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2967,13 +2977,33 @@ function swatchesHTML(atual){
 }
 
 let infoWinCor = null;
+function infoImovelHTML(it){
+  const linhas = [];
+  const add=(rot,val)=>{ if(val!==undefined && val!==null && String(val).trim()!=='') linhas.push(`<div class="ip-row"><span class="ip-k">${rot}</span><span class="ip-v">${escapeHtml(String(val))}</span></div>`); };
+  add('Matrícula', it.numero_matricula);
+  add('Identificação', it.identificador);
+  add('Proprietário', it.proprietario);
+  add('CPF/CNPJ', it.cpf);
+  add('Tipo', it.tipo_imovel);
+  add('Área', (it.area_ha!=null ? fmt(it.area_ha,4)+' ha' : ''));
+  const suc=((it.matricula_sucessora)||'').split(',').map(s=>s.trim()).filter(Boolean).join(', ');
+  if(it.situacao==='encerrada') add('Situação', 'Encerrada por unificação'+(suc?(' → '+suc):''));
+  else if(it.motivo_situacao==='desmembramento') add('Situação', 'Desmembramento'+(suc?(' → trecho(s): '+suc):''));
+  return linhas.join('') || '<div class="ip-row"><span class="ip-v" style="color:#9aa6b2">Sem dados cadastrados.</span></div>';
+}
+function destacarNoPainel(id){
+  const lista=document.getElementById('saved-list'); if(!lista) return;
+  lista.querySelectorAll('.item.destaque').forEach(el=>el.classList.remove('destaque'));
+  const el=lista.querySelector('.item[data-id="'+id+'"]');
+  if(el){ el.classList.add('destaque'); try{ el.scrollIntoView({block:'nearest',behavior:'smooth'}); }catch(_){ el.scrollIntoView(); } }
+}
 function abrirSeletorCor(it, e){
   if(!infoWinCor) infoWinCor = new google.maps.InfoWindow();
   const atual = corValida(it.cor) ? it.cor.toLowerCase() : '';
   const op = opacidadeImovel(it);
   infoWinCor.setContent(`<div class="cor-pop" id="cor-pop">
-    <div class="cor-pop-t">${escapeHtml(it.identificador||'Imóvel')}</div>
-    <div class="cor-pop-sub">${fmt(it.area_ha,2)} ha${it.numero_matricula?(' · Mat. '+escapeHtml(it.numero_matricula)):''}</div>
+    <div class="cor-pop-t">Informações do imóvel</div>
+    <div class="ip-box">${infoImovelHTML(it)}</div>
     <div class="cor-pop-lbl">Cor de destaque</div>
     <div class="cor-pop-grid">${swatchesHTML(atual)}</div>
     <div class="cor-pop-lbl" style="margin-top:9px">Intensidade</div>
@@ -2982,6 +3012,8 @@ function abrirSeletorCor(it, e){
   </div>`);
   infoWinCor.setPosition((e && e.latLng) ? e.latLng : centroidOf(it.pts));
   infoWinCor.open(map);
+  if(infoWinCor.setZIndex) infoWinCor.setZIndex(99999);
+  destacarNoPainel(it.id);
   google.maps.event.addListenerOnce(infoWinCor, 'domready', ()=>{
     const pop = document.getElementById('cor-pop'); if(!pop) return;
     let corSel = atual;
