@@ -1219,6 +1219,113 @@ function gerarRelatorioSobreposicaoPDF($dados) {
  *  ROTEAMENTO DE AÇÕES (AJAX)
  * ==================================================================== */
 
+/* ====================================================================
+ *  IA (GEMINI) — OCR de matrículas em PDF
+ * ==================================================================== */
+function geminiModelosPadrao() { return ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.1-pro-preview']; }
+function geminiConfigPath() { return __DIR__ . '/config_gemini.json'; }
+function geminiConfigLer() {
+    $base = ['api_key' => '', 'models' => geminiModelosPadrao(), 'default_model' => 'gemini-3.5-flash'];
+    $p = geminiConfigPath();
+    if (is_file($p)) { $d = json_decode((string)@file_get_contents($p), true); if (is_array($d)) $base = array_merge($base, $d); }
+    if (empty($base['models']) || !is_array($base['models'])) $base['models'] = geminiModelosPadrao();
+    if (!in_array($base['default_model'], $base['models'], true)) $base['default_model'] = $base['models'][0];
+    return $base;
+}
+function geminiConfigSalvar($data) {
+    return @file_put_contents(geminiConfigPath(), json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) !== false;
+}
+/* Procura um imóvel mapeado pelo número da matrícula (exato e depois normalizado). */
+function acharMemorialPorMatricula($conn, $mat) {
+    $norm = function ($s) { return strtolower(preg_replace('/[^0-9a-zA-Z]/', '', (string)$s)); };
+    $alvo = $norm($mat);
+    if ($alvo === '') return null;
+    $stmt = $conn->prepare("SELECT id FROM memoriais_mapeados WHERE numero_matricula = ? LIMIT 1");
+    if ($stmt) { $stmt->bind_param('s', $mat); $stmt->execute(); $r = $stmt->get_result(); if ($r && ($row = $r->fetch_assoc())) return (int)$row['id']; }
+    $res = $conn->query("SELECT id, numero_matricula FROM memoriais_mapeados WHERE numero_matricula IS NOT NULL AND numero_matricula <> ''");
+    while ($res && ($row = $res->fetch_assoc())) { if ($norm($row['numero_matricula']) === $alvo) return (int)$row['id']; }
+    return null;
+}
+/* Prompt de extração: pede JSON com as chaves = colunas do banco. */
+function geminiPromptMatricula() {
+    return "Você é um extrator de dados de matrículas de imóveis de cartório de Registro de Imóveis do Brasil. "
+        . "Leia a matrícula em PDF e devolva SOMENTE um objeto JSON (sem texto extra, sem markdown) com as chaves abaixo. "
+        . "Use string vazia quando não encontrar. Não invente dados.\n"
+        . "{\n"
+        . "\"nome_imo\": denominação do imóvel (ex.: FAZENDA AGRO TRÊS IRMÃOS),\n"
+        . "\"tipo_imovel\": \"rural\" ou \"urbano\",\n"
+        . "\"dat_mat\": data de abertura/registro da matrícula (dd/mm/aaaa),\n"
+        . "\"liv_mat\": número do livro,\n"
+        . "\"fol_mat\": número da folha/ficha,\n"
+        . "\"transcri\": número de transcrição anterior, se houver,\n"
+        . "\"cnm\": Código Nacional da Matrícula (CNM),\n"
+        . "\"cns\": Código Nacional da Serventia (CNS), normalmente o prefixo do CNM,\n"
+        . "\"endereco\": localização/endereço do imóvel,\n"
+        . "\"municipio\": município do imóvel,\n"
+        . "\"uf\": sigla do estado (2 letras),\n"
+        . "\"proprietario\": nome(s) do(s) proprietário(s) ATUAL(is) (o mais recente registrado/outorgado); separe vários por vírgula,\n"
+        . "\"cpf\": CPF ou CNPJ do(s) proprietário(s) atual(is), na mesma ordem, separados por vírgula,\n"
+        . "\"conf_nom\": nomes dos confrontantes/limites separados por vírgula,\n"
+        . "\"conf_mat\": matrículas confrontantes, se citadas, separadas por vírgula,\n"
+        . "\"rel_jur\": tipo de relação jurídica (ex.: propriedade),\n"
+        . "\"ccir_sncr\": número do CCIR,\n"
+        . "\"sigef\": código de certificação SIGEF/INCRA, se houver,\n"
+        . "\"snci\": número SNCI, se houver,\n"
+        . "\"cib_nirf\": número CIB ou NIRF (Receita Federal),\n"
+        . "\"car\": número do CAR (Cadastro Ambiental Rural),\n"
+        . "\"rip\": número RIP, se houver,\n"
+        . "\"cif\": número CIF, se houver,\n"
+        . "\"classifica\": \"1\" se o imóvel for georreferenciado e CERTIFICADO pelo INCRA (ou urbano com ART), \"2\" se georreferenciado sem certificação, \"3\" se apenas desenho/sem georreferenciamento\n"
+        . "}";
+}
+/* Chama a API do Gemini com o PDF e retorna os dados extraídos. */
+function geminiExtrairMatricula($cfg, $pdfBytes) {
+    if (trim($cfg['api_key']) === '') return ['ok' => false, 'erro' => 'Chave da API do Gemini não configurada.'];
+    $model = $cfg['default_model'];
+    $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent?key=' . urlencode($cfg['api_key']);
+    $payload = [
+        'contents' => [['parts' => [
+            ['text' => geminiPromptMatricula()],
+            ['inline_data' => ['mime_type' => 'application/pdf', 'data' => base64_encode($pdfBytes)]],
+        ]]],
+        'generationConfig' => ['temperature' => 0.1, 'responseMimeType' => 'application/json'],
+    ];
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => 180,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+    ]);
+    $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    if ($resp === false) return ['ok' => false, 'erro' => 'Falha de conexão com o Gemini: ' . $err];
+    $j = json_decode($resp, true);
+    if ($code < 200 || $code >= 300) {
+        $msg = $j['error']['message'] ?? ('HTTP ' . $code);
+        return ['ok' => false, 'erro' => 'Gemini: ' . $msg];
+    }
+    $txt = $j['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    $txt = trim(preg_replace('/```json|```/i', '', $txt));
+    $dados = json_decode($txt, true);
+    if (!is_array($dados)) return ['ok' => false, 'erro' => 'A IA não retornou um JSON válido.'];
+    return ['ok' => true, 'dados' => $dados, 'modelo' => $model];
+}
+/* Aplica os dados extraídos ao imóvel (campos ONR + base). Não sobrescreve a geometria. */
+function aplicarDadosMatricula($conn, $id, $d) {
+    salvarCamposOnr($conn, $id, $d); // colunas ONR (nomes iguais às chaves)
+    $sets = []; $vals = []; $types = '';
+    $base = ['identificador', 'proprietario', 'cpf', 'tipo_imovel'];
+    foreach ($base as $col) {
+        $k = $col;
+        if ($col === 'identificador' && (!isset($d['identificador']) || trim((string)$d['identificador']) === '')) $k = 'nome_imo';
+        if (!isset($d[$k]) || trim((string)$d[$k]) === '') continue;
+        $v = trim((string)$d[$k]);
+        if ($col === 'tipo_imovel') { $v = (stripos($v, 'rural') !== false) ? 'rural' : ((stripos($v, 'urban') !== false) ? 'urbano' : ''); if ($v === '') continue; }
+        $sets[] = "`$col` = ?"; $vals[] = $v; $types .= 's';
+    }
+    if ($sets) { $vals[] = $id; $types .= 'i'; $st = $conn->prepare("UPDATE memoriais_mapeados SET " . implode(', ', $sets) . " WHERE id = ?"); $st->bind_param($types, ...$vals); $st->execute(); }
+    return true;
+}
+
 if (isset($_POST['acao'])) {
 
     /* ----- Relatório de sobreposição em PDF (saída binária, antes do header JSON) ----- */
@@ -1363,6 +1470,56 @@ if (isset($_POST['acao'])) {
             $stmt->bind_param('sssi', $sit, $mot, $suc, $id);
             $stmt->execute();
             echo json_encode(['ok' => true, 'id' => $id, 'situacao' => $sit, 'motivo_situacao' => $mot, 'matricula_sucessora' => $suc], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'gemini_config_get') {
+            $cfg = geminiConfigLer();
+            $k = (string)$cfg['api_key'];
+            $mask = ($k === '') ? '' : (substr($k, 0, 4) . str_repeat('•', max(0, min(16, strlen($k) - 8))) . substr($k, -4));
+            echo json_encode(['ok' => true, 'configurado' => ($k !== ''), 'key_mascara' => $mask, 'models' => $cfg['models'], 'default_model' => $cfg['default_model']], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($acao === 'gemini_config_save') {
+            $atual = geminiConfigLer();
+            $api_key = trim((string)($_POST['api_key'] ?? ''));
+            if ($api_key === '') $api_key = $atual['api_key']; // vazio mantém a chave atual
+            $models = json_decode((string)($_POST['models'] ?? '[]'), true);
+            if (!is_array($models) || empty($models)) $models = geminiModelosPadrao();
+            $models = array_values(array_unique(array_filter(array_map(fn($m) => trim((string)$m), $models))));
+            $def = trim((string)($_POST['default_model'] ?? ''));
+            if (!in_array($def, $models, true)) $def = $models[0];
+            $ok = geminiConfigSalvar(['api_key' => $api_key, 'models' => $models, 'default_model' => $def]);
+            echo json_encode(['ok' => (bool)$ok, 'mensagem' => $ok ? 'Configuração de IA salva.' : 'Não foi possível salvar (permissão de escrita?).'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($acao === 'processar_pdf_matricula') {
+            if (empty($_FILES['pdf']['tmp_name']) || !is_uploaded_file($_FILES['pdf']['tmp_name'])) {
+                echo json_encode(['ok' => false, 'erro' => 'Nenhum PDF foi enviado.']); exit;
+            }
+            $matricula = trim((string)($_POST['matricula'] ?? ''));
+            if ($matricula === '') $matricula = preg_replace('/\.pdf$/i', '', (string)$_FILES['pdf']['name']);
+            $matricula = trim($matricula);
+            if ($matricula === '') { echo json_encode(['ok' => false, 'erro' => 'Nomeie o PDF com o número da matrícula (ex.: 2470.pdf).']); exit; }
+            // 1) confere se a matrícula está cadastrada (mapeada)
+            $id = acharMemorialPorMatricula($conn, $matricula);
+            if (!$id) { echo json_encode(['ok' => false, 'erro' => 'A matrícula ' . $matricula . ' não está cadastrada no mapa. Mapeie/grave o imóvel com esse número antes de processar o PDF.']); exit; }
+            // 2) IA configurada?
+            $cfg = geminiConfigLer();
+            if (trim($cfg['api_key']) === '') { echo json_encode(['ok' => false, 'erro' => 'Configure a chave da API do Gemini antes de processar.']); exit; }
+            // 3) processa o PDF
+            $pdfBytes = @file_get_contents($_FILES['pdf']['tmp_name']);
+            if ($pdfBytes === false || $pdfBytes === '') { echo json_encode(['ok' => false, 'erro' => 'Falha ao ler o PDF enviado.']); exit; }
+            $r = geminiExtrairMatricula($cfg, $pdfBytes);
+            if (!$r['ok']) { echo json_encode($r); exit; }
+            // 4) aplica os dados ao imóvel
+            aplicarDadosMatricula($conn, $id, $r['dados']);
+            $preenchidos = array_values(array_filter(array_keys($r['dados']), fn($k) => trim((string)($r['dados'][$k] ?? '')) !== ''));
+            echo json_encode([
+                'ok' => true, 'id' => $id, 'matricula' => $matricula, 'modelo' => $r['modelo'],
+                'campos' => $preenchidos, 'dados' => $r['dados'],
+                'mensagem' => 'Matrícula ' . $matricula . ' processada — ' . count($preenchidos) . ' campo(s) preenchido(s).'
+            ], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -1810,6 +1967,12 @@ if (isset($_POST['acao'])) {
   .kml-zone.loaded{border-style:solid;border-color:rgba(47,170,106,.4);color:#7fd9a8}
   .kml-zone.lote{margin-top:8px}
   .kml-zone.lote:hover,.kml-zone.lote.drag{border-color:#0d9488;color:var(--ink);background:rgba(13,148,136,.06)}
+  .kml-zone.ia{margin-top:8px}
+  .kml-zone.ia:hover,.kml-zone.ia.drag{border-color:#7c3aed;color:var(--ink);background:rgba(124,58,237,.07)}
+  .link-config{display:block;width:100%;margin-top:6px;background:none;border:none;color:var(--faint);
+    font-family:var(--mono);font-size:10px;cursor:pointer;text-align:left;padding:3px 1px}
+  .link-config:hover{color:#7c3aed}
+  .gem-models{display:flex;flex-wrap:wrap;gap:5px;min-height:22px}
 
   /* Cabeçalho da lista + botão ver todos */
   .saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -2233,6 +2396,13 @@ if (isset($_POST['acao'])) {
         <span id="kml-lote-label">Cadastro em lote — vários <b>KML</b></span>
       </div>
 
+      <div class="kml-zone ia" id="pdf-mat-zone">
+        <input type="file" id="pdf-mat-file" accept="application/pdf,.pdf" hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15h6M9 18h4"></path></svg>
+        <span id="pdf-mat-label">Matrícula em <b>PDF</b> — preencher via IA</span>
+      </div>
+      <button type="button" class="link-config" id="btn-gemini-config">⚙ Configurar IA (Gemini)</button>
+
       <div class="status" id="status"></div>
 
       <div class="stats" id="stats" style="display:none">
@@ -2408,6 +2578,36 @@ if (isset($_POST['acao'])) {
     <div class="modal-f">
       <button class="btn-ghost" onclick="fecharConfigOnr()">Cancelar</button>
       <button class="btn-primary" onclick="salvarConfigOnr()">Salvar configuração</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: configuração da IA (Gemini) -->
+<div id="modal-gemini-config" class="modal-ov">
+  <div class="modal-card">
+    <div class="modal-h">
+      <h3>Configurar IA (Gemini)</h3>
+      <button class="modal-x" onclick="fecharConfigGemini()" title="Fechar">×</button>
+    </div>
+    <div class="modal-b">
+      <div class="fld"><label class="field-label">Chave da API do Gemini</label><input id="gem-key" type="text" autocomplete="off" placeholder="Cole a API key do Google AI Studio"></div>
+      <div class="fld">
+        <label class="field-label">Modelos cadastrados</label>
+        <div id="gem-models" class="gem-models"></div>
+        <div class="chips-add" style="margin-top:7px">
+          <input id="gem-model-input" type="text" placeholder="Adicionar modelo (ex.: gemini-3.5-flash)">
+          <button type="button" id="gem-model-add" class="btn-ghost-sm">+ Adicionar</button>
+        </div>
+      </div>
+      <div class="fld">
+        <label class="field-label">Modelo padrão para OCR de matrículas</label>
+        <select id="gem-default"></select>
+      </div>
+      <p class="cor-hint">A chave fica salva no servidor em <code>dimensor/config_gemini.json</code>. Use um modelo com leitura de PDF (visão). O modelo padrão é o usado para extrair os dados das matrículas.</p>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" onclick="fecharConfigGemini()">Cancelar</button>
+      <button class="btn-primary" onclick="salvarConfigGemini()">Salvar configuração</button>
     </div>
   </div>
 </div>
@@ -3573,6 +3773,65 @@ async function salvarConfigOnr(){
   fecharConfigOnr(); setStatus('ok','Configuração da API ONR salva.');
 }
 
+/* ===================== IA (GEMINI) — OCR de matrícula em PDF ===================== */
+async function enviarPdfMatricula(file){
+  if(!file) return;
+  const mat = file.name.replace(/\.pdf$/i,'').trim();
+  if(!/[0-9]/.test(mat)){ setStatus('err','Nomeie o PDF com o número da matrícula (ex.: 2470.pdf).'); return; }
+  const lbl=document.getElementById('pdf-mat-label');
+  if(lbl) lbl.innerHTML='Processando matrícula <b>'+mat+'</b>…';
+  setStatus('warn','Conferindo matrícula '+mat+' e lendo o PDF com IA…');
+  try{
+    const fd=new FormData();
+    fd.append('acao','processar_pdf_matricula');
+    fd.append('matricula', mat);
+    fd.append('pdf', file);
+    const r = await fetch(window.location.pathname, {method:'POST', body:fd}).then(x=>x.json());
+    if(!r.ok){ setStatus('err', r.erro||'Falha ao processar o PDF.'); return; }
+    setStatus('ok', r.mensagem + (r.modelo?(' ('+r.modelo+')'):''));
+    carregarLista();
+    // se o imóvel processado estiver aberto no formulário, recarrega para mostrar os campos
+    if(typeof imovelAtivoId!=='undefined' && imovelAtivoId && String(imovelAtivoId)===String(r.id)) carregarImovel(r.id);
+  }catch(e){ setStatus('err','Falha na requisição de processamento.'); }
+  finally{ if(lbl) lbl.innerHTML='Matrícula em <b>PDF</b> — preencher via IA'; }
+}
+let gemModels=[], gemDefault='';
+function gemRenderModels(){
+  const wrap=document.getElementById('gem-models'); if(!wrap) return;
+  if(!gemModels.length){ wrap.innerHTML='<span class="chips-vazio">nenhum modelo cadastrado</span>'; }
+  else wrap.innerHTML = gemModels.map((m,i)=>`<span class="chip">${escapeHtml(m)}<button type="button" data-i="${i}" class="chip-x" title="Remover">×</button></span>`).join('');
+  wrap.querySelectorAll('.chip-x').forEach(b=>b.onclick=()=>{ const m=gemModels[+b.dataset.i]; gemModels.splice(+b.dataset.i,1); if(gemDefault===m) gemDefault=gemModels[0]||''; gemRenderModels(); });
+  const sel=document.getElementById('gem-default'); if(sel){
+    sel.innerHTML = gemModels.map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+    if(gemDefault) sel.value=gemDefault;
+  }
+}
+function gemAddModel(){
+  const inp=document.getElementById('gem-model-input'); if(!inp) return;
+  const v=inp.value.trim(); if(!v) return;
+  if(!gemModels.includes(v)) gemModels.push(v);
+  if(!gemDefault) gemDefault=v;
+  inp.value=''; inp.focus(); gemRenderModels();
+}
+async function abrirConfigGemini(){
+  const r = await post({acao:'gemini_config_get'});
+  gemModels = (r.ok && Array.isArray(r.models)) ? r.models.slice() : [];
+  gemDefault = (r.ok && r.default_model) ? r.default_model : (gemModels[0]||'');
+  const k=document.getElementById('gem-key'); k.value='';
+  k.placeholder = (r.ok && r.configurado) ? ('Chave salva: '+r.key_mascara+' (em branco mantém)') : 'Cole a API key do Google AI Studio';
+  gemRenderModels();
+  document.getElementById('modal-gemini-config').classList.add('show');
+}
+function fecharConfigGemini(){ document.getElementById('modal-gemini-config').classList.remove('show'); }
+async function salvarConfigGemini(){
+  const sel=document.getElementById('gem-default');
+  gemDefault = sel ? sel.value : gemDefault;
+  const api_key=document.getElementById('gem-key').value.trim();
+  const r = await post({acao:'gemini_config_save', api_key, models:JSON.stringify(gemModels), default_model:gemDefault});
+  if(!r.ok){ setStatus('err', r.mensagem||'Falha ao salvar configuração de IA.'); return; }
+  fecharConfigGemini(); setStatus('ok','Configuração de IA salva.');
+}
+
 function mostrarEncInfo(reg){
   const box=document.getElementById('enc-info');
   const tit=document.getElementById('enc-info-titulo');
@@ -3756,6 +4015,19 @@ function verificarPertencimento(geo){
   const blote=document.getElementById('btn-onr-lote'); if(blote) blote.addEventListener('click', enviarTodosOnr);
   const bcfg=document.getElementById('btn-onr-config'); if(bcfg) bcfg.addEventListener('click', abrirConfigOnr);
   const cfgov=document.getElementById('modal-onr-config'); if(cfgov) cfgov.addEventListener('click', e=>{ if(e.target===cfgov) fecharConfigOnr(); });
+  // IA (Gemini): zona de PDF de matrícula + configuração
+  const pz=document.getElementById('pdf-mat-zone'); const pf=document.getElementById('pdf-mat-file');
+  if(pz && pf){
+    pz.onclick=()=>pf.click();
+    pf.onchange=e=>{ if(e.target.files && e.target.files[0]) enviarPdfMatricula(e.target.files[0]); e.target.value=''; };
+    ['dragover','dragenter'].forEach(ev=>pz.addEventListener(ev,e=>{e.preventDefault();pz.classList.add('drag');}));
+    ['dragleave','drop'].forEach(ev=>pz.addEventListener(ev,e=>{e.preventDefault();pz.classList.remove('drag');}));
+    pz.addEventListener('drop', e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) enviarPdfMatricula(f); });
+  }
+  const bgem=document.getElementById('btn-gemini-config'); if(bgem) bgem.addEventListener('click', abrirConfigGemini);
+  const gadd=document.getElementById('gem-model-add'); if(gadd) gadd.addEventListener('click', gemAddModel);
+  const ginp=document.getElementById('gem-model-input'); if(ginp) ginp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); gemAddModel(); } });
+  const gov=document.getElementById('modal-gemini-config'); if(gov) gov.addEventListener('click', e=>{ if(e.target===gov) fecharConfigGemini(); });
 })();
 
 /* ---- recolher / drawer ---- */
