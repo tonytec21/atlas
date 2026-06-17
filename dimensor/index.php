@@ -345,11 +345,400 @@ function ensureTable($conn) {
         'cpf'              => "ADD COLUMN cpf VARCHAR(20) NULL DEFAULT NULL",
         'tipo_imovel'      => "ADD COLUMN tipo_imovel VARCHAR(12) NULL DEFAULT NULL",
         'cor_opacidade'    => "ADD COLUMN cor_opacidade DECIMAL(3,2) NULL DEFAULT NULL",
+        // ---- Atributos do shapefile ONR (Mapa do Registro de Imóveis) ----
+        'nome_imo'         => "ADD COLUMN nome_imo VARCHAR(180) NULL DEFAULT NULL",
+        'dat_mat'          => "ADD COLUMN dat_mat VARCHAR(20) NULL DEFAULT NULL",
+        'liv_mat'          => "ADD COLUMN liv_mat VARCHAR(20) NULL DEFAULT NULL",
+        'fol_mat'          => "ADD COLUMN fol_mat VARCHAR(20) NULL DEFAULT NULL",
+        'transcri'         => "ADD COLUMN transcri VARCHAR(60) NULL DEFAULT NULL",
+        'cnm'              => "ADD COLUMN cnm VARCHAR(40) NULL DEFAULT NULL",
+        'cns'              => "ADD COLUMN cns VARCHAR(20) NULL DEFAULT NULL",
+        'endereco'         => "ADD COLUMN endereco VARCHAR(255) NULL DEFAULT NULL",
+        'numero_imovel'    => "ADD COLUMN numero_imovel VARCHAR(30) NULL DEFAULT NULL",
+        'cep'              => "ADD COLUMN cep VARCHAR(12) NULL DEFAULT NULL",
+        'municipio'        => "ADD COLUMN municipio VARCHAR(120) NULL DEFAULT NULL",
+        'uf'               => "ADD COLUMN uf VARCHAR(2) NULL DEFAULT NULL",
+        'conf_mat'         => "ADD COLUMN conf_mat VARCHAR(255) NULL DEFAULT NULL",
+        'conf_nom'         => "ADD COLUMN conf_nom VARCHAR(255) NULL DEFAULT NULL",
+        'rel_jur'          => "ADD COLUMN rel_jur VARCHAR(60) NULL DEFAULT NULL",
+        'dat_ini'          => "ADD COLUMN dat_ini VARCHAR(20) NULL DEFAULT NULL",
+        'dat_fim'          => "ADD COLUMN dat_fim VARCHAR(20) NULL DEFAULT NULL",
+        'per_rel'          => "ADD COLUMN per_rel VARCHAR(20) NULL DEFAULT NULL",
+        'ccir_sncr'        => "ADD COLUMN ccir_sncr VARCHAR(40) NULL DEFAULT NULL",
+        'sigef'            => "ADD COLUMN sigef VARCHAR(60) NULL DEFAULT NULL",
+        'snci'             => "ADD COLUMN snci VARCHAR(40) NULL DEFAULT NULL",
+        'cib_nirf'         => "ADD COLUMN cib_nirf VARCHAR(40) NULL DEFAULT NULL",
+        'itbi'             => "ADD COLUMN itbi VARCHAR(30) NULL DEFAULT NULL",
+        'car'              => "ADD COLUMN car VARCHAR(80) NULL DEFAULT NULL",
+        'rip'              => "ADD COLUMN rip VARCHAR(30) NULL DEFAULT NULL",
+        'cif'              => "ADD COLUMN cif VARCHAR(30) NULL DEFAULT NULL",
+        'classifica'       => "ADD COLUMN classifica VARCHAR(2) NULL DEFAULT NULL",
+        // ---- Metadados da importação ONR ----
+        'onr_nivel_publicidade' => "ADD COLUMN onr_nivel_publicidade VARCHAR(2) NULL DEFAULT NULL",
+        'onr_classificacao'     => "ADD COLUMN onr_classificacao VARCHAR(3) NULL DEFAULT NULL",
+        'onr_numero_prenotacao' => "ADD COLUMN onr_numero_prenotacao VARCHAR(60) NULL DEFAULT NULL",
+        'onr_descricao'         => "ADD COLUMN onr_descricao VARCHAR(500) NULL DEFAULT NULL",
+        'onr_importation_id'    => "ADD COLUMN onr_importation_id VARCHAR(80) NULL DEFAULT NULL",
+        'onr_status'            => "ADD COLUMN onr_status VARCHAR(60) NULL DEFAULT NULL",
+        'onr_enviado_em'        => "ADD COLUMN onr_enviado_em DATETIME NULL DEFAULT NULL",
     ];
     foreach ($novas as $colNome => $ddl) {
         $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colNome) . "'");
         if ($c && $c->num_rows === 0) { $conn->query("ALTER TABLE memoriais_mapeados " . $ddl); }
     }
+}
+
+/**
+ * Lista canônica dos campos ONR (coluna no banco => rótulo) e o agrupamento da UI.
+ * Fonte única usada pelo formulário, pelo salvamento e (futuramente) pela geração do shapefile.
+ */
+function onrGrupos() {
+    return [
+        'Matrícula e registro' => [
+            'nome_imo'  => ['Nome do imóvel', 'text', 'Ex.: Fazenda Santa Rita'],
+            'dat_mat'   => ['Data da matrícula', 'text', 'dd/mm/aaaa'],
+            'liv_mat'   => ['Livro', 'text', 'Ex.: 2'],
+            'fol_mat'   => ['Folha', 'text', 'Ex.: 103'],
+            'transcri'  => ['Transcrição', 'text', 'Ex.: TR987654'],
+            'cnm'       => ['CNM (Cód. Nacional Matrícula)', 'text', '000000.0.0000000-00'],
+            'cns'       => ['CNS (Cód. Nacional Serventia)', 'text', 'Ex.: 000000'],
+        ],
+        'Localização' => [
+            'endereco'      => ['Endereço', 'text', 'Ex.: Rodovia BR 000, km 00'],
+            'numero_imovel' => ['Número', 'text', 'Ex.: 123'],
+            'cep'           => ['CEP', 'text', '00000000'],
+            'municipio'     => ['Município', 'text', 'Ex.: Zé Doca'],
+            'uf'            => ['UF', 'text', 'Ex.: MA'],
+        ],
+        'Proprietário e relação jurídica' => [
+            'rel_jur'  => ['Relação jurídica', 'text', 'Ex.: propriedade, usufruto, promessa c&v'],
+            'dat_ini'  => ['Início da relação', 'text', 'dd/mm/aaaa'],
+            'dat_fim'  => ['Fim da relação', 'text', 'dd/mm/aaaa'],
+            'per_rel'  => ['Percentual', 'text', 'Ex.: 33,33%'],
+        ],
+        'Confrontações' => [
+            'conf_mat' => ['Matrículas confrontantes', 'text', 'Ex.: 10001,10010,210001'],
+            'conf_nom' => ['Nomes dos confrontantes', 'text', 'Fulano, Sicrano, Beltrano'],
+        ],
+        'Cadastros externos' => [
+            'ccir_sncr' => ['CCIR / SNCR', 'text', '000.000.000.000-0'],
+            'sigef'     => ['SIGEF', 'text', ''],
+            'snci'      => ['SNCI', 'text', ''],
+            'cib_nirf'  => ['CIB / NIRF', 'text', ''],
+            'car'       => ['CAR', 'text', 'SP-0000000-...'],
+            'rip'       => ['RIP', 'text', ''],
+            'cif'       => ['CIF', 'text', ''],
+            'itbi'      => ['Valor do ITBI', 'text', 'Ex.: 5.000,00'],
+        ],
+    ];
+}
+/** Lista achatada das colunas ONR editáveis pelo usuário (sem metadados de envio). */
+function onrCampos() {
+    $cols = [];
+    foreach (onrGrupos() as $campos) { foreach ($campos as $col => $_) { $cols[] = $col; } }
+    // metadados da importação também são salvos pelo mesmo mecanismo
+    return array_merge($cols, ['classifica', 'onr_nivel_publicidade', 'onr_classificacao', 'onr_numero_prenotacao', 'onr_descricao']);
+}
+/** Salva (UPDATE) os campos ONR de um imóvel a partir de um array associativo (ex.: $_POST). */
+function salvarCamposOnr($conn, $id, $src) {
+    $id = (int)$id; if ($id <= 0) return false;
+    $sets = []; $vals = []; $types = '';
+    foreach (onrCampos() as $col) {
+        if (!array_key_exists($col, $src)) continue;
+        $v = trim((string)$src[$col]);
+        $sets[] = "`$col` = ?";
+        $vals[] = ($v === '') ? null : $v;
+        $types .= 's';
+    }
+    if (empty($sets)) return false;
+    $vals[] = $id; $types .= 'i';
+    $stmt = $conn->prepare("UPDATE memoriais_mapeados SET " . implode(', ', $sets) . " WHERE id = ?");
+    if (!$stmt) return false;
+    $stmt->bind_param($types, ...$vals);
+    return $stmt->execute();
+}
+
+/* ===================== CONFIGURAÇÃO DA API ONR ===================== */
+function onrConfigPath() { return __DIR__ . '/config_onr.json'; }
+function onrConfigLer() {
+    $p = onrConfigPath();
+    $base = ['base_url' => 'https://www.mapa.onr.org.br/', 'token' => ''];
+    if (is_file($p)) {
+        $d = json_decode((string)@file_get_contents($p), true);
+        if (is_array($d)) $base = array_merge($base, $d);
+    }
+    if ($base['base_url'] !== '' && substr($base['base_url'], -1) !== '/') $base['base_url'] .= '/';
+    return $base;
+}
+function onrConfigSalvar($base_url, $token) {
+    $base_url = trim($base_url); if ($base_url === '') $base_url = 'https://www.mapa.onr.org.br/';
+    if (substr($base_url, -1) !== '/') $base_url .= '/';
+    $data = ['base_url' => $base_url, 'token' => trim($token)];
+    return @file_put_contents(onrConfigPath(), json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) !== false;
+}
+
+/* ===================== GERADOR DE SHAPEFILE (PHP puro) ===================== */
+function onrNumBr($s) {
+    $s = trim((string)$s);
+    if ($s === '') return 0.0;
+    $s = preg_replace('/[^0-9,.\-]/', '', $s);          // remove R$, %, espaços, etc.
+    if (strpos($s, ',') !== false) {                     // formato BR: 1.234,56
+        $s = str_replace('.', '', $s);
+        $s = str_replace(',', '.', $s);
+    }
+    return is_numeric($s) ? (float)$s : 0.0;
+}
+// Definição das colunas .dbf na ordem oficial: [NOME_DBF, tipo C/N, tamanho, decimais, origem]
+function onrCamposDbf() {
+    return [
+        ['MATRICULA','C',20,0,'numero_matricula'],
+        ['DAT_MAT','C',12,0,'dat_mat'],
+        ['LIV_MAT','N',10,0,'liv_mat'],
+        ['FOL_MAT','N',10,0,'fol_mat'],
+        ['TRANSCRI','C',30,0,'transcri'],
+        ['CNM','C',30,0,'cnm'],
+        ['CNS','C',20,0,'cns'],
+        ['ENDERECO','C',120,0,'endereco'],
+        ['NUMERO','C',15,0,'numero_imovel'],
+        ['CEP','N',10,0,'cep'],
+        ['MUNICIPIO','C',60,0,'municipio'],
+        ['UF','C',2,0,'uf'],
+        ['NOME_PROP','C',150,0,'proprietario'],
+        ['CPF_CNPJ','C',60,0,'cpf'],
+        ['CONF_MAT','C',150,0,'conf_mat'],
+        ['CONF_NOM','C',150,0,'conf_nom'],
+        ['REL_JUR','C',40,0,'rel_jur'],
+        ['DAT_INI','C',12,0,'dat_ini'],
+        ['DAT_FIM','C',12,0,'dat_fim'],
+        ['PER_REL','N',12,2,'per_rel'],
+        ['NOME_IMO','C',80,0,'__nome_imo'],
+        ['AREA_HA','N',18,4,'__area_ha'],
+        ['AREA_M2','N',18,2,'__area_m2'],
+        ['PERIM_M','N',16,2,'__perim_m'],
+        ['PERIM_KM','N',15,3,'__perim_km'],
+        ['CCIR_SNCR','C',30,0,'ccir_sncr'],
+        ['SIGEF','C',60,0,'sigef'],
+        ['SNCI','C',40,0,'snci'],
+        ['CIB_NIRF','C',40,0,'cib_nirf'],
+        ['ITBI','N',15,2,'itbi'],
+        ['CAR','C',80,0,'car'],
+        ['RIP','N',18,0,'rip'],
+        ['CIF','N',18,0,'cif'],
+        ['CLASSIFICA','N',2,0,'classifica'],
+    ];
+}
+// Valor de um campo a partir do registro (com campos computados __*)
+function onrValorCampo($origem, $row) {
+    switch ($origem) {
+        case '__nome_imo':  return ($row['nome_imo'] ?? '') !== '' ? $row['nome_imo'] : ($row['identificador'] ?? '');
+        case '__area_ha':   return (float)($row['area_ha'] ?? 0);
+        case '__area_m2':   return (float)($row['area_ha'] ?? 0) * 10000.0;
+        case '__perim_m':   return (float)($row['perimetro_m'] ?? 0);
+        case '__perim_km':  return (float)($row['perimetro_m'] ?? 0) / 1000.0;
+        default:            return $row[$origem] ?? '';
+    }
+}
+// Gera os 4 arquivos do shapefile em $dir com nome base $base. Retorna lista de caminhos ou false.
+function onrGerarShapefile($conn, $id, $dir, $base) {
+    $id = (int)$id;
+    $res = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = $id LIMIT 1");
+    if (!$res || !($row = $res->fetch_assoc())) return false;
+
+    // pontos: "lat,lng lat,lng ..."  -> shapefile usa X=lng, Y=lat
+    $pts = [];
+    foreach (preg_split('/\s+/', trim((string)$row['coordenadas_wgs84'])) as $par) {
+        if ($par === '') continue;
+        $xy = explode(',', $par);
+        if (count($xy) >= 2) $pts[] = [(float)$xy[1], (float)$xy[0]]; // [X=lng, Y=lat]
+    }
+    if (count($pts) < 3) return false;
+    // fecha o anel
+    if ($pts[0][0] !== $pts[count($pts)-1][0] || $pts[0][1] !== $pts[count($pts)-1][1]) $pts[] = $pts[0];
+    // garante orientação horária (anel externo do shapefile)
+    $area2 = 0.0;
+    for ($i = 0; $i < count($pts)-1; $i++) { $area2 += ($pts[$i][0]*$pts[$i+1][1] - $pts[$i+1][0]*$pts[$i][1]); }
+    if ($area2 > 0) $pts = array_reverse($pts); // estava anti-horário -> inverte
+
+    $xs = array_column($pts, 0); $ys = array_column($pts, 1);
+    $xmin=min($xs); $xmax=max($xs); $ymin=min($ys); $ymax=max($ys);
+    $n = count($pts);
+
+    // ---- conteúdo do registro .shp (Polygon = 5) ----
+    $rec  = pack('V', 5);
+    $rec .= pack('e', $xmin).pack('e', $ymin).pack('e', $xmax).pack('e', $ymax);
+    $rec .= pack('V', 1);          // numParts
+    $rec .= pack('V', $n);         // numPoints
+    $rec .= pack('V', 0);          // part 0 começa no índice 0
+    foreach ($pts as $p) { $rec .= pack('e', $p[0]).pack('e', $p[1]); }
+    $recLenWords = strlen($rec) / 2;
+
+    // ---- .shp ----
+    $shpHeaderLenWords = (100 + 8 + strlen($rec)) / 2;
+    $hdr  = pack('N', 9994).str_repeat(pack('N', 0), 5);
+    $shp  = $hdr.pack('N', (int)$shpHeaderLenWords).pack('V', 1000).pack('V', 5);
+    $shp .= pack('e', $xmin).pack('e', $ymin).pack('e', $xmax).pack('e', $ymax);
+    $shp .= str_repeat(pack('e', 0), 4); // z e m ranges
+    $shp .= pack('N', 1).pack('N', (int)$recLenWords); // record header (num=1)
+    $shp .= $rec;
+
+    // ---- .shx ----
+    $shxHeaderLenWords = (100 + 8) / 2;
+    $shx  = $hdr.pack('N', (int)$shxHeaderLenWords).pack('V', 1000).pack('V', 5);
+    $shx .= pack('e', $xmin).pack('e', $ymin).pack('e', $xmax).pack('e', $ymax);
+    $shx .= str_repeat(pack('e', 0), 4);
+    $shx .= pack('N', 50).pack('N', (int)$recLenWords); // offset 50 words (byte 100)
+
+    // ---- .dbf ----
+    $campos = onrCamposDbf();
+    $recordLen = 1; foreach ($campos as $c) { $recordLen += $c[2]; }
+    $headerLen = 32 + count($campos)*32 + 1;
+    $dbf  = pack('C', 0x03);
+    $dbf .= pack('C', (int)date('y')).pack('C', (int)date('n')).pack('C', (int)date('j'));
+    $dbf .= pack('V', 1);                 // 1 registro
+    $dbf .= pack('v', $headerLen).pack('v', $recordLen);
+    $dbf .= str_repeat("\x00", 20);
+    foreach ($campos as $c) {
+        list($nome,$tipo,$len,$dec) = $c;
+        $dbf .= str_pad(substr($nome,0,10), 11, "\x00");
+        $dbf .= $tipo;
+        $dbf .= str_repeat("\x00", 4);
+        $dbf .= pack('C', $len).pack('C', $dec);
+        $dbf .= str_repeat("\x00", 14);
+    }
+    $dbf .= "\x0D"; // terminador de cabeçalho
+    $dbf .= " ";    // flag de não-deletado
+    foreach ($campos as $c) {
+        list($nome,$tipo,$len,$dec,$orig) = $c;
+        $val = onrValorCampo($orig, $row);
+        if ($tipo === 'N') {
+            $num = is_numeric($val) ? (float)$val : onrNumBr($val);
+            $txt = ($dec > 0) ? number_format($num, $dec, '.', '') : (string)(int)round($num);
+            if (strlen($txt) > $len) $txt = substr($txt, 0, $len);
+            $dbf .= str_pad($txt, $len, ' ', STR_PAD_LEFT);
+        } else {
+            $txt = (string)$val;
+            // remove acentos/caracteres fora do ASCII para o dBASE
+            $txt = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $txt);
+            if ($txt === false) $txt = (string)$val;
+            $txt = substr($txt, 0, $len);
+            $dbf .= str_pad($txt, $len, ' ', STR_PAD_RIGHT);
+        }
+    }
+    $dbf .= "\x1A"; // EOF
+
+    // ---- .prj (SIRGAS 2000 geográfico, EPSG:4674) ----
+    $prj = 'GEOGCS["SIRGAS 2000",DATUM["Sistema_de_Referencia_Geocentrico_para_as_Americas_2000",'
+         . 'SPHEROID["GRS 1980",6378137,298.257222101]],PRIMEM["Greenwich",0],'
+         . 'UNIT["degree",0.0174532925199433]]';
+
+    $paths = [];
+    $map = ['shp'=>$shp, 'shx'=>$shx, 'dbf'=>$dbf, 'prj'=>$prj];
+    foreach ($map as $ext => $bin) {
+        $fp = rtrim($dir,'/').'/'.$base.'.'.$ext;
+        if (@file_put_contents($fp, $bin) === false) return false;
+        $paths[$ext] = $fp;
+    }
+    return $paths;
+}
+
+/* ===================== CLIENTE HTTP DA API ONR ===================== */
+function onrHttp($method, $url, $token, $jsonBody = null, $putFile = null) {
+    $ch = curl_init($url);
+    $headers = [];
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    if ($token) $headers[] = 'Authorization: Bearer ' . $token;
+    if ($jsonBody !== null) {
+        $headers[] = 'Content-Type: application/json';
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($jsonBody, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+    if ($putFile !== null) {
+        $headers[] = 'Content-Type: application/octet-stream';
+        curl_setopt($ch, CURLOPT_POSTFIELDS, (string)@file_get_contents($putFile));
+    }
+    if ($headers) curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $body = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+    $json = json_decode((string)$body, true);
+    return ['code' => $code, 'body' => $body, 'json' => $json, 'erro' => $err];
+}
+// Executa o fluxo completo de envio de um imóvel; retorna ['ok'=>bool,'mensagem','importation_id','status']
+function onrEnviarImovel($conn, $id) {
+    $cfg = onrConfigLer();
+    if (trim($cfg['token']) === '') return ['ok' => false, 'mensagem' => 'Token da API ONR não configurado.'];
+    $base = $cfg['base_url']; $token = $cfg['token'];
+
+    $id = (int)$id;
+    $res = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = $id LIMIT 1");
+    if (!$res || !($row = $res->fetch_assoc())) return ['ok' => false, 'mensagem' => 'Imóvel não encontrado.'];
+
+    // valida metadados obrigatórios
+    $cat = ($row['tipo_imovel'] === 'rural') ? 'rural' : (($row['tipo_imovel'] === 'urbano') ? 'urbano' : '');
+    $faltam = [];
+    if ($cat === '') $faltam[] = 'tipo (urbano/rural)';
+    if (($row['onr_nivel_publicidade'] ?? '') === '') $faltam[] = 'nível de publicidade';
+    if (($row['onr_classificacao'] ?? '') === '') $faltam[] = 'classificação da importação';
+    if (($row['onr_numero_prenotacao'] ?? '') === '') $faltam[] = 'número da prenotação';
+    if (($row['onr_descricao'] ?? '') === '') $faltam[] = 'descrição';
+    if ($faltam) return ['ok' => false, 'mensagem' => 'Faltam dados ONR: ' . implode(', ', $faltam) . '.'];
+
+    // gera shapefile em diretório temporário
+    $dir = sys_get_temp_dir() . '/onr_' . $id . '_' . uniqid();
+    @mkdir($dir, 0775, true);
+    $baseNome = preg_replace('/[^A-Za-z0-9_]/', '_', 'imovel_' . ($row['numero_matricula'] ?: $id));
+    $arqs = onrGerarShapefile($conn, $id, $dir, $baseNome);
+    if (!$arqs) return ['ok' => false, 'mensagem' => 'Falha ao gerar o shapefile (polígono inválido?).'];
+
+    $nomes = array_map(fn($e) => $baseNome . '.' . $e, ['shp','shx','dbf','prj']);
+
+    // Passo 1: gerar URLs de importação
+    $payload = [
+        'categoria_poligono'      => $cat,
+        'nivel_publicidade'       => (int)$row['onr_nivel_publicidade'],
+        'classificacao_poligonos' => (int)$row['onr_classificacao'],
+        'numero_prenotacao'       => (string)$row['onr_numero_prenotacao'],
+        'descricao_importacao'    => (string)$row['onr_descricao'],
+        'nomes_arquivos'          => array_values($nomes),
+    ];
+    $r1 = onrHttp('POST', $base . 'api/v1/poligonos/gerar-url-importacao', $token, $payload);
+    if ($r1['code'] < 200 || $r1['code'] >= 300 || empty($r1['json']['data']['importation_id'])) {
+        $msg = $r1['json']['mensagem'] ?? ($r1['json']['message'] ?? ('HTTP ' . $r1['code']));
+        return ['ok' => false, 'mensagem' => 'Erro ao gerar URLs: ' . $msg];
+    }
+    $importId = $r1['json']['data']['importation_id'];
+    $urls = $r1['json']['data']['upload_urls'] ?? [];
+
+    // Passo 2: upload (PUT) de cada arquivo na URL correspondente
+    foreach ($urls as $u) {
+        $fn = $u['filename'] ?? ''; $upUrl = $u['upload_url'] ?? '';
+        $ext = strtolower(pathinfo($fn, PATHINFO_EXTENSION));
+        if (!isset($arqs[$ext]) || $upUrl === '') continue;
+        $rp = onrHttp('PUT', $upUrl, null, null, $arqs[$ext]);
+        if ($rp['code'] < 200 || $rp['code'] >= 300) {
+            return ['ok' => false, 'mensagem' => "Falha no upload de $fn (HTTP {$rp['code']})."];
+        }
+    }
+
+    // Passo 3: confirmar
+    $r3 = onrHttp('POST', $base . 'api/v1/poligonos/confirmar', $token, ['importation_id' => $importId]);
+    if ($r3['code'] < 200 || $r3['code'] >= 300) {
+        $msg = $r3['json']['mensagem'] ?? ($r3['json']['message'] ?? ('HTTP ' . $r3['code']));
+        return ['ok' => false, 'mensagem' => 'Erro ao confirmar: ' . $msg, 'importation_id' => $importId];
+    }
+
+    // grava o id da importação e status no imóvel
+    $stmt = $conn->prepare("UPDATE memoriais_mapeados SET onr_importation_id=?, onr_status=?, onr_enviado_em=NOW() WHERE id=?");
+    $st = 'ENVIADO';
+    $stmt->bind_param('ssi', $importId, $st, $id);
+    $stmt->execute();
+
+    // limpa arquivos temporários
+    foreach ($arqs as $f) { @unlink($f); } @rmdir($dir);
+
+    return ['ok' => true, 'mensagem' => 'Enviado com sucesso à ONR.', 'importation_id' => $importId, 'status' => 'ENVIADO'];
 }
 
 /** Tenta localizar um imóvel existente pela matrícula. */
@@ -914,6 +1303,9 @@ if (isset($_POST['acao'])) {
             $imovelId = ($numMatricula !== '') ? findImovelIdByMatricula($conn, $numMatricula) : null;
             $novoId = inserirMemorial($conn, $identificador, $tipo, $origem, $imovelId, $fonte, $data, $numMatricula, $proprietario, $cpf, $tipoImovel);
 
+            // grava também os campos ONR enviados junto, se houver
+            salvarCamposOnr($conn, $novoId, $_POST);
+
             echo json_encode([
                 'ok' => true,
                 'id' => $novoId,
@@ -921,6 +1313,75 @@ if (isset($_POST['acao'])) {
                 'mensagem' => 'Imóvel "' . $identificador . '" gravado com ' . $data['num_vertices'] . ' vértices.'
                     . ($imovelId ? ' Vinculado ao cadastro (id ' . $imovelId . ').' : '')
             ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'salvar_onr') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Selecione/grave um imóvel antes de salvar os dados ONR.']); exit; }
+            $ok = salvarCamposOnr($conn, $id, $_POST);
+            echo json_encode(['ok' => (bool)$ok, 'id' => $id, 'mensagem' => $ok ? 'Dados ONR salvos.' : 'Nada a salvar.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'onr_config_get') {
+            $cfg = onrConfigLer();
+            // não devolve o token inteiro por segurança — apenas máscara + se está configurado
+            $tok = (string)$cfg['token'];
+            $mask = ($tok === '') ? '' : (substr($tok, 0, 4) . str_repeat('•', max(0, min(20, strlen($tok)-8))) . substr($tok, -4));
+            echo json_encode(['ok' => true, 'base_url' => $cfg['base_url'], 'configurado' => ($tok !== ''), 'token_mascara' => $mask], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($acao === 'onr_config_save') {
+            $base_url = (string)($_POST['base_url'] ?? '');
+            $token    = (string)($_POST['token'] ?? '');
+            // se o token vier vazio, mantém o atual (permite salvar só a URL)
+            if (trim($token) === '') { $atual = onrConfigLer(); $token = $atual['token']; }
+            $ok = onrConfigSalvar($base_url, $token);
+            echo json_encode(['ok' => (bool)$ok, 'mensagem' => $ok ? 'Configuração salva.' : 'Não foi possível salvar (verifique permissão de escrita na pasta).'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'enviar_onr') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'mensagem' => 'Imóvel inválido.']); exit; }
+            echo json_encode(onrEnviarImovel($conn, $id), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($acao === 'enviar_onr_lote') {
+            // envia todos os que estão prontos e ainda não foram enviados
+            $res = $conn->query(
+                "SELECT id FROM memoriais_mapeados
+                 WHERE tipo_imovel IN ('urbano','rural')
+                   AND onr_nivel_publicidade IS NOT NULL AND onr_nivel_publicidade <> ''
+                   AND onr_classificacao IS NOT NULL AND onr_classificacao <> ''
+                   AND onr_numero_prenotacao IS NOT NULL AND onr_numero_prenotacao <> ''
+                   AND onr_descricao IS NOT NULL AND onr_descricao <> ''
+                   AND (onr_importation_id IS NULL OR onr_importation_id = '')
+                 ORDER BY id"
+            );
+            $ids = []; while ($res && $r = $res->fetch_assoc()) { $ids[] = (int)$r['id']; }
+            $enviados = 0; $falhas = []; 
+            foreach ($ids as $iid) {
+                $r = onrEnviarImovel($conn, $iid);
+                if ($r['ok']) $enviados++; else $falhas[] = "#$iid: " . $r['mensagem'];
+            }
+            echo json_encode(['ok' => true, 'total' => count($ids), 'enviados' => $enviados, 'falhas' => $falhas], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($acao === 'status_onr') {
+            $id = (int)($_POST['id'] ?? 0);
+            $res = $conn->query("SELECT onr_importation_id FROM memoriais_mapeados WHERE id = $id LIMIT 1");
+            $row = $res ? $res->fetch_assoc() : null;
+            $impId = $row['onr_importation_id'] ?? '';
+            if ($impId === '') { echo json_encode(['ok' => false, 'mensagem' => 'Imóvel ainda não enviado.']); exit; }
+            $cfg = onrConfigLer();
+            $r = onrHttp('POST', $cfg['base_url'] . 'api/v1/poligonos/status', $cfg['token'], ['importation_id' => $impId]);
+            $status = $r['json']['data']['status'] ?? ('HTTP ' . $r['code']);
+            $stmt = $conn->prepare("UPDATE memoriais_mapeados SET onr_status = ? WHERE id = ?");
+            $stmt->bind_param('si', $status, $id);
+            $stmt->execute();
+            echo json_encode(['ok' => true, 'status' => $status, 'importation_id' => $impId], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -945,6 +1406,7 @@ if (isset($_POST['acao'])) {
             $stmt = $conn->prepare("UPDATE memoriais_mapeados SET identificador=?, tipo_identificador=?, numero_matricula=?, proprietario=?, cpf=?, tipo_imovel=?, imovel_id=? WHERE id=?");
             $stmt->bind_param('ssssssii', $identificador, $tipo, $nm, $pr, $cp, $ti, $imovelId, $id);
             $stmt->execute();
+            salvarCamposOnr($conn, $id, $_POST);
             echo json_encode(['ok' => true, 'id' => $id, 'imovel_id' => $imovelId], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -998,11 +1460,22 @@ if (isset($_POST['acao'])) {
             $res = $conn->query(
                 "SELECT id, identificador, tipo_identificador, origem, imovel_id, num_vertices,
                         area_ha, perimetro_m, centro_lat, centro_lng, cor, cor_opacidade,
-                        numero_matricula, proprietario, cpf, tipo_imovel, criado_em
+                        numero_matricula, proprietario, cpf, tipo_imovel,
+                        onr_status, onr_importation_id, onr_numero_prenotacao, onr_classificacao,
+                        onr_nivel_publicidade, onr_descricao, criado_em
                  FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 1000"
             );
             $rows = [];
-            while ($res && $row = $res->fetch_assoc()) { $rows[] = $row; }
+            while ($res && $row = $res->fetch_assoc()) {
+                $pronto = in_array($row['tipo_imovel'], ['urbano','rural'], true)
+                    && trim((string)$row['onr_nivel_publicidade']) !== ''
+                    && trim((string)$row['onr_classificacao']) !== ''
+                    && trim((string)$row['onr_numero_prenotacao']) !== ''
+                    && trim((string)$row['onr_descricao']) !== '';
+                $row['onr_pronto'] = $pronto ? 1 : 0;
+                $row['onr_enviado'] = (trim((string)$row['onr_importation_id']) !== '') ? 1 : 0;
+                $rows[] = $row;
+            }
             echo json_encode(['ok' => true, 'itens' => $rows], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -1190,6 +1663,22 @@ if (isset($_POST['acao'])) {
   .cor-sw:hover{transform:scale(1.08)}
   .cor-sw.sel{border-color:var(--ink);box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
   .cor-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.45;margin-top:9px}
+  /* Accordion de dados ONR */
+  .onr-box{margin-top:14px}
+  .onr-accordion{border:1px solid var(--line);border-radius:11px;background:var(--bg);overflow:hidden}
+  .onr-accordion>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:11px 13px;font-family:var(--disp);font-size:13px;font-weight:600;color:var(--ink)}
+  .onr-accordion>summary::-webkit-details-marker{display:none}
+  .onr-accordion>summary::after{content:'▾';margin-left:auto;color:var(--faint);transition:transform .2s}
+  .onr-accordion[open]>summary::after{transform:rotate(180deg)}
+  .onr-hint-active{font-family:var(--mono);font-size:10px;font-weight:400;color:var(--faint)}
+  .onr-body{padding:4px 13px 14px;border-top:1px solid var(--line)}
+  .onr-sub{margin-top:10px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .onr-sub>summary{list-style:none;cursor:pointer;padding:8px 11px;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);background:var(--panel)}
+  .onr-sub>summary::-webkit-details-marker{display:none}
+  .onr-sub>summary::after{content:'+';float:right;color:var(--faint);font-weight:700}
+  .onr-sub[open]>summary::after{content:'–'}
+  .onr-sub .form-grid{padding:10px 11px 11px}
+  .onr-sub input[readonly]{opacity:.65;background:var(--panel);cursor:not-allowed}
   /* Popup de cor sobre o mapa (InfoWindow — bolha branca) */
   .cor-pop{font-family:var(--disp);min-width:200px;color:#1f2733}
   .cor-pop-t{font-size:13px;font-weight:700;line-height:1.2}
@@ -1354,6 +1843,16 @@ if (isset($_POST['acao'])) {
   .item .it-edit:hover{color:var(--red-bright);background:var(--red-soft)}
   .tag.urb{background:rgba(37,99,235,.14);color:#2563eb;border:1px solid rgba(37,99,235,.3)}
   .tag.rural{background:rgba(22,163,74,.14);color:#16a34a;border:1px solid rgba(22,163,74,.3)}
+  /* Envio ONR na lista */
+  .saved-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .mini-btn.onr{background:linear-gradient(135deg,#0d9488,#1d4ed8);color:#fff;border-color:transparent}
+  .mini-btn.onr:hover{filter:brightness(1.08)}
+  .item .it-onr{background:transparent;border:none;color:#0d9488;font-size:13px;cursor:pointer;padding:2px 5px;border-radius:6px;flex:none}
+  .item .it-onr:hover:not(:disabled){background:rgba(13,148,136,.14)}
+  .item .it-onr:disabled{color:var(--line);cursor:not-allowed}
+  .item .it-onr.enviado{color:#1d4ed8}
+  .onr-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:var(--line);color:var(--faint);margin-left:4px;vertical-align:middle}
+  .onr-badge.env{background:rgba(29,78,216,.16);color:#1d4ed8}
   /* ===== Slider de intensidade ===== */
   .op-wrap{display:flex;align-items:center;gap:10px;margin-top:11px}
   .op-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);flex:none}
@@ -1474,6 +1973,83 @@ if (isset($_POST['acao'])) {
         <button class="btn-save" id="btn-save" disabled>Gravar no banco</button>
       </div>
 
+      <div class="onr-box">
+        <details class="onr-accordion">
+          <summary class="onr-summary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            Dados para o Mapa ONR
+            <span class="onr-hint-active" id="onr-hint-active">— grave/abra um imóvel</span>
+          </summary>
+          <div class="onr-body">
+            <?php foreach (onrGrupos() as $grupo => $campos): ?>
+              <details class="onr-sub" open>
+                <summary><?= htmlspecialchars($grupo) ?></summary>
+                <div class="form-grid">
+                  <?php foreach ($campos as $col => $meta): list($rot, $tp, $ph) = $meta; ?>
+                    <div class="fld grid-2">
+                      <label class="field-label"><?= htmlspecialchars($rot) ?></label>
+                      <input id="onr_<?= $col ?>" data-onr="<?= $col ?>" type="text" placeholder="<?= htmlspecialchars($ph) ?>">
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              </details>
+            <?php endforeach; ?>
+
+            <details class="onr-sub" open>
+              <summary>Geometria e classificação</summary>
+              <div class="form-grid">
+                <div class="fld"><label class="field-label">Área (ha)</label><input id="onr_area_ha" type="text" readonly></div>
+                <div class="fld"><label class="field-label">Área (m²)</label><input id="onr_area_m2" type="text" readonly></div>
+                <div class="fld"><label class="field-label">Perímetro (m)</label><input id="onr_perim_m" type="text" readonly></div>
+                <div class="fld"><label class="field-label">Perímetro (km)</label><input id="onr_perim_km" type="text" readonly></div>
+                <div class="fld grid-2">
+                  <label class="field-label">Classificação (CLASSIFICA)</label>
+                  <select id="onr_classifica" data-onr="classifica">
+                    <option value="">—</option>
+                    <option value="1">A — georref. rural certificado / urbano com ART</option>
+                    <option value="2">B — georreferenciado sem certificação</option>
+                    <option value="3">C — desenho sobre imagem de satélite</option>
+                  </select>
+                </div>
+              </div>
+            </details>
+
+            <details class="onr-sub">
+              <summary>Parâmetros de envio à ONR</summary>
+              <div class="form-grid">
+                <div class="fld"><label class="field-label">Categoria</label><input id="onr_categoria" type="text" readonly placeholder="vem do Tipo do imóvel"></div>
+                <div class="fld">
+                  <label class="field-label">Nível de publicidade</label>
+                  <select id="onr_nivel_publicidade" data-onr="onr_nivel_publicidade">
+                    <option value="">—</option>
+                    <option value="1">1 — Somente quem enviou</option>
+                    <option value="2">2 — Somente a serventia</option>
+                    <option value="3">3 — Todos oficiais (internet)</option>
+                    <option value="4">4 — Público geral (internet)</option>
+                  </select>
+                </div>
+                <div class="fld grid-2">
+                  <label class="field-label">Classificação da importação</label>
+                  <select id="onr_classificacao" data-onr="onr_classificacao">
+                    <option value="">—</option>
+                    <option value="1">1 — Geral</option><option value="2">2 — Loteamento</option>
+                    <option value="3">3 — Usucapião</option><option value="4">4 — Retificação</option>
+                    <option value="5">5 — REURB</option><option value="6">6 — Definido pelo RI1</option>
+                    <option value="7">7 — Definido pelo RI2</option><option value="8">8 — Estrangeiro</option>
+                    <option value="9">9 — Fusão</option><option value="10">10 — Desmembramento</option>
+                  </select>
+                </div>
+                <div class="fld grid-2"><label class="field-label">Número da prenotação</label><input id="onr_numero_prenotacao" data-onr="onr_numero_prenotacao" type="text" placeholder="Ex.: 2024-54321"></div>
+                <div class="fld grid-2"><label class="field-label">Descrição da importação</label><input id="onr_descricao" data-onr="onr_descricao" type="text" placeholder="Ex.: Importação do polígono ..."></div>
+              </div>
+            </details>
+
+            <button type="button" class="btn-save" id="btn-onr-salvar" disabled style="width:100%;margin-top:12px">Salvar dados ONR</button>
+            <p class="cor-hint">Esses dados alimentam o shapefile e o envio à API do Mapa do Registro de Imóveis (ONR).</p>
+          </div>
+        </details>
+      </div>
+
       <div class="muni-box">
         <p class="label muni-label">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
@@ -1538,7 +2114,11 @@ if (isset($_POST['acao'])) {
       <div class="saved">
         <div class="saved-head">
           <h3>Imóveis gravados</h3>
-          <button class="mini-btn" id="btn-todos">Ver todos no mapa</button>
+          <div class="saved-actions">
+            <button class="mini-btn" id="btn-todos">Ver todos no mapa</button>
+            <button class="mini-btn onr" id="btn-onr-lote" title="Enviar todos os imóveis prontos ao Mapa ONR">➤ Enviar prontos</button>
+            <button class="mini-btn" id="btn-onr-config" title="Configurar a API do Mapa ONR">⚙</button>
+          </div>
         </div>
         <div class="search-wrap">
           <svg class="search-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -1638,6 +2218,25 @@ if (isset($_POST['acao'])) {
     </div>
   </div>
 </div>
+
+<!-- Modal: configuração da API ONR -->
+<div id="modal-onr-config" class="modal-ov">
+  <div class="modal-card">
+    <div class="modal-h">
+      <h3>Configurar API do Mapa ONR</h3>
+      <button class="modal-x" onclick="fecharConfigOnr()" title="Fechar">×</button>
+    </div>
+    <div class="modal-b">
+      <div class="fld"><label class="field-label">BASE_URL</label><input id="cfg-base-url" type="text" placeholder="https://www.mapa.onr.org.br/"></div>
+      <div class="fld"><label class="field-label">Bearer Token (chave da API)</label><input id="cfg-token" type="text" autocomplete="off" placeholder="Cole aqui o Bearer Token"></div>
+      <p class="cor-hint">O token é gerado no portal do Mapa ONR (Configurações &gt; Chave API para envio de polígonos) com certificado e-CPF e tem validade de 15 dias. Fica salvo no servidor em <code>dimensor/config_onr.json</code>.</p>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" onclick="fecharConfigOnr()">Cancelar</button>
+      <button class="btn-primary" onclick="salvarConfigOnr()">Salvar configuração</button>
+    </div>
+  </div>
+</div>
 <?php include(__DIR__ . '/../rodape.php'); ?>
 
 <script>
@@ -1708,6 +2307,7 @@ function limparSingle(){
   limparLabels();
   imovelEditandoId=null;
   const cb=document.getElementById('cor-box'); if(cb) cb.style.display='none';
+  if(typeof onrSetAtivo==='function'){ onrSetAtivo(null); document.querySelectorAll('[data-onr]').forEach(el=>el.value=''); onrPreencherGeometria({area_ha:null,perimetro_m:null}); }
 }
 function limparOverview(){
   overviewPolys.forEach(p=>p.setMap(null)); overviewPolys=[];
@@ -1799,7 +2399,7 @@ document.getElementById('btn-save').onclick = async ()=>{
   });
   if(!res.ok){ setStatus('err', res.erro || 'Falha ao gravar.'); return; }
   setStatus('ok', res.mensagem);
-  if(res.id){ abrirCorPainel(res.id, null, null); }
+  if(res.id){ abrirCorPainel(res.id, null, null); onrSetAtivo(res.id, identificador); onrPreencherGeometria(lastGeo); }
   carregarLista();
 };
 
@@ -2298,13 +2898,21 @@ function renderLista(){
     const meta = `${fmt(it.area_ha,2)} ha`;
     const corDot = corValida(it.cor) ? `<span class="item-dot" style="background:${it.cor}"></span>` : '<span class="item-dot vazio"></span>';
     const tag = it.tipo_imovel ? `<span class="tag ${it.tipo_imovel==='rural'?'rural':'urb'}">${it.tipo_imovel}</span>` : '';
+    const enviado = String(it.onr_enviado)==='1';
+    const pronto  = String(it.onr_pronto)==='1';
+    const statusTxt = it.onr_status ? escapeHtml(it.onr_status) : (enviado?'ENVIADO':'');
+    const onrBadge = statusTxt ? `<span class="onr-badge ${enviado?'env':''}">${statusTxt}</span>` : '';
+    const onrBtn = enviado
+      ? `<button class="it-onr enviado" data-act="status" title="Consultar status na ONR">⟳</button>`
+      : `<button class="it-onr" data-act="enviar" title="${pronto?'Enviar ao Mapa ONR':'Faltam dados ONR para enviar'}" ${pronto?'':'disabled'}>➤</button>`;
     return `<div class="item" data-id="${it.id}">
       ${corDot}
       <div class="info">
         <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')}</div>
-        <div class="mt">${sub.join(' · ')||meta}</div>
+        <div class="mt">${sub.join(' · ')||meta} ${onrBadge}</div>
       </div>
       ${tag}
+      ${onrBtn}
       <button class="it-edit" title="Editar dados">✎</button>
       <button class="del" title="Excluir">×</button>
     </div>`;
@@ -2313,6 +2921,8 @@ function renderLista(){
     const id = el.dataset.id;
     el.querySelector('.del').onclick = async (e)=>{ e.stopPropagation(); if(!confirm('Excluir este imóvel?'))return; await post({acao:'excluir', id}); carregarLista(); if(modo==='overview') verTodos(); };
     el.querySelector('.it-edit').onclick = (e)=>{ e.stopPropagation(); abrirEdicao(id); };
+    const onrB = el.querySelector('.it-onr');
+    if(onrB) onrB.onclick = (e)=>{ e.stopPropagation(); if(onrB.dataset.act==='status') consultarStatusOnr(id); else enviarOnr(id); };
     el.oncontextmenu = (e)=>{ e.preventDefault(); selecionarDaLista(id); };
     el.onclick = (e)=>{ if(ctrlAtivo || e.ctrlKey || e.metaKey){ e.preventDefault(); selecionarDaLista(id); return; } carregarImovel(id); };
   });
@@ -2335,6 +2945,7 @@ async function carregarImovel(id){
   lastGeo = res.geo;
   desenhar(res.geo, reg.identificador);
   abrirCorPainel(id, reg.cor, reg.cor_opacidade);
+  preencherOnr(reg); onrPreencherGeometria(res.geo); onrSetAtivo(id, reg.identificador);
   document.getElementById('btn-save').disabled=false;
   setStatus('ok', `Carregado: ${reg.identificador} (${res.geo.num_vertices} vértices).`);
   abrirPainelMobile();
@@ -2364,6 +2975,91 @@ async function salvarEdicao(){
   });
   if(!r.ok){ setStatus('err', r.erro||'Falha ao atualizar.'); return; }
   fecharEdicao(); carregarLista(); setStatus('ok','Dados do imóvel atualizados.');
+}
+
+/* ===================== DADOS ONR (carga p/ Mapa do Registro de Imóveis) ===================== */
+let imovelAtivoId = null;
+function onrSetAtivo(id, rotulo){
+  imovelAtivoId = id || null;
+  const btn = document.getElementById('btn-onr-salvar');
+  const hint = document.getElementById('onr-hint-active');
+  if(btn) btn.disabled = !imovelAtivoId;
+  if(hint) hint.textContent = imovelAtivoId ? ('— '+(rotulo||('#'+imovelAtivoId))) : '— grave/abra um imóvel';
+}
+function onrFmt(v,d){ return (v==null||v==='') ? '' : Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function onrPreencherGeometria(geo){
+  if(!geo) return;
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.value=v; };
+  set('onr_area_ha', onrFmt(geo.area_ha,4));
+  set('onr_area_m2', onrFmt((geo.area_ha||0)*10000,2));
+  set('onr_perim_m', onrFmt(geo.perimetro_m,2));
+  set('onr_perim_km', onrFmt((geo.perimetro_m||0)/1000,3));
+}
+function preencherOnr(reg){
+  document.querySelectorAll('[data-onr]').forEach(el=>{
+    const col = el.getAttribute('data-onr');
+    el.value = (reg && reg[col]!=null) ? reg[col] : '';
+  });
+  const cat = document.getElementById('onr_categoria');
+  const tipo = document.getElementById('tipo_imovel');
+  if(cat) cat.value = (reg && reg.tipo_imovel) ? reg.tipo_imovel : (tipo ? tipo.value : '');
+}
+function coletarOnr(){
+  const o = {};
+  document.querySelectorAll('[data-onr]').forEach(el=>{ o[el.getAttribute('data-onr')] = el.value.trim(); });
+  return o;
+}
+async function salvarOnr(){
+  if(!imovelAtivoId){ setStatus('err','Grave ou abra um imóvel antes de salvar os dados ONR.'); return; }
+  const r = await post(Object.assign({acao:'salvar_onr', id:imovelAtivoId}, coletarOnr()));
+  if(!r.ok){ setStatus('err', r.erro||'Falha ao salvar dados ONR.'); return; }
+  setStatus('ok','Dados ONR salvos para este imóvel.');
+  carregarLista();
+}
+
+/* ---- Envio à ONR ---- */
+async function enviarOnr(id){
+  if(!confirm('Enviar este imóvel ao Mapa do Registro de Imóveis (ONR)?')) return;
+  setStatus('warn','Enviando à ONR… (gerando shapefile e transmitindo)');
+  const r = await post({acao:'enviar_onr', id});
+  if(!r.ok){ setStatus('err', r.mensagem||'Falha no envio.'); carregarLista(); return; }
+  setStatus('ok', r.mensagem + (r.importation_id?(' · ID: '+r.importation_id):''));
+  carregarLista();
+}
+async function consultarStatusOnr(id){
+  setStatus('warn','Consultando status na ONR…');
+  const r = await post({acao:'status_onr', id});
+  if(!r.ok){ setStatus('err', r.mensagem||'Falha ao consultar status.'); return; }
+  setStatus('ok','Status ONR: '+r.status);
+  carregarLista();
+}
+async function enviarTodosOnr(){
+  const prontos = (imoveisCache||[]).filter(it=> String(it.onr_pronto)==='1' && String(it.onr_enviado)!=='1').length;
+  if(prontos===0){ setStatus('warn','Nenhum imóvel pronto para envio (faltam dados ONR ou já enviados).'); return; }
+  if(!confirm('Enviar '+prontos+' imóvel(is) pronto(s) à ONR?')) return;
+  setStatus('warn','Enviando '+prontos+' imóvel(is) à ONR…');
+  const r = await post({acao:'enviar_onr_lote'});
+  if(!r.ok){ setStatus('err','Falha no envio em lote.'); return; }
+  let msg = `Enviados ${r.enviados} de ${r.total}.`;
+  if(r.falhas && r.falhas.length) msg += ' Falhas: '+r.falhas.join(' | ');
+  setStatus((r.falhas && r.falhas.length) ? 'warn':'ok', msg);
+  carregarLista();
+}
+/* ---- Configuração da API ONR ---- */
+async function abrirConfigOnr(){
+  const r = await post({acao:'onr_config_get'});
+  document.getElementById('cfg-base-url').value = (r.ok? r.base_url : 'https://www.mapa.onr.org.br/');
+  const tk = document.getElementById('cfg-token'); tk.value = '';
+  tk.placeholder = (r.ok && r.configurado) ? ('Token salvo: '+r.token_mascara+' (em branco mantém)') : 'Cole aqui o Bearer Token';
+  document.getElementById('modal-onr-config').classList.add('show');
+}
+function fecharConfigOnr(){ document.getElementById('modal-onr-config').classList.remove('show'); }
+async function salvarConfigOnr(){
+  const base_url = document.getElementById('cfg-base-url').value.trim();
+  const token = document.getElementById('cfg-token').value.trim();
+  const r = await post({acao:'onr_config_save', base_url, token});
+  if(!r.ok){ setStatus('err', r.mensagem||'Falha ao salvar configuração.'); return; }
+  fecharConfigOnr(); setStatus('ok','Configuração da API ONR salva.');
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -2501,6 +3197,15 @@ function verificarPertencimento(geo){
   const tg=document.getElementById('btn-toggle-panel'); if(tg) tg.addEventListener('click', togglePainel);
   const fab=document.getElementById('fab-panel'); if(fab) fab.addEventListener('click', abrirPainelMobile);
   const back=document.getElementById('panel-backdrop'); if(back) back.addEventListener('click', fecharPainelMobile);
+
+  // Dados ONR
+  const bonr=document.getElementById('btn-onr-salvar'); if(bonr) bonr.addEventListener('click', salvarOnr);
+  const tImo=document.getElementById('tipo_imovel'); const cat=document.getElementById('onr_categoria');
+  if(tImo && cat){ tImo.addEventListener('change', ()=>{ cat.value = tImo.value || ''; }); }
+  // Envio ONR (lote + configuração)
+  const blote=document.getElementById('btn-onr-lote'); if(blote) blote.addEventListener('click', enviarTodosOnr);
+  const bcfg=document.getElementById('btn-onr-config'); if(bcfg) bcfg.addEventListener('click', abrirConfigOnr);
+  const cfgov=document.getElementById('modal-onr-config'); if(cfgov) cfgov.addEventListener('click', e=>{ if(e.target===cfgov) fecharConfigOnr(); });
 })();
 
 /* ---- recolher / drawer ---- */
