@@ -1591,12 +1591,15 @@ if (isset($_POST['acao'])) {
             $id = acharMemorialPorMatricula($conn, $matricula);
             if ($id) {
                 // JÁ EXISTE -> apenas complementa os dados (não altera a geometria)
-                $cur = $conn->query("SELECT onr_descricao, onr_numero_prenotacao FROM memoriais_mapeados WHERE id = " . (int)$id . " LIMIT 1");
+                $cur = $conn->query("SELECT onr_descricao, onr_numero_prenotacao, onr_nivel_publicidade, onr_classificacao FROM memoriais_mapeados WHERE id = " . (int)$id . " LIMIT 1");
                 $cur = $cur ? $cur->fetch_assoc() : [];
                 // não sobrescreve prenotação já preenchida manualmente
                 if (trim((string)($cur['onr_numero_prenotacao'] ?? '')) !== '') unset($d['onr_numero_prenotacao']);
                 // descrição da importação: padrão quando ainda não houver
                 if (trim((string)($cur['onr_descricao'] ?? '')) === '' && trim((string)($d['onr_descricao'] ?? '')) === '') $d['onr_descricao'] = 'Importação de polígonos';
+                // parâmetros de envio: padrões quando ainda não houver
+                if (trim((string)($cur['onr_nivel_publicidade'] ?? '')) === '') $d['onr_nivel_publicidade'] = '3';
+                if (trim((string)($cur['onr_classificacao'] ?? '')) === '') $d['onr_classificacao'] = '1';
                 aplicarDadosMatricula($conn, $id, $d);
                 $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
                 echo json_encode([
@@ -1622,6 +1625,9 @@ if (isset($_POST['acao'])) {
             $novoId = inserirMemorial($conn, $identificador, 'matricula', 'memorial', $imovelId, $memorial, $geo, $matricula, $proprietario, $cpf, $tipoImovel);
             // descrição da importação: padrão quando não houver
             if (trim((string)($d['onr_descricao'] ?? '')) === '') $d['onr_descricao'] = 'Importação de polígonos';
+            // parâmetros de envio: padrões
+            if (trim((string)($d['onr_nivel_publicidade'] ?? '')) === '') $d['onr_nivel_publicidade'] = '3';
+            if (trim((string)($d['onr_classificacao'] ?? '')) === '') $d['onr_classificacao'] = '1';
             // grava os demais campos ONR extraídos
             salvarCamposOnr($conn, $novoId, $d);
             $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
@@ -2436,7 +2442,7 @@ if (isset($_POST['acao'])) {
                     <option value="">—</option>
                     <option value="1">1 — Somente quem enviou</option>
                     <option value="2">2 — Somente a serventia</option>
-                    <option value="3">3 — Todos oficiais (internet)</option>
+                    <option value="3" selected>3 — Todos oficiais (internet)</option>
                     <option value="4">4 — Público geral (internet)</option>
                   </select>
                 </div>
@@ -2444,7 +2450,7 @@ if (isset($_POST['acao'])) {
                   <label class="field-label">Classificação da importação</label>
                   <select id="onr_classificacao" data-onr="onr_classificacao">
                     <option value="">—</option>
-                    <option value="1">1 — Geral</option><option value="2">2 — Loteamento</option>
+                    <option value="1" selected>1 — Geral</option><option value="2">2 — Loteamento</option>
                     <option value="3">3 — Usucapião</option><option value="4">4 — Retificação</option>
                     <option value="5">5 — REURB</option><option value="6">6 — Definido pelo RI1</option>
                     <option value="7">7 — Definido pelo RI2</option><option value="8">8 — Estrangeiro</option>
@@ -2828,7 +2834,7 @@ function limparSingle(){
   limparLabels();
   imovelEditandoId=null;
   const cb=document.getElementById('cor-box'); if(cb) cb.style.display='none';
-  if(typeof onrSetAtivo==='function'){ onrSetAtivo(null); document.querySelectorAll('[data-onr]').forEach(el=>el.value=''); onrPreencherGeometria({area_ha:null,perimetro_m:null}); }
+  if(typeof onrSetAtivo==='function'){ onrSetAtivo(null); document.querySelectorAll('[data-onr]').forEach(el=>{ const col=el.getAttribute('data-onr'); el.value = (typeof ONR_PADRAO!=='undefined' && ONR_PADRAO[col]!==undefined) ? ONR_PADRAO[col] : ''; }); onrPreencherGeometria({area_ha:null,perimetro_m:null}); }
   const ei=document.getElementById('enc-info'); if(ei) ei.style.display='none';
 }
 function limparOverview(){
@@ -3816,10 +3822,13 @@ function onrPreencherGeometria(geo){
   set('onr_perim_m', onrFmt(geo.perimetro_m,2));
   set('onr_perim_km', onrFmt((geo.perimetro_m||0)/1000,3));
 }
+const ONR_PADRAO = {onr_nivel_publicidade:'3', onr_classificacao:'1'};
 function preencherOnr(reg){
   document.querySelectorAll('[data-onr]').forEach(el=>{
     const col = el.getAttribute('data-onr');
-    el.value = (reg && reg[col]!=null) ? reg[col] : '';
+    let v = (reg && reg[col]!=null && reg[col]!=='') ? reg[col] : '';
+    if(v==='' && ONR_PADRAO[col]!==undefined) v = ONR_PADRAO[col];
+    el.value = v;
   });
   const cat = document.getElementById('onr_categoria');
   const tipo = document.getElementById('tipo_imovel');
