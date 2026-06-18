@@ -272,27 +272,55 @@ function utmToGeo($east, $north, $zone = 23, $south = true) {
 
 /**
  * Extrai coordenadas UTM (E/N em metros) do memorial e converte para lat/lng.
+ *
+ * IMPORTANTE: cada vértice é montado PAREANDO LOCALMENTE o N e o E que aparecem
+ * juntos no texto ("N=... e E=..."), preservando a ORDEM do documento. A versão
+ * antiga separava todos os Eastings num array e todos os Northings noutro e
+ * pareava por índice — o que desalinhava o polígono inteiro sempre que a
+ * quantidade de E e N capturados era diferente (ex.: o 1º vértice cuja Easting
+ * vem SEM o "m" final: "E=433.093,50 referidas ao MC..."), gerando um polígono
+ * cruzado/embaralhado. O pareamento local elimina esse problema.
+ *
+ * Os números são ancorados no rótulo MAIÚSCULO "N"/"E" (isolado, nunca parte de
+ * palavras como EROMIR/SEU) com o "m" final OPCIONAL — assim distâncias
+ * ("distância de 178,69m") e o "e" conectivo não são confundidos com coordenadas.
  * Classifica por grandeza: Easting ~6 dígitos, Northing ~7-8 dígitos.
- * Tolerante a ruído de OCR (rótulos "E"/"N" podem vir colados/errados).
  */
 function extractUTMCoordinates($rawText, $zone = 23, $south = true) {
     $t = normalizeGeoText($rawText);
-    // números no formato BR seguidos de "m" (exceto m²/m2/m3 = área)
-    preg_match_all('/(\d[\d.,]*\d)\s*m(?![²2³])/u', $t, $m, PREG_SET_ORDER);
-    $east = []; $north = [];
+    // Tokens "N ..." / "E ..." na ordem do texto; "m" opcional; '=' opcional.
+    $re = '/(?<![\p{L}])([NE])\s*=?\s*(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)\s*m?(?!\d)/u';
+    preg_match_all($re, $t, $m, PREG_SET_ORDER);
+    $tokens = [];
     foreach ($m as $x) {
-        $val = brNumero($x[1]);
-        $ip = floor(abs($val));
-        if ($ip >= 100000 && $ip <= 999999) $east[] = $val;       // Easting
-        elseif ($ip >= 1000000 && $ip <= 99999999) $north[] = $val; // Northing
+        $val = brNumero($x[2]);
+        $ip  = (int) floor(abs($val));
+        if ($x[1] === 'N' && $ip >= 1000000 && $ip <= 99999999) $tokens[] = ['N', $val];
+        elseif ($x[1] === 'E' && $ip >= 100000 && $ip <= 999999) $tokens[] = ['E', $val];
     }
-    $n = min(count($east), count($north));
+    // Pareamento LOCAL: 1 N + 1 E consecutivos (em qualquer ordem) = 1 vértice.
+    $pares = []; $pendN = null; $pendE = null; $ne = 0; $nn = 0;
+    foreach ($tokens as $tk) {
+        if ($tk[0] === 'N') { $pendN = $tk[1]; $nn++; }
+        else { $pendE = $tk[1]; $ne++; }
+        if ($pendN !== null && $pendE !== null) {
+            $pares[] = [$pendN, $pendE]; // [north, east]
+            $pendN = null; $pendE = null;
+        }
+    }
+    // remove vértice final repetido (== primeiro), comum no fechamento do perímetro
+    $k = count($pares);
+    if ($k > 1
+        && abs($pares[0][0] - $pares[$k-1][0]) < 0.05
+        && abs($pares[0][1] - $pares[$k-1][1]) < 0.05) {
+        array_pop($pares);
+    }
     $pts = [];
-    for ($i = 0; $i < $n; $i++) {
-        $g = utmToGeo($east[$i], $north[$i], $zone, $south);
+    foreach ($pares as $p) {
+        $g = utmToGeo($p[1], $p[0], $zone, $south); // utmToGeo(east, north)
         if ($g[0] >= -90 && $g[0] <= 90 && $g[1] >= -180 && $g[1] <= 180) $pts[] = [$g[0], $g[1]];
     }
-    return ['pts' => $pts, 'e_count' => count($east), 'n_count' => count($north)];
+    return ['pts' => $pts, 'e_count' => $ne, 'n_count' => $nn];
 }
 
 /**
@@ -310,6 +338,69 @@ function extractTraverseLegs($text) {
     return $legs;
 }
 
+/** Mediana de uma lista de floats (robusta a outliers). */
+function medianaFloat(array $arr) {
+    $a = $arr; sort($a, SORT_NUMERIC); $n = count($a);
+    if ($n === 0) return 0.0;
+    $mid = intdiv($n, 2);
+    return ($n % 2) ? (float)$a[$mid] : (((float)$a[$mid - 1] + (float)$a[$mid]) / 2.0);
+}
+
+/**
+ * Reconcilia os vértices (lat/lng) com o caminhamento por AZIMUTE+DISTÂNCIA do
+ * memorial. Muitos memoriais trazem, redundantemente, as coordenadas de cada
+ * vértice E os azimutes/distâncias de cada lado. Quando a matrícula tem ERRO DE
+ * DIGITAÇÃO numa coordenada (vértice trocado/duplicado), a coordenada escrita
+ * fica incoerente com o caminhamento — que é a medição original do agrimensor e
+ * fecha o polígono. Esta função:
+ *   1) reconstrói o polígono a partir dos azimutes/distâncias (lados);
+ *   2) ancora a reconstrução nos próprios vértices por MEDIANA das diferenças
+ *      (robusta: ignora os vértices errados ao estimar a posição/translação);
+ *   3) substitui APENAS os vértices cujo desvio passa de $tol (erros reais),
+ *      mantendo intactos os vértices coerentes do documento.
+ *
+ * Só atua quando há um lado por vértice (legs == v ou v-1) e a MAIORIA dos
+ * vértices é coerente com o caminhamento (evita "consertar" o que não deve).
+ * Retorna ['pts'=>[[lat,lng]...], 'corrigidos'=>[índices 1-based], 'usou'=>bool].
+ */
+function reconcileTraverse(array $pts, array $legs, $zone = 23, $south = true, $tol = 5.0) {
+    $v = count($pts); $nl = count($legs);
+    if ($v < 3 || ($nl !== $v && $nl !== $v - 1)) return ['pts' => $pts, 'corrigidos' => [], 'usou' => false];
+
+    // vértices escritos -> UTM [north, east]
+    $U = [];
+    foreach ($pts as $p) { $u = geoToUTM($p[0], $p[1], $zone); $U[] = [$u[1], $u[0]]; }
+
+    // caminhamento relativo a partir de (0,0): azimute medido da NORTE da grade
+    $rel = [[0.0, 0.0]];
+    for ($i = 0; $i < $v - 1; $i++) {
+        $az = deg2rad($legs[$i]['az']); $d = (float)$legs[$i]['dist'];
+        $rel[] = [$rel[$i][0] + $d * cos($az), $rel[$i][1] + $d * sin($az)];
+    }
+
+    // âncora robusta: mediana de (escrito - relativo) em cada eixo
+    $dN = []; $dE = [];
+    for ($i = 0; $i < $v; $i++) { $dN[] = $U[$i][0] - $rel[$i][0]; $dE[] = $U[$i][1] - $rel[$i][1]; }
+    $offN = medianaFloat($dN); $offE = medianaFloat($dE);
+
+    // correção híbrida: mantém o vértice escrito quando coerente; senão reconstrói
+    $corrig = []; $novoU = []; $inliers = 0;
+    for ($i = 0; $i < $v; $i++) {
+        $rN = $rel[$i][0] + $offN; $rE = $rel[$i][1] + $offE;
+        $dev = hypot($U[$i][0] - $rN, $U[$i][1] - $rE);
+        if ($dev <= $tol) { $novoU[] = $U[$i]; $inliers++; }
+        else { $novoU[] = [$rN, $rE]; $corrig[] = $i + 1; }
+    }
+
+    if (empty($corrig) || $inliers < (int)ceil($v * 0.6)) {
+        return ['pts' => $pts, 'corrigidos' => [], 'usou' => false];
+    }
+
+    $novoPts = [];
+    foreach ($novoU as $u) { $g = utmToGeo($u[1], $u[0], $zone, $south); $novoPts[] = [$g[0], $g[1]]; }
+    return ['pts' => $novoPts, 'corrigidos' => $corrig, 'usou' => true];
+}
+
 /** Monta o pacote a partir do texto de um memorial descritivo (GMS). */
 function buildGeoData($memorial) {
     $res = extractGeoCoordinates($memorial);   // 1º GMS rotulado (Longitude:/Latitude:)
@@ -323,10 +414,29 @@ function buildGeoData($memorial) {
         $utm = extractUTMCoordinates($memorial);
         if (count($utm['pts']) >= 3) { $pts = $utm['pts']; $fonte = 'utm'; }
     }
+
+    // Reconciliação por caminhamento: corrige vértices com coordenada incoerente
+    // (erro de digitação no documento) usando os azimutes/distâncias do memorial.
+    $corrigidos = [];
+    if (count($pts) >= 3) {
+        $legs = extractTraverseLegs($memorial);
+        if (count($legs) >= 3) {
+            $rec = reconcileTraverse($pts, $legs);
+            if ($rec['usou']) { $pts = $rec['pts']; $corrigidos = $rec['corrigidos']; }
+        }
+    }
+
     $data = buildGeoDataFromPoints($pts);
     $data['lon_count'] = $res['lon_count'] ?? 0;
     $data['lat_count'] = $res['lat_count'] ?? 0;
     $data['fonte_coord'] = $fonte;
+    $data['vertices_corrigidos'] = $corrigidos;
+    if (!empty($corrigidos)) {
+        $rotulos = implode(', ', array_map(function ($i) { return 'M' . str_pad($i, 2, '0', STR_PAD_LEFT); }, $corrigidos));
+        $data['aviso_geometria'] = 'Atenção: ' . count($corrigidos) . ' vértice(s) com coordenada inconsistente no documento '
+            . '(' . $rotulos . ') foram reconstruídos a partir dos azimutes/distâncias do próprio memorial. '
+            . 'Confira o desenho antes de gravar.';
+    }
     return $data;
 }
 
@@ -1773,7 +1883,10 @@ if (isset($_POST['acao'])) {
             echo json_encode([
                 'ok' => true, 'existe' => false, 'criado' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
                 'num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha'], 'campos' => $preenchidos,
+                'vertices_corrigidos' => $geo['vertices_corrigidos'] ?? [],
+                'aviso_geometria' => $geo['aviso_geometria'] ?? '',
                 'mensagem' => 'Matrícula ' . $matricula . ' cadastrada e mapeada com ' . $geo['num_vertices'] . ' vértices (' . number_format($geo['area_ha'], 4, ',', '.') . ' ha). ' . count($preenchidos) . ' campo(s) preenchido(s).'
+                    . (!empty($geo['aviso_geometria']) ? ' ' . $geo['aviso_geometria'] : '')
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
