@@ -619,10 +619,11 @@ function ensureTable($conn) {
         $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colNome) . "'");
         if ($c && $c->num_rows === 0) { $conn->query("ALTER TABLE memoriais_mapeados " . $ddl); }
     }
-    // matricula_sucessora pode conter VÁRIAS matrículas (desmembramento) — alarga uma única vez
+    // matricula_sucessora pode conter MUITAS matrículas (intervalos de desmembramento
+    // expandidos, ex.: 745-900 => 156 números) — promove para TEXT para não truncar.
     $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE 'matricula_sucessora'");
-    if ($c && ($col = $c->fetch_assoc()) && stripos($col['Type'], 'varchar(120)') !== false) {
-        $conn->query("ALTER TABLE memoriais_mapeados MODIFY matricula_sucessora VARCHAR(600) NULL DEFAULT NULL");
+    if ($c && ($col = $c->fetch_assoc()) && stripos($col['Type'], 'text') === false) {
+        $conn->query("ALTER TABLE memoriais_mapeados MODIFY matricula_sucessora TEXT NULL DEFAULT NULL");
     }
 }
 
@@ -2959,9 +2960,11 @@ if (isset($_POST['acao'])) {
             <label class="field-label" id="ed-suc-label">Matrículas sucessoras (originadas)</label>
             <div id="ed-sucessora-chips" class="chips"></div>
             <div class="chips-add">
-              <input id="ed-sucessora-input" type="text" placeholder="Digite a matrícula e tecle Enter">
+              <input id="ed-sucessora-input" type="text" placeholder="Ex.: 745-900 (intervalo) ou 745;785;796 (específicas)">
               <button type="button" id="ed-sucessora-add" class="btn-ghost-sm">+ Adicionar</button>
             </div>
+            <p class="cor-hint" id="ed-suc-syntax">Use <b>745-900</b> para um intervalo (745 até 900) e <b>;</b> para números específicos (745;785;796). Pode combinar: <b>745-760;800;ou 12.345-6</b>.</p>
+            <p class="cor-hint" id="ed-suc-feedback" style="display:none"></p>
           </div>
           <p class="cor-hint" id="ed-sit-hint"></p>
         </div>
@@ -4106,6 +4109,7 @@ async function abrirEdicao(id){
   document.getElementById('ed-situacao').value = sitSel;
   edSucList = (it.matricula_sucessora||'').split(',').map(s=>s.trim()).filter(Boolean);
   edRenderSucChips();
+  if(typeof edSucFeedback==='function') edSucFeedback('');
   edToggleEnc();
   edPreencherOnr(null);            // limpa enquanto busca o registro completo
   document.getElementById('modal-edit').classList.add('show');
@@ -4136,11 +4140,50 @@ function edRenderSucChips(){
   wrap.innerHTML = edSucList.map((m,idx)=>`<span class="chip">${escapeHtml(m)}<button type="button" data-i="${idx}" class="chip-x" title="Remover">×</button></span>`).join('');
   wrap.querySelectorAll('.chip-x').forEach(b=>b.onclick=()=>{ edSucList.splice(+b.dataset.i,1); edRenderSucChips(); });
 }
+/* Interpreta a entrada de matrículas sucessoras:
+   - "745-900"  => intervalo expandido (745, 746, …, 900)
+   - "745;785"  => números específicos (separados por ; , ou nova linha)
+   - combinações: "745-760;800;1001-1003"
+   Segurança: "12.345-6" (dígito verificador, fim < início) é tratado como uma
+   única matrícula, e intervalos absurdos (> MAX) são ignorados com aviso. */
+function edParseSucessoras(raw){
+  const MAX_INTERVALO = 5000;
+  const out = [], avisos = [];
+  const tokens = String(raw||'').split(/[;\n,]+/).map(s=>s.trim()).filter(Boolean);
+  for(const tk of tokens){
+    const r = tk.match(/^(\d+)\s*[-–—]\s*(\d+)$/);   // intervalo (aceita - – —)
+    if(r){
+      const a = parseInt(r[1],10), b = parseInt(r[2],10);
+      if(b < a){ out.push(tk); continue; }           // ex.: 12345-6 => matrícula literal
+      if(b - a > MAX_INTERVALO){ avisos.push(tk+` (intervalo acima de ${MAX_INTERVALO.toLocaleString('pt-BR')})`); continue; }
+      for(let n=a; n<=b; n++) out.push(String(n));
+    } else {
+      out.push(tk);
+    }
+  }
+  return { nums: out, avisos };
+}
+function edSucFeedback(txt, tipo){
+  const el = document.getElementById('ed-suc-feedback');
+  if(!el) return;
+  if(!txt){ el.style.display='none'; el.textContent=''; return; }
+  el.style.display=''; el.textContent = txt;
+  el.style.color = tipo==='warn' ? 'var(--amber, #b45309)' : 'var(--faint)';
+}
 function edAddSuc(){
   const inp=document.getElementById('ed-sucessora-input'); if(!inp) return;
-  const v=inp.value.trim(); if(!v) return;
-  if(!edSucList.some(x=>normMat(x)===normMat(v))) edSucList.push(v);
+  const raw=inp.value.trim(); if(!raw){ return; }
+  const { nums, avisos } = edParseSucessoras(raw);
+  let add=0, dup=0;
+  for(const v of nums){
+    if(edSucList.some(x=>normMat(x)===normMat(v))){ dup++; continue; }
+    edSucList.push(v); add++;
+  }
   inp.value=''; inp.focus(); edRenderSucChips();
+  let msg = add ? `${add} matrícula(s) adicionada(s)` : 'Nenhuma matrícula nova';
+  if(dup) msg += `, ${dup} já estava(m) na lista`;
+  if(avisos.length) msg += `. Ignorado(s): ${avisos.join('; ')}`;
+  edSucFeedback(msg + '.', avisos.length ? 'warn' : 'ok');
 }
 function edToggleEnc(){
   const v = document.getElementById('ed-situacao').value;
