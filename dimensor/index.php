@@ -1294,6 +1294,7 @@ function geminiPromptMatricula() {
         . "\"endereco\": localização/endereço do imóvel,\n"
         . "\"municipio\": município do imóvel,\n"
         . "\"uf\": sigla do estado (2 letras),\n"
+        . "\"cep\": CEP do imóvel (8 dígitos, só números); se não constar no documento, informe o CEP GERAL do município,\n"
         . "\"proprietario\": nome(s) do(s) proprietário(s) ATUAL(is) (o mais recente registrado/outorgado); separe vários por vírgula,\n"
         . "\"cpf\": CPF ou CNPJ do(s) proprietário(s) atual(is), na mesma ordem, separados por vírgula,\n"
         . "\"conf_nom\": nomes dos confrontantes/limites separados por vírgula,\n"
@@ -1356,6 +1357,42 @@ function aplicarDadosMatricula($conn, $id, $d) {
     }
     if ($sets) { $vals[] = $id; $types .= 'i'; $st = $conn->prepare("UPDATE memoriais_mapeados SET " . implode(', ', $sets) . " WHERE id = ?"); $st->bind_param($types, ...$vals); $st->execute(); }
     return true;
+}
+
+/* ====================================================================
+ *  CONSULTA DE CEP (ViaCEP)
+ * ==================================================================== */
+function cepNormalizar($cep) { $d = preg_replace('/\D/', '', (string)$cep); return strlen($d) === 8 ? $d : ''; }
+function cepConsultar($cep) {
+    $c = cepNormalizar($cep);
+    if ($c === '') return null;
+    $ch = curl_init('https://viacep.com.br/ws/' . $c . '/json/');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0, CURLOPT_FOLLOWLOCATION => true,
+    ]);
+    $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    if ($resp === false || $code < 200 || $code >= 300) return null;
+    $j = json_decode((string)$resp, true);
+    if (!is_array($j) || !empty($j['erro'])) return null;
+    return [
+        'cep'        => $c,
+        'logradouro' => $j['logradouro'] ?? '',
+        'bairro'     => $j['bairro'] ?? '',
+        'municipio'  => $j['localidade'] ?? '',
+        'uf'         => $j['uf'] ?? '',
+    ];
+}
+/* Normaliza o CEP extraído e, se válido, completa município/UF/endereço vazios. */
+function enriquecerCepExtraido(&$d) {
+    $cep = cepNormalizar($d['cep'] ?? '');
+    if ($cep === '') { return; }
+    $d['cep'] = $cep;
+    $info = cepConsultar($cep);
+    if (!$info) return;
+    if (trim((string)($d['municipio'] ?? '')) === '' && $info['municipio'] !== '') $d['municipio'] = $info['municipio'];
+    if (trim((string)($d['uf'] ?? '')) === '' && $info['uf'] !== '') $d['uf'] = $info['uf'];
+    if (trim((string)($d['endereco'] ?? '')) === '' && $info['logradouro'] !== '') $d['endereco'] = $info['logradouro'];
 }
 
 if (isset($_POST['acao'])) {
@@ -1505,6 +1542,12 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'consultar_cep') {
+            $info = cepConsultar($_POST['cep'] ?? '');
+            if (!$info) { echo json_encode(['ok' => false, 'erro' => 'CEP não encontrado.']); exit; }
+            echo json_encode(array_merge(['ok' => true], $info), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         if ($acao === 'gemini_config_get') {
             $cfg = geminiConfigLer();
             $k = (string)$cfg['api_key'];
@@ -1542,6 +1585,7 @@ if (isset($_POST['acao'])) {
             $r = geminiExtrairMatricula($cfg, $pdfBytes);
             if (!$r['ok']) { echo json_encode($r); exit; }
             $d = $r['dados'];
+            enriquecerCepExtraido($d); // valida/completa CEP via ViaCEP (cadastro e complemento)
 
             $id = acharMemorialPorMatricula($conn, $matricula);
             if ($id) {
@@ -4089,6 +4133,24 @@ function verificarPertencimento(geo){
   const gadd=document.getElementById('gem-model-add'); if(gadd) gadd.addEventListener('click', gemAddModel);
   const ginp=document.getElementById('gem-model-input'); if(ginp) ginp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); gemAddModel(); } });
   const gov=document.getElementById('modal-gemini-config'); if(gov) gov.addEventListener('click', e=>{ if(e.target===gov) fecharConfigGemini(); });
+  // Consulta de CEP (ViaCEP) no campo do formulário ONR
+  const cepEl=document.getElementById('onr_cep');
+  if(cepEl){
+    cepEl.setAttribute('inputmode','numeric'); cepEl.setAttribute('maxlength','9');
+    cepEl.addEventListener('input', ()=>{ const dg=cepEl.value.replace(/\D/g,'').slice(0,8); cepEl.value = dg.length>5 ? dg.slice(0,5)+'-'+dg.slice(5) : dg; });
+    cepEl.addEventListener('blur', async ()=>{
+      const dg=cepEl.value.replace(/\D/g,''); if(dg.length!==8) return;
+      try{
+        const r=await post({acao:'consultar_cep', cep:dg});
+        if(!r.ok){ setStatus('warn','CEP não encontrado.'); return; }
+        const setF=(id,val,force)=>{ const e=document.getElementById(id); if(e && val && (force || !e.value.trim())) e.value=val; };
+        setF('onr_municipio', r.municipio, true);
+        setF('onr_uf', r.uf, true);
+        setF('onr_endereco', r.logradouro, false);
+        setStatus('ok', 'CEP '+cepEl.value+' — '+(r.municipio||'')+'/'+(r.uf||''));
+      }catch(_){}
+    });
+  }
 })();
 
 /* ---- recolher / drawer ---- */
