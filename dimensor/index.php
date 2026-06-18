@@ -826,7 +826,7 @@ function onrEnviarImovel($conn, $id) {
     if (!$res || !($row = $res->fetch_assoc())) return ['ok' => false, 'mensagem' => 'Imóvel não encontrado.'];
 
     // valida metadados obrigatórios
-    $cat = ($row['tipo_imovel'] === 'rural') ? 'rural' : (($row['tipo_imovel'] === 'urbano') ? 'urbano' : '');
+    $cat = ($row['tipo_imovel'] === 'rural') ? 'RURAL' : (($row['tipo_imovel'] === 'urbano') ? 'URBANO' : '');
     $faltam = [];
     if ($cat === '') $faltam[] = 'tipo (urbano/rural)';
     if (($row['onr_nivel_publicidade'] ?? '') === '') $faltam[] = 'nível de publicidade';
