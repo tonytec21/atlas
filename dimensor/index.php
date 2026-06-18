@@ -3655,8 +3655,8 @@ async function verTodos(){
             });
             // exceção: se o trecho cobre ~toda a matrícula-mãe, ela fica "morta" por completo
             let mae=null;
-            if(itens[i].motivo_situacao==='desmembramento' && listaMat(itens[i].matricula_sucessora).includes(normMat(itens[j].numero_matricula))) mae=itens[i];
-            else if(itens[j].motivo_situacao==='desmembramento' && listaMat(itens[j].matricula_sucessora).includes(normMat(itens[i].numero_matricula))) mae=itens[j];
+            if(itens[i].motivo_situacao==='desmembramento' && listaMatKey(itens[i].matricula_sucessora).includes(matKey(itens[j].numero_matricula))) mae=itens[i];
+            else if(itens[j].motivo_situacao==='desmembramento' && listaMatKey(itens[j].matricula_sucessora).includes(matKey(itens[i].numero_matricula))) mae=itens[j];
             if(mae && mae.area_ha>0 && (areaHa/mae.area_ha)>=0.98 && mae._poly){
               mae._poly.setOptions({strokeColor:'#9aa3ad',strokeOpacity:.4,strokeWeight:1,fillColor:'#9aa3ad',fillOpacity:.05,zIndex:0});
             }
@@ -3706,11 +3706,17 @@ function corValida(c){
 function imovelMorto(it){ return !!(it && it.situacao === 'encerrada'); }
 function normMat(s){ return (s==null?'':String(s)).replace(/[^0-9a-zA-Z]/g,'').toLowerCase(); }
 function listaMat(s){ return (s==null?'':String(s)).split(',').map(x=>normMat(x)).filter(Boolean); }
+/* Chave de comparação de NÚMERO de matrícula: além de remover pontuação e caixa,
+   ignora ZEROS À ESQUERDA — assim "00000745", "745" e "0745" são a MESMA matrícula.
+   Necessário porque os rótulos/matrículas são gravados com zero-padding (00000745),
+   enquanto as sucessoras (inclusive intervalos 745-900) são digitadas sem padding. */
+function matKey(s){ const k=normMat(s); return k.replace(/^0+(?=.)/,''); }
+function listaMatKey(s){ return (s==null?'':String(s)).split(/[,;]+/).map(x=>matKey(x)).filter(Boolean); }
 /* A e B têm relação de desmembramento? (uma lista a outra como matrícula sucessora) */
 function ehDesmembramentoPar(a,b){
-  const an=normMat(a.numero_matricula), bn=normMat(b.numero_matricula);
-  return (a.motivo_situacao==='desmembramento' && bn && listaMat(a.matricula_sucessora).includes(bn)) ||
-         (b.motivo_situacao==='desmembramento' && an && listaMat(b.matricula_sucessora).includes(an));
+  const an=matKey(a.numero_matricula), bn=matKey(b.numero_matricula);
+  return (a.motivo_situacao==='desmembramento' && bn && listaMatKey(a.matricula_sucessora).includes(bn)) ||
+         (b.motivo_situacao==='desmembramento' && an && listaMatKey(b.matricula_sucessora).includes(an));
 }
 function corBaseImovel(it){
   if(imovelMorto(it)) return '#9aa3ad';                 // cinza "morto"
@@ -4176,7 +4182,7 @@ function edAddSuc(){
   const { nums, avisos } = edParseSucessoras(raw);
   let add=0, dup=0;
   for(const v of nums){
-    if(edSucList.some(x=>normMat(x)===normMat(v))){ dup++; continue; }
+    if(edSucList.some(x=>matKey(x)===matKey(v))){ dup++; continue; }
     edSucList.push(v); add++;
   }
   inp.value=''; inp.focus(); edRenderSucChips();
