@@ -93,7 +93,7 @@ function dmsToDecimal($deg, $min, $sec) {
 
 /** Extrai todos os valores GMS rotulados por "long..." ou "lat...". */
 function extractByLabel($text, $label) {
-    $re = '/' . $label . '(?:itude)?\.?\s*(-?\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"/iu';
+    $re = '/' . $label . '(?:itude)?\s*[:.]?\s*(-?\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"/iu';
     preg_match_all($re, $text, $m, PREG_SET_ORDER);
     $out = [];
     foreach ($m as $x) {
@@ -1306,7 +1306,8 @@ function geminiPromptMatricula() {
         . "\"car\": número do CAR (Cadastro Ambiental Rural),\n"
         . "\"rip\": número RIP, se houver,\n"
         . "\"cif\": número CIF, se houver,\n"
-        . "\"classifica\": \"1\" se o imóvel for georreferenciado e CERTIFICADO pelo INCRA (ou urbano com ART), \"2\" se georreferenciado sem certificação, \"3\" se apenas desenho/sem georreferenciamento\n"
+        . "\"classifica\": \"1\" se o imóvel for georreferenciado e CERTIFICADO pelo INCRA (ou urbano com ART), \"2\" se georreferenciado sem certificação, \"3\" se apenas desenho/sem georreferenciamento,\n"
+        . "\"memorial\": transcreva o texto INTEGRAL da descrição do perímetro (a parte que começa em algo como 'Inicia-se a descrição deste imóvel no vértice...' e segue por todos os vértices até voltar ao ponto inicial), mantendo EXATAMENTE todas as Longitudes e Latitudes em graus, minutos e segundos como aparecem no documento (não converta, não arredonde, não omita vértices)\n"
         . "}";
 }
 /* Chama a API do Gemini com o PDF e retorna os dados extraídos. */
@@ -1532,24 +1533,49 @@ if (isset($_POST['acao'])) {
             if ($matricula === '') $matricula = preg_replace('/\.pdf$/i', '', (string)$_FILES['pdf']['name']);
             $matricula = trim($matricula);
             if ($matricula === '') { echo json_encode(['ok' => false, 'erro' => 'Nomeie o PDF com o número da matrícula (ex.: 2470.pdf).']); exit; }
-            // 1) confere se a matrícula está cadastrada (mapeada)
-            $id = acharMemorialPorMatricula($conn, $matricula);
-            if (!$id) { echo json_encode(['ok' => false, 'erro' => 'A matrícula ' . $matricula . ' não está cadastrada no mapa. Mapeie/grave o imóvel com esse número antes de processar o PDF.']); exit; }
-            // 2) IA configurada?
+            // IA configurada?
             $cfg = geminiConfigLer();
             if (trim($cfg['api_key']) === '') { echo json_encode(['ok' => false, 'erro' => 'Configure a chave da API do Gemini antes de processar.']); exit; }
-            // 3) processa o PDF
+            // lê e processa o PDF
             $pdfBytes = @file_get_contents($_FILES['pdf']['tmp_name']);
             if ($pdfBytes === false || $pdfBytes === '') { echo json_encode(['ok' => false, 'erro' => 'Falha ao ler o PDF enviado.']); exit; }
             $r = geminiExtrairMatricula($cfg, $pdfBytes);
             if (!$r['ok']) { echo json_encode($r); exit; }
-            // 4) aplica os dados ao imóvel
-            aplicarDadosMatricula($conn, $id, $r['dados']);
-            $preenchidos = array_values(array_filter(array_keys($r['dados']), fn($k) => trim((string)($r['dados'][$k] ?? '')) !== ''));
+            $d = $r['dados'];
+
+            $id = acharMemorialPorMatricula($conn, $matricula);
+            if ($id) {
+                // JÁ EXISTE -> apenas complementa os dados (não altera a geometria)
+                aplicarDadosMatricula($conn, $id, $d);
+                $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
+                echo json_encode([
+                    'ok' => true, 'existe' => true, 'criado' => false, 'id' => $id, 'matricula' => $matricula, 'modelo' => $r['modelo'],
+                    'campos' => $preenchidos,
+                    'mensagem' => 'Matrícula ' . $matricula . ' já cadastrada — ' . count($preenchidos) . ' campo(s) complementado(s).'
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            // NÃO EXISTE -> cadastra extraindo as coordenadas do memorial
+            $memorial = (string)($d['memorial'] ?? '');
+            $geo = buildGeoData($memorial);
+            if (empty($geo['ok'])) {
+                echo json_encode(['ok' => false, 'erro' => 'A matrícula ' . $matricula . ' não está cadastrada e não foi possível extrair as coordenadas do memorial no PDF (vértices encontrados: ' . (int)($geo['num_vertices'] ?? 0) . '). Verifique se o PDF contém a descrição do perímetro com Longitude/Latitude.']);
+                exit;
+            }
+            $identificador = trim((string)($d['nome_imo'] ?? '')); if ($identificador === '') $identificador = $matricula;
+            $tipoImovel = (stripos((string)($d['tipo_imovel'] ?? ''), 'rural') !== false) ? 'rural' : ((stripos((string)($d['tipo_imovel'] ?? ''), 'urban') !== false) ? 'urbano' : '');
+            $proprietario = trim((string)($d['proprietario'] ?? ''));
+            $cpf = trim((string)($d['cpf'] ?? ''));
+            $imovelId = findImovelIdByMatricula($conn, $matricula);
+            $novoId = inserirMemorial($conn, $identificador, 'matricula', 'memorial', $imovelId, $memorial, $geo, $matricula, $proprietario, $cpf, $tipoImovel);
+            // grava os demais campos ONR extraídos
+            salvarCamposOnr($conn, $novoId, $d);
+            $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
             echo json_encode([
-                'ok' => true, 'id' => $id, 'matricula' => $matricula, 'modelo' => $r['modelo'],
-                'campos' => $preenchidos, 'dados' => $r['dados'],
-                'mensagem' => 'Matrícula ' . $matricula . ' processada — ' . count($preenchidos) . ' campo(s) preenchido(s).'
+                'ok' => true, 'existe' => false, 'criado' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
+                'num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha'], 'campos' => $preenchidos,
+                'mensagem' => 'Matrícula ' . $matricula . ' cadastrada e mapeada com ' . $geo['num_vertices'] . ' vértices (' . number_format($geo['area_ha'], 4, ',', '.') . ' ha). ' . count($preenchidos) . ' campo(s) preenchido(s).'
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -2430,7 +2456,7 @@ if (isset($_POST['acao'])) {
       <div class="kml-zone ia" id="pdf-mat-zone">
         <input type="file" id="pdf-mat-file" accept="application/pdf,.pdf" hidden>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15h6M9 18h4"></path></svg>
-        <span id="pdf-mat-label">Matrícula em <b>PDF</b> — preencher via IA</span>
+        <span id="pdf-mat-label">Matrícula em <b>PDF</b> — cadastrar/complementar via IA</span>
       </div>
       <button type="button" class="link-config" id="btn-gemini-config">⚙ Configurar IA (Gemini)</button>
 
@@ -3820,11 +3846,15 @@ async function enviarPdfMatricula(file){
     const r = await fetch(window.location.pathname, {method:'POST', body:fd}).then(x=>x.json());
     if(!r.ok){ setStatus('err', r.erro||'Falha ao processar o PDF.'); return; }
     setStatus('ok', r.mensagem + (r.modelo?(' ('+r.modelo+')'):''));
-    carregarLista();
-    // se o imóvel processado estiver aberto no formulário, recarrega para mostrar os campos
-    if(typeof imovelAtivoId!=='undefined' && imovelAtivoId && String(imovelAtivoId)===String(r.id)) carregarImovel(r.id);
+    await carregarLista();
+    if(r.criado){
+      // novo imóvel mapeado: atualiza a visão do mapa
+      if(typeof modo!=='undefined' && modo==='overview') verTodos();
+    } else if(typeof imovelAtivoId!=='undefined' && imovelAtivoId && String(imovelAtivoId)===String(r.id)){
+      carregarImovel(r.id);
+    }
   }catch(e){ setStatus('err','Falha na requisição de processamento.'); }
-  finally{ if(lbl) lbl.innerHTML='Matrícula em <b>PDF</b> — preencher via IA'; }
+  finally{ if(lbl) lbl.innerHTML='Matrícula em <b>PDF</b> — cadastrar/complementar via IA'; }
 }
 let gemModels=[], gemDefault='';
 function gemRenderModels(){
