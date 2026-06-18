@@ -202,12 +202,86 @@ function buildGeoDataFromPoints($pts) {
     ];
 }
 
+/** Converte um número no formato brasileiro (1.234.567,89) para float, tolerante a OCR. */
+function brNumero($s) {
+    $s = trim((string)$s);
+    if (strpos($s, ',') !== false) {
+        $pos = strrpos($s, ',');
+        $int = preg_replace('/\D/', '', substr($s, 0, $pos));
+        $dec = preg_replace('/\D/', '', substr($s, $pos + 1));
+        return (float)(($int === '' ? '0' : $int) . '.' . ($dec === '' ? '0' : $dec));
+    }
+    return (float)preg_replace('/[^\d]/', '', $s);
+}
+
+/** UTM (Transversa de Mercator) -> geográfica (lat/lon), SIRGAS2000/WGS84. */
+function utmToGeo($east, $north, $zone = 23, $south = true) {
+    $a = 6378137.0; $f = 1 / 298.257223563; $k0 = 0.9996;
+    $e2 = $f * (2 - $f);
+    $e1 = (1 - sqrt(1 - $e2)) / (1 + sqrt(1 - $e2));
+    $x = $east - 500000.0;
+    $y = $north - ($south ? 10000000.0 : 0.0);
+    $lon0 = deg2rad(($zone - 1) * 6 - 180 + 3);
+    $M = $y / $k0;
+    $mu = $M / ($a * (1 - $e2 / 4 - 3 * $e2 ** 2 / 64 - 5 * $e2 ** 3 / 256));
+    $phi1 = $mu
+        + (3 * $e1 / 2 - 27 * $e1 ** 3 / 32) * sin(2 * $mu)
+        + (21 * $e1 ** 2 / 16 - 55 * $e1 ** 4 / 32) * sin(4 * $mu)
+        + (151 * $e1 ** 3 / 96) * sin(6 * $mu)
+        + (1097 * $e1 ** 4 / 512) * sin(8 * $mu);
+    $ep2 = $e2 / (1 - $e2);
+    $C1 = $ep2 * cos($phi1) ** 2;
+    $T1 = tan($phi1) ** 2;
+    $N1 = $a / sqrt(1 - $e2 * sin($phi1) ** 2);
+    $R1 = $a * (1 - $e2) / pow(1 - $e2 * sin($phi1) ** 2, 1.5);
+    $D = $x / ($N1 * $k0);
+    $lat = $phi1 - ($N1 * tan($phi1) / $R1) * ($D ** 2 / 2
+        - (5 + 3 * $T1 + 10 * $C1 - 4 * $C1 ** 2 - 9 * $ep2) * $D ** 4 / 24
+        + (61 + 90 * $T1 + 298 * $C1 + 45 * $T1 ** 2 - 252 * $ep2 - 3 * $C1 ** 2) * $D ** 6 / 720);
+    $lon = $lon0 + ($D
+        - (1 + 2 * $T1 + $C1) * $D ** 3 / 6
+        + (5 - 2 * $C1 + 28 * $T1 - 3 * $C1 ** 2 + 8 * $ep2 + 24 * $T1 ** 2) * $D ** 5 / 120) / cos($phi1);
+    return [rad2deg($lat), rad2deg($lon)];
+}
+
+/**
+ * Extrai coordenadas UTM (E/N em metros) do memorial e converte para lat/lng.
+ * Classifica por grandeza: Easting ~6 dígitos, Northing ~7-8 dígitos.
+ * Tolerante a ruído de OCR (rótulos "E"/"N" podem vir colados/errados).
+ */
+function extractUTMCoordinates($rawText, $zone = 23, $south = true) {
+    $t = normalizeGeoText($rawText);
+    // números no formato BR seguidos de "m" (exceto m²/m2/m3 = área)
+    preg_match_all('/(\d[\d.,]*\d)\s*m(?![²2³])/u', $t, $m, PREG_SET_ORDER);
+    $east = []; $north = [];
+    foreach ($m as $x) {
+        $val = brNumero($x[1]);
+        $ip = floor(abs($val));
+        if ($ip >= 100000 && $ip <= 999999) $east[] = $val;       // Easting
+        elseif ($ip >= 1000000 && $ip <= 99999999) $north[] = $val; // Northing
+    }
+    $n = min(count($east), count($north));
+    $pts = [];
+    for ($i = 0; $i < $n; $i++) {
+        $g = utmToGeo($east[$i], $north[$i], $zone, $south);
+        if ($g[0] >= -90 && $g[0] <= 90 && $g[1] >= -180 && $g[1] <= 180) $pts[] = [$g[0], $g[1]];
+    }
+    return ['pts' => $pts, 'e_count' => count($east), 'n_count' => count($north)];
+}
+
 /** Monta o pacote a partir do texto de um memorial descritivo (GMS). */
 function buildGeoData($memorial) {
-    $res = extractGeoCoordinates($memorial);
-    $data = buildGeoDataFromPoints($res['pts']);
+    $res = extractGeoCoordinates($memorial);   // 1º tenta GMS (Long/Lat)
+    $pts = $res['pts'];
+    $fonte = 'gms';
+    if (count($pts) < 3) {                       // 2º tenta UTM (E/N em metros)
+        $utm = extractUTMCoordinates($memorial);
+        if (count($utm['pts']) >= 3) { $pts = $utm['pts']; $fonte = 'utm'; }
+    }
+    $data = buildGeoDataFromPoints($pts);
     $data['lon_count'] = $res['lon_count'];
     $data['lat_count'] = $res['lat_count'];
+    $data['fonte_coord'] = $fonte;
     return $data;
 }
 
@@ -1309,7 +1383,7 @@ function geminiPromptMatricula() {
         . "\"cif\": número CIF, se houver,\n"
         . "\"classifica\": \"1\" se o imóvel for georreferenciado e CERTIFICADO pelo INCRA (ou urbano com ART), \"2\" se georreferenciado sem certificação, \"3\" se apenas desenho/sem georreferenciamento,\n"
         . "\"onr_numero_prenotacao\": número do PROTOCOLO ou da PRENOTAÇÃO da matrícula — procure por 'protocolo', 'prenotação' ou 'prenot' (ex.: 'sob protocolo n° 10.676' => 10676). Sempre existe; retorne apenas o número,\n"
-        . "\"memorial\": transcreva o texto INTEGRAL da descrição do perímetro (a parte que começa em algo como 'Inicia-se a descrição deste imóvel no vértice...' e segue por todos os vértices até voltar ao ponto inicial), mantendo EXATAMENTE todas as Longitudes e Latitudes em graus, minutos e segundos como aparecem no documento (não converta, não arredonde, não omita vértices)\n"
+        . "\"memorial\": transcreva o texto INTEGRAL da descrição do perímetro (a parte que começa em algo como 'Inicia-se a descrição deste imóvel/perímetro no vértice...' e segue por todos os vértices até voltar ao ponto inicial), mantendo EXATAMENTE todas as coordenadas de cada vértice como aparecem no documento — sejam Longitude/Latitude em graus-minutos-segundos, OU coordenadas UTM 'E ... m' e 'N ... m' em metros (não converta, não arredonde, não omita vértices)\n"
         . "}";
 }
 /* Chama a API do Gemini com o PDF e retorna os dados extraídos. */
@@ -1614,7 +1688,7 @@ if (isset($_POST['acao'])) {
             $memorial = (string)($d['memorial'] ?? '');
             $geo = buildGeoData($memorial);
             if (empty($geo['ok'])) {
-                echo json_encode(['ok' => false, 'erro' => 'A matrícula ' . $matricula . ' não está cadastrada e não foi possível extrair as coordenadas do memorial no PDF (vértices encontrados: ' . (int)($geo['num_vertices'] ?? 0) . '). Verifique se o PDF contém a descrição do perímetro com Longitude/Latitude.']);
+                echo json_encode(['ok' => false, 'erro' => 'A matrícula ' . $matricula . ' não está cadastrada e não foi possível extrair as coordenadas do memorial no PDF (vértices encontrados: ' . (int)($geo['num_vertices'] ?? 0) . '). Verifique se o PDF contém a descrição do perímetro com coordenadas (Longitude/Latitude em GMS ou UTM E/N em metros).']);
                 exit;
             }
             $identificador = trim((string)($d['nome_imo'] ?? '')); if ($identificador === '') $identificador = $matricula;
