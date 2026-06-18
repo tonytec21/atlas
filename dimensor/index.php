@@ -1725,6 +1725,38 @@ if (isset($_POST['acao'])) {
             }
             $tipo = ($numMatricula !== '') ? 'matricula' : 'nome';
 
+            // DEDUPLICAÇÃO: se a matrícula já está cadastrada, NÃO cria um novo
+            // registro (evita polígono duplicado/sobreposição). Apenas complementa
+            // as informações do registro existente — mesmo comportamento do fluxo
+            // de processamento de PDF. A geometria gravada é preservada.
+            if ($numMatricula !== '') {
+                $idExistente = acharMemorialPorMatricula($conn, $numMatricula);
+                if ($idExistente) {
+                    $imovelId = findImovelIdByMatricula($conn, $numMatricula);
+                    // só atualiza o que veio preenchido (não apaga dados já existentes)
+                    $sets = []; $vals = []; $types = '';
+                    if ($identificador !== '') { $sets[] = 'identificador=?';     $vals[] = $identificador; $types .= 's'; }
+                    $sets[] = 'tipo_identificador=?'; $vals[] = 'matricula'; $types .= 's';
+                    if ($proprietario !== '') { $sets[] = 'proprietario=?';        $vals[] = $proprietario;  $types .= 's'; }
+                    if ($cpf !== '')          { $sets[] = 'cpf=?';                 $vals[] = $cpf;           $types .= 's'; }
+                    if ($tipoImovel !== '')   { $sets[] = 'tipo_imovel=?';         $vals[] = $tipoImovel;    $types .= 's'; }
+                    if ($imovelId !== null)   { $sets[] = 'imovel_id=?';           $vals[] = $imovelId;      $types .= 'i'; }
+                    if (!empty($sets)) {
+                        $vals[] = $idExistente; $types .= 'i';
+                        $stmt = $conn->prepare("UPDATE memoriais_mapeados SET " . implode(', ', $sets) . " WHERE id = ?");
+                        if ($stmt) { $stmt->bind_param($types, ...$vals); $stmt->execute(); }
+                    }
+                    // complementa os campos ONR enviados junto (se houver)
+                    salvarCamposOnr($conn, $idExistente, $_POST);
+                    echo json_encode([
+                        'ok' => true, 'existe' => true, 'atualizado' => true, 'criado' => false,
+                        'id' => $idExistente, 'imovel_id' => $imovelId,
+                        'mensagem' => 'A matrícula ' . $numMatricula . ' já estava cadastrada — as informações foram complementadas, sem duplicar o polígono no mapa.'
+                    ], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            }
+
             $data = processarFonte($origem, $fonte);
             if (!$data['ok']) {
                 $legs = ($origem === 'kml') ? [] : extractTraverseLegs($fonte);
@@ -1962,6 +1994,15 @@ if (isset($_POST['acao'])) {
             if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
             if ($identificador === '' && $numMatricula !== '') $identificador = $numMatricula;
             if ($identificador === '') { echo json_encode(['ok' => false, 'erro' => 'Informe a identificação ou a matrícula.']); exit; }
+
+            // não permite atribuir uma matrícula que já pertence a OUTRO imóvel
+            if ($numMatricula !== '') {
+                $dono = acharMemorialPorMatricula($conn, $numMatricula);
+                if ($dono && $dono !== $id) {
+                    echo json_encode(['ok' => false, 'erro' => 'Já existe outro imóvel cadastrado com a matrícula ' . $numMatricula . ' (registro #' . $dono . '). Não é possível duplicar o número da matrícula.']);
+                    exit;
+                }
+            }
 
             $tipo = ($numMatricula !== '') ? 'matricula' : 'nome';
             $imovelId = ($numMatricula !== '') ? findImovelIdByMatricula($conn, $numMatricula) : null;
@@ -2541,13 +2582,14 @@ if (isset($_POST['acao'])) {
     display:none;align-items:center;justify-content:center;padding:18px}
   .modal-ov.show{display:flex}
   .modal-card{width:100%;max-width:440px;background:var(--panel);color:var(--ink);border:1px solid var(--line);
-    border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;animation:modalIn .18s ease}
+    border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;animation:modalIn .18s ease;
+    display:flex;flex-direction:column;max-height:calc(100vh - 36px)}
   @keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
   .modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line)}
   .modal-h h3{margin:0;font-size:15px;font-weight:600}
   .modal-x{background:none;border:none;color:var(--faint);font-size:22px;line-height:1;cursor:pointer}
   .modal-x:hover{color:var(--red-bright)}
-  .modal-b{padding:18px;display:flex;flex-direction:column;gap:12px}
+  .modal-b{padding:18px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
   .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .modal-f{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);justify-content:flex-end}
   .modal-f .btn-primary,.modal-f .btn-ghost{width:auto;padding:9px 16px}
@@ -2922,6 +2964,71 @@ if (isset($_POST['acao'])) {
           </div>
           <p class="cor-hint" id="ed-sit-hint"></p>
         </div>
+      </div>
+
+      <!-- Dados para o Mapa ONR (recolhível, igual ao painel lateral) -->
+      <div class="onr-box">
+        <details class="onr-accordion ed-onr">
+          <summary class="onr-summary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            Dados para o Mapa ONR
+            <span class="onr-hint-active">— opcional</span>
+          </summary>
+          <div class="onr-body">
+            <?php foreach (onrGrupos() as $grupo => $campos): ?>
+              <details class="onr-sub" open>
+                <summary><?= htmlspecialchars($grupo) ?></summary>
+                <div class="form-grid">
+                  <?php foreach ($campos as $col => $meta): list($rot, $tp, $ph) = $meta; ?>
+                    <div class="fld grid-2">
+                      <label class="field-label"><?= htmlspecialchars($rot) ?></label>
+                      <input id="eonr_<?= $col ?>" data-eonr="<?= $col ?>" type="text" placeholder="<?= htmlspecialchars($ph) ?>">
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              </details>
+            <?php endforeach; ?>
+
+            <details class="onr-sub" open>
+              <summary>Classificação e parâmetros de envio</summary>
+              <div class="form-grid">
+                <div class="fld grid-2">
+                  <label class="field-label">Classificação (CLASSIFICA)</label>
+                  <select id="eonr_classifica" data-eonr="classifica">
+                    <option value="">—</option>
+                    <option value="1">A — georref. rural certificado / urbano com ART</option>
+                    <option value="2">B — georreferenciado sem certificação</option>
+                    <option value="3">C — desenho sobre imagem de satélite</option>
+                  </select>
+                </div>
+                <div class="fld">
+                  <label class="field-label">Nível de publicidade</label>
+                  <select id="eonr_onr_nivel_publicidade" data-eonr="onr_nivel_publicidade">
+                    <option value="">—</option>
+                    <option value="1">1 — Somente quem enviou</option>
+                    <option value="2">2 — Somente a serventia</option>
+                    <option value="3">3 — Todos oficiais (internet)</option>
+                    <option value="4">4 — Público geral (internet)</option>
+                  </select>
+                </div>
+                <div class="fld grid-2">
+                  <label class="field-label">Classificação da importação</label>
+                  <select id="eonr_onr_classificacao" data-eonr="onr_classificacao">
+                    <option value="">—</option>
+                    <option value="1">1 — Geral</option><option value="2">2 — Loteamento</option>
+                    <option value="3">3 — Usucapião</option><option value="4">4 — Retificação</option>
+                    <option value="5">5 — REURB</option><option value="6">6 — Definido pelo RI1</option>
+                    <option value="7">7 — Definido pelo RI2</option><option value="8">8 — Estrangeiro</option>
+                    <option value="9">9 — Fusão</option><option value="10">10 — Desmembramento</option>
+                  </select>
+                </div>
+                <div class="fld grid-2"><label class="field-label">Número da prenotação</label><input id="eonr_onr_numero_prenotacao" data-eonr="onr_numero_prenotacao" type="text" placeholder="Ex.: 2024-54321"></div>
+                <div class="fld grid-2"><label class="field-label">Descrição da importação</label><input id="eonr_onr_descricao" data-eonr="onr_descricao" type="text" placeholder="Ex.: Importação do polígono ..."></div>
+              </div>
+            </details>
+            <p class="cor-hint">Esses dados alimentam o shapefile e o envio ao Mapa do Registro de Imóveis (ONR) e são gravados junto ao clicar em “Salvar alterações”.</p>
+          </div>
+        </details>
       </div>
     </div>
     <div class="modal-f">
@@ -3978,7 +4085,7 @@ function edAddProp(){ edProps.push({nome:'',doc:''}); edRenderProps();
   const wrap=document.getElementById('ed-prop-list'); if(wrap){ const ins=wrap.querySelectorAll('.prop-nome'); if(ins.length) ins[ins.length-1].focus(); }
 }
 
-function abrirEdicao(id){
+async function abrirEdicao(id){
   const it = imoveisCache.find(x=>String(x.id)===String(id));
   if(!it) return;
   document.getElementById('ed-id').value = it.id;
@@ -3999,7 +4106,27 @@ function abrirEdicao(id){
   edSucList = (it.matricula_sucessora||'').split(',').map(s=>s.trim()).filter(Boolean);
   edRenderSucChips();
   edToggleEnc();
+  edPreencherOnr(null);            // limpa enquanto busca o registro completo
   document.getElementById('modal-edit').classList.add('show');
+  // os dados ONR completos não vêm na listagem enxuta: busca o registro inteiro
+  try {
+    const res = await post({acao:'carregar', id});
+    if(res && res.ok && res.registro) edPreencherOnr(res.registro);
+  } catch(e){ /* mantém os valores padrão */ }
+}
+const EONR_PADRAO = {onr_nivel_publicidade:'3', onr_classificacao:'1'};
+function edPreencherOnr(reg){
+  document.querySelectorAll('[data-eonr]').forEach(el=>{
+    const col = el.getAttribute('data-eonr');
+    let v = (reg && reg[col]!=null && reg[col]!=='') ? reg[col] : '';
+    if(v==='' && EONR_PADRAO[col]!==undefined) v = EONR_PADRAO[col];
+    el.value = v;
+  });
+}
+function edColetarOnr(){
+  const o = {};
+  document.querySelectorAll('[data-eonr]').forEach(el=>{ o[el.getAttribute('data-eonr')] = el.value.trim(); });
+  return o;
 }
 let edSucList = [];
 function edRenderSucChips(){
@@ -4036,13 +4163,13 @@ async function salvarEdicao(){
   if(invalidos.length){ setStatus('err','Documento inválido: '+invalidos.map(p=>p.doc).join(', ')+'. Corrija para salvar.'); return; }
   const proprietario = props.map(p=>p.nome).join(', ');
   const cpf = props.map(p=>p.doc).join(', ');
-  const r = await post({acao:'atualizar_imovel', id,
+  const r = await post(Object.assign({acao:'atualizar_imovel', id,
     identificador: document.getElementById('ed-identificador').value.trim(),
     numero_matricula: document.getElementById('ed-matricula').value.trim(),
     proprietario: proprietario,
     cpf: cpf,
     tipo_imovel: document.getElementById('ed-tipo').value
-  });
+  }, edColetarOnr()));
   if(!r.ok){ setStatus('err', r.erro||'Falha ao atualizar.'); return; }
   // salva a situação: ativa | encerrada(unificação) | desmembramento(parcial, mãe ativa)
   const sv = document.getElementById('ed-situacao').value;
