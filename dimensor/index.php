@@ -1308,6 +1308,7 @@ function geminiPromptMatricula() {
         . "\"rip\": número RIP, se houver,\n"
         . "\"cif\": número CIF, se houver,\n"
         . "\"classifica\": \"1\" se o imóvel for georreferenciado e CERTIFICADO pelo INCRA (ou urbano com ART), \"2\" se georreferenciado sem certificação, \"3\" se apenas desenho/sem georreferenciamento,\n"
+        . "\"onr_numero_prenotacao\": número do PROTOCOLO ou da PRENOTAÇÃO da matrícula — procure por 'protocolo', 'prenotação' ou 'prenot' (ex.: 'sob protocolo n° 10.676' => 10676). Sempre existe; retorne apenas o número,\n"
         . "\"memorial\": transcreva o texto INTEGRAL da descrição do perímetro (a parte que começa em algo como 'Inicia-se a descrição deste imóvel no vértice...' e segue por todos os vértices até voltar ao ponto inicial), mantendo EXATAMENTE todas as Longitudes e Latitudes em graus, minutos e segundos como aparecem no documento (não converta, não arredonde, não omita vértices)\n"
         . "}";
 }
@@ -1590,6 +1591,12 @@ if (isset($_POST['acao'])) {
             $id = acharMemorialPorMatricula($conn, $matricula);
             if ($id) {
                 // JÁ EXISTE -> apenas complementa os dados (não altera a geometria)
+                $cur = $conn->query("SELECT onr_descricao, onr_numero_prenotacao FROM memoriais_mapeados WHERE id = " . (int)$id . " LIMIT 1");
+                $cur = $cur ? $cur->fetch_assoc() : [];
+                // não sobrescreve prenotação já preenchida manualmente
+                if (trim((string)($cur['onr_numero_prenotacao'] ?? '')) !== '') unset($d['onr_numero_prenotacao']);
+                // descrição da importação: padrão quando ainda não houver
+                if (trim((string)($cur['onr_descricao'] ?? '')) === '' && trim((string)($d['onr_descricao'] ?? '')) === '') $d['onr_descricao'] = 'Importação de polígonos';
                 aplicarDadosMatricula($conn, $id, $d);
                 $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
                 echo json_encode([
@@ -1613,6 +1620,8 @@ if (isset($_POST['acao'])) {
             $cpf = trim((string)($d['cpf'] ?? ''));
             $imovelId = findImovelIdByMatricula($conn, $matricula);
             $novoId = inserirMemorial($conn, $identificador, 'matricula', 'memorial', $imovelId, $memorial, $geo, $matricula, $proprietario, $cpf, $tipoImovel);
+            // descrição da importação: padrão quando não houver
+            if (trim((string)($d['onr_descricao'] ?? '')) === '') $d['onr_descricao'] = 'Importação de polígonos';
             // grava os demais campos ONR extraídos
             salvarCamposOnr($conn, $novoId, $d);
             $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
