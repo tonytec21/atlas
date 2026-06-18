@@ -205,8 +205,11 @@ function buildGeoDataFromPoints($pts) {
 /** Converte um número no formato brasileiro (1.234.567,89) para float, tolerante a OCR. */
 function brNumero($s) {
     $s = trim((string)$s);
-    if (strpos($s, ',') !== false) {
-        $pos = strrpos($s, ',');
+    // separador decimal = o ÚLTIMO ',' ou '.' do número (tolera OCR que troca ',' por '.')
+    $posC = strrpos($s, ',');
+    $posD = strrpos($s, '.');
+    $pos = max($posC === false ? -1 : $posC, $posD === false ? -1 : $posD);
+    if ($pos >= 0) {
         $int = preg_replace('/\D/', '', substr($s, 0, $pos));
         $dec = preg_replace('/\D/', '', substr($s, $pos + 1));
         return (float)(($int === '' ? '0' : $int) . '.' . ($dec === '' ? '0' : $dec));
