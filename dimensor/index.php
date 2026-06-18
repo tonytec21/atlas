@@ -81,6 +81,29 @@ function normalizeGeoText($text) {
     return $text;
 }
 
+/**
+ * Extrai coordenadas GMS SEM rótulo (tabela SIGEF: colunas Longitude/Latitude).
+ * Exige o sinal NEGATIVO (coordenadas BR são negativas) — azimutes são positivos,
+ * então não são confundidos. Classifica por grandeza: |grau|>=20 = longitude.
+ */
+function extractGeoCoordinatesTabela($rawText) {
+    $t = normalizeGeoText($rawText);
+    preg_match_all('/(-\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"/u', $t, $m, PREG_SET_ORDER);
+    $lons = []; $lats = [];
+    foreach ($m as $x) {
+        $deg = abs((float) preg_replace('/[^\d]/', '', $x[1]));
+        $val = dmsToDecimal($x[1], $x[2], $x[3]);
+        if ($deg >= 20) $lons[] = $val; else $lats[] = $val;
+    }
+    $n = min(count($lons), count($lats));
+    $pts = [];
+    for ($i = 0; $i < $n; $i++) {
+        $lat = $lats[$i]; $lng = $lons[$i];
+        if ($lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) $pts[] = [$lat, $lng];
+    }
+    return ['pts' => $pts, 'lon_count' => count($lons), 'lat_count' => count($lats)];
+}
+
 /** Converte Graus/Minutos/Segundos para grau decimal. */
 function dmsToDecimal($deg, $min, $sec) {
     $negative = strpos((string)$deg, '-') !== false;
@@ -289,16 +312,20 @@ function extractTraverseLegs($text) {
 
 /** Monta o pacote a partir do texto de um memorial descritivo (GMS). */
 function buildGeoData($memorial) {
-    $res = extractGeoCoordinates($memorial);   // 1º tenta GMS (Long/Lat)
+    $res = extractGeoCoordinates($memorial);   // 1º GMS rotulado (Longitude:/Latitude:)
     $pts = $res['pts'];
     $fonte = 'gms';
-    if (count($pts) < 3) {                       // 2º tenta UTM (E/N em metros)
+    if (count($pts) < 3) {                       // 2º GMS sem rótulo (tabela SIGEF/INCRA)
+        $tab = extractGeoCoordinatesTabela($memorial);
+        if (count($tab['pts']) >= 3) { $pts = $tab['pts']; $fonte = 'gms_tabela'; $res = $tab; }
+    }
+    if (count($pts) < 3) {                        // 3º UTM (E/N em metros)
         $utm = extractUTMCoordinates($memorial);
         if (count($utm['pts']) >= 3) { $pts = $utm['pts']; $fonte = 'utm'; }
     }
     $data = buildGeoDataFromPoints($pts);
-    $data['lon_count'] = $res['lon_count'];
-    $data['lat_count'] = $res['lat_count'];
+    $data['lon_count'] = $res['lon_count'] ?? 0;
+    $data['lat_count'] = $res['lat_count'] ?? 0;
     $data['fonte_coord'] = $fonte;
     return $data;
 }
@@ -1376,6 +1403,7 @@ function geminiPromptMatricula() {
         . "Use string vazia quando não encontrar. Não invente dados.\n"
         . "{\n"
         . "\"nome_imo\": denominação do imóvel (ex.: FAZENDA AGRO TRÊS IRMÃOS),\n"
+        . "\"numero_matricula\": número da matrícula do imóvel, se constar (ex.: 'Matrícula do imóvel: 873' => 873),\n"
         . "\"tipo_imovel\": \"rural\" ou \"urbano\",\n"
         . "\"dat_mat\": data de abertura/registro da matrícula (dd/mm/aaaa),\n"
         . "\"liv_mat\": número do livro,\n"
@@ -1401,7 +1429,7 @@ function geminiPromptMatricula() {
         . "\"cif\": número CIF, se houver,\n"
         . "\"classifica\": \"1\" se o imóvel for georreferenciado e CERTIFICADO pelo INCRA (ou urbano com ART), \"2\" se georreferenciado sem certificação, \"3\" se apenas desenho/sem georreferenciamento,\n"
         . "\"onr_numero_prenotacao\": número do PROTOCOLO ou da PRENOTAÇÃO da matrícula — procure por 'protocolo', 'prenotação' ou 'prenot' (ex.: 'sob protocolo n° 10.676' => 10676). Sempre existe; retorne apenas o número,\n"
-        . "\"memorial\": transcreva o texto INTEGRAL da descrição do perímetro (a parte que começa em algo como 'Inicia-se a descrição deste imóvel/perímetro no vértice...' e segue por todos os vértices até voltar ao ponto inicial), mantendo EXATAMENTE todas as coordenadas de cada vértice como aparecem no documento — sejam Longitude/Latitude em graus-minutos-segundos, OU coordenadas UTM 'E ... m' e 'N ... m' em metros (não converta, não arredonde, não omita vértices)\n"
+        . "\"memorial\": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. Pode ser: (a) texto corrido começando em 'Inicia-se a descrição...'; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; ou (c) uma TABELA do SIGEF/INCRA com colunas Código, Longitude, Latitude — neste caso transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039\" -4°05'50,116\"'). Inclua todos os vértices; não converta, não arredonde, não omita nenhum\n"
         . "}";
 }
 /* Chama a API do Gemini com o PDF e retorna os dados extraídos. */
@@ -1684,6 +1712,14 @@ if (isset($_POST['acao'])) {
             if (!$r['ok']) { echo json_encode($r); exit; }
             $d = $r['dados'];
             enriquecerCepExtraido($d); // valida/completa CEP via ViaCEP (cadastro e complemento)
+            // matrícula efetiva: se o nome do arquivo não for um número limpo (ex.: UUID do SIGEF),
+            // usa a matrícula extraída do documento.
+            $matDoc = trim((string)($d['numero_matricula'] ?? ''));
+            if (!preg_match('/^\d{1,8}$/', $matricula) && $matDoc !== '') $matricula = preg_replace('/\D/', '', $matDoc);
+            if ($matricula === '' || !preg_match('/\d/', $matricula)) {
+                echo json_encode(['ok' => false, 'erro' => 'Não foi possível identificar o número da matrícula (nem no nome do arquivo nem no documento). Renomeie o PDF com o número da matrícula.']);
+                exit;
+            }
 
             $id = acharMemorialPorMatricula($conn, $matricula);
             if ($id) {
@@ -2618,7 +2654,7 @@ if (isset($_POST['acao'])) {
       <div class="kml-zone ia" id="pdf-mat-zone">
         <input type="file" id="pdf-mat-file" accept="application/pdf,.pdf" hidden>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15h6M9 18h4"></path></svg>
-        <span id="pdf-mat-label">Matrícula em <b>PDF</b> — cadastrar/complementar via IA</span>
+        <span id="pdf-mat-label">Matrícula ou <b>SIGEF</b> em PDF — mapear via IA</span>
       </div>
       <button type="button" class="link-config" id="btn-gemini-config">⚙ Configurar IA (Gemini)</button>
 
@@ -3999,10 +4035,9 @@ async function salvarConfigOnr(){
 async function enviarPdfMatricula(file){
   if(!file) return;
   const mat = file.name.replace(/\.pdf$/i,'').trim();
-  if(!/[0-9]/.test(mat)){ setStatus('err','Nomeie o PDF com o número da matrícula (ex.: 2470.pdf).'); return; }
   const lbl=document.getElementById('pdf-mat-label');
-  if(lbl) lbl.innerHTML='Processando matrícula <b>'+mat+'</b>…';
-  setStatus('warn','Conferindo matrícula '+mat+' e lendo o PDF com IA…');
+  if(lbl) lbl.innerHTML='Processando <b>'+escapeHtml(mat||'PDF')+'</b>…';
+  setStatus('warn','Lendo o PDF com IA e identificando a matrícula…');
   try{
     const fd=new FormData();
     fd.append('acao','processar_pdf_matricula');
@@ -4019,7 +4054,7 @@ async function enviarPdfMatricula(file){
       carregarImovel(r.id);
     }
   }catch(e){ setStatus('err','Falha na requisição de processamento.'); }
-  finally{ if(lbl) lbl.innerHTML='Matrícula em <b>PDF</b> — cadastrar/complementar via IA'; }
+  finally{ if(lbl) lbl.innerHTML='Matrícula ou <b>SIGEF</b> em PDF — mapear via IA'; }
 }
 let gemModels=[], gemDefault='';
 function gemRenderModels(){
