@@ -272,6 +272,21 @@ function extractUTMCoordinates($rawText, $zone = 23, $south = true) {
     return ['pts' => $pts, 'e_count' => count($east), 'n_count' => count($north)];
 }
 
+/**
+ * Detecta segmentos de "azimute + distância" (memoriais antigos por rumos/distâncias).
+ * Não georreferencia (faltam coordenadas de âncora); serve para identificar o tipo.
+ */
+function extractTraverseLegs($text) {
+    $t = normalizeGeoText($text);
+    $re = '/azimute\s*(?:de)?\s*(\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"?[^0-9]{0,40}?dist[âa]ncia\s*(?:de)?\s*([\d.,]+)\s*m/isu';
+    preg_match_all($re, $t, $m, PREG_SET_ORDER);
+    $legs = [];
+    foreach ($m as $x) {
+        $legs[] = ['az' => dmsToDecimal($x[1], $x[2], $x[3]), 'dist' => brNumero($x[4])];
+    }
+    return $legs;
+}
+
 /** Monta o pacote a partir do texto de um memorial descritivo (GMS). */
 function buildGeoData($memorial) {
     $res = extractGeoCoordinates($memorial);   // 1º tenta GMS (Long/Lat)
@@ -1574,6 +1589,11 @@ if (isset($_POST['acao'])) {
 
             $data = processarFonte($origem, $fonte);
             if (!$data['ok']) {
+                $legs = ($origem === 'kml') ? [] : extractTraverseLegs($fonte);
+                if (count($legs) >= 3) {
+                    echo json_encode(['ok' => false, 'erro' => 'Este memorial descreve o perímetro por azimutes e distâncias (' . count($legs) . ' segmentos) a partir de marcos, sem coordenadas geográficas (Long/Lat ou UTM E/N). Não é possível posicioná-lo no mapa — informe um memorial com as coordenadas dos vértices.']);
+                    exit;
+                }
                 echo json_encode(['ok' => false, 'erro' => 'A fonte não gerou um polígono válido (mínimo 3 vértices).']);
                 exit;
             }
@@ -1691,6 +1711,12 @@ if (isset($_POST['acao'])) {
             $memorial = (string)($d['memorial'] ?? '');
             $geo = buildGeoData($memorial);
             if (empty($geo['ok'])) {
+                $legs = extractTraverseLegs($memorial);
+                if (count($legs) >= 3) {
+                    $tot = array_sum(array_column($legs, 'dist'));
+                    echo json_encode(['ok' => false, 'erro' => 'A matrícula ' . $matricula . ' descreve o perímetro por AZIMUTES E DISTÂNCIAS a partir de marcos físicos (' . count($legs) . ' segmentos, ~' . number_format($tot, 0, ',', '.') . ' m de extensão), porém SEM coordenadas geográficas (Long/Lat ou UTM E/N). É um memorial antigo, não georreferenciado — não há como posicioná-lo no mapa automaticamente. Para mapear, é necessário um memorial com as coordenadas dos vértices, ou o georreferenciamento (SIGEF/INCRA) do imóvel.']);
+                    exit;
+                }
                 echo json_encode(['ok' => false, 'erro' => 'A matrícula ' . $matricula . ' não está cadastrada e não foi possível extrair as coordenadas do memorial no PDF (vértices encontrados: ' . (int)($geo['num_vertices'] ?? 0) . '). Verifique se o PDF contém a descrição do perímetro com coordenadas (Longitude/Latitude em GMS ou UTM E/N em metros).']);
                 exit;
             }
