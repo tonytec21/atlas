@@ -2377,6 +2377,7 @@ if (isset($_POST['acao'])) {
   .kml-zone.lote{margin-top:8px}
   .kml-zone.lote:hover,.kml-zone.lote.drag{border-color:#0d9488;color:var(--ink);background:rgba(13,148,136,.06)}
   .kml-zone.ia{margin-top:8px}
+  .zone-multi{font-family:var(--mono);font-size:9.5px;color:var(--faint);opacity:.85}
   .kml-zone.ia:hover,.kml-zone.ia.drag{border-color:#7c3aed;color:var(--ink);background:rgba(124,58,237,.07)}
   .link-config{display:block;width:100%;margin-top:6px;background:none;border:none;color:var(--faint);
     font-family:var(--mono);font-size:10px;cursor:pointer;text-align:left;padding:3px 1px}
@@ -2807,9 +2808,9 @@ if (isset($_POST['acao'])) {
       </div>
 
       <div class="kml-zone ia" id="pdf-mat-zone">
-        <input type="file" id="pdf-mat-file" accept="application/pdf,.pdf" hidden>
+        <input type="file" id="pdf-mat-file" accept="application/pdf,.pdf" multiple hidden>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15h6M9 18h4"></path></svg>
-        <span id="pdf-mat-label">Matrícula ou <b>SIGEF</b> em PDF — mapear via IA</span>
+        <span id="pdf-mat-label">Matrícula ou <b>SIGEF</b> em PDF — mapear via IA <span class="zone-multi">(1 ou vários)</span></span>
       </div>
       <button type="button" class="link-config" id="btn-gemini-config">⚙ Configurar IA (Gemini)</button>
 
@@ -4294,7 +4295,57 @@ async function enviarPdfMatricula(file){
       carregarImovel(r.id);
     }
   }catch(e){ setStatus('err','Falha na requisição de processamento.'); }
-  finally{ if(lbl) lbl.innerHTML='Matrícula ou <b>SIGEF</b> em PDF — mapear via IA'; }
+  finally{ if(lbl) lbl.innerHTML='Matrícula ou <b>SIGEF</b> em PDF — mapear via IA <span class="zone-multi">(1 ou vários)</span>'; }
+}
+
+/* Processa VÁRIOS PDFs em fila (sequencial — respeita o limite/ordem da IA). */
+async function enviarLotePdfMatricula(fileList){
+  const arr = Array.from(fileList||[]).filter(f=>/\.pdf$/i.test(f.name) || f.type==='application/pdf');
+  if(!arr.length){ setStatus('err','Selecione um ou mais arquivos .pdf.'); return; }
+  if(arr.length===1){ return enviarPdfMatricula(arr[0]); }   // 1 só: usa o fluxo individual
+
+  const lbl=document.getElementById('pdf-mat-label');
+  const restaurarLbl=()=>{ if(lbl) lbl.innerHTML='Matrícula ou <b>SIGEF</b> em PDF — mapear via IA <span class="zone-multi">(1 ou vários)</span>'; };
+  let criadas=0, complementadas=0; const falhas=[], avisos=[];
+
+  for(let i=0;i<arr.length;i++){
+    const f=arr[i];
+    const mat=f.name.replace(/\.pdf$/i,'').trim();
+    if(lbl) lbl.innerHTML=`Processando <b>${i+1}/${arr.length}</b> — ${escapeHtml(mat||'PDF')}…`;
+    setStatus('warn', `Lote IA: ${i+1}/${arr.length} — lendo “${escapeHtml(mat||f.name)}” com IA…`);
+    try{
+      const fd=new FormData();
+      fd.append('acao','processar_pdf_matricula');
+      fd.append('matricula', mat);
+      fd.append('pdf', f);
+      const r = await fetch(window.location.pathname, {method:'POST', body:fd}).then(x=>x.json());
+      if(!r || !r.ok){
+        const erro=(r&&r.erro)||'falha';
+        falhas.push((mat||f.name)+': '+erro);
+        // sem a chave da IA configurada não adianta seguir o lote
+        if(/Configure a chave da API|chave da API do Gemini/i.test(erro)){
+          restaurarLbl();
+          setStatus('err','Configure a chave da API do Gemini antes de processar o lote.');
+          await carregarLista();
+          return;
+        }
+        continue;
+      }
+      if(r.criado) criadas++; else complementadas++;
+      if(r.aviso_geometria) avisos.push(r.matricula||mat);
+    }catch(e){ falhas.push((mat||f.name)+': erro de requisição'); }
+  }
+
+  restaurarLbl();
+  await carregarLista();
+  if(typeof modo!=='undefined' && modo==='overview') verTodos();
+
+  let msg = `Lote IA concluído: ${criadas} matrícula(s) mapeada(s)`
+          + (complementadas?`, ${complementadas} complementada(s)`:'')
+          + ` de ${arr.length}.`;
+  if(avisos.length) msg += ` Geometria reconstruída (confira): ${avisos.slice(0,5).join(', ')}${avisos.length>5?'…':''}.`;
+  if(falhas.length) msg += ' Não cadastradas: ' + falhas.slice(0,4).join(' | ') + (falhas.length>4?' …':'');
+  setStatus(falhas.length?'warn':'ok', msg);
 }
 let gemModels=[], gemDefault='';
 function gemRenderModels(){
@@ -4520,10 +4571,10 @@ function verificarPertencimento(geo){
   const pz=document.getElementById('pdf-mat-zone'); const pf=document.getElementById('pdf-mat-file');
   if(pz && pf){
     pz.onclick=()=>pf.click();
-    pf.onchange=e=>{ if(e.target.files && e.target.files[0]) enviarPdfMatricula(e.target.files[0]); e.target.value=''; };
+    pf.onchange=e=>{ const fs=e.target.files; if(fs && fs.length){ fs.length>1 ? enviarLotePdfMatricula(fs) : enviarPdfMatricula(fs[0]); } e.target.value=''; };
     ['dragover','dragenter'].forEach(ev=>pz.addEventListener(ev,e=>{e.preventDefault();pz.classList.add('drag');}));
     ['dragleave','drop'].forEach(ev=>pz.addEventListener(ev,e=>{e.preventDefault();pz.classList.remove('drag');}));
-    pz.addEventListener('drop', e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) enviarPdfMatricula(f); });
+    pz.addEventListener('drop', e=>{ const fs=e.dataTransfer.files; if(fs && fs.length){ fs.length>1 ? enviarLotePdfMatricula(fs) : enviarPdfMatricula(fs[0]); } });
   }
   const bgem=document.getElementById('btn-gemini-config'); if(bgem) bgem.addEventListener('click', abrirConfigGemini);
   const gadd=document.getElementById('gem-model-add'); if(gadd) gadd.addEventListener('click', gemAddModel);
