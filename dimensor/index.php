@@ -1643,7 +1643,8 @@ if (isset($_POST['acao'])) {
 
     try {
         if ($acao === 'ibge_municipios') {
-            $uf = strtoupper(preg_replace('/[^A-Za-z]/', '', (string)($_POST['uf'] ?? '')));
+            // aceita UF por sigla (MA) ou por código IBGE do estado (21) — ambos funcionam na API
+            $uf = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)($_POST['uf'] ?? '')));
             if ($uf === '') { echo json_encode(['ok' => false, 'erro' => 'UF não informada.']); exit; }
             $url = 'https://servicodados.ibge.gov.br/api/v1/localidades/estados/' . rawurlencode($uf) . '/municipios?orderBy=nome';
             $err = '';
@@ -1656,6 +1657,26 @@ if (isset($_POST['acao'])) {
                 if (isset($m['id'], $m['nome'])) $out[] = ['id' => (int)$m['id'], 'nome' => (string)$m['nome']];
             }
             echo json_encode(['ok' => true, 'municipios' => $out], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'ibge_malha_uf') {
+            // Malha do ESTADO subdividida por município (cada feature traz codarea = código do município).
+            // Usada para identificar, por ponto-em-polígono, qual município vizinho pega parte do imóvel.
+            $uf = preg_replace('/\D/', '', (string)($_POST['uf'] ?? ''));
+            if ($uf === '') { echo json_encode(['ok' => false, 'erro' => 'UF não informada.']); exit; }
+            $base = 'https://servicodados.ibge.gov.br/api/v3/malhas/estados/' . rawurlencode($uf)
+                  . '?formato=application/vnd.geo%2Bjson&intrarregiao=municipio';
+            $err = '';
+            $geo = httpGetText($base . '&qualidade=2', $err);   // qualidade 2 = leve, suficiente p/ identificar
+            if ($geo === false) {
+                $err2 = '';
+                $geo = httpGetText($base, $err2);
+                if ($geo === false) { echo json_encode(['ok' => false, 'erro' => 'Falha ao obter a malha estadual no IBGE: ' . $err]); exit; }
+            }
+            $gj = json_decode($geo, true);
+            if (!is_array($gj) || !isset($gj['type'])) { echo json_encode(['ok' => false, 'erro' => 'GeoJSON estadual inválido do IBGE.']); exit; }
+            echo json_encode(['ok' => true, 'geojson' => $gj], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -2199,7 +2220,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-vizinho-munic (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-vizinho-ibge (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3156,7 +3177,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-vizinho-munic','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-vizinho-ibge','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4586,26 +4607,50 @@ function limparFora(){
   foraLabels.forEach(l=>{ try{ l.setMap(null); }catch(e){} }); foraLabels=[];
 }
 function normNomeMun(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-// reverse geocoding de 1 ponto -> { municipio, uf } (usa o Geocoder do Google já carregado)
-function municipioDoPonto(lat,lng){
-  return new Promise(resolve=>{
-    if(!window.google || !google.maps || !google.maps.Geocoder){ resolve(null); return; }
-    try{
-      new google.maps.Geocoder().geocode({location:{lat,lng}, language:'pt-BR'}, (res,status)=>{
-        if(status!=='OK' || !res || !res.length){ resolve(null); return; }
-        let mun='', uf='';
-        for(const r of res){
-          for(const c of (r.address_components||[])){
-            const t=c.types||[];
-            if(!mun && t.includes('administrative_area_level_2')) mun=c.long_name;
-            if(!uf  && t.includes('administrative_area_level_1')) uf=c.short_name;
-          }
-          if(mun) break;
-        }
-        resolve(mun ? {municipio:mun, uf:uf} : null);
-      });
-    }catch(e){ resolve(null); }
-  });
+
+// Cache da malha estadual (features por município) e dos nomes, por código de UF (2 dígitos)
+let _malhaUF={cod:'', feats:null}, _muniUF={cod:'', mapa:null};
+
+async function carregarMalhaUF(ufCod){
+  if(_malhaUF.cod===ufCod && _malhaUF.feats) return _malhaUF.feats;
+  const r = await post({acao:'ibge_malha_uf', uf:ufCod});
+  if(!r.ok || !r.geojson) return null;
+  const fc = r.geojson;
+  const feats = [];
+  const lista = (fc.type==='FeatureCollection') ? (fc.features||[]) : (fc.type==='Feature' ? [fc] : []);
+  for(const f of lista){
+    if(!f.geometry) continue;
+    const cod = String((f.properties&&(f.properties.codarea||f.properties.CD_MUN||f.properties.codigo))||'').replace(/\D/g,'');
+    feats.push({cod, feat:f});
+  }
+  _malhaUF={cod:ufCod, feats};
+  return feats;
+}
+async function carregarMunicipiosUF(ufCod){
+  if(_muniUF.cod===ufCod && _muniUF.mapa) return _muniUF.mapa;
+  const r = await post({acao:'ibge_municipios', uf:ufCod});
+  const mapa = {};
+  if(r.ok && Array.isArray(r.municipios)) r.municipios.forEach(m=>{ mapa[String(m.id)] = m.nome; });
+  _muniUF={cod:ufCod, mapa};
+  return mapa;
+}
+// Identifica o município que contém um ponto, via IBGE (sem Google Geocoding)
+async function municipioDoPontoIBGE(lat,lng,ufCod){
+  if(!ufCod) return null;
+  let feats, mapa;
+  try{ feats = await carregarMalhaUF(ufCod); }catch(e){ feats=null; }
+  if(!feats || !feats.length) return null;
+  try{ mapa = await carregarMunicipiosUF(ufCod); }catch(e){ mapa={}; }
+  const pt = turf.point([lng,lat]);
+  for(const it of feats){
+    let dentro=false;
+    try{ dentro = turf.booleanPointInPolygon(pt, it.feat); }catch(e){}
+    if(dentro){
+      const nome = (mapa && mapa[it.cod]) ? mapa[it.cod] : null;
+      return { municipio: nome, codigo: it.cod };
+    }
+  }
+  return null;
 }
 // Identifica e indica o(s) município(s) vizinho(s) na parte do imóvel que fica fora do limite
 async function detectarVizinhos(prop){
@@ -4629,6 +4674,11 @@ async function detectarVizinhos(prop){
     else if(g.type==='MultiPolygon') g.coordinates.forEach(c=>pedacos.push(turf.polygon(c)));
   }catch(e){}
 
+  // UF (2 dígitos) derivada do código do município selecionado (1ºs 2 dígitos do código IBGE)
+  const muniSel=document.getElementById('muni-list');
+  const muniId=(muniSel && muniSel.value)?String(muniSel.value).replace(/\D/g,''):'';
+  const ufCod=muniId.length>=2 ? muniId.substring(0,2) : '';
+
   const nomes=[];
   for(const ped of pedacos){
     // ignora microslivers de borda (< 200 m²) que são só imprecisão da malha
@@ -4638,7 +4688,7 @@ async function detectarVizinhos(prop){
     try{ pt=turf.pointOnFeature(ped); }catch(e){ try{ pt=turf.centroid(ped); }catch(_){ pt=null; } }
     if(!pt) continue;
     const lng=pt.geometry.coordinates[0], lat=pt.geometry.coordinates[1];
-    const info=await municipioDoPonto(lat,lng);
+    const info=await municipioDoPontoIBGE(lat,lng,ufCod);
     const nome=info && info.municipio ? info.municipio : null;
     if(nome && normNomeMun(nome)!==normNomeMun(limiteNome)){
       if(!nomes.some(n=>normNomeMun(n)===normNomeMun(nome))) nomes.push(nome);
@@ -4657,7 +4707,7 @@ async function detectarVizinhos(prop){
     if(badge){ badge.className='muni-badge parcial'; badge.textContent=txt; badge.style.display='block'; }
     muniStatus('warn','Parte do imóvel está em: '+nomes.join(', ')+'. A área fora do município está destacada em laranja no mapa.');
   } else {
-    muniStatus('warn','O imóvel cruza o limite de '+limiteNome+', mas não foi possível identificar o município vizinho automaticamente (verifique se a API de Geocoding do Google está habilitada).');
+    muniStatus('warn','O imóvel cruza o limite de '+limiteNome+'. A parte de fora está destacada em laranja, mas não foi possível identificar o município vizinho (a parte fora pode estar em outro estado).');
   }
 }
 
