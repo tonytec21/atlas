@@ -2220,7 +2220,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-vizinho-ibge (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-filtro-lista (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2921,7 +2921,7 @@ header('Expires: 0');
       </div>
       <div class="ov-hint" id="ov-hint">Ctrl+clique (ou clique direito) nos imóveis para selecionar · clique numa sobreposição para o relatório dela</div>
       <div class="ov-search">
-        <input type="text" id="ov-busca" placeholder="Filtrar por matrícula ou identificação...">
+        <input type="text" id="ov-busca" placeholder="Filtrar... (use ; para ver só esses: 744;822;867)">
         <button id="ov-busca-clear" title="Limpar filtro">×</button>
       </div>
       <div class="ov-overlaps" id="ov-overlaps"></div>
@@ -3177,7 +3177,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-vizinho-ibge','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-filtro-lista','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -3663,7 +3663,7 @@ async function verTodos(){
     const centro = centroidOf(it.pts);
     // rótulo padrão: "Mat. <número sem zeros à esquerda>", se existir
     const mat = (it.numero_matricula||'').trim();
-    if(mat) addLabel(centro, rotuloMat(mat));
+    if(mat) it._label = addLabel(centro, rotuloMat(mat));
     // identificação do imóvel: só ao pousar o mouse ~2s
     poly.addListener('mouseover', ()=> agendarHoverTip(centro, it.identificador));
     poly.addListener('mousemove', ()=> { if(!hoverTip && !hoverTimer) agendarHoverTip(centro, it.identificador); });
@@ -3911,6 +3911,12 @@ function renderOverviewPanel(total, overlaps){
 }
 function filtrarOverlaps(){
   const termoRaw = (document.getElementById('ov-busca')?.value || '').trim();
+
+  // Modo LISTA: se a busca tem ';', mostra SOMENTE os imóveis listados no mapa
+  if(termoRaw.includes(';')){ aplicarFiltroPorLista(termoRaw); return; }
+
+  // Modo normal: restaura todos os imóveis no mapa e filtra apenas a lista de sobreposições
+  restaurarMapaCompleto();
   const termo = termoRaw.toLowerCase();
   const norm = s => (s==null?'':String(s)).toLowerCase();
   const normD = s => (s==null?'':String(s)).replace(/[^0-9a-z]/gi,'').toLowerCase();
@@ -3934,6 +3940,62 @@ function filtrarOverlaps(){
   if(btn) btn.textContent = termo ? 'Gerar relatório do imóvel filtrado (PDF)' : 'Gerar relatório de sobreposição (PDF)';
   desenharListaOverlaps(lista, termoRaw);
   agendarFocoBusca(termoRaw);
+}
+
+// Testa se um imóvel casa com um token (matrícula sem zeros à esquerda OU identificação)
+function imovelCasaToken(it, tk){
+  const t=(tk||'').trim(); if(!t) return false;
+  const tl=t.toLowerCase();
+  const tk2=matKey(t);
+  const mk=matKey(it.numero_matricula);
+  if(tk2 && (tk2===mk || (mk && mk.includes(tk2)))) return true;
+  const idn=(it.identificador==null?'':String(it.identificador)).toLowerCase();
+  if(idn.includes(tl)) return true;
+  return false;
+}
+// Mostra SOMENTE os imóveis cujas matrículas/identificações foram listadas com ';'
+function aplicarFiltroPorLista(termoRaw){
+  const tokens = termoRaw.split(';').map(s=>s.trim()).filter(Boolean);
+  const mostrados = new Set();
+  const matched = [];
+  itensOverview.forEach(it=>{
+    const ok = tokens.some(tk=>imovelCasaToken(it, tk));
+    if(it._poly)  it._poly.setMap(ok?map:null);
+    if(it._label) it._label.setMap(ok?map:null);
+    if(ok){ mostrados.add(it.id); matched.push(it); }
+  });
+  // esconde TODAS as sobreposições enquanto filtra por lista (foco só nos imóveis pedidos)
+  overlapPolys.forEach(p=>p.setMap(null));
+  // na lista do painel, mantém só sobreposições entre dois imóveis exibidos
+  const lista = overlapsAtuais.filter(o=>mostrados.has(o.a.id) && mostrados.has(o.b.id));
+  overlapsExibidos = lista;
+  const sub=document.getElementById('ov-sub');
+  if(sub) sub.textContent = `${matched.length} imóvel(is) exibido(s) · lista de ${tokens.length} item(ns)`;
+  const btn=document.getElementById('btn-relatorio');
+  if(btn) btn.textContent = lista.length ? 'Gerar relatório dos imóveis filtrados (PDF)' : 'Gerar relatório de sobreposição (PDF)';
+  desenharListaOverlaps(lista, termoRaw);
+  // ajusta o zoom para enquadrar só os imóveis exibidos
+  if(matched.length){
+    const b=new google.maps.LatLngBounds();
+    matched.forEach(it=>(it.pts||[]).forEach(p=>b.extend({lat:p[0],lng:p[1]})));
+    if(!b.isEmpty()) map.fitBounds(b, 60);
+  }
+  const semMatch = tokens.filter(tk=>!itensOverview.some(it=>imovelCasaToken(it,tk)));
+  if(matched.length){
+    setStatus(semMatch.length?'warn':'ok',
+      `${matched.length} imóvel(is) exibido(s) no mapa.` + (semMatch.length?` Não encontrado(s): ${semMatch.join(', ')}.`:''));
+  } else {
+    setStatus('warn','Nenhum imóvel encontrado para: '+tokens.join(', '));
+  }
+}
+// Restaura todos os imóveis e sobreposições no mapa (desfaz o filtro por lista)
+function restaurarMapaCompleto(){
+  if(modo!=='overview') return;
+  if(itensOverview) itensOverview.forEach(it=>{
+    if(it._poly)  it._poly.setMap(map);
+    if(it._label) it._label.setMap(map);
+  });
+  overlapPolys.forEach(p=>p.setMap(map));
 }
 let buscaFocusTimer=null;
 function agendarFocoBusca(termoRaw){
