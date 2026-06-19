@@ -2220,7 +2220,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-filtro-lista (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-filtro-sobrep (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3177,7 +3177,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-filtro-lista','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-filtro-sobrep','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -3690,8 +3690,10 @@ async function verTodos(){
           // A matrícula-mãe continua ativa; apenas este trecho fica destacado.
           if(ehDesmembramentoPar(itens[i], itens[j])){
             turfToPaths(inter.geometry).forEach(path=>{
-              overlapPolys.push(new google.maps.Polygon({paths:path,strokeColor:'#9aa3ad',
-                strokeOpacity:.55,strokeWeight:1,fillColor:'#9aa3ad',fillOpacity:.5,map:map,zIndex:4,clickable:false}));
+              const op = new google.maps.Polygon({paths:path,strokeColor:'#9aa3ad',
+                strokeOpacity:.55,strokeWeight:1,fillColor:'#9aa3ad',fillOpacity:.5,map:map,zIndex:4,clickable:false});
+              op._pair=[itens[i].id, itens[j].id]; op._tipo='morto';
+              overlapPolys.push(op);
             });
             // exceção: se o trecho cobre ~toda a matrícula-mãe, ela fica "morta" por completo
             let mae=null;
@@ -3704,8 +3706,10 @@ async function verTodos(){
           }
           const rings = turfToPaths(inter.geometry).map(path=>path.map(pt=>[pt.lat, pt.lng]));
           turfToPaths(inter.geometry).forEach(path=>{
-            overlapPolys.push(new google.maps.Polygon({paths:path,strokeColor:'#e2342f',
-              strokeOpacity:.95,strokeWeight:1.5,fillColor:'#e2342f',fillOpacity:.5,map:map,zIndex:5,clickable:false}));
+            const op = new google.maps.Polygon({paths:path,strokeColor:'#e2342f',
+              strokeOpacity:.95,strokeWeight:1.5,fillColor:'#e2342f',fillOpacity:.5,map:map,zIndex:5,clickable:false});
+            op._pair=[itens[i].id, itens[j].id]; op._tipo='conflito';
+            overlapPolys.push(op);
           });
           const c = turf.centroid(inter).geometry.coordinates;
           overlaps.push({
@@ -3964,13 +3968,18 @@ function aplicarFiltroPorLista(termoRaw){
     if(it._label) it._label.setMap(ok?map:null);
     if(ok){ mostrados.add(it.id); matched.push(it); }
   });
-  // esconde TODAS as sobreposições enquanto filtra por lista (foco só nos imóveis pedidos)
-  overlapPolys.forEach(p=>p.setMap(null));
+  // ANÁLISE DE SOBREPOSIÇÃO entre os imóveis filtrados: mostra só os destaques
+  // cujos dois imóveis estão exibidos; esconde os demais.
+  overlapPolys.forEach(p=>{
+    const pr=p._pair;
+    const vis = pr && mostrados.has(pr[0]) && mostrados.has(pr[1]);
+    p.setMap(vis?map:null);
+  });
   // na lista do painel, mantém só sobreposições entre dois imóveis exibidos
   const lista = overlapsAtuais.filter(o=>mostrados.has(o.a.id) && mostrados.has(o.b.id));
   overlapsExibidos = lista;
   const sub=document.getElementById('ov-sub');
-  if(sub) sub.textContent = `${matched.length} imóvel(is) exibido(s) · lista de ${tokens.length} item(ns)`;
+  if(sub) sub.textContent = `${matched.length} imóvel(is) · ${lista.length} sobreposição(ões) entre eles · lista de ${tokens.length} item(ns)`;
   const btn=document.getElementById('btn-relatorio');
   if(btn) btn.textContent = lista.length ? 'Gerar relatório dos imóveis filtrados (PDF)' : 'Gerar relatório de sobreposição (PDF)';
   desenharListaOverlaps(lista, termoRaw);
@@ -3982,8 +3991,11 @@ function aplicarFiltroPorLista(termoRaw){
   }
   const semMatch = tokens.filter(tk=>!itensOverview.some(it=>imovelCasaToken(it,tk)));
   if(matched.length){
-    setStatus(semMatch.length?'warn':'ok',
-      `${matched.length} imóvel(is) exibido(s) no mapa.` + (semMatch.length?` Não encontrado(s): ${semMatch.join(', ')}.`:''));
+    const ov = lista.length;
+    let msg = `${matched.length} imóvel(is) exibido(s). ` +
+      (ov ? `⚠ ${ov} sobreposição(ões) detectada(s) entre eles.` : '✓ Nenhuma sobreposição entre eles.');
+    if(semMatch.length) msg += ` Não encontrado(s): ${semMatch.join(', ')}.`;
+    setStatus(ov?'warn':'ok', msg);
   } else {
     setStatus('warn','Nenhum imóvel encontrado para: '+tokens.join(', '));
   }
