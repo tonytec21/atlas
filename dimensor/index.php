@@ -1541,7 +1541,13 @@ function gerarRelatorioSobreposicaoPDF($dados) {
             $pdf->Cell(0, 5, 'Vértices da região de sobreposição', 0, 1, 'L');
             $pdf->writeHTML($vtx, true, false, true, false, '');
 
-            // Espaço para parecer do engenheiro
+            // Espaço para parecer do engenheiro.
+            // A caixa abaixo é desenhada com Rect (que NÃO dispara a quebra automática),
+            // então garantimos manualmente 2,5 cm (25 mm) de folga da borda inferior:
+            // rótulo (~6) + caixa (18) = 24 mm. Se não couber, vai para a próxima página.
+            if ($pdf->GetY() + 24 > $pdf->getPageHeight() - 25) {
+                $pdf->AddPage();
+            }
             $pdf->Ln(1);
             $pdf->SetFont('helvetica', 'B', 8);
             $pdf->Cell(0, 5, 'Parecer técnico / correção:', 0, 1, 'L');
@@ -1551,7 +1557,10 @@ function gerarRelatorioSobreposicaoPDF($dados) {
             $pdf->Ln(22);
         }
 
-        // Assinatura
+        // Assinatura — respeita a mesma folga de 2,5 cm da borda inferior
+        if ($pdf->GetY() + 15 > $pdf->getPageHeight() - 25) {
+            $pdf->AddPage();
+        }
         $pdf->Ln(4);
         $pdf->SetFont('helvetica', '', 9);
         $pdf->Cell(0, 6, '____________________________________________', 0, 1, 'C');
@@ -2314,7 +2323,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-detalhe-pag2 (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-parecer-limite (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3271,7 +3280,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-detalhe-pag2','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-parecer-limite','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
