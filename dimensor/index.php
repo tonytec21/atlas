@@ -1275,7 +1275,7 @@ function gerarRelatorioSobreposicaoPDF($dados) {
                 // "Emitido em ..." na VERTICAL, junto à margem direita da página
                 $txt = 'Emitido em ' . date('d/m/Y H:i') . ' — Atlas Dimensor / Sistema Atlas';
                 $tw  = $this->GetStringWidth($txt);
-                $xv  = $pw - 4;                                  // ~4 mm da borda direita
+                $xv  = $pw - 6;                                  // ~6 mm da borda direita (afastado)
                 $yv  = ($this->getPageHeight() + $tw) / 2;       // centralizado verticalmente
                 $this->StartTransform();
                 $this->Rotate(90, $xv, $yv);                     // gira 90° (lê de baixo p/ cima)
@@ -1475,7 +1475,10 @@ function gerarRelatorioSobreposicaoPDF($dados) {
             return implode('<br>', $parts);
         };
         $capImovel = function ($mat, $nome) {
-            if ($mat !== '' && $nome !== '' && $nome !== '—') return 'Mat. ' . $mat . ' (' . $nome . ')';
+            $mat = preg_replace('/^0+(?=\d)/', '', trim((string)$mat));   // sem zeros à esquerda
+            $nome = trim((string)$nome);
+            $iguala = ($nome !== '' && (mb_strtolower($nome) === mb_strtolower($mat) || ltrim($nome, '0') === ltrim($mat, '0')));
+            if ($mat !== '' && $nome !== '' && $nome !== '—' && !$iguala) return 'Mat. ' . $mat . ' (' . $nome . ')';
             if ($mat !== '') return 'Mat. ' . $mat;
             return ($nome !== '' ? $nome : '—');
         };
@@ -1525,8 +1528,9 @@ function gerarRelatorioSobreposicaoPDF($dados) {
             if ($imgOv !== false) {
                 $pdf->Ln(1);
                 $pdf->SetFont('helvetica', 'B', 8);
-                $pdf->Cell(0, 5, 'Mapa: ' . $capImovel($matA, $nomeA) . ' (azul) · '
-                    . $capImovel($matB, $nomeB) . ' (amarelo) · sobreposição (vermelho)', 0, 1, 'L');
+                $tituloMapa = 'Mapa: ' . $capImovel($matA, $nomeA) . ' (azul) · '
+                    . $capImovel($matB, $nomeB) . ' (amarelo) · sobreposição (vermelho)';
+                $pdf->MultiCell(0, 4.2, $tituloMapa, 0, 'L');   // MultiCell quebra dentro da margem
                 pdfColocarImagem($pdf, $imgOv, 182, 360 / 640);
             }
 
@@ -2332,7 +2336,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-rodape-lateral (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-titulo-mapa (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3289,7 +3293,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-rodape-lateral','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-titulo-mapa','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
