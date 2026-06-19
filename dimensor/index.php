@@ -1318,6 +1318,64 @@ function gerarRelatorioSobreposicaoPDF($dados) {
         . '</div><br>';
     $pdf->writeHTML($titulo, true, false, true, false, '');
 
+    // ---- Matrículas em foco + resumo descritivo (logo no início do relatório) ----
+    $rotMat = function ($s) {
+        $s = trim((string)$s);
+        return $s === '' ? '' : preg_replace('/^0+(?=\d)/', '', $s);
+    };
+    // matrículas pesquisadas (campo "mats"); na falta, as envolvidas nas sobreposições
+    $matsFoco = trim((string)($_POST['mats'] ?? ''));
+    if ($matsFoco === '') {
+        $set = [];
+        foreach ($overlaps as $o) {
+            foreach (['a', 'b'] as $k) {
+                $m = isset($o[$k]['numero_matricula']) ? $rotMat($o[$k]['numero_matricula']) : '';
+                if ($m !== '') $set[$m] = true;
+            }
+        }
+        $matsFoco = implode(', ', array_keys($set));
+    }
+    $focoLabel = $matsFoco !== '' ? 'Mat. ' . htmlspecialchars($matsFoco, ENT_QUOTES, 'UTF-8') : '—';
+    $focoFrase = $matsFoco !== ''
+        ? 'a(s) matrícula(s) <b>Mat. ' . htmlspecialchars($matsFoco, ENT_QUOTES, 'UTF-8') . '</b>'
+        : 'os imóveis cadastrados';
+
+    $nOver = count($overlaps);
+    $listaHtml = '';
+    if ($nOver > 0) {
+        $descr = 'Esta análise tem como foco ' . $focoFrase . '. '
+            . 'Foram detectadas <b>' . $nOver . '</b> sobreposição(ões), totalizando <b>' . $br($areaTotal, 4) . ' ha</b> (' . $br($areaTotal * 10000, 2) . ' m²) de área sobreposta. '
+            . 'Cada sobreposição indica que dois imóveis ocupam, segundo as coordenadas registradas, uma mesma porção de território — situação que requer verificação técnica e pode demandar retificação de matrícula.';
+        $lim = 0;
+        foreach ($overlaps as $o) {
+            $lim++;
+            if ($lim > 6) { $listaHtml .= '• … e mais ' . ($nOver - 6) . ' sobreposição(ões) detalhada(s) na sequência.<br>'; break; }
+            $ma = $rotMat($o['a']['numero_matricula'] ?? '');
+            $mb = $rotMat($o['b']['numero_matricula'] ?? '');
+            $na = trim((string)($o['a']['identificador'] ?? ''));
+            $nb = trim((string)($o['b']['identificador'] ?? ''));
+            $rotA = $ma !== '' ? 'Mat. ' . $ma : ($na !== '' ? $na : '—');
+            $rotB = $mb !== '' ? 'Mat. ' . $mb : ($nb !== '' ? $nb : '—');
+            $ao = isset($o['area_ha']) ? (float)$o['area_ha'] : 0;
+            $listaHtml .= '• <b>' . htmlspecialchars($rotA, ENT_QUOTES, 'UTF-8') . '</b> &times; <b>' . htmlspecialchars($rotB, ENT_QUOTES, 'UTF-8') . '</b> — sobreposição de '
+                . $br($ao, 4) . ' ha (' . $br($ao * 10000, 2) . ' m²)<br>';
+        }
+    } else {
+        $descr = 'Esta análise tem como foco ' . $focoFrase . '. '
+            . '<b>Não foi detectada sobreposição</b> entre os imóveis analisados, conforme as coordenadas registradas.';
+    }
+
+    $foco = '<table cellpadding="6" style="border:1px solid #a80f1e;background:#fbeaec;">'
+          . '<tr><td width="100%"><span style="color:#a80f1e;font-weight:bold;font-size:10px;">MATRÍCULA(S) EM FOCO</span><br>'
+          . '<span style="font-size:13px;font-weight:bold;">' . $focoLabel . '</span></td></tr></table><br>'
+          . '<div style="font-family:helvetica;font-size:9.5px;color:#222222;text-align:justify;">' . $descr . '</div>';
+    if ($listaHtml !== '') {
+        $foco .= '<br><div style="font-family:helvetica;font-size:9px;color:#333333;">' . $listaHtml . '</div>';
+    }
+    $foco .= '<br>';
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->writeHTML($foco, true, false, true, false, '');
+
     // ---- Resumo ----
     $resumo = '
     <style>
@@ -1336,6 +1394,7 @@ function gerarRelatorioSobreposicaoPDF($dados) {
         <td colspan="3"><span class="k">Área total sobreposta</span> &nbsp; <span class="v">' . $br($areaTotal, 4) . ' ha</span> &nbsp;(' . $br($areaTotal * 10000, 2) . ' m²)</td>
       </tr>
     </table><br>';
+    $pdf->SetTextColor(0, 0, 0);
     $pdf->writeHTML($resumo, true, false, true, false, '');
 
     // ---- Imagem do mapa geral (imóveis + sobreposições) ----
@@ -2229,7 +2288,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-nome-relatorio (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-relatorio-foco (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3186,7 +3245,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-nome-relatorio','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-relatorio-foco','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
