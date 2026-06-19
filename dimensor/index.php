@@ -2187,6 +2187,11 @@ if (isset($_POST['acao'])) {
     }
 }
 
+// Página HTML (GET): impede o navegador de servir uma versão em cache, para que
+// cada atualização do sistema apareça imediatamente, sem refresh forçado.
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -2194,6 +2199,7 @@ if (isset($_POST['acao'])) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-rotulo-mat (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3138,6 +3144,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
+console.info('%cAtlas Dimensor — build 2026-06-19-rotulo-mat','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -3621,9 +3628,9 @@ async function verTodos(){
     overviewPolys.push(poly);
     it._bbox = bboxOf(it.pts);
     const centro = centroidOf(it.pts);
-    // rótulo padrão: somente o número da matrícula, se existir
+    // rótulo padrão: "Mat. <número sem zeros à esquerda>", se existir
     const mat = (it.numero_matricula||'').trim();
-    if(mat) addLabel(centro, mat);
+    if(mat) addLabel(centro, rotuloMat(mat));
     // identificação do imóvel: só ao pousar o mouse ~2s
     poly.addListener('mouseover', ()=> agendarHoverTip(centro, it.identificador));
     poly.addListener('mousemove', ()=> { if(!hoverTip && !hoverTimer) agendarHoverTip(centro, it.identificador); });
@@ -3712,6 +3719,14 @@ function listaMat(s){ return (s==null?'':String(s)).split(',').map(x=>normMat(x)
    enquanto as sucessoras (inclusive intervalos 745-900) são digitadas sem padding. */
 function matKey(s){ const k=normMat(s); return k.replace(/^0+(?=.)/,''); }
 function listaMatKey(s){ return (s==null?'':String(s)).split(/[,;]+/).map(x=>matKey(x)).filter(Boolean); }
+/* Rótulo de exibição da matrícula: remove zeros à esquerda (preservando letras/
+   formato) e prefixa "Mat. ". Ex.: "00000860" -> "Mat. 860". */
+function rotuloMat(s){
+  let n = String(s==null?'':s).trim();
+  if(!n) return '';
+  n = n.replace(/^0+(?=\d)/,'');   // tira zeros à esquerda apenas antes de dígitos
+  return 'Mat. ' + n;
+}
 /* A e B têm relação de desmembramento? (uma lista a outra como matrícula sucessora) */
 function ehDesmembramentoPar(a,b){
   const an=matKey(a.numero_matricula), bn=matKey(b.numero_matricula);
@@ -3950,7 +3965,7 @@ function renderLista(){
   }
   wrap.innerHTML = itens.map(it=>{
     const sub = [];
-    if(it.numero_matricula) sub.push('Mat. '+escapeHtml(it.numero_matricula));
+    if(it.numero_matricula) sub.push(escapeHtml(rotuloMat(it.numero_matricula)));
     if(it.proprietario) sub.push(escapeHtml(it.proprietario));
     const meta = `${fmt(it.area_ha,2)} ha`;
     const corDot = corValida(it.cor) ? `<span class="item-dot" style="background:${it.cor}"></span>` : '<span class="item-dot vazio"></span>';
