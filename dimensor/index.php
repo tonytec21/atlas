@@ -2199,7 +2199,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-rotulo-mat (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-vizinho-munic (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2488,6 +2488,8 @@ header('Expires: 0');
   .map-chip.hover{transform:translate(-50%,calc(-50% - 20px));background:rgba(13,148,136,.96);
     border-color:rgba(255,255,255,.35);font-family:var(--disp);font-weight:600;letter-spacing:.1px;
     box-shadow:0 4px 14px rgba(0,0,0,.4);animation:chipFade .14s ease-out}
+  .map-chip.vizinho{background:rgba(180,83,9,.94);border-color:rgba(251,191,36,.7);color:#fff;
+    font-family:var(--disp);font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.45)}
   @keyframes chipFade{from{opacity:0;transform:translate(-50%,calc(-50% - 12px))}to{opacity:1;transform:translate(-50%,calc(-50% - 20px))}}
   .overlay{position:absolute;inset:0;display:grid;place-items:center;z-index:4;color:var(--faint);
     font-family:var(--mono);font-size:12px;text-align:center;pointer-events:none}
@@ -3154,7 +3156,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-rotulo-mat','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-vizinho-munic','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4545,6 +4547,7 @@ function limiteToTurf(gj){
 function ocultarLimite(){
   if(limiteLayer){ limiteLayer.setMap(null); limiteLayer=null; }
   limiteTurf=null; limiteNome='';
+  limparFora();
   const b=document.getElementById('muni-badge'); if(b) b.style.display='none';
   const oc=document.getElementById('btn-muni-ocultar'); if(oc) oc.style.display='none';
 }
@@ -4576,10 +4579,92 @@ async function mostrarLimite(){
   }
 }
 
+// ---- Detecção do município vizinho que "pega" parte do imóvel ----
+let foraLayer=null, foraLabels=[];
+function limparFora(){
+  if(foraLayer){ foraLayer.setMap(null); foraLayer=null; }
+  foraLabels.forEach(l=>{ try{ l.setMap(null); }catch(e){} }); foraLabels=[];
+}
+function normNomeMun(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+// reverse geocoding de 1 ponto -> { municipio, uf } (usa o Geocoder do Google já carregado)
+function municipioDoPonto(lat,lng){
+  return new Promise(resolve=>{
+    if(!window.google || !google.maps || !google.maps.Geocoder){ resolve(null); return; }
+    try{
+      new google.maps.Geocoder().geocode({location:{lat,lng}, language:'pt-BR'}, (res,status)=>{
+        if(status!=='OK' || !res || !res.length){ resolve(null); return; }
+        let mun='', uf='';
+        for(const r of res){
+          for(const c of (r.address_components||[])){
+            const t=c.types||[];
+            if(!mun && t.includes('administrative_area_level_2')) mun=c.long_name;
+            if(!uf  && t.includes('administrative_area_level_1')) uf=c.short_name;
+          }
+          if(mun) break;
+        }
+        resolve(mun ? {municipio:mun, uf:uf} : null);
+      });
+    }catch(e){ resolve(null); }
+  });
+}
+// Identifica e indica o(s) município(s) vizinho(s) na parte do imóvel que fica fora do limite
+async function detectarVizinhos(prop){
+  limparFora();
+  let fora=null;
+  try{ fora = turf.difference(prop, limiteTurf); }catch(e){ fora=null; }
+  if(!fora || !fora.geometry){ return; }
+
+  // destaca no mapa a parte que está fora do município
+  try{
+    foraLayer = new google.maps.Data({map:map});
+    foraLayer.addGeoJson({type:'Feature', properties:{}, geometry:fora.geometry});
+    foraLayer.setStyle({fillColor:'#f59e0b', fillOpacity:0.32, strokeColor:'#b45309', strokeOpacity:0.95, strokeWeight:2, clickable:false});
+  }catch(e){}
+
+  // separa os pedaços de "fora" (Polygon ou MultiPolygon) e pega 1 ponto em cada
+  const pedacos=[];
+  const g=fora.geometry;
+  try{
+    if(g.type==='Polygon') pedacos.push(turf.polygon(g.coordinates));
+    else if(g.type==='MultiPolygon') g.coordinates.forEach(c=>pedacos.push(turf.polygon(c)));
+  }catch(e){}
+
+  const nomes=[];
+  for(const ped of pedacos){
+    // ignora microslivers de borda (< 200 m²) que são só imprecisão da malha
+    let areaM2=0; try{ areaM2=turf.area(ped); }catch(e){}
+    if(areaM2 < 200) continue;
+    let pt=null;
+    try{ pt=turf.pointOnFeature(ped); }catch(e){ try{ pt=turf.centroid(ped); }catch(_){ pt=null; } }
+    if(!pt) continue;
+    const lng=pt.geometry.coordinates[0], lat=pt.geometry.coordinates[1];
+    const info=await municipioDoPonto(lat,lng);
+    const nome=info && info.municipio ? info.municipio : null;
+    if(nome && normNomeMun(nome)!==normNomeMun(limiteNome)){
+      if(!nomes.some(n=>normNomeMun(n)===normNomeMun(nome))) nomes.push(nome);
+    }
+    // rótulo apontando o vizinho, posicionado na parte de fora (mesmo sem nome resolvido)
+    try{
+      const lb=new LabelOverlay(new google.maps.LatLng(lat,lng), '→ '+(nome||'município vizinho'), 'vizinho');
+      foraLabels.push(lb);
+    }catch(e){}
+  }
+
+  // atualiza o badge e o status com o(s) vizinho(s)
+  const badge=document.getElementById('muni-badge');
+  if(nomes.length){
+    const txt='⚠ Imóvel CRUZA o limite de '+limiteNome+' — parte em '+nomes.join(', ');
+    if(badge){ badge.className='muni-badge parcial'; badge.textContent=txt; badge.style.display='block'; }
+    muniStatus('warn','Parte do imóvel está em: '+nomes.join(', ')+'. A área fora do município está destacada em laranja no mapa.');
+  } else {
+    muniStatus('warn','O imóvel cruza o limite de '+limiteNome+', mas não foi possível identificar o município vizinho automaticamente (verifique se a API de Geocoding do Google está habilitada).');
+  }
+}
+
 function verificarPertencimento(geo){
   window.__ultimoGeo = geo;
   const badge = document.getElementById('muni-badge');
-  if(!limiteTurf || !geo || !geo.pts || geo.pts.length<3){ if(badge) badge.style.display='none'; return; }
+  if(!limiteTurf || !geo || !geo.pts || geo.pts.length<3){ if(badge) badge.style.display='none'; limparFora(); return; }
   try{
     const ring = geo.pts.map(p=>[p[1], p[0]]); // turf usa [lng,lat]
     if(ring[0][0]!==ring[ring.length-1][0] || ring[0][1]!==ring[ring.length-1][1]) ring.push(ring[0]);
@@ -4589,11 +4674,12 @@ function verificarPertencimento(geo){
     try{ intersects = turf.booleanIntersects(prop, limiteTurf); }
     catch(e){ try{ intersects = turf.booleanPointInPolygon(turf.point([geo.centro_lng, geo.centro_lat]), limiteTurf); }catch(_){} }
     let cls, txt;
-    if(within){ cls='dentro'; txt='✓ Imóvel DENTRO de '+limiteNome; }
-    else if(intersects){ cls='parcial'; txt='⚠ Imóvel CRUZA o limite de '+limiteNome+' (parte fora)'; }
-    else { cls='fora'; txt='✗ Imóvel FORA de '+limiteNome; }
+    if(within){ cls='dentro'; txt='✓ Imóvel DENTRO de '+limiteNome; limparFora(); }
+    else if(intersects){ cls='parcial'; txt='⚠ Imóvel CRUZA o limite de '+limiteNome+' (identificando vizinho…)'; }
+    else { cls='fora'; txt='✗ Imóvel FORA de '+limiteNome; limparFora(); }
     if(badge){ badge.className='muni-badge '+cls; badge.textContent=txt; badge.style.display='block'; }
     muniStatus(cls==='dentro'?'ok':(cls==='parcial'?'warn':'err'), txt);
+    if(cls==='parcial') detectarVizinhos(prop);   // assíncrono: atualiza badge/rótulos ao concluir
   }catch(e){ if(badge) badge.style.display='none'; }
 }
 
