@@ -1369,8 +1369,9 @@ function gerarRelatorioSobreposicaoPDF($dados) {
     // a versão em <table> deixava um vão grande depois dela).
     $focoLabelPlain = $matsFoco !== '' ? 'Mat. ' . $matsFoco : '—';
     $pdf->SetTextColor(0, 0, 0);
-    $bx = $pdf->GetX(); $by = $pdf->GetY();
-    $bw = $pdf->getPageWidth() - $pdf->lMargin - $pdf->rMargin;
+    $mg = $pdf->getMargins();
+    $bx = $mg['left']; $by = $pdf->GetY();
+    $bw = $pdf->getPageWidth() - $mg['left'] - $mg['right'];
     $pdf->SetFont('helvetica', 'B', 12);
     $nLab = max(1, $pdf->getNumLines($focoLabelPlain, $bw - 6));
     $boxH = 9 + $nLab * 5.0;
@@ -2310,7 +2311,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-foco-box (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-foco-box-fix (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3267,7 +3268,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-foco-box','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-foco-box-fix','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
