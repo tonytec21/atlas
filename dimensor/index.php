@@ -1453,6 +1453,9 @@ function gerarRelatorioSobreposicaoPDF($dados) {
         $pdf->SetFont('helvetica', '', 9);
         $pdf->MultiCell(0, 6, 'Os ' . $totalImoveis . ' imóveis cadastrados não apresentam interseção de áreas conforme as coordenadas registradas.', 0, 'L');
     } else {
+        // Página 1 fica reservada ao resumo + mapa geral; o detalhamento por
+        // sobreposição começa sempre na página 2.
+        $pdf->AddPage();
         $n = 0;
         // rótulos: matrícula em destaque (quando houver) + identificação
         $linhaImovel = function ($mat, $nome) {
@@ -2311,7 +2314,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-foco-box-fix (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-detalhe-pag2 (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3268,7 +3271,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-foco-box-fix','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-detalhe-pag2','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
