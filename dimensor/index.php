@@ -1350,15 +1350,23 @@ function gerarRelatorioSobreposicaoPDF($dados) {
         : 'os imóveis cadastrados';
 
     $nOver = count($overlaps);
+    // separa material x formal (Prov. CNJ 149, red. Prov. 195/2025, Art. 440-AZ §§1º-2º)
+    $nMat = 0; $nForm = 0; $areaMat = 0.0; $areaForm = 0.0;
+    foreach ($overlaps as $o) {
+        $t = ($o['tipo'] ?? 'material') === 'formal' ? 'formal' : 'material';
+        if ($t === 'formal') { $nForm++; $areaForm += (float)($o['area_ha'] ?? 0); }
+        else { $nMat++; $areaMat += (float)($o['area_ha'] ?? 0); }
+    }
     $listaHtml = '';
     if ($nOver > 0) {
         $descr = 'Esta análise tem como foco ' . $focoFrase . '. '
-            . 'Foram detectadas <b>' . $nOver . '</b> sobreposição(ões), totalizando <b>' . $br($areaTotal, 4) . ' ha</b> (' . $br($areaTotal * 10000, 2) . ' m²) de área sobreposta. '
-            . 'Cada sobreposição indica que dois imóveis ocupam, segundo as coordenadas registradas, uma mesma porção de território — situação que requer verificação técnica e pode demandar retificação de matrícula.';
+            . 'Foram identificadas <b>' . $nOver . '</b> coincidência(s) de área, totalizando <b>' . $br($areaTotal, 4) . ' ha</b> (' . $br($areaTotal * 10000, 2) . ' m²): '
+            . '<b>' . $nMat . '</b> material(is)' . ($nForm ? ' e <b>' . $nForm . '</b> meramente formal(is), de divisa' : '') . '. '
+            . 'Nos termos do Provimento CNJ n. 149 (red. Prov. n. 195/2025), Art. 440-AZ: a sobreposição <b>material</b> (§1º) ultrapassa a tolerância posicional do manual técnico do ONR e demanda saneamento (Art. 440-BA); a <b>formal</b> (§2º) restringe-se às divisas ou a pequena parte por técnica de levantamento, dentro da tolerância, não ensejando saneamento isoladamente.';
         $lim = 0;
         foreach ($overlaps as $o) {
             $lim++;
-            if ($lim > 6) { $listaHtml .= '• … e mais ' . ($nOver - 6) . ' sobreposição(ões) detalhada(s) na sequência.<br>'; break; }
+            if ($lim > 6) { $listaHtml .= '• … e mais ' . ($nOver - 6) . ' coincidência(s) detalhada(s) na sequência.<br>'; break; }
             $ma = $rotMat($o['a']['numero_matricula'] ?? '');
             $mb = $rotMat($o['b']['numero_matricula'] ?? '');
             $na = trim((string)($o['a']['identificador'] ?? ''));
@@ -1366,7 +1374,9 @@ function gerarRelatorioSobreposicaoPDF($dados) {
             $rotA = $ma !== '' ? 'Mat. ' . $ma : ($na !== '' ? $na : '—');
             $rotB = $mb !== '' ? 'Mat. ' . $mb : ($nb !== '' ? $nb : '—');
             $ao = isset($o['area_ha']) ? (float)$o['area_ha'] : 0;
-            $listaHtml .= '• <b>' . htmlspecialchars($rotA, ENT_QUOTES, 'UTF-8') . '</b> &times; <b>' . htmlspecialchars($rotB, ENT_QUOTES, 'UTF-8') . '</b> — sobreposição de '
+            $tf = ($o['tipo'] ?? 'material') === 'formal';
+            $tag = $tf ? '<span style="color:#b45309;">[formal · divisa]</span>' : '<span style="color:#a80f1e;">[material]</span>';
+            $listaHtml .= '• <b>' . htmlspecialchars($rotA, ENT_QUOTES, 'UTF-8') . '</b> &times; <b>' . htmlspecialchars($rotB, ENT_QUOTES, 'UTF-8') . '</b> ' . $tag . ' — '
                 . $br($ao, 4) . ' ha (' . $br($ao * 10000, 2) . ' m²)<br>';
         }
     } else {
@@ -1498,9 +1508,21 @@ function gerarRelatorioSobreposicaoPDF($dados) {
             $pctA = $areaA > 0 ? ($areaO / $areaA * 100) : 0;
             $pctB = $areaB > 0 ? ($areaO / $areaB * 100) : 0;
 
+            // Classificação material x formal (Prov. CNJ 149, red. Prov. 195/2025, Art. 440-AZ)
+            $ehFormal = (($o['tipo'] ?? 'material') === 'formal');
+            $largOv = (isset($o['largura_m']) && $o['largura_m'] !== null) ? (float)$o['largura_m'] : null;
+            $largTxt = $largOv !== null ? ' Faixa de sobreposição de ~' . $br($largOv, 2) . ' m.' : '';
+            $tagHdr = $ehFormal
+                ? '&nbsp;&nbsp;<span style="background-color:#b45309;color:#fff;font-weight:bold;">&nbsp; FORMAL · DIVISA &nbsp;</span>'
+                : '&nbsp;&nbsp;<span style="background-color:#7a0c16;color:#fff;font-weight:bold;">&nbsp; MATERIAL &nbsp;</span>';
+            $notaCls = $ehFormal
+                ? '<b>Sobreposição meramente formal (Art. 440-AZ §2º):</b> restrita à divisa / pequena parte por técnica de levantamento, dentro da tolerância posicional (' . $br(0.50, 2) . ' m).' . $largTxt . ' Não enseja saneamento isoladamente; cabe ao registrador a prudente análise com base no SIG-RI.'
+                : '<b>Sobreposição material (Art. 440-AZ §1º):</b> ultrapassa a tolerância posicional do manual técnico do ONR.' . $largTxt . ' Recomenda-se observação na certidão (Art. 440-BA) e saneamento na forma do art. 213, II, da Lei 6.015/1973.';
+            $corNota = $ehFormal ? '#fdf3e3' : '#fbeaec';
+
             $bloco = '
             <table cellpadding="4">
-              <tr><td><span style="background-color:#a80f1e;color:#fff;font-weight:bold;">&nbsp; SOBREPOSIÇÃO ' . $n . ' &nbsp;</span></td></tr>
+              <tr><td><span style="background-color:#a80f1e;color:#fff;font-weight:bold;">&nbsp; SOBREPOSIÇÃO ' . $n . ' &nbsp;</span>' . $tagHdr . '</td></tr>
             </table>
             <table cellpadding="4" border="0.5" style="border-color:#cccccc;">
               <tr style="background-color:#f0f0f0;">
@@ -1517,7 +1539,8 @@ function gerarRelatorioSobreposicaoPDF($dados) {
                 <td width="33%"><span style="color:#555;">% sobre A / B</span><br><b>' . $br($pctA, 1) . '% / ' . $br($pctB, 1) . '%</b></td>
                 <td width="33%"><span style="color:#555;">Centro (UTM 23S)</span><br><b>E ' . $br($cenUtm[0], 2) . ' &nbsp; N ' . $br($cenUtm[1], 2) . '</b></td>
               </tr>
-            </table>';
+            </table>
+            <table cellpadding="4"><tr><td width="100%" style="background-color:' . $corNota . ';font-size:8.5px;color:#333333;">' . $notaCls . '</td></tr></table>';
             $pdf->writeHTML($bloco, true, false, true, false, '');
 
             // Imagem da sobreposição (A azul · B amarelo · sobreposição vermelha)
@@ -2336,7 +2359,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-titulo-mapa (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-sobrep-formal (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2573,6 +2596,10 @@ header('Expires: 0');
   .ov-row:hover{background:rgba(226,52,47,.13)}
   .ov-row .pair{font-size:12px;font-weight:500;line-height:1.35}
   .ov-row .amt{font-family:var(--mono);font-size:10.5px;color:var(--red-text);margin-top:3px}
+  .ov-tag{display:inline-block;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.3px;
+    text-transform:uppercase;padding:1px 6px;border-radius:7px;vertical-align:middle;margin-left:4px;white-space:nowrap}
+  .ov-tag.material{background:rgba(226,52,47,.18);color:var(--red-text);border:1px solid rgba(226,52,47,.5)}
+  .ov-tag.formal{background:rgba(245,158,11,.16);color:#b45309;border:1px solid rgba(180,83,9,.45)}
   .ov-none{font-family:var(--mono);font-size:11px;color:var(--green-text);padding:10px 6px}
   .ov-foot{padding:11px;border-top:1px solid var(--line)}
 
@@ -3293,7 +3320,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-titulo-mapa','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-sobrep-formal','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -3678,7 +3705,8 @@ function gerarRelatorioComDados(overlaps, total){
   const lean = overlaps.map(o=>({
     a:{id:o.a.id, identificador:o.a.identificador, numero_matricula:o.a.numero_matricula, area_ha:o.a.area_ha},
     b:{id:o.b.id, identificador:o.b.identificador, numero_matricula:o.b.numero_matricula, area_ha:o.b.area_ha},
-    area_ha:o.area_ha, centro:o.centro, rings:o.rings
+    area_ha:o.area_ha, centro:o.centro, rings:o.rings,
+    tipo:o.tipo||'material', largura_m:(o.largura_m!=null&&isFinite(o.largura_m))?o.largura_m:null
   }));
   const dados = JSON.stringify({ total_imoveis: total, overlaps: lean });
   const f = document.createElement('form');
@@ -3765,6 +3793,30 @@ document.getElementById('sel-relatorio').onclick = ()=>{
   gerarRelatorioComDados(subset, totalDistintos(subset));
 };
 
+// === Classificação de sobreposição conforme Provimento CNJ 149 (red. Prov. 195/2025), Art. 440-AZ ===
+// §1º sobreposição MATERIAL: ultrapassa a tolerância posicional (manual técnico do ONR) → exige saneamento.
+// §2º sobreposição FORMAL: apenas nas divisas / pequena parte por técnica de levantamento, dentro da tolerância.
+// Tolerância posicional de referência: 0,50 m (norma de georreferenciamento). A faixa de divisa entre dois
+// imóveis, cada um com erro até 0,50 m, pode chegar a ~1,0 m de largura → usamos isso como limite do "formal".
+const TOL_POSICIONAL_M = 0.50;
+const TOL_DIVISA_M = 2 * TOL_POSICIONAL_M; // 1,0 m
+function larguraFaixaSobrep(inter){
+  // largura média de uma faixa ≈ 2 * área / perímetro (robusto para tiras finas de divisa)
+  try{
+    const area = turf.area(inter);          // m²
+    let perim = 0;
+    const ln = turf.polygonToLine(inter);
+    if(ln.type==='FeatureCollection'){ (ln.features||[]).forEach(f=>{ perim += turf.length(f,{units:'meters'}); }); }
+    else { perim = turf.length(ln,{units:'meters'}); }
+    if(perim<=0) return Infinity;
+    return 2*area/perim;
+  }catch(e){ return Infinity; }
+}
+function classificarSobrep(inter){
+  const larg = larguraFaixaSobrep(inter);
+  return { tipo: (larg <= TOL_DIVISA_M ? 'formal' : 'material'), largura_m: larg };
+}
+
 async function verTodos(){
   modo='overview';
   document.getElementById('btn-todos').classList.add('active');
@@ -3844,17 +3896,22 @@ async function verTodos(){
             continue; // não entra na lista de sobreposições (sem vermelho, sem contagem)
           }
           const rings = turfToPaths(inter.geometry).map(path=>path.map(pt=>[pt.lat, pt.lng]));
+          const cls = classificarSobrep(inter);              // formal (divisa/tolerável) x material
+          const formal = cls.tipo==='formal';
           turfToPaths(inter.geometry).forEach(path=>{
-            const op = new google.maps.Polygon({paths:path,strokeColor:'#e2342f',
-              strokeOpacity:.95,strokeWeight:1.5,fillColor:'#e2342f',fillOpacity:.5,map:map,zIndex:5,clickable:false});
-            op._pair=[itens[i].id, itens[j].id]; op._tipo='conflito';
+            const op = new google.maps.Polygon({paths:path,
+              strokeColor: formal?'#b45309':'#e2342f', strokeOpacity: formal?.85:.95,
+              strokeWeight: formal?1:1.5,
+              fillColor: formal?'#f59e0b':'#e2342f', fillOpacity: formal?.32:.5,
+              map:map, zIndex: formal?4:5, clickable:false});
+            op._pair=[itens[i].id, itens[j].id]; op._tipo=cls.tipo;
             overlapPolys.push(op);
           });
           const c = turf.centroid(inter).geometry.coordinates;
           overlaps.push({
             a:{id:itens[i].id, identificador:itens[i].identificador, numero_matricula:itens[i].numero_matricula, area_ha:itens[i].area_ha, pts:itens[i].pts},
             b:{id:itens[j].id, identificador:itens[j].identificador, numero_matricula:itens[j].numero_matricula, area_ha:itens[j].area_ha, pts:itens[j].pts},
-            area_ha:areaHa, centro:{lat:c[1],lng:c[0]}, rings:rings
+            area_ha:areaHa, centro:{lat:c[1],lng:c[0]}, rings:rings, tipo:cls.tipo, largura_m:cls.largura_m
           });
         }
       }catch(err){ /* polígono inválido: ignora */ }
@@ -4052,6 +4109,12 @@ function renderOverviewPanel(total, overlaps){
   const busca=document.getElementById('ov-busca'); if(busca) busca.value='';
   filtrarOverlaps();
 }
+// conta sobreposições materiais x formais (divisa/toleráveis) — Prov. CNJ 149, Art. 440-AZ §§1º-2º
+function contarTipos(lista){
+  let mat=0, formal=0;
+  (lista||[]).forEach(o=>{ if(o.tipo==='formal') formal++; else mat++; });
+  return {mat, formal};
+}
 function filtrarOverlaps(){
   const termoRaw = (document.getElementById('ov-busca')?.value || '').trim();
 
@@ -4075,9 +4138,14 @@ function filtrarOverlaps(){
   }
   overlapsExibidos = lista;
   const sub=document.getElementById('ov-sub');
-  if(sub) sub.textContent = termo
-    ? `${lista.length} de ${overlapsAtuais.length} sobreposição(ões) · filtro "${termoRaw}"`
-    : `${totalImoveisAtual} imóveis · ${overlapsAtuais.length} sobreposição(ões)`;
+  if(sub){
+    if(termo){
+      sub.textContent = `${lista.length} de ${overlapsAtuais.length} sobreposição(ões) · filtro "${termoRaw}"`;
+    } else {
+      const t=contarTipos(overlapsAtuais);
+      sub.textContent = `${totalImoveisAtual} imóveis · ${t.mat} material(is)` + (t.formal?` · ${t.formal} formal(is) de divisa`:'');
+    }
+  }
   // rótulo do botão de relatório
   const btn=document.getElementById('btn-relatorio');
   if(btn) btn.textContent = termo ? 'Gerar relatório do imóvel filtrado (PDF)' : 'Gerar relatório de sobreposição (PDF)';
@@ -4118,7 +4186,10 @@ function aplicarFiltroPorLista(termoRaw){
   const lista = overlapsAtuais.filter(o=>mostrados.has(o.a.id) && mostrados.has(o.b.id));
   overlapsExibidos = lista;
   const sub=document.getElementById('ov-sub');
-  if(sub) sub.textContent = `${matched.length} imóvel(is) · ${lista.length} sobreposição(ões) entre eles · lista de ${tokens.length} item(ns)`;
+  if(sub){
+    const t=contarTipos(lista);
+    sub.textContent = `${matched.length} imóvel(is) · ${t.mat} material(is)` + (t.formal?` + ${t.formal} formal(is)`:'') + ` entre eles · lista de ${tokens.length} item(ns)`;
+  }
   const btn=document.getElementById('btn-relatorio');
   if(btn) btn.textContent = lista.length ? 'Gerar relatório dos imóveis filtrados (PDF)' : 'Gerar relatório de sobreposição (PDF)';
   desenharListaOverlaps(lista, termoRaw);
@@ -4130,11 +4201,13 @@ function aplicarFiltroPorLista(termoRaw){
   }
   const semMatch = tokens.filter(tk=>!itensOverview.some(it=>imovelCasaToken(it,tk)));
   if(matched.length){
-    const ov = lista.length;
-    let msg = `${matched.length} imóvel(is) exibido(s). ` +
-      (ov ? `⚠ ${ov} sobreposição(ões) detectada(s) entre eles.` : '✓ Nenhuma sobreposição entre eles.');
+    const t = contarTipos(lista);
+    let msg;
+    if(t.mat) msg = `${matched.length} imóvel(is) exibido(s). ⚠ ${t.mat} sobreposição(ões) MATERIAL(IS) entre eles` + (t.formal?` (e ${t.formal} apenas formal/divisa).`:'.');
+    else if(t.formal) msg = `${matched.length} imóvel(is) exibido(s). ${t.formal} sobreposição(ões) apenas FORMAL(IS) de divisa — toleráveis (Art. 440-AZ §2º).`;
+    else msg = `${matched.length} imóvel(is) exibido(s). ✓ Nenhuma sobreposição entre eles.`;
     if(semMatch.length) msg += ` Não encontrado(s): ${semMatch.join(', ')}.`;
-    setStatus(ov?'warn':'ok', msg);
+    setStatus(t.mat?'warn':'ok', msg);
   } else {
     setStatus('warn','Nenhum imóvel encontrado para: '+tokens.join(', '));
   }
@@ -4174,14 +4247,25 @@ function desenharListaOverlaps(overlaps, termo){
     box.innerHTML = '<div class="ov-none">'+(termo ? '✓ Nenhuma sobreposição para "'+escapeHtml(termo)+'".' : '✓ Nenhuma sobreposição entre os imóveis exibidos.')+'</div>';
     return;
   }
-  const lista = overlaps.slice().sort((x,y)=>y.area_ha-x.area_ha);
+  const lista = overlaps.slice().sort((x,y)=>{
+    const fx = x.tipo==='formal'?1:0, fy = y.tipo==='formal'?1:0;
+    if(fx!==fy) return fx-fy;          // materiais primeiro
+    return y.area_ha-x.area_ha;
+  });
   const rotulo = o => escapeHtml((o.numero_matricula? o.numero_matricula+' — ':'')+(o.identificador||'')) || escapeHtml(o.identificador||'(sem id)');
-  box.innerHTML = '<div class="ttl">Sobreposições</div>' + lista.map((o,i)=>`
+  box.innerHTML = '<div class="ttl">Sobreposições</div>' + lista.map((o,i)=>{
+    const formal = o.tipo==='formal';
+    const badge = formal
+      ? `<span class="ov-tag formal" title="Apenas na divisa, dentro da tolerância — Art. 440-AZ §2º">formal · divisa</span>`
+      : `<span class="ov-tag material" title="Ultrapassa a tolerância posicional — Art. 440-AZ §1º; requer saneamento">material</span>`;
+    const larg = (o.largura_m!=null && isFinite(o.largura_m)) ? ` · faixa ~${fmt(o.largura_m,2)} m` : '';
+    return `
     <div class="ov-row" data-i="${i}">
       <button class="row-rep" data-i="${i}">relatório</button>
-      <div class="pair">${rotulo(o.a)} <span style="color:var(--faint)">⨯</span> ${rotulo(o.b)}</div>
-      <div class="amt">${fmt(o.area_ha,4)} ha sobrepostos</div>
-    </div>`).join('');
+      <div class="pair">${rotulo(o.a)} <span style="color:var(--faint)">⨯</span> ${rotulo(o.b)} ${badge}</div>
+      <div class="amt">${fmt(o.area_ha,4)} ha sobrepostos${larg}</div>
+    </div>`;
+  }).join('');
   box.querySelectorAll('.ov-row').forEach(row=>{
     row.onclick=()=>{ const o=lista[+row.dataset.i]; map.panTo(o.centro); map.setZoom(15); };
   });
