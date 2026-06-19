@@ -2651,6 +2651,14 @@ header('Expires: 0');
     </div>
 
     <div class="body">
+
+      <details class="onr-accordion manual-accordion">
+        <summary class="onr-summary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>
+          Cadastro manual
+          <span class="onr-hint-active">— memorial / dados do imóvel</span>
+        </summary>
+        <div class="onr-body">
       <p class="label">Memorial descritivo</p>
       <textarea id="memorial" spellcheck="false"
         placeholder="Cole o memorial com coordenadas em graus, minutos e segundos (ex.: longitude -46°53'11,184&quot; e latitude -4°8'33,962&quot;)…"></textarea>
@@ -2692,6 +2700,8 @@ header('Expires: 0');
         <button class="btn-primary" id="btn-map">Mapear</button>
         <button class="btn-save" id="btn-save" disabled>Gravar no banco</button>
       </div>
+        </div>
+      </details>
 
       <div class="onr-box">
         <details class="onr-accordion">
