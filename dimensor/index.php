@@ -1473,7 +1473,16 @@ function gerarRelatorioSobreposicaoPDF($dados) {
         $pdf->Cell(0, 5, 'Responsável Técnico (Engenheiro / Agrimensor)', 0, 1, 'C');
     }
 
-    $pdf->Output('relatorio_sobreposicao.pdf', 'I');
+    // Nome do arquivo: "Relatório de Sobreposição Mat. <matrículas pesquisadas>.pdf"
+    $mats = isset($_POST['mats']) ? trim((string)$_POST['mats']) : '';
+    // remove caracteres inválidos para nome de arquivo e limita o tamanho
+    $mats = preg_replace('/[\/\\\\:\*\?"<>\|\r\n]+/u', ' ', $mats);
+    $mats = trim(preg_replace('/\s{2,}/u', ' ', $mats));
+    if (mb_strlen($mats) > 80) $mats = mb_substr($mats, 0, 80) . '…';
+    $nomeArq = ($mats !== '')
+        ? 'Relatório de Sobreposição Mat. ' . $mats . '.pdf'
+        : 'Relatório de Sobreposição.pdf';
+    $pdf->Output($nomeArq, 'I');
 }
 
 /* ====================================================================
@@ -2220,7 +2229,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-filtro-sobrep (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-nome-relatorio (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3177,7 +3186,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-filtro-sobrep','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-nome-relatorio','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -3536,6 +3545,28 @@ function totalDistintos(overlaps){
 }
 
 /* ---- envia um conjunto de sobreposições para o PDF (nova aba) ---- */
+function matsParaNomeArquivo(overlaps){
+  const termo = (document.getElementById('ov-busca')?.value || '').trim();
+  let nums = [];
+  if(termo){
+    // matrículas/termos efetivamente pesquisados (separados por ; ou ,)
+    nums = termo.split(/[;,]+/).map(s=>s.trim()).filter(Boolean)
+               .map(s=>s.replace(/^0+(?=\d)/,''));   // sem zeros à esquerda
+  } else {
+    // sem filtro: matrículas distintas envolvidas nas sobreposições do relatório
+    const set=new Set();
+    (overlaps||[]).forEach(o=>{
+      [o.a.numero_matricula, o.b.numero_matricula].forEach(m=>{
+        const v=(m==null?'':String(m)).trim(); if(v) set.add(v.replace(/^0+(?=\d)/,''));
+      });
+    });
+    nums=[...set];
+  }
+  // remove duplicadas preservando ordem
+  nums = nums.filter((v,i)=>nums.indexOf(v)===i);
+  if(!nums.length || nums.length>8) return '';   // muitas: usa o nome genérico
+  return nums.join(', ');
+}
 function gerarRelatorioComDados(overlaps, total){
   const lean = overlaps.map(o=>({
     a:{id:o.a.id, identificador:o.a.identificador, numero_matricula:o.a.numero_matricula, area_ha:o.a.area_ha},
@@ -3547,6 +3578,7 @@ function gerarRelatorioComDados(overlaps, total){
   f.method='POST'; f.action=window.location.pathname; f.target='_blank';
   const i1=document.createElement('input'); i1.type='hidden'; i1.name='acao'; i1.value='relatorio_sobreposicao'; f.appendChild(i1);
   const i2=document.createElement('input'); i2.type='hidden'; i2.name='dados'; i2.value=dados; f.appendChild(i2);
+  const i3=document.createElement('input'); i3.type='hidden'; i3.name='mats'; i3.value=matsParaNomeArquivo(overlaps); f.appendChild(i3);
   document.body.appendChild(f); f.submit(); document.body.removeChild(f);
 }
 
