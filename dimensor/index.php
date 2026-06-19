@@ -1365,16 +1365,22 @@ function gerarRelatorioSobreposicaoPDF($dados) {
             . '<b>Não foi detectada sobreposição</b> entre os imóveis analisados, conforme as coordenadas registradas.';
     }
 
-    $foco = '<table cellpadding="6" style="border:1px solid #a80f1e;background:#fbeaec;">'
+    // Caixa "em foco"
+    $caixa = '<table cellpadding="5" style="border:1px solid #a80f1e;background:#fbeaec;">'
           . '<tr><td width="100%"><span style="color:#a80f1e;font-weight:bold;font-size:10px;">MATRÍCULA(S) EM FOCO</span><br>'
-          . '<span style="font-size:13px;font-weight:bold;">' . $focoLabel . '</span></td></tr></table><br>'
-          . '<div style="font-family:helvetica;font-size:9.5px;color:#222222;text-align:justify;">' . $descr . '</div>';
-    if ($listaHtml !== '') {
-        $foco .= '<br><div style="font-family:helvetica;font-size:9px;color:#333333;">' . $listaHtml . '</div>';
-    }
-    $foco .= '<br>';
+          . '<span style="font-size:13px;font-weight:bold;">' . $focoLabel . '</span></td></tr></table>';
     $pdf->SetTextColor(0, 0, 0);
-    $pdf->writeHTML($foco, true, false, true, false, '');
+    $pdf->writeHTML($caixa, true, false, true, false, '');
+    $pdf->Ln(1);
+    // Descrição + lista num ÚNICO bloco (evita o espaço em branco que vários <div>/<br> geram)
+    $bloco = '<div style="font-family:helvetica;font-size:9.5px;color:#222222;text-align:justify;">' . $descr;
+    if ($listaHtml !== '') {
+        $bloco .= '<br><br><span style="font-size:9px;color:#333333;">' . $listaHtml . '</span>';
+    }
+    $bloco .= '</div>';
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->writeHTML($bloco, true, false, true, false, '');
+    $pdf->Ln(1);
 
     // ---- Resumo ----
     $resumo = '
@@ -1393,9 +1399,10 @@ function gerarRelatorioSobreposicaoPDF($dados) {
       <tr>
         <td colspan="3"><span class="k">Área total sobreposta</span> &nbsp; <span class="v">' . $br($areaTotal, 4) . ' ha</span> &nbsp;(' . $br($areaTotal * 10000, 2) . ' m²)</td>
       </tr>
-    </table><br>';
+    </table>';
     $pdf->SetTextColor(0, 0, 0);
     $pdf->writeHTML($resumo, true, false, true, false, '');
+    $pdf->Ln(2);
 
     // ---- Imagem do mapa geral (imóveis + sobreposições) ----
     if (!empty($overlaps) && !empty($imoveisById)) {
@@ -1410,7 +1417,7 @@ function gerarRelatorioSobreposicaoPDF($dados) {
         if ($imgGeral !== false) {
             $pdf->SetFont('helvetica', 'B', 9);
             $pdf->Cell(0, 5, 'Mapa geral — imóveis (azul) e sobreposições (vermelho)', 0, 1, 'L');
-            pdfColocarImagem($pdf, $imgGeral, 182, 420 / 640);
+            pdfColocarImagem($pdf, $imgGeral, 168, 420 / 640);
             $pdf->Ln(2);
         } else {
             $pdf->SetFont('helvetica', '', 8);
@@ -2288,7 +2295,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-relatorio-foco (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-relatorio-compacto (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3245,7 +3252,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-relatorio-foco','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-relatorio-compacto','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
