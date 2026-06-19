@@ -1269,12 +1269,21 @@ function gerarRelatorioSobreposicaoPDF($dados) {
                 }
             }
             public function Footer() {
-                // Rodapé técnico posicionado acima do endereço do timbrado (que fica no pé da folha)
-                $this->SetY(-22);
+                $pw = $this->getPageWidth();
                 $this->SetFont('helvetica', '', 7);
                 $this->SetTextColor(120, 120, 120);
-                $this->Cell(0, 5, 'Emitido em ' . date('d/m/Y H:i') . ' — Atlas Dimensor / Sistema Atlas', 0, 0, 'L');
-                $this->Cell(0, 5, 'Página ' . $this->getAliasNumPage() . ' de ' . $this->getAliasNbPages(), 0, 0, 'R');
+                // "Emitido em ..." na VERTICAL, junto à margem direita da página
+                $txt = 'Emitido em ' . date('d/m/Y H:i') . ' — Atlas Dimensor / Sistema Atlas';
+                $tw  = $this->GetStringWidth($txt);
+                $xv  = $pw - 4;                                  // ~4 mm da borda direita
+                $yv  = ($this->getPageHeight() + $tw) / 2;       // centralizado verticalmente
+                $this->StartTransform();
+                $this->Rotate(90, $xv, $yv);                     // gira 90° (lê de baixo p/ cima)
+                $this->Text($xv, $yv, $txt);
+                $this->StopTransform();
+                // "Página X de Y" — 2 mm acima e 5 mm mais à direita
+                $this->SetXY(0, -24);
+                $this->Cell($pw - 9, 5, 'Página ' . $this->getAliasNumPage() . ' de ' . $this->getAliasNbPages(), 0, 0, 'R');
             }
         }
     }
@@ -2323,7 +2332,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-parecer-limite (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-rodape-lateral (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3280,7 +3289,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-parecer-limite','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-rodape-lateral','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
