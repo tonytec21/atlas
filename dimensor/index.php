@@ -2359,7 +2359,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-sobrep-formal (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-formal-oculta (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3320,7 +3320,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-sobrep-formal','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-formal-oculta','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -3898,15 +3898,16 @@ async function verTodos(){
           const rings = turfToPaths(inter.geometry).map(path=>path.map(pt=>[pt.lat, pt.lng]));
           const cls = classificarSobrep(inter);              // formal (divisa/tolerável) x material
           const formal = cls.tipo==='formal';
-          turfToPaths(inter.geometry).forEach(path=>{
-            const op = new google.maps.Polygon({paths:path,
-              strokeColor: formal?'#b45309':'#e2342f', strokeOpacity: formal?.85:.95,
-              strokeWeight: formal?1:1.5,
-              fillColor: formal?'#f59e0b':'#e2342f', fillOpacity: formal?.32:.5,
-              map:map, zIndex: formal?4:5, clickable:false});
-            op._pair=[itens[i].id, itens[j].id]; op._tipo=cls.tipo;
-            overlapPolys.push(op);
-          });
+          // Sobreposição MERAMENTE FORMAL (apenas na divisa, dentro da tolerância — Art. 440-AZ §2º):
+          // NÃO é desenhada no mapa. Apenas as MATERIAIS aparecem destacadas (vermelho).
+          if(!formal){
+            turfToPaths(inter.geometry).forEach(path=>{
+              const op = new google.maps.Polygon({paths:path,strokeColor:'#e2342f',
+                strokeOpacity:.95,strokeWeight:1.5,fillColor:'#e2342f',fillOpacity:.5,map:map,zIndex:5,clickable:false});
+              op._pair=[itens[i].id, itens[j].id]; op._tipo='material';
+              overlapPolys.push(op);
+            });
+          }
           const c = turf.centroid(inter).geometry.coordinates;
           overlaps.push({
             a:{id:itens[i].id, identificador:itens[i].identificador, numero_matricula:itens[i].numero_matricula, area_ha:itens[i].area_ha, pts:itens[i].pts},
@@ -4143,7 +4144,7 @@ function filtrarOverlaps(){
       sub.textContent = `${lista.length} de ${overlapsAtuais.length} sobreposição(ões) · filtro "${termoRaw}"`;
     } else {
       const t=contarTipos(overlapsAtuais);
-      sub.textContent = `${totalImoveisAtual} imóveis · ${t.mat} material(is)` + (t.formal?` · ${t.formal} formal(is) de divisa`:'');
+      sub.textContent = `${totalImoveisAtual} imóveis · ${t.mat} material(is)` + (t.formal?` · ${t.formal} formal(is) de divisa (não exibidas no mapa)`:'');
     }
   }
   // rótulo do botão de relatório
