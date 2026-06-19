@@ -1365,13 +1365,28 @@ function gerarRelatorioSobreposicaoPDF($dados) {
             . '<b>Não foi detectada sobreposição</b> entre os imóveis analisados, conforme as coordenadas registradas.';
     }
 
-    // Caixa "em foco"
-    $caixa = '<table cellpadding="5" style="border:1px solid #a80f1e;background:#fbeaec;">'
-          . '<tr><td width="100%"><span style="color:#a80f1e;font-weight:bold;font-size:10px;">MATRÍCULA(S) EM FOCO</span><br>'
-          . '<span style="font-size:13px;font-weight:bold;">' . $focoLabel . '</span></td></tr></table>';
+    // Caixa "MATRÍCULA(S) EM FOCO" desenhada manualmente (controle total do espaçamento;
+    // a versão em <table> deixava um vão grande depois dela).
+    $focoLabelPlain = $matsFoco !== '' ? 'Mat. ' . $matsFoco : '—';
     $pdf->SetTextColor(0, 0, 0);
-    $pdf->writeHTML($caixa, true, false, true, false, '');
-    $pdf->Ln(1);
+    $bx = $pdf->GetX(); $by = $pdf->GetY();
+    $bw = $pdf->getPageWidth() - $pdf->lMargin - $pdf->rMargin;
+    $pdf->SetFont('helvetica', 'B', 12);
+    $nLab = max(1, $pdf->getNumLines($focoLabelPlain, $bw - 6));
+    $boxH = 9 + $nLab * 5.0;
+    $pdf->SetFillColor(251, 234, 236);   // #fbeaec
+    $pdf->SetDrawColor(168, 15, 30);     // #a80f1e
+    $pdf->SetLineWidth(0.3);
+    $pdf->Rect($bx, $by, $bw, $boxH, 'DF');
+    $pdf->SetXY($bx + 3, $by + 2.3);
+    $pdf->SetFont('helvetica', 'B', 8);
+    $pdf->SetTextColor(168, 15, 30);
+    $pdf->MultiCell($bw - 6, 4, 'MATRÍCULA(S) EM FOCO', 0, 'L');
+    $pdf->SetX($bx + 3);
+    $pdf->SetFont('helvetica', 'B', 12);
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->MultiCell($bw - 6, 5.0, $focoLabelPlain, 0, 'L');
+    $pdf->SetY($by + $boxH + 2);
     // Descrição + lista num ÚNICO bloco (evita o espaço em branco que vários <div>/<br> geram)
     $bloco = '<div style="font-family:helvetica;font-size:9.5px;color:#222222;text-align:justify;">' . $descr;
     if ($listaHtml !== '') {
@@ -2295,7 +2310,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-relatorio-compacto (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-foco-box (rótulos "Mat." sem zeros à esquerda) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3252,7 +3267,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-relatorio-compacto','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-19-foco-box','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
