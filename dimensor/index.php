@@ -2327,6 +2327,37 @@ function aplicarDadosMatricula($conn, $id, $d) {
     return true;
 }
 
+/* Preenche APENAS os campos vazios do imóvel a partir de $d (mesma lógica do modal anexo_analisar):
+   só toca colunas que existem na linha e estão vazias — nunca sobrescreve nem referencia coluna
+   inexistente (evita erro de SQL/exceção mysqli). Retorna a lista de campos preenchidos. */
+function complementarMatricula($conn, $id, array $d, array $rowAtual) {
+    $id = (int)$id; if ($id <= 0) return [];
+    $pessoas = qualificacaoNormalizar($d['pessoas'] ?? []);
+    qualificacaoDerivarFlat($d, $pessoas);
+    $whitelist = array_merge(onrCampos(), ['proprietario', 'cpf', 'tipo_imovel', 'identificador', 'numero_matricula']);
+    $sets = []; $vals = []; $types = ''; $preenchidos = [];
+    foreach ($whitelist as $col) {
+        if (!array_key_exists($col, $rowAtual)) continue;                 // coluna precisa existir na tabela
+        $k = $col;
+        if ($col === 'identificador' && trim((string)($d['identificador'] ?? '')) === '') $k = 'nome_imo';
+        if (!array_key_exists($k, $d)) continue;
+        $v = is_scalar($d[$k]) ? trim((string)$d[$k]) : '';
+        if ($v === '') continue;
+        if ($col === 'tipo_imovel') { $v = (stripos($v, 'rural') !== false) ? 'rural' : ((stripos($v, 'urban') !== false) ? 'urbano' : ''); if ($v === '') continue; }
+        if (trim((string)$rowAtual[$col]) !== '') continue;              // já preenchido -> respeita
+        $sets[] = "`$col` = ?"; $vals[] = $v; $types .= 's'; $preenchidos[] = $col;
+    }
+    if ($sets) {
+        $vals[] = $id; $types .= 'i';
+        $st = $conn->prepare("UPDATE memoriais_mapeados SET " . implode(', ', $sets) . " WHERE id = ?");
+        if ($st) { $st->bind_param($types, ...$vals); $st->execute(); }
+    }
+    if ($pessoas && trim((string)($rowAtual['qualificacao_json'] ?? '')) === '') {
+        qualificacaoGravar($conn, $id, $pessoas); $preenchidos[] = 'qualificacao_json';
+    }
+    return array_values(array_unique($preenchidos));
+}
+
 /* ====================================================================
  *  CONSULTA DE CEP (ViaCEP)
  * ==================================================================== */
@@ -2897,6 +2928,7 @@ if (isset($_POST['acao'])) {
             exit;
         }
         if ($acao === 'processar_pdf_matricula') {
+          try {
             if (empty($_FILES['pdf']['tmp_name']) || !is_uploaded_file($_FILES['pdf']['tmp_name'])) {
                 echo json_encode(['ok' => false, 'erro' => 'Nenhum PDF foi enviado.']); exit;
             }
@@ -2925,26 +2957,22 @@ if (isset($_POST['acao'])) {
 
             $id = acharMemorialParaPdf($conn, $matricula, $matDoc);
             if ($id) {
-                // JÁ EXISTE -> apenas complementa os dados (não altera a geometria)
-                $cur = $conn->query("SELECT numero_matricula, onr_descricao, onr_numero_prenotacao, onr_nivel_publicidade, onr_classificacao FROM memoriais_mapeados WHERE id = " . (int)$id . " LIMIT 1");
-                $cur = $cur ? $cur->fetch_assoc() : [];
+                // JÁ EXISTE -> complementa apenas os campos vazios (não altera a geometria)
+                $rs = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = " . (int)$id . " LIMIT 1");
+                $rowAtual = $rs ? $rs->fetch_assoc() : [];
+                if (!is_array($rowAtual)) $rowAtual = [];
                 // não sobrescreve prenotação já preenchida manualmente
-                if (trim((string)($cur['onr_numero_prenotacao'] ?? '')) !== '') unset($d['onr_numero_prenotacao']);
-                // descrição da importação: padrão quando ainda não houver
-                if (trim((string)($cur['onr_descricao'] ?? '')) === '' && trim((string)($d['onr_descricao'] ?? '')) === '') $d['onr_descricao'] = 'Importação de polígonos';
-                // parâmetros de envio: padrões quando ainda não houver
-                if (trim((string)($cur['onr_nivel_publicidade'] ?? '')) === '') $d['onr_nivel_publicidade'] = '3';
-                if (trim((string)($cur['onr_classificacao'] ?? '')) === '') $d['onr_classificacao'] = '1';
-                aplicarDadosMatricula($conn, $id, $d);
+                if (trim((string)($rowAtual['onr_numero_prenotacao'] ?? '')) !== '') unset($d['onr_numero_prenotacao']);
+                // padrões da importação (só quando ainda não houver, no banco e no extraído)
+                if (trim((string)($rowAtual['onr_descricao'] ?? '')) === '' && trim((string)($d['onr_descricao'] ?? '')) === '') $d['onr_descricao'] = 'Importação de polígonos';
+                if (trim((string)($rowAtual['onr_nivel_publicidade'] ?? '')) === '' && trim((string)($d['onr_nivel_publicidade'] ?? '')) === '') $d['onr_nivel_publicidade'] = '3';
+                if (trim((string)($rowAtual['onr_classificacao'] ?? '')) === '' && trim((string)($d['onr_classificacao'] ?? '')) === '') $d['onr_classificacao'] = '1';
                 // imóvel cadastrado só com KML costuma não ter numero_matricula: preenche agora
-                if (trim((string)($cur['numero_matricula'] ?? '')) === '' && $matricula !== '') {
-                    $stm = $conn->prepare("UPDATE memoriais_mapeados SET numero_matricula = ? WHERE id = ?");
-                    if ($stm) { $stm->bind_param('si', $matricula, $id); $stm->execute(); }
-                }
+                if (trim((string)($rowAtual['numero_matricula'] ?? '')) === '' && $matricula !== '' && trim((string)($d['numero_matricula'] ?? '')) === '') $d['numero_matricula'] = $matricula;
+                $preenchidos = complementarMatricula($conn, $id, $d, $rowAtual);
                 $anexoId = anexoSalvarBytes($conn, $id, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
                 $incPdf = detectarInconsistenciasPdf($d, null);
                 inconsGravar($conn, $id, $incPdf);
-                $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
                 echo json_encode([
                     'ok' => true, 'existe' => true, 'criado' => false, 'id' => $id, 'matricula' => $matricula, 'modelo' => $r['modelo'],
                     'campos' => $preenchidos, 'anexo_id' => $anexoId, 'inconsistencias' => array_values($incPdf),
@@ -2995,6 +3023,10 @@ if (isset($_POST['acao'])) {
                     . (!empty($geo['aviso_geometria']) ? ' ' . $geo['aviso_geometria'] : '')
             ], JSON_UNESCAPED_UNICODE);
             exit;
+          } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'erro' => 'Erro ao processar o PDF: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+            exit;
+          }
         }
 
         if ($acao === 'onr_config_get') {
@@ -3474,7 +3506,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pdf-complementa-kml (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pdf-complementa-seguro (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4646,7 +4678,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-pdf-complementa-kml','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-pdf-complementa-seguro','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
