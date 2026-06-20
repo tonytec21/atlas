@@ -1912,8 +1912,9 @@ function itn03ImovelDaLinha(array $r, array &$avisos) {
         $imovel['cod_sncr'] = preg_match('#^(?:\d{12}|\d{13})$#', $cod) ? $cod : '000000000000';
         if (preg_match('#^\d{11}$#', $cod)) $imovel['ccir'] = $cod;
         $car = trim((string)($r['car'] ?? ''));
-        if (preg_match('#^(?:[A-Za-z]{2}-\d{7}-[A-Za-z0-9]{32}|[A-Za-z0-9]{41})$#', $car)) {
-            $imovel['car'] = $car;
+        $carNorm = preg_replace('/[.\s]/', '', $car); // hash vem agrupado por pontos -> torna contíguo
+        if (preg_match('#^(?:[A-Za-z]{2}-\d{7}-[A-Za-z0-9]{32}|[A-Za-z0-9]{41})$#', $carNorm)) {
+            $imovel['car'] = $carNorm;
         } else {
             $uc = preg_match('#^[A-Za-z]{2}$#', $uf2) ? $uf2 : 'XX';
             $imovel['car'] = $uc . '-0000000-' . str_repeat('0', 32);
@@ -2612,7 +2613,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-fix-cpf-text (exportação de carga ITN 03 — individual e lote) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-car-normaliza (exportação de carga ITN 03 — individual e lote) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3582,7 +3583,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-fix-cpf-text','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-car-normaliza','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
