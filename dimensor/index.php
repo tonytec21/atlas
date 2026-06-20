@@ -71,6 +71,28 @@ if (isset($_GET['diag_staticmap'])) {
     exit;
 }
 
+/* ---------- Download/visualização de anexo: dimensor/index.php?anexo=<id>[&dl=1] ---------- */
+if (isset($_GET['anexo'])) {
+    $aid = (int)$_GET['anexo'];
+    $a = function_exists('anexoObter') ? anexoObter($conn, $aid) : null;
+    if (!$a) { http_response_code(404); header('Content-Type: text/plain; charset=UTF-8'); echo 'Anexo não encontrado.'; exit; }
+    $caminho = anexosDir() . '/' . $a['arquivo'];
+    if (!is_file($caminho)) { http_response_code(404); header('Content-Type: text/plain; charset=UTF-8'); echo 'Arquivo ausente no servidor.'; exit; }
+    $mime = $a['mime'] ?: 'application/octet-stream';
+    $ext  = strtolower(pathinfo($a['arquivo'], PATHINFO_EXTENSION));
+    if ($mime === 'application/octet-stream') { if ($ext === 'pdf') $mime = 'application/pdf'; elseif ($ext === 'kml') $mime = 'application/vnd.google-earth.kml+xml'; }
+    $inline = empty($_GET['dl']) && $ext === 'pdf'; // PDF abre no navegador; demais baixam
+    $nome = preg_replace('/[\r\n"]+/', '', (string)$a['nome_original']);
+    if (!headers_sent()) {
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . $nome . '"');
+        header('Content-Length: ' . filesize($caminho));
+        header('Cache-Control: private, max-age=0, must-revalidate');
+    }
+    readfile($caminho);
+    exit;
+}
+
 /* ====================================================================
  *  BIBLIOTECA DE COORDENADAS
  * ==================================================================== */
@@ -639,6 +661,107 @@ function ensureTable($conn) {
             $conn->query("ALTER TABLE memoriais_mapeados MODIFY $colMulti TEXT NULL DEFAULT NULL");
         }
     }
+
+    // ---- Anexos do imóvel (PDF da matrícula, PDF do SIGEF, KML, outros) ----
+    $conn->query("CREATE TABLE IF NOT EXISTS memoriais_anexos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        memorial_id INT NOT NULL,
+        tipo VARCHAR(20) NOT NULL DEFAULT 'outro',
+        nome_original VARCHAR(255) NOT NULL,
+        arquivo VARCHAR(255) NOT NULL,
+        mime VARCHAR(120) NULL DEFAULT NULL,
+        tamanho INT NULL DEFAULT NULL,
+        hash CHAR(40) NULL DEFAULT NULL,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_anexo_memorial (memorial_id),
+        INDEX idx_anexo_hash (memorial_id, hash)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+/* ====================================================================
+ *  ANEXOS DO IMÓVEL (armazenamento em disco + registro no banco)
+ * ==================================================================== */
+/* Diretório de anexos (criado sob demanda, com proteção contra acesso direto). */
+function anexosDir() {
+    $dir = __DIR__ . '/anexos';
+    if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+    // Defesa em profundidade: bloqueia acesso direto via Apache (o download passa pelo index.php).
+    $ht = $dir . '/.htaccess';
+    if (!is_file($ht)) @file_put_contents($ht, "Require all denied\nDeny from all\n");
+    $idx = $dir . '/index.html';
+    if (!is_file($idx)) @file_put_contents($idx, '');
+    return $dir;
+}
+/* Classifica o tipo do anexo a partir do nome/conteúdo. */
+function anexoTipo($nomeOriginal, $mime = '', $dadosExtraidos = null) {
+    $ext = strtolower(pathinfo((string)$nomeOriginal, PATHINFO_EXTENSION));
+    if ($ext === 'kml' || stripos((string)$mime, 'kml') !== false) return 'kml';
+    if ($ext === 'pdf' || stripos((string)$mime, 'pdf') !== false) {
+        $n = strtolower((string)$nomeOriginal);
+        $temSigef = (is_array($dadosExtraidos) && trim((string)($dadosExtraidos['sigef'] ?? '')) !== '');
+        // UUID no nome (ex.: download do SIGEF) ou menção a SIGEF/INCRA => PDF do SIGEF
+        if (strpos($n, 'sigef') !== false || strpos($n, 'incra') !== false
+            || preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i', $n)
+            || $temSigef && strpos($n, 'matricula') === false) {
+            return 'pdf_sigef';
+        }
+        return 'pdf_matricula';
+    }
+    return 'outro';
+}
+/* Persiste bytes como anexo do imóvel. Deduplica por (memorial_id, hash). Retorna id ou null. */
+function anexoSalvarBytes($conn, $memorialId, $bytes, $nomeOriginal, $tipo = 'outro', $mime = null) {
+    $memorialId = (int)$memorialId;
+    if ($memorialId <= 0 || $bytes === '' || $bytes === false) return null;
+    $hash = sha1($bytes);
+    // já existe esse arquivo neste imóvel? então não duplica.
+    $st = $conn->prepare("SELECT id FROM memoriais_anexos WHERE memorial_id = ? AND hash = ? LIMIT 1");
+    if ($st) { $st->bind_param('is', $memorialId, $hash); $st->execute(); $rs = $st->get_result();
+        if ($rs && ($row = $rs->fetch_assoc())) return (int)$row['id']; }
+    $dir = anexosDir();
+    $ext = strtolower(pathinfo((string)$nomeOriginal, PATHINFO_EXTENSION)); if ($ext === '' || strlen($ext) > 5) $ext = 'bin';
+    $arquivo = $memorialId . '_' . date('YmdHis') . '_' . substr($hash, 0, 8) . '.' . $ext;
+    if (@file_put_contents($dir . '/' . $arquivo, $bytes) === false) return null;
+    $tam = strlen($bytes);
+    $nomeOriginal = mb_substr((string)$nomeOriginal, 0, 250);
+    $st = $conn->prepare("INSERT INTO memoriais_anexos (memorial_id, tipo, nome_original, arquivo, mime, tamanho, hash) VALUES (?,?,?,?,?,?,?)");
+    if (!$st) { @unlink($dir . '/' . $arquivo); return null; }
+    $st->bind_param('issssis', $memorialId, $tipo, $nomeOriginal, $arquivo, $mime, $tam, $hash);
+    if (!$st->execute()) { @unlink($dir . '/' . $arquivo); return null; }
+    return (int)$st->insert_id;
+}
+/* Lista anexos de um imóvel (mais recentes primeiro). */
+function anexosListar($conn, $memorialId) {
+    $memorialId = (int)$memorialId; $out = [];
+    $st = $conn->prepare("SELECT id, tipo, nome_original, arquivo, mime, tamanho, criado_em FROM memoriais_anexos WHERE memorial_id = ? ORDER BY id DESC");
+    if (!$st) return $out;
+    $st->bind_param('i', $memorialId); $st->execute(); $rs = $st->get_result();
+    while ($rs && ($row = $rs->fetch_assoc())) $out[] = $row;
+    return $out;
+}
+/* Obtém um anexo pelo id. */
+function anexoObter($conn, $anexoId) {
+    $anexoId = (int)$anexoId;
+    $st = $conn->prepare("SELECT * FROM memoriais_anexos WHERE id = ? LIMIT 1");
+    if (!$st) return null;
+    $st->bind_param('i', $anexoId); $st->execute(); $rs = $st->get_result();
+    return ($rs && ($row = $rs->fetch_assoc())) ? $row : null;
+}
+/* Exclui um anexo (registro + arquivo em disco). */
+function anexoExcluir($conn, $anexoId) {
+    $a = anexoObter($conn, $anexoId); if (!$a) return false;
+    @unlink(anexosDir() . '/' . $a['arquivo']);
+    $st = $conn->prepare("DELETE FROM memoriais_anexos WHERE id = ?");
+    if (!$st) return false; $id = (int)$anexoId; $st->bind_param('i', $id); return $st->execute();
+}
+/* Rótulo amigável do tipo de anexo. */
+function anexoTipoRotulo($tipo) {
+    return [
+        'pdf_matricula' => 'PDF da matrícula',
+        'pdf_sigef'     => 'PDF do SIGEF',
+        'kml'           => 'KML',
+        'outro'         => 'Anexo',
+    ][$tipo] ?? 'Anexo';
 }
 
 /**
@@ -2476,11 +2599,12 @@ if (isset($_POST['acao'])) {
                 if (trim((string)($cur['onr_nivel_publicidade'] ?? '')) === '') $d['onr_nivel_publicidade'] = '3';
                 if (trim((string)($cur['onr_classificacao'] ?? '')) === '') $d['onr_classificacao'] = '1';
                 aplicarDadosMatricula($conn, $id, $d);
+                $anexoId = anexoSalvarBytes($conn, $id, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
                 $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
                 echo json_encode([
                     'ok' => true, 'existe' => true, 'criado' => false, 'id' => $id, 'matricula' => $matricula, 'modelo' => $r['modelo'],
-                    'campos' => $preenchidos,
-                    'mensagem' => 'Matrícula ' . $matricula . ' já cadastrada — ' . count($preenchidos) . ' campo(s) complementado(s).'
+                    'campos' => $preenchidos, 'anexo_id' => $anexoId,
+                    'mensagem' => 'Matrícula ' . $matricula . ' já cadastrada — ' . count($preenchidos) . ' campo(s) complementado(s). PDF arquivado.'
                 ], JSON_UNESCAPED_UNICODE);
                 exit;
             }
@@ -2514,6 +2638,7 @@ if (isset($_POST['acao'])) {
             // grava os demais campos ONR extraídos
             salvarCamposOnr($conn, $novoId, $d);
             qualificacaoGravar($conn, $novoId, $pessoasNovo); // qualificação estruturada dos titulares atuais
+            $anexoId = anexoSalvarBytes($conn, $novoId, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
             $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
             echo json_encode([
                 'ok' => true, 'existe' => false, 'criado' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
@@ -2838,6 +2963,103 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'anexo_listar') {
+            $mid = (int)($_POST['id'] ?? 0);
+            if ($mid <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
+            echo json_encode(['ok' => true, 'anexos' => anexosListar($conn, $mid)], JSON_UNESCAPED_UNICODE); exit;
+        }
+
+        if ($acao === 'anexo_excluir') {
+            $aid = (int)($_POST['aid'] ?? 0);
+            $mid = (int)($_POST['id'] ?? 0);
+            $ok = anexoExcluir($conn, $aid);
+            echo json_encode(['ok' => $ok, 'anexos' => $mid > 0 ? anexosListar($conn, $mid) : []], JSON_UNESCAPED_UNICODE); exit;
+        }
+
+        if ($acao === 'anexo_upload') {
+            $mid = (int)($_POST['id'] ?? 0);
+            if ($mid <= 0) { echo json_encode(['ok' => false, 'erro' => 'Salve o imóvel antes de anexar arquivos.']); exit; }
+            if (empty($_FILES['file']['tmp_name']) || !is_uploaded_file($_FILES['file']['tmp_name'])) { echo json_encode(['ok' => false, 'erro' => 'Nenhum arquivo enviado.']); exit; }
+            $bytes = @file_get_contents($_FILES['file']['tmp_name']);
+            if ($bytes === false || $bytes === '') { echo json_encode(['ok' => false, 'erro' => 'Falha ao ler o arquivo.']); exit; }
+            $nome = (string)$_FILES['file']['name'];
+            $mime = (string)($_FILES['file']['type'] ?? '');
+            $tipo = anexoTipo($nome, $mime);
+            $aid = anexoSalvarBytes($conn, $mid, $bytes, $nome, $tipo, $mime ?: null);
+            if (!$aid) { echo json_encode(['ok' => false, 'erro' => 'Não foi possível arquivar o anexo.']); exit; }
+            echo json_encode(['ok' => true, 'anexo_id' => $aid, 'tipo' => $tipo, 'anexos' => anexosListar($conn, $mid),
+                'mensagem' => anexoTipoRotulo($tipo) . ' anexado.'], JSON_UNESCAPED_UNICODE); exit;
+        }
+
+        if ($acao === 'anexo_analisar') {
+            // Analisa um PDF (anexo existente via aid, ou upload novo via file) e PREENCHE
+            // apenas os campos VAZIOS do imóvel (nunca sobrescreve o que já está preenchido).
+            $mid = (int)($_POST['id'] ?? 0);
+            if ($mid <= 0) { echo json_encode(['ok' => false, 'erro' => 'Salve o imóvel antes de analisar anexos.']); exit; }
+            $cfg = geminiConfigLer();
+            if (trim($cfg['api_key']) === '') { echo json_encode(['ok' => false, 'erro' => 'Configure a chave da API do Gemini antes de analisar.']); exit; }
+
+            $bytes = null; $nome = ''; $mime = 'application/pdf'; $aid = (int)($_POST['aid'] ?? 0);
+            if ($aid > 0) {
+                $a = anexoObter($conn, $aid);
+                if (!$a) { echo json_encode(['ok' => false, 'erro' => 'Anexo não encontrado.']); exit; }
+                $bytes = @file_get_contents(anexosDir() . '/' . $a['arquivo']); $nome = $a['nome_original']; $mime = $a['mime'] ?: 'application/pdf';
+            } elseif (!empty($_FILES['file']['tmp_name']) && is_uploaded_file($_FILES['file']['tmp_name'])) {
+                $bytes = @file_get_contents($_FILES['file']['tmp_name']); $nome = (string)$_FILES['file']['name']; $mime = (string)($_FILES['file']['type'] ?? 'application/pdf');
+            } else { echo json_encode(['ok' => false, 'erro' => 'Nenhum arquivo para analisar.']); exit; }
+            if ($bytes === false || $bytes === '') { echo json_encode(['ok' => false, 'erro' => 'Falha ao ler o arquivo para análise.']); exit; }
+            if (stripos($mime, 'pdf') === false && strtolower(pathinfo($nome, PATHINFO_EXTENSION)) !== 'pdf') {
+                echo json_encode(['ok' => false, 'erro' => 'A análise por IA é para PDF (matrícula/SIGEF). Para KML, use o mapeamento.']); exit;
+            }
+            $r = geminiExtrairMatricula($cfg, $bytes);
+            if (!$r['ok']) { echo json_encode($r); exit; }
+            $d = $r['dados'];
+            enriquecerCepExtraido($d);
+
+            // se veio de upload novo (sem aid), arquiva agora para reprocessamento futuro
+            if ($aid <= 0) { $aid = anexoSalvarBytes($conn, $mid, $bytes, $nome, anexoTipo($nome, $mime, $d), $mime ?: 'application/pdf'); }
+
+            $rs = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = " . (int)$mid . " LIMIT 1");
+            $rowAtual = $rs ? $rs->fetch_assoc() : null;
+            if (!$rowAtual) { echo json_encode(['ok' => false, 'erro' => 'Imóvel não encontrado.']); exit; }
+
+            // deriva colunas planas dos titulares (sem sobrescrever o que a IA já trouxe em $d)
+            $pessoas = qualificacaoNormalizar($d['pessoas'] ?? []);
+            qualificacaoDerivarFlat($d, $pessoas);
+
+            // monta o conjunto "preencher se vazio" usando uma whitelist de colunas
+            $whitelist = array_merge(onrCampos(), ['proprietario', 'cpf', 'tipo_imovel', 'identificador']);
+            $sets = []; $vals = []; $types = ''; $preenchidos = [];
+            foreach ($whitelist as $col) {
+                if (!array_key_exists($col, $d)) continue;
+                $v = is_scalar($d[$col]) ? trim((string)$d[$col]) : '';
+                if ($v === '') continue;
+                if ($col === 'tipo_imovel') { $v = (stripos($v, 'rural') !== false) ? 'rural' : ((stripos($v, 'urban') !== false) ? 'urbano' : ''); if ($v === '') continue; }
+                if (array_key_exists($col, $rowAtual) && trim((string)$rowAtual[$col]) !== '') continue; // já preenchido -> respeita
+                $sets[] = "`$col` = ?"; $vals[] = $v; $types .= 's'; $preenchidos[] = $col;
+            }
+            if ($sets) {
+                $vals[] = $mid; $types .= 'i';
+                $st = $conn->prepare("UPDATE memoriais_mapeados SET " . implode(', ', $sets) . " WHERE id = ?");
+                if ($st) { $st->bind_param($types, ...$vals); $st->execute(); }
+            }
+            // qualificação: só grava se ainda não houver (preenchimento de faltante)
+            if ($pessoas && trim((string)($rowAtual['qualificacao_json'] ?? '')) === '') {
+                qualificacaoGravar($conn, $mid, $pessoas); $preenchidos[] = 'qualificacao_json';
+            }
+
+            // devolve o registro atualizado (para o formulário recarregar) + anexos
+            $rs2 = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = " . (int)$mid . " LIMIT 1");
+            $registro = $rs2 ? $rs2->fetch_assoc() : $rowAtual;
+            $nFalta = count(array_unique($preenchidos));
+            echo json_encode([
+                'ok' => true, 'id' => $mid, 'anexo_id' => $aid, 'modelo' => $r['modelo'],
+                'registro' => $registro, 'anexos' => anexosListar($conn, $mid),
+                'campos' => array_values(array_unique($preenchidos)),
+                'mensagem' => $nFalta > 0 ? ($nFalta . ' campo(s) faltante(s) preenchido(s) pela IA. Revise e salve.') : 'Nada a preencher — os campos já estavam completos.'
+            ], JSON_UNESCAPED_UNICODE); exit;
+        }
+
         if ($acao === 'carregar') {
             $id = (int)($_POST['id'] ?? 0);
             $stmt = $conn->prepare("SELECT * FROM memoriais_mapeados WHERE id = ?");
@@ -2848,7 +3070,7 @@ if (isset($_POST['acao'])) {
             if (!$row) { echo json_encode(['ok' => false, 'erro' => 'Registro não encontrado.']); exit; }
             // reconstrói a geometria a partir das coordenadas gravadas (independe da origem)
             $data = buildGeoDataFromWgs84($row['coordenadas_wgs84']);
-            echo json_encode(['ok' => true, 'registro' => $row, 'geo' => $data], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['ok' => true, 'registro' => $row, 'geo' => $data, 'anexos' => anexosListar($conn, $id)], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -2883,7 +3105,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-qualificacao (carga ITN 03: contexto correto + qualificação dos titulares atuais via registros/averbações) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-anexos-ia (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3315,6 +3537,44 @@ header('Expires: 0');
   .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .modal-f{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);justify-content:flex-end}
   .modal-f .btn-primary,.modal-f .btn-ghost{width:auto;padding:9px 16px}
+  /* ===== Modal de edição — largo, responsivo e organizado ===== */
+  #modal-edit .modal-card{max-width:1020px}
+  #modal-edit .modal-b{padding:16px 18px;gap:14px}
+  .ed-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  .ed-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .ed-section{border:1px solid var(--line);border-radius:12px;background:var(--bg);overflow:hidden}
+  .ed-section>.ed-sec-head{display:flex;align-items:center;gap:8px;padding:10px 13px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .ed-section>.ed-sec-head .ed-sec-ic{display:flex;color:var(--red)}
+  .ed-section>.ed-sec-head h4{margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink)}
+  .ed-section>.ed-sec-head .ed-sec-sub{margin-left:auto;font-size:10.5px;color:var(--faint)}
+  .ed-section>.ed-sec-body{padding:13px;display:flex;flex-direction:column;gap:11px}
+  #modal-edit .onr-box{margin:0}
+  #modal-edit .onr-accordion{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  /* Dropzone de anexos */
+  .ed-drop{border:1.6px dashed var(--line);border-radius:11px;padding:16px 12px;text-align:center;cursor:pointer;
+    transition:.15s;background:var(--panel);color:var(--faint)}
+  .ed-drop:hover,.ed-drop.drag{border-color:var(--red);background:rgba(168,15,30,.05);color:var(--ink)}
+  .ed-drop .ed-drop-ic{display:flex;justify-content:center;margin-bottom:6px;color:var(--red)}
+  .ed-drop b{color:var(--ink)}
+  .ed-drop small{display:block;margin-top:3px;font-size:10.5px}
+  .ed-drop-opts{display:flex;align-items:center;gap:7px;justify-content:center;margin-top:9px;font-size:11.5px;color:var(--ink)}
+  .ed-drop-opts input{accent-color:var(--red)}
+  /* Lista de anexos */
+  .anx-list{display:flex;flex-direction:column;gap:8px}
+  .anx-empty{font-size:11.5px;color:var(--faint);padding:4px 2px}
+  .anx-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--panel)}
+  .anx-ic{flex:0 0 30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+  .anx-ic.pdf_matricula{background:#a80f1e}.anx-ic.pdf_sigef{background:#1f7a4d}.anx-ic.kml{background:#2563eb}.anx-ic.outro{background:#6b7280}
+  .anx-meta{flex:1;min-width:0}
+  .anx-nome{font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .anx-sub{font-size:10px;color:var(--faint);margin-top:1px}
+  .anx-acts{display:flex;gap:4px;flex:0 0 auto}
+  .anx-btn{width:30px;height:30px;border:1px solid var(--line);background:var(--bg);color:var(--faint);border-radius:8px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:.15s}
+  .anx-btn:hover{color:var(--ink);border-color:var(--red)}
+  .anx-btn.danger:hover{color:#fff;background:var(--red);border-color:var(--red)}
+  .anx-btn[disabled]{opacity:.45;cursor:default}
+  @media (max-width:820px){ .ed-grid{grid-template-columns:1fr} }
   /* ===== FAB + backdrop (mobile) ===== */
   .fab-panel{display:none;position:fixed;right:16px;bottom:92px;z-index:1100;width:52px;height:52px;border-radius:50%;
     background:var(--red);color:#fff;border:none;box-shadow:0 6px 20px rgba(168,15,30,.45);cursor:pointer;align-items:center;justify-content:center}
@@ -3674,6 +3934,14 @@ header('Expires: 0');
     </div>
     <input type="hidden" id="ed-id">
     <div class="modal-b">
+      <div class="ed-grid">
+       <div class="ed-col">
+        <div class="ed-section">
+          <div class="ed-sec-head">
+            <span class="ed-sec-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            <h4>Identificação do imóvel</h4>
+          </div>
+          <div class="ed-sec-body">
       <div class="fld"><label class="field-label">Identificação do imóvel</label><input id="ed-identificador" type="text"></div>
       <div class="modal-row">
         <div class="fld"><label class="field-label">Nº da matrícula</label><input id="ed-matricula" type="text"></div>
@@ -3709,6 +3977,31 @@ header('Expires: 0');
           </div>
           <p class="cor-hint" id="ed-sit-hint"></p>
         </div>
+      </div>
+          </div>
+        </div>
+       </div>
+
+       <div class="ed-col">
+        <div class="ed-section">
+          <div class="ed-sec-head">
+            <span class="ed-sec-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+            <h4>Anexos do imóvel</h4>
+            <span class="ed-sec-sub" id="ed-anx-count"></span>
+          </div>
+          <div class="ed-sec-body">
+            <div id="ed-anexos-list" class="anx-list"><div class="anx-empty">—</div></div>
+            <div id="ed-drop" class="ed-drop" tabindex="0">
+              <div class="ed-drop-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+              <b>Arraste um arquivo aqui</b> ou clique para selecionar
+              <small>PDF da matrícula · PDF do SIGEF · KML</small>
+              <label class="ed-drop-opts" onclick="event.stopPropagation()"><input type="checkbox" id="ed-anx-ia" checked> Analisar com IA p/ preencher campos faltantes</label>
+            </div>
+            <input type="file" id="ed-anx-file" accept=".pdf,.kml,application/pdf,application/vnd.google-earth.kml+xml" style="display:none">
+            <p class="cor-hint">Os PDFs enviados para cadastro/complemento ficam arquivados aqui para conferência e reprocessamento.</p>
+          </div>
+        </div>
+       </div>
       </div>
 
       <!-- Dados para o Mapa ONR (recolhível, igual ao painel lateral) -->
@@ -3885,7 +4178,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-itn03-qualificacao','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-anexos-ia','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5046,9 +5339,12 @@ function novaMatriculaItn03(){
   edSucList=[]; if(typeof edRenderSucChips==='function') edRenderSucChips();
   if(typeof edToggleEnc==='function') edToggleEnc();
   edPreencherOnr(null);
+  edAnxId = 0;
+  edRenderAnexos([]);
   const onrAcc=document.querySelector('#modal-edit .ed-onr'); if(onrAcc) onrAcc.open=true;
   const t=document.getElementById('ed-titulo'); if(t) t.textContent='Nova matrícula — só ITN 03 (sem mapa)';
   document.getElementById('modal-edit').classList.add('show');
+  edAtualizarDrop();
   document.getElementById('ed-identificador').focus();
 }
 async function abrirEdicao(id){
@@ -5076,12 +5372,16 @@ async function abrirEdicao(id){
   if(typeof edSucFeedback==='function') edSucFeedback('');
   edToggleEnc();
   edPreencherOnr(null);            // limpa enquanto busca o registro completo
+  edAnxId = it.id;
+  edRenderAnexos(null);            // "carregando…"
   document.getElementById('modal-edit').classList.add('show');
+  edAtualizarDrop();
   // os dados ONR completos não vêm na listagem enxuta: busca o registro inteiro
   try {
     const res = await post({acao:'carregar', id});
     if(res && res.ok && res.registro) edPreencherOnr(res.registro);
-  } catch(e){ /* mantém os valores padrão */ }
+    if(res && res.ok) edRenderAnexos(res.anexos||[]);
+  } catch(e){ edRenderAnexos([]); }
 }
 const EONR_PADRAO = {onr_nivel_publicidade:'3', onr_classificacao:'1'};
 function edPreencherOnr(reg){
@@ -5191,6 +5491,131 @@ function edToggleEnc(){
     else hint.textContent='';
   }
 }
+/* ===================== ANEXOS DO IMÓVEL ===================== */
+let edAnxId = 0;            // id do imóvel atualmente em edição (0 = ainda não salvo)
+let edAnxBusy = false;
+const ANX_ROTULO = {pdf_matricula:'PDF da matrícula', pdf_sigef:'PDF do SIGEF', kml:'KML', outro:'Anexo'};
+function fmtBytes(n){ n=+n||0; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(0)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
+function edAtualizarDrop(){
+  const drop=document.getElementById('ed-drop'); if(!drop) return;
+  if(edAnxId>0){ drop.classList.remove('disabled'); drop.style.opacity=''; drop.style.pointerEvents=''; }
+  else { drop.style.opacity='.55'; drop.style.pointerEvents='none'; }
+}
+function edRenderAnexos(list){
+  const box=document.getElementById('ed-anexos-list'); const cnt=document.getElementById('ed-anx-count');
+  if(!box) return;
+  if(list===null){ box.innerHTML='<div class="anx-empty">Carregando…</div>'; if(cnt) cnt.textContent=''; return; }
+  if(!Array.isArray(list) || !list.length){
+    box.innerHTML = '<div class="anx-empty">'+(edAnxId>0?'Nenhum anexo ainda. Use a área abaixo para enviar.':'Salve o imóvel para anexar arquivos.')+'</div>';
+    if(cnt) cnt.textContent=''; return;
+  }
+  if(cnt) cnt.textContent = list.length+' arquivo'+(list.length>1?'s':'');
+  const ehPdf = t => t==='pdf_matricula'||t==='pdf_sigef';
+  box.innerHTML = list.map(a=>{
+    const rot = ANX_ROTULO[a.tipo]||'Anexo';
+    const sub = rot+' · '+fmtBytes(a.tamanho)+(a.criado_em?(' · '+String(a.criado_em).slice(0,16).replace('T',' ')):'');
+    const url = window.location.pathname+'?anexo='+a.id;
+    const analisarBtn = ehPdf(a.tipo)
+      ? `<button class="anx-btn" title="Analisar com IA e preencher campos faltantes" data-anx-ia="${a.id}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.7-6.7l-1.4 1.4M7.7 16.3l-1.4 1.4m12.4 0l-1.4-1.4M7.7 7.7L6.3 6.3"/><circle cx="12" cy="12" r="3.2"/></svg></button>` : '';
+    const sigla = a.tipo==='kml'?'KML':(ehPdf(a.tipo)?'PDF':'•');
+    return `<div class="anx-item">
+      <div class="anx-ic ${a.tipo}">${sigla}</div>
+      <div class="anx-meta"><div class="anx-nome" title="${escapeHtml(a.nome_original)}">${escapeHtml(a.nome_original)}</div><div class="anx-sub">${escapeHtml(sub)}</div></div>
+      <div class="anx-acts">
+        <a class="anx-btn" href="${url}" target="_blank" rel="noopener" title="Abrir / baixar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></a>
+        ${analisarBtn}
+        <button class="anx-btn danger" title="Excluir anexo" data-anx-del="${a.id}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('[data-anx-ia]').forEach(b=> b.onclick=()=> edAnalisarAnexo(+b.dataset.anxIa));
+  box.querySelectorAll('[data-anx-del]').forEach(b=> b.onclick=()=> edExcluirAnexo(+b.dataset.anxDel));
+}
+/* aplica um registro completo ao formulário (após análise IA) — proprietários, tipo, ONR, qualificação */
+function edAplicarRegistro(reg){
+  if(!reg) return;
+  if(reg.identificador && !document.getElementById('ed-identificador').value.trim()) document.getElementById('ed-identificador').value = reg.identificador;
+  if(reg.tipo_imovel && !document.getElementById('ed-tipo').value) document.getElementById('ed-tipo').value = reg.tipo_imovel;
+  // proprietários: se o editor estiver vazio, repovoa a partir do registro
+  const vazio = !edProps.some(p=>(p.nome||'').trim()||(p.doc||'').trim());
+  if(vazio && (reg.proprietario||reg.cpf)){
+    const nomes=(reg.proprietario||'').split(',').map(s=>s.trim());
+    const docs=(reg.cpf||'').split(',').map(s=>s.trim());
+    edProps=[]; const n=Math.max(nomes.length,docs.length);
+    for(let k=0;k<n;k++){ const nm=nomes[k]||'', dc=docs[k]?mascaraDoc(docs[k]):''; if(nm||dc) edProps.push({nome:nm,doc:dc}); }
+    if(!edProps.length) edProps=[{nome:'',doc:''}];
+    edRenderProps();
+  }
+  edPreencherOnrSeVazio(reg); // preenche apenas os inputs vazios; preserva o que o usuário digitou
+}
+/* preenche os inputs ONR vazios a partir do registro (sem sobrescrever o que o usuário digitou) */
+function edPreencherOnrSeVazio(reg){
+  document.querySelectorAll('[data-eonr]').forEach(el=>{
+    const col=el.getAttribute('data-eonr');
+    const cur=(el.value==null)?'':String(el.value).trim();
+    if(cur==='' && reg && reg[col]!=null && String(reg[col])!=='') el.value = reg[col];
+  });
+  if(typeof edRenderQualificacao==='function') edRenderQualificacao(reg ? reg.qualificacao_json : '');
+}
+async function edEnviarArquivo(file){
+  if(!file) return;
+  if(edAnxId<=0){ setStatus('warn','Salve o imóvel antes de anexar arquivos.'); return; }
+  if(edAnxBusy){ return; }
+  const ehPdf = /\.pdf$/i.test(file.name) || file.type==='application/pdf';
+  const analisar = ehPdf && document.getElementById('ed-anx-ia') && document.getElementById('ed-anx-ia').checked;
+  edAnxBusy = true;
+  const drop=document.getElementById('ed-drop');
+  if(drop) drop.classList.add('drag');
+  setStatus('warn', analisar ? `Enviando e analisando “${escapeHtml(file.name)}” com IA…` : `Anexando “${escapeHtml(file.name)}”…`);
+  try{
+    const fd=new FormData();
+    fd.append('acao', analisar?'anexo_analisar':'anexo_upload');
+    fd.append('id', edAnxId);
+    fd.append('file', file);
+    const r = await fetch(window.location.pathname,{method:'POST',body:fd}).then(x=>x.json());
+    if(!r || !r.ok){ setStatus('err', (r&&r.erro)||'Falha ao enviar o anexo.'); return; }
+    if(r.anexos) edRenderAnexos(r.anexos);
+    if(analisar && r.registro){ edAplicarRegistro(r.registro); }
+    setStatus('ok', (r.mensagem||'Anexo enviado.')+(r.modelo?(' ('+r.modelo+')'):''));
+  }catch(e){ setStatus('err','Falha na requisição de anexo.'); }
+  finally{ edAnxBusy=false; if(drop) drop.classList.remove('drag'); const fi=document.getElementById('ed-anx-file'); if(fi) fi.value=''; }
+}
+async function edAnalisarAnexo(aid){
+  if(edAnxId<=0 || !aid) return; if(edAnxBusy) return;
+  edAnxBusy=true;
+  setStatus('warn','Analisando anexo com IA e preenchendo campos faltantes…');
+  try{
+    const fd=new FormData(); fd.append('acao','anexo_analisar'); fd.append('id', edAnxId); fd.append('aid', aid);
+    const r = await fetch(window.location.pathname,{method:'POST',body:fd}).then(x=>x.json());
+    if(!r || !r.ok){ setStatus('err',(r&&r.erro)||'Falha ao analisar o anexo.'); return; }
+    if(r.anexos) edRenderAnexos(r.anexos);
+    if(r.registro) edAplicarRegistro(r.registro);
+    setStatus('ok', (r.mensagem||'Análise concluída.')+(r.modelo?(' ('+r.modelo+')'):''));
+  }catch(e){ setStatus('err','Falha na requisição de análise.'); }
+  finally{ edAnxBusy=false; }
+}
+async function edExcluirAnexo(aid){
+  if(!aid) return;
+  const ok = await Swal.fire({...swalTema(), title:'Excluir anexo?', text:'O arquivo será removido do servidor.', icon:'warning', showCancelButton:true, confirmButtonText:'Excluir', cancelButtonText:'Cancelar'}).then(x=>x.isConfirmed).catch(()=>false);
+  if(!ok) return;
+  try{
+    const r = await post({acao:'anexo_excluir', aid, id:edAnxId});
+    if(r && r.ok){ edRenderAnexos(r.anexos||[]); setStatus('ok','Anexo excluído.'); }
+    else setStatus('err','Não foi possível excluir o anexo.');
+  }catch(e){ setStatus('err','Falha ao excluir o anexo.'); }
+}
+function edInitDrop(){
+  const drop=document.getElementById('ed-drop'); const fi=document.getElementById('ed-anx-file');
+  if(!drop || !fi || drop.dataset.init) return; drop.dataset.init='1';
+  drop.addEventListener('click', ()=>{ if(edAnxId>0) fi.click(); });
+  drop.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ')&&edAnxId>0){ e.preventDefault(); fi.click(); } });
+  ['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); if(edAnxId>0) drop.classList.add('drag'); }));
+  ['dragleave','dragend'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag'); }));
+  drop.addEventListener('drop', e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag');
+    const f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(f) edEnviarArquivo(f); });
+  fi.addEventListener('change', ()=>{ const f=fi.files && fi.files[0]; if(f) edEnviarArquivo(f); });
+}
+
 function fecharEdicao(){ edNovoItn03=false; const t=document.getElementById('ed-titulo'); if(t) t.textContent='Editar dados do imóvel'; document.getElementById('modal-edit').classList.remove('show'); }
 
 /* ===================== EXPORTAÇÃO DE CARGA ITN 03 (ONR) ===================== */
@@ -5809,6 +6234,7 @@ function verificarPertencimento(geo){
   const einp=document.getElementById('ed-sucessora-input'); if(einp) einp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); edAddSuc(); } });
   const ec=document.getElementById('ed-cancelar'); if(ec) ec.addEventListener('click', fecharEdicao);
   const eov=document.getElementById('modal-edit'); if(eov) eov.addEventListener('click', e=>{ if(e.target===eov) fecharEdicao(); });
+  edInitDrop();
 
   // Recolher painel / drawer mobile
   const tg=document.getElementById('btn-toggle-panel'); if(tg) tg.addEventListener('click', togglePainel);
