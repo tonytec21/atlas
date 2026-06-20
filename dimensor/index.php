@@ -1929,14 +1929,27 @@ function gerarRelatorioInconsistenciasPDF($conn, $ids) {
                 }
             }
             public function Footer() {
-                $this->SetY(-15); $this->SetFont('helvetica','',8); $this->SetTextColor(120,120,120);
-                $this->Cell(0,8,'Atlas Dimensor — Relatório de inconsistências · '.date('d/m/Y H:i').'  ·  Página '.$this->getAliasNumPage().'/'.$this->getAliasNbPages(),0,0,'C');
+                $pw = $this->getPageWidth();
+                $this->SetFont('helvetica', '', 7);
+                $this->SetTextColor(120, 120, 120);
+                // "Emitido em ..." na VERTICAL, junto à margem direita da página (centralizado)
+                $txt = 'Emitido em ' . date('d/m/Y H:i') . ' — Atlas Dimensor / Sistema Atlas';
+                $tw  = $this->GetStringWidth($txt);
+                $xv  = $pw - 6;                                  // ~6 mm da borda direita
+                $yv  = ($this->getPageHeight() + $tw) / 2;       // centralizado verticalmente
+                $this->StartTransform();
+                $this->Rotate(90, $xv, $yv);                     // gira 90° (lê de baixo p/ cima)
+                $this->Text($xv, $yv, $txt);
+                $this->StopTransform();
+                // "Página X de Y" — alinhada à direita, acima do timbrado
+                $this->SetXY(0, -24);
+                $this->Cell($pw - 9, 5, 'Página ' . $this->getAliasNumPage() . ' de ' . $this->getAliasNbPages(), 0, 0, 'R');
             }
         }
     }
     $pdf = new RelatorioInconsPDF('P', 'mm', 'A4', true, 'UTF-8');
     $pdf->SetCreator('Atlas Dimensor'); $pdf->SetTitle('Relatório de inconsistências');
-    $pdf->SetMargins(16, 40, 16); $pdf->SetAutoPageBreak(true, 20);
+    $pdf->SetMargins(16, 42, 16); $pdf->SetAutoPageBreak(true, 28); // topo 42 e fundo 28 para limpar o timbrado
     $pdf->AddPage();
 
     $pdf->SetFont('helvetica', 'B', 15); $pdf->SetTextColor(30,30,30);
@@ -3372,7 +3385,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-inc-geom-detalhe (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-inc-rodape2 (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4536,7 +4549,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-inc-geom-detalhe','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-inc-rodape2','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
