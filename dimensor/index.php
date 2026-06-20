@@ -621,6 +621,9 @@ function ensureTable($conn) {
         'matricula_sucessora'  => "ADD COLUMN matricula_sucessora VARCHAR(120) NULL DEFAULT NULL",
         // Matrícula cadastrada SÓ para a carga ITN 03 (sem coordenadas/mapeamento).
         'itn03_exclusivo'      => "ADD COLUMN itn03_exclusivo TINYINT(1) NOT NULL DEFAULT 0",
+        // Qualificação estruturada dos titulares ATUAIS (JSON), extraída dos registros/averbações.
+        // Usada pela carga ITN 03 (dados_pessoa) e mantém compat. com as colunas proprietario/cpf.
+        'qualificacao_json'    => "ADD COLUMN qualificacao_json MEDIUMTEXT NULL DEFAULT NULL",
     ];
     foreach ($novas as $colNome => $ddl) {
         $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colNome) . "'");
@@ -1657,41 +1660,74 @@ function acharMemorialPorMatricula($conn, $mat) {
     while ($res && ($row = $res->fetch_assoc())) { if ($norm($row['numero_matricula']) === $alvo) return (int)$row['id']; }
     return null;
 }
-/* Prompt de extração: pede JSON com as chaves = colunas do banco. */
+/* Prompt de extração: pede JSON com as chaves = colunas do banco.
+   IMPORTANTE: a titularidade é definida pela CADEIA de atos (Registros R-n e Averbações Av-n).
+   O modelo deve percorrê-la em ordem e devolver os TITULARES ATUAIS com a qualificação completa. */
 function geminiPromptMatricula() {
-    return "Você é um extrator de dados de matrículas de imóveis de cartório de Registro de Imóveis do Brasil. "
-        . "Leia a matrícula em PDF e devolva SOMENTE um objeto JSON (sem texto extra, sem markdown) com as chaves abaixo. "
-        . "Use string vazia quando não encontrar. Não invente dados.\n"
-        . "{\n"
-        . "\"nome_imo\": denominação do imóvel (ex.: FAZENDA AGRO TRÊS IRMÃOS),\n"
-        . "\"numero_matricula\": número da matrícula do imóvel, se constar (ex.: 'Matrícula do imóvel: 873' => 873),\n"
-        . "\"tipo_imovel\": \"rural\" ou \"urbano\",\n"
-        . "\"dat_mat\": data de abertura/registro da matrícula (dd/mm/aaaa),\n"
-        . "\"liv_mat\": número do livro,\n"
-        . "\"fol_mat\": número da folha/ficha,\n"
-        . "\"transcri\": número de transcrição anterior, se houver,\n"
-        . "\"cnm\": Código Nacional da Matrícula (CNM),\n"
-        . "\"cns\": Código Nacional da Serventia (CNS), normalmente o prefixo do CNM,\n"
-        . "\"endereco\": localização/endereço do imóvel,\n"
-        . "\"municipio\": município do imóvel,\n"
-        . "\"uf\": sigla do estado (2 letras),\n"
-        . "\"cep\": CEP do imóvel (8 dígitos, só números); se não constar no documento, informe o CEP GERAL do município,\n"
-        . "\"proprietario\": nome(s) do(s) proprietário(s) ATUAL(is) (o mais recente registrado/outorgado); separe vários por vírgula,\n"
-        . "\"cpf\": CPF ou CNPJ do(s) proprietário(s) atual(is), na mesma ordem, separados por vírgula,\n"
-        . "\"conf_nom\": nomes dos confrontantes/limites separados por vírgula,\n"
-        . "\"conf_mat\": matrículas confrontantes, se citadas, separadas por vírgula,\n"
-        . "\"rel_jur\": tipo de relação jurídica (ex.: propriedade),\n"
-        . "\"ccir_sncr\": número do CCIR,\n"
-        . "\"sigef\": código de certificação SIGEF/INCRA, se houver,\n"
-        . "\"snci\": número SNCI, se houver,\n"
-        . "\"cib_nirf\": número CIB ou NIRF (Receita Federal),\n"
-        . "\"car\": número do CAR (Cadastro Ambiental Rural),\n"
-        . "\"rip\": número RIP, se houver,\n"
-        . "\"cif\": número CIF, se houver,\n"
-        . "\"classifica\": \"1\" se o imóvel for georreferenciado e CERTIFICADO pelo INCRA (ou urbano com ART), \"2\" se georreferenciado sem certificação, \"3\" se apenas desenho/sem georreferenciamento,\n"
-        . "\"onr_numero_prenotacao\": número do PROTOCOLO ou da PRENOTAÇÃO da matrícula — procure por 'protocolo', 'prenotação' ou 'prenot' (ex.: 'sob protocolo n° 10.676' => 10676). Sempre existe; retorne apenas o número,\n"
-        . "\"memorial\": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. Pode ser: (a) texto corrido começando em 'Inicia-se a descrição...'; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; ou (c) uma TABELA do SIGEF/INCRA com colunas Código, Longitude, Latitude — neste caso transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039\" -4°05'50,116\"'). Inclua todos os vértices; não converta, não arredonde, não omita nenhum\n"
-        . "}";
+    return <<<'PROMPT'
+Você é um extrator de dados de matrículas de imóveis de cartório de Registro de Imóveis do Brasil.
+Leia a matrícula em PDF e devolva SOMENTE um objeto JSON (sem texto extra, sem markdown) com as chaves abaixo.
+Use string vazia "" quando não encontrar; use [] para listas vazias. NUNCA invente dados.
+
+COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
+- A matrícula tem o registro de abertura (R-0/R-1) e depois uma sequência de REGISTROS (R-2, R-3, ...) e AVERBAÇÕES (Av-1, Av-2, ...).
+- Percorra TODOS os atos na ordem em que aparecem. Cada transmissão (compra e venda, doação, partilha por óbito/divórcio, dação, arrematação, integralização, usucapião, permuta, adjudicação etc.) ou instituição/extinção de direito real (usufruto, fideicomisso, superfície, promessa de compra e venda registrada etc.) ALTERA quem é o titular atual.
+- O TITULAR ATUAL é definido pelo ÚLTIMO ato eficaz de cada direito. Atos CANCELADOS, baixados ou substituídos por averbação posterior NÃO valem — ignore o titular antigo quando houver transmissão posterior.
+- Atente para averbações que cancelam registros (ex.: "Av-5 ... cancelo o R-3"), alteram estado civil/nome, ou registram divórcio/partilha que muda a titularidade ou o percentual.
+- Quando houver mais de um titular atual (co-proprietários, nu-proprietário + usufrutuário, casal), retorne TODOS, cada um com seu direito e percentual/fração.
+
+{
+"nome_imo": denominação do imóvel (ex.: FAZENDA AGRO TRÊS IRMÃOS),
+"numero_matricula": número da matrícula do imóvel, se constar (ex.: 'Matrícula do imóvel: 873' => 873),
+"tipo_imovel": "rural" ou "urbano",
+"dat_mat": data de abertura/registro da matrícula (dd/mm/aaaa),
+"liv_mat": número do livro,
+"fol_mat": número da folha/ficha,
+"transcri": número de transcrição anterior, se houver,
+"cnm": Código Nacional da Matrícula (CNM),
+"cns": Código Nacional da Serventia (CNS), normalmente o prefixo do CNM,
+"endereco": localização/endereço do imóvel,
+"municipio": município do imóvel,
+"uf": sigla do estado (2 letras),
+"cep": CEP do imóvel (8 dígitos, só números); se não constar no documento, informe o CEP GERAL do município,
+"proprietario": nome(s) do(s) TITULAR(es) ATUAL(is) conforme a regra acima; separe vários por vírgula,
+"cpf": CPF ou CNPJ do(s) titular(es) atual(is), na MESMA ordem de "proprietario", separados por vírgula,
+"rel_jur": relação jurídica do titular principal por extenso (ex.: propriedade, usufruto, nua-propriedade, promessa de compra e venda),
+"dat_ini": data (dd/mm/aaaa) do ATO que originou a relação jurídica atual (a data do registro/averbação da última transmissão eficaz),
+"per_rel": percentual/fração do titular principal (ex.: 100%, 50%, 1/2),
+"pessoas": [
+   // UMA entrada por TITULAR ATUAL. Liste todos. Cada objeto:
+   {
+     "nome": nome completo,
+     "cpf_cnpj": CPF (11) ou CNPJ (14) — pode conter máscara,
+     "estrangeiro": true se a nacionalidade NÃO for brasileira, senão false,
+     "nacionalidade": nacionalidade por extenso (ex.: brasileira, argentina, portuguesa),
+     "estado_civil": estado civil por extenso (solteiro, casado, separado, divorciado, viúvo, união estável),
+     "regime_bens": regime de bens por extenso, se casado/união estável (ex.: comunhão parcial, comunhão universal, separação total/convencional, separação legal/obrigatória),
+     "profissao": profissão, se constar,
+     "rg": número do RG/identidade, se constar,
+     "orgao_emissor": órgão emissor do RG (ex.: SSP/MA), se constar,
+     "endereco": endereço/domicílio do titular, se constar,
+     "relacao_juridica": direito real do titular por extenso (proprietário, usufrutuário, nu-proprietário, promitente comprador, fiduciário, superficiário, etc.),
+     "data_inicio": data (dd/mm/aaaa) do ato que conferiu esse direito a este titular,
+     "percentual": percentual numérico do direito (ex.: 100, 50, 33.33). Se não constar, divida igualmente entre os co-titulares,
+     "condicao": "adquirente" (titular atual) ou "alienante" (transmitente anterior). Liste apenas titulares ATUAIS como "adquirente"
+   }
+],
+"conf_nom": nomes dos confrontantes/limites separados por vírgula,
+"conf_mat": matrículas confrontantes, se citadas, separadas por vírgula,
+"ccir_sncr": número do CCIR,
+"sigef": código de certificação SIGEF/INCRA, se houver,
+"snci": número SNCI, se houver,
+"cib_nirf": número CIB ou NIRF (Receita Federal),
+"car": número do CAR (Cadastro Ambiental Rural),
+"rip": número RIP, se houver,
+"cif": número CIF, se houver,
+"classifica": "1" se o imóvel for georreferenciado e CERTIFICADO pelo INCRA (ou urbano com ART), "2" se georreferenciado sem certificação, "3" se apenas desenho/sem georreferenciamento,
+"onr_numero_prenotacao": número do PROTOCOLO ou da PRENOTAÇÃO da matrícula — procure por 'protocolo', 'prenotação' ou 'prenot' (ex.: 'sob protocolo n° 10.676' => 10676). Sempre existe; retorne apenas o número,
+"memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. Pode ser: (a) texto corrido começando em 'Inicia-se a descrição...'; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; ou (c) uma TABELA do SIGEF/INCRA com colunas Código, Longitude, Latitude — neste caso transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'). Inclua todos os vértices; não converta, não arredonde, não omita nenhum
+}
+PROMPT;
 }
 /* Chama a API do Gemini com o PDF e retorna os dados extraídos. */
 function geminiExtrairMatricula($cfg, $pdfBytes) {
@@ -1724,8 +1760,134 @@ function geminiExtrairMatricula($cfg, $pdfBytes) {
     if (!is_array($dados)) return ['ok' => false, 'erro' => 'A IA não retornou um JSON válido.'];
     return ['ok' => true, 'dados' => $dados, 'modelo' => $model];
 }
+/* ===================== QUALIFICAÇÃO DOS TITULARES (registros/averbações) =====================
+   A IA devolve "pessoas": lista de TITULARES ATUAIS com qualificação. Guardamos o array bruto em
+   qualificacao_json e derivamos as colunas planas (proprietario/cpf/rel_jur/dat_ini/per_rel) para
+   manter a compatibilidade com o mapa/InfoWindow. A carga ITN 03 (itn03ImovelDaLinha) lê este JSON
+   e faz o mapeamento texto -> enum no momento da exportação. */
+
+/* Estado civil por extenso -> código (glossário ITN 03). Default 1 (solteiro). */
+function itn03MapEstadoCivil($s) {
+    $t = itn03NormNome($s);
+    if ($t === '') return 1;
+    if (strpos($t, 'uniao') !== false || strpos($t, 'convivente') !== false) return 6; // união estável
+    if (strpos($t, 'cas') !== false)                                          return 2; // casado(a)
+    if (strpos($t, 'divorc') !== false)                                       return 4;
+    if (strpos($t, 'separ') !== false)                                        return 3;
+    if (strpos($t, 'viuv') !== false || strpos($t, 'viuvo') !== false)        return 5;
+    if (strpos($t, 'solt') !== false)                                         return 1;
+    return 1;
+}
+/* Regime de bens por extenso -> código (glossário ITN 03). Default 1 (comunhão parcial). */
+function itn03MapRegimeBens($s) {
+    $t = itn03NormNome($s);
+    if ($t === '') return 1;
+    if (strpos($t, 'universal') !== false)                                  return 2;
+    if (strpos($t, 'obrigat') !== false || strpos($t, 'legal') !== false)   return 4; // separação legal/obrigatória
+    if (strpos($t, 'separ') !== false)                                      return 3; // separação convencional/absoluta
+    if (strpos($t, 'aquest') !== false || strpos($t, 'participacao') !== false) return 5;
+    if (strpos($t, 'estrangeir') !== false)                                 return 7;
+    if (strpos($t, 'pacto') !== false || strpos($t, 'misto') !== false)     return 6;
+    if (strpos($t, 'parcial') !== false || strpos($t, 'comunhao') !== false) return 1;
+    return 1;
+}
+/* Relação jurídica por extenso -> código (glossário ITN 03). Default 1 (proprietário). */
+function itn03MapRelacaoJuridica($s) {
+    $t = itn03NormNome($s);
+    if ($t === '') return 1;
+    if (strpos($t, 'nu') === 0 || strpos($t, 'nu propriet') !== false || strpos($t, 'nua propriedade') !== false) return 3;
+    if (strpos($t, 'usufrut') !== false)                                    return 2;
+    if (strpos($t, 'promitente') !== false || strpos($t, 'promessa') !== false || strpos($t, 'compromiss') !== false) return 12;
+    if (strpos($t, 'fiduciante') !== false)                                 return 8;
+    if (strpos($t, 'fiduciari') !== false)                                  return 9;
+    if (strpos($t, 'superfici') !== false)                                  return 7;
+    if (strpos($t, 'arrendante') !== false)                                 return 10;
+    if (strpos($t, 'arrendatari') !== false)                                return 11;
+    if (strpos($t, 'multipropriet') !== false)                              return 13;
+    if (strpos($t, 'parceir') !== false)                                    return 14;
+    if (strpos($t, 'enfiteut') !== false)                                   return 17;
+    if (strpos($t, 'habitad') !== false || strpos($t, 'habitac') !== false) return 5;
+    if (strpos($t, 'usuari') !== false)                                     return 4;
+    if (strpos($t, 'propriet') !== false || strpos($t, 'propriedade') !== false) return 1;
+    return 1;
+}
+/* Extrai dígitos de percentual ("33,33%" / "1/2" -> número). Retorna float ou null. */
+function itn03PercentualNum($s) {
+    $s = trim((string)$s);
+    if ($s === '') return null;
+    if (preg_match('#(\d+)\s*/\s*(\d+)#', $s, $m) && (float)$m[2] != 0) return round(100 * (float)$m[1] / (float)$m[2], 2);
+    $s = str_replace(['%', ' '], '', $s);
+    $s = str_replace('.', '', $s);   // separador de milhar eventual
+    $s = str_replace(',', '.', $s);  // vírgula decimal -> ponto
+    return is_numeric($s) ? round((float)$s, 2) : null;
+}
+/* Normaliza a lista "pessoas" da IA num array consistente (mantém texto + flags). */
+function qualificacaoNormalizar($pessoas) {
+    if (!is_array($pessoas)) return [];
+    $out = [];
+    foreach ($pessoas as $p) {
+        if (!is_array($p)) continue;
+        $nome = trim((string)($p['nome'] ?? $p['nome_completo'] ?? ''));
+        $doc  = itn03Dig($p['cpf_cnpj'] ?? ($p['cpf'] ?? ''));
+        if ($nome === '' && $doc === '') continue;
+        $estr = $p['estrangeiro'] ?? null;
+        if (is_string($estr)) $estr = in_array(strtolower(trim($estr)), ['1','true','sim','yes'], true);
+        $nac  = trim((string)($p['nacionalidade'] ?? ''));
+        if ($estr === null) $estr = ($nac !== '' && itn03NormNome($nac) !== 'brasileira' && itn03NormNome($nac) !== 'brasileiro' && itn03NormNome($nac) !== 'brasil');
+        $out[] = [
+            'nome'          => $nome,
+            'cpf_cnpj'      => $doc,
+            'estrangeiro'   => (bool)$estr,
+            'nacionalidade' => $nac,
+            'estado_civil'  => trim((string)($p['estado_civil'] ?? '')),
+            'regime_bens'   => trim((string)($p['regime_bens'] ?? '')),
+            'profissao'     => trim((string)($p['profissao'] ?? '')),
+            'rg'            => trim((string)($p['rg'] ?? '')),
+            'orgao_emissor' => trim((string)($p['orgao_emissor'] ?? '')),
+            'endereco'      => trim((string)($p['endereco'] ?? '')),
+            'relacao_juridica' => trim((string)($p['relacao_juridica'] ?? ($p['relacao'] ?? ''))),
+            'data_inicio'   => trim((string)($p['data_inicio'] ?? ($p['data'] ?? ''))),
+            'percentual'    => trim((string)($p['percentual'] ?? '')),
+            'condicao'      => trim((string)($p['condicao'] ?? '')),
+        ];
+    }
+    return $out;
+}
+/* A partir das pessoas, preenche colunas planas vazias (proprietario/cpf/rel_jur/dat_ini/per_rel). */
+function qualificacaoDerivarFlat(array &$d, array $pessoas) {
+    if (!$pessoas) return;
+    // Apenas titulares atuais (descarta explicitamente "alienante").
+    $atuais = array_values(array_filter($pessoas, fn($p) => itn03NormNome($p['condicao']) !== 'alienante'));
+    if (!$atuais) $atuais = $pessoas;
+    $nomes = array_values(array_filter(array_map(fn($p) => $p['nome'], $atuais)));
+    $docs  = array_values(array_filter(array_map(fn($p) => $p['cpf_cnpj'], $atuais)));
+    if ($nomes && trim((string)($d['proprietario'] ?? '')) === '') $d['proprietario'] = implode(', ', $nomes);
+    if ($docs  && trim((string)($d['cpf'] ?? '')) === '')          $d['cpf']          = implode(', ', $docs);
+    $p0 = $atuais[0];
+    if (trim((string)($d['rel_jur'] ?? '')) === '' && $p0['relacao_juridica'] !== '') $d['rel_jur'] = $p0['relacao_juridica'];
+    if (trim((string)($d['dat_ini'] ?? '')) === '' && $p0['data_inicio'] !== '')      $d['dat_ini'] = $p0['data_inicio'];
+    if (trim((string)($d['per_rel'] ?? '')) === '' && $p0['percentual'] !== '')       $d['per_rel'] = $p0['percentual'];
+}
+/* Grava o JSON de qualificação na coluna qualificacao_json (prepared). */
+function qualificacaoGravar($conn, $id, array $pessoas) {
+    $id = (int)$id; if ($id <= 0) return false;
+    $json = $pessoas ? json_encode($pessoas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+    $st = $conn->prepare("UPDATE memoriais_mapeados SET qualificacao_json = ? WHERE id = ?");
+    if (!$st) return false;
+    $st->bind_param('si', $json, $id);
+    return $st->execute();
+}
+/* Ponto único: normaliza pessoas, deriva colunas planas em $d e persiste o JSON. */
+function aplicarQualificacao($conn, $id, array &$d) {
+    if (!array_key_exists('pessoas', $d)) return;
+    $pessoas = qualificacaoNormalizar($d['pessoas']);
+    qualificacaoDerivarFlat($d, $pessoas);
+    qualificacaoGravar($conn, $id, $pessoas);
+}
+
 /* Aplica os dados extraídos ao imóvel (campos ONR + base). Não sobrescreve a geometria. */
 function aplicarDadosMatricula($conn, $id, $d) {
+    aplicarQualificacao($conn, $id, $d); // persiste qualificação + deriva proprietario/cpf/rel_jur/dat_ini/per_rel
     salvarCamposOnr($conn, $id, $d); // colunas ONR (nomes iguais às chaves)
     $sets = []; $vals = []; $types = '';
     $base = ['identificador', 'proprietario', 'cpf', 'tipo_imovel'];
@@ -1863,24 +2025,74 @@ function itn03ImovelDaLinha(array $r, array &$avisos) {
         if (isset($r['area_ha']) && $r['area_ha'] !== null) $di['area_m2'] = round(((float)$r['area_ha']) * 10000, 2);
     }
 
-    $nomes = array_values(array_filter(array_map('trim', preg_split('/[;,]/', (string)($r['proprietario'] ?? '')))));
-    $cpfs  = array_values(array_filter(array_map('trim', preg_split('/[;,]/', (string)($r['cpf'] ?? '')))));
-    if (!$nomes) { $nomes = ['Proprietário não informado']; $avisos[] = "$rotulo: proprietário não informado (preencher)."; }
-    $np = count($nomes); $pessoas = [];
-    foreach ($nomes as $i => $nome) {
-        $doc = itn03Dig($cpfs[$i] ?? ($cpfs[0] ?? ''));
-        if ($doc === '' || (strlen($doc) !== 11 && strlen($doc) !== 14)) { $doc = '00000000000'; $avisos[] = "$rotulo: CPF/CNPJ de \"$nome\" ausente/ inválido (preencher)."; }
-        $pessoas[] = [
-            'nome_completo' => $nome, 'estrangeiro' => false, 'cpf_cnpj' => $doc,
-            'estado_civil' => 1, 'condicao_parte' => 2, 'relacao_juridica' => 1,
-            'data_inicio_rel_juridica' => itn03DataBr($r['dat_ini'] ?? '') ?: $dataMat,
-            'percentual' => round(100 / $np, 2),
-        ];
+    // ---- Titulares ATUAIS: prioriza a qualificação estruturada (lida de registros/averbações) ----
+    $qual = [];
+    $rawQ = trim((string)($r['qualificacao_json'] ?? ''));
+    if ($rawQ !== '') { $tmp = json_decode($rawQ, true); if (is_array($tmp)) $qual = $tmp; }
+    if ($qual) { // descarta alienantes, se marcados
+        $qa = array_values(array_filter($qual, fn($p) => itn03NormNome($p['condicao'] ?? '') !== 'alienante'));
+        if ($qa) $qual = $qa;
     }
+    $relJurTxt = trim((string)($r['rel_jur'] ?? ''));
+    $datIniCol = itn03DataBr($r['dat_ini'] ?? '') ?: $dataMat;
+
+    $pessoas = []; $temEstrangeiro = false;
+    if ($qual) {
+        $np = max(1, count($qual));
+        foreach ($qual as $p) {
+            $nome = trim((string)($p['nome'] ?? '')) ?: 'Proprietário não informado';
+            $doc  = itn03Dig($p['cpf_cnpj'] ?? '');
+            if ($doc === '' || (strlen($doc) !== 11 && strlen($doc) !== 14)) { $doc = '00000000000'; $avisos[] = "$rotulo: CPF/CNPJ de \"$nome\" ausente/ inválido (preencher)."; }
+            $estr = !empty($p['estrangeiro']); if ($estr) $temEstrangeiro = true;
+            $ec   = itn03MapEstadoCivil($p['estado_civil'] ?? '');
+            $perc = itn03PercentualNum($p['percentual'] ?? ''); if ($perc === null) $perc = round(100 / $np, 2);
+            $dini = itn03DataBr($p['data_inicio'] ?? '') ?: $datIniCol;
+            $rel  = itn03MapRelacaoJuridica($p['relacao_juridica'] ?? $relJurTxt);
+            $cond = (itn03NormNome($p['condicao'] ?? '') === 'alienante') ? 1 : 2;
+            $pess = [
+                'nome_completo' => $nome, 'cpf_cnpj' => $doc, 'estrangeiro' => $estr,
+                'estado_civil' => $ec, 'condicao_parte' => $cond, 'relacao_juridica' => $rel,
+                'data_inicio_rel_juridica' => $dini, 'percentual' => $perc,
+            ];
+            if ($ec === 2 || $ec === 6) { // casado/união estável => regime de bens obrigatório
+                $pess['regime_bens'] = itn03MapRegimeBens($p['regime_bens'] ?? '');
+                if (trim((string)($p['regime_bens'] ?? '')) === '') $avisos[] = "$rotulo: regime de bens de \"$nome\" não informado (usado comunhão parcial — conferir).";
+            }
+            if ($estr) {
+                $pess['filhos_brasileiros'] = 3; // 3: não informado (preencher)
+                $nacCod = itn03Dig($p['nacionalidade'] ?? '');
+                if ($nacCod !== '') $pess['nacionalidade'] = (int)$nacCod;
+                else $avisos[] = "$rotulo: nacionalidade (cód. IBGE do país) de \"$nome\" não informada (obrigatória p/ estrangeiro — preencher).";
+            }
+            $pessoas[] = $pess;
+        }
+    } else {
+        // Fallback: colunas planas proprietario/cpf (sem qualificação estruturada disponível)
+        $nomes = array_values(array_filter(array_map('trim', preg_split('/[;,]/', (string)($r['proprietario'] ?? '')))));
+        $cpfs  = array_values(array_filter(array_map('trim', preg_split('/[;,]/', (string)($r['cpf'] ?? '')))));
+        if (!$nomes) { $nomes = ['Proprietário não informado']; $avisos[] = "$rotulo: proprietário não informado (preencher)."; }
+        $np = count($nomes);
+        $relCod = itn03MapRelacaoJuridica($relJurTxt);
+        $perCol = ($np === 1) ? itn03PercentualNum($r['per_rel'] ?? '') : null; // per_rel = % do principal; com vários, divide igualmente
+        foreach ($nomes as $i => $nome) {
+            $doc = itn03Dig($cpfs[$i] ?? ($cpfs[0] ?? ''));
+            if ($doc === '' || (strlen($doc) !== 11 && strlen($doc) !== 14)) { $doc = '00000000000'; $avisos[] = "$rotulo: CPF/CNPJ de \"$nome\" ausente/ inválido (preencher)."; }
+            $pessoas[] = [
+                'nome_completo' => $nome, 'cpf_cnpj' => $doc, 'estrangeiro' => false,
+                'estado_civil' => 1, 'condicao_parte' => 2, 'relacao_juridica' => $relCod,
+                'data_inicio_rel_juridica' => $datIniCol,
+                'percentual' => $perCol !== null ? $perCol : round(100 / $np, 2),
+            ];
+        }
+    }
+
+    // Contexto: rural padrão = 1; rural de estrangeiros = 3 (quando há titular estrangeiro).
+    // Urbano = 1 (padrão); contexto 2 (União) não é autodetectado.
+    $contextoVal = ($eh_rural && $temEstrangeiro) ? 3 : 1;
 
     $imovel = [
         'tipo_imovel' => $eh_rural ? 2 : 1,
-        ($eh_rural ? 'contexto_rural' : 'contexto_urbano') => $eh_rural ? 3 : 1,
+        ($eh_rural ? 'contexto_rural' : 'contexto_urbano') => $contextoVal,
         'motivo_envio' => 2,
         'georreferenciamento' => $geo,
         'tipo_matricula_transcricao' => 1,
@@ -1903,9 +2115,12 @@ function itn03ImovelDaLinha(array $r, array &$avisos) {
     }
 
     if ($eh_rural) {
-        $imovel['autorizacao_incra'] = false;
-        $imovel['faixa_fronteira']   = false;
-        $imovel['area_sn']           = false;
+        // Campos EXCLUSIVOS do contexto 3 (Imóvel Rural de Estrangeiros) — não enviar em imóvel padrão.
+        if ($contextoVal === 3) {
+            $imovel['autorizacao_incra'] = false;
+            $imovel['faixa_fronteira']   = false;
+            $imovel['area_sn']           = false;
+        }
         $imovel['imovel_possui_nome']= ($nomeImo !== '');
         if ($nomeImo !== '') $imovel['nome_imovel'] = $nomeImo;
         $imovel['area_terreno_total'] = ['valor' => round((float)($r['area_ha'] ?? 0), 4), 'unidade' => 2];
@@ -1962,7 +2177,8 @@ function itn03GerarArquivos(array $linhas) {
 function itn03SelectCols() {
     return "id, identificador, numero_matricula, cnm, cns, nome_imo, dat_mat, liv_mat, fol_mat,
             tipo_imovel, classifica, endereco, numero_imovel, cep, municipio, uf,
-            proprietario, cpf, dat_ini, area_ha, sigef, ccir_sncr, car, cib_nirf, cif,
+            proprietario, cpf, dat_ini, rel_jur, per_rel, qualificacao_json,
+            area_ha, sigef, ccir_sncr, car, cib_nirf, cif,
             onr_nivel_publicidade, onr_classificacao, onr_numero_prenotacao, onr_descricao,
             itn03_exclusivo, coordenadas_wgs84";
 }
@@ -2284,6 +2500,8 @@ if (isset($_POST['acao'])) {
             }
             $identificador = trim((string)($d['nome_imo'] ?? '')); if ($identificador === '') $identificador = $matricula;
             $tipoImovel = (stripos((string)($d['tipo_imovel'] ?? ''), 'rural') !== false) ? 'rural' : ((stripos((string)($d['tipo_imovel'] ?? ''), 'urban') !== false) ? 'urbano' : '');
+            $pessoasNovo = qualificacaoNormalizar($d['pessoas'] ?? []);
+            qualificacaoDerivarFlat($d, $pessoasNovo); // proprietario/cpf/rel_jur/dat_ini/per_rel a partir dos titulares
             $proprietario = trim((string)($d['proprietario'] ?? ''));
             $cpf = trim((string)($d['cpf'] ?? ''));
             $imovelId = findImovelIdByMatricula($conn, $matricula);
@@ -2295,6 +2513,7 @@ if (isset($_POST['acao'])) {
             if (trim((string)($d['onr_classificacao'] ?? '')) === '') $d['onr_classificacao'] = '1';
             // grava os demais campos ONR extraídos
             salvarCamposOnr($conn, $novoId, $d);
+            qualificacaoGravar($conn, $novoId, $pessoasNovo); // qualificação estruturada dos titulares atuais
             $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
             echo json_encode([
                 'ok' => true, 'existe' => false, 'criado' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
@@ -2664,7 +2883,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-exclusivas (exportação de carga ITN 03 — individual e lote) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-qualificacao (carga ITN 03: contexto correto + qualificação dos titulares atuais via registros/averbações) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2764,6 +2983,15 @@ header('Expires: 0');
   .onr-sub>summary::-webkit-details-marker{display:none}
   .onr-sub>summary::after{content:'+';float:right;color:var(--faint);font-weight:700}
   .onr-sub[open]>summary::after{content:'–'}
+  .qual-list{padding:8px 10px;display:flex;flex-direction:column;gap:8px}
+  .qual-card{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel)}
+  .qual-head{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12.5px}
+  .qual-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 6px;border-radius:6px}
+  .qual-tag.adq{background:rgba(19,105,63,.14);color:#13693f}
+  .qual-tag.alien{background:rgba(168,15,30,.14);color:#a80f1e}
+  .qual-row{display:flex;gap:8px;font-size:11.5px;line-height:1.45}
+  .qual-k{flex:0 0 116px;color:var(--faint);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px}
+  .qual-v{flex:1;color:var(--ink)}
   .onr-sub .form-grid{padding:10px 11px 11px}
   .onr-sub input[readonly]{opacity:.65;background:var(--panel);cursor:not-allowed}
   /* Popup de cor sobre o mapa (InfoWindow — bolha branca) */
@@ -3506,6 +3734,11 @@ header('Expires: 0');
               </details>
             <?php endforeach; ?>
 
+            <details class="onr-sub" id="ed-qual-sub" open>
+              <summary>Titulares atuais — qualificação (carga ITN 03)</summary>
+              <div id="ed-qual-list" class="qual-list"><span class="chips-vazio">Sem qualificação estruturada. Processe o PDF da matrícula para extrair os titulares atuais (registros/averbações).</span></div>
+            </details>
+
             <details class="onr-sub" open>
               <summary>Classificação e parâmetros de envio</summary>
               <div class="form-grid">
@@ -3652,7 +3885,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-itn03-exclusivas','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-itn03-qualificacao','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4858,6 +5091,35 @@ function edPreencherOnr(reg){
     if(v==='' && EONR_PADRAO[col]!==undefined) v = EONR_PADRAO[col];
     el.value = v;
   });
+  edRenderQualificacao(reg ? reg.qualificacao_json : '');
+}
+/* Mostra (somente leitura) os titulares atuais extraídos dos registros/averbações. */
+function edRenderQualificacao(json){
+  const box=document.getElementById('ed-qual-list'); if(!box) return;
+  let arr=[];
+  try{ if(json){ arr = (typeof json==='string') ? JSON.parse(json) : json; } }catch(e){ arr=[]; }
+  if(!Array.isArray(arr) || !arr.length){
+    box.innerHTML='<span class="chips-vazio">Sem qualificação estruturada. Processe o PDF da matrícula para extrair os titulares atuais (registros/averbações).</span>';
+    return;
+  }
+  const linha=(rot,val)=> val? `<div class="qual-row"><span class="qual-k">${escapeHtml(rot)}</span><span class="qual-v">${escapeHtml(String(val))}</span></div>`:'';
+  box.innerHTML = arr.map(p=>{
+    const nac = p.estrangeiro ? (p.nacionalidade||'estrangeiro(a)') : 'brasileiro(a)';
+    const cd  = (p.condicao||'').toLowerCase()==='alienante' ? '<span class="qual-tag alien">alienante</span>' : '<span class="qual-tag adq">titular atual</span>';
+    return `<div class="qual-card">
+      <div class="qual-head"><b>${escapeHtml(p.nome||'(sem nome)')}</b> ${cd}</div>
+      ${linha('CPF/CNPJ', p.cpf_cnpj?mascaraDoc(String(p.cpf_cnpj)):'')}
+      ${linha('Relação jurídica', p.relacao_juridica)}
+      ${linha('Início da relação', p.data_inicio)}
+      ${linha('Percentual', p.percentual!==''&&p.percentual!=null?(p.percentual+(String(p.percentual).includes('%')?'':'%')):'')}
+      ${linha('Nacionalidade', nac)}
+      ${linha('Estado civil', p.estado_civil)}
+      ${linha('Regime de bens', p.regime_bens)}
+      ${linha('Profissão', p.profissao)}
+      ${linha('RG', [p.rg,p.orgao_emissor].filter(Boolean).join(' '))}
+      ${linha('Endereço', p.endereco)}
+    </div>`;
+  }).join('');
 }
 function edColetarOnr(){
   const o = {};
