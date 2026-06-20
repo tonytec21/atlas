@@ -2578,7 +2578,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-defaults (exportação de carga ITN 03 — individual e lote) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-swal-zindex2 (exportação de carga ITN 03 — individual e lote) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2977,6 +2977,7 @@ header('Expires: 0');
   /* ===== Modal de edição ===== */
   .modal-ov{position:fixed;inset:0;z-index:1200;background:rgba(8,12,18,.55);backdrop-filter:blur(3px);
     display:none;align-items:center;justify-content:center;padding:18px}
+  .swal2-container{z-index:100050 !important}
   .modal-ov.show{display:flex}
   .modal-card{width:100%;max-width:440px;background:var(--panel);color:var(--ink);border:1px solid var(--line);
     border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;animation:modalIn .18s ease;
@@ -3547,7 +3548,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-itn03-defaults','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-swal-zindex2','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4805,7 +4806,8 @@ function itn03MostrarAvisos(avisos, contexto){
          + '<ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.6">' + itens + '</ul></div>',
     width: 640,
     confirmButtonText:'Entendi',
-    confirmButtonColor:'#a80f1e'
+    confirmButtonColor:'#a80f1e',
+    didOpen:(popup)=>{ const c = popup && popup.parentElement; if(c && c.classList.contains('swal2-container')) c.style.zIndex='100050'; }
   }, swalTema()));
 }
 async function exportarItn03Individual(){
