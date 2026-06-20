@@ -810,20 +810,58 @@ function inconsNomeKml($nomeBruto) {
     if ($limpo !== '') $nome = $limpo;
     return [trim($nome), $inc];
 }
-/* Checagens geométricas comuns (KML e PDF). */
+/* Formata distância em m/km no padrão pt-BR. */
+function inconsFmtDist($m) {
+    return $m >= 1000 ? number_format($m / 1000, 2, ',', '.') . ' km'
+                      : number_format($m, $m < 10 ? 1 : 0, ',', '.') . ' m';
+}
+/* Checagens geométricas detalhadas (KML e PDF): lados desproporcionais, vértices
+   duplicados, área atípica, coordenadas fora do Brasil e autointerseção. */
 function detectarInconsistenciasGeo($geo, $origem = '') {
     $inc = [];
     $nv = (int)($geo['num_vertices'] ?? 0);
     if ($nv > 0 && $nv < 4) $inc[] = ['sev' => 'erro', 'msg' => 'Polígono com poucos vértices (' . $nv . ') — o mínimo para uma poligonal fechada é 4.'];
-    $area = (float)($geo['area_ha'] ?? 0);
-    if ($nv >= 3 && $area <= 0.0001) $inc[] = ['sev' => 'erro', 'msg' => 'Área praticamente nula — geometria possivelmente degenerada.'];
-    if ($area > 500000) $inc[] = ['sev' => 'alerta', 'msg' => 'Área muito grande (' . number_format($area, 0, ',', '.') . ' ha) — confira a escala/coordenadas.'];
+
     $pts = [];
     foreach (preg_split('/\s+/', trim((string)($geo['coordenadas_wgs84'] ?? ''))) as $par) {
         if ($par === '') continue; $xy = explode(',', $par); if (count($xy) >= 2) $pts[] = [(float)$xy[0], (float)$xy[1]];
     }
-    if ($pts) {
-        if (inconsCoordForaBrasil($pts)) $inc[] = ['sev' => 'erro', 'msg' => 'Há vértices fora dos limites aproximados do Brasil — verifique o sistema de coordenadas (datum/fuso).'];
+    $n = count($pts);
+
+    // Área
+    $area = (float)($geo['area_ha'] ?? 0);
+    if ($n >= 3 && $area <= 0.0001) {
+        $inc[] = ['sev' => 'erro', 'msg' => 'Área praticamente nula — geometria possivelmente degenerada.'];
+    } elseif ($area > 50000) {
+        $inc[] = ['sev' => 'erro', 'msg' => 'Área de ~' . number_format($area, 0, ',', '.') . ' ha — muito acima do esperado; provável erro de escala/datum.'];
+    } elseif ($area > 5000) {
+        $inc[] = ['sev' => 'alerta', 'msg' => 'Área de ~' . number_format($area, 0, ',', '.') . ' ha — atípica para um único imóvel (confira a poligonal/escala).'];
+    }
+
+    if ($n >= 3) {
+        if (inconsCoordForaBrasil($pts)) $inc[] = ['sev' => 'erro', 'msg' => 'Há vértices fora dos limites aproximados do Brasil — verifique o datum/fuso das coordenadas.'];
+
+        // Comprimento de cada lado (inclui o lado de fechamento Vn→V1)
+        $sides = []; for ($i = 0; $i < $n; $i++) { $sides[] = haversine($pts[$i], $pts[($i + 1) % $n]); }
+        $ord = $sides; sort($ord); $med = $ord[intdiv($n, 2)]; if ($med <= 0) $med = array_sum($sides) / max(1, $n);
+
+        // Vértices consecutivos quase coincidentes (duplicados/redundantes)
+        for ($i = 0; $i < $n; $i++) {
+            if ($sides[$i] < 2.0) {
+                $a = $i + 1; $b = (($i + 1) % $n) + 1;
+                $inc[] = ['sev' => 'alerta', 'msg' => 'V' . $a . ' e V' . $b . ' a ~' . inconsFmtDist($sides[$i]) . ' de distância (vértice duplicado/redundante).'];
+            }
+        }
+        // Lados desproporcionais (≥ 3× a mediana e > 1 km) — possível vértice ausente/fora de ordem
+        $outliers = [];
+        for ($i = 0; $i < $n; $i++) { if ($med > 0 && $sides[$i] >= 3 * $med && $sides[$i] > 1000) $outliers[] = $i; }
+        usort($outliers, function ($x, $y) use ($sides) { return $sides[$y] <=> $sides[$x]; });
+        foreach (array_slice($outliers, 0, 3) as $i) {
+            $a = $i + 1; $b = (($i + 1) % $n) + 1;
+            $rot = ($i === $n - 1) ? ('Lado de fechamento V' . $a . '→V1') : ('Lado V' . $a . '→V' . $b);
+            $inc[] = ['sev' => 'alerta', 'msg' => $rot . ' ≈ ' . inconsFmtDist($sides[$i]) . ' — muito maior que os demais (mediana ≈ ' . inconsFmtDist($med) . '). Possível vértice ausente ou fora de ordem.'];
+        }
+        // Autointerseção
         if (inconsAutoIntersecta($pts)) $inc[] = ['sev' => 'alerta', 'msg' => 'A poligonal parece se autointersectar (lados se cruzam) — confira a ordem dos vértices.'];
     }
     return $inc;
@@ -1847,18 +1885,31 @@ function gerarRelatorioInconsistenciasPDF($conn, $ids) {
     else { header('Content-Type: text/plain; charset=UTF-8'); echo 'TCPDF não encontrado neste ambiente.'; return; }
 
     $ids = array_values(array_filter(array_map('intval', (array)$ids)));
+    $cols = "id, identificador, numero_matricula, municipio, uf, area_ha, num_vertices, origem, coordenadas_wgs84, inconsistencias";
     if ($ids) {
         $in = implode(',', $ids);
-        $sql = "SELECT id, identificador, numero_matricula, municipio, uf, area_ha, origem, inconsistencias
-                FROM memoriais_mapeados WHERE id IN ($in) ORDER BY identificador";
+        $sql = "SELECT $cols FROM memoriais_mapeados WHERE id IN ($in) ORDER BY identificador";
     } else {
-        $sql = "SELECT id, identificador, numero_matricula, municipio, uf, area_ha, origem, inconsistencias
-                FROM memoriais_mapeados WHERE inconsistencias IS NOT NULL AND inconsistencias <> '' AND inconsistencias <> '[]' ORDER BY identificador";
+        $sql = "SELECT $cols FROM memoriais_mapeados WHERE (inconsistencias IS NOT NULL AND inconsistencias <> '' AND inconsistencias <> '[]') ORDER BY identificador";
     }
+    $rank = ['erro' => 0, 'alerta' => 1, 'info' => 2];
     $rows = []; $res = $conn->query($sql);
     while ($res && ($r = $res->fetch_assoc())) {
-        $inc = json_decode((string)$r['inconsistencias'], true);
-        if (is_array($inc) && $inc) { $r['_inc'] = $inc; $rows[] = $r; }
+        $stored = json_decode((string)$r['inconsistencias'], true); if (!is_array($stored)) $stored = [];
+        // recomputa a análise geométrica a partir das coordenadas gravadas (enriquece registros antigos)
+        $geoInc = detectarInconsistenciasGeo([
+            'num_vertices' => $r['num_vertices'], 'area_ha' => $r['area_ha'], 'coordenadas_wgs84' => $r['coordenadas_wgs84']
+        ], (string)$r['origem']);
+        // mescla preservando as de nome e deduplicando por mensagem; ordena por severidade
+        $merged = []; $vistos = [];
+        foreach (array_merge($stored, $geoInc) as $it) {
+            $m = (string)($it['msg'] ?? ''); if ($m === '' || isset($vistos[$m])) continue; $vistos[$m] = 1; $merged[] = $it;
+        }
+        usort($merged, function ($a, $b) use ($rank) { return ($rank[$a['sev'] ?? 'alerta'] ?? 1) <=> ($rank[$b['sev'] ?? 'alerta'] ?? 1); });
+        if ($merged) {
+            inconsGravar($conn, (int)$r['id'], $merged); // re-grava p/ refletir no badge/InfoWindow da consulta
+            $r['_inc'] = $merged; $rows[] = $r;
+        }
     }
 
     if (!class_exists('RelatorioInconsPDF')) {
@@ -1920,6 +1971,7 @@ function gerarRelatorioInconsistenciasPDF($conn, $ids) {
         foreach ($r['_inc'] as $it) {
             $sev = strtolower((string)($it['sev'] ?? 'alerta'));
             $msg = (string)($it['msg'] ?? '');
+            $msg = strtr($msg, ['≈' => '~', '→' => ' a ', '–' => '-', '—' => '-']); // helvetica (core) não tem esses glifos
             if ($sev === 'erro') { $pdf->SetTextColor(168,15,30); $tag = 'ERRO'; }
             elseif ($sev === 'info') { $pdf->SetTextColor(60,90,160); $tag = 'INFO'; }
             else { $pdf->SetTextColor(150,110,0); $tag = 'ALERTA'; }
@@ -3320,7 +3372,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-import-inconsistencias (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-inc-geom-detalhe (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4484,7 +4536,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-import-inconsistencias','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-inc-geom-detalhe','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
