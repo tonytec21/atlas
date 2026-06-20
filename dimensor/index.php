@@ -1386,6 +1386,21 @@ function staticMapUrlSobreposicao($polyA, $polyB, $rings, $key) {
     return 'https://maps.googleapis.com/maps/api/staticmap?' . implode('&', $params);
 }
 
+/** Static Maps de UM imóvel: desenha o polígono (a partir das coordenadas gravadas). */
+function staticMapUrlImovel($pts, $key) {
+    if (count($pts) < 3) return '';
+    $params = ['size=640x360', 'scale=2', 'maptype=hybrid', 'format=png'];
+    $params[] = 'path=' . rawurlencode('color:0xe2342fff|weight:3|fillcolor:0xe2342f33|enc:' . encodePolyline(closeRing($pts)));
+    // marcadores pequenos nos vértices (ajudam a localizar os pontos citados nas inconsistências)
+    if (count($pts) <= 60) {
+        $locs = [];
+        foreach ($pts as $p) { $locs[] = round($p[0], 6) . ',' . round($p[1], 6); }
+        $params[] = 'markers=' . rawurlencode('size:tiny|color:0xffffff|' . implode('|', $locs));
+    }
+    $params[] = 'key=' . $key;
+    return 'https://maps.googleapis.com/maps/api/staticmap?' . implode('&', $params);
+}
+
 /** Busca os bytes de uma imagem por URL (cURL ou file_get_contents). */
 function fetchImageBytes($url, &$erro = null) {
     $erro = '';
@@ -1992,6 +2007,29 @@ function gerarRelatorioInconsistenciasPDF($conn, $ids) {
             $pdf->Cell(16, 5, $tag, 0, 0, 'L');
             $pdf->SetFont('helvetica', '', 9.5); $pdf->SetTextColor(45,45,45);
             $pdf->MultiCell(0, 5, $msg, 0, 'L', false, 1, $pdf->GetX(), $pdf->GetY());
+        }
+        // Desenho do imóvel no mapa (Static Maps), a partir das coordenadas gravadas
+        $ptsMapa = [];
+        foreach (preg_split('/\s+/', trim((string)$r['coordenadas_wgs84'])) as $par) {
+            if ($par === '') continue; $xy = explode(',', $par); if (count($xy) >= 2) $ptsMapa[] = [(float)$xy[0], (float)$xy[1]];
+        }
+        if (count($ptsMapa) >= 3) {
+            $pdf->Ln(1);
+            $errImg = '';
+            $img = fetchImageBytes(staticMapUrlImovel($ptsMapa, GMAPS_STATIC_KEY), $errImg);
+            $w = 120; $h = $w * 0.5625;
+            if ($img !== false && $img !== null) {
+                if ($pdf->GetY() + $h > $pdf->getPageHeight() - 30) $pdf->AddPage();
+                $pdf->SetFont('helvetica', '', 8); $pdf->SetTextColor(120,120,120);
+                $pdf->Cell(0, 4, 'Desenho do imóvel (polígono gerado pelas coordenadas):', 0, 1, 'L');
+                $tmp = tempnam(sys_get_temp_dir(), 'inc') . '.png'; file_put_contents($tmp, $img);
+                $pdf->Image($tmp, $pdf->getMargins()['left'], $pdf->GetY() + 1, $w, 0, 'PNG');
+                $pdf->SetY($pdf->GetY() + $h + 4);
+                @unlink($tmp);
+            } else {
+                $pdf->SetFont('helvetica', 'I', 8); $pdf->SetTextColor(150,150,150);
+                $pdf->MultiCell(0, 4, 'Desenho do imóvel indisponível (' . $errImg . '). Habilite a "Maps Static API" no Google Cloud e use, em GMAPS_STATIC_KEY, uma chave sem restrição de referer.', 0, 'L');
+            }
         }
         $pdf->Ln(4);
     }
@@ -3385,7 +3423,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-inc-rodape2 (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-inc-mapa (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4549,7 +4587,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-inc-rodape2','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-inc-mapa','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
