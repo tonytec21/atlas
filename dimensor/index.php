@@ -3452,7 +3452,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-encerr-georref (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-sel-pilha-rotulo (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3765,6 +3765,9 @@ header('Expires: 0');
     font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;
     border:1px solid rgba(226,52,47,.65);white-space:nowrap;pointer-events:none;
     text-shadow:0 1px 2px rgba(0,0,0,.85);letter-spacing:.2px}
+  .map-chip.clic{pointer-events:auto;cursor:pointer;transition:transform .1s ease,background .12s ease,border-color .12s ease}
+  .map-chip.clic:hover{background:rgba(13,148,136,.96);border-color:rgba(255,255,255,.55);
+    transform:translate(-50%,-50%) scale(1.08);box-shadow:0 3px 12px rgba(0,0,0,.45);z-index:5}
   .map-chip.hover{transform:translate(-50%,calc(-50% - 20px));background:rgba(13,148,136,.96);
     border-color:rgba(255,255,255,.35);font-family:var(--disp);font-weight:600;letter-spacing:.1px;
     box-shadow:0 4px 14px rgba(0,0,0,.4);animation:chipFade .14s ease-out}
@@ -4598,10 +4601,14 @@ function initMap(){
 
   // Rótulo flutuante (chip) sobre o polígono — definido aqui pois depende da API já carregada
   LabelOverlay = class extends google.maps.OverlayView {
-    constructor(position, text, cls){ super(); this.position=position; this.text=text; this.cls=cls||''; this.div=null; this.setMap(map); }
+    constructor(position, text, cls, onClick){ super(); this.position=position; this.text=text; this.cls=cls||''; this.onClick=onClick||null; this.div=null; this.setMap(map); }
     onAdd(){
       const d=document.createElement('div');
-      d.className='map-chip'+(this.cls?(' '+this.cls):''); d.textContent=this.text;
+      d.className='map-chip'+(this.cls?(' '+this.cls):'')+(this.onClick?' clic':''); d.textContent=this.text;
+      if(this.onClick){
+        const fn=this.onClick;
+        d.addEventListener('click', ev=>{ ev.stopPropagation(); fn(ev); });
+      }
       this.div=d; this.getPanes().floatPane.appendChild(d);
     }
     draw(){
@@ -4617,15 +4624,15 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-encerr-georref','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-sel-pilha-rotulo','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
   return {lat:la/pts.length, lng:ln/pts.length};
 }
-function addLabel(pos, text){
+function addLabel(pos, text, onClick){
   if(!text) return null;
-  const ov = new LabelOverlay(new google.maps.LatLng(pos.lat, pos.lng), text);
+  const ov = new LabelOverlay(new google.maps.LatLng(pos.lat, pos.lng), text, '', onClick||null);
   labelOverlays.push(ov);
   return ov;
 }
@@ -5079,6 +5086,46 @@ document.getElementById('ov-reopen').onclick = ()=>{
 };
 
 /* ---- seleção de imóveis (Ctrl+clique) ---- */
+
+/* Ponto dentro do polígono (ray casting em [lat,lng]) — independe da lib geometry */
+function pontoEmPoligono(latLng, pts){
+  if(!pts || pts.length<3) return false;
+  const x=latLng.lng(), y=latLng.lat(); let dentro=false;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+    const xi=pts[i][1], yi=pts[i][0], xj=pts[j][1], yj=pts[j][0];
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi)) dentro=!dentro;
+  }
+  return dentro;
+}
+/* Todos os imóveis cujo polígono contém o ponto, do menor para o maior (o de cima primeiro) */
+function imoveisSobPonto(latLng){
+  return itensOverview
+    .filter(o=>o && o.pts && pontoEmPoligono(latLng, o.pts))
+    .sort((a,b)=>(+a.area_ha||0)-(+b.area_ha||0));
+}
+/* Estado do ciclo: cliques repetidos ~no mesmo lugar avançam para a camada seguinte */
+let pilhaUltima = {x:-99, y:-99, idx:0, ids:''};
+function clicarPilha(latLng, e, ctrl){
+  const pilha = imoveisSobPonto(latLng);
+  if(!pilha.length) return;
+  const ev = e && e.domEvent ? e.domEvent : null;
+  const x = ev ? ev.clientX : 0, y = ev ? ev.clientY : 0;
+  const ids = pilha.map(o=>o.id).join(',');
+  const mesmoLocal = ids===pilhaUltima.ids && Math.abs(x-pilhaUltima.x)<14 && Math.abs(y-pilhaUltima.y)<14;
+  const idx = (mesmoLocal && pilha.length>1) ? (pilhaUltima.idx+1) % pilha.length : 0;
+  pilhaUltima = {x, y, idx, ids};
+  const it = pilha[idx];
+  if(pilha.length>1) swalToast('info', `Imóvel ${idx+1} de ${pilha.length} sob o cursor — clique de novo para alternar.`);
+  if(ctrl) toggleSelecao(it); else abrirSeletorCor(it, e);
+}
+/* Seleção direta a partir do rótulo (ignora a sobreposição: vai exatamente neste imóvel) */
+function selecionarImovelDireto(it, ctrl){
+  if(!it) return;
+  pilhaUltima = {x:-99, y:-99, idx:0, ids:''};
+  if(ctrl) toggleSelecao(it);
+  else abrirSeletorCor(it, {latLng: new google.maps.LatLng(centroidOf(it.pts).lat, centroidOf(it.pts).lng)});
+}
+
 function estiloImovel(it){
   if(!it._poly) return;
   const sel = selecionados.has(it.id);
@@ -5182,16 +5229,20 @@ async function verTodos(){
     it._poly = poly;
     poly.addListener('click',(e)=>{
       const ctrl = ctrlAtivo || (e && e.domEvent && (e.domEvent.ctrlKey || e.domEvent.metaKey));
-      if(ctrl) toggleSelecao(it); else abrirSeletorCor(it, e);
+      if(e && e.latLng) clicarPilha(e.latLng, e, ctrl);
+      else if(ctrl) toggleSelecao(it); else abrirSeletorCor(it, e);
     });
     // clique direito também seleciona (alternativa ao Ctrl, e cobre Mac)
-    poly.addListener('rightclick',()=>toggleSelecao(it));
+    poly.addListener('rightclick',(e)=>{ if(e && e.latLng) clicarPilha(e.latLng, e, true); else toggleSelecao(it); });
     overviewPolys.push(poly);
     it._bbox = bboxOf(it.pts);
     const centro = centroidOf(it.pts);
-    // rótulo padrão: "Mat. <número sem zeros à esquerda>", se existir
+    // rótulo padrão: "Mat. <número sem zeros à esquerda>", se existir — agora clicável (seleciona este imóvel)
     const mat = (it.numero_matricula||'').trim();
-    if(mat) it._label = addLabel(centro, rotuloMat(mat));
+    if(mat) it._label = addLabel(centro, rotuloMat(mat), (ev)=>{
+      const ctrl = ctrlAtivo || (ev && (ev.ctrlKey || ev.metaKey));
+      selecionarImovelDireto(it, ctrl);
+    });
     // identificação do imóvel: só ao pousar o mouse ~2s
     poly.addListener('mouseover', ()=> agendarHoverTip(centro, it.identificador));
     poly.addListener('mousemove', ()=> { if(!hoverTip && !hoverTimer) agendarHoverTip(centro, it.identificador); });
