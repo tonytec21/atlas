@@ -1888,7 +1888,13 @@ function itn03ImovelDaLinha(array $r, array &$avisos) {
         'dados_pessoa' => $pessoas,
     ];
     $pren = itn03Dig($r['onr_numero_prenotacao'] ?? '');
-    if ($pren !== '') { $imovel['protocolo_prenotacao'] = (int)$pren; $imovel['data_protocolo_prenotacao'] = $dataMat; }
+    if ($pren !== '' && (int)$pren !== 0) {
+        $imovel['protocolo_prenotacao'] = (int)$pren;
+        $imovel['data_protocolo_prenotacao'] = $dataMat;
+    } else {
+        $imovel['protocolo_prenotacao'] = null;       // 0 ou em branco => null
+        $imovel['data_protocolo_prenotacao'] = null;
+    }
 
     if ($eh_rural) {
         $imovel['autorizacao_incra'] = false;
@@ -2602,7 +2608,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-apto (exportação de carga ITN 03 — individual e lote) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pren-null (exportação de carga ITN 03 — individual e lote) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3572,7 +3578,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-itn03-apto','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-pren-null','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
