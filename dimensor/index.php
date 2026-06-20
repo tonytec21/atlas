@@ -2840,11 +2840,11 @@ if (isset($_POST['acao'])) {
             if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
             $sit = (($_POST['situacao'] ?? '') === 'encerrada') ? 'encerrada' : 'ativa';
             $m = $_POST['motivo_situacao'] ?? '';
-            $mot = in_array($m, ['unificacao', 'desmembramento'], true) ? $m : null;
+            $mot = in_array($m, ['unificacao', 'desmembramento', 'georreferenciamento'], true) ? $m : null;
             $s = trim((string)($_POST['matricula_sucessora'] ?? ''));
             $suc = ($s !== '') ? $s : null;
-            // coerência: unificação encerra a matrícula; desmembramento parcial a mantém ativa
-            if ($mot === 'unificacao') $sit = 'encerrada';
+            // coerência: unificação e georreferenciamento encerram a matrícula; desmembramento parcial a mantém ativa
+            if ($mot === 'unificacao' || $mot === 'georreferenciamento') $sit = 'encerrada';
             if ($sit === 'ativa' && $mot !== 'desmembramento') { $mot = null; $suc = null; }
             $stmt = $conn->prepare("UPDATE memoriais_mapeados SET situacao=?, motivo_situacao=?, matricula_sucessora=? WHERE id=?");
             $stmt->bind_param('sssi', $sit, $mot, $suc, $id);
@@ -3452,7 +3452,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-kml-anexo-backfill (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-encerr-georref (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4364,6 +4364,7 @@ header('Expires: 0');
           <select id="ed-situacao">
             <option value="ativa">Ativa</option>
             <option value="unificacao">Encerrada por unificação</option>
+            <option value="georreferenciamento">Encerrada por georreferenciamento</option>
             <option value="desmembramento">Desmembramento — saiu um trecho</option>
           </select>
         </div>
@@ -4616,7 +4617,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-kml-anexo-backfill','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-encerr-georref','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5336,7 +5337,7 @@ function infoImovelHTML(it){
   add('Tipo', it.tipo_imovel);
   add('Área', (it.area_ha!=null ? fmt(it.area_ha,4)+' ha' : ''));
   const suc=((it.matricula_sucessora)||'').split(',').map(s=>s.trim()).filter(Boolean).join(', ');
-  if(it.situacao==='encerrada') add('Situação', 'Encerrada por unificação'+(suc?(' → '+suc):''));
+  if(it.situacao==='encerrada') add('Situação', (it.motivo_situacao==='georreferenciamento'?'Encerrada por georreferenciamento':'Encerrada por unificação')+(suc?(' → '+suc):''));
   else if(it.motivo_situacao==='desmembramento') add('Situação', 'Desmembramento'+(suc?(' → trecho(s): '+suc):''));
   // inconsistências (busca também no cache da lista, que traz o campo completo)
   const cache = (typeof imoveisCache!=='undefined') ? imoveisCache.find(x=>String(x.id)===String(it.id)) : null;
@@ -5669,8 +5670,11 @@ function renderLista(){
     const aptoItn = String(it.itn03_apto)==='1';
     const morto   = it.situacao==='encerrada';
     const desmembrada = !morto && it.motivo_situacao==='desmembramento';
+    const ehGeoref = morto && it.motivo_situacao==='georreferenciamento';
     const mortoBadge = morto
-      ? `<span class="morto-badge" title="${it.matricula_sucessora?('Sucessora: '+escapeHtml(it.matricula_sucessora)):'Encerrada por unificação'}">✝ unificada</span>`
+      ? (ehGeoref
+          ? `<span class="morto-badge" title="${it.matricula_sucessora?('Nova matrícula: '+escapeHtml(it.matricula_sucessora)):'Encerrada por georreferenciamento'}">⊗ georref.</span>`
+          : `<span class="morto-badge" title="${it.matricula_sucessora?('Sucessora: '+escapeHtml(it.matricula_sucessora)):'Encerrada por unificação'}">✝ unificada</span>`)
       : (desmembrada ? `<span class="desmembra-badge" title="${it.matricula_sucessora?('Trecho originou a matrícula '+escapeHtml(it.matricula_sucessora)):'Desmembramento'}">✂ desmembrada</span>` : '');
     const exclBadge = excl
       ? `<span class="itn03-badge" title="Matrícula exclusiva ITN 03 (sem mapa)">ITN 03</span><span class="itn03-apto ${aptoItn?'ok':'no'}" title="${aptoItn?'Apta para a carga ITN 03':'Faltam dados mínimos (tipo, matrícula, CNM, município, UF)'}">${aptoItn?'✓ apta':'⚠ incompleta'}</span>`
@@ -5863,6 +5867,7 @@ async function abrirEdicao(id){
   document.getElementById('ed-tipo').value = it.tipo_imovel||'';
   let sitSel='ativa';
   if(it.motivo_situacao==='desmembramento') sitSel='desmembramento';
+  else if(it.motivo_situacao==='georreferenciamento') sitSel='georreferenciamento';
   else if(it.situacao==='encerrada' || it.motivo_situacao==='unificacao') sitSel='unificacao';
   document.getElementById('ed-situacao').value = sitSel;
   edSucList = (it.matricula_sucessora||'').split(',').map(s=>s.trim()).filter(Boolean);
@@ -5982,9 +5987,12 @@ function edToggleEnc(){
   const hint = document.getElementById('ed-sit-hint');
   const lab = document.getElementById('ed-suc-label');
   if(ex) ex.style.display = (v==='ativa') ? 'none' : 'block';
-  if(lab) lab.textContent = (v==='unificacao') ? 'Matrícula sucessora (em que foi unificada)' : 'Matrículas sucessoras (originadas do desmembramento)';
+  if(lab) lab.textContent = (v==='unificacao') ? 'Matrícula sucessora (em que foi unificada)'
+                          : (v==='georreferenciamento') ? 'Nova matrícula (aberta pelo georreferenciamento)'
+                          : 'Matrículas sucessoras (originadas do desmembramento)';
   if(hint){
     if(v==='unificacao') hint.innerHTML = 'A matrícula é <b>encerrada por completo</b> (apagada/"morta") e não gera sobreposição, pois deu origem à nova matrícula.';
+    else if(v==='georreferenciamento') hint.innerHTML = 'A matrícula é <b>encerrada pelo georreferenciamento</b> e deu origem a uma nova matrícula. Ela fica <b>cinza</b> no mapa (inativa) e <b>não gera sobreposição</b>. Indique a nova matrícula aberta.';
     else if(v==='desmembramento') hint.innerHTML = 'A matrícula-mãe <b>permanece ativa</b>. Cada <b>trecho</b> coincidente com uma matrícula originada é destacado como "morto" e não gera sobreposição. Você pode adicionar <b>quantas matrículas</b> saíram dela.';
     else hint.textContent='';
   }
@@ -6221,6 +6229,12 @@ async function exportarItn03Lote(escopo){
 }
 async function salvarEdicao(){
   const id = document.getElementById('ed-id').value;
+  // georreferenciamento exige a indicação da nova matrícula aberta (antes de gravar qualquer coisa)
+  if(document.getElementById('ed-situacao').value==='georreferenciamento' && !edSucList.length){
+    setStatus('warn','Indique a nova matrícula aberta pelo georreferenciamento antes de salvar.');
+    const inp=document.getElementById('ed-sucessora-input'); if(inp) inp.focus();
+    return;
+  }
   // proprietários: coleta, valida documentos e junta por vírgula (alinhados por posição)
   const props = edProps.map(p=>({nome:(p.nome||'').trim(), doc:(p.doc||'').trim()})).filter(p=>p.nome||p.doc);
   const invalidos = props.filter(p=>p.doc && docValido(p.doc)===false);
@@ -6250,10 +6264,12 @@ async function salvarEdicao(){
     tipo_imovel: document.getElementById('ed-tipo').value
   }, edColetarOnr()));
   if(!r.ok){ setStatus('err', r.erro||'Falha ao atualizar.'); return; }
-  // salva a situação: ativa | encerrada(unificação) | desmembramento(parcial, mãe ativa)
+  // salva a situação: ativa | encerrada(unificação/georreferenciamento) | desmembramento(parcial, mãe ativa)
   const sv = document.getElementById('ed-situacao').value;
-  const situacao = (sv==='unificacao') ? 'encerrada' : 'ativa';
-  const motivo = (sv==='unificacao') ? 'unificacao' : (sv==='desmembramento' ? 'desmembramento' : '');
+  const situacao = (sv==='unificacao'||sv==='georreferenciamento') ? 'encerrada' : 'ativa';
+  const motivo = (sv==='unificacao') ? 'unificacao'
+               : (sv==='georreferenciamento') ? 'georreferenciamento'
+               : (sv==='desmembramento' ? 'desmembramento' : '');
   await post({acao:'salvar_situacao', id,
     situacao: situacao,
     motivo_situacao: motivo,
