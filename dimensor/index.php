@@ -2764,6 +2764,12 @@ if (isset($_POST['acao'])) {
                     }
                     // complementa os campos ONR enviados junto (se houver)
                     salvarCamposOnr($conn, $idExistente, $_POST);
+                    // arquiva o KML também quando a matrícula já existia (geometria preservada)
+                    if ($origem === 'kml' && $fonte !== '') {
+                        $nomeArqDup = trim((string)($_POST['nome_arquivo'] ?? ''));
+                        if ($nomeArqDup === '') $nomeArqDup = ($numMatricula !== '' ? $numMatricula : 'imovel') . '.kml';
+                        anexoSalvarBytes($conn, $idExistente, $fonte, $nomeArqDup, 'kml', 'application/vnd.google-earth.kml+xml');
+                    }
                     // inconsistências de nome do KML (geometria preservada do registro existente)
                     $incDup = [];
                     if ($origem === 'kml') {
@@ -2795,6 +2801,13 @@ if (isset($_POST['acao'])) {
 
             // grava também os campos ONR enviados junto, se houver
             salvarCamposOnr($conn, $novoId, $_POST);
+
+            // arquiva o próprio KML como anexo (para conferência/reprocessamento posterior)
+            if ($origem === 'kml' && $fonte !== '') {
+                $nomeArq = trim((string)($_POST['nome_arquivo'] ?? ''));
+                if ($nomeArq === '') $nomeArq = ($identificador !== '' ? $identificador : 'imovel') . '.kml';
+                anexoSalvarBytes($conn, $novoId, $fonte, $nomeArq, 'kml', 'application/vnd.google-earth.kml+xml');
+            }
 
             // inconsistências: geometria + (se KML) nome do placemark interno
             $incList = detectarInconsistenciasGeo($data, $origem);
@@ -3183,6 +3196,9 @@ if (isset($_POST['acao'])) {
                 $novoId = inserirMemorial($conn, $nome, $tipo, 'kml', $imovelId, '', $geo);
                 $inc = array_merge($incNome, detectarInconsistenciasGeo($geo, 'kml'));
                 inconsGravar($conn, $novoId, $inc);
+                // arquiva o KML completo como anexo deste imóvel (para análise posterior)
+                $nomeArqLote = trim((string)($_POST['nome_arquivo'] ?? '')); if ($nomeArqLote === '') $nomeArqLote = 'importacao.kml';
+                anexoSalvarBytes($conn, $novoId, $kml, $nomeArqLote, 'kml', 'application/vnd.google-earth.kml+xml');
                 $salvos++; $nomesSalvos[] = $nome;
                 $resultados[] = ['nome' => $nome, 'status' => 'criado', 'id' => $novoId, 'msg' => $geo['num_vertices'] . ' vértices', 'inconsistencias' => array_values($inc)];
             }
@@ -3386,6 +3402,19 @@ if (isset($_POST['acao'])) {
             $r = $stmt->get_result();
             $row = $r ? $r->fetch_assoc() : null;
             if (!$row) { echo json_encode(['ok' => false, 'erro' => 'Registro não encontrado.']); exit; }
+            // Backfill: imóveis cadastrados via KML antes do arquivamento têm o KML em memorial_descritivo.
+            // Se ainda não houver anexo KML, cria um a partir do conteúdo salvo (sem reimportar).
+            if (($row['origem'] ?? '') === 'kml') {
+                $md = (string)($row['memorial_descritivo'] ?? '');
+                if ($md !== '' && (stripos($md, '<kml') !== false || stripos($md, '<coordinates') !== false)) {
+                    $temKml = false;
+                    foreach (anexosListar($conn, $id) as $ax) { if (($ax['tipo'] ?? '') === 'kml') { $temKml = true; break; } }
+                    if (!$temKml) {
+                        $nm = trim((string)($row['numero_matricula'] ?? '')); if ($nm === '') $nm = trim((string)($row['identificador'] ?? '')); if ($nm === '') $nm = 'imovel';
+                        anexoSalvarBytes($conn, $id, $md, $nm . '.kml', 'kml', 'application/vnd.google-earth.kml+xml');
+                    }
+                }
+            }
             // reconstrói a geometria a partir das coordenadas gravadas (independe da origem)
             $data = buildGeoDataFromWgs84($row['coordenadas_wgs84']);
             echo json_encode(['ok' => true, 'registro' => $row, 'geo' => $data, 'anexos' => anexosListar($conn, $id)], JSON_UNESCAPED_UNICODE);
@@ -3423,7 +3452,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-inc-mapa (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-kml-anexo-backfill (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4554,7 +4583,7 @@ let ctrlAtivo = false;                            // estado da tecla Ctrl/Cmd
 document.addEventListener('keydown', e=>{ if(e.key==='Control'||e.key==='Meta'||e.ctrlKey||e.metaKey) ctrlAtivo=true; });
 document.addEventListener('keyup',   e=>{ if(e.key==='Control'||e.key==='Meta') ctrlAtivo=false; });
 window.addEventListener('blur', ()=>{ ctrlAtivo=false; });
-let lastGeo = null, origemAtual = 'memorial', kmlRaw = '';
+let lastGeo = null, origemAtual = 'memorial', kmlRaw = '', kmlNomeArquivo = '';
 let modo = 'single';
 let LabelOverlay = null;
 
@@ -4587,7 +4616,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-inc-mapa','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-kml-anexo-backfill','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4771,7 +4800,7 @@ async function lerLoteKml(files){
   // Um único arquivo com VÁRIOS polígonos -> abre o painel de nomeação
   if(arr.length===1){
     try{
-      const txt = await arr[0].text(); kmlRaw = txt;
+      const txt = await arr[0].text(); kmlRaw = txt; kmlNomeArquivo = arr[0].name||'';
       const res = await post({acao:'processar_kml', kml:txt});
       if(res && res.ok && res.total>1){ origemAtual='kml'; abrirPainelKml(res.placemarks); setStatus('ok', `${res.total} polígonos no KML — nomeie cada um e grave.`); return; }
     }catch(e){ /* cai no fluxo padrão abaixo */ }
@@ -4784,7 +4813,7 @@ async function lerLoteKml(files){
     importProgressUpdate(i, arr.length, base);
     try{
       const txt = await f.text();
-      const params = { acao:'salvar', origem:'kml', memorial: txt };
+      const params = { acao:'salvar', origem:'kml', memorial: txt, nome_arquivo: f.name };
       if(nomeEhMatricula(base)) params.numero_matricula = base; else params.identificador = base;
       const r = await post(params);
       resultados.push(resultadoDeResposta(base, r));
@@ -4939,7 +4968,7 @@ document.getElementById('btn-import-lote').onclick = async ()=>{
     tipos[i]=row.querySelector('select').value;
   });
   setStatus('warn','Gravando…');
-  const r = await post({acao:'salvar_kml_lote', kml:kmlRaw, nomes:JSON.stringify(nomes), tipos:JSON.stringify(tipos)});
+  const r = await post({acao:'salvar_kml_lote', kml:kmlRaw, nomes:JSON.stringify(nomes), tipos:JSON.stringify(tipos), nome_arquivo:kmlNomeArquivo});
   if(!r.ok){ setStatus('err', r.erro||'Falha na importação.'); return; }
   document.getElementById('kml-panel').classList.remove('show');
   await carregarLista(); verTodos();
