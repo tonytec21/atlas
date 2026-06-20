@@ -1766,6 +1766,195 @@ function enriquecerCepExtraido(&$d) {
     if (trim((string)($d['endereco'] ?? '')) === '' && $info['logradouro'] !== '') $d['endereco'] = $info['logradouro'];
 }
 
+/* ======================= EXPORTADOR DE CARGA ITN 03 (ONR, schema v1.2.0) =======================
+   Gera a carga JSON validável: { version, cns, imoveis:[...] }. Urbano (tipo_imovel=1) e rural (=2)
+   usam SCHEMAS DIFERENTES, então a carga é separada por tipo. Campos obrigatórios ausentes recebem
+   padrões válidos e são registrados em $avisos para a serventia completar antes do envio ao ONR. */
+function itn03UfCod($uf2) {
+    $m = ['RO'=>11,'AC'=>12,'AM'=>13,'RR'=>14,'PA'=>15,'AP'=>16,'TO'=>17,'MA'=>21,
+          'PI'=>22,'CE'=>23,'RN'=>24,'PB'=>25,'PE'=>26,'AL'=>27,'SE'=>28,'BA'=>29,
+          'MG'=>31,'ES'=>32,'RJ'=>33,'SP'=>35,'PR'=>41,'SC'=>42,'RS'=>43,'MS'=>50,
+          'MT'=>51,'GO'=>52,'DF'=>53];
+    return $m[strtoupper(trim((string)$uf2))] ?? null;
+}
+function itn03DataBr($s) {
+    $s = trim((string)$s);
+    if ($s === '') return null;
+    if (preg_match('#^\d{2}/\d{2}/\d{4}$#', $s)) return $s;
+    if (preg_match('#^(\d{4})-(\d{2})-(\d{2})#', $s, $m)) return "$m[3]/$m[2]/$m[1]";
+    return null;
+}
+function itn03Dig($s) { return preg_replace('/\D+/', '', (string)$s); }
+function itn03NormNome($s) {
+    $s = function_exists('mb_strtolower') ? mb_strtolower(trim((string)$s), 'UTF-8') : strtolower(trim((string)$s));
+    $s = strtr($s, ['á'=>'a','à'=>'a','â'=>'a','ã'=>'a','é'=>'e','ê'=>'e','í'=>'i','ó'=>'o','ô'=>'o','õ'=>'o','ú'=>'u','ç'=>'c',
+                    'Á'=>'a','À'=>'a','Â'=>'a','Ã'=>'a','É'=>'e','Ê'=>'e','Í'=>'i','Ó'=>'o','Ô'=>'o','Õ'=>'o','Ú'=>'u','Ç'=>'c']);
+    return trim(preg_replace('/[^a-z0-9]+/', ' ', $s));
+}
+/* resolve o código IBGE (7 díg.) do município a partir do nome + UF, com cache em arquivo. */
+function itn03MunicipioCod($uf2, $nome) {
+    static $cache = [];
+    $uf2 = strtoupper(trim((string)$uf2));
+    $alvo = itn03NormNome($nome);
+    if ($uf2 === '' || $alvo === '') return null;
+    if (!isset($cache[$uf2])) {
+        $cache[$uf2] = [];
+        $dir = __DIR__ . '/data'; if (!is_dir($dir)) @mkdir($dir, 0775, true);
+        $cf = $dir . '/ibge_mun_' . $uf2 . '.json';
+        $arr = null;
+        if (is_file($cf)) { $arr = json_decode((string)@file_get_contents($cf), true); }
+        if (!is_array($arr)) {
+            $err = '';
+            $url = 'https://servicodados.ibge.gov.br/api/v1/localidades/estados/' . rawurlencode($uf2) . '/municipios?orderBy=nome';
+            $txt = function_exists('httpGetText') ? httpGetText($url, $err) : @file_get_contents($url);
+            $arr = $txt ? json_decode($txt, true) : null;
+            if (is_array($arr)) @file_put_contents($cf, json_encode($arr, JSON_UNESCAPED_UNICODE));
+        }
+        if (is_array($arr)) foreach ($arr as $m) {
+            if (isset($m['id'], $m['nome'])) $cache[$uf2][itn03NormNome($m['nome'])] = (int)$m['id'];
+        }
+    }
+    return $cache[$uf2][$alvo] ?? null;
+}
+/* mapeia uma linha de memoriais_mapeados -> objeto "imóvel" da ITN 03; acumula avisos por imóvel. */
+function itn03ImovelDaLinha(array $r, array &$avisos) {
+    $rotulo = trim((string)($r['numero_matricula'] ?? '')) ?: trim((string)($r['identificador'] ?? '')) ?: ('#' . ($r['id'] ?? '?'));
+    $cls = strtolower(trim((string)($r['classifica'] ?? '')));
+    $tip = strtolower(trim((string)($r['tipo_imovel'] ?? '')));
+    $eh_rural = false;
+    if ($cls === 'r' || strpos($tip, 'rural') !== false) $eh_rural = true;
+    if ($cls === 'u' || strpos($tip, 'urb') !== false)  $eh_rural = false;
+
+    $uf2   = strtoupper(trim((string)($r['uf'] ?? '')));
+    $ufCod = itn03UfCod($uf2);
+    if (!$ufCod) { $avisos[] = "$rotulo: UF ausente/ inválida (usado 0 — corrigir)."; $ufCod = 0; }
+    $munCod = itn03MunicipioCod($uf2, $r['municipio'] ?? '');
+    if (!$munCod) { $avisos[] = "$rotulo: código IBGE do município não resolvido (usado 0 — preencher)."; $munCod = 0; }
+
+    $geo    = trim((string)($r['coordenadas_wgs84'] ?? '')) !== '';
+    $cnm    = trim((string)($r['cnm'] ?? ''));
+    if (!preg_match('#^(?:\d{6}\.\d\.\d{7}-\d{2}|\d{16})$#', $cnm)) { $avisos[] = "$rotulo: CNM ausente/ inválido (obrigatório — preencher)."; }
+    $numMat = trim((string)($r['numero_matricula'] ?? ''));
+    $dataMat= itn03DataBr($r['dat_mat'] ?? '') ?: '01/01/2024';
+    $nomeImo= trim((string)($r['nome_imo'] ?? ''));
+    $sigef  = trim((string)($r['sigef'] ?? ''));
+    $certif = (bool)preg_match('#^[A-Za-z0-9]{32}$#', $sigef);
+
+    $di = [
+        'logradouro' => (trim((string)($r['endereco'] ?? '')) !== '') ? trim((string)$r['endereco']) : 'Não informado',
+        'cep'        => itn03Dig($r['cep'] ?? '') ?: '00000000',
+        'cod_ibge_municipio' => $munCod,
+        'uf'         => $ufCod,
+    ];
+    if (!$eh_rural) {
+        $di['tipo_logradouro']   = 250;
+        $di['numero_logradouro'] = (trim((string)($r['numero_imovel'] ?? '')) !== '') ? trim((string)$r['numero_imovel']) : 'S/N';
+        if (isset($r['area_ha']) && $r['area_ha'] !== null) $di['area_m2'] = round(((float)$r['area_ha']) * 10000, 2);
+    }
+
+    $nomes = array_values(array_filter(array_map('trim', preg_split('/[;,]/', (string)($r['proprietario'] ?? '')))));
+    $cpfs  = array_values(array_filter(array_map('trim', preg_split('/[;,]/', (string)($r['cpf'] ?? '')))));
+    if (!$nomes) { $nomes = ['Proprietário não informado']; $avisos[] = "$rotulo: proprietário não informado (preencher)."; }
+    $np = count($nomes); $pessoas = [];
+    foreach ($nomes as $i => $nome) {
+        $doc = itn03Dig($cpfs[$i] ?? ($cpfs[0] ?? ''));
+        if ($doc === '' || (strlen($doc) !== 11 && strlen($doc) !== 14)) { $doc = '00000000000'; $avisos[] = "$rotulo: CPF/CNPJ de \"$nome\" ausente/ inválido (preencher)."; }
+        $pessoas[] = [
+            'nome_completo' => $nome, 'estrangeiro' => false, 'cpf_cnpj' => $doc,
+            'estado_civil' => 1, 'condicao_parte' => 2, 'relacao_juridica' => 1,
+            'data_inicio_rel_juridica' => itn03DataBr($r['dat_ini'] ?? '') ?: $dataMat,
+            'percentual' => round(100 / $np, 2),
+        ];
+    }
+
+    $imovel = [
+        'tipo_imovel' => $eh_rural ? 2 : 1,
+        ($eh_rural ? 'contexto_rural' : 'contexto_urbano') => $eh_rural ? 3 : 1,
+        'motivo_envio' => 1,
+        'georreferenciamento' => $geo,
+        'tipo_matricula_transcricao' => 1,
+        'numero_matricula' => $numMat !== '' ? $numMat : '0',
+        'data_matricula' => $dataMat,
+        'situacao' => 1,
+        'cnm' => $cnm,
+        'tipo_ato' => 1, 'numero_ato' => '1', 'ato' => 1, 'data_ato' => $dataMat,
+        'certificacao_incra' => $certif,
+        'dados_imovel' => [$di],
+        'dados_pessoa' => $pessoas,
+    ];
+    $pren = itn03Dig($r['onr_numero_prenotacao'] ?? '');
+    if ($pren !== '') { $imovel['protocolo_prenotacao'] = (int)$pren; $imovel['data_protocolo_prenotacao'] = $dataMat; }
+
+    if ($eh_rural) {
+        $imovel['autorizacao_incra'] = false;
+        $imovel['faixa_fronteira']   = false;
+        $imovel['area_sn']           = false;
+        $imovel['imovel_possui_nome']= ($nomeImo !== '');
+        if ($nomeImo !== '') $imovel['nome_imovel'] = $nomeImo;
+        $imovel['area_terreno_total'] = ['valor' => round((float)($r['area_ha'] ?? 0), 4), 'unidade' => 2];
+        if ($certif) $imovel['codigo_incra'] = $sigef;
+        $cod = itn03Dig($r['ccir_sncr'] ?? '');
+        $imovel['cod_sncr'] = preg_match('#^(?:\d{12}|\d{13})$#', $cod) ? $cod : '000000000000';
+        if (preg_match('#^\d{11}$#', $cod)) $imovel['ccir'] = $cod;
+        $car = trim((string)($r['car'] ?? ''));
+        if (preg_match('#^(?:[A-Za-z]{2}-\d{7}-[A-Za-z0-9]{32}|[A-Za-z0-9]{41})$#', $car)) {
+            $imovel['car'] = $car;
+        } else {
+            $uc = preg_match('#^[A-Za-z]{2}$#', $uf2) ? $uf2 : 'XX';
+            $imovel['car'] = $uc . '-0000000-' . str_repeat('0', 32);
+            $avisos[] = "$rotulo: CAR ausente/ inválido (usado placeholder — preencher).";
+        }
+    } else {
+        $cif = trim((string)($r['cif'] ?? ''));
+        $imovel['cif'] = $cif !== '' ? $cif : '0';
+        if ($cif === '') $avisos[] = "$rotulo: CIF (Cadastro Imobiliário Fiscal) ausente (usado 0 — preencher).";
+    }
+    $cib = trim((string)($r['cib_nirf'] ?? ''));
+    if (preg_match('#^(?:[A-Za-z0-9]{8}|[A-Za-z0-9]{7}-[A-Za-z0-9])$#', $cib)) $imovel['cib'] = $cib;
+
+    if ($geo) {
+        $coords = [];
+        foreach (preg_split('/\s+/', trim((string)$r['coordenadas_wgs84'])) as $p) {
+            $xy = explode(',', $p);
+            if (count($xy) >= 2 && is_numeric(trim($xy[0])) && is_numeric(trim($xy[1]))) $coords[] = trim($xy[1]) . ',' . trim($xy[0]);
+        }
+        if ($coords) $imovel['coordenadas'] = implode(';', $coords);
+    }
+    $imovel['__tipo'] = $eh_rural ? 'rural' : 'urbano';
+    return $imovel;
+}
+/* monta os arquivos de carga (1 por tipo presente) a partir de uma lista de linhas. */
+function itn03GerarArquivos(array $linhas) {
+    $avisos = []; $porTipo = ['urbano' => [], 'rural' => []]; $cnsCont = [];
+    foreach ($linhas as $r) {
+        $im = itn03ImovelDaLinha($r, $avisos);
+        $tipo = $im['__tipo']; unset($im['__tipo']);
+        $porTipo[$tipo][] = $im;
+        $c = trim((string)($r['cns'] ?? '')); if ($c !== '') $cnsCont[$c] = ($cnsCont[$c] ?? 0) + 1;
+    }
+    $cns = '000000';
+    if ($cnsCont) { arsort($cnsCont); $cns = (string)array_key_first($cnsCont); }
+    if (!preg_match('#^(?:\d{6}|\d{5}-\d)$#', $cns)) { $cns = '000000'; $avisos[] = "CNS da serventia ausente/ inválido (usado 000000 — configurar)."; }
+    $arquivos = [];
+    foreach (['urbano', 'rural'] as $tipo) {
+        if (!$porTipo[$tipo]) continue;
+        $carga = ['version' => '1.2.0', 'cns' => $cns, 'imoveis' => $porTipo[$tipo]];
+        $plural = ($tipo === 'rural') ? 'rurais' : 'urbanos';
+        $arquivos[] = [
+            'tipo' => $tipo, 'n' => count($porTipo[$tipo]),
+            'nome' => 'carga_itn03_' . $plural . '.json',
+            'conteudo' => json_encode($carga, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ];
+    }
+    return ['arquivos' => $arquivos, 'avisos' => array_values(array_unique($avisos))];
+}
+function itn03SelectCols() {
+    return "id, identificador, numero_matricula, cnm, cns, nome_imo, dat_mat, liv_mat, fol_mat,
+            tipo_imovel, classifica, endereco, numero_imovel, cep, municipio, uf,
+            proprietario, cpf, dat_ini, area_ha, sigef, ccir_sncr, car, cib_nirf, cif,
+            onr_numero_prenotacao, coordenadas_wgs84";
+}
+
 if (isset($_POST['acao'])) {
 
     /* ----- Relatório de sobreposição em PDF (saída binária, antes do header JSON) ----- */
@@ -2180,6 +2369,38 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'itn03_individual') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
+            $stmt = $conn->prepare("SELECT " . itn03SelectCols() . " FROM memoriais_mapeados WHERE id = ? LIMIT 1");
+            $stmt->bind_param('i', $id); $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            if (!$row) { echo json_encode(['ok' => false, 'erro' => 'Imóvel não encontrado.']); exit; }
+            $res = itn03GerarArquivos([$row]);
+            echo json_encode(['ok' => true, 'arquivos' => $res['arquivos'], 'avisos' => $res['avisos']], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($acao === 'itn03_lote') {
+            // ids opcionais (lista do filtro); se vazio, exporta todos os ativos
+            $idsRaw = trim((string)($_POST['ids'] ?? ''));
+            $linhas = [];
+            if ($idsRaw !== '') {
+                $ids = array_values(array_filter(array_map('intval', preg_split('/[^0-9]+/', $idsRaw))));
+                if ($ids) {
+                    $in = implode(',', $ids);
+                    $rs = $conn->query("SELECT " . itn03SelectCols() . " FROM memoriais_mapeados WHERE id IN ($in) ORDER BY id");
+                    while ($rs && $r = $rs->fetch_assoc()) $linhas[] = $r;
+                }
+            } else {
+                $rs = $conn->query("SELECT " . itn03SelectCols() . " FROM memoriais_mapeados WHERE situacao <> 'encerrada' OR situacao IS NULL ORDER BY id");
+                while ($rs && $r = $rs->fetch_assoc()) $linhas[] = $r;
+            }
+            if (!$linhas) { echo json_encode(['ok' => false, 'erro' => 'Nenhum imóvel para exportar.']); exit; }
+            $res = itn03GerarArquivos($linhas);
+            echo json_encode(['ok' => true, 'total' => count($linhas), 'arquivos' => $res['arquivos'], 'avisos' => $res['avisos']], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($acao === 'serventia_municipio') {
             $raw = '';
             try {
@@ -2359,7 +2580,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-19-formal-oculta (rótulos "Mat." sem zeros à esquerda) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-export (exportação de carga ITN 03 — individual e lote) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2581,6 +2802,10 @@ header('Expires: 0');
   .legend .sw.sel{background:rgba(245,158,11,.45);border:1px solid #f59e0b}
   .ov-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.4;padding:8px 15px 0}
   .ov-search{display:flex;gap:6px;padding:8px 10px 2px}
+  .ov-itn03{padding:6px 10px 2px}
+  .btn-itn03{width:100%;padding:8px 10px;border:1px solid #1f7a4d;background:#e8f7ee;color:#13693f;border-radius:8px;font-weight:600;font-size:12px;cursor:pointer;transition:.15s}
+  .btn-itn03:hover{background:#d6f0e0}
+  .btn-itn03:disabled{opacity:.6;cursor:default}
   .ov-search input{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;color:var(--ink);
     font-size:12px;padding:7px 9px;font-family:var(--disp);outline:none}
   .ov-search input:focus{border-color:#0d9488}
@@ -3067,6 +3292,9 @@ header('Expires: 0');
         <input type="text" id="ov-busca" placeholder="Filtrar... (use ; para ver só esses: 744;822;867)">
         <button id="ov-busca-clear" title="Limpar filtro">×</button>
       </div>
+      <div class="ov-itn03">
+        <button id="ov-itn03" class="btn-itn03" title="Gerar a carga ITN 03 (ONR) dos imóveis — todos, ou apenas os do filtro ;">⤓ Exportar carga ITN 03 (lote)</button>
+      </div>
       <div class="ov-overlaps" id="ov-overlaps"></div>
       <div class="ov-foot">
         <button class="btn-report" id="btn-relatorio">Gerar relatório de sobreposição (PDF)</button>
@@ -3219,6 +3447,7 @@ header('Expires: 0');
     </div>
     <div class="modal-f">
       <button class="btn-ghost" id="ed-cancelar2" onclick="fecharEdicao()">Cancelar</button>
+      <button class="btn-ghost" id="ed-itn03" title="Gerar a carga ITN 03 (ONR) só desta matrícula">⤓ Carga ITN 03</button>
       <button class="btn-primary" id="ed-salvar">Salvar alterações</button>
     </div>
   </div>
@@ -3320,7 +3549,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-19-formal-oculta','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-itn03-export','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4551,6 +4780,54 @@ function edToggleEnc(){
   }
 }
 function fecharEdicao(){ document.getElementById('modal-edit').classList.remove('show'); }
+
+/* ===================== EXPORTAÇÃO DE CARGA ITN 03 (ONR) ===================== */
+function itn03Baixar(nome, conteudo){
+  const blob = new Blob([conteudo], {type:'application/json;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+function itn03MostrarAvisos(avisos, contexto){
+  if(!avisos || !avisos.length) return;
+  const max = 14;
+  const lista = avisos.slice(0, max).map(a=>'• '+a).join('\n');
+  const extra = avisos.length>max ? ('\n… e mais '+(avisos.length-max)+' aviso(s).') : '';
+  alert('Carga ITN 03 gerada ('+contexto+').\n\nAlguns campos obrigatórios usaram valores padrão — revise antes de enviar ao ONR:\n\n'+lista+extra);
+}
+async function exportarItn03Individual(){
+  const id = (document.getElementById('ed-id')||{}).value;
+  if(!id){ setStatus('err','Selecione uma matrícula primeiro.'); return; }
+  const btn = document.getElementById('ed-itn03'); const txt = btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='Gerando…'; }
+  try{
+    const res = await post({acao:'itn03_individual', id});
+    if(!res.ok){ setStatus('err', res.erro||'Falha ao gerar a carga ITN 03.'); return; }
+    (res.arquivos||[]).forEach(f=>itn03Baixar(f.nome, f.conteudo));
+    setStatus('ok','Carga ITN 03 da matrícula gerada.');
+    itn03MostrarAvisos(res.avisos, 'matrícula');
+  }catch(e){ setStatus('err','Erro: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=txt; } }
+}
+async function exportarItn03Lote(){
+  // se houver um filtro por lista (;) ativo, exporta só esses ids; senão, todos os ativos
+  const busca = (document.getElementById('ov-busca')||{}).value || '';
+  const ids = busca.indexOf(';')>=0 ? busca : '';
+  const btn = document.getElementById('ov-itn03'); const txt = btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='Gerando…'; }
+  try{
+    const res = await post({acao:'itn03_lote', ids});
+    if(!res.ok){ setStatus('err', res.erro||'Falha ao gerar a carga ITN 03.'); return; }
+    const arqs = res.arquivos||[];
+    arqs.forEach(f=>itn03Baixar(f.nome, f.conteudo));
+    const resumo = arqs.map(f=>f.n+' '+(f.tipo==='rural'?(f.n>1?'rurais':'rural'):(f.n>1?'urbanos':'urbano'))).join(' + ');
+    setStatus('ok','Carga ITN 03 (lote) gerada: '+(res.total||0)+' imóvel(is) — '+resumo+(arqs.length>1?' (um arquivo por tipo)':'')+'.');
+    itn03MostrarAvisos(res.avisos, 'lote');
+  }catch(e){ setStatus('err','Erro: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=txt; } }
+}
 async function salvarEdicao(){
   const id = document.getElementById('ed-id').value;
   // proprietários: coleta, valida documentos e junta por vírgula (alinhados por posição)
@@ -5051,6 +5328,8 @@ function verificarPertencimento(geo){
 
   // Modal de edição
   const es=document.getElementById('ed-salvar'); if(es) es.addEventListener('click', salvarEdicao);
+  const ei=document.getElementById('ed-itn03'); if(ei) ei.addEventListener('click', exportarItn03Individual);
+  const ol=document.getElementById('ov-itn03'); if(ol) ol.addEventListener('click', exportarItn03Lote);
   const esit=document.getElementById('ed-situacao'); if(esit) esit.addEventListener('change', edToggleEnc);
   const epadd=document.getElementById('ed-prop-add'); if(epadd) epadd.addEventListener('click', edAddProp);
   // máscara CPF/CNPJ no campo do formulário principal
