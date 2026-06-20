@@ -619,6 +619,8 @@ function ensureTable($conn) {
         'situacao'             => "ADD COLUMN situacao VARCHAR(20) NOT NULL DEFAULT 'ativa'",
         'motivo_situacao'      => "ADD COLUMN motivo_situacao VARCHAR(20) NULL DEFAULT NULL",
         'matricula_sucessora'  => "ADD COLUMN matricula_sucessora VARCHAR(120) NULL DEFAULT NULL",
+        // Matrícula cadastrada SÓ para a carga ITN 03 (sem coordenadas/mapeamento).
+        'itn03_exclusivo'      => "ADD COLUMN itn03_exclusivo TINYINT(1) NOT NULL DEFAULT 0",
     ];
     foreach ($novas as $colNome => $ddl) {
         $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colNome) . "'");
@@ -1962,7 +1964,7 @@ function itn03SelectCols() {
             tipo_imovel, classifica, endereco, numero_imovel, cep, municipio, uf,
             proprietario, cpf, dat_ini, area_ha, sigef, ccir_sncr, car, cib_nirf, cif,
             onr_nivel_publicidade, onr_classificacao, onr_numero_prenotacao, onr_descricao,
-            coordenadas_wgs84";
+            itn03_exclusivo, coordenadas_wgs84";
 }
 /* "apto para o Mapa da ONR" (mesmo critério do onr_pronto): se está pronto p/ o Mapa, está pronto p/ a carga ITN 03. */
 function itn03Faltam(array $r) {
@@ -1975,6 +1977,17 @@ function itn03Faltam(array $r) {
     return $faltam;
 }
 function itn03Apto(array $r) { return count(itn03Faltam($r)) === 0; }
+/* Aptidão das matrículas EXCLUSIVAS da ITN 03 (sem mapa): só o mínimo que a carga exige. */
+function itn03ExclusivoFaltam(array $r) {
+    $faltam = [];
+    if (!in_array((string)($r['tipo_imovel'] ?? ''), ['urbano','rural'], true)) $faltam[] = 'tipo (urbano/rural)';
+    if (trim((string)($r['numero_matricula'] ?? '')) === '') $faltam[] = 'número da matrícula';
+    if (!preg_match('#^(?:\d{6}\.\d\.\d{7}-\d{2}|\d{16})$#', trim((string)($r['cnm'] ?? '')))) $faltam[] = 'CNM válido';
+    if (trim((string)($r['municipio'] ?? '')) === '') $faltam[] = 'município';
+    if (trim((string)($r['uf'] ?? '')) === '') $faltam[] = 'UF';
+    return $faltam;
+}
+function itn03ExclusivoApto(array $r) { return count(itn03ExclusivoFaltam($r)) === 0; }
 
 if (isset($_POST['acao'])) {
 
@@ -2397,9 +2410,13 @@ if (isset($_POST['acao'])) {
             $stmt->bind_param('i', $id); $stmt->execute();
             $row = $stmt->get_result()->fetch_assoc();
             if (!$row) { echo json_encode(['ok' => false, 'erro' => 'Imóvel não encontrado.']); exit; }
-            $falta = itn03Faltam($row);
+            $ehExcl = (int)($row['itn03_exclusivo'] ?? 0) === 1;
+            $falta = $ehExcl ? itn03ExclusivoFaltam($row) : itn03Faltam($row);
             if ($falta) {
-                echo json_encode(['ok' => false, 'erro' => 'Esta matrícula ainda não está apta para o Mapa da ONR (e, portanto, para a carga ITN 03). Faltam: ' . implode(', ', $falta) . '.'], JSON_UNESCAPED_UNICODE);
+                $ctx = $ehExcl
+                    ? 'a carga ITN 03 (mínimo: tipo + número da matrícula + CNM válido + município + UF)'
+                    : 'o Mapa da ONR (e, portanto, para a carga ITN 03)';
+                echo json_encode(['ok' => false, 'erro' => 'Esta matrícula ainda não está apta para ' . $ctx . '. Faltam: ' . implode(', ', $falta) . '.'], JSON_UNESCAPED_UNICODE);
                 exit;
             }
             $res = itn03GerarArquivos([$row]);
@@ -2407,30 +2424,62 @@ if (isset($_POST['acao'])) {
             exit;
         }
         if ($acao === 'itn03_lote') {
-            // ids opcionais (lista do filtro); se vazio, exporta todos os ativos
+            $escopo = (($_POST['escopo'] ?? 'mapa') === 'exclusivas') ? 'exclusivas' : 'mapa';
             $idsRaw = trim((string)($_POST['ids'] ?? ''));
             $linhas = [];
-            if ($idsRaw !== '') {
-                $ids = array_values(array_filter(array_map('intval', preg_split('/[^0-9]+/', $idsRaw))));
-                if ($ids) {
-                    $in = implode(',', $ids);
-                    $rs = $conn->query("SELECT " . itn03SelectCols() . " FROM memoriais_mapeados WHERE id IN ($in) ORDER BY id");
+            if ($escopo === 'exclusivas') {
+                $rs = $conn->query("SELECT " . itn03SelectCols() . " FROM memoriais_mapeados WHERE itn03_exclusivo = 1 AND (situacao <> 'encerrada' OR situacao IS NULL) ORDER BY id");
+                while ($rs && $r = $rs->fetch_assoc()) $linhas[] = $r;
+                $aptoFn = 'itn03ExclusivoApto';
+                $msgVazio = 'Nenhuma matrícula exclusiva ITN 03 apta. Cada uma precisa de: tipo (urbano/rural) + número da matrícula + CNM válido + município + UF.';
+                $msgSemReg = 'Nenhuma matrícula exclusiva ITN 03 cadastrada.';
+            } else {
+                if ($idsRaw !== '') {
+                    $ids = array_values(array_filter(array_map('intval', preg_split('/[^0-9]+/', $idsRaw))));
+                    if ($ids) {
+                        $in = implode(',', $ids);
+                        $rs = $conn->query("SELECT " . itn03SelectCols() . " FROM memoriais_mapeados WHERE id IN ($in) AND itn03_exclusivo = 0 ORDER BY id");
+                        while ($rs && $r = $rs->fetch_assoc()) $linhas[] = $r;
+                    }
+                } else {
+                    $rs = $conn->query("SELECT " . itn03SelectCols() . " FROM memoriais_mapeados WHERE itn03_exclusivo = 0 AND (situacao <> 'encerrada' OR situacao IS NULL) ORDER BY id");
                     while ($rs && $r = $rs->fetch_assoc()) $linhas[] = $r;
                 }
-            } else {
-                $rs = $conn->query("SELECT " . itn03SelectCols() . " FROM memoriais_mapeados WHERE situacao <> 'encerrada' OR situacao IS NULL ORDER BY id");
-                while ($rs && $r = $rs->fetch_assoc()) $linhas[] = $r;
+                $aptoFn = 'itn03Apto';
+                $msgVazio = 'Nenhum imóvel apto para a carga ITN 03. Só são exportados os que estão prontos para o Mapa da ONR (tipo + nível de publicidade + classificação + prenotação + descrição).';
+                $msgSemReg = 'Nenhum imóvel para exportar.';
             }
-            if (!$linhas) { echo json_encode(['ok' => false, 'erro' => 'Nenhum imóvel para exportar.']); exit; }
+            if (!$linhas) { echo json_encode(['ok' => false, 'erro' => $msgSemReg], JSON_UNESCAPED_UNICODE); exit; }
             $total = count($linhas);
-            $aptas = array_values(array_filter($linhas, 'itn03Apto'));
+            $aptas = array_values(array_filter($linhas, $aptoFn));
             $puladas = $total - count($aptas);
-            if (!$aptas) {
-                echo json_encode(['ok' => false, 'erro' => 'Nenhum imóvel apto para a carga ITN 03. Só são exportados os que estão prontos para o Mapa da ONR (tipo + nível de publicidade + classificação + prenotação + descrição).'], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
+            if (!$aptas) { echo json_encode(['ok' => false, 'erro' => $msgVazio], JSON_UNESCAPED_UNICODE); exit; }
             $res = itn03GerarArquivos($aptas);
-            echo json_encode(['ok' => true, 'total' => count($aptas), 'puladas' => $puladas, 'arquivos' => $res['arquivos'], 'avisos' => $res['avisos']], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['ok' => true, 'total' => count($aptas), 'puladas' => $puladas, 'escopo' => $escopo, 'arquivos' => $res['arquivos'], 'avisos' => $res['avisos']], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($acao === 'itn03_exclusiva_nova') {
+            $identificador = trim((string)($_POST['identificador'] ?? ''));
+            $numMatricula  = trim((string)($_POST['numero_matricula'] ?? ''));
+            $proprietario  = trim((string)($_POST['proprietario'] ?? ''));
+            $cpf           = trim((string)($_POST['cpf'] ?? ''));
+            $tipoImovel    = in_array(($_POST['tipo_imovel'] ?? ''), ['urbano', 'rural'], true) ? (string)$_POST['tipo_imovel'] : '';
+            $areaHa        = trim((string)($_POST['area_ha'] ?? ''));
+            if ($identificador === '' && $numMatricula !== '') $identificador = $numMatricula;
+            if ($identificador === '') { echo json_encode(['ok' => false, 'erro' => 'Informe a identificação ou a matrícula.']); exit; }
+            if ($numMatricula !== '') {
+                $dono = acharMemorialPorMatricula($conn, $numMatricula);
+                if ($dono) { echo json_encode(['ok' => false, 'erro' => 'Já existe um imóvel cadastrado com a matrícula ' . $numMatricula . ' (registro #' . $dono . ').']); exit; }
+            }
+            $tipo = ($numMatricula !== '') ? 'matricula' : 'nome';
+            $areaVal = ($areaHa !== '') ? (float)str_replace(',', '.', $areaHa) : null;
+            $data = ['num_vertices' => null, 'area_ha' => $areaVal, 'perimetro_m' => null,
+                     'centro_lat' => null, 'centro_lng' => null, 'coordenadas_wgs84' => null, 'coordenadas_utm' => null];
+            $novoId = inserirMemorial($conn, $identificador, $tipo, 'itn03', null, null, $data, $numMatricula, $proprietario, $cpf, $tipoImovel);
+            if (!$novoId) { echo json_encode(['ok' => false, 'erro' => 'Falha ao cadastrar a matrícula.']); exit; }
+            $conn->query("UPDATE memoriais_mapeados SET itn03_exclusivo = 1 WHERE id = " . (int)$novoId);
+            salvarCamposOnr($conn, $novoId, $_POST);
+            echo json_encode(['ok' => true, 'id' => $novoId], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -2483,9 +2532,9 @@ if (isset($_POST['acao'])) {
             $res = $conn->query(
                 "SELECT id, identificador, tipo_identificador, origem, imovel_id, num_vertices,
                         area_ha, perimetro_m, centro_lat, centro_lng, cor, cor_opacidade,
-                        numero_matricula, proprietario, cpf, tipo_imovel,
+                        numero_matricula, proprietario, cpf, tipo_imovel, cnm, municipio, uf,
                         onr_status, onr_importation_id, onr_numero_prenotacao, onr_classificacao,
-                        onr_nivel_publicidade, onr_descricao,
+                        onr_nivel_publicidade, onr_descricao, itn03_exclusivo,
                         situacao, motivo_situacao, matricula_sucessora, criado_em
                  FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 1000"
             );
@@ -2498,6 +2547,8 @@ if (isset($_POST['acao'])) {
                     && trim((string)$row['onr_descricao']) !== '';
                 $row['onr_pronto'] = $pronto ? 1 : 0;
                 $row['onr_enviado'] = (trim((string)$row['onr_importation_id']) !== '') ? 1 : 0;
+                $row['itn03_exclusivo'] = (int)($row['itn03_exclusivo'] ?? 0);
+                $row['itn03_apto'] = itn03ExclusivoApto($row) ? 1 : 0; // aptidão p/ carga exclusiva ITN 03
                 $rows[] = $row;
             }
             echo json_encode(['ok' => true, 'itens' => $rows], JSON_UNESCAPED_UNICODE);
@@ -2613,7 +2664,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-car-normaliza (exportação de carga ITN 03 — individual e lote) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-exclusivas (exportação de carga ITN 03 — individual e lote) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2807,6 +2858,16 @@ header('Expires: 0');
 
   /* Cabeçalho da lista + botão ver todos */
   .saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .vista-toggle{display:flex;gap:4px;background:var(--panel2,rgba(128,128,128,.08));border:1px solid var(--line);border-radius:9px;padding:3px;margin-bottom:8px}
+  .vista-toggle .vt-btn{flex:1;border:none;background:transparent;color:var(--ink,#555);font-size:11.5px;font-weight:600;padding:6px 8px;border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .vista-toggle .vt-btn.active{background:var(--card,#fff);color:var(--brand,#0d9488);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .vt-count{display:inline-block;min-width:16px;padding:0 5px;margin-left:2px;border-radius:9px;background:rgba(13,148,136,.18);color:#0d9488;font-size:10px;line-height:15px}
+  .itn03-actions{display:flex;gap:6px;margin-bottom:8px}
+  .itn03-actions .mini-btn{flex:1}
+  .item .itn03-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:rgba(99,102,241,.16);color:#4f46e5;margin-left:4px}
+  .item .itn03-apto{font-size:10px;font-weight:600;margin-left:4px}
+  .item .itn03-apto.ok{color:#13693f}
+  .item .itn03-apto.no{color:#a80f1e}
   .saved-head h3{margin:0}
   .mini-btn{font-family:var(--mono);font-size:10px;letter-spacing:.5px;padding:6px 10px;background:transparent;
     border:1px solid var(--line);color:var(--muted);border-radius:6px}
@@ -3288,6 +3349,14 @@ header('Expires: 0');
             <button class="mini-btn" id="btn-onr-config" title="Configurar a API do Mapa ONR">⚙</button>
           </div>
         </div>
+        <div class="vista-toggle" id="vista-toggle">
+          <button type="button" class="vt-btn active" data-vista="mapa">Mapeadas</button>
+          <button type="button" class="vt-btn" data-vista="itn03">Exclusivas ITN 03 <span id="vt-count-itn03" class="vt-count"></span></button>
+        </div>
+        <div class="itn03-actions" id="itn03-actions" style="display:none">
+          <button class="mini-btn" id="btn-itn03-nova" title="Cadastrar uma matrícula só para a carga ITN 03 (sem coordenadas/mapa)">➕ Nova matrícula</button>
+          <button class="mini-btn onr" id="btn-itn03-export-excl" title="Exportar a carga ITN 03 das matrículas exclusivas aptas">⤓ Exportar carga</button>
+        </div>
         <div class="search-wrap">
           <svg class="search-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           <input id="busca" type="text" placeholder="Buscar por matrícula, proprietário, identificação…">
@@ -3372,7 +3441,7 @@ header('Expires: 0');
 <div id="modal-edit" class="modal-ov">
   <div class="modal-card">
     <div class="modal-h">
-      <h3>Editar dados do imóvel</h3>
+      <h3 id="ed-titulo">Editar dados do imóvel</h3>
       <button class="modal-x" id="ed-cancelar" title="Fechar">×</button>
     </div>
     <input type="hidden" id="ed-id">
@@ -3583,7 +3652,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-car-normaliza','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-itn03-exclusivas','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4540,6 +4609,7 @@ function desenharListaOverlaps(overlaps, termo){
 
 /* ===================== LISTA DE SALVOS ===================== */
 let imoveisCache = [];
+let vistaLista = 'mapa'; // 'mapa' (mapeadas) | 'itn03' (exclusivas ITN 03)
 async function carregarLista(){
   const res = await post({acao:'listar'});
   imoveisCache = (res.ok && res.itens) ? res.itens : [];
@@ -4548,13 +4618,20 @@ async function carregarLista(){
 function renderLista(){
   const wrap = document.getElementById('saved-list');
   const termo = (document.getElementById('busca').value||'').trim().toLowerCase();
-  let itens = imoveisCache;
+  const ehItn03 = it => String(it.itn03_exclusivo)==='1';
+  const nExcl = imoveisCache.filter(ehItn03).length;
+  const cb=document.getElementById('vt-count-itn03'); if(cb) cb.textContent = nExcl||'';
+  const acts=document.getElementById('itn03-actions'); if(acts) acts.style.display = (vistaLista==='itn03')?'flex':'none';
+  let itens = imoveisCache.filter(it=> vistaLista==='itn03' ? ehItn03(it) : !ehItn03(it));
   if(termo){
     itens = itens.filter(it=>[it.identificador,it.numero_matricula,it.proprietario,it.cpf,it.tipo_imovel,it.origem]
       .some(c=>(c||'').toString().toLowerCase().includes(termo)));
   }
   if(!itens.length){
-    wrap.innerHTML = '<div class="empty-list">'+(imoveisCache.length?'Nenhum imóvel encontrado.':'Nenhum imóvel gravado ainda.')+'</div>';
+    const vazio = vistaLista==='itn03'
+      ? (nExcl ? 'Nenhuma encontrada.' : 'Nenhuma matrícula exclusiva ITN 03 ainda. Use “➕ Nova matrícula”.')
+      : (imoveisCache.length?'Nenhum imóvel encontrado.':'Nenhum imóvel gravado ainda.');
+    wrap.innerHTML = '<div class="empty-list">'+vazio+'</div>';
     return;
   }
   wrap.innerHTML = itens.map(it=>{
@@ -4566,24 +4643,31 @@ function renderLista(){
     const tag = it.tipo_imovel ? `<span class="tag ${it.tipo_imovel==='rural'?'rural':'urb'}">${it.tipo_imovel}</span>` : '';
     const enviado = String(it.onr_enviado)==='1';
     const pronto  = String(it.onr_pronto)==='1';
+    const excl    = ehItn03(it);
+    const aptoItn = String(it.itn03_apto)==='1';
     const morto   = it.situacao==='encerrada';
     const desmembrada = !morto && it.motivo_situacao==='desmembramento';
     const mortoBadge = morto
       ? `<span class="morto-badge" title="${it.matricula_sucessora?('Sucessora: '+escapeHtml(it.matricula_sucessora)):'Encerrada por unificação'}">✝ unificada</span>`
       : (desmembrada ? `<span class="desmembra-badge" title="${it.matricula_sucessora?('Trecho originou a matrícula '+escapeHtml(it.matricula_sucessora)):'Desmembramento'}">✂ desmembrada</span>` : '');
+    const exclBadge = excl
+      ? `<span class="itn03-badge" title="Matrícula exclusiva ITN 03 (sem mapa)">ITN 03</span><span class="itn03-apto ${aptoItn?'ok':'no'}" title="${aptoItn?'Apta para a carga ITN 03':'Faltam dados mínimos (tipo, matrícula, CNM, município, UF)'}">${aptoItn?'✓ apta':'⚠ incompleta'}</span>`
+      : '';
     const statusTxt = it.onr_status ? escapeHtml(it.onr_status) : (enviado?'ENVIADO':'');
-    const onrBadge = statusTxt ? `<span class="onr-badge ${enviado?'env':''}">${statusTxt}</span>` : '';
-    const onrBtn = enviado
-      ? `<button class="it-onr enviado" data-act="status" title="Consultar status na ONR">⟳</button>`
-      : `<button class="it-onr" data-act="enviar" title="${pronto?'Enviar ao Mapa ONR':'Faltam dados ONR para enviar'}" ${pronto?'':'disabled'}>➤</button>`;
+    const onrBadge = (statusTxt && !excl) ? `<span class="onr-badge ${enviado?'env':''}">${statusTxt}</span>` : '';
+    const acaoBtn = excl
+      ? `<button class="it-onr" data-act="itn03" title="${aptoItn?'Exportar carga ITN 03 desta matrícula':'Faltam dados mínimos da ITN 03 para exportar'}" ${aptoItn?'':'disabled'}>⤓</button>`
+      : (enviado
+          ? `<button class="it-onr enviado" data-act="status" title="Consultar status na ONR">⟳</button>`
+          : `<button class="it-onr" data-act="enviar" title="${pronto?'Enviar ao Mapa ONR':'Faltam dados ONR para enviar'}" ${pronto?'':'disabled'}>➤</button>`);
     return `<div class="item${morto?' morto':''}" data-id="${it.id}">
       ${corDot}
       <div class="info">
-        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}</div>
+        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}${exclBadge}</div>
         <div class="mt">${sub.join(' · ')||meta} ${onrBadge}</div>
       </div>
       ${tag}
-      ${onrBtn}
+      ${acaoBtn}
       <button class="it-edit" title="Editar dados">✎</button>
       <button class="del" title="Excluir">×</button>
     </div>`;
@@ -4593,9 +4677,16 @@ function renderLista(){
     el.querySelector('.del').onclick = async (e)=>{ e.stopPropagation(); if(!(await swalConfirm('Excluir imóvel?','Esta ação não pode ser desfeita.','Excluir')))return; await post({acao:'excluir', id}); carregarLista(); if(modo==='overview') verTodos(); };
     el.querySelector('.it-edit').onclick = (e)=>{ e.stopPropagation(); abrirEdicao(id); };
     const onrB = el.querySelector('.it-onr');
-    if(onrB) onrB.onclick = (e)=>{ e.stopPropagation(); if(onrB.dataset.act==='status') consultarStatusOnr(id); else enviarOnr(id); };
+    if(onrB) onrB.onclick = (e)=>{ e.stopPropagation();
+      const act = onrB.dataset.act;
+      if(act==='itn03') exportarItn03Individual(id);
+      else if(act==='status') consultarStatusOnr(id);
+      else enviarOnr(id);
+    };
     el.oncontextmenu = (e)=>{ e.preventDefault(); selecionarDaLista(id); };
-    el.onclick = (e)=>{ if(ctrlAtivo || e.ctrlKey || e.metaKey){ e.preventDefault(); selecionarDaLista(id); return; } carregarImovel(id); };
+    el.onclick = (e)=>{ if(ctrlAtivo || e.ctrlKey || e.metaKey){ e.preventDefault(); selecionarDaLista(id); return; }
+      if(String(el.dataset.id) && imoveisCache.find(x=>String(x.id)===String(id)&&String(x.itn03_exclusivo)==='1')){ abrirEdicao(id); return; } // exclusiva: sem mapa, abre edição
+      carregarImovel(id); };
   });
   sincronizarListaSelecao();
 }
@@ -4704,9 +4795,34 @@ function edAddProp(){ edProps.push({nome:'',doc:''}); edRenderProps();
   const wrap=document.getElementById('ed-prop-list'); if(wrap){ const ins=wrap.querySelectorAll('.prop-nome'); if(ins.length) ins[ins.length-1].focus(); }
 }
 
+let edNovoItn03 = false;
+function sincronizarVistaToggle(){
+  document.querySelectorAll('#vista-toggle .vt-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.vista===vistaLista);
+  });
+  const acts=document.getElementById('itn03-actions'); if(acts) acts.style.display=(vistaLista==='itn03')?'flex':'none';
+}
+function novaMatriculaItn03(){
+  edNovoItn03 = true;
+  document.getElementById('ed-id').value = '';
+  document.getElementById('ed-identificador').value = '';
+  document.getElementById('ed-matricula').value = '';
+  edProps=[{nome:'',doc:''}]; edRenderProps();
+  document.getElementById('ed-tipo').value = '';
+  const sit=document.getElementById('ed-situacao'); if(sit) sit.value='ativa';
+  edSucList=[]; if(typeof edRenderSucChips==='function') edRenderSucChips();
+  if(typeof edToggleEnc==='function') edToggleEnc();
+  edPreencherOnr(null);
+  const onrAcc=document.querySelector('#modal-edit .ed-onr'); if(onrAcc) onrAcc.open=true;
+  const t=document.getElementById('ed-titulo'); if(t) t.textContent='Nova matrícula — só ITN 03 (sem mapa)';
+  document.getElementById('modal-edit').classList.add('show');
+  document.getElementById('ed-identificador').focus();
+}
 async function abrirEdicao(id){
   const it = imoveisCache.find(x=>String(x.id)===String(id));
   if(!it) return;
+  edNovoItn03 = false;
+  const tt=document.getElementById('ed-titulo'); if(tt) tt.textContent='Editar dados do imóvel';
   document.getElementById('ed-id').value = it.id;
   document.getElementById('ed-identificador').value = it.identificador||'';
   document.getElementById('ed-matricula').value = it.numero_matricula||'';
@@ -4813,7 +4929,7 @@ function edToggleEnc(){
     else hint.textContent='';
   }
 }
-function fecharEdicao(){ document.getElementById('modal-edit').classList.remove('show'); }
+function fecharEdicao(){ edNovoItn03=false; const t=document.getElementById('ed-titulo'); if(t) t.textContent='Editar dados do imóvel'; document.getElementById('modal-edit').classList.remove('show'); }
 
 /* ===================== EXPORTAÇÃO DE CARGA ITN 03 (ONR) ===================== */
 function itn03Baixar(nome, conteudo){
@@ -4845,10 +4961,10 @@ function itn03MostrarAvisos(avisos, contexto){
     didOpen:(popup)=>{ const c = popup && popup.parentElement; if(c && c.classList.contains('swal2-container')) c.style.zIndex='100050'; }
   }, swalTema()));
 }
-async function exportarItn03Individual(){
-  const id = (document.getElementById('ed-id')||{}).value;
+async function exportarItn03Individual(idArg){
+  const id = idArg || (document.getElementById('ed-id')||{}).value;
   if(!id){ setStatus('err','Selecione uma matrícula primeiro.'); return; }
-  const btn = document.getElementById('ed-itn03'); const txt = btn?btn.textContent:'';
+  const btn = idArg ? null : document.getElementById('ed-itn03'); const txt = btn?btn.textContent:'';
   if(btn){ btn.disabled=true; btn.textContent='Gerando…'; }
   try{
     const res = await post({acao:'itn03_individual', id});
@@ -4868,21 +4984,33 @@ async function exportarItn03Individual(){
   }catch(e){ setStatus('err','Erro: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=txt; } }
 }
-async function exportarItn03Lote(){
-  // se houver um filtro por lista (;) ativo, exporta só esses ids; senão, todos os ativos
-  const busca = (document.getElementById('ov-busca')||{}).value || '';
+async function exportarItn03Lote(escopo){
+  escopo = (escopo==='exclusivas') ? 'exclusivas' : 'mapa';
+  // visão "mapa": respeita o filtro por lista (;) da Visão geral; exclusivas: todas as aptas
+  const busca = (escopo==='mapa') ? ((document.getElementById('ov-busca')||{}).value || '') : '';
   const ids = busca.indexOf(';')>=0 ? busca : '';
-  const btn = document.getElementById('ov-itn03'); const txt = btn?btn.textContent:'';
+  const btn = (escopo==='exclusivas') ? document.getElementById('btn-itn03-export-excl') : document.getElementById('ov-itn03');
+  const txt = btn?btn.textContent:'';
   if(btn){ btn.disabled=true; btn.textContent='Gerando…'; }
   try{
-    const res = await post({acao:'itn03_lote', ids});
-    if(!res.ok){ setStatus('err', res.erro||'Falha ao gerar a carga ITN 03.'); return; }
+    const res = await post({acao:'itn03_lote', ids, escopo});
+    if(!res.ok){
+      setStatus('err', res.erro||'Falha ao gerar a carga ITN 03.');
+      if(typeof Swal!=='undefined'){
+        Swal.fire(Object.assign({icon:'info', title:'Nada para exportar', text:res.erro||'Falha ao gerar a carga ITN 03.',
+          confirmButtonText:'Entendi', confirmButtonColor:'#a80f1e',
+          didOpen:(p)=>{ const c=p&&p.parentElement; if(c&&c.classList.contains('swal2-container')) c.style.zIndex='100050'; }
+        }, swalTema()));
+      }
+      return;
+    }
     const arqs = res.arquivos||[];
     arqs.forEach(f=>itn03Baixar(f.nome, f.conteudo));
     const resumo = arqs.map(f=>f.n+' '+(f.tipo==='rural'?(f.n>1?'rurais':'rural'):(f.n>1?'urbanos':'urbano'))).join(' + ');
-    const puladas = res.puladas ? ' · '+res.puladas+' não pronto(s) para o Mapa ONR (ignorado(s))' : '';
-    setStatus('ok','Carga ITN 03 (lote) gerada: '+(res.total||0)+' imóvel(is) — '+resumo+(arqs.length>1?' (um arquivo por tipo)':'')+puladas+'.');
-    itn03MostrarAvisos(res.avisos, 'lote');
+    const ctxLbl = escopo==='exclusivas' ? 'exclusivas ITN 03' : 'lote';
+    const puladasMsg = res.puladas ? ' · '+res.puladas+(escopo==='exclusivas'?' incompleta(s) (ignorada(s))':' não pronto(s) p/ o Mapa ONR (ignorado(s))') : '';
+    setStatus('ok','Carga ITN 03 ('+ctxLbl+') gerada: '+(res.total||0)+' imóvel(is) — '+resumo+(arqs.length>1?' (um arquivo por tipo)':'')+puladasMsg+'.');
+    itn03MostrarAvisos(res.avisos, ctxLbl);
   }catch(e){ setStatus('err','Erro: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=txt; } }
 }
@@ -4894,6 +5022,21 @@ async function salvarEdicao(){
   if(invalidos.length){ setStatus('err','Documento inválido: '+invalidos.map(p=>p.doc).join(', ')+'. Corrija para salvar.'); return; }
   const proprietario = props.map(p=>p.nome).join(', ');
   const cpf = props.map(p=>p.doc).join(', ');
+  if(edNovoItn03){
+    // cadastro de matrícula EXCLUSIVA da ITN 03 (sem coordenadas/mapa)
+    const r = await post(Object.assign({acao:'itn03_exclusiva_nova',
+      identificador: document.getElementById('ed-identificador').value.trim(),
+      numero_matricula: document.getElementById('ed-matricula').value.trim(),
+      proprietario: proprietario, cpf: cpf,
+      tipo_imovel: document.getElementById('ed-tipo').value
+    }, edColetarOnr()));
+    if(!r.ok){ setStatus('err', r.erro||'Falha ao cadastrar a matrícula.'); return; }
+    edNovoItn03=false; fecharEdicao();
+    vistaLista='itn03'; sincronizarVistaToggle();
+    await carregarLista();
+    setStatus('ok','Matrícula exclusiva ITN 03 cadastrada.');
+    return;
+  }
   const r = await post(Object.assign({acao:'atualizar_imovel', id,
     identificador: document.getElementById('ed-identificador').value.trim(),
     numero_matricula: document.getElementById('ed-matricula').value.trim(),
@@ -5386,8 +5529,14 @@ function verificarPertencimento(geo){
 
   // Modal de edição
   const es=document.getElementById('ed-salvar'); if(es) es.addEventListener('click', salvarEdicao);
-  const ei=document.getElementById('ed-itn03'); if(ei) ei.addEventListener('click', exportarItn03Individual);
-  const ol=document.getElementById('ov-itn03'); if(ol) ol.addEventListener('click', exportarItn03Lote);
+  const ei=document.getElementById('ed-itn03'); if(ei) ei.addEventListener('click', ()=>exportarItn03Individual());
+  const ol=document.getElementById('ov-itn03'); if(ol) ol.addEventListener('click', ()=>exportarItn03Lote('mapa'));
+  document.querySelectorAll('#vista-toggle .vt-btn').forEach(b=> b.addEventListener('click', ()=>{
+    vistaLista = b.dataset.vista==='itn03' ? 'itn03' : 'mapa';
+    sincronizarVistaToggle(); renderLista();
+  }));
+  const bNova=document.getElementById('btn-itn03-nova'); if(bNova) bNova.addEventListener('click', novaMatriculaItn03);
+  const bExpExcl=document.getElementById('btn-itn03-export-excl'); if(bExpExcl) bExpExcl.addEventListener('click', ()=>exportarItn03Lote('exclusivas'));
   const esit=document.getElementById('ed-situacao'); if(esit) esit.addEventListener('change', edToggleEnc);
   const epadd=document.getElementById('ed-prop-add'); if(epadd) epadd.addEventListener('click', edAddProp);
   // máscara CPF/CNPJ no campo do formulário principal
