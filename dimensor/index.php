@@ -553,8 +553,8 @@ function ensureTable($conn) {
         cor VARCHAR(20) NULL DEFAULT NULL,
         cor_opacidade DECIMAL(3,2) NULL DEFAULT NULL,
         numero_matricula VARCHAR(60) NULL DEFAULT NULL,
-        proprietario VARCHAR(180) NULL DEFAULT NULL,
-        cpf VARCHAR(20) NULL DEFAULT NULL,
+        proprietario TEXT NULL DEFAULT NULL,
+        cpf TEXT NULL DEFAULT NULL,
         tipo_imovel VARCHAR(12) NULL DEFAULT NULL,
         criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
@@ -575,8 +575,8 @@ function ensureTable($conn) {
     // Compatibilidade: campos de cadastro do imóvel + intensidade da cor
     $novas = [
         'numero_matricula' => "ADD COLUMN numero_matricula VARCHAR(60) NULL DEFAULT NULL",
-        'proprietario'     => "ADD COLUMN proprietario VARCHAR(180) NULL DEFAULT NULL",
-        'cpf'              => "ADD COLUMN cpf VARCHAR(20) NULL DEFAULT NULL",
+        'proprietario'     => "ADD COLUMN proprietario TEXT NULL DEFAULT NULL",
+        'cpf'              => "ADD COLUMN cpf TEXT NULL DEFAULT NULL",
         'tipo_imovel'      => "ADD COLUMN tipo_imovel VARCHAR(12) NULL DEFAULT NULL",
         'cor_opacidade'    => "ADD COLUMN cor_opacidade DECIMAL(3,2) NULL DEFAULT NULL",
         // ---- Atributos do shapefile ONR (Mapa do Registro de Imóveis) ----
@@ -624,11 +624,15 @@ function ensureTable($conn) {
         $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colNome) . "'");
         if ($c && $c->num_rows === 0) { $conn->query("ALTER TABLE memoriais_mapeados " . $ddl); }
     }
-    // matricula_sucessora pode conter MUITAS matrículas (intervalos de desmembramento
-    // expandidos, ex.: 745-900 => 156 números) — promove para TEXT para não truncar.
-    $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE 'matricula_sucessora'");
-    if ($c && ($col = $c->fetch_assoc()) && stripos($col['Type'], 'text') === false) {
-        $conn->query("ALTER TABLE memoriais_mapeados MODIFY matricula_sucessora TEXT NULL DEFAULT NULL");
+    // Colunas que podem conter MUITOS valores separados por vírgula e truncavam:
+    //  - matricula_sucessora: intervalos de desmembramento expandidos (ex.: 745-900 => 156 números)
+    //  - proprietario / cpf: vários titulares (VARCHAR(180)/VARCHAR(20) cortavam o 2º em diante)
+    // Promove todas para TEXT (idempotente).
+    foreach (['matricula_sucessora', 'proprietario', 'cpf'] as $colMulti) {
+        $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colMulti) . "'");
+        if ($c && ($col = $c->fetch_assoc()) && stripos($col['Type'], 'text') === false) {
+            $conn->query("ALTER TABLE memoriais_mapeados MODIFY $colMulti TEXT NULL DEFAULT NULL");
+        }
     }
 }
 
@@ -2608,7 +2612,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pren-null (exportação de carga ITN 03 — individual e lote) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-fix-cpf-text (exportação de carga ITN 03 — individual e lote) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3578,7 +3582,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-pren-null','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-fix-cpf-text','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
