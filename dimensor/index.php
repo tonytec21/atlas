@@ -1,4 +1,9 @@
 <?php
+if (!headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
 /* =====================================================================
  *  index.php (Atlas Dimensor)  —  Sistema Atlas
  *  Lê memoriais descritivos com coordenadas geográficas em GMS
@@ -1870,7 +1875,7 @@ function itn03ImovelDaLinha(array $r, array &$avisos) {
     $imovel = [
         'tipo_imovel' => $eh_rural ? 2 : 1,
         ($eh_rural ? 'contexto_rural' : 'contexto_urbano') => $eh_rural ? 3 : 1,
-        'motivo_envio' => 1,
+        'motivo_envio' => 2,
         'georreferenciamento' => $geo,
         'tipo_matricula_transcricao' => 1,
         'numero_matricula' => $numMat !== '' ? $numMat : '0',
@@ -1912,14 +1917,7 @@ function itn03ImovelDaLinha(array $r, array &$avisos) {
     $cib = trim((string)($r['cib_nirf'] ?? ''));
     if (preg_match('#^(?:[A-Za-z0-9]{8}|[A-Za-z0-9]{7}-[A-Za-z0-9])$#', $cib)) $imovel['cib'] = $cib;
 
-    if ($geo) {
-        $coords = [];
-        foreach (preg_split('/\s+/', trim((string)$r['coordenadas_wgs84'])) as $p) {
-            $xy = explode(',', $p);
-            if (count($xy) >= 2 && is_numeric(trim($xy[0])) && is_numeric(trim($xy[1]))) $coords[] = trim($xy[1]) . ',' . trim($xy[0]);
-        }
-        if ($coords) $imovel['coordenadas'] = implode(';', $coords);
-    }
+    $imovel['coordenadas'] = ''; // por padrão em branco (geometria enviada por outra via)
     $imovel['__tipo'] = $eh_rural ? 'rural' : 'urbano';
     return $imovel;
 }
@@ -2580,7 +2578,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-export (exportação de carga ITN 03 — individual e lote) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-defaults (exportação de carga ITN 03 — individual e lote) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3549,7 +3547,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-itn03-export','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-itn03-defaults','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4790,12 +4788,25 @@ function itn03Baixar(nome, conteudo){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 4000);
 }
+function itn03Esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function itn03MostrarAvisos(avisos, contexto){
   if(!avisos || !avisos.length) return;
-  const max = 14;
-  const lista = avisos.slice(0, max).map(a=>'• '+a).join('\n');
-  const extra = avisos.length>max ? ('\n… e mais '+(avisos.length-max)+' aviso(s).') : '';
-  alert('Carga ITN 03 gerada ('+contexto+').\n\nAlguns campos obrigatórios usaram valores padrão — revise antes de enviar ao ONR:\n\n'+lista+extra);
+  if(typeof Swal==='undefined'){
+    alert('Carga ITN 03 gerada ('+contexto+').\n\nRevise antes de enviar ao ONR:\n\n'+avisos.map(a=>'• '+a).join('\n'));
+    return;
+  }
+  const itens = avisos.map(a=>'<li>'+itn03Esc(a)+'</li>').join('');
+  Swal.fire(Object.assign({
+    icon:'warning',
+    title:'Carga ITN 03 gerada ('+contexto+')',
+    html:'<p style="margin:0 0 10px;font-size:13px">'
+         + avisos.length + ' campo(s) obrigatório(s) usaram valores padrão — revise antes de enviar ao ONR:</p>'
+         + '<div style="max-height:48vh;overflow:auto;text-align:left;border:1px solid rgba(128,128,128,.25);border-radius:8px;padding:10px 12px">'
+         + '<ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.6">' + itens + '</ul></div>',
+    width: 640,
+    confirmButtonText:'Entendi',
+    confirmButtonColor:'#a80f1e'
+  }, swalTema()));
 }
 async function exportarItn03Individual(){
   const id = (document.getElementById('ed-id')||{}).value;
