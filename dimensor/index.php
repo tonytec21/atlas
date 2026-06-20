@@ -2067,6 +2067,23 @@ function acharMemorialPorMatricula($conn, $mat) {
     while ($res && ($row = $res->fetch_assoc())) { if ($norm($row['numero_matricula']) === $alvo) return (int)$row['id']; }
     return null;
 }
+
+/* Busca o imóvel para complementar via PDF: por número de matrícula (arquivo ou documento)
+   e, como fallback, por identificador — cobre imóveis cadastrados só com KML (que muitas
+   vezes têm apenas o identificador preenchido, sem numero_matricula). */
+function acharMemorialParaPdf($conn, $mat, $matDoc = '') {
+    $id = acharMemorialPorMatricula($conn, $mat);
+    if ($id) return $id;
+    if ($matDoc !== '' && $matDoc !== $mat) { $id = acharMemorialPorMatricula($conn, $matDoc); if ($id) return $id; }
+    $norm = function ($s) { return strtolower(preg_replace('/[^0-9a-zA-Z]/', '', (string)$s)); };
+    $alvos = [];
+    foreach ([$mat, $matDoc] as $a) { $n = $norm($a); if ($n !== '') $alvos[$n] = true; }
+    if ($alvos) {
+        $res = $conn->query("SELECT id, identificador FROM memoriais_mapeados WHERE identificador IS NOT NULL AND identificador <> ''");
+        while ($res && ($row = $res->fetch_assoc())) { if (isset($alvos[$norm($row['identificador'])])) return (int)$row['id']; }
+    }
+    return null;
+}
 /* Prompt de extração: pede JSON com as chaves = colunas do banco.
    IMPORTANTE: a titularidade é definida pela CADEIA de atos (Registros R-n e Averbações Av-n).
    O modelo deve percorrê-la em ordem e devolver os TITULARES ATUAIS com a qualificação completa. */
@@ -2906,10 +2923,10 @@ if (isset($_POST['acao'])) {
                 exit;
             }
 
-            $id = acharMemorialPorMatricula($conn, $matricula);
+            $id = acharMemorialParaPdf($conn, $matricula, $matDoc);
             if ($id) {
                 // JÁ EXISTE -> apenas complementa os dados (não altera a geometria)
-                $cur = $conn->query("SELECT onr_descricao, onr_numero_prenotacao, onr_nivel_publicidade, onr_classificacao FROM memoriais_mapeados WHERE id = " . (int)$id . " LIMIT 1");
+                $cur = $conn->query("SELECT numero_matricula, onr_descricao, onr_numero_prenotacao, onr_nivel_publicidade, onr_classificacao FROM memoriais_mapeados WHERE id = " . (int)$id . " LIMIT 1");
                 $cur = $cur ? $cur->fetch_assoc() : [];
                 // não sobrescreve prenotação já preenchida manualmente
                 if (trim((string)($cur['onr_numero_prenotacao'] ?? '')) !== '') unset($d['onr_numero_prenotacao']);
@@ -2919,6 +2936,11 @@ if (isset($_POST['acao'])) {
                 if (trim((string)($cur['onr_nivel_publicidade'] ?? '')) === '') $d['onr_nivel_publicidade'] = '3';
                 if (trim((string)($cur['onr_classificacao'] ?? '')) === '') $d['onr_classificacao'] = '1';
                 aplicarDadosMatricula($conn, $id, $d);
+                // imóvel cadastrado só com KML costuma não ter numero_matricula: preenche agora
+                if (trim((string)($cur['numero_matricula'] ?? '')) === '' && $matricula !== '') {
+                    $stm = $conn->prepare("UPDATE memoriais_mapeados SET numero_matricula = ? WHERE id = ?");
+                    if ($stm) { $stm->bind_param('si', $matricula, $id); $stm->execute(); }
+                }
                 $anexoId = anexoSalvarBytes($conn, $id, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
                 $incPdf = detectarInconsistenciasPdf($d, null);
                 inconsGravar($conn, $id, $incPdf);
@@ -3452,7 +3474,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-sel-pilha-rotulo (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pdf-complementa-kml (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4624,7 +4646,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-sel-pilha-rotulo','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-pdf-complementa-kml','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
