@@ -641,6 +641,8 @@ function ensureTable($conn) {
         'situacao'             => "ADD COLUMN situacao VARCHAR(20) NOT NULL DEFAULT 'ativa'",
         'motivo_situacao'      => "ADD COLUMN motivo_situacao VARCHAR(20) NULL DEFAULT NULL",
         'matricula_sucessora'  => "ADD COLUMN matricula_sucessora VARCHAR(120) NULL DEFAULT NULL",
+        // Imóvel detectado FORA do perímetro do município (guarda o município real). Bloqueia envio ONR/ITN.
+        'fora_municipio'       => "ADD COLUMN fora_municipio VARCHAR(120) NULL DEFAULT NULL",
         // Matrícula cadastrada SÓ para a carga ITN 03 (sem coordenadas/mapeamento).
         'itn03_exclusivo'      => "ADD COLUMN itn03_exclusivo TINYINT(1) NOT NULL DEFAULT 0",
         // Qualificação estruturada dos titulares ATUAIS (JSON), extraída dos registros/averbações.
@@ -1198,6 +1200,10 @@ function onrEnviarImovel($conn, $id) {
     $id = (int)$id;
     $res = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = $id LIMIT 1");
     if (!$res || !($row = $res->fetch_assoc())) return ['ok' => false, 'mensagem' => 'Imóvel não encontrado.'];
+
+    // imóvel fora do perímetro do município: não pertence ao cartório — envio bloqueado
+    $foraMun = trim((string)($row['fora_municipio'] ?? ''));
+    if ($foraMun !== '') return ['ok' => false, 'mensagem' => 'Imóvel FORA do município' . ($foraMun !== 'fora' ? ' (está em ' . $foraMun . ')' : '') . ' — não pertence a este cartório. Envio ao Mapa ONR bloqueado.'];
 
     // valida metadados obrigatórios
     $cat = ($row['tipo_imovel'] === 'rural') ? 'RURAL' : (($row['tipo_imovel'] === 'urbano') ? 'URBANO' : '');
@@ -2635,11 +2641,15 @@ function itn03SelectCols() {
             proprietario, cpf, dat_ini, rel_jur, per_rel, qualificacao_json,
             area_ha, sigef, ccir_sncr, car, cib_nirf, cif,
             onr_nivel_publicidade, onr_classificacao, onr_numero_prenotacao, onr_descricao,
-            itn03_exclusivo, coordenadas_wgs84";
+            itn03_exclusivo, fora_municipio, coordenadas_wgs84";
 }
 /* "apto para o Mapa da ONR" (mesmo critério do onr_pronto): se está pronto p/ o Mapa, está pronto p/ a carga ITN 03. */
+/* Imóvel marcado como FORA do perímetro do município (não pertence ao cartório). */
+function imovelForaMunicipio($r) { return trim((string)($r['fora_municipio'] ?? '')) !== ''; }
+
 function itn03Faltam(array $r) {
     $faltam = [];
+    if (imovelForaMunicipio($r)) $faltam[] = 'imóvel fora do município';
     if (!in_array((string)($r['tipo_imovel'] ?? ''), ['urbano','rural'], true)) $faltam[] = 'tipo (urbano/rural)';
     if (trim((string)($r['onr_nivel_publicidade'] ?? '')) === '') $faltam[] = 'nível de publicidade';
     if (trim((string)($r['onr_classificacao'] ?? '')) === '')     $faltam[] = 'classificação da importação';
@@ -2651,6 +2661,7 @@ function itn03Apto(array $r) { return count(itn03Faltam($r)) === 0; }
 /* Aptidão das matrículas EXCLUSIVAS da ITN 03 (sem mapa): só o mínimo que a carga exige. */
 function itn03ExclusivoFaltam(array $r) {
     $faltam = [];
+    if (imovelForaMunicipio($r)) $faltam[] = 'imóvel fora do município';
     if (!in_array((string)($r['tipo_imovel'] ?? ''), ['urbano','rural'], true)) $faltam[] = 'tipo (urbano/rural)';
     if (trim((string)($r['numero_matricula'] ?? '')) === '') $faltam[] = 'número da matrícula';
     if (!preg_match('#^(?:\d{6}\.\d\.\d{7}-\d{2}|\d{16})$#', trim((string)($r['cnm'] ?? '')))) $faltam[] = 'CNM válido';
@@ -2898,6 +2909,20 @@ if (isset($_POST['acao'])) {
             $stmt->bind_param('sssi', $sit, $mot, $suc, $id);
             $stmt->execute();
             echo json_encode(['ok' => true, 'id' => $id, 'situacao' => $sit, 'motivo_situacao' => $mot, 'matricula_sucessora' => $suc], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'marcar_fora_municipio') {
+            // Marca/desmarca o imóvel como fora do perímetro do município (bloqueia envio ONR/ITN).
+            // 'municipio' = nome do município real (quando fora) ou vazio para limpar (quando dentro).
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
+            $mun = trim((string)($_POST['municipio'] ?? ''));
+            if (mb_strlen($mun) > 120) $mun = mb_substr($mun, 0, 120);
+            $val = ($mun !== '') ? $mun : null;
+            $stmt = $conn->prepare("UPDATE memoriais_mapeados SET fora_municipio = ? WHERE id = ?");
+            if ($stmt) { $stmt->bind_param('si', $val, $id); $stmt->execute(); }
+            echo json_encode(['ok' => true, 'id' => $id, 'fora_municipio' => $val], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -3267,12 +3292,14 @@ if (isset($_POST['acao'])) {
                         numero_matricula, proprietario, cpf, tipo_imovel, cnm, municipio, uf,
                         onr_status, onr_importation_id, onr_numero_prenotacao, onr_classificacao,
                         onr_nivel_publicidade, onr_descricao, itn03_exclusivo, inconsistencias,
-                        situacao, motivo_situacao, matricula_sucessora, criado_em
+                        situacao, motivo_situacao, matricula_sucessora, fora_municipio, criado_em
                  FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 1000"
             );
             $rows = [];
             while ($res && $row = $res->fetch_assoc()) {
-                $pronto = in_array($row['tipo_imovel'], ['urbano','rural'], true)
+                $fora = imovelForaMunicipio($row);
+                $pronto = !$fora
+                    && in_array($row['tipo_imovel'], ['urbano','rural'], true)
                     && trim((string)$row['onr_nivel_publicidade']) !== ''
                     && trim((string)$row['onr_classificacao']) !== ''
                     && trim((string)$row['onr_numero_prenotacao']) !== ''
@@ -3292,7 +3319,7 @@ if (isset($_POST['acao'])) {
             $res = $conn->query(
                 "SELECT id, identificador, tipo_identificador, origem, area_ha, cor, cor_opacidade,
                         numero_matricula, proprietario, cpf, tipo_imovel,
-                        situacao, motivo_situacao, matricula_sucessora, coordenadas_wgs84
+                        situacao, motivo_situacao, matricula_sucessora, fora_municipio, coordenadas_wgs84
                  FROM memoriais_mapeados ORDER BY id"
             );
             $itens = [];
@@ -3318,6 +3345,7 @@ if (isset($_POST['acao'])) {
                         'situacao' => $row['situacao'] ?? 'ativa',
                         'motivo_situacao' => $row['motivo_situacao'],
                         'matricula_sucessora' => $row['matricula_sucessora'],
+                        'fora_municipio' => $row['fora_municipio'] ?? '',
                         'pts' => $pts,
                     ];
                 }
@@ -3506,7 +3534,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pdf-complementa-seguro (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-fora-municipio (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3872,6 +3900,8 @@ header('Expires: 0');
   .item.morto .nm{text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:var(--faint)}
   .morto-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(120,130,145,.18);color:#8893a3;margin-left:4px;vertical-align:middle;text-decoration:none}
   .desmembra-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(13,148,136,.16);color:#0d9488;margin-left:4px;vertical-align:middle;text-decoration:none}
+  .fora-badge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:rgba(226,52,47,.16);color:#e2342f;border:1px solid rgba(226,52,47,.4);margin-left:4px;vertical-align:middle;text-decoration:none}
+  .item.fora-mun{box-shadow:inset 3px 0 0 #e2342f}
   .situacao-edit{margin-top:6px;padding-top:11px;border-top:1px solid var(--line)}
   /* Multi-entrada de matrículas (chips) */
   .chips{display:flex;flex-wrap:wrap;gap:5px;min-height:24px;margin-bottom:6px}
@@ -4678,7 +4708,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-pdf-complementa-seguro','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-fora-municipio','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5444,6 +5474,16 @@ function infoImovelHTML(it){
   const suc=((it.matricula_sucessora)||'').split(',').map(s=>s.trim()).filter(Boolean).join(', ');
   if(it.situacao==='encerrada') add('Situação', (it.motivo_situacao==='georreferenciamento'?'Encerrada por georreferenciamento':'Encerrada por unificação')+(suc?(' → '+suc):''));
   else if(it.motivo_situacao==='desmembramento') add('Situação', 'Desmembramento'+(suc?(' → trecho(s): '+suc):''));
+  // alerta de imóvel fora do perímetro do município (também busca no cache da lista)
+  const cacheFora = (typeof imoveisCache!=='undefined') ? imoveisCache.find(x=>String(x.id)===String(it.id)) : null;
+  const foraMun = ((cacheFora && cacheFora.fora_municipio) || it.fora_municipio || '').toString().trim();
+  let foraHTML = '';
+  if(foraMun){
+    foraHTML = `<div class="ip-inc" style="border-color:rgba(226,52,47,.5)">
+      <div class="ip-inc-h">⚠ Imóvel FORA do município${foraMun!=='fora'?(' — está em '+escapeHtml(foraMun)):''}</div>
+      <div class="ip-inc-row"><span class="inc-msg">Este imóvel não pertence ao município do cartório. O envio ao Mapa ONR e a carga ITN 03 estão <b>bloqueados</b> para esta matrícula.</span></div>
+    </div>`;
+  }
   // inconsistências (busca também no cache da lista, que traz o campo completo)
   const cache = (typeof imoveisCache!=='undefined') ? imoveisCache.find(x=>String(x.id)===String(it.id)) : null;
   const inc = incParse((cache && cache.inconsistencias) || it.inconsistencias);
@@ -5456,7 +5496,7 @@ function infoImovelHTML(it){
     </div>`;
   }
   const base = linhas.join('') || '<div class="ip-row"><span class="ip-v" style="color:#9aa6b2">Sem dados cadastrados.</span></div>';
-  return base + incHTML;
+  return foraHTML + base + incHTML;
 }
 function destacarNoPainel(id){
   const lista=document.getElementById('saved-list'); if(!lista) return;
@@ -5784,17 +5824,21 @@ function renderLista(){
     const exclBadge = excl
       ? `<span class="itn03-badge" title="Matrícula exclusiva ITN 03 (sem mapa)">ITN 03</span><span class="itn03-apto ${aptoItn?'ok':'no'}" title="${aptoItn?'Apta para a carga ITN 03':'Faltam dados mínimos (tipo, matrícula, CNM, município, UF)'}">${aptoItn?'✓ apta':'⚠ incompleta'}</span>`
       : '';
+    const foraMun = (it.fora_municipio||'').toString().trim();
+    const foraBadge = foraMun
+      ? `<span class="fora-badge" title="Imóvel FORA do município${foraMun!=='fora'?(' — está em '+escapeHtml(foraMun)):''}. Não pertence ao cartório; envio ONR e carga ITN bloqueados.">⚠ fora do município</span>`
+      : '';
     const statusTxt = it.onr_status ? escapeHtml(it.onr_status) : (enviado?'ENVIADO':'');
     const onrBadge = (statusTxt && !excl) ? `<span class="onr-badge ${enviado?'env':''}">${statusTxt}</span>` : '';
     const acaoBtn = excl
-      ? `<button class="it-onr" data-act="itn03" title="${aptoItn?'Exportar carga ITN 03 desta matrícula':'Faltam dados mínimos da ITN 03 para exportar'}" ${aptoItn?'':'disabled'}>⤓</button>`
+      ? `<button class="it-onr" data-act="itn03" title="${aptoItn?'Exportar carga ITN 03 desta matrícula':(foraMun?'Bloqueado: imóvel fora do município':'Faltam dados mínimos da ITN 03 para exportar')}" ${aptoItn?'':'disabled'}>⤓</button>`
       : (enviado
           ? `<button class="it-onr enviado" data-act="status" title="Consultar status na ONR">⟳</button>`
-          : `<button class="it-onr" data-act="enviar" title="${pronto?'Enviar ao Mapa ONR':'Faltam dados ONR para enviar'}" ${pronto?'':'disabled'}>➤</button>`);
-    return `<div class="item${morto?' morto':''}" data-id="${it.id}">
+          : `<button class="it-onr" data-act="enviar" title="${pronto?'Enviar ao Mapa ONR':(foraMun?'Bloqueado: imóvel fora do município':'Faltam dados ONR para enviar')}" ${pronto?'':'disabled'}>➤</button>`);
+    return `<div class="item${morto?' morto':''}${foraMun?' fora-mun':''}" data-id="${it.id}">
       ${corDot}
       <div class="info">
-        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}${exclBadge}${(function(){const n=incParse(it.inconsistencias).length;return n?`<span class="inc-badge" title="${n} inconsistência(s) — clique para ver/relatar" data-inc="${it.id}">⚠ ${n}</span>`:'';})()}</div>
+        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}${foraBadge}${exclBadge}${(function(){const n=incParse(it.inconsistencias).length;return n?`<span class="inc-badge" title="${n} inconsistência(s) — clique para ver/relatar" data-inc="${it.id}">⚠ ${n}</span>`:'';})()}</div>
         <div class="mt">${sub.join(' · ')||meta} ${onrBadge}</div>
       </div>
       ${tag}
@@ -6690,6 +6734,7 @@ async function mostrarLimite(){
     const oc=document.getElementById('btn-muni-ocultar'); if(oc) oc.style.display='';
     muniStatus('ok', 'Limite de ' + limiteNome + ' carregado.');
     if(window.__ultimoGeo) verificarPertencimento(window.__ultimoGeo);
+    verificarTodosPertencimento();   // varre todos os imóveis e bloqueia os que estão fora
   }catch(e){
     muniStatus('err', 'Erro ao carregar o limite municipal.');
   }
@@ -6806,6 +6851,73 @@ async function detectarVizinhos(prop){
   }
 }
 
+// Identifica o município real do imóvel quando está TOTALMENTE fora do limite, marca o
+// alerta e bloqueia o envio ONR/ITN. Persiste em fora_municipio.
+async function detectarMunicipioFora(prop){
+  limparFora();
+  const badge=document.getElementById('muni-badge');
+  let pt=null;
+  try{ pt=turf.pointOnFeature(prop); }catch(e){ try{ pt=turf.centroid(prop); }catch(_){ pt=null; } }
+  const muniSel=document.getElementById('muni-list');
+  const muniId=(muniSel && muniSel.value)?String(muniSel.value).replace(/\D/g,''):'';
+  const ufCod=muniId.length>=2 ? muniId.substring(0,2) : '';
+  let nome=null;
+  if(pt && ufCod){
+    const lng=pt.geometry.coordinates[0], lat=pt.geometry.coordinates[1];
+    try{ const info=await municipioDoPontoIBGE(lat,lng,ufCod); nome=info && info.municipio ? info.municipio : null; }catch(e){}
+    try{ foraLabels.push(new LabelOverlay(new google.maps.LatLng(lat,lng), '→ '+(nome||'fora do município'), 'vizinho')); }catch(e){}
+  }
+  const txt = nome
+    ? ('✗ Imóvel FORA de '+limiteNome+' — está em '+nome)
+    : ('✗ Imóvel FORA de '+limiteNome+' (município não identificado — pode ser de outro estado)');
+  if(badge){ badge.className='muni-badge fora'; badge.textContent=txt; badge.style.display='block'; }
+  muniStatus('err', txt+'. Não pertence ao município: envio ONR e carga ITN bloqueados.');
+  marcarForaMunicipio(imovelAtivoId, nome || 'fora');
+}
+
+// Persiste (e bloqueia) o estado "fora do município". municipio vazio => limpa o bloqueio.
+// Retorna true se houve mudança. Com silent=true não recarrega a lista (para uso em lote).
+async function marcarForaMunicipio(id, municipio, silent){
+  if(!id) return false;
+  const it=(typeof imoveisCache!=='undefined') ? imoveisCache.find(x=>String(x.id)===String(id)) : null;
+  const antes = it ? ((it.fora_municipio||'').toString().trim()) : null;
+  const agora = (municipio||'').toString().trim();
+  if(antes!==null && antes===agora) return false;   // sem mudança: evita repersistir/recarregar
+  try{
+    await post({acao:'marcar_fora_municipio', id, municipio: agora});
+    if(it){ it.fora_municipio = agora; if(agora){ it.onr_pronto='0'; it.itn03_apto='0'; } }
+    if(!silent && typeof carregarLista==='function') carregarLista();
+    return true;
+  }catch(e){ return false; }
+}
+
+// Varre TODOS os imóveis da visão geral contra o limite carregado: marca/bloqueia os que
+// estão totalmente fora e libera os que estão dentro/cruzando. Roda ao carregar o limite.
+async function verificarTodosPertencimento(){
+  if(!limiteTurf || typeof itensOverview==='undefined' || !itensOverview || !itensOverview.length) return;
+  const muniSel=document.getElementById('muni-list');
+  const muniId=(muniSel && muniSel.value)?String(muniSel.value).replace(/\D/g,''):'';
+  const ufCod=muniId.length>=2 ? muniId.substring(0,2) : '';
+  let mudou=false;
+  for(const it of itensOverview){
+    if(!it.pts || it.pts.length<3) continue;
+    try{
+      const ring=it.pts.map(p=>[p[1],p[0]]);
+      if(ring[0][0]!==ring[ring.length-1][0] || ring[0][1]!==ring[ring.length-1][1]) ring.push(ring[0]);
+      const prop=turf.polygon([ring]);
+      let intersects=false; try{ intersects=turf.booleanIntersects(prop, limiteTurf); }catch(e){}
+      if(intersects){ if(await marcarForaMunicipio(it.id,'',true)) mudou=true; continue; } // dentro/cruza: não bloqueia
+      // totalmente fora -> identifica o município (malha já fica em cache) e marca
+      let nome=null;
+      if(ufCod){
+        try{ const pt=turf.pointOnFeature(prop); const info=await municipioDoPontoIBGE(pt.geometry.coordinates[1],pt.geometry.coordinates[0],ufCod); nome=info&&info.municipio?info.municipio:null; }catch(e){}
+      }
+      if(await marcarForaMunicipio(it.id, nome||'fora', true)) mudou=true;
+    }catch(e){}
+  }
+  if(mudou){ if(typeof carregarLista==='function') carregarLista(); if(typeof modo!=='undefined' && modo==='overview' && typeof verTodos==='function') verTodos(); }
+}
+
 function verificarPertencimento(geo){
   window.__ultimoGeo = geo;
   const badge = document.getElementById('muni-badge');
@@ -6819,12 +6931,13 @@ function verificarPertencimento(geo){
     try{ intersects = turf.booleanIntersects(prop, limiteTurf); }
     catch(e){ try{ intersects = turf.booleanPointInPolygon(turf.point([geo.centro_lng, geo.centro_lat]), limiteTurf); }catch(_){} }
     let cls, txt;
-    if(within){ cls='dentro'; txt='✓ Imóvel DENTRO de '+limiteNome; limparFora(); }
-    else if(intersects){ cls='parcial'; txt='⚠ Imóvel CRUZA o limite de '+limiteNome+' (identificando vizinho…)'; }
-    else { cls='fora'; txt='✗ Imóvel FORA de '+limiteNome; limparFora(); }
+    if(within){ cls='dentro'; txt='✓ Imóvel DENTRO de '+limiteNome; limparFora(); marcarForaMunicipio(imovelAtivoId, ''); }
+    else if(intersects){ cls='parcial'; txt='⚠ Imóvel CRUZA o limite de '+limiteNome+' (identificando vizinho…)'; marcarForaMunicipio(imovelAtivoId, ''); }
+    else { cls='fora'; txt='✗ Imóvel FORA de '+limiteNome+' (identificando município…)'; limparFora(); }
     if(badge){ badge.className='muni-badge '+cls; badge.textContent=txt; badge.style.display='block'; }
     muniStatus(cls==='dentro'?'ok':(cls==='parcial'?'warn':'err'), txt);
-    if(cls==='parcial') detectarVizinhos(prop);   // assíncrono: atualiza badge/rótulos ao concluir
+    if(cls==='parcial') detectarVizinhos(prop);          // assíncrono: atualiza badge/rótulos ao concluir
+    else if(cls==='fora') detectarMunicipioFora(prop);   // assíncrono: identifica o município real e bloqueia
   }catch(e){ if(badge) badge.style.display='none'; }
 }
 
