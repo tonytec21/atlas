@@ -724,9 +724,10 @@ function anexoSalvarBytes($conn, $memorialId, $bytes, $nomeOriginal, $tipo = 'ou
     if (@file_put_contents($dir . '/' . $arquivo, $bytes) === false) return null;
     $tam = strlen($bytes);
     $nomeOriginal = mb_substr((string)$nomeOriginal, 0, 250);
-    $st = $conn->prepare("INSERT INTO memoriais_anexos (memorial_id, tipo, nome_original, arquivo, mime, tamanho, hash) VALUES (?,?,?,?,?,?,?)");
+    $agora = date('Y-m-d H:i:s'); // usa o fuso do PHP (America/Fortaleza), não o do servidor MySQL
+    $st = $conn->prepare("INSERT INTO memoriais_anexos (memorial_id, tipo, nome_original, arquivo, mime, tamanho, hash, criado_em) VALUES (?,?,?,?,?,?,?,?)");
     if (!$st) { @unlink($dir . '/' . $arquivo); return null; }
-    $st->bind_param('issssis', $memorialId, $tipo, $nomeOriginal, $arquivo, $mime, $tam, $hash);
+    $st->bind_param('issssiss', $memorialId, $tipo, $nomeOriginal, $arquivo, $mime, $tam, $hash, $agora);
     if (!$st->execute()) { @unlink($dir . '/' . $arquivo); return null; }
     return (int)$st->insert_id;
 }
@@ -3105,7 +3106,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-anexos-ia2 (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-anexos-tz (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4191,7 +4192,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-anexos-ia2','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-anexos-tz','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5509,6 +5510,7 @@ let edAnxId = 0;            // id do imóvel atualmente em edição (0 = ainda n
 let edAnxBusy = false;
 const ANX_ROTULO = {pdf_matricula:'PDF da matrícula', pdf_sigef:'PDF do SIGEF', kml:'KML', outro:'Anexo'};
 function fmtBytes(n){ n=+n||0; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(0)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
+function fmtDataHora(s){ const m=String(s||'').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : (s||''); }
 function edAtualizarDrop(){
   const drop=document.getElementById('ed-drop'); if(!drop) return;
   if(edAnxId>0){ drop.classList.remove('disabled'); drop.style.opacity=''; drop.style.pointerEvents=''; }
@@ -5526,7 +5528,7 @@ function edRenderAnexos(list){
   const ehPdf = t => t==='pdf_matricula'||t==='pdf_sigef';
   box.innerHTML = list.map(a=>{
     const rot = ANX_ROTULO[a.tipo]||'Anexo';
-    const sub = rot+' · '+fmtBytes(a.tamanho)+(a.criado_em?(' · '+String(a.criado_em).slice(0,16).replace('T',' ')):'');
+    const sub = rot+' · '+fmtBytes(a.tamanho)+(a.criado_em?(' · '+fmtDataHora(a.criado_em)):'');
     const url = window.location.pathname+'?anexo='+a.id;
     const analisarBtn = ehPdf(a.tipo)
       ? `<button class="anx-btn" title="Analisar com IA e preencher campos faltantes" data-anx-ia="${a.id}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.7-6.7l-1.4 1.4M7.7 16.3l-1.4 1.4m12.4 0l-1.4-1.4M7.7 7.7L6.3 6.3"/><circle cx="12" cy="12" r="3.2"/></svg></button>` : '';
