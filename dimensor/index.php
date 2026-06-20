@@ -3105,7 +3105,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-anexos-ia (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-anexos-ia2 (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3574,6 +3574,18 @@ header('Expires: 0');
   .anx-btn:hover{color:var(--ink);border-color:var(--red)}
   .anx-btn.danger:hover{color:#fff;background:var(--red);border-color:var(--red)}
   .anx-btn[disabled]{opacity:.45;cursor:default}
+  /* feedback de processamento DENTRO do modal (antes ficava só na barra atrás do modal) */
+  .ed-drop.busy{opacity:.6;border-style:solid;cursor:not-allowed}
+  .anx-busy{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;font-size:12px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+  .anx-busy.work{border-color:rgba(168,15,30,.4);background:rgba(168,15,30,.06)}
+  .anx-busy.warn{border-color:#caa700;background:rgba(202,167,0,.10)}
+  .anx-busy.ok{border-color:rgba(19,105,63,.45);background:rgba(19,105,63,.08)}
+  .anx-spin{flex:0 0 16px;width:16px;height:16px;border-radius:50%;border:2.5px solid rgba(168,15,30,.25);
+    border-top-color:var(--red);animation:anxspin .7s linear infinite}
+  @keyframes anxspin{to{transform:rotate(360deg)}}
+  .anx-busy.shake{animation:anxshake .4s ease}
+  @keyframes anxshake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
   @media (max-width:820px){ .ed-grid{grid-template-columns:1fr} }
   /* ===== FAB + backdrop (mobile) ===== */
   .fab-panel{display:none;position:fixed;right:16px;bottom:92px;z-index:1100;width:52px;height:52px;border-radius:50%;
@@ -3991,6 +4003,7 @@ header('Expires: 0');
           </div>
           <div class="ed-sec-body">
             <div id="ed-anexos-list" class="anx-list"><div class="anx-empty">—</div></div>
+            <div id="ed-anx-busy" class="anx-busy" style="display:none" aria-live="polite"></div>
             <div id="ed-drop" class="ed-drop" tabindex="0">
               <div class="ed-drop-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
               <b>Arraste um arquivo aqui</b> ou clique para selecionar
@@ -4178,7 +4191,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-anexos-ia','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-anexos-ia2','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5340,7 +5353,7 @@ function novaMatriculaItn03(){
   if(typeof edToggleEnc==='function') edToggleEnc();
   edPreencherOnr(null);
   edAnxId = 0;
-  edRenderAnexos([]);
+  edAnxBusy=false; if(typeof edAnxBusyUI==='function') edAnxBusyUI('off'); edRenderAnexos([]);
   const onrAcc=document.querySelector('#modal-edit .ed-onr'); if(onrAcc) onrAcc.open=true;
   const t=document.getElementById('ed-titulo'); if(t) t.textContent='Nova matrícula — só ITN 03 (sem mapa)';
   document.getElementById('modal-edit').classList.add('show');
@@ -5373,7 +5386,7 @@ async function abrirEdicao(id){
   edToggleEnc();
   edPreencherOnr(null);            // limpa enquanto busca o registro completo
   edAnxId = it.id;
-  edRenderAnexos(null);            // "carregando…"
+  edAnxBusy=false; if(typeof edAnxBusyUI==='function') edAnxBusyUI('off'); edRenderAnexos(null);
   document.getElementById('modal-edit').classList.add('show');
   edAtualizarDrop();
   // os dados ONR completos não vêm na listagem enxuta: busca o registro inteiro
@@ -5557,41 +5570,60 @@ function edPreencherOnrSeVazio(reg){
   });
   if(typeof edRenderQualificacao==='function') edRenderQualificacao(reg ? reg.qualificacao_json : '');
 }
+/* feedback de processamento DENTRO do modal (visível mesmo com o modal aberto) */
+function edAnxBusyUI(estado, msg){
+  const b=document.getElementById('ed-anx-busy'); const drop=document.getElementById('ed-drop');
+  if(drop) drop.classList.toggle('busy', estado==='work');
+  if(!b) return;
+  if(estado==='off'){ b.style.display='none'; b.className='anx-busy'; b.innerHTML=''; return; }
+  b.className='anx-busy ' + (estado==='work'?'work':estado);
+  const ic = estado==='work' ? '<span class="anx-spin" aria-hidden="true"></span>'
+           : estado==='ok'   ? '<span style="color:#13693f;font-weight:700">✓</span>'
+           : estado==='warn' ? '<span style="color:#8a7200;font-weight:700">!</span>'
+           :                    '<span style="color:#a80f1e;font-weight:700">×</span>';
+  b.innerHTML = ic + '<span>' + escapeHtml(msg||'') + '</span>';
+  b.style.display = 'flex';
+}
 async function edEnviarArquivo(file){
   if(!file) return;
-  if(edAnxId<=0){ setStatus('warn','Salve o imóvel antes de anexar arquivos.'); return; }
-  if(edAnxBusy){ return; }
+  if(edAnxId<=0){ edAnxBusyUI('warn','Salve o imóvel antes de anexar arquivos.'); swalToast('info','Salve o imóvel antes de anexar.'); return; }
+  if(edAnxBusy){ swalToast('info','Aguarde — já há um arquivo sendo processado.'); const b=document.getElementById('ed-anx-busy'); if(b){ b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); } return; }
   const ehPdf = /\.pdf$/i.test(file.name) || file.type==='application/pdf';
   const analisar = ehPdf && document.getElementById('ed-anx-ia') && document.getElementById('ed-anx-ia').checked;
   edAnxBusy = true;
-  const drop=document.getElementById('ed-drop');
-  if(drop) drop.classList.add('drag');
-  setStatus('warn', analisar ? `Enviando e analisando “${escapeHtml(file.name)}” com IA…` : `Anexando “${escapeHtml(file.name)}”…`);
+  edAnxBusyUI('work', analisar ? `Analisando “${file.name}” com IA… aguarde, isso pode levar alguns segundos.` : `Anexando “${file.name}”…`);
+  setStatus('warn', analisar ? `Analisando “${escapeHtml(file.name)}” com IA…` : `Anexando “${escapeHtml(file.name)}”…`);
   try{
     const fd=new FormData();
     fd.append('acao', analisar?'anexo_analisar':'anexo_upload');
     fd.append('id', edAnxId);
     fd.append('file', file);
     const r = await fetch(window.location.pathname,{method:'POST',body:fd}).then(x=>x.json());
-    if(!r || !r.ok){ setStatus('err', (r&&r.erro)||'Falha ao enviar o anexo.'); return; }
+    if(!r || !r.ok){ const er=(r&&r.erro)||'Falha ao enviar o anexo.'; edAnxBusyUI('err', er); setStatus('err', er); return; }
     if(r.anexos) edRenderAnexos(r.anexos);
     if(analisar && r.registro){ edAplicarRegistro(r.registro); }
+    edAnxBusyUI('ok', r.mensagem || (analisar?'Análise concluída.':'Anexo enviado.'));
     setStatus('ok', (r.mensagem||'Anexo enviado.')+(r.modelo?(' ('+r.modelo+')'):''));
-  }catch(e){ setStatus('err','Falha na requisição de anexo.'); }
-  finally{ edAnxBusy=false; if(drop) drop.classList.remove('drag'); const fi=document.getElementById('ed-anx-file'); if(fi) fi.value=''; }
+    setTimeout(()=>{ if(!edAnxBusy) edAnxBusyUI('off'); }, 3500);
+  }catch(e){ edAnxBusyUI('err','Falha na requisição de anexo.'); setStatus('err','Falha na requisição de anexo.'); }
+  finally{ edAnxBusy=false; const fi=document.getElementById('ed-anx-file'); if(fi) fi.value=''; }
 }
 async function edAnalisarAnexo(aid){
-  if(edAnxId<=0 || !aid) return; if(edAnxBusy) return;
+  if(edAnxId<=0 || !aid) return;
+  if(edAnxBusy){ swalToast('info','Aguarde — já há um arquivo sendo processado.'); return; }
   edAnxBusy=true;
-  setStatus('warn','Analisando anexo com IA e preenchendo campos faltantes…');
+  edAnxBusyUI('work','Analisando anexo com IA e preenchendo campos faltantes… aguarde.');
+  setStatus('warn','Analisando anexo com IA…');
   try{
     const fd=new FormData(); fd.append('acao','anexo_analisar'); fd.append('id', edAnxId); fd.append('aid', aid);
     const r = await fetch(window.location.pathname,{method:'POST',body:fd}).then(x=>x.json());
-    if(!r || !r.ok){ setStatus('err',(r&&r.erro)||'Falha ao analisar o anexo.'); return; }
+    if(!r || !r.ok){ const er=(r&&r.erro)||'Falha ao analisar o anexo.'; edAnxBusyUI('err', er); setStatus('err', er); return; }
     if(r.anexos) edRenderAnexos(r.anexos);
     if(r.registro) edAplicarRegistro(r.registro);
+    edAnxBusyUI('ok', r.mensagem||'Análise concluída.');
     setStatus('ok', (r.mensagem||'Análise concluída.')+(r.modelo?(' ('+r.modelo+')'):''));
-  }catch(e){ setStatus('err','Falha na requisição de análise.'); }
+    setTimeout(()=>{ if(!edAnxBusy) edAnxBusyUI('off'); }, 3500);
+  }catch(e){ edAnxBusyUI('err','Falha na requisição de análise.'); setStatus('err','Falha na requisição de análise.'); }
   finally{ edAnxBusy=false; }
 }
 async function edExcluirAnexo(aid){
@@ -5607,9 +5639,9 @@ async function edExcluirAnexo(aid){
 function edInitDrop(){
   const drop=document.getElementById('ed-drop'); const fi=document.getElementById('ed-anx-file');
   if(!drop || !fi || drop.dataset.init) return; drop.dataset.init='1';
-  drop.addEventListener('click', ()=>{ if(edAnxId>0) fi.click(); });
-  drop.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ')&&edAnxId>0){ e.preventDefault(); fi.click(); } });
-  ['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); if(edAnxId>0) drop.classList.add('drag'); }));
+  drop.addEventListener('click', ()=>{ if(edAnxBusy){ swalToast('info','Aguarde — já há um arquivo sendo processado.'); return; } if(edAnxId>0) fi.click(); });
+  drop.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ')&&edAnxId>0&&!edAnxBusy){ e.preventDefault(); fi.click(); } });
+  ['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); if(edAnxId>0&&!edAnxBusy) drop.classList.add('drag'); }));
   ['dragleave','dragend'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag'); }));
   drop.addEventListener('drop', e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag');
     const f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(f) edEnviarArquivo(f); });
