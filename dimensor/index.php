@@ -646,6 +646,8 @@ function ensureTable($conn) {
         // Qualificação estruturada dos titulares ATUAIS (JSON), extraída dos registros/averbações.
         // Usada pela carga ITN 03 (dados_pessoa) e mantém compat. com as colunas proprietario/cpf.
         'qualificacao_json'    => "ADD COLUMN qualificacao_json MEDIUMTEXT NULL DEFAULT NULL",
+        // Inconsistências detectadas na importação (JSON: [{sev,msg}, ...]). Imóvel é cadastrado mesmo assim.
+        'inconsistencias'      => "ADD COLUMN inconsistencias MEDIUMTEXT NULL DEFAULT NULL",
     ];
     foreach ($novas as $colNome => $ddl) {
         $c = $conn->query("SHOW COLUMNS FROM memoriais_mapeados LIKE '" . $conn->real_escape_string($colNome) . "'");
@@ -763,6 +765,91 @@ function anexoTipoRotulo($tipo) {
         'kml'           => 'KML',
         'outro'         => 'Anexo',
     ][$tipo] ?? 'Anexo';
+}
+
+/* ====================================================================
+ *  INCONSISTÊNCIAS DE IMPORTAÇÃO
+ *  O imóvel é SEMPRE cadastrado; as inconsistências são apenas sinalizadas
+ *  (JSON [{sev:'erro'|'alerta'|'info', msg:'...'}]) para conferência/relatório.
+ * ==================================================================== */
+function inconsCoordForaBrasil($pts) {
+    foreach ($pts as $p) { $la = $p[0]; $lo = $p[1];
+        if ($la < -34 || $la > 6 || $lo < -74 || $lo > -33) return true; }
+    return false;
+}
+function inconsSegCruza($p1, $p2, $p3, $p4) {
+    $d = function ($a, $b, $c) { return ($b[0]-$a[0])*($c[1]-$a[1]) - ($b[1]-$a[1])*($c[0]-$a[0]); };
+    $d1=$d($p3,$p4,$p1); $d2=$d($p3,$p4,$p2); $d3=$d($p1,$p2,$p3); $d4=$d($p1,$p2,$p4);
+    return ((($d1>0&&$d2<0)||($d1<0&&$d2>0)) && (($d3>0&&$d4<0)||($d3<0&&$d4>0)));
+}
+function inconsAutoIntersecta($pts) {
+    $n = count($pts); if ($n < 4) return false;
+    for ($i = 0; $i < $n-1; $i++) {
+        for ($j = $i+1; $j < $n-1; $j++) {
+            if ($j === $i || $j === $i+1 || ($i === 0 && $j === $n-2)) continue; // lados adjacentes
+            if (inconsSegCruza($pts[$i], $pts[$i+1], $pts[$j], $pts[$j+1])) return true;
+        }
+    }
+    return false;
+}
+/* Analisa o nome do placemark do KML. Retorna [nomeLimpo, [inconsistências]]. */
+function inconsNomeKml($nomeBruto) {
+    $orig = trim((string)$nomeBruto); $inc = []; $nome = $orig;
+    if (preg_match('#[\\\\/]#', $nome) || preg_match('#^[A-Za-z]:#', $nome)) {
+        $base = preg_replace('#^.*[\\\\/]#', '', $nome);
+        $base = preg_replace('#\.kml$#i', '', $base);
+        $inc[] = ['sev' => 'alerta', 'msg' => 'O nome do placemark era um caminho de arquivo ("' . $orig . '") — usado apenas o nome final.'];
+        $nome = trim($base);
+    }
+    $low = function_exists('mb_strtolower') ? mb_strtolower($nome, 'UTF-8') : strtolower($nome);
+    $low = strtr($low, ['ã'=>'a','á'=>'a','â'=>'a','é'=>'e','ê'=>'e','í'=>'i','ó'=>'o','ô'=>'o','õ'=>'o','ú'=>'u','ç'=>'c']);
+    foreach (['nao exato','aproximad','rascunho','provisori','estimad','nao georref','sem georref'] as $m) {
+        if (strpos($low, $m) !== false) { $inc[] = ['sev' => 'alerta', 'msg' => 'O nome indica geometria aproximada/inexata ("' . $orig . '") — a poligonal pode não corresponder ao perímetro exato.']; break; }
+    }
+    $limpo = trim(preg_replace('/[-_\s]*(n[ãa]o\s*exat[oa]|aproximad[oa]|rascunho|provis[óo]ri[oa]|estimad[oa]|sem\s*georref\w*|n[ãa]o\s*georref\w*).*$/iu', '', $nome));
+    if ($limpo !== '') $nome = $limpo;
+    return [trim($nome), $inc];
+}
+/* Checagens geométricas comuns (KML e PDF). */
+function detectarInconsistenciasGeo($geo, $origem = '') {
+    $inc = [];
+    $nv = (int)($geo['num_vertices'] ?? 0);
+    if ($nv > 0 && $nv < 4) $inc[] = ['sev' => 'erro', 'msg' => 'Polígono com poucos vértices (' . $nv . ') — o mínimo para uma poligonal fechada é 4.'];
+    $area = (float)($geo['area_ha'] ?? 0);
+    if ($nv >= 3 && $area <= 0.0001) $inc[] = ['sev' => 'erro', 'msg' => 'Área praticamente nula — geometria possivelmente degenerada.'];
+    if ($area > 500000) $inc[] = ['sev' => 'alerta', 'msg' => 'Área muito grande (' . number_format($area, 0, ',', '.') . ' ha) — confira a escala/coordenadas.'];
+    $pts = [];
+    foreach (preg_split('/\s+/', trim((string)($geo['coordenadas_wgs84'] ?? ''))) as $par) {
+        if ($par === '') continue; $xy = explode(',', $par); if (count($xy) >= 2) $pts[] = [(float)$xy[0], (float)$xy[1]];
+    }
+    if ($pts) {
+        if (inconsCoordForaBrasil($pts)) $inc[] = ['sev' => 'erro', 'msg' => 'Há vértices fora dos limites aproximados do Brasil — verifique o sistema de coordenadas (datum/fuso).'];
+        if (inconsAutoIntersecta($pts)) $inc[] = ['sev' => 'alerta', 'msg' => 'A poligonal parece se autointersectar (lados se cruzam) — confira a ordem dos vértices.'];
+    }
+    return $inc;
+}
+/* Inconsistências específicas de uma matrícula lida por IA (PDF). */
+function detectarInconsistenciasPdf($d, $geo = null) {
+    $inc = [];
+    $cnm = trim((string)($d['cnm'] ?? ''));
+    if (!preg_match('#^(?:\d{6}\.\d\.\d{7}-\d{2}|\d{16})$#', $cnm)) $inc[] = ['sev' => 'alerta', 'msg' => 'CNM ausente ou em formato inválido — é necessário para a carga ITN 03.'];
+    if (trim((string)($d['municipio'] ?? '')) === '') $inc[] = ['sev' => 'alerta', 'msg' => 'Município não identificado no documento.'];
+    if (trim((string)($d['uf'] ?? '')) === '')        $inc[] = ['sev' => 'alerta', 'msg' => 'UF não identificada no documento.'];
+    if (trim((string)($d['proprietario'] ?? '')) === '') $inc[] = ['sev' => 'alerta', 'msg' => 'Proprietário(s) atual(is) não identificado(s) na cadeia de registros/averbações.'];
+    if (is_array($geo)) {
+        if (!empty($geo['aviso_geometria'])) $inc[] = ['sev' => 'alerta', 'msg' => 'Geometria: ' . $geo['aviso_geometria']];
+        $vc = $geo['vertices_corrigidos'] ?? [];
+        if (is_array($vc) && count($vc)) $inc[] = ['sev' => 'alerta', 'msg' => count($vc) . ' vértice(s) corrigido(s) na leitura automática — confira a poligonal no mapa.'];
+        $inc = array_merge($inc, detectarInconsistenciasGeo($geo, 'pdf'));
+    }
+    return $inc;
+}
+/* Grava (ou limpa) a lista de inconsistências de um imóvel. */
+function inconsGravar($conn, $id, array $inc) {
+    $id = (int)$id; if ($id <= 0) return;
+    $json = $inc ? json_encode(array_values($inc), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+    $st = $conn->prepare("UPDATE memoriais_mapeados SET inconsistencias = ? WHERE id = ?");
+    if ($st) { $st->bind_param('si', $json, $id); $st->execute(); }
 }
 
 /**
@@ -1753,6 +1840,99 @@ function gerarRelatorioSobreposicaoPDF($dados) {
     $pdf->Output($nomeArq, 'I');
 }
 
+/* Relatório de inconsistências (TCPDF). $ids vazio => todos os imóveis com inconsistências. */
+function gerarRelatorioInconsistenciasPDF($conn, $ids) {
+    if (file_exists(__DIR__ . '/../oficios/tcpdf/tcpdf.php')) { require_once __DIR__ . '/../oficios/tcpdf/tcpdf.php'; }
+    elseif (file_exists(__DIR__ . '/tcpdf/tcpdf.php'))       { require_once __DIR__ . '/tcpdf/tcpdf.php'; }
+    else { header('Content-Type: text/plain; charset=UTF-8'); echo 'TCPDF não encontrado neste ambiente.'; return; }
+
+    $ids = array_values(array_filter(array_map('intval', (array)$ids)));
+    if ($ids) {
+        $in = implode(',', $ids);
+        $sql = "SELECT id, identificador, numero_matricula, municipio, uf, area_ha, origem, inconsistencias
+                FROM memoriais_mapeados WHERE id IN ($in) ORDER BY identificador";
+    } else {
+        $sql = "SELECT id, identificador, numero_matricula, municipio, uf, area_ha, origem, inconsistencias
+                FROM memoriais_mapeados WHERE inconsistencias IS NOT NULL AND inconsistencias <> '' AND inconsistencias <> '[]' ORDER BY identificador";
+    }
+    $rows = []; $res = $conn->query($sql);
+    while ($res && ($r = $res->fetch_assoc())) {
+        $inc = json_decode((string)$r['inconsistencias'], true);
+        if (is_array($inc) && $inc) { $r['_inc'] = $inc; $rows[] = $r; }
+    }
+
+    if (!class_exists('RelatorioInconsPDF')) {
+        class RelatorioInconsPDF extends TCPDF {
+            public function Header() {
+                $timbrado = __DIR__ . '/../style/img/timbrado.png';
+                if (@file_exists($timbrado)) {
+                    $pw = $this->getPageWidth(); $ph = $this->getPageHeight();
+                    $oldL=$this->lMargin;$oldR=$this->rMargin;$oldT=$this->tMargin;$oldB=$this->bMargin;$oldAPB=$this->AutoPageBreak;
+                    $this->lMargin=0;$this->rMargin=0;$this->tMargin=0;$this->SetAutoPageBreak(false,0);
+                    @$this->Image($timbrado,0,0,$pw,$ph,'','','',false,300,'',false,false,0,false,false,false);
+                    $this->lMargin=$oldL;$this->rMargin=$oldR;$this->tMargin=$oldT;$this->SetAutoPageBreak($oldAPB,$oldB);
+                } else {
+                    $this->SetFillColor(168,15,30); $this->Rect(0,0,$this->getPageWidth(),24,'F');
+                    $this->SetTextColor(255,255,255); $this->SetFont('helvetica','B',13); $this->SetXY(14,7);
+                    $this->Cell(0,8,'RELATÓRIO DE INCONSISTÊNCIAS',0,1,'L'); $this->SetTextColor(0,0,0);
+                }
+            }
+            public function Footer() {
+                $this->SetY(-15); $this->SetFont('helvetica','',8); $this->SetTextColor(120,120,120);
+                $this->Cell(0,8,'Atlas Dimensor — Relatório de inconsistências · '.date('d/m/Y H:i').'  ·  Página '.$this->getAliasNumPage().'/'.$this->getAliasNbPages(),0,0,'C');
+            }
+        }
+    }
+    $pdf = new RelatorioInconsPDF('P', 'mm', 'A4', true, 'UTF-8');
+    $pdf->SetCreator('Atlas Dimensor'); $pdf->SetTitle('Relatório de inconsistências');
+    $pdf->SetMargins(16, 40, 16); $pdf->SetAutoPageBreak(true, 20);
+    $pdf->AddPage();
+
+    $pdf->SetFont('helvetica', 'B', 15); $pdf->SetTextColor(30,30,30);
+    $pdf->Cell(0, 8, 'Relatório de inconsistências de importação', 0, 1, 'L');
+    $pdf->SetFont('helvetica', '', 9); $pdf->SetTextColor(110,110,110);
+    $pdf->Cell(0, 6, 'Emitido em ' . date('d/m/Y H:i') . ' · ' . count($rows) . ' imóvel(is) com inconsistências', 0, 1, 'L');
+    $pdf->Ln(3);
+
+    if (!$rows) {
+        $pdf->SetFont('helvetica', '', 11); $pdf->SetTextColor(40,40,40);
+        $pdf->MultiCell(0, 7, 'Nenhuma inconsistência encontrada para os imóveis selecionados.', 0, 'L');
+        $pdf->Output('Relatorio_Inconsistencias.pdf', 'I'); return;
+    }
+
+    foreach ($rows as $r) {
+        $titulo = trim((string)$r['identificador']); if ($titulo === '') $titulo = 'Imóvel #' . $r['id'];
+        $mat = trim((string)$r['numero_matricula']);
+        $loc = trim(trim((string)$r['municipio']) . (trim((string)$r['uf']) !== '' ? '/' . $r['uf'] : ''), '/');
+        $area = ($r['area_ha'] !== null && $r['area_ha'] !== '') ? number_format((float)$r['area_ha'], 4, ',', '.') . ' ha' : '';
+
+        $pdf->SetDrawColor(220,220,220); $pdf->SetFillColor(245,246,248);
+        $pdf->SetFont('helvetica', 'B', 11); $pdf->SetTextColor(20,20,20);
+        $pdf->MultiCell(0, 7, $titulo . ($mat !== '' ? '   ·   Matrícula ' . $mat : ''), 0, 'L', true, 1);
+        $sub = [];
+        if ($loc !== '')  $sub[] = $loc;
+        if ($area !== '') $sub[] = $area;
+        $sub[] = 'origem: ' . ($r['origem'] ?: '—');
+        $pdf->SetFont('helvetica', '', 8.5); $pdf->SetTextColor(120,120,120);
+        $pdf->MultiCell(0, 5, implode('   ·   ', $sub), 0, 'L');
+        $pdf->Ln(1);
+
+        foreach ($r['_inc'] as $it) {
+            $sev = strtolower((string)($it['sev'] ?? 'alerta'));
+            $msg = (string)($it['msg'] ?? '');
+            if ($sev === 'erro') { $pdf->SetTextColor(168,15,30); $tag = 'ERRO'; }
+            elseif ($sev === 'info') { $pdf->SetTextColor(60,90,160); $tag = 'INFO'; }
+            else { $pdf->SetTextColor(150,110,0); $tag = 'ALERTA'; }
+            $pdf->SetFont('helvetica', 'B', 8.5);
+            $pdf->Cell(16, 5, $tag, 0, 0, 'L');
+            $pdf->SetFont('helvetica', '', 9.5); $pdf->SetTextColor(45,45,45);
+            $pdf->MultiCell(0, 5, $msg, 0, 'L', false, 1, $pdf->GetX(), $pdf->GetY());
+        }
+        $pdf->Ln(4);
+    }
+    $pdf->Output('Relatorio_Inconsistencias.pdf', 'I');
+}
+
 /* ====================================================================
  *  ROTEAMENTO DE AÇÕES (AJAX)
  * ==================================================================== */
@@ -2339,6 +2519,15 @@ if (isset($_POST['acao'])) {
         exit;
     }
 
+    /* ----- Relatório de inconsistências em PDF (saída binária, antes do header JSON) ----- */
+    if ($_POST['acao'] === 'relatorio_inconsistencias') {
+        ensureTable($conn);
+        $ids = json_decode(isset($_POST['ids']) ? (string)$_POST['ids'] : '[]', true);
+        if (!is_array($ids)) $ids = [];
+        gerarRelatorioInconsistenciasPDF($conn, $ids);
+        exit;
+    }
+
     header('Content-Type: application/json; charset=UTF-8');
     ensureTable($conn);
     $acao = $_POST['acao'];
@@ -2472,9 +2661,15 @@ if (isset($_POST['acao'])) {
                     }
                     // complementa os campos ONR enviados junto (se houver)
                     salvarCamposOnr($conn, $idExistente, $_POST);
+                    // inconsistências de nome do KML (geometria preservada do registro existente)
+                    $incDup = [];
+                    if ($origem === 'kml') {
+                        foreach (parseKml($fonte) as $p0) { list(, $iN) = inconsNomeKml($p0['nome'] ?? ''); $incDup = array_merge($incDup, $iN); }
+                        if ($incDup) inconsGravar($conn, $idExistente, $incDup);
+                    }
                     echo json_encode([
                         'ok' => true, 'existe' => true, 'atualizado' => true, 'criado' => false,
-                        'id' => $idExistente, 'imovel_id' => $imovelId,
+                        'id' => $idExistente, 'imovel_id' => $imovelId, 'inconsistencias' => array_values($incDup),
                         'mensagem' => 'A matrícula ' . $numMatricula . ' já estava cadastrada — as informações foram complementadas, sem duplicar o polígono no mapa.'
                     ], JSON_UNESCAPED_UNICODE);
                     exit;
@@ -2498,10 +2693,18 @@ if (isset($_POST['acao'])) {
             // grava também os campos ONR enviados junto, se houver
             salvarCamposOnr($conn, $novoId, $_POST);
 
+            // inconsistências: geometria + (se KML) nome do placemark interno
+            $incList = detectarInconsistenciasGeo($data, $origem);
+            if ($origem === 'kml') {
+                foreach (parseKml($fonte) as $p0) { list(, $incNome) = inconsNomeKml($p0['nome'] ?? ''); $incList = array_merge($incList, $incNome); }
+            }
+            inconsGravar($conn, $novoId, $incList);
+
             echo json_encode([
                 'ok' => true,
                 'id' => $novoId,
                 'imovel_id' => $imovelId,
+                'inconsistencias' => array_values($incList),
                 'mensagem' => 'Imóvel "' . $identificador . '" gravado com ' . $data['num_vertices'] . ' vértices.'
                     . ($imovelId ? ' Vinculado ao cadastro (id ' . $imovelId . ').' : '')
             ], JSON_UNESCAPED_UNICODE);
@@ -2601,10 +2804,12 @@ if (isset($_POST['acao'])) {
                 if (trim((string)($cur['onr_classificacao'] ?? '')) === '') $d['onr_classificacao'] = '1';
                 aplicarDadosMatricula($conn, $id, $d);
                 $anexoId = anexoSalvarBytes($conn, $id, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
+                $incPdf = detectarInconsistenciasPdf($d, null);
+                inconsGravar($conn, $id, $incPdf);
                 $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
                 echo json_encode([
                     'ok' => true, 'existe' => true, 'criado' => false, 'id' => $id, 'matricula' => $matricula, 'modelo' => $r['modelo'],
-                    'campos' => $preenchidos, 'anexo_id' => $anexoId,
+                    'campos' => $preenchidos, 'anexo_id' => $anexoId, 'inconsistencias' => array_values($incPdf),
                     'mensagem' => 'Matrícula ' . $matricula . ' já cadastrada — ' . count($preenchidos) . ' campo(s) complementado(s). PDF arquivado.'
                 ], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -2640,12 +2845,14 @@ if (isset($_POST['acao'])) {
             salvarCamposOnr($conn, $novoId, $d);
             qualificacaoGravar($conn, $novoId, $pessoasNovo); // qualificação estruturada dos titulares atuais
             $anexoId = anexoSalvarBytes($conn, $novoId, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
+            $incPdf = detectarInconsistenciasPdf($d, $geo);
+            inconsGravar($conn, $novoId, $incPdf);
             $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
             echo json_encode([
                 'ok' => true, 'existe' => false, 'criado' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
                 'num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha'], 'campos' => $preenchidos,
                 'vertices_corrigidos' => $geo['vertices_corrigidos'] ?? [],
-                'aviso_geometria' => $geo['aviso_geometria'] ?? '',
+                'aviso_geometria' => $geo['aviso_geometria'] ?? '', 'inconsistencias' => array_values($incPdf),
                 'mensagem' => 'Matrícula ' . $matricula . ' cadastrada e mapeada com ' . $geo['num_vertices'] . ' vértices (' . number_format($geo['area_ha'], 4, ',', '.') . ' ha). ' . count($preenchidos) . ' campo(s) preenchido(s).'
                     . (!empty($geo['aviso_geometria']) ? ' ' . $geo['aviso_geometria'] : '')
             ], JSON_UNESCAPED_UNICODE);
@@ -2856,20 +3063,27 @@ if (isset($_POST['acao'])) {
                 echo json_encode(['ok' => false, 'erro' => 'Nenhum polígono encontrado no KML.']);
                 exit;
             }
-            $salvos = 0; $nomesSalvos = [];
+            $salvos = 0; $nomesSalvos = []; $resultados = [];
             foreach ($pm as $i => $p) {
+                list($nomeLimpoInterno, $incNome) = inconsNomeKml($p['nome'] ?? '');
                 $geo = buildGeoDataFromPoints($p['pts']);
-                if (!$geo['ok']) continue;
-
+                if (!$geo['ok']) {
+                    $resultados[] = ['nome' => ($nomes[$i] ?? $nomeLimpoInterno ?: ('Imóvel KML ' . ($i+1))), 'status' => 'erro', 'id' => null,
+                        'msg' => 'Polígono inválido (menos de 3 vértices).', 'inconsistencias' => []];
+                    continue;
+                }
                 $nome = isset($nomes[$i]) ? trim((string)$nomes[$i]) : '';
-                if ($nome === '') $nome = $p['nome'] !== '' ? $p['nome'] : ('Imóvel KML ' . ($i + 1));
+                if ($nome === '') $nome = $nomeLimpoInterno !== '' ? $nomeLimpoInterno : ('Imóvel KML ' . ($i + 1));
                 $tipo = (isset($tipos[$i]) && $tipos[$i] === 'matricula') ? 'matricula' : 'nome';
                 $imovelId = ($tipo === 'matricula') ? findImovelIdByMatricula($conn, $nome) : null;
 
-                inserirMemorial($conn, $nome, $tipo, 'kml', $imovelId, '', $geo);
+                $novoId = inserirMemorial($conn, $nome, $tipo, 'kml', $imovelId, '', $geo);
+                $inc = array_merge($incNome, detectarInconsistenciasGeo($geo, 'kml'));
+                inconsGravar($conn, $novoId, $inc);
                 $salvos++; $nomesSalvos[] = $nome;
+                $resultados[] = ['nome' => $nome, 'status' => 'criado', 'id' => $novoId, 'msg' => $geo['num_vertices'] . ' vértices', 'inconsistencias' => array_values($inc)];
             }
-            echo json_encode(['ok' => true, 'salvos' => $salvos, 'nomes' => $nomesSalvos], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['ok' => true, 'salvos' => $salvos, 'nomes' => $nomesSalvos, 'resultados' => $resultados], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -2879,7 +3093,7 @@ if (isset($_POST['acao'])) {
                         area_ha, perimetro_m, centro_lat, centro_lng, cor, cor_opacidade,
                         numero_matricula, proprietario, cpf, tipo_imovel, cnm, municipio, uf,
                         onr_status, onr_importation_id, onr_numero_prenotacao, onr_classificacao,
-                        onr_nivel_publicidade, onr_descricao, itn03_exclusivo,
+                        onr_nivel_publicidade, onr_descricao, itn03_exclusivo, inconsistencias,
                         situacao, motivo_situacao, matricula_sucessora, criado_em
                  FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 1000"
             );
@@ -3106,7 +3320,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-anexos-tz (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-import-inconsistencias (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3588,6 +3802,56 @@ header('Expires: 0');
   .anx-busy.shake{animation:anxshake .4s ease}
   @keyframes anxshake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
   @media (max-width:820px){ .ed-grid{grid-template-columns:1fr} }
+  /* ===== Overlay de progresso da importação ===== */
+  .import-ov{position:fixed;inset:0;z-index:100040;display:none;align-items:center;justify-content:center;
+    background:rgba(8,12,18,.62);backdrop-filter:blur(3px)}
+  .import-ov.show{display:flex}
+  .import-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px 30px;text-align:center;
+    box-shadow:0 24px 70px rgba(0,0,0,.5);min-width:260px}
+  .import-ttl{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:16px;letter-spacing:.2px}
+  .import-ring{position:relative;width:120px;height:120px;margin:0 auto}
+  .import-ring svg{transform:rotate(-90deg)}
+  .import-ring .ring-bg{fill:none;stroke:var(--line);stroke-width:9}
+  .import-ring .ring-fg{fill:none;stroke:var(--red);stroke-width:9;stroke-linecap:round;
+    stroke-dasharray:326.7;stroke-dashoffset:326.7;transition:stroke-dashoffset .3s ease}
+  .import-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:var(--ink)}
+  .import-meta{margin-top:14px;font-size:12px;color:var(--faint)}
+  .import-file{margin-top:4px;font-size:11.5px;color:var(--ink);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)}
+  /* ===== Modal de resultados da importação ===== */
+  .impres-resumo{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .impres-chip{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid var(--line)}
+  .impres-chip.ok{color:#13693f;background:rgba(19,105,63,.10);border-color:rgba(19,105,63,.3)}
+  .impres-chip.dup{color:#1f5fa5;background:rgba(31,95,165,.10);border-color:rgba(31,95,165,.3)}
+  .impres-chip.err{color:#a80f1e;background:rgba(168,15,30,.10);border-color:rgba(168,15,30,.3)}
+  .impres-chip.warn{color:#8a6d00;background:rgba(202,167,0,.12);border-color:rgba(202,167,0,.35)}
+  .impres-list{display:flex;flex-direction:column;gap:8px}
+  .impres-item{border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:var(--panel)}
+  .impres-row1{display:flex;align-items:center;gap:9px}
+  .impres-ic{flex:0 0 22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff}
+  .impres-ic.criado{background:#13693f}.impres-ic.duplicado{background:#1f5fa5}.impres-ic.erro{background:#a80f1e}
+  .impres-nome{font-size:12.5px;font-weight:600;color:var(--ink)}
+  .impres-st{margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--faint)}
+  .impres-msg{font-size:11px;color:var(--faint);margin-top:3px;margin-left:31px}
+  .impres-inc{margin:7px 0 0 31px;display:flex;flex-direction:column;gap:4px}
+  .impres-inc .inc-line{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.4}
+  .inc-tag{flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:.4px;padding:1px 6px;border-radius:5px;margin-top:1px}
+  .inc-tag.erro{background:rgba(168,15,30,.14);color:#a80f1e}
+  .inc-tag.alerta{background:rgba(202,167,0,.16);color:#8a6d00}
+  .inc-tag.info{background:rgba(31,95,165,.14);color:#1f5fa5}
+  .impres-inc .inc-msg{color:var(--ink)}
+  .impres-relrow{margin:7px 0 0 31px}
+  .impres-relrow .mini-rel{font-size:11px;color:var(--red);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline}
+  /* badge de inconsistência na lista */
+  .inc-badge{display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:800;letter-spacing:.3px;
+    padding:1px 6px;border-radius:10px;background:rgba(202,167,0,.16);color:#8a6d00;border:1px solid rgba(202,167,0,.4);cursor:pointer;vertical-align:middle}
+  .inc-badge:hover{background:rgba(202,167,0,.28)}
+  /* bloco de inconsistências no InfoWindow do mapa */
+  .ip-inc{margin-top:9px;padding-top:9px;border-top:1px dashed rgba(0,0,0,.18)}
+  .ip-inc-h{font-size:11.5px;font-weight:700;color:#8a6d00;margin-bottom:6px}
+  .ip-inc-row{display:flex;gap:6px;align-items:flex-start;font-size:11px;line-height:1.4;margin-bottom:4px}
+  .ip-inc-row .inc-msg{color:#1a2330}
+  .ip-inc-btn{margin-top:5px;font-size:11px;font-weight:600;color:#fff;background:var(--red);border:none;border-radius:7px;padding:5px 10px;cursor:pointer}
+  .ip-inc-btn:hover{background:var(--red-bright)}
   /* ===== FAB + backdrop (mobile) ===== */
   .fab-panel{display:none;position:fixed;right:16px;bottom:92px;z-index:1100;width:52px;height:52px;border-radius:50%;
     background:var(--red);color:#fff;border:none;box-shadow:0 6px 20px rgba(168,15,30,.45);cursor:pointer;align-items:center;justify-content:center}
@@ -3799,16 +4063,10 @@ header('Expires: 0');
         <div class="status" id="muni-status"></div>
       </div>
 
-      <div class="kml-zone" id="kml-zone">
-        <input type="file" id="kml-file" accept=".kml,application/vnd.google-earth.kml+xml" hidden>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-        <span id="kml-zone-label">Importar arquivo <b>KML</b></span>
-      </div>
-
       <div class="kml-zone lote" id="kml-lote-zone">
         <input type="file" id="kml-lote-file" accept=".kml,application/vnd.google-earth.kml+xml" multiple hidden>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1"></rect><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
-        <span id="kml-lote-label">Cadastro em lote — vários <b>KML</b></span>
+        <span id="kml-lote-label">Importar <b>KML</b> <span class="zone-multi">(1 ou vários)</span></span>
       </div>
 
       <div class="kml-zone ia" id="pdf-mat-zone">
@@ -4115,6 +4373,40 @@ header('Expires: 0');
   </div>
 </div>
 
+<!-- Overlay de progresso da importação (centralizado) -->
+<div id="import-ov" class="import-ov">
+  <div class="import-card">
+    <div class="import-ttl" id="import-ttl">Importando…</div>
+    <div class="import-ring">
+      <svg viewBox="0 0 120 120" width="120" height="120">
+        <circle cx="60" cy="60" r="52" class="ring-bg"></circle>
+        <circle cx="60" cy="60" r="52" class="ring-fg" id="import-ring-fg"></circle>
+      </svg>
+      <div class="import-pct" id="import-pct">0%</div>
+    </div>
+    <div class="import-meta" id="import-meta">0 de 0</div>
+    <div class="import-file" id="import-file"></div>
+  </div>
+</div>
+
+<!-- Modal: resultados da importação -->
+<div id="modal-import-res" class="modal-ov">
+  <div class="modal-card" style="max-width:680px">
+    <div class="modal-h">
+      <h3 id="impres-titulo">Resultado da importação</h3>
+      <button class="modal-x" id="impres-x" title="Fechar">×</button>
+    </div>
+    <div class="modal-b">
+      <div class="impres-resumo" id="impres-resumo"></div>
+      <div class="impres-list" id="impres-list"></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" id="impres-rel" title="Gerar PDF com as inconsistências encontradas nesta importação">⤓ Relatório de inconsistências</button>
+      <button class="btn-primary" id="impres-fechar">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: configuração da IA (Gemini) -->
 <div id="modal-gemini-config" class="modal-ov">
   <div class="modal-card">
@@ -4192,7 +4484,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-anexos-tz','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-import-inconsistencias','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4350,15 +4642,7 @@ document.getElementById('btn-save').onclick = async ()=>{
 };
 
 /* ===================== IMPORTAÇÃO KML ===================== */
-const kmlZone = document.getElementById('kml-zone');
-const kmlFile = document.getElementById('kml-file');
-kmlZone.onclick = ()=> kmlFile.click();
-kmlFile.onchange = e=>{ if(e.target.files[0]) lerArquivoKml(e.target.files[0]); };
-['dragover','dragenter'].forEach(ev=>kmlZone.addEventListener(ev,e=>{e.preventDefault();kmlZone.classList.add('drag');}));
-['dragleave','drop'].forEach(ev=>kmlZone.addEventListener(ev,e=>{e.preventDefault();kmlZone.classList.remove('drag');}));
-kmlZone.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) lerArquivoKml(f); });
-
-/* ---- Cadastro em lote: vários arquivos KML (1 imóvel por arquivo) ---- */
+/* ---- Importação de KML: 1 ou vários arquivos (1 imóvel por arquivo) ---- */
 const kmlLoteZone = document.getElementById('kml-lote-zone');
 const kmlLoteFile = document.getElementById('kml-lote-file');
 if(kmlLoteZone && kmlLoteFile){
@@ -4368,68 +4652,115 @@ if(kmlLoteZone && kmlLoteFile){
   ['dragleave','drop'].forEach(ev=>kmlLoteZone.addEventListener(ev,e=>{e.preventDefault();kmlLoteZone.classList.remove('drag');}));
   kmlLoteZone.addEventListener('drop', e=>{ const fs=e.dataTransfer.files; if(fs && fs.length) lerLoteKml(fs); });
 }
+function resetKmlZone(){ /* zona de KML único removida — no-op por compatibilidade */ }
 // Define se o nome do arquivo é "número de matrícula" (só dígitos e separadores . - / espaço)
 function nomeEhMatricula(nome){
   return /[0-9]/.test(nome) && /^[0-9.\-\/\s]+$/.test(nome);
 }
+function resultadoDeResposta(nome, r){
+  if(!r || !r.ok) return {nome, status:'erro', id:null, msg:(r&&r.erro)||'falha', inconsistencias:[]};
+  const status = r.existe ? 'duplicado' : 'criado';
+  return {nome, status, id:r.id||null, msg:r.mensagem||'', inconsistencias:r.inconsistencias||[]};
+}
 async function lerLoteKml(files){
   const arr = Array.from(files).filter(f=>/\.kml$/i.test(f.name));
   if(!arr.length){ setStatus('err','Selecione um ou mais arquivos .kml.'); return; }
-  const lbl = document.getElementById('kml-lote-label');
-  let ok=0; const falhas=[];
+  // Um único arquivo com VÁRIOS polígonos -> abre o painel de nomeação
+  if(arr.length===1){
+    try{
+      const txt = await arr[0].text(); kmlRaw = txt;
+      const res = await post({acao:'processar_kml', kml:txt});
+      if(res && res.ok && res.total>1){ origemAtual='kml'; abrirPainelKml(res.placemarks); setStatus('ok', `${res.total} polígonos no KML — nomeie cada um e grave.`); return; }
+    }catch(e){ /* cai no fluxo padrão abaixo */ }
+  }
+  // 1 ou vários arquivos (1 imóvel por arquivo): processa com progresso + lista de resultados
+  const resultados=[];
+  importProgressShow('Importando KML', arr.length);
   for(let i=0;i<arr.length;i++){
-    const f=arr[i];
-    if(lbl) lbl.innerHTML = `Importando <b>${i+1}/${arr.length}</b>…`;
-    setStatus('warn', `Cadastro em lote: ${i+1}/${arr.length}…`);
+    const f=arr[i]; const base=f.name.replace(/\.kml$/i,'').trim();
+    importProgressUpdate(i, arr.length, base);
     try{
       const txt = await f.text();
-      const base = f.name.replace(/\.kml$/i,'').trim();
       const params = { acao:'salvar', origem:'kml', memorial: txt };
       if(nomeEhMatricula(base)) params.numero_matricula = base; else params.identificador = base;
       const r = await post(params);
-      if(r && r.ok) ok++; else falhas.push(base+': '+((r&&r.erro)||'falha'));
-    }catch(e){ falhas.push(f.name+': erro de leitura'); }
+      resultados.push(resultadoDeResposta(base, r));
+    }catch(e){ resultados.push({nome:base, status:'erro', id:null, msg:'erro de leitura', inconsistencias:[]}); }
   }
-  if(lbl) lbl.innerHTML = 'Cadastro em lote — vários <b>KML</b>';
-  let msg = `Lote KML: ${ok} de ${arr.length} cadastrado(s).`;
-  if(falhas.length) msg += ' Não cadastrados: ' + falhas.slice(0,4).join(' | ') + (falhas.length>4?' …':'');
-  setStatus(falhas.length?'warn':'ok', msg);
-  carregarLista();
-  if(modo==='overview') verTodos();
+  importProgressUpdate(arr.length, arr.length, '');
+  importProgressHide();
+  await carregarLista(); if(modo==='overview') verTodos();
+  importResultadosModal('Importação de KML', resultados);
 }
 
-function resetKmlZone(){
-  kmlZone.classList.remove('loaded');
-  document.getElementById('kml-zone-label').innerHTML = 'Importar arquivo <b>KML</b>';
+/* ===================== PROGRESSO + RESULTADOS DE IMPORTAÇÃO ===================== */
+const IMPORT_RING_LEN = 326.7;
+function importProgressShow(titulo, total){
+  const ov=document.getElementById('import-ov'); if(!ov) return;
+  const t=document.getElementById('import-ttl'); if(t) t.textContent = titulo||'Importando…';
+  importProgressUpdate(0, total||1, '');
+  ov.classList.add('show');
 }
-function lerArquivoKml(file){
-  const reader = new FileReader();
-  reader.onload = async ()=>{
-    kmlRaw = reader.result;
-    setStatus('warn','Lendo KML…');
-    const res = await post({acao:'processar_kml', kml:kmlRaw});
-    if(!res.ok){ setStatus('err', res.erro || 'KML inválido.'); return; }
-
-    kmlZone.classList.add('loaded');
-    document.getElementById('kml-zone-label').innerHTML = '<b>'+escapeHtml(file.name)+'</b> · '+res.total+' polígono(s)';
-
-    if(res.total===1){
-      // um imóvel: carrega para revisão e gravação individual
-      origemAtual='kml';
-      const pm=res.placemarks[0];
-      if(pm.nome) document.getElementById('identificador').value=pm.nome;
-      desenhar(pm, pm.nome || document.getElementById('identificador').value.trim());
-      document.getElementById('btn-save').disabled=false;
-      setStatus('ok', `KML lido: ${pm.num_vertices} vértices. Confira o nome e clique em Gravar.`);
-    } else {
-      // vários imóveis: abre painel para nomear cada um antes de gravar
-      origemAtual='kml';
-      abrirPainelKml(res.placemarks);
-      setStatus('ok', `${res.total} imóveis no KML. Nomeie cada um no painel e clique em Gravar.`);
-    }
-  };
-  reader.readAsText(file);
+function importProgressUpdate(done, total, nome){
+  total = total||1; const pct = Math.max(0, Math.min(100, Math.round(done/total*100)));
+  const fg=document.getElementById('import-ring-fg'); if(fg) fg.style.strokeDashoffset = (IMPORT_RING_LEN*(1-pct/100)).toFixed(1);
+  const p=document.getElementById('import-pct'); if(p) p.textContent = pct+'%';
+  const m=document.getElementById('import-meta'); if(m) m.textContent = `${Math.min(done,total)} de ${total}`;
+  const fn=document.getElementById('import-file'); if(fn) fn.textContent = nome||'';
 }
+function importProgressHide(){ const ov=document.getElementById('import-ov'); if(ov) ov.classList.remove('show'); }
+
+let impresIdsInc = [];
+function incLinhasHTML(inc){
+  if(!inc || !inc.length) return '';
+  return '<div class="impres-inc">'+inc.map(x=>{
+    const sev=(x.sev||'alerta'); const tag = sev==='erro'?'ERRO':(sev==='info'?'INFO':'ALERTA');
+    return `<div class="inc-line"><span class="inc-tag ${sev}">${tag}</span><span class="inc-msg">${escapeHtml(x.msg||'')}</span></div>`;
+  }).join('')+'</div>';
+}
+function importResultadosModal(titulo, resultados){
+  resultados = resultados||[];
+  const cont = {criado:0,duplicado:0,erro:0}; let comInc=0; impresIdsInc=[];
+  resultados.forEach(r=>{ cont[r.status]=(cont[r.status]||0)+1; if(r.inconsistencias && r.inconsistencias.length){ comInc++; if(r.id) impresIdsInc.push(r.id); } });
+  const tt=document.getElementById('impres-titulo'); if(tt) tt.textContent = titulo||'Resultado da importação';
+  const resumo=[];
+  if(cont.criado) resumo.push(`<span class="impres-chip ok">${cont.criado} cadastrado(s)</span>`);
+  if(cont.duplicado) resumo.push(`<span class="impres-chip dup">${cont.duplicado} já existente(s)</span>`);
+  if(cont.erro) resumo.push(`<span class="impres-chip err">${cont.erro} com erro</span>`);
+  if(comInc) resumo.push(`<span class="impres-chip warn">${comInc} com inconsistência(s)</span>`);
+  document.getElementById('impres-resumo').innerHTML = resumo.join('') || '<span class="impres-chip">Nada importado</span>';
+  document.getElementById('impres-list').innerHTML = resultados.map(r=>{
+    const ic = r.status==='criado'?'✓':(r.status==='duplicado'?'≡':'×');
+    const st = r.status==='criado'?'Cadastrado':(r.status==='duplicado'?'Já existente':'Erro');
+    const rel = (r.inconsistencias && r.inconsistencias.length && r.id)
+      ? `<div class="impres-relrow"><button class="mini-rel" data-rel="${r.id}">⤓ Relatório deste imóvel</button></div>` : '';
+    return `<div class="impres-item">
+      <div class="impres-row1"><span class="impres-ic ${r.status}">${ic}</span><span class="impres-nome">${escapeHtml(r.nome||'(sem nome)')}</span><span class="impres-st">${st}</span></div>
+      ${r.msg?`<div class="impres-msg">${escapeHtml(r.msg)}</div>`:''}
+      ${incLinhasHTML(r.inconsistencias)}
+      ${rel}
+    </div>`;
+  }).join('') || '<div class="impres-msg">Nenhum item processado.</div>';
+  document.querySelectorAll('#impres-list [data-rel]').forEach(b=> b.onclick=()=> gerarRelatorioInconsistencias([+b.dataset.rel]));
+  const relBtn=document.getElementById('impres-rel');
+  if(relBtn){ relBtn.style.display = impresIdsInc.length?'inline-flex':'none'; relBtn.onclick=()=> gerarRelatorioInconsistencias(impresIdsInc); }
+  document.getElementById('modal-import-res').classList.add('show');
+}
+function gerarRelatorioInconsistencias(ids){
+  ids = (ids||[]).filter(Boolean);
+  if(!ids.length){ setStatus('warn','Não há imóveis com inconsistências para o relatório.'); return; }
+  const f=document.createElement('form'); f.method='POST'; f.action=window.location.pathname; f.target='_blank';
+  const i1=document.createElement('input'); i1.type='hidden'; i1.name='acao'; i1.value='relatorio_inconsistencias'; f.appendChild(i1);
+  const i2=document.createElement('input'); i2.type='hidden'; i2.name='ids'; i2.value=JSON.stringify(ids); f.appendChild(i2);
+  document.body.appendChild(f); f.submit(); document.body.removeChild(f);
+}
+(function(){
+  const fechar=()=>{ const m=document.getElementById('modal-import-res'); if(m) m.classList.remove('show'); };
+  const x=document.getElementById('impres-x'); if(x) x.onclick=fechar;
+  const fe=document.getElementById('impres-fechar'); if(fe) fe.onclick=fechar;
+  const ov=document.getElementById('modal-import-res'); if(ov) ov.addEventListener('click', e=>{ if(e.target===ov) fechar(); });
+})();
+
 
 // abre o painel de nomeação dos imóveis do KML (vários polígonos)
 function abrirPainelKml(placemarks){
@@ -4507,9 +4838,10 @@ document.getElementById('btn-import-lote').onclick = async ()=>{
   setStatus('warn','Gravando…');
   const r = await post({acao:'salvar_kml_lote', kml:kmlRaw, nomes:JSON.stringify(nomes), tipos:JSON.stringify(tipos)});
   if(!r.ok){ setStatus('err', r.erro||'Falha na importação.'); return; }
-  setStatus('ok', `${r.salvos} imóveis gravados do KML.`);
   document.getElementById('kml-panel').classList.remove('show');
-  carregarLista(); verTodos();
+  await carregarLista(); verTodos();
+  if(Array.isArray(r.resultados)) importResultadosModal('Importação de KML (vários polígonos)', r.resultados);
+  setStatus('ok', `${r.salvos} imóveis gravados do KML.`);
 };
 
 /* ===================== VISÃO GERAL + SOBREPOSIÇÕES ===================== */
@@ -4856,6 +5188,12 @@ function swatchesHTML(atual){
 }
 
 let infoWinCor = null;
+function incParse(v){
+  if(!v) return [];
+  if(Array.isArray(v)) return v;
+  try{ const a=JSON.parse(v); return Array.isArray(a)?a:[]; }catch(e){ return []; }
+}
+function incSevTag(sev){ return sev==='erro'?'ERRO':(sev==='info'?'INFO':'ALERTA'); }
 function infoImovelHTML(it){
   const linhas = [];
   const add=(rot,val)=>{ if(val!==undefined && val!==null && String(val).trim()!=='') linhas.push(`<div class="ip-row"><span class="ip-k">${rot}</span><span class="ip-v">${escapeHtml(String(val))}</span></div>`); };
@@ -4868,7 +5206,19 @@ function infoImovelHTML(it){
   const suc=((it.matricula_sucessora)||'').split(',').map(s=>s.trim()).filter(Boolean).join(', ');
   if(it.situacao==='encerrada') add('Situação', 'Encerrada por unificação'+(suc?(' → '+suc):''));
   else if(it.motivo_situacao==='desmembramento') add('Situação', 'Desmembramento'+(suc?(' → trecho(s): '+suc):''));
-  return linhas.join('') || '<div class="ip-row"><span class="ip-v" style="color:#9aa6b2">Sem dados cadastrados.</span></div>';
+  // inconsistências (busca também no cache da lista, que traz o campo completo)
+  const cache = (typeof imoveisCache!=='undefined') ? imoveisCache.find(x=>String(x.id)===String(it.id)) : null;
+  const inc = incParse((cache && cache.inconsistencias) || it.inconsistencias);
+  let incHTML = '';
+  if(inc.length){
+    incHTML = `<div class="ip-inc">
+      <div class="ip-inc-h">⚠ ${inc.length} inconsistência(s) detectada(s)</div>
+      ${inc.map(x=>`<div class="ip-inc-row"><span class="inc-tag ${x.sev||'alerta'}">${incSevTag(x.sev)}</span><span class="inc-msg">${escapeHtml(x.msg||'')}</span></div>`).join('')}
+      <button type="button" class="ip-inc-btn" onclick="gerarRelatorioInconsistencias([${parseInt(it.id,10)||0}])">⤓ Gerar relatório de inconsistências</button>
+    </div>`;
+  }
+  const base = linhas.join('') || '<div class="ip-row"><span class="ip-v" style="color:#9aa6b2">Sem dados cadastrados.</span></div>';
+  return base + incHTML;
 }
 function destacarNoPainel(id){
   const lista=document.getElementById('saved-list'); if(!lista) return;
@@ -5203,7 +5553,7 @@ function renderLista(){
     return `<div class="item${morto?' morto':''}" data-id="${it.id}">
       ${corDot}
       <div class="info">
-        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}${exclBadge}</div>
+        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}${exclBadge}${(function(){const n=incParse(it.inconsistencias).length;return n?`<span class="inc-badge" title="${n} inconsistência(s) — clique para ver/relatar" data-inc="${it.id}">⚠ ${n}</span>`:'';})()}</div>
         <div class="mt">${sub.join(' · ')||meta} ${onrBadge}</div>
       </div>
       ${tag}
@@ -5223,6 +5573,8 @@ function renderLista(){
       else if(act==='status') consultarStatusOnr(id);
       else enviarOnr(id);
     };
+    const incB = el.querySelector('.inc-badge');
+    if(incB) incB.onclick = (e)=>{ e.stopPropagation(); gerarRelatorioInconsistencias([parseInt(id,10)||0]); };
     el.oncontextmenu = (e)=>{ e.preventDefault(); selecionarDaLista(id); };
     el.onclick = (e)=>{ if(ctrlAtivo || e.ctrlKey || e.metaKey){ e.preventDefault(); selecionarDaLista(id); return; }
       if(String(el.dataset.id) && imoveisCache.find(x=>String(x.id)===String(id)&&String(x.itn03_exclusivo)==='1')){ abrirEdicao(id); return; } // exclusiva: sem mapa, abre edição
@@ -5243,7 +5595,7 @@ async function carregarImovel(id){
   document.getElementById('cpf').value = reg.cpf||'';
   document.getElementById('tipo_imovel').value = reg.tipo_imovel||'';
   document.getElementById('tipo_identificador').value = reg.tipo_identificador||'nome';
-  if(origemAtual==='kml') kmlZone.classList.add('loaded'); else resetKmlZone();
+  resetKmlZone();
   lastGeo = res.geo;
   desenhar(res.geo, reg.identificador);
   abrirCorPainel(id, reg.cor, reg.cor_opacidade);
@@ -5898,15 +6250,12 @@ async function enviarLotePdfMatricula(fileList){
   if(!arr.length){ setStatus('err','Selecione um ou mais arquivos .pdf.'); return; }
   if(arr.length===1){ return enviarPdfMatricula(arr[0]); }   // 1 só: usa o fluxo individual
 
-  const lbl=document.getElementById('pdf-mat-label');
-  const restaurarLbl=()=>{ if(lbl) lbl.innerHTML='Matrícula ou <b>SIGEF</b> em PDF — mapear via IA <span class="zone-multi">(1 ou vários)</span>'; };
-  let criadas=0, complementadas=0; const falhas=[], avisos=[];
-
+  const resultados=[];
+  importProgressShow('Lendo matrículas com IA', arr.length);
   for(let i=0;i<arr.length;i++){
     const f=arr[i];
     const mat=f.name.replace(/\.pdf$/i,'').trim();
-    if(lbl) lbl.innerHTML=`Processando <b>${i+1}/${arr.length}</b> — ${escapeHtml(mat||'PDF')}…`;
-    setStatus('warn', `Lote IA: ${i+1}/${arr.length} — lendo “${escapeHtml(mat||f.name)}” com IA…`);
+    importProgressUpdate(i, arr.length, mat||f.name);
     try{
       const fd=new FormData();
       fd.append('acao','processar_pdf_matricula');
@@ -5915,31 +6264,27 @@ async function enviarLotePdfMatricula(fileList){
       const r = await fetch(window.location.pathname, {method:'POST', body:fd}).then(x=>x.json());
       if(!r || !r.ok){
         const erro=(r&&r.erro)||'falha';
-        falhas.push((mat||f.name)+': '+erro);
         // sem a chave da IA configurada não adianta seguir o lote
         if(/Configure a chave da API|chave da API do Gemini/i.test(erro)){
-          restaurarLbl();
+          importProgressHide();
           setStatus('err','Configure a chave da API do Gemini antes de processar o lote.');
           await carregarLista();
+          if(resultados.length) importResultadosModal('Importação de matrículas (PDF)', resultados);
           return;
         }
+        resultados.push({nome:(mat||f.name), status:'erro', id:null, msg:erro, inconsistencias:[]});
         continue;
       }
-      if(r.criado) criadas++; else complementadas++;
-      if(r.aviso_geometria) avisos.push(r.matricula||mat);
-    }catch(e){ falhas.push((mat||f.name)+': erro de requisição'); }
+      const status = r.criado ? 'criado' : 'duplicado';
+      resultados.push({nome:(r.matricula||mat||f.name), status, id:r.id||null, msg:r.mensagem||'', inconsistencias:r.inconsistencias||[]});
+    }catch(e){ resultados.push({nome:(mat||f.name), status:'erro', id:null, msg:'erro de requisição', inconsistencias:[]}); }
   }
-
-  restaurarLbl();
+  importProgressUpdate(arr.length, arr.length, '');
+  importProgressHide();
   await carregarLista();
   if(typeof modo!=='undefined' && modo==='overview') verTodos();
-
-  let msg = `Lote IA concluído: ${criadas} matrícula(s) mapeada(s)`
-          + (complementadas?`, ${complementadas} complementada(s)`:'')
-          + ` de ${arr.length}.`;
-  if(avisos.length) msg += ` Geometria reconstruída (confira): ${avisos.slice(0,5).join(', ')}${avisos.length>5?'…':''}.`;
-  if(falhas.length) msg += ' Não cadastradas: ' + falhas.slice(0,4).join(' | ') + (falhas.length>4?' …':'');
-  setStatus(falhas.length?'warn':'ok', msg);
+  importResultadosModal('Importação de matrículas (PDF)', resultados);
+  setStatus('ok', 'Importação de PDFs concluída.');
 }
 let gemModels=[], gemDefault='';
 function gemRenderModels(){
