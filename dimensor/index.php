@@ -1950,8 +1950,20 @@ function itn03SelectCols() {
     return "id, identificador, numero_matricula, cnm, cns, nome_imo, dat_mat, liv_mat, fol_mat,
             tipo_imovel, classifica, endereco, numero_imovel, cep, municipio, uf,
             proprietario, cpf, dat_ini, area_ha, sigef, ccir_sncr, car, cib_nirf, cif,
-            onr_numero_prenotacao, coordenadas_wgs84";
+            onr_nivel_publicidade, onr_classificacao, onr_numero_prenotacao, onr_descricao,
+            coordenadas_wgs84";
 }
+/* "apto para o Mapa da ONR" (mesmo critério do onr_pronto): se está pronto p/ o Mapa, está pronto p/ a carga ITN 03. */
+function itn03Faltam(array $r) {
+    $faltam = [];
+    if (!in_array((string)($r['tipo_imovel'] ?? ''), ['urbano','rural'], true)) $faltam[] = 'tipo (urbano/rural)';
+    if (trim((string)($r['onr_nivel_publicidade'] ?? '')) === '') $faltam[] = 'nível de publicidade';
+    if (trim((string)($r['onr_classificacao'] ?? '')) === '')     $faltam[] = 'classificação da importação';
+    if (trim((string)($r['onr_numero_prenotacao'] ?? '')) === '')  $faltam[] = 'número da prenotação';
+    if (trim((string)($r['onr_descricao'] ?? '')) === '')          $faltam[] = 'descrição';
+    return $faltam;
+}
+function itn03Apto(array $r) { return count(itn03Faltam($r)) === 0; }
 
 if (isset($_POST['acao'])) {
 
@@ -2374,6 +2386,11 @@ if (isset($_POST['acao'])) {
             $stmt->bind_param('i', $id); $stmt->execute();
             $row = $stmt->get_result()->fetch_assoc();
             if (!$row) { echo json_encode(['ok' => false, 'erro' => 'Imóvel não encontrado.']); exit; }
+            $falta = itn03Faltam($row);
+            if ($falta) {
+                echo json_encode(['ok' => false, 'erro' => 'Esta matrícula ainda não está apta para o Mapa da ONR (e, portanto, para a carga ITN 03). Faltam: ' . implode(', ', $falta) . '.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $res = itn03GerarArquivos([$row]);
             echo json_encode(['ok' => true, 'arquivos' => $res['arquivos'], 'avisos' => $res['avisos']], JSON_UNESCAPED_UNICODE);
             exit;
@@ -2394,8 +2411,15 @@ if (isset($_POST['acao'])) {
                 while ($rs && $r = $rs->fetch_assoc()) $linhas[] = $r;
             }
             if (!$linhas) { echo json_encode(['ok' => false, 'erro' => 'Nenhum imóvel para exportar.']); exit; }
-            $res = itn03GerarArquivos($linhas);
-            echo json_encode(['ok' => true, 'total' => count($linhas), 'arquivos' => $res['arquivos'], 'avisos' => $res['avisos']], JSON_UNESCAPED_UNICODE);
+            $total = count($linhas);
+            $aptas = array_values(array_filter($linhas, 'itn03Apto'));
+            $puladas = $total - count($aptas);
+            if (!$aptas) {
+                echo json_encode(['ok' => false, 'erro' => 'Nenhum imóvel apto para a carga ITN 03. Só são exportados os que estão prontos para o Mapa da ONR (tipo + nível de publicidade + classificação + prenotação + descrição).'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $res = itn03GerarArquivos($aptas);
+            echo json_encode(['ok' => true, 'total' => count($aptas), 'puladas' => $puladas, 'arquivos' => $res['arquivos'], 'avisos' => $res['avisos']], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -2578,7 +2602,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-swal-zindex2 (exportação de carga ITN 03 — individual e lote) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-itn03-apto (exportação de carga ITN 03 — individual e lote) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3292,7 +3316,7 @@ header('Expires: 0');
         <button id="ov-busca-clear" title="Limpar filtro">×</button>
       </div>
       <div class="ov-itn03">
-        <button id="ov-itn03" class="btn-itn03" title="Gerar a carga ITN 03 (ONR) dos imóveis — todos, ou apenas os do filtro ;">⤓ Exportar carga ITN 03 (lote)</button>
+        <button id="ov-itn03" class="btn-itn03" title="Gerar a carga ITN 03 (ONR) dos imóveis prontos para o Mapa ONR — todos, ou apenas os do filtro ;">⤓ Exportar carga ITN 03 (lote)</button>
       </div>
       <div class="ov-overlaps" id="ov-overlaps"></div>
       <div class="ov-foot">
@@ -3446,7 +3470,7 @@ header('Expires: 0');
     </div>
     <div class="modal-f">
       <button class="btn-ghost" id="ed-cancelar2" onclick="fecharEdicao()">Cancelar</button>
-      <button class="btn-ghost" id="ed-itn03" title="Gerar a carga ITN 03 (ONR) só desta matrícula">⤓ Carga ITN 03</button>
+      <button class="btn-ghost" id="ed-itn03" title="Gerar a carga ITN 03 desta matrícula (precisa estar pronta para o Mapa ONR)">⤓ Carga ITN 03</button>
       <button class="btn-primary" id="ed-salvar">Salvar alterações</button>
     </div>
   </div>
@@ -3548,7 +3572,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-swal-zindex2','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-itn03-apto','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -4817,7 +4841,16 @@ async function exportarItn03Individual(){
   if(btn){ btn.disabled=true; btn.textContent='Gerando…'; }
   try{
     const res = await post({acao:'itn03_individual', id});
-    if(!res.ok){ setStatus('err', res.erro||'Falha ao gerar a carga ITN 03.'); return; }
+    if(!res.ok){
+      setStatus('err', res.erro||'Falha ao gerar a carga ITN 03.');
+      if(typeof Swal!=='undefined'){
+        Swal.fire(Object.assign({icon:'info', title:'Ainda não dá para exportar', text:res.erro||'Falha ao gerar a carga ITN 03.',
+          confirmButtonText:'Entendi', confirmButtonColor:'#a80f1e',
+          didOpen:(p)=>{ const c=p&&p.parentElement; if(c&&c.classList.contains('swal2-container')) c.style.zIndex='100050'; }
+        }, swalTema()));
+      }
+      return;
+    }
     (res.arquivos||[]).forEach(f=>itn03Baixar(f.nome, f.conteudo));
     setStatus('ok','Carga ITN 03 da matrícula gerada.');
     itn03MostrarAvisos(res.avisos, 'matrícula');
@@ -4836,7 +4869,8 @@ async function exportarItn03Lote(){
     const arqs = res.arquivos||[];
     arqs.forEach(f=>itn03Baixar(f.nome, f.conteudo));
     const resumo = arqs.map(f=>f.n+' '+(f.tipo==='rural'?(f.n>1?'rurais':'rural'):(f.n>1?'urbanos':'urbano'))).join(' + ');
-    setStatus('ok','Carga ITN 03 (lote) gerada: '+(res.total||0)+' imóvel(is) — '+resumo+(arqs.length>1?' (um arquivo por tipo)':'')+'.');
+    const puladas = res.puladas ? ' · '+res.puladas+' não pronto(s) para o Mapa ONR (ignorado(s))' : '';
+    setStatus('ok','Carga ITN 03 (lote) gerada: '+(res.total||0)+' imóvel(is) — '+resumo+(arqs.length>1?' (um arquivo por tipo)':'')+puladas+'.');
     itn03MostrarAvisos(res.avisos, 'lote');
   }catch(e){ setStatus('err','Erro: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=txt; } }
