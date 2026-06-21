@@ -645,6 +645,8 @@ function ensureTable($conn) {
         'fora_municipio'       => "ADD COLUMN fora_municipio VARCHAR(120) NULL DEFAULT NULL",
         // Contexto da carga ITN 03 para imóvel RURAL: '1' padrão, '2' Imóvel da União, '3' Estrangeiros. Vazio = autodetectar.
         'contexto_rural'       => "ADD COLUMN contexto_rural VARCHAR(1) NULL DEFAULT NULL",
+        // Imóvel que ULTRAPASSA o limite (parte em município vizinho): JSON {municipio,vizinho,dentro_ha,dentro_pct,fora_ha,fora_pct}.
+        'parcial_json'         => "ADD COLUMN parcial_json TEXT NULL DEFAULT NULL",
         // Matrícula cadastrada SÓ para a carga ITN 03 (sem coordenadas/mapeamento).
         'itn03_exclusivo'      => "ADD COLUMN itn03_exclusivo TINYINT(1) NOT NULL DEFAULT 0",
         // Qualificação estruturada dos titulares ATUAIS (JSON), extraída dos registros/averbações.
@@ -3077,6 +3079,20 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'marcar_parcial') {
+            // Marca/desmarca o imóvel como "ultrapassa o limite" (parte em município vizinho).
+            // 'parcial' = JSON {municipio,vizinho,dentro_ha,dentro_pct,fora_ha,fora_pct} ou vazio para limpar.
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
+            $raw = trim((string)($_POST['parcial'] ?? ''));
+            $val = null;
+            if ($raw !== '') { $dec = json_decode($raw, true); if (is_array($dec)) $val = json_encode($dec, JSON_UNESCAPED_UNICODE); }
+            $stmt = $conn->prepare("UPDATE memoriais_mapeados SET parcial_json = ? WHERE id = ?");
+            if ($stmt) { $stmt->bind_param('si', $val, $id); $stmt->execute(); }
+            echo json_encode(['ok' => true, 'id' => $id, 'parcial' => $val], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($acao === 'consultar_cep') {
             $info = cepConsultar($_POST['cep'] ?? '');
             if (!$info) { echo json_encode(['ok' => false, 'erro' => 'CEP não encontrado.']); exit; }
@@ -3468,7 +3484,7 @@ if (isset($_POST['acao'])) {
         if ($acao === 'lista_sig') {
             // Assinatura leve do estado atual (para sincronização entre usuários por polling).
             // Cobre inserções, edições e exclusões sem transferir a lista inteira.
-            $res = $conn->query("SELECT id, situacao, motivo_situacao, matricula_sucessora, fora_municipio, contexto_rural,
+            $res = $conn->query("SELECT id, situacao, motivo_situacao, matricula_sucessora, fora_municipio, contexto_rural, parcial_json,
                                         tipo_imovel, proprietario, cpf, numero_matricula, identificador, cor, cor_opacidade,
                                         area_ha, num_vertices, onr_status, onr_importation_id, inconsistencias
                                  FROM memoriais_mapeados ORDER BY id");
@@ -3485,7 +3501,7 @@ if (isset($_POST['acao'])) {
                         numero_matricula, proprietario, cpf, tipo_imovel, cnm, municipio, uf,
                         onr_status, onr_importation_id, onr_numero_prenotacao, onr_classificacao,
                         onr_nivel_publicidade, onr_descricao, itn03_exclusivo, inconsistencias,
-                        situacao, motivo_situacao, matricula_sucessora, fora_municipio, contexto_rural, criado_em
+                        situacao, motivo_situacao, matricula_sucessora, fora_municipio, contexto_rural, parcial_json, criado_em
                  FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 1000"
             );
             $rows = [];
@@ -3732,7 +3748,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-badge-encerrada (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-fora-ultrapassa-limite (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3935,8 +3951,8 @@ header('Expires: 0');
 
   /* Cabeçalho da lista + botão ver todos */
   .saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-  .vista-toggle{display:flex;gap:4px;background:var(--panel2,rgba(128,128,128,.08));border:1px solid var(--line);border-radius:9px;padding:3px;margin-bottom:8px}
-  .vista-toggle .vt-btn{flex:1;border:none;background:transparent;color:var(--ink,#555);font-size:11.5px;font-weight:600;padding:6px 8px;border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .vista-toggle{display:flex;flex-wrap:wrap;gap:4px;background:var(--panel2,rgba(128,128,128,.08));border:1px solid var(--line);border-radius:9px;padding:3px;margin-bottom:8px}
+  .vista-toggle .vt-btn{flex:1 1 calc(50% - 4px);border:none;background:transparent;color:var(--ink,#555);font-size:11px;font-weight:600;padding:6px 6px;border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap}
   .vista-toggle .vt-btn.active{background:var(--card,#fff);color:var(--brand,#0d9488);box-shadow:0 1px 3px rgba(0,0,0,.12)}
   .vt-count{display:inline-block;min-width:16px;padding:0 5px;margin-left:2px;border-radius:9px;background:rgba(13,148,136,.18);color:#0d9488;font-size:10px;line-height:15px}
   .itn03-actions{display:flex;gap:6px;margin-bottom:8px}
@@ -4100,6 +4116,9 @@ header('Expires: 0');
   .desmembra-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(13,148,136,.16);color:#0d9488;margin-left:4px;vertical-align:middle;text-decoration:none}
   .fora-badge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:rgba(226,52,47,.16);color:#e2342f;border:1px solid rgba(226,52,47,.4);margin-left:4px;vertical-align:middle;text-decoration:none}
   .enc-meta{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:5px;background:rgba(226,52,47,.14);color:#e2342f;border:1px solid rgba(226,52,47,.4);margin-left:6px;vertical-align:middle;text-decoration:none;text-transform:uppercase}
+  .parcial-badge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:rgba(200,136,31,.16);color:var(--amber-text);border:1px solid rgba(200,136,31,.45);margin-left:4px;vertical-align:middle;text-decoration:none}
+  .parcial-line{font-family:var(--mono);font-size:9.5px;color:var(--amber-text);margin-top:3px;line-height:1.35;background:rgba(200,136,31,.08);border-left:2px solid rgba(200,136,31,.5);padding:2px 6px;border-radius:0 4px 4px 0}
+  .item.parcial-mun{box-shadow:inset 3px 0 0 rgba(200,136,31,.55)}
   .item.fora-mun{box-shadow:inset 3px 0 0 #e2342f}
   .situacao-edit{margin-top:6px;padding-top:11px;border-top:1px solid var(--line)}
   /* Multi-entrada de matrículas (chips) */
@@ -4532,6 +4551,8 @@ header('Expires: 0');
         <div class="vista-toggle" id="vista-toggle">
           <button type="button" class="vt-btn active" data-vista="mapa">Mapeadas</button>
           <button type="button" class="vt-btn" data-vista="itn03">Exclusivas ITN 03 <span id="vt-count-itn03" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="ultrapassa" title="Imóveis que ultrapassam o limite (parte em município vizinho)">Ultrapassam <span id="vt-count-ultrapassa" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="fora" title="Imóveis fora do perímetro do município">Fora do município <span id="vt-count-fora" class="vt-count"></span></button>
         </div>
         <div class="itn03-actions" id="itn03-actions" style="display:none">
           <button class="mini-btn" id="btn-itn03-nova" title="Cadastrar uma matrícula só para a carga ITN 03 (sem coordenadas/mapa)">➕ Nova matrícula</button>
@@ -4923,7 +4944,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-badge-encerrada','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-fora-ultrapassa-limite','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6048,10 +6069,21 @@ function renderLista(){
   const wrap = document.getElementById('saved-list');
   const termo = (document.getElementById('busca').value||'').trim().toLowerCase();
   const ehItn03 = it => String(it.itn03_exclusivo)==='1';
+  const temFora = it => (it.fora_municipio||'').toString().trim()!=='';
+  const temParcial = it => (it.parcial_json||'').toString().trim()!=='';
   const nExcl = imoveisCache.filter(ehItn03).length;
+  const nFora = imoveisCache.filter(it=>!ehItn03(it) && temFora(it)).length;
+  const nParcial = imoveisCache.filter(it=>!ehItn03(it) && temParcial(it)).length;
   const cb=document.getElementById('vt-count-itn03'); if(cb) cb.textContent = nExcl||'';
+  const cbF=document.getElementById('vt-count-fora'); if(cbF) cbF.textContent = nFora||'';
+  const cbP=document.getElementById('vt-count-ultrapassa'); if(cbP) cbP.textContent = nParcial||'';
   const acts=document.getElementById('itn03-actions'); if(acts) acts.style.display = (vistaLista==='itn03')?'flex':'none';
-  let itens = imoveisCache.filter(it=> vistaLista==='itn03' ? ehItn03(it) : !ehItn03(it));
+  let itens = imoveisCache.filter(it=>{
+    if(vistaLista==='itn03') return ehItn03(it);
+    if(vistaLista==='fora') return !ehItn03(it) && temFora(it);
+    if(vistaLista==='ultrapassa') return !ehItn03(it) && temParcial(it);
+    return !ehItn03(it); // 'mapa': todas as mapeadas
+  });
   if(termo){
     itens = itens.filter(it=>[it.identificador,it.numero_matricula,it.proprietario,it.cpf,it.tipo_imovel,it.origem]
       .some(c=>(c||'').toString().toLowerCase().includes(termo)));
@@ -6059,7 +6091,11 @@ function renderLista(){
   if(!itens.length){
     const vazio = vistaLista==='itn03'
       ? (nExcl ? 'Nenhuma encontrada.' : 'Nenhuma matrícula exclusiva ITN 03 ainda. Use “➕ Nova matrícula”.')
-      : (imoveisCache.length?'Nenhum imóvel encontrado.':'Nenhum imóvel gravado ainda.');
+      : vistaLista==='fora'
+        ? 'Nenhuma matrícula fora do município. Carregue o limite do município para verificar o pertencimento.'
+        : vistaLista==='ultrapassa'
+          ? 'Nenhuma matrícula ultrapassando o limite. Carregue o limite do município para verificar.'
+          : (imoveisCache.length?'Nenhum imóvel encontrado.':'Nenhum imóvel gravado ainda.');
     wrap.innerHTML = '<div class="empty-list">'+vazio+'</div>';
     return;
   }
@@ -6089,6 +6125,14 @@ function renderLista(){
     const foraBadge = foraMun
       ? `<span class="fora-badge" title="Imóvel FORA do município${foraMun!=='fora'?(' — está em '+escapeHtml(foraMun)):''}. Não pertence ao cartório; envio ONR e carga ITN bloqueados.">⚠ fora do município</span>`
       : '';
+    let parcialObj=null; try{ if((it.parcial_json||'').toString().trim()) parcialObj=JSON.parse(it.parcial_json); }catch(e){}
+    const fmtPct = v => (Math.round((+v||0)*10)/10).toString().replace('.',',');
+    const parcialBadge = parcialObj
+      ? `<span class="parcial-badge" title="Parte do imóvel está em ${escapeHtml(parcialObj.vizinho||'município vizinho')}">⤢ ultrapassa o limite</span>`
+      : '';
+    const parcialLine = parcialObj
+      ? `<div class="parcial-line" title="Divisão da área do imóvel entre os municípios">⤢ <b>${fmtPct(parcialObj.dentro_pct)}%</b> (${fmt(parcialObj.dentro_ha,2)} ha) em ${escapeHtml(parcialObj.municipio||'este município')} · <b>${fmtPct(parcialObj.fora_pct)}%</b> (${fmt(parcialObj.fora_ha,2)} ha) em ${escapeHtml(parcialObj.vizinho||'município vizinho')}</div>`
+      : '';
     const statusTxt = it.onr_status ? escapeHtml(it.onr_status) : (enviado?'ENVIADO':'');
     const onrBadge = (statusTxt && !excl) ? `<span class="onr-badge ${enviado?'env':''}">${statusTxt}</span>` : '';
     const encMotivo = it.motivo_situacao==='georreferenciamento' ? 'georreferenciamento' : (it.motivo_situacao==='desmembramento' ? 'desmembramento total' : 'unificação');
@@ -6100,11 +6144,12 @@ function renderLista(){
       : (enviado
           ? `<button class="it-onr enviado" data-act="status" title="Consultar status na ONR">⟳</button>`
           : `<button class="it-onr" data-act="enviar" title="${pronto?'Enviar ao Mapa ONR':(morto?'Bloqueado: matrícula encerrada':(foraMun?'Bloqueado: imóvel fora do município':'Faltam dados ONR para enviar'))}" ${pronto?'':'disabled'}>➤</button>`);
-    return `<div class="item${morto?' morto':''}${foraMun?' fora-mun':''}" data-id="${it.id}">
+    return `<div class="item${morto?' morto':''}${foraMun?' fora-mun':''}${parcialObj?' parcial-mun':''}" data-id="${it.id}">
       ${corDot}
       <div class="info">
-        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}${foraBadge}${exclBadge}${(function(){const n=incParse(it.inconsistencias).length;return n?`<span class="inc-badge" title="${n} inconsistência(s) — clique para ver/relatar" data-inc="${it.id}">⚠ ${n}</span>`:'';})()}</div>
+        <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}${foraBadge}${parcialBadge}${exclBadge}${(function(){const n=incParse(it.inconsistencias).length;return n?`<span class="inc-badge" title="${n} inconsistência(s) — clique para ver/relatar" data-inc="${it.id}">⚠ ${n}</span>`:'';})()}</div>
         <div class="mt">${sub.join(' · ')||meta} ${onrBadge}${encMeta}</div>
+        ${parcialLine}
       </div>
       ${tag}
       ${acaoBtn}
@@ -7146,6 +7191,10 @@ async function detectarVizinhos(prop){
   } else {
     muniStatus('warn','O imóvel cruza o limite de '+limiteNome+'. A parte de fora está destacada em laranja, mas não foi possível identificar o município vizinho (a parte fora pode estar em outro estado).');
   }
+
+  // calcula e persiste o split (parte no município x parte no vizinho) para a lista/categoria "ultrapassa"
+  const sp=splitParcial(prop);
+  if(sp) marcarParcial(imovelAtivoId, Object.assign({municipio:limiteNome, vizinho:nomes.join(', ')}, sp));
 }
 
 // Identifica o município real do imóvel quando está TOTALMENTE fora do limite, marca o
@@ -7188,6 +7237,59 @@ async function marcarForaMunicipio(id, municipio, silent){
   }catch(e){ return false; }
 }
 
+// Calcula o split de área de um imóvel que cruza o limite: parte dentro x parte fora (vizinho).
+function splitParcial(prop){
+  if(!limiteTurf || !prop) return null;
+  let total=0, areaIn=0;
+  try{ total=turf.area(prop); }catch(e){}
+  try{ const inter=turf.intersect(prop, limiteTurf); if(inter) areaIn=turf.area(inter); }catch(e){}
+  if(total<=0) return null;
+  if(areaIn>total) areaIn=total;
+  const dentroHa=areaIn/10000, foraHa=Math.max(0,(total-areaIn))/10000;
+  const dentroPct=areaIn/total*100, foraPct=Math.max(0,100-dentroPct);
+  return { dentro_ha:+dentroHa.toFixed(4), dentro_pct:+dentroPct.toFixed(1), fora_ha:+foraHa.toFixed(4), fora_pct:+foraPct.toFixed(1) };
+}
+
+// Nomes do(s) município(s) vizinho(s) na parte do imóvel que fica fora do limite (sem desenhar no mapa).
+async function vizinhosDaParte(prop, ufCod){
+  const nomes=[];
+  let fora=null; try{ fora=turf.difference(prop, limiteTurf); }catch(e){ fora=null; }
+  if(!fora || !fora.geometry) return nomes;
+  const pedacos=[]; const g=fora.geometry;
+  try{
+    if(g.type==='Polygon') pedacos.push(turf.polygon(g.coordinates));
+    else if(g.type==='MultiPolygon') g.coordinates.forEach(c=>pedacos.push(turf.polygon(c)));
+  }catch(e){}
+  for(const ped of pedacos){
+    let areaM2=0; try{ areaM2=turf.area(ped); }catch(e){}
+    if(areaM2 < 200) continue; // ignora microslivers de borda
+    let pt=null; try{ pt=turf.pointOnFeature(ped); }catch(e){ try{ pt=turf.centroid(ped); }catch(_){ pt=null; } }
+    if(!pt) continue;
+    const lng=pt.geometry.coordinates[0], lat=pt.geometry.coordinates[1];
+    let nome=null; try{ const info=await municipioDoPontoIBGE(lat,lng,ufCod); nome=info && info.municipio ? info.municipio : null; }catch(e){}
+    if(nome && normNomeMun(nome)!==normNomeMun(limiteNome) && !nomes.some(n=>normNomeMun(n)===normNomeMun(nome))) nomes.push(nome);
+  }
+  return nomes;
+}
+
+function parcialSig(o){ if(!o) return ''; return [o.dentro_pct,o.fora_pct,o.dentro_ha,o.fora_ha,(o.vizinho||''),(o.municipio||'')].join('|'); }
+
+// Persiste (e mostra) o estado "ultrapassa o limite". obj nulo => limpa. Retorna true se mudou.
+async function marcarParcial(id, obj, silent){
+  if(!id) return false;
+  const it=(typeof imoveisCache!=='undefined') ? imoveisCache.find(x=>String(x.id)===String(id)) : null;
+  let antesObj=null; const antes = it ? ((it.parcial_json||'').toString()) : null;
+  try{ antesObj = antes ? JSON.parse(antes) : null; }catch(e){}
+  if(antes!==null && parcialSig(antesObj)===parcialSig(obj)) return false; // sem mudança
+  const novo = obj ? JSON.stringify(obj) : '';
+  try{
+    await post({acao:'marcar_parcial', id, parcial: novo});
+    if(it) it.parcial_json = novo;
+    if(!silent && typeof carregarLista==='function') carregarLista();
+    return true;
+  }catch(e){ return false; }
+}
+
 // Varre TODOS os imóveis da visão geral contra o limite carregado: marca/bloqueia os que
 // estão totalmente fora e libera os que estão dentro/cruzando. Roda ao carregar o limite.
 async function verificarTodosPertencimento(){
@@ -7202,13 +7304,27 @@ async function verificarTodosPertencimento(){
       const ring=it.pts.map(p=>[p[1],p[0]]);
       if(ring[0][0]!==ring[ring.length-1][0] || ring[0][1]!==ring[ring.length-1][1]) ring.push(ring[0]);
       const prop=turf.polygon([ring]);
-      let intersects=false; try{ intersects=turf.booleanIntersects(prop, limiteTurf); }catch(e){}
-      if(intersects){ if(await marcarForaMunicipio(it.id,'',true)) mudou=true; continue; } // dentro/cruza: não bloqueia
+      let within=false, intersects=false;
+      try{ within=turf.booleanWithin(prop, limiteTurf); }catch(e){}
+      try{ intersects=turf.booleanIntersects(prop, limiteTurf); }catch(e){}
+      if(within){ // totalmente dentro: libera e limpa parcial
+        if(await marcarForaMunicipio(it.id,'',true)) mudou=true;
+        if(await marcarParcial(it.id, null, true)) mudou=true;
+        continue;
+      }
+      if(intersects){ // ULTRAPASSA o limite: calcula o split e identifica o vizinho
+        if(await marcarForaMunicipio(it.id,'',true)) mudou=true;
+        const sp=splitParcial(prop);
+        if(sp){ const nomes=await vizinhosDaParte(prop, ufCod);
+          if(await marcarParcial(it.id, Object.assign({municipio:limiteNome, vizinho:nomes.join(', ')}, sp), true)) mudou=true; }
+        continue;
+      }
       // totalmente fora -> identifica o município (malha já fica em cache) e marca
       let nome=null;
       if(ufCod){
         try{ const pt=turf.pointOnFeature(prop); const info=await municipioDoPontoIBGE(pt.geometry.coordinates[1],pt.geometry.coordinates[0],ufCod); nome=info&&info.municipio?info.municipio:null; }catch(e){}
       }
+      if(await marcarParcial(it.id, null, true)) mudou=true;
       if(await marcarForaMunicipio(it.id, nome||'fora', true)) mudou=true;
     }catch(e){}
   }
@@ -7228,9 +7344,9 @@ function verificarPertencimento(geo){
     try{ intersects = turf.booleanIntersects(prop, limiteTurf); }
     catch(e){ try{ intersects = turf.booleanPointInPolygon(turf.point([geo.centro_lng, geo.centro_lat]), limiteTurf); }catch(_){} }
     let cls, txt;
-    if(within){ cls='dentro'; txt='✓ Imóvel DENTRO de '+limiteNome; limparFora(); marcarForaMunicipio(imovelAtivoId, ''); }
+    if(within){ cls='dentro'; txt='✓ Imóvel DENTRO de '+limiteNome; limparFora(); marcarForaMunicipio(imovelAtivoId, ''); marcarParcial(imovelAtivoId, null); }
     else if(intersects){ cls='parcial'; txt='⚠ Imóvel CRUZA o limite de '+limiteNome+' (identificando vizinho…)'; marcarForaMunicipio(imovelAtivoId, ''); }
-    else { cls='fora'; txt='✗ Imóvel FORA de '+limiteNome+' (identificando município…)'; limparFora(); }
+    else { cls='fora'; txt='✗ Imóvel FORA de '+limiteNome+' (identificando município…)'; limparFora(); marcarParcial(imovelAtivoId, null); }
     if(badge){ badge.className='muni-badge '+cls; badge.textContent=txt; badge.style.display='block'; }
     muniStatus(cls==='dentro'?'ok':(cls==='parcial'?'warn':'err'), txt);
     if(cls==='parcial') detectarVizinhos(prop);          // assíncrono: atualiza badge/rótulos ao concluir
@@ -7261,7 +7377,8 @@ function verificarPertencimento(geo){
   const ei=document.getElementById('ed-itn03'); if(ei) ei.addEventListener('click', ()=>exportarItn03Individual());
   const ol=document.getElementById('ov-itn03'); if(ol) ol.addEventListener('click', ()=>exportarItn03Lote('mapa'));
   document.querySelectorAll('#vista-toggle .vt-btn').forEach(b=> b.addEventListener('click', ()=>{
-    vistaLista = b.dataset.vista==='itn03' ? 'itn03' : 'mapa';
+    const v=b.dataset.vista;
+    vistaLista = (v==='itn03'||v==='fora'||v==='ultrapassa') ? v : 'mapa';
     sincronizarVistaToggle(); renderLista();
   }));
   const bNova=document.getElementById('btn-itn03-nova'); if(bNova) bNova.addEventListener('click', novaMatriculaItn03);
