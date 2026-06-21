@@ -643,6 +643,8 @@ function ensureTable($conn) {
         'matricula_sucessora'  => "ADD COLUMN matricula_sucessora VARCHAR(120) NULL DEFAULT NULL",
         // Imóvel detectado FORA do perímetro do município (guarda o município real). Bloqueia envio ONR/ITN.
         'fora_municipio'       => "ADD COLUMN fora_municipio VARCHAR(120) NULL DEFAULT NULL",
+        // Contexto da carga ITN 03 para imóvel RURAL: '1' padrão, '2' Imóvel da União, '3' Estrangeiros. Vazio = autodetectar.
+        'contexto_rural'       => "ADD COLUMN contexto_rural VARCHAR(1) NULL DEFAULT NULL",
         // Matrícula cadastrada SÓ para a carga ITN 03 (sem coordenadas/mapeamento).
         'itn03_exclusivo'      => "ADD COLUMN itn03_exclusivo TINYINT(1) NOT NULL DEFAULT 0",
         // Qualificação estruturada dos titulares ATUAIS (JSON), extraída dos registros/averbações.
@@ -2205,6 +2207,7 @@ COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
 "nome_imo": denominação do imóvel (ex.: FAZENDA AGRO TRÊS IRMÃOS),
 "numero_matricula": número da matrícula do imóvel, se constar (ex.: 'Matrícula do imóvel: 873' => 873),
 "tipo_imovel": "rural" ou "urbano",
+"imovel_uniao": true SE o imóvel pertencer à UNIÃO FEDERAL / domínio da União (ex.: proprietário 'União Federal', terras/terreno de marinha, domínio da União, SPU, INCRA como titular do domínio, terras devolutas federais) — senão false,
 "dat_mat": data de abertura/registro da matrícula (dd/mm/aaaa),
 "liv_mat": número do livro,
 "fol_mat": número da folha/ficha,
@@ -2443,7 +2446,7 @@ function complementarMatricula($conn, $id, array $d, array $rowAtual) {
     $id = (int)$id; if ($id <= 0) return [];
     $pessoas = qualificacaoNormalizar($d['pessoas'] ?? []);
     qualificacaoDerivarFlat($d, $pessoas);
-    $whitelist = array_merge(onrCampos(), ['proprietario', 'cpf', 'tipo_imovel', 'identificador', 'numero_matricula']);
+    $whitelist = array_merge(onrCampos(), ['proprietario', 'cpf', 'tipo_imovel', 'identificador', 'numero_matricula', 'contexto_rural']);
     $sets = []; $vals = []; $types = ''; $preenchidos = [];
     foreach ($whitelist as $col) {
         if (!array_key_exists($col, $rowAtual)) continue;                 // coluna precisa existir na tabela
@@ -2554,6 +2557,26 @@ function itn03MunicipioCod($uf2, $nome) {
     return $cache[$uf2][$alvo] ?? null;
 }
 /* mapeia uma linha de memoriais_mapeados -> objeto "imóvel" da ITN 03; acumula avisos por imóvel. */
+/* Detecta se algum titular é a UNIÃO FEDERAL (CNPJ 00.394.411/... ou nome "União Federal"). */
+function itn03EhUniaoTitulares($pessoas) {
+    foreach ((array)$pessoas as $p) {
+        $doc = itn03Dig($p['cpf_cnpj'] ?? '');
+        if (strlen($doc) === 14 && strpos($doc, '00394411') === 0) return true; // CNPJ da União
+        $nome = itn03NormNome($p['nome'] ?? '');
+        if (strpos($nome, 'uniao federal') !== false) return true;
+    }
+    return false;
+}
+
+/* Detecta o contexto da carga ITN 03 para imóvel rural a partir dos dados extraídos:
+ *  '2' = Imóvel da União; '3' = Estrangeiros; '' = padrão/auto (contexto 1). */
+function itn03ContextoRuralDetectar($d) {
+    $uniao = filter_var($d['imovel_uniao'] ?? false, FILTER_VALIDATE_BOOLEAN) || itn03EhUniaoTitulares($d['pessoas'] ?? []);
+    if ($uniao) return '2';
+    foreach ((array)($d['pessoas'] ?? []) as $p) { if (!empty($p['estrangeiro'])) return '3'; }
+    return '';
+}
+
 function itn03ImovelDaLinha(array $r, array &$avisos) {
     $rotulo = trim((string)($r['numero_matricula'] ?? '')) ?: trim((string)($r['identificador'] ?? '')) ?: ('#' . ($r['id'] ?? '?'));
     $cls = strtolower(trim((string)($r['classifica'] ?? '')));
@@ -2650,9 +2673,21 @@ function itn03ImovelDaLinha(array $r, array &$avisos) {
         }
     }
 
-    // Contexto: rural padrão = 1; rural de estrangeiros = 3 (quando há titular estrangeiro).
-    // Urbano = 1 (padrão); contexto 2 (União) não é autodetectado.
-    $contextoVal = ($eh_rural && $temEstrangeiro) ? 3 : 1;
+    // Contexto rural: valor PERSISTIDO (1/2/3) tem prioridade; senão autodetecta.
+    //   1 = padrão · 2 = Imóvel da União · 3 = Estrangeiros. Urbano usa 1 (União não autodetectada).
+    $ctxPersist = trim((string)($r['contexto_rural'] ?? ''));
+    if ($eh_rural && in_array($ctxPersist, ['1', '2', '3'], true)) {
+        $contextoVal = (int)$ctxPersist;
+    } elseif ($eh_rural) {
+        $ehUniao = itn03EhUniaoTitulares($qual)
+                || itn03EhUniaoTitulares([['nome' => $r['proprietario'] ?? '', 'cpf_cnpj' => $r['cpf'] ?? '']]);
+        $contextoVal = $ehUniao ? 2 : ($temEstrangeiro ? 3 : 1);
+    } else {
+        $contextoVal = 1;
+    }
+    if ($eh_rural && $contextoVal === 2) {
+        $avisos[] = "$rotulo: classificado como IMÓVEL DA UNIÃO (contexto rural 2) — confira os campos específicos exigidos pela ITN 03 para imóveis da União antes de enviar.";
+    }
 
     $imovel = [
         'tipo_imovel' => $eh_rural ? 2 : 1,
@@ -2744,7 +2779,7 @@ function itn03SelectCols() {
             proprietario, cpf, dat_ini, rel_jur, per_rel, qualificacao_json,
             area_ha, sigef, ccir_sncr, car, cib_nirf, cif,
             onr_nivel_publicidade, onr_classificacao, onr_numero_prenotacao, onr_descricao,
-            itn03_exclusivo, fora_municipio, coordenadas_wgs84";
+            itn03_exclusivo, fora_municipio, contexto_rural, coordenadas_wgs84";
 }
 /* "apto para o Mapa da ONR" (mesmo critério do onr_pronto): se está pronto p/ o Mapa, está pronto p/ a carga ITN 03. */
 /* Imóvel marcado como FORA do perímetro do município (não pertence ao cartório). */
@@ -3074,6 +3109,7 @@ if (isset($_POST['acao'])) {
             if (!$r['ok']) { echo json_encode($r); exit; }
             $d = $r['dados'];
             enriquecerCepExtraido($d); // valida/completa CEP via ViaCEP (cadastro e complemento)
+            $ctxR = itn03ContextoRuralDetectar($d); if ($ctxR !== '') $d['contexto_rural'] = $ctxR; // União/estrangeiro p/ ITN 03
             // matrícula efetiva: se o nome do arquivo não for um número limpo (ex.: UUID do SIGEF),
             // usa a matrícula extraída do documento.
             $matDoc = trim((string)($d['numero_matricula'] ?? ''));
@@ -3139,6 +3175,7 @@ if (isset($_POST['acao'])) {
             if (trim((string)($d['onr_classificacao'] ?? '')) === '') $d['onr_classificacao'] = '1';
             // grava os demais campos ONR extraídos
             salvarCamposOnr($conn, $novoId, $d);
+            if (!empty($d['contexto_rural'])) { $stx = $conn->prepare("UPDATE memoriais_mapeados SET contexto_rural = ? WHERE id = ?"); if ($stx) { $cv2 = (string)$d['contexto_rural']; $stx->bind_param('si', $cv2, $novoId); $stx->execute(); } }
             qualificacaoGravar($conn, $novoId, $pessoasNovo); // qualificação estruturada dos titulares atuais
             $anexoId = anexoSalvarBytes($conn, $novoId, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
             $incPdf = detectarInconsistenciasPdf($d, $geo);
@@ -3252,6 +3289,10 @@ if (isset($_POST['acao'])) {
             $stmt = $conn->prepare("UPDATE memoriais_mapeados SET identificador=?, tipo_identificador=?, numero_matricula=?, proprietario=?, cpf=?, tipo_imovel=?, imovel_id=? WHERE id=?");
             $stmt->bind_param('ssssssii', $identificador, $tipo, $nm, $pr, $cp, $ti, $imovelId, $id);
             $stmt->execute();
+            // contexto rural da carga ITN 03 ('1'|'2'|'3'); vazio => autodetecção
+            $ctxRural = in_array((string)($_POST['contexto_rural'] ?? ''), ['1', '2', '3'], true) ? (string)$_POST['contexto_rural'] : null;
+            $stx = $conn->prepare("UPDATE memoriais_mapeados SET contexto_rural=? WHERE id=?");
+            if ($stx) { $stx->bind_param('si', $ctxRural, $id); $stx->execute(); }
             salvarCamposOnr($conn, $id, $_POST);
             echo json_encode(['ok' => true, 'id' => $id, 'imovel_id' => $imovelId], JSON_UNESCAPED_UNICODE);
             exit;
@@ -3399,7 +3440,7 @@ if (isset($_POST['acao'])) {
                         numero_matricula, proprietario, cpf, tipo_imovel, cnm, municipio, uf,
                         onr_status, onr_importation_id, onr_numero_prenotacao, onr_classificacao,
                         onr_nivel_publicidade, onr_descricao, itn03_exclusivo, inconsistencias,
-                        situacao, motivo_situacao, matricula_sucessora, fora_municipio, criado_em
+                        situacao, motivo_situacao, matricula_sucessora, fora_municipio, contexto_rural, criado_em
                  FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 1000"
             );
             $rows = [];
@@ -3549,9 +3590,10 @@ if (isset($_POST['acao'])) {
             // deriva colunas planas dos titulares (sem sobrescrever o que a IA já trouxe em $d)
             $pessoas = qualificacaoNormalizar($d['pessoas'] ?? []);
             qualificacaoDerivarFlat($d, $pessoas);
+            $ctxR = itn03ContextoRuralDetectar($d); if ($ctxR !== '') $d['contexto_rural'] = $ctxR; // União/estrangeiro p/ ITN 03
 
             // monta o conjunto "preencher se vazio" usando uma whitelist de colunas
-            $whitelist = array_merge(onrCampos(), ['proprietario', 'cpf', 'tipo_imovel', 'identificador']);
+            $whitelist = array_merge(onrCampos(), ['proprietario', 'cpf', 'tipo_imovel', 'identificador', 'contexto_rural']);
             $sets = []; $vals = []; $types = ''; $preenchidos = [];
             foreach ($whitelist as $col) {
                 if (!array_key_exists($col, $d)) continue;
@@ -3645,7 +3687,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-ciclo-vida-pdf (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-contexto-rural-itn (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4550,6 +4592,18 @@ header('Expires: 0');
           <select id="ed-tipo"><option value="">—</option><option value="urbano">Urbano</option><option value="rural">Rural</option></select>
         </div>
       </div>
+      <div class="modal-row" id="ed-ctxr-wrap" style="display:none">
+        <div class="fld" style="flex:1">
+          <label class="field-label">Contexto rural (carga ITN 03)</label>
+          <select id="ed-contexto-rural">
+            <option value="">Padrão (autodetectar)</option>
+            <option value="1">Padrão</option>
+            <option value="2">Imóvel da União</option>
+            <option value="3">Cidadão estrangeiro</option>
+          </select>
+          <div class="field-hint" style="margin-top:4px">Indica à ITN 03 se o imóvel rural é da União ou de estrangeiro. Deixe em "autodetectar" para o sistema decidir pelos titulares.</div>
+        </div>
+      </div>
       <div class="fld grid-2">
         <label class="field-label">Proprietários (pessoa física ou jurídica)</label>
         <div id="ed-prop-list" class="prop-list"></div>
@@ -4819,7 +4873,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-ciclo-vida-pdf','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-contexto-rural-itn','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6125,6 +6179,8 @@ async function abrirEdicao(id){
   if(!edProps.length) edProps=[{nome:'',doc:''}];
   edRenderProps();
   document.getElementById('ed-tipo').value = it.tipo_imovel||'';
+  const ctxSel=document.getElementById('ed-contexto-rural'); if(ctxSel) ctxSel.value = (it.contexto_rural!=null?String(it.contexto_rural):'');
+  if(typeof edToggleContextoRural==='function') edToggleContextoRural();
   let sitSel='ativa';
   if(it.motivo_situacao==='desmembramento') sitSel='desmembramento';
   else if(it.motivo_situacao==='georreferenciamento') sitSel='georreferenciamento';
@@ -6258,6 +6314,11 @@ function edToggleEnc(){
   }
 }
 /* ===================== ANEXOS DO IMÓVEL ===================== */
+function edToggleContextoRural(){
+  const wrap=document.getElementById('ed-ctxr-wrap');
+  const tipo=document.getElementById('ed-tipo');
+  if(wrap) wrap.style.display = (tipo && tipo.value==='rural') ? 'flex' : 'none';
+}
 let edAnxId = 0;            // id do imóvel atualmente em edição (0 = ainda não salvo)
 let edAnxBusy = false;
 const ANX_ROTULO = {pdf_matricula:'PDF da matrícula', pdf_sigef:'PDF do SIGEF', kml:'KML', outro:'Anexo'};
@@ -6314,6 +6375,10 @@ function edAplicarRegistro(reg){
     edRenderProps();
   }
   edPreencherOnrSeVazio(reg); // preenche apenas os inputs vazios; preserva o que o usuário digitou
+  // contexto rural (ITN 03) detectado no PDF — preenche se ainda estiver vazio
+  const ctxSel=document.getElementById('ed-contexto-rural');
+  if(ctxSel && reg && reg.contexto_rural!=null && String(reg.contexto_rural)!=='' && !ctxSel.value){ ctxSel.value=String(reg.contexto_rural); }
+  if(typeof edToggleContextoRural==='function') edToggleContextoRural();
   // situação atualizada por ciclo de vida (encerramento/desmembramento) detectado no PDF
   const selSit = document.getElementById('ed-situacao');
   if(selSit && reg){
@@ -6540,7 +6605,8 @@ async function salvarEdicao(){
     numero_matricula: document.getElementById('ed-matricula').value.trim(),
     proprietario: proprietario,
     cpf: cpf,
-    tipo_imovel: document.getElementById('ed-tipo').value
+    tipo_imovel: document.getElementById('ed-tipo').value,
+    contexto_rural: (document.getElementById('ed-contexto-rural')||{}).value || ''
   }, edColetarOnr()));
   if(!r.ok){ setStatus('err', r.erro||'Falha ao atualizar.'); return; }
   // salva a situação: ativa | encerrada(unificação/georreferenciamento) | desmembramento(parcial, mãe ativa)
@@ -7100,6 +7166,7 @@ function verificarPertencimento(geo){
   const bNova=document.getElementById('btn-itn03-nova'); if(bNova) bNova.addEventListener('click', novaMatriculaItn03);
   const bExpExcl=document.getElementById('btn-itn03-export-excl'); if(bExpExcl) bExpExcl.addEventListener('click', ()=>exportarItn03Lote('exclusivas'));
   const esit=document.getElementById('ed-situacao'); if(esit) esit.addEventListener('change', edToggleEnc);
+  const etipo=document.getElementById('ed-tipo'); if(etipo) etipo.addEventListener('change', edToggleContextoRural);
   const epadd=document.getElementById('ed-prop-add'); if(epadd) epadd.addEventListener('click', edAddProp);
   // máscara CPF/CNPJ no campo do formulário principal
   const cpfMain=document.getElementById('cpf');
