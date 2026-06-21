@@ -2829,6 +2829,7 @@ if (isset($_POST['acao'])) {
     }
 
     header('Content-Type: application/json; charset=UTF-8');
+    @ini_set('display_errors', '0'); // avisos/deprecations do PHP nunca devem vazar para dentro do JSON (corromperia a resposta)
     ensureTable($conn);
     $acao = $_POST['acao'];
 
@@ -3192,7 +3193,7 @@ if (isset($_POST['acao'])) {
             $incPdf = detectarInconsistenciasPdf($d, $semCoord ? null : $geo);
             inconsGravar($conn, $novoId, $incPdf);
             $cv = aplicarCicloVida($conn, $novoId, $matricula, $d['ciclo_vida'] ?? []);
-            $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
+            $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && !is_array($d[$k] ?? null) && trim((string)($d[$k] ?? '')) !== ''));
             if ($semCoord) {
                 echo json_encode([
                     'ok' => true, 'existe' => false, 'criado' => true, 'itn03_exclusivo' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
@@ -3719,7 +3720,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pdf-itn-sem-coord (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pdf-itn-json-fix (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4906,7 +4907,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-pdf-itn-sem-coord','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-pdf-itn-json-fix','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
