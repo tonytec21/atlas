@@ -553,6 +553,43 @@ function processarFonte($origem, $conteudo) {
     return buildGeoData($conteudo);
 }
 
+/* O imóvel já possui geometria (coordenadas)? */
+function imovelTemGeo($conn, $id) {
+    $id = (int)$id;
+    $rs = $conn->query("SELECT coordenadas_wgs84, num_vertices FROM memoriais_mapeados WHERE id = $id LIMIT 1");
+    $r = $rs ? $rs->fetch_assoc() : null;
+    if (!$r) return false;
+    return trim((string)($r['coordenadas_wgs84'] ?? '')) !== '' || (int)($r['num_vertices'] ?? 0) > 0;
+}
+
+/* Mapeia um imóvel SEM coordenadas (ex.: exclusivo da ITN 03) a partir de um KML ou memorial/SIGEF:
+   extrai a geometria e atualiza a linha como MAPEADA (origem, coordenadas e itn03_exclusivo=0). */
+function mapearImovelComGeo($conn, $id, $origem, $conteudo) {
+    $id = (int)$id;
+    if ($id <= 0) return ['ok' => false, 'erro' => 'Imóvel inválido.'];
+    $conteudo = (string)$conteudo;
+    if (trim($conteudo) === '') return ['ok' => false, 'erro' => 'Conteúdo do KML/memorial vazio.'];
+    $origem = ($origem === 'kml') ? 'kml' : 'memorial';
+    $geo = processarFonte($origem, $conteudo);
+    if (empty($geo['ok'])) {
+        return ['ok' => false, 'erro' => 'Não foi possível extrair coordenadas do ' . ($origem === 'kml' ? 'KML' : 'memorial/SIGEF') . ' (vértices encontrados: ' . (int)($geo['num_vertices'] ?? 0) . ').'];
+    }
+    $rs = $conn->query("SELECT numero_matricula FROM memoriais_mapeados WHERE id = $id LIMIT 1");
+    $row = $rs ? $rs->fetch_assoc() : null;
+    $mat = $row ? trim((string)($row['numero_matricula'] ?? '')) : '';
+    $imovelId = ($mat !== '') ? findImovelIdByMatricula($conn, $mat) : null;
+    $st = $conn->prepare("UPDATE memoriais_mapeados SET origem = ?, imovel_id = ?, memorial_descritivo = ?,
+        num_vertices = ?, area_ha = ?, perimetro_m = ?, centro_lat = ?, centro_lng = ?,
+        coordenadas_wgs84 = ?, coordenadas_utm = ?, itn03_exclusivo = 0 WHERE id = ?");
+    if ($st) {
+        $st->bind_param('sisiddddssi', $origem, $imovelId, $conteudo,
+            $geo['num_vertices'], $geo['area_ha'], $geo['perimetro_m'], $geo['centro_lat'], $geo['centro_lng'],
+            $geo['coordenadas_wgs84'], $geo['coordenadas_utm'], $id);
+        $st->execute();
+    }
+    return ['ok' => true, 'geo' => $geo];
+}
+
 /* ====================================================================
  *  BANCO DE DADOS
  * ==================================================================== */
@@ -2988,10 +3025,23 @@ if (isset($_POST['acao'])) {
                         foreach (parseKml($fonte) as $p0) { list(, $iN) = inconsNomeKml($p0['nome'] ?? ''); $incDup = array_merge($incDup, $iN); }
                         if ($incDup) inconsGravar($conn, $idExistente, $incDup);
                     }
+                    // se a matrícula já existia mas SEM coordenadas (ex.: exclusiva ITN 03),
+                    // o KML/memorial agora COMPLEMENTA a geometria e a mapeia.
+                    $mapeadoDup = null;
+                    if (!imovelTemGeo($conn, $idExistente) && trim($fonte) !== '') {
+                        $mp = mapearImovelComGeo($conn, $idExistente, $origem, $fonte);
+                        if (!empty($mp['ok'])) {
+                            $geoMp = $mp['geo'];
+                            inconsGravar($conn, $idExistente, array_merge($incDup, detectarInconsistenciasGeo($geoMp, $origem)));
+                            $mapeadoDup = ['num_vertices' => $geoMp['num_vertices'], 'area_ha' => $geoMp['area_ha']];
+                        }
+                    }
                     echo json_encode([
                         'ok' => true, 'existe' => true, 'atualizado' => true, 'criado' => false,
-                        'id' => $idExistente, 'imovel_id' => $imovelId, 'inconsistencias' => array_values($incDup),
-                        'mensagem' => 'A matrícula ' . $numMatricula . ' já estava cadastrada — as informações foram complementadas, sem duplicar o polígono no mapa.'
+                        'id' => $idExistente, 'imovel_id' => $imovelId, 'inconsistencias' => array_values($incDup), 'mapeado' => $mapeadoDup,
+                        'mensagem' => $mapeadoDup
+                            ? ('A matrícula ' . $numMatricula . ' (que estava só na ITN 03) foi MAPEADA com ' . $mapeadoDup['num_vertices'] . ' vértices (' . number_format($mapeadoDup['area_ha'], 4, ',', '.') . ' ha) — agora aparece no mapa.')
+                            : ('A matrícula ' . $numMatricula . ' já estava cadastrada — as informações foram complementadas, sem duplicar o polígono no mapa.')
                     ], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
@@ -3612,8 +3662,22 @@ if (isset($_POST['acao'])) {
             $tipo = anexoTipo($nome, $mime);
             $aid = anexoSalvarBytes($conn, $mid, $bytes, $nome, $tipo, $mime ?: null);
             if (!$aid) { echo json_encode(['ok' => false, 'erro' => 'Não foi possível arquivar o anexo.']); exit; }
-            echo json_encode(['ok' => true, 'anexo_id' => $aid, 'tipo' => $tipo, 'anexos' => anexosListar($conn, $mid),
-                'mensagem' => anexoTipoRotulo($tipo) . ' anexado.'], JSON_UNESCAPED_UNICODE); exit;
+            // Se for KML e o imóvel ainda não tem coordenadas (ex.: exclusivo da ITN 03), MAPEIA automaticamente.
+            $mapeado = null; $mapeadoErro = '';
+            $ehKml = ($tipo === 'kml') || strtolower(pathinfo($nome, PATHINFO_EXTENSION)) === 'kml' || stripos($mime, 'kml') !== false;
+            if ($ehKml && !imovelTemGeo($conn, $mid)) {
+                $mp = mapearImovelComGeo($conn, $mid, 'kml', $bytes);
+                if (!empty($mp['ok'])) {
+                    $geo = $mp['geo'];
+                    inconsGravar($conn, $mid, detectarInconsistenciasGeo($geo, 'kml'));
+                    $rsM = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = " . (int)$mid . " LIMIT 1");
+                    $mapeado = ['num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha'], 'registro' => ($rsM ? $rsM->fetch_assoc() : null)];
+                } else { $mapeadoErro = (string)($mp['erro'] ?? ''); }
+            }
+            echo json_encode(['ok' => true, 'anexo_id' => $aid, 'tipo' => $tipo, 'anexos' => anexosListar($conn, $mid), 'mapeado' => $mapeado,
+                'mensagem' => $mapeado
+                    ? ('KML anexado e matrícula MAPEADA com ' . $mapeado['num_vertices'] . ' vértices (' . number_format($mapeado['area_ha'], 4, ',', '.') . ' ha). Agora aparece no mapa.')
+                    : (anexoTipoRotulo($tipo) . ' anexado.' . ($mapeadoErro !== '' ? ' (não foi possível mapear: ' . $mapeadoErro . ')' : ''))], JSON_UNESCAPED_UNICODE); exit;
         }
 
         if ($acao === 'anexo_analisar') {
@@ -3678,15 +3742,28 @@ if (isset($_POST['acao'])) {
             $matAtual = trim((string)($d['numero_matricula'] ?? ($rowAtual['numero_matricula'] ?? '')));
             $cvAplicado = aplicarCicloVida($conn, $mid, $matAtual, $d['ciclo_vida'] ?? []);
 
+            // Se o imóvel NÃO tinha coordenadas (ex.: exclusivo da ITN 03) e o PDF/SIGEF traz memorial
+            // com coordenadas, MAPEIA o imóvel (deixa de ser exclusivo e passa a aparecer no mapa).
+            $mapeado = null;
+            if (!imovelTemGeo($conn, $mid) && trim((string)($d['memorial'] ?? '')) !== '') {
+                $mp = mapearImovelComGeo($conn, $mid, 'memorial', $d['memorial']);
+                if (!empty($mp['ok'])) {
+                    $geo = $mp['geo'];
+                    inconsGravar($conn, $mid, detectarInconsistenciasPdf($d, $geo));
+                    $mapeado = ['num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha']];
+                }
+            }
+
             // devolve o registro atualizado (para o formulário recarregar) + anexos
             $rs2 = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = " . (int)$mid . " LIMIT 1");
             $registro = $rs2 ? $rs2->fetch_assoc() : $rowAtual;
             $nFalta = count(array_unique($preenchidos));
+            $msgMap = $mapeado ? (' Matrícula MAPEADA com ' . $mapeado['num_vertices'] . ' vértices (' . number_format($mapeado['area_ha'], 4, ',', '.') . ' ha) — agora aparece no mapa.') : '';
             echo json_encode([
                 'ok' => true, 'id' => $mid, 'anexo_id' => $aid, 'modelo' => $r['modelo'],
-                'registro' => $registro, 'anexos' => anexosListar($conn, $mid),
+                'registro' => $registro, 'anexos' => anexosListar($conn, $mid), 'mapeado' => $mapeado,
                 'campos' => array_values(array_unique($preenchidos)), 'ciclo_vida' => $cvAplicado,
-                'mensagem' => ($nFalta > 0 ? ($nFalta . ' campo(s) faltante(s) preenchido(s) pela IA. Revise e salve.') : 'Nada a preencher — os campos já estavam completos.') . cicloVidaResumo($cvAplicado)
+                'mensagem' => ($nFalta > 0 ? ($nFalta . ' campo(s) faltante(s) preenchido(s) pela IA. Revise e salve.') : 'Nada a preencher — os campos já estavam completos.') . cicloVidaResumo($cvAplicado) . $msgMap
             ], JSON_UNESCAPED_UNICODE); exit;
         }
 
@@ -3748,7 +3825,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-categorias-lista (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-mapear-exclusiva-kml (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4228,6 +4305,7 @@ header('Expires: 0');
   .anx-btn[disabled]{opacity:.45;cursor:default}
   /* feedback de processamento DENTRO do modal (antes ficava só na barra atrás do modal) */
   .ed-drop.busy{opacity:.6;border-style:solid;cursor:not-allowed}
+  .ed-mapear-hint{background:rgba(31,95,165,.10);border:1px solid rgba(31,95,165,.35);color:#1f5fa5;border-radius:9px;padding:9px 11px;font-size:11.5px;line-height:1.45;margin-bottom:9px}
   .anx-busy{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;font-size:12px;
     border:1px solid var(--line);background:var(--panel);color:var(--ink)}
   .anx-busy.work{border-color:rgba(168,15,30,.4);background:rgba(168,15,30,.06)}
@@ -4720,6 +4798,7 @@ header('Expires: 0');
           <div class="ed-sec-body">
             <div id="ed-anexos-list" class="anx-list"><div class="anx-empty">—</div></div>
             <div id="ed-anx-busy" class="anx-busy" style="display:none" aria-live="polite"></div>
+            <div id="ed-mapear-hint" class="ed-mapear-hint" style="display:none">📍 Matrícula <b>exclusiva da ITN 03</b> (sem mapa). Anexe um <b>KML</b> ou o <b>PDF do SIGEF</b> abaixo para <b>mapeá-la</b> automaticamente (extrai as coordenadas e passa a aparecer no mapa).</div>
             <div id="ed-drop" class="ed-drop" tabindex="0">
               <div class="ed-drop-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
               <b>Arraste um arquivo aqui</b> ou clique para selecionar
@@ -4946,7 +5025,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-categorias-lista','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-mapear-exclusiva-kml','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6304,6 +6383,7 @@ function sincronizarVistaToggle(){
 }
 function novaMatriculaItn03(){
   edNovoItn03 = true;
+  edEhExclusiva = true; if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint();
   document.getElementById('ed-id').value = '';
   document.getElementById('ed-identificador').value = '';
   document.getElementById('ed-matricula').value = '';
@@ -6325,6 +6405,8 @@ async function abrirEdicao(id){
   const it = imoveisCache.find(x=>String(x.id)===String(id));
   if(!it) return;
   edNovoItn03 = false;
+  edEhExclusiva = String(it.itn03_exclusivo)==='1';
+  if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint();
   const tt=document.getElementById('ed-titulo'); if(tt) tt.textContent='Editar dados do imóvel';
   document.getElementById('ed-id').value = it.id;
   document.getElementById('ed-identificador').value = it.identificador||'';
@@ -6478,6 +6560,8 @@ function edToggleContextoRural(){
   if(wrap) wrap.style.display = (tipo && tipo.value==='rural') ? 'flex' : 'none';
 }
 let edAnxId = 0;            // id do imóvel atualmente em edição (0 = ainda não salvo)
+let edEhExclusiva = false;  // a matrícula em edição é exclusiva da ITN 03 (sem mapa)?
+function edAtualizarMapearHint(){ const h=document.getElementById('ed-mapear-hint'); if(h) h.style.display = edEhExclusiva ? 'block' : 'none'; }
 let edAnxBusy = false;
 const ANX_ROTULO = {pdf_matricula:'PDF da matrícula', pdf_sigef:'PDF do SIGEF', kml:'KML', outro:'Anexo'};
 function fmtBytes(n){ n=+n||0; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(0)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
@@ -6593,6 +6677,12 @@ async function edEnviarArquivo(file){
     if(!r || !r.ok){ const er=(r&&r.erro)||'Falha ao enviar o anexo.'; edAnxBusyUI('err', er); setStatus('err', er); return; }
     if(r.anexos) edRenderAnexos(r.anexos);
     if(analisar && r.registro){ edAplicarRegistro(r.registro); }
+    if(r.mapeado){ // KML/SIGEF mapeou uma matrícula que estava sem coordenadas
+      if(r.registro) edAplicarRegistro(r.registro);
+      edEhExclusiva = false; if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint();
+      if(typeof carregarLista==='function') carregarLista();
+      if(typeof modo!=='undefined' && modo==='overview' && typeof verTodos==='function') verTodos();
+    }
     edAnxBusyUI('ok', r.mensagem || (analisar?'Análise concluída.':'Anexo enviado.'));
     setStatus('ok', (r.mensagem||'Anexo enviado.')+(r.modelo?(' ('+r.modelo+')'):''));
     setTimeout(()=>{ if(!edAnxBusy) edAnxBusyUI('off'); }, 3500);
@@ -6612,7 +6702,8 @@ async function edAnalisarAnexo(aid){
     if(r.anexos) edRenderAnexos(r.anexos);
     if(r.registro) edAplicarRegistro(r.registro);
     // ciclo de vida pode ter alterado esta matrícula e a anterior: atualiza lista/mapa
-    if(r.ciclo_vida && (r.ciclo_vida.self || r.ciclo_vida.anterior)){
+    if((r.ciclo_vida && (r.ciclo_vida.self || r.ciclo_vida.anterior)) || r.mapeado){
+      if(r.mapeado){ edEhExclusiva = false; if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint(); }
       if(typeof carregarLista==='function') carregarLista();
       if(typeof modo!=='undefined' && modo==='overview' && typeof verTodos==='function') verTodos();
     }
