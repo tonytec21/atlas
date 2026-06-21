@@ -1207,6 +1207,14 @@ function onrEnviarImovel($conn, $id) {
     $foraMun = trim((string)($row['fora_municipio'] ?? ''));
     if ($foraMun !== '') return ['ok' => false, 'mensagem' => 'Imóvel FORA do município' . ($foraMun !== 'fora' ? ' (está em ' . $foraMun . ')' : '') . ' — não pertence a este cartório. Envio ao Mapa ONR bloqueado.'];
 
+    // matrícula encerrada (unificação/desmembramento total/georreferenciamento): não pode ser enviada
+    if (strtolower(trim((string)($row['situacao'] ?? ''))) === 'encerrada') {
+        $mot = strtolower(trim((string)($row['motivo_situacao'] ?? '')));
+        $motTxt = $mot === 'georreferenciamento' ? 'por georreferenciamento' : ($mot === 'desmembramento' ? 'por desmembramento total' : 'por unificação');
+        $suc = trim((string)($row['matricula_sucessora'] ?? ''));
+        return ['ok' => false, 'mensagem' => 'Matrícula ENCERRADA ' . $motTxt . ($suc !== '' ? ' (sucessora: ' . $suc . ')' : '') . ' — não pode ser enviada ao Mapa ONR.'];
+    }
+
     // valida metadados obrigatórios
     $cat = ($row['tipo_imovel'] === 'rural') ? 'RURAL' : (($row['tipo_imovel'] === 'urbano') ? 'URBANO' : '');
     $faltam = [];
@@ -2779,15 +2787,18 @@ function itn03SelectCols() {
             proprietario, cpf, dat_ini, rel_jur, per_rel, qualificacao_json,
             area_ha, sigef, ccir_sncr, car, cib_nirf, cif,
             onr_nivel_publicidade, onr_classificacao, onr_numero_prenotacao, onr_descricao,
-            itn03_exclusivo, fora_municipio, contexto_rural, coordenadas_wgs84";
+            itn03_exclusivo, fora_municipio, contexto_rural, situacao, coordenadas_wgs84";
 }
 /* "apto para o Mapa da ONR" (mesmo critério do onr_pronto): se está pronto p/ o Mapa, está pronto p/ a carga ITN 03. */
 /* Imóvel marcado como FORA do perímetro do município (não pertence ao cartório). */
 function imovelForaMunicipio($r) { return trim((string)($r['fora_municipio'] ?? '')) !== ''; }
+/* Matrícula ENCERRADA (unificação/desmembramento total/georreferenciamento): não pode ser enviada à ONR nem à carga ITN 03. */
+function imovelEncerrado($r) { return strtolower(trim((string)($r['situacao'] ?? ''))) === 'encerrada'; }
 
 function itn03Faltam(array $r) {
     $faltam = [];
     if (imovelForaMunicipio($r)) $faltam[] = 'imóvel fora do município';
+    if (imovelEncerrado($r))     $faltam[] = 'matrícula encerrada';
     if (!in_array((string)($r['tipo_imovel'] ?? ''), ['urbano','rural'], true)) $faltam[] = 'tipo (urbano/rural)';
     if (trim((string)($r['onr_nivel_publicidade'] ?? '')) === '') $faltam[] = 'nível de publicidade';
     if (trim((string)($r['onr_classificacao'] ?? '')) === '')     $faltam[] = 'classificação da importação';
@@ -2800,6 +2811,7 @@ function itn03Apto(array $r) { return count(itn03Faltam($r)) === 0; }
 function itn03ExclusivoFaltam(array $r) {
     $faltam = [];
     if (imovelForaMunicipio($r)) $faltam[] = 'imóvel fora do município';
+    if (imovelEncerrado($r))     $faltam[] = 'matrícula encerrada';
     if (!in_array((string)($r['tipo_imovel'] ?? ''), ['urbano','rural'], true)) $faltam[] = 'tipo (urbano/rural)';
     if (trim((string)($r['numero_matricula'] ?? '')) === '') $faltam[] = 'número da matrícula';
     if (!preg_match('#^(?:\d{6}\.\d\.\d{7}-\d{2}|\d{16})$#', trim((string)($r['cnm'] ?? '')))) $faltam[] = 'CNM válido';
@@ -3479,7 +3491,7 @@ if (isset($_POST['acao'])) {
             $rows = [];
             while ($res && $row = $res->fetch_assoc()) {
                 $fora = imovelForaMunicipio($row);
-                $pronto = !$fora
+                $pronto = !$fora && !imovelEncerrado($row)
                     && in_array($row['tipo_imovel'], ['urbano','rural'], true)
                     && trim((string)$row['onr_nivel_publicidade']) !== ''
                     && trim((string)$row['onr_classificacao']) !== ''
@@ -3720,7 +3732,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-result-destino (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-bloqueio-encerrada (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4910,7 +4922,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-result-destino','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-bloqueio-encerrada','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6070,7 +6082,7 @@ function renderLista(){
           : `<span class="morto-badge" title="${it.matricula_sucessora?('Sucessora: '+escapeHtml(it.matricula_sucessora)):'Encerrada por unificação'}">✝ unificada</span>`)
       : (desmembrada ? `<span class="desmembra-badge" title="${it.matricula_sucessora?('Trecho originou a matrícula '+escapeHtml(it.matricula_sucessora)):'Desmembramento'}">✂ desmembrada</span>` : '');
     const exclBadge = excl
-      ? `<span class="itn03-badge" title="Matrícula exclusiva ITN 03 (sem mapa)">ITN 03</span><span class="itn03-apto ${aptoItn?'ok':'no'}" title="${aptoItn?'Apta para a carga ITN 03':'Faltam dados mínimos (tipo, matrícula, CNM, município, UF)'}">${aptoItn?'✓ apta':'⚠ incompleta'}</span>`
+      ? `<span class="itn03-badge" title="Matrícula exclusiva ITN 03 (sem mapa)">ITN 03</span><span class="itn03-apto ${aptoItn?'ok':'no'}" title="${aptoItn?'Apta para a carga ITN 03':(morto?'Matrícula encerrada — não entra na carga ITN 03':'Faltam dados mínimos (tipo, matrícula, CNM, município, UF)')}">${aptoItn?'✓ apta':(morto?'⊘ encerrada':'⚠ incompleta')}</span>`
       : '';
     const foraMun = (it.fora_municipio||'').toString().trim();
     const foraBadge = foraMun
@@ -6079,10 +6091,10 @@ function renderLista(){
     const statusTxt = it.onr_status ? escapeHtml(it.onr_status) : (enviado?'ENVIADO':'');
     const onrBadge = (statusTxt && !excl) ? `<span class="onr-badge ${enviado?'env':''}">${statusTxt}</span>` : '';
     const acaoBtn = excl
-      ? `<button class="it-onr" data-act="itn03" title="${aptoItn?'Exportar carga ITN 03 desta matrícula':(foraMun?'Bloqueado: imóvel fora do município':'Faltam dados mínimos da ITN 03 para exportar')}" ${aptoItn?'':'disabled'}>⤓</button>`
+      ? `<button class="it-onr" data-act="itn03" title="${aptoItn?'Exportar carga ITN 03 desta matrícula':(morto?'Bloqueado: matrícula encerrada':(foraMun?'Bloqueado: imóvel fora do município':'Faltam dados mínimos da ITN 03 para exportar'))}" ${aptoItn?'':'disabled'}>⤓</button>`
       : (enviado
           ? `<button class="it-onr enviado" data-act="status" title="Consultar status na ONR">⟳</button>`
-          : `<button class="it-onr" data-act="enviar" title="${pronto?'Enviar ao Mapa ONR':(foraMun?'Bloqueado: imóvel fora do município':'Faltam dados ONR para enviar')}" ${pronto?'':'disabled'}>➤</button>`);
+          : `<button class="it-onr" data-act="enviar" title="${pronto?'Enviar ao Mapa ONR':(morto?'Bloqueado: matrícula encerrada':(foraMun?'Bloqueado: imóvel fora do município':'Faltam dados ONR para enviar'))}" ${pronto?'':'disabled'}>➤</button>`);
     return `<div class="item${morto?' morto':''}${foraMun?' fora-mun':''}" data-id="${it.id}">
       ${corDot}
       <div class="info">
