@@ -2090,6 +2090,101 @@ function acharMemorialParaPdf($conn, $mat, $matDoc = '') {
     }
     return null;
 }
+
+/* ====================================================================
+ *  CICLO DE VIDA DA MATRÍCULA (encerramento / desmembramento) a partir do PDF
+ * ==================================================================== */
+/* Normaliza um número de matrícula (só dígitos) para comparação. */
+function matNormalizar($s) { return preg_replace('/\D+/', '', (string)$s); }
+
+/* Recebe array OU string e devolve a lista de matrículas (só dígitos), sem duplicatas. */
+function matriculasLimpar($v) {
+    $itens = [];
+    if (is_array($v)) { foreach ($v as $x) $itens[] = (string)$x; }
+    else { foreach (preg_split('/[;,\/]| e /', (string)$v) as $x) $itens[] = $x; }
+    $out = [];
+    foreach ($itens as $x) { $n = matNormalizar($x); if ($n !== '' && !isset($out[$n])) $out[$n] = $n; }
+    return array_values($out);
+}
+
+/* Atualiza situação/motivo de um imóvel e MESCLA (união) as matrículas sucessoras. */
+function atualizarSituacaoMerge($conn, $id, $situacao, $motivo, array $novasSuc) {
+    $id = (int)$id; if ($id <= 0) return false;
+    $rs = $conn->query("SELECT matricula_sucessora FROM memoriais_mapeados WHERE id = $id LIMIT 1");
+    $row = $rs ? $rs->fetch_assoc() : null;
+    if (!$row) return false;
+    $suc = [];
+    foreach (preg_split('/[;,]/', (string)($row['matricula_sucessora'] ?? '')) as $s) { $s = trim($s); $k = matNormalizar($s); if ($k !== '' && !isset($suc[$k])) $suc[$k] = $s; }
+    foreach ($novasSuc as $s) { $s = trim((string)$s); $k = matNormalizar($s); if ($k !== '' && !isset($suc[$k])) $suc[$k] = $s; }
+    $sucStr = implode(', ', array_values($suc));
+    $st = $conn->prepare("UPDATE memoriais_mapeados SET situacao = ?, motivo_situacao = ?, matricula_sucessora = ? WHERE id = ?");
+    if (!$st) return false;
+    $st->bind_param('sssi', $situacao, $motivo, $sucStr, $id);
+    return $st->execute();
+}
+
+/* Aplica o ciclo de vida extraído do PDF:
+ *  (1) à PRÓPRIA matrícula: se há averbação de encerramento -> encerra (com motivo + sucessoras);
+ *      se há desmembramento de parte (mãe segue ativa) -> marca desmembramento + matrículas originadas;
+ *  (2) à matrícula ANTERIOR citada no registro de abertura -> marca nela a nova matrícula originada,
+ *      encerrando-a (unificação/georref.) ou mantendo-a ativa (desmembramento), SE estiver cadastrada.
+ * Retorna o que foi aplicado (para a mensagem de retorno). */
+function aplicarCicloVida($conn, $idAtual, $matriculaAtual, $cv) {
+    $res = ['self' => null, 'anterior' => null];
+    if (!is_array($cv)) return $res;
+    $matAtual     = trim((string)$matriculaAtual);
+    $matAtualNorm = matNormalizar($matAtual);
+
+    $encerrada = filter_var($cv['encerrada'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    $motivo = strtolower(trim((string)($cv['motivo'] ?? '')));
+    if (!in_array($motivo, ['unificacao','desmembramento','georreferenciamento'], true)) $motivo = '';
+    $originou = matriculasLimpar($cv['originou_matriculas'] ?? []);
+    $originou = array_values(array_filter($originou, fn($m) => $m !== $matAtualNorm)); // sem auto-referência
+
+    // (1) própria matrícula
+    if ((int)$idAtual > 0) {
+        if ($encerrada) {
+            $mot = $motivo ?: 'unificacao';
+            atualizarSituacaoMerge($conn, $idAtual, 'encerrada', $mot, $originou);
+            $res['self'] = ['situacao' => 'encerrada', 'motivo' => $mot, 'sucessora' => $originou];
+        } elseif ($originou) {
+            atualizarSituacaoMerge($conn, $idAtual, 'ativa', 'desmembramento', $originou);
+            $res['self'] = ['situacao' => 'ativa', 'motivo' => 'desmembramento', 'sucessora' => $originou];
+        }
+    }
+
+    // (2) matrícula anterior (origem desta), se cadastrada
+    $matAnt  = matNormalizar($cv['registro_anterior_matricula'] ?? '');
+    $tipoAnt = strtolower(trim((string)($cv['registro_anterior_tipo'] ?? '')));
+    if ($tipoAnt === 'encerramento') $tipoAnt = 'unificacao';
+    if (!in_array($tipoAnt, ['unificacao','desmembramento','georreferenciamento'], true)) $tipoAnt = '';
+    if ($matAnt !== '' && $matAnt !== $matAtualNorm && $matAtual !== '') {
+        $idAnt = acharMemorialPorMatricula($conn, $matAnt);
+        if ($idAnt && (int)$idAnt !== (int)$idAtual) {
+            $tipo = $tipoAnt ?: 'desmembramento'; // padrão conservador: mãe segue ativa
+            if ($tipo === 'desmembramento') atualizarSituacaoMerge($conn, $idAnt, 'ativa', 'desmembramento', [$matAtual]);
+            else                            atualizarSituacaoMerge($conn, $idAnt, 'encerrada', $tipo, [$matAtual]);
+            $res['anterior'] = ['id' => (int)$idAnt, 'matricula' => $matAnt, 'tipo' => $tipo];
+        }
+    }
+    return $res;
+}
+
+/* Monta um resumo legível do que o ciclo de vida aplicou (para a mensagem de retorno). */
+function cicloVidaResumo($cv) {
+    $p = [];
+    if (!empty($cv['self'])) {
+        $s = $cv['self'];
+        if ($s['situacao'] === 'encerrada') $p[] = 'matrícula marcada como ENCERRADA (' . $s['motivo'] . ')' . ($s['sucessora'] ? ' → ' . implode(', ', $s['sucessora']) : '');
+        else $p[] = 'desmembramento registrado → ' . implode(', ', $s['sucessora']);
+    }
+    if (!empty($cv['anterior'])) {
+        $a = $cv['anterior'];
+        $p[] = 'matrícula anterior ' . $a['matricula'] . ' atualizada (' . $a['tipo'] . ')';
+    }
+    return $p ? (' Ciclo de vida: ' . implode('; ', $p) . '.') : '';
+}
+
 /* Prompt de extração: pede JSON com as chaves = colunas do banco.
    IMPORTANTE: a titularidade é definida pela CADEIA de atos (Registros R-n e Averbações Av-n).
    O modelo deve percorrê-la em ordem e devolver os TITULARES ATUAIS com a qualificação completa. */
@@ -2155,6 +2250,14 @@ COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
 "cif": número CIF, se houver,
 "classifica": "1" se o imóvel for georreferenciado e CERTIFICADO pelo INCRA (ou urbano com ART), "2" se georreferenciado sem certificação, "3" se apenas desenho/sem georreferenciamento,
 "onr_numero_prenotacao": número do PROTOCOLO ou da PRENOTAÇÃO da matrícula — procure por 'protocolo', 'prenotação' ou 'prenot' (ex.: 'sob protocolo n° 10.676' => 10676). Sempre existe; retorne apenas o número,
+"ciclo_vida": {
+   // EVENTOS de encerramento/desmembramento DESTA matrícula e a ORIGEM dela. Analise os REGISTROS (R-n) e AVERBAÇÕES (Av-n).
+   "encerrada": true SE houver averbação que ENCERRA/CANCELA esta matrícula por completo (ex.: 'encerra-se a presente matrícula', unificação com outra(s), desmembramento TOTAL da área, ou georreferenciamento que abriu nova matrícula em substituição) — senão false,
+   "motivo": SE encerrada, o motivo — 'unificacao' (unificada a outra matrícula), 'desmembramento' (toda a área foi desmembrada), 'georreferenciamento' (encerrada por georreferenciamento que originou nova matrícula) — senão "",
+   "originou_matriculas": [matrículas NOVAS abertas A PARTIR DESTA, por encerramento total OU por desmembramento de parte (ex.: 'desmembrada a área tal, originando a matrícula 5.678'). SOMENTE os números, sem pontos],
+   "registro_anterior_matricula": número da matrícula ANTERIOR da qual ESTA se originou, citada no registro de abertura/R-1 (ex.: 'imóvel havido por desmembramento da matrícula 1.234' => 1234). Apenas o número. Senão "",
+   "registro_anterior_tipo": como ESTA se originou da anterior — 'desmembramento', 'unificacao' ou 'georreferenciamento' — senão ""
+},
 "memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. Pode ser: (a) texto corrido começando em 'Inicia-se a descrição...'; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; ou (c) uma TABELA do SIGEF/INCRA com colunas Código, Longitude, Latitude — neste caso transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'). Inclua todos os vértices; não converta, não arredonde, não omita nenhum
 }
 PROMPT;
@@ -2998,10 +3101,12 @@ if (isset($_POST['acao'])) {
                 $anexoId = anexoSalvarBytes($conn, $id, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
                 $incPdf = detectarInconsistenciasPdf($d, null);
                 inconsGravar($conn, $id, $incPdf);
+                $cv = aplicarCicloVida($conn, $id, $matricula, $d['ciclo_vida'] ?? []);
                 echo json_encode([
                     'ok' => true, 'existe' => true, 'criado' => false, 'id' => $id, 'matricula' => $matricula, 'modelo' => $r['modelo'],
                     'campos' => $preenchidos, 'anexo_id' => $anexoId, 'inconsistencias' => array_values($incPdf),
-                    'mensagem' => 'Matrícula ' . $matricula . ' já cadastrada — ' . count($preenchidos) . ' campo(s) complementado(s). PDF arquivado.'
+                    'ciclo_vida' => $cv,
+                    'mensagem' => 'Matrícula ' . $matricula . ' já cadastrada — ' . count($preenchidos) . ' campo(s) complementado(s). PDF arquivado.' . cicloVidaResumo($cv)
                 ], JSON_UNESCAPED_UNICODE);
                 exit;
             }
@@ -3038,14 +3143,16 @@ if (isset($_POST['acao'])) {
             $anexoId = anexoSalvarBytes($conn, $novoId, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
             $incPdf = detectarInconsistenciasPdf($d, $geo);
             inconsGravar($conn, $novoId, $incPdf);
+            $cv = aplicarCicloVida($conn, $novoId, $matricula, $d['ciclo_vida'] ?? []);
             $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
             echo json_encode([
                 'ok' => true, 'existe' => false, 'criado' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
                 'num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha'], 'campos' => $preenchidos,
                 'vertices_corrigidos' => $geo['vertices_corrigidos'] ?? [],
                 'aviso_geometria' => $geo['aviso_geometria'] ?? '', 'inconsistencias' => array_values($incPdf),
+                'ciclo_vida' => $cv,
                 'mensagem' => 'Matrícula ' . $matricula . ' cadastrada e mapeada com ' . $geo['num_vertices'] . ' vértices (' . number_format($geo['area_ha'], 4, ',', '.') . ' ha). ' . count($preenchidos) . ' campo(s) preenchido(s).'
-                    . (!empty($geo['aviso_geometria']) ? ' ' . $geo['aviso_geometria'] : '')
+                    . (!empty($geo['aviso_geometria']) ? ' ' . $geo['aviso_geometria'] : '') . cicloVidaResumo($cv)
             ], JSON_UNESCAPED_UNICODE);
             exit;
           } catch (\Throwable $e) {
@@ -3464,6 +3571,10 @@ if (isset($_POST['acao'])) {
                 qualificacaoGravar($conn, $mid, $pessoas); $preenchidos[] = 'qualificacao_json';
             }
 
+            // ciclo de vida (encerramento/desmembramento + matrícula anterior) a partir do PDF
+            $matAtual = trim((string)($d['numero_matricula'] ?? ($rowAtual['numero_matricula'] ?? '')));
+            $cvAplicado = aplicarCicloVida($conn, $mid, $matAtual, $d['ciclo_vida'] ?? []);
+
             // devolve o registro atualizado (para o formulário recarregar) + anexos
             $rs2 = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = " . (int)$mid . " LIMIT 1");
             $registro = $rs2 ? $rs2->fetch_assoc() : $rowAtual;
@@ -3471,8 +3582,8 @@ if (isset($_POST['acao'])) {
             echo json_encode([
                 'ok' => true, 'id' => $mid, 'anexo_id' => $aid, 'modelo' => $r['modelo'],
                 'registro' => $registro, 'anexos' => anexosListar($conn, $mid),
-                'campos' => array_values(array_unique($preenchidos)),
-                'mensagem' => $nFalta > 0 ? ($nFalta . ' campo(s) faltante(s) preenchido(s) pela IA. Revise e salve.') : 'Nada a preencher — os campos já estavam completos.'
+                'campos' => array_values(array_unique($preenchidos)), 'ciclo_vida' => $cvAplicado,
+                'mensagem' => ($nFalta > 0 ? ($nFalta . ' campo(s) faltante(s) preenchido(s) pela IA. Revise e salve.') : 'Nada a preencher — os campos já estavam completos.') . cicloVidaResumo($cvAplicado)
             ], JSON_UNESCAPED_UNICODE); exit;
         }
 
@@ -3534,7 +3645,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-fora-municipio (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-ciclo-vida-pdf (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4708,7 +4819,7 @@ function initMap(){
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-fora-municipio','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-ciclo-vida-pdf','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6203,6 +6314,20 @@ function edAplicarRegistro(reg){
     edRenderProps();
   }
   edPreencherOnrSeVazio(reg); // preenche apenas os inputs vazios; preserva o que o usuário digitou
+  // situação atualizada por ciclo de vida (encerramento/desmembramento) detectado no PDF
+  const selSit = document.getElementById('ed-situacao');
+  if(selSit && reg){
+    let sit='';
+    if(reg.motivo_situacao==='desmembramento') sit='desmembramento';
+    else if(reg.motivo_situacao==='georreferenciamento') sit='georreferenciamento';
+    else if(reg.situacao==='encerrada' || reg.motivo_situacao==='unificacao') sit='unificacao';
+    if(sit){
+      selSit.value = sit;
+      edSucList = (reg.matricula_sucessora||'').split(',').map(s=>s.trim()).filter(Boolean);
+      if(typeof edRenderSucChips==='function') edRenderSucChips();
+      if(typeof edToggleEnc==='function') edToggleEnc();
+    }
+  }
 }
 /* preenche os inputs ONR vazios a partir do registro (sem sobrescrever o que o usuário digitou) */
 function edPreencherOnrSeVazio(reg){
@@ -6263,6 +6388,11 @@ async function edAnalisarAnexo(aid){
     if(!r || !r.ok){ const er=(r&&r.erro)||'Falha ao analisar o anexo.'; edAnxBusyUI('err', er); setStatus('err', er); return; }
     if(r.anexos) edRenderAnexos(r.anexos);
     if(r.registro) edAplicarRegistro(r.registro);
+    // ciclo de vida pode ter alterado esta matrícula e a anterior: atualiza lista/mapa
+    if(r.ciclo_vida && (r.ciclo_vida.self || r.ciclo_vida.anterior)){
+      if(typeof carregarLista==='function') carregarLista();
+      if(typeof modo!=='undefined' && modo==='overview' && typeof verTodos==='function') verTodos();
+    }
     edAnxBusyUI('ok', r.mensagem||'Análise concluída.');
     setStatus('ok', (r.mensagem||'Análise concluída.')+(r.modelo?(' ('+r.modelo+')'):''));
     setTimeout(()=>{ if(!edAnxBusy) edAnxBusyUI('off'); }, 3500);
