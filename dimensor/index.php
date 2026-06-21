@@ -3720,7 +3720,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pdf-itn-json-fix (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-result-destino (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4236,6 +4236,9 @@ header('Expires: 0');
   .impres-ic.criado{background:#13693f}.impres-ic.duplicado{background:#1f5fa5}.impres-ic.erro{background:#a80f1e}
   .impres-nome{font-size:12.5px;font-weight:600;color:var(--ink)}
   .impres-st{margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--faint)}
+  .impres-dest{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid var(--line);white-space:nowrap}
+  .impres-dest.mapa{color:#13693f;background:rgba(19,105,63,.10);border-color:rgba(19,105,63,.30)}
+  .impres-dest.itn{color:#4636a8;background:rgba(70,54,168,.10);border-color:rgba(70,54,168,.30)}
   .impres-msg{font-size:11px;color:var(--faint);margin-top:3px;margin-left:31px}
   .impres-inc{margin:7px 0 0 31px;display:flex;flex-direction:column;gap:4px}
   .impres-inc .inc-line{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.4}
@@ -4907,7 +4910,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-pdf-itn-json-fix','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-result-destino','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5143,11 +5146,13 @@ function incLinhasHTML(inc){
 }
 function importResultadosModal(titulo, resultados){
   resultados = resultados||[];
-  const cont = {criado:0,duplicado:0,erro:0}; let comInc=0; impresIdsInc=[];
-  resultados.forEach(r=>{ cont[r.status]=(cont[r.status]||0)+1; if(r.inconsistencias && r.inconsistencias.length){ comInc++; if(r.id) impresIdsInc.push(r.id); } });
+  const cont = {criado:0,duplicado:0,erro:0}; let comInc=0; impresIdsInc=[]; let nMapa=0, nItn=0;
+  resultados.forEach(r=>{ cont[r.status]=(cont[r.status]||0)+1; if(r.destino==='mapa') nMapa++; else if(r.destino==='itn') nItn++; if(r.inconsistencias && r.inconsistencias.length){ comInc++; if(r.id) impresIdsInc.push(r.id); } });
   const tt=document.getElementById('impres-titulo'); if(tt) tt.textContent = titulo||'Resultado da importação';
   const resumo=[];
   if(cont.criado) resumo.push(`<span class="impres-chip ok">${cont.criado} cadastrado(s)</span>`);
+  if(nMapa) resumo.push(`<span class="impres-chip" style="color:#13693f;border-color:rgba(19,105,63,.3)">${nMapa} no mapa</span>`);
+  if(nItn) resumo.push(`<span class="impres-chip" style="color:#4636a8;border-color:rgba(70,54,168,.3)">${nItn} só ITN 03</span>`);
   if(cont.duplicado) resumo.push(`<span class="impres-chip dup">${cont.duplicado} já existente(s)</span>`);
   if(cont.erro) resumo.push(`<span class="impres-chip err">${cont.erro} com erro</span>`);
   if(comInc) resumo.push(`<span class="impres-chip warn">${comInc} com inconsistência(s)</span>`);
@@ -5155,10 +5160,12 @@ function importResultadosModal(titulo, resultados){
   document.getElementById('impres-list').innerHTML = resultados.map(r=>{
     const ic = r.status==='criado'?'✓':(r.status==='duplicado'?'≡':'×');
     const st = r.status==='criado'?'Cadastrado':(r.status==='duplicado'?'Já existente':'Erro');
+    const dest = r.destino==='itn' ? '<span class="impres-dest itn" title="Cadastrada apenas para a carga da ITN 03 (sem coordenadas, não aparece no mapa)">ITN 03 · sem mapa</span>'
+               : r.destino==='mapa' ? '<span class="impres-dest mapa" title="Cadastrada com coordenadas — disponível no mapa e na carga ITN 03">No mapa</span>' : '';
     const rel = (r.inconsistencias && r.inconsistencias.length && r.id)
       ? `<div class="impres-relrow"><button class="mini-rel" data-rel="${r.id}">⤓ Relatório deste imóvel</button></div>` : '';
     return `<div class="impres-item">
-      <div class="impres-row1"><span class="impres-ic ${r.status}">${ic}</span><span class="impres-nome">${escapeHtml(r.nome||'(sem nome)')}</span><span class="impres-st">${st}</span></div>
+      <div class="impres-row1"><span class="impres-ic ${r.status}">${ic}</span><span class="impres-nome">${escapeHtml(r.nome||'(sem nome)')}</span>${dest}<span class="impres-st">${st}</span></div>
       ${r.msg?`<div class="impres-msg">${escapeHtml(r.msg)}</div>`:''}
       ${incLinhasHTML(r.inconsistencias)}
       ${rel}
@@ -6845,7 +6852,8 @@ async function enviarLotePdfMatricula(fileList){
         continue;
       }
       const status = r.criado ? 'criado' : 'duplicado';
-      resultados.push({nome:(r.matricula||mat||f.name), status, id:r.id||null, msg:r.mensagem||'', inconsistencias:r.inconsistencias||[]});
+      const destino = r.criado ? (r.itn03_exclusivo ? 'itn' : 'mapa') : '';
+      resultados.push({nome:(r.matricula||mat||f.name), status, destino, id:r.id||null, msg:r.mensagem||'', inconsistencias:r.inconsistencias||[]});
     }catch(e){ resultados.push({nome:(mat||f.name), status:'erro', id:null, msg:'erro de requisição', inconsistencias:[]}); }
   }
   importProgressUpdate(arr.length, arr.length, '');
