@@ -3825,7 +3825,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-busca-intervalos-lista (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-legenda-encerrada (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4147,6 +4147,9 @@ header('Expires: 0');
     box-shadow:0 4px 14px rgba(0,0,0,.4);animation:chipFade .14s ease-out}
   .map-chip.vizinho{background:rgba(180,83,9,.94);border-color:rgba(251,191,36,.7);color:#fff;
     font-family:var(--disp);font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.45)}
+  .map-chip.morto{background:rgba(86,94,104,.42);color:rgba(255,255,255,.72);border:1px dashed rgba(255,255,255,.32);
+    text-decoration:line-through;font-style:italic;font-weight:500;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+  .map-chip.morto.clic:hover{background:rgba(86,94,104,.85);border-color:rgba(255,255,255,.5);color:#fff}
   @keyframes chipFade{from{opacity:0;transform:translate(-50%,calc(-50% - 12px))}to{opacity:1;transform:translate(-50%,calc(-50% - 20px))}}
   .overlay{position:absolute;inset:0;display:grid;place-items:center;z-index:4;color:var(--faint);
     font-family:var(--mono);font-size:12px;text-align:center;pointer-events:none}
@@ -5029,15 +5032,15 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-busca-intervalos-lista','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-legenda-encerrada','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
   return {lat:la/pts.length, lng:ln/pts.length};
 }
-function addLabel(pos, text, onClick){
+function addLabel(pos, text, onClick, cls){
   if(!text) return null;
-  const ov = new LabelOverlay(new google.maps.LatLng(pos.lat, pos.lng), text, '', onClick||null);
+  const ov = new LabelOverlay(new google.maps.LatLng(pos.lat, pos.lng), text, cls||'', onClick||null);
   labelOverlays.push(ov);
   return ov;
 }
@@ -5651,7 +5654,7 @@ async function verTodos(preservarVista){
     if(mat) it._label = addLabel(centro, rotuloMat(mat), (ev)=>{
       const ctrl = ctrlAtivo || (ev && (ev.ctrlKey || ev.metaKey));
       selecionarImovelDireto(it, ctrl);
-    });
+    }, imovelMorto(it) ? 'morto' : '');
     // identificação do imóvel: só ao pousar o mouse ~2s
     poly.addListener('mouseover', ()=> agendarHoverTip(centro, it.identificador));
     poly.addListener('mousemove', ()=> { if(!hoverTip && !hoverTimer) agendarHoverTip(centro, it.identificador); });
