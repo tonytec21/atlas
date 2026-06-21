@@ -3748,7 +3748,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-fora-ultrapassa-limite (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-categorias-lista (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4549,10 +4549,12 @@ header('Expires: 0');
           </div>
         </div>
         <div class="vista-toggle" id="vista-toggle">
-          <button type="button" class="vt-btn active" data-vista="mapa">Mapeadas</button>
-          <button type="button" class="vt-btn" data-vista="itn03">Exclusivas ITN 03 <span id="vt-count-itn03" class="vt-count"></span></button>
-          <button type="button" class="vt-btn" data-vista="ultrapassa" title="Imóveis que ultrapassam o limite (parte em município vizinho)">Ultrapassam <span id="vt-count-ultrapassa" class="vt-count"></span></button>
-          <button type="button" class="vt-btn" data-vista="fora" title="Imóveis fora do perímetro do município">Fora do município <span id="vt-count-fora" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="todas" title="Todas as matrículas, inclusive as exclusivas da carga ITN 03">Todas <span id="vt-count-todas" class="vt-count"></span></button>
+          <button type="button" class="vt-btn active" data-vista="mapa" title="Matrículas com mapa (polígono)">Mapeadas <span id="vt-count-mapa" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="dentro" title="Matrículas dentro do perímetro do município">Dentro do município <span id="vt-count-dentro" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="fora" title="Matrículas fora do perímetro do município">Fora do município <span id="vt-count-fora" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="ultrapassa" title="Matrículas que ultrapassam o limite (parte em município vizinho)">Ultrapassam <span id="vt-count-ultrapassa" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="itn03" title="Matrículas exclusivas da carga ITN 03 (sem mapa)">Exclusivas ITN 03 <span id="vt-count-itn03" class="vt-count"></span></button>
         </div>
         <div class="itn03-actions" id="itn03-actions" style="display:none">
           <button class="mini-btn" id="btn-itn03-nova" title="Cadastrar uma matrícula só para a carga ITN 03 (sem coordenadas/mapa)">➕ Nova matrícula</button>
@@ -4944,7 +4946,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-fora-ultrapassa-limite','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-categorias-lista','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6071,17 +6073,26 @@ function renderLista(){
   const ehItn03 = it => String(it.itn03_exclusivo)==='1';
   const temFora = it => (it.fora_municipio||'').toString().trim()!=='';
   const temParcial = it => (it.parcial_json||'').toString().trim()!=='';
+  const ehDentro = it => !ehItn03(it) && !temFora(it) && !temParcial(it);
   const nExcl = imoveisCache.filter(ehItn03).length;
   const nFora = imoveisCache.filter(it=>!ehItn03(it) && temFora(it)).length;
   const nParcial = imoveisCache.filter(it=>!ehItn03(it) && temParcial(it)).length;
-  const cb=document.getElementById('vt-count-itn03'); if(cb) cb.textContent = nExcl||'';
-  const cbF=document.getElementById('vt-count-fora'); if(cbF) cbF.textContent = nFora||'';
-  const cbP=document.getElementById('vt-count-ultrapassa'); if(cbP) cbP.textContent = nParcial||'';
+  const nMapa = imoveisCache.filter(it=>!ehItn03(it)).length;
+  const nDentro = imoveisCache.filter(ehDentro).length;
+  const setCount=(id,n)=>{ const e=document.getElementById(id); if(e) e.textContent=n||''; };
+  setCount('vt-count-todas', imoveisCache.length);
+  setCount('vt-count-mapa', nMapa);
+  setCount('vt-count-dentro', nDentro);
+  setCount('vt-count-fora', nFora);
+  setCount('vt-count-ultrapassa', nParcial);
+  setCount('vt-count-itn03', nExcl);
   const acts=document.getElementById('itn03-actions'); if(acts) acts.style.display = (vistaLista==='itn03')?'flex':'none';
   let itens = imoveisCache.filter(it=>{
+    if(vistaLista==='todas') return true;
     if(vistaLista==='itn03') return ehItn03(it);
     if(vistaLista==='fora') return !ehItn03(it) && temFora(it);
     if(vistaLista==='ultrapassa') return !ehItn03(it) && temParcial(it);
+    if(vistaLista==='dentro') return ehDentro(it);
     return !ehItn03(it); // 'mapa': todas as mapeadas
   });
   if(termo){
@@ -6095,7 +6106,9 @@ function renderLista(){
         ? 'Nenhuma matrícula fora do município. Carregue o limite do município para verificar o pertencimento.'
         : vistaLista==='ultrapassa'
           ? 'Nenhuma matrícula ultrapassando o limite. Carregue o limite do município para verificar.'
-          : (imoveisCache.length?'Nenhum imóvel encontrado.':'Nenhum imóvel gravado ainda.');
+          : vistaLista==='dentro'
+            ? 'Nenhuma matrícula dentro do município (ou ainda não verificada). Carregue o limite para verificar.'
+            : (imoveisCache.length?'Nenhum imóvel encontrado.':'Nenhum imóvel gravado ainda.');
     wrap.innerHTML = '<div class="empty-list">'+vazio+'</div>';
     return;
   }
@@ -7378,7 +7391,7 @@ function verificarPertencimento(geo){
   const ol=document.getElementById('ov-itn03'); if(ol) ol.addEventListener('click', ()=>exportarItn03Lote('mapa'));
   document.querySelectorAll('#vista-toggle .vt-btn').forEach(b=> b.addEventListener('click', ()=>{
     const v=b.dataset.vista;
-    vistaLista = (v==='itn03'||v==='fora'||v==='ultrapassa') ? v : 'mapa';
+    vistaLista = ['itn03','fora','ultrapassa','dentro','todas'].includes(v) ? v : 'mapa';
     sincronizarVistaToggle(); renderLista();
   }));
   const bNova=document.getElementById('btn-itn03-nova'); if(bNova) bNova.addEventListener('click', novaMatriculaItn03);
