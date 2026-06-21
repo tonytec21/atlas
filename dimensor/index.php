@@ -3732,7 +3732,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-bloqueio-encerrada (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-badge-encerrada (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4099,6 +4099,7 @@ header('Expires: 0');
   .morto-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(120,130,145,.18);color:#8893a3;margin-left:4px;vertical-align:middle;text-decoration:none}
   .desmembra-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(13,148,136,.16);color:#0d9488;margin-left:4px;vertical-align:middle;text-decoration:none}
   .fora-badge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:rgba(226,52,47,.16);color:#e2342f;border:1px solid rgba(226,52,47,.4);margin-left:4px;vertical-align:middle;text-decoration:none}
+  .enc-meta{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:5px;background:rgba(226,52,47,.14);color:#e2342f;border:1px solid rgba(226,52,47,.4);margin-left:6px;vertical-align:middle;text-decoration:none;text-transform:uppercase}
   .item.fora-mun{box-shadow:inset 3px 0 0 #e2342f}
   .situacao-edit{margin-top:6px;padding-top:11px;border-top:1px solid var(--line)}
   /* Multi-entrada de matrículas (chips) */
@@ -4922,7 +4923,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-bloqueio-encerrada','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-badge-encerrada','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6090,6 +6091,10 @@ function renderLista(){
       : '';
     const statusTxt = it.onr_status ? escapeHtml(it.onr_status) : (enviado?'ENVIADO':'');
     const onrBadge = (statusTxt && !excl) ? `<span class="onr-badge ${enviado?'env':''}">${statusTxt}</span>` : '';
+    const encMotivo = it.motivo_situacao==='georreferenciamento' ? 'georreferenciamento' : (it.motivo_situacao==='desmembramento' ? 'desmembramento total' : 'unificação');
+    const encMeta = morto
+      ? `<span class="enc-meta" title="Matrícula encerrada por ${encMotivo}${it.matricula_sucessora?(' — sucessora: '+escapeHtml(it.matricula_sucessora)):''}. Não entra na carga ITN 03 nem no Mapa da ONR.">⊘ matrícula encerrada</span>`
+      : '';
     const acaoBtn = excl
       ? `<button class="it-onr" data-act="itn03" title="${aptoItn?'Exportar carga ITN 03 desta matrícula':(morto?'Bloqueado: matrícula encerrada':(foraMun?'Bloqueado: imóvel fora do município':'Faltam dados mínimos da ITN 03 para exportar'))}" ${aptoItn?'':'disabled'}>⤓</button>`
       : (enviado
@@ -6099,7 +6104,7 @@ function renderLista(){
       ${corDot}
       <div class="info">
         <div class="nm">${escapeHtml(it.identificador||'(sem identificação)')} ${mortoBadge}${foraBadge}${exclBadge}${(function(){const n=incParse(it.inconsistencias).length;return n?`<span class="inc-badge" title="${n} inconsistência(s) — clique para ver/relatar" data-inc="${it.id}">⚠ ${n}</span>`:'';})()}</div>
-        <div class="mt">${sub.join(' · ')||meta} ${onrBadge}</div>
+        <div class="mt">${sub.join(' · ')||meta} ${onrBadge}${encMeta}</div>
       </div>
       ${tag}
       ${acaoBtn}
