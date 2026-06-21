@@ -3150,15 +3150,17 @@ if (isset($_POST['acao'])) {
             // NÃO EXISTE -> cadastra extraindo as coordenadas do memorial
             $memorial = (string)($d['memorial'] ?? '');
             $geo = buildGeoData($memorial);
-            if (empty($geo['ok'])) {
+            // Sem coordenadas no memorial -> NÃO falha: cadastra como matrícula EXCLUSIVA da ITN 03 (sem mapa).
+            $semCoord = empty($geo['ok']);
+            $motivoSemCoord = '';
+            if ($semCoord) {
                 $legs = extractTraverseLegs($memorial);
                 if (count($legs) >= 3) {
                     $tot = array_sum(array_column($legs, 'dist'));
-                    echo json_encode(['ok' => false, 'erro' => 'A matrícula ' . $matricula . ' descreve o perímetro por AZIMUTES E DISTÂNCIAS a partir de marcos físicos (' . count($legs) . ' segmentos, ~' . number_format($tot, 0, ',', '.') . ' m de extensão), porém SEM coordenadas geográficas (Long/Lat ou UTM E/N). É um memorial antigo, não georreferenciado — não há como posicioná-lo no mapa automaticamente. Para mapear, é necessário um memorial com as coordenadas dos vértices, ou o georreferenciamento (SIGEF/INCRA) do imóvel.']);
-                    exit;
+                    $motivoSemCoord = 'o memorial descreve o perímetro por azimutes e distâncias a partir de marcos físicos (' . count($legs) . ' segmentos, ~' . number_format($tot, 0, ',', '.') . ' m), sem coordenadas geográficas';
+                } else {
+                    $motivoSemCoord = 'não foi possível extrair coordenadas do memorial (Long/Lat em GMS ou UTM E/N)';
                 }
-                echo json_encode(['ok' => false, 'erro' => 'A matrícula ' . $matricula . ' não está cadastrada e não foi possível extrair as coordenadas do memorial no PDF (vértices encontrados: ' . (int)($geo['num_vertices'] ?? 0) . '). Verifique se o PDF contém a descrição do perímetro com coordenadas (Longitude/Latitude em GMS ou UTM E/N em metros).']);
-                exit;
             }
             $identificador = trim((string)($d['nome_imo'] ?? '')); if ($identificador === '') $identificador = $matricula;
             $tipoImovel = (stripos((string)($d['tipo_imovel'] ?? ''), 'rural') !== false) ? 'rural' : ((stripos((string)($d['tipo_imovel'] ?? ''), 'urban') !== false) ? 'urbano' : '');
@@ -3167,7 +3169,16 @@ if (isset($_POST['acao'])) {
             $proprietario = trim((string)($d['proprietario'] ?? ''));
             $cpf = trim((string)($d['cpf'] ?? ''));
             $imovelId = findImovelIdByMatricula($conn, $matricula);
-            $novoId = inserirMemorial($conn, $identificador, 'matricula', 'memorial', $imovelId, $memorial, $geo, $matricula, $proprietario, $cpf, $tipoImovel);
+            if ($semCoord) {
+                // EXCLUSIVA da ITN 03: sem coordenadas/mapa, apenas dados para a carga
+                $areaVal = (isset($d['area_ha']) && trim((string)$d['area_ha']) !== '') ? (float)str_replace(',', '.', (string)$d['area_ha']) : null;
+                $dataExc = ['num_vertices' => null, 'area_ha' => $areaVal, 'perimetro_m' => null,
+                            'centro_lat' => null, 'centro_lng' => null, 'coordenadas_wgs84' => null, 'coordenadas_utm' => null];
+                $novoId = inserirMemorial($conn, $identificador, 'matricula', 'itn03', $imovelId, null, $dataExc, $matricula, $proprietario, $cpf, $tipoImovel);
+                if ($novoId) $conn->query("UPDATE memoriais_mapeados SET itn03_exclusivo = 1 WHERE id = " . (int)$novoId);
+            } else {
+                $novoId = inserirMemorial($conn, $identificador, 'matricula', 'memorial', $imovelId, $memorial, $geo, $matricula, $proprietario, $cpf, $tipoImovel);
+            }
             // descrição da importação: padrão quando não houver
             if (trim((string)($d['onr_descricao'] ?? '')) === '') $d['onr_descricao'] = 'Importação de polígonos';
             // parâmetros de envio: padrões
@@ -3178,19 +3189,27 @@ if (isset($_POST['acao'])) {
             if (!empty($d['contexto_rural'])) { $stx = $conn->prepare("UPDATE memoriais_mapeados SET contexto_rural = ? WHERE id = ?"); if ($stx) { $cv2 = (string)$d['contexto_rural']; $stx->bind_param('si', $cv2, $novoId); $stx->execute(); } }
             qualificacaoGravar($conn, $novoId, $pessoasNovo); // qualificação estruturada dos titulares atuais
             $anexoId = anexoSalvarBytes($conn, $novoId, $pdfBytes, (string)$_FILES['pdf']['name'], anexoTipo((string)$_FILES['pdf']['name'], 'application/pdf', $d), 'application/pdf');
-            $incPdf = detectarInconsistenciasPdf($d, $geo);
+            $incPdf = detectarInconsistenciasPdf($d, $semCoord ? null : $geo);
             inconsGravar($conn, $novoId, $incPdf);
             $cv = aplicarCicloVida($conn, $novoId, $matricula, $d['ciclo_vida'] ?? []);
             $preenchidos = array_values(array_filter(array_keys($d), fn($k) => $k !== 'memorial' && trim((string)($d[$k] ?? '')) !== ''));
-            echo json_encode([
-                'ok' => true, 'existe' => false, 'criado' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
-                'num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha'], 'campos' => $preenchidos,
-                'vertices_corrigidos' => $geo['vertices_corrigidos'] ?? [],
-                'aviso_geometria' => $geo['aviso_geometria'] ?? '', 'inconsistencias' => array_values($incPdf),
-                'ciclo_vida' => $cv,
-                'mensagem' => 'Matrícula ' . $matricula . ' cadastrada e mapeada com ' . $geo['num_vertices'] . ' vértices (' . number_format($geo['area_ha'], 4, ',', '.') . ' ha). ' . count($preenchidos) . ' campo(s) preenchido(s).'
-                    . (!empty($geo['aviso_geometria']) ? ' ' . $geo['aviso_geometria'] : '') . cicloVidaResumo($cv)
-            ], JSON_UNESCAPED_UNICODE);
+            if ($semCoord) {
+                echo json_encode([
+                    'ok' => true, 'existe' => false, 'criado' => true, 'itn03_exclusivo' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
+                    'campos' => $preenchidos, 'anexo_id' => $anexoId, 'inconsistencias' => array_values($incPdf), 'ciclo_vida' => $cv,
+                    'mensagem' => 'Matrícula ' . $matricula . ' cadastrada como EXCLUSIVA da ITN 03 (sem mapa), pois ' . $motivoSemCoord . '. ' . count($preenchidos) . ' campo(s) preenchido(s). PDF arquivado.' . cicloVidaResumo($cv)
+                ], JSON_UNESCAPED_UNICODE);
+            } else {
+                echo json_encode([
+                    'ok' => true, 'existe' => false, 'criado' => true, 'id' => $novoId, 'matricula' => $matricula, 'modelo' => $r['modelo'],
+                    'num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha'], 'campos' => $preenchidos,
+                    'vertices_corrigidos' => $geo['vertices_corrigidos'] ?? [],
+                    'aviso_geometria' => $geo['aviso_geometria'] ?? '', 'inconsistencias' => array_values($incPdf),
+                    'ciclo_vida' => $cv,
+                    'mensagem' => 'Matrícula ' . $matricula . ' cadastrada e mapeada com ' . $geo['num_vertices'] . ' vértices (' . number_format($geo['area_ha'], 4, ',', '.') . ' ha). ' . count($preenchidos) . ' campo(s) preenchido(s).'
+                        . (!empty($geo['aviso_geometria']) ? ' ' . $geo['aviso_geometria'] : '') . cicloVidaResumo($cv)
+                ], JSON_UNESCAPED_UNICODE);
+            }
             exit;
           } catch (\Throwable $e) {
             echo json_encode(['ok' => false, 'erro' => 'Erro ao processar o PDF: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -3700,7 +3719,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-sync-multiusuario (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-pdf-itn-sem-coord (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4887,7 +4906,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-sync-multiusuario','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-pdf-itn-sem-coord','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
