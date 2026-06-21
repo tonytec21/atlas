@@ -3825,7 +3825,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-mapear-exclusiva-kml (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-busca-intervalos-lista (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4029,7 +4029,8 @@ header('Expires: 0');
   /* Cabeçalho da lista + botão ver todos */
   .saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
   .vista-toggle{display:flex;flex-wrap:wrap;gap:4px;background:var(--panel2,rgba(128,128,128,.08));border:1px solid var(--line);border-radius:9px;padding:3px;margin-bottom:8px}
-  .vista-toggle .vt-btn{flex:1 1 calc(50% - 4px);border:none;background:transparent;color:var(--ink,#555);font-size:11px;font-weight:600;padding:6px 6px;border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .vista-toggle .vt-btn{flex:0 1 auto;border:none;background:transparent;color:var(--ink,#555);font-size:11px;font-weight:600;padding:6px 9px;border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .vista-toggle .vt-btn.vt-onr.active{background:rgba(31,95,165,.16);color:#1f5fa5}
   .vista-toggle .vt-btn.active{background:var(--card,#fff);color:var(--brand,#0d9488);box-shadow:0 1px 3px rgba(0,0,0,.12)}
   .vt-count{display:inline-block;min-width:16px;padding:0 5px;margin-left:2px;border-radius:9px;background:rgba(13,148,136,.18);color:#0d9488;font-size:10px;line-height:15px}
   .itn03-actions{display:flex;gap:6px;margin-bottom:8px}
@@ -4633,6 +4634,9 @@ header('Expires: 0');
           <button type="button" class="vt-btn" data-vista="fora" title="Matrículas fora do perímetro do município">Fora do município <span id="vt-count-fora" class="vt-count"></span></button>
           <button type="button" class="vt-btn" data-vista="ultrapassa" title="Matrículas que ultrapassam o limite (parte em município vizinho)">Ultrapassam <span id="vt-count-ultrapassa" class="vt-count"></span></button>
           <button type="button" class="vt-btn" data-vista="itn03" title="Matrículas exclusivas da carga ITN 03 (sem mapa)">Exclusivas ITN 03 <span id="vt-count-itn03" class="vt-count"></span></button>
+          <button type="button" class="vt-btn vt-onr" data-vista="prontas" title="Mapeadas prontas para enviar ao Mapa da ONR (com todos os dados e não enviadas)">Prontas p/ ONR <span id="vt-count-prontas" class="vt-count"></span></button>
+          <button type="button" class="vt-btn vt-onr" data-vista="enviadas" title="Matrículas já enviadas ao Mapa da ONR">Enviadas <span id="vt-count-enviadas" class="vt-count"></span></button>
+          <button type="button" class="vt-btn vt-onr" data-vista="faltando" title="Mapeadas que ainda faltam enviar ao Mapa da ONR (não enviadas, exceto fora do município/encerradas)">Faltando enviar <span id="vt-count-faltando" class="vt-count"></span></button>
         </div>
         <div class="itn03-actions" id="itn03-actions" style="display:none">
           <button class="mini-btn" id="btn-itn03-nova" title="Cadastrar uma matrícula só para a carga ITN 03 (sem coordenadas/mapa)">➕ Nova matrícula</button>
@@ -4640,7 +4644,7 @@ header('Expires: 0');
         </div>
         <div class="search-wrap">
           <svg class="search-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <input id="busca" type="text" placeholder="Buscar por matrícula, proprietário, identificação…">
+          <input id="busca" type="text" placeholder="Buscar… matrícula, proprietário, ou 744-760 (intervalo) e 744;822 (específicas)">
           <button id="busca-clear" class="search-clear" title="Limpar" style="display:none">×</button>
         </div>
         <div id="saved-list"><div class="empty-list">Carregando…</div></div>
@@ -5025,7 +5029,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-mapear-exclusiva-kml','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-busca-intervalos-lista','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5745,6 +5749,36 @@ function listaMat(s){ return (s==null?'':String(s)).split(',').map(x=>normMat(x)
    Necessário porque os rótulos/matrículas são gravados com zero-padding (00000745),
    enquanto as sucessoras (inclusive intervalos 745-900) são digitadas sem padding. */
 function matKey(s){ const k=normMat(s); return k.replace(/^0+(?=.)/,''); }
+
+/* Busca da lista lateral com a mesma ideia do painel de visão geral:
+   ';' separa termos (mostra só os que casam com QUALQUER um) e '-' define intervalo de matrículas (A-B).
+   Também casa por texto (identificação, proprietário, CPF, tipo, origem). */
+function buscaTokenCasaItem(it, tk){
+  const t=(tk||'').trim(); if(!t) return false;
+  const mk = matKey(it.numero_matricula);
+  const mkNum = (mk && /^\d+$/.test(mk)) ? parseInt(mk,10) : null;
+  // intervalo numérico A-B -> casa pela matrícula dentro da faixa
+  const mRange = t.match(/^(\d[\d.\s]*)-(\d[\d.\s]*)$/);
+  if(mRange){
+    const a=parseInt(mRange[1].replace(/\D/g,''),10);
+    const b=parseInt(mRange[2].replace(/\D/g,''),10);
+    if(!isNaN(a)&&!isNaN(b)&&mkNum!=null){ const lo=Math.min(a,b),hi=Math.max(a,b); return mkNum>=lo && mkNum<=hi; }
+    return false;
+  }
+  // matrícula específica (sem zeros à esquerda)
+  const tkKey = matKey(t);
+  if(tkKey && mk && (mk===tkKey || mk.includes(tkKey))) return true;
+  // texto livre em qualquer campo
+  const tl=t.toLowerCase();
+  return [it.identificador,it.numero_matricula,it.proprietario,it.cpf,it.tipo_imovel,it.origem]
+    .some(c=>(c||'').toString().toLowerCase().includes(tl));
+}
+function buscaCasaItem(it, termoRaw){
+  const raw=(termoRaw||'').trim(); if(!raw) return true;
+  const tokens = raw.split(';').map(s=>s.trim()).filter(Boolean);
+  if(!tokens.length) return true;
+  return tokens.some(tk=>buscaTokenCasaItem(it, tk));
+}
 function listaMatKey(s){ return (s==null?'':String(s)).split(/[,;]+/).map(x=>matKey(x)).filter(Boolean); }
 /* Rótulo de exibição da matrícula: remove zeros à esquerda (preservando letras/
    formato) e prefixa "Mat. ". Ex.: "00000860" -> "Mat. 860". */
@@ -6148,16 +6182,22 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pollLis
 window.addEventListener('focus', ()=>{ pollLista(); });
 function renderLista(){
   const wrap = document.getElementById('saved-list');
-  const termo = (document.getElementById('busca').value||'').trim().toLowerCase();
   const ehItn03 = it => String(it.itn03_exclusivo)==='1';
   const temFora = it => (it.fora_municipio||'').toString().trim()!=='';
   const temParcial = it => (it.parcial_json||'').toString().trim()!=='';
   const ehDentro = it => !ehItn03(it) && !temFora(it) && !temParcial(it);
+  const ehEnviado = it => String(it.onr_enviado)==='1';
+  const ehProntoOnr = it => String(it.onr_pronto)==='1' && !ehEnviado(it);
+  const ehBloqOnr = it => temFora(it) || String(it.situacao)==='encerrada';
+  const ehFaltando = it => !ehItn03(it) && !ehEnviado(it) && !ehBloqOnr(it);
   const nExcl = imoveisCache.filter(ehItn03).length;
   const nFora = imoveisCache.filter(it=>!ehItn03(it) && temFora(it)).length;
   const nParcial = imoveisCache.filter(it=>!ehItn03(it) && temParcial(it)).length;
   const nMapa = imoveisCache.filter(it=>!ehItn03(it)).length;
   const nDentro = imoveisCache.filter(ehDentro).length;
+  const nProntas = imoveisCache.filter(it=>!ehItn03(it) && ehProntoOnr(it)).length;
+  const nEnviadas = imoveisCache.filter(it=>!ehItn03(it) && ehEnviado(it)).length;
+  const nFaltando = imoveisCache.filter(ehFaltando).length;
   const setCount=(id,n)=>{ const e=document.getElementById(id); if(e) e.textContent=n||''; };
   setCount('vt-count-todas', imoveisCache.length);
   setCount('vt-count-mapa', nMapa);
@@ -6165,6 +6205,9 @@ function renderLista(){
   setCount('vt-count-fora', nFora);
   setCount('vt-count-ultrapassa', nParcial);
   setCount('vt-count-itn03', nExcl);
+  setCount('vt-count-prontas', nProntas);
+  setCount('vt-count-enviadas', nEnviadas);
+  setCount('vt-count-faltando', nFaltando);
   const acts=document.getElementById('itn03-actions'); if(acts) acts.style.display = (vistaLista==='itn03')?'flex':'none';
   let itens = imoveisCache.filter(it=>{
     if(vistaLista==='todas') return true;
@@ -6172,11 +6215,14 @@ function renderLista(){
     if(vistaLista==='fora') return !ehItn03(it) && temFora(it);
     if(vistaLista==='ultrapassa') return !ehItn03(it) && temParcial(it);
     if(vistaLista==='dentro') return ehDentro(it);
+    if(vistaLista==='prontas') return !ehItn03(it) && ehProntoOnr(it);
+    if(vistaLista==='enviadas') return !ehItn03(it) && ehEnviado(it);
+    if(vistaLista==='faltando') return ehFaltando(it);
     return !ehItn03(it); // 'mapa': todas as mapeadas
   });
-  if(termo){
-    itens = itens.filter(it=>[it.identificador,it.numero_matricula,it.proprietario,it.cpf,it.tipo_imovel,it.origem]
-      .some(c=>(c||'').toString().toLowerCase().includes(termo)));
+  const termoRaw = (document.getElementById('busca').value||'').trim();
+  if(termoRaw){
+    itens = itens.filter(it=>buscaCasaItem(it, termoRaw));
   }
   if(!itens.length){
     const vazio = vistaLista==='itn03'
@@ -6187,7 +6233,13 @@ function renderLista(){
           ? 'Nenhuma matrícula ultrapassando o limite. Carregue o limite do município para verificar.'
           : vistaLista==='dentro'
             ? 'Nenhuma matrícula dentro do município (ou ainda não verificada). Carregue o limite para verificar.'
-            : (imoveisCache.length?'Nenhum imóvel encontrado.':'Nenhum imóvel gravado ainda.');
+            : vistaLista==='prontas'
+              ? 'Nenhuma matrícula pronta para enviar ao Mapa da ONR. Complete os dados ONR das matrículas.'
+              : vistaLista==='enviadas'
+                ? 'Nenhuma matrícula enviada ao Mapa da ONR ainda.'
+                : vistaLista==='faltando'
+                  ? 'Nenhuma matrícula faltando enviar — tudo enviado ou bloqueado.'
+                  : (imoveisCache.length?'Nenhum imóvel encontrado.':'Nenhum imóvel gravado ainda.');
     wrap.innerHTML = '<div class="empty-list">'+vazio+'</div>';
     return;
   }
@@ -7482,7 +7534,7 @@ function verificarPertencimento(geo){
   const ol=document.getElementById('ov-itn03'); if(ol) ol.addEventListener('click', ()=>exportarItn03Lote('mapa'));
   document.querySelectorAll('#vista-toggle .vt-btn').forEach(b=> b.addEventListener('click', ()=>{
     const v=b.dataset.vista;
-    vistaLista = ['itn03','fora','ultrapassa','dentro','todas'].includes(v) ? v : 'mapa';
+    vistaLista = ['itn03','fora','ultrapassa','dentro','todas','prontas','enviadas','faltando'].includes(v) ? v : 'mapa';
     sincronizarVistaToggle(); renderLista();
   }));
   const bNova=document.getElementById('btn-itn03-nova'); if(bNova) bNova.addEventListener('click', novaMatriculaItn03);
