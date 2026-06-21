@@ -3433,6 +3433,19 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'lista_sig') {
+            // Assinatura leve do estado atual (para sincronização entre usuários por polling).
+            // Cobre inserções, edições e exclusões sem transferir a lista inteira.
+            $res = $conn->query("SELECT id, situacao, motivo_situacao, matricula_sucessora, fora_municipio, contexto_rural,
+                                        tipo_imovel, proprietario, cpf, numero_matricula, identificador, cor, cor_opacidade,
+                                        area_ha, num_vertices, onr_status, onr_importation_id, inconsistencias
+                                 FROM memoriais_mapeados ORDER BY id");
+            $h = hash_init('crc32b'); $c = 0;
+            while ($res && $row = $res->fetch_assoc()) { $c++; hash_update($h, implode('|', array_map(fn($v) => (string)$v, $row)) . "\n"); }
+            echo json_encode(['ok' => true, 'sig' => $c . '-' . hash_final($h)], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($acao === 'listar') {
             $res = $conn->query(
                 "SELECT id, identificador, tipo_identificador, origem, imovel_id, num_vertices,
@@ -3687,7 +3700,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-contexto-rural-itn (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-sync-multiusuario (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4871,9 +4884,10 @@ function initMap(){
 
   carregarLista();
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
+  iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-contexto-rural-itn','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-sync-multiusuario','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5450,7 +5464,7 @@ function classificarSobrep(inter){
   return { tipo: (larg <= TOL_DIVISA_M ? 'formal' : 'material'), largura_m: larg };
 }
 
-async function verTodos(){
+async function verTodos(preservarVista){
   modo='overview';
   document.getElementById('btn-todos').classList.add('active');
   document.getElementById('kml-panel').classList.remove('show');
@@ -5498,7 +5512,7 @@ async function verTodos(){
     poly.addListener('mouseout',  ()=> ocultarHoverTip());
     path.forEach(pt=>bounds.extend(pt));
   });
-  map.fitBounds(bounds,40);
+  if(!preservarVista) map.fitBounds(bounds,40);
 
   // detecção de sobreposição (pré-filtro por bounding box + turf.intersect)
   const overlaps = [];
@@ -5948,6 +5962,48 @@ async function carregarLista(){
   imoveisCache = (res.ok && res.itens) ? res.itens : [];
   renderLista();
 }
+
+/* ===================== SINCRONIZAÇÃO MULTIUSUÁRIO (polling) =====================
+   Detecta cadastros/edições/exclusões feitos por QUALQUER usuário e atualiza a lista
+   (e o mapa, preservando a vista) sem precisar recarregar a página. */
+let listaSig = null;            // assinatura do último estado conhecido
+let listaPollMs = 9000;         // intervalo do polling (ms)
+let listaPollTimer = null;
+let listaPollOcupado = false;
+
+function podeAtualizarMapaPoll(){
+  const modal = document.getElementById('modal-edit');
+  if(modal && modal.classList.contains('show')) return false;          // não mexe durante edição
+  const ov = document.getElementById('import-ov');
+  if(ov && getComputedStyle(ov).display !== 'none') return false;       // não mexe durante importação
+  if(typeof infoWinCor!=='undefined' && infoWinCor && infoWinCor.getMap && infoWinCor.getMap()) return false; // popup aberto
+  return true;
+}
+
+async function pollLista(){
+  if(listaPollOcupado || document.hidden) return;
+  listaPollOcupado = true;
+  try{
+    const r = await post({acao:'lista_sig'});
+    if(r && r.ok){
+      if(listaSig === null){ listaSig = r.sig; }            // primeira leitura: estabelece a base
+      else if(r.sig !== listaSig){                          // algo mudou (outro usuário ou esta aba)
+        listaSig = r.sig;
+        await carregarLista();
+        if(typeof modo!=='undefined' && modo==='overview' && podeAtualizarMapaPoll()) verTodos(true);
+      }
+    }
+  }catch(e){ /* silencioso: tenta novamente no próximo ciclo */ }
+  finally{ listaPollOcupado = false; }
+}
+
+function iniciarPollLista(){
+  if(listaPollTimer) clearInterval(listaPollTimer);
+  listaPollTimer = setInterval(pollLista, listaPollMs);
+  pollLista(); // estabelece a assinatura inicial imediatamente
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pollLista(); });
+window.addEventListener('focus', ()=>{ pollLista(); });
 function renderLista(){
   const wrap = document.getElementById('saved-list');
   const termo = (document.getElementById('busca').value||'').trim().toLowerCase();
