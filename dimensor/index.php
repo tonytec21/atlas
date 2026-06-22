@@ -3939,7 +3939,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-modal-memorial-textarea (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-relatorio-foco-matricula (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5171,7 +5171,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-modal-memorial-textarea','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-relatorio-foco-matricula','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6301,6 +6301,7 @@ function aplicarFiltroPorLista(termoRaw){
   // sementes: imóveis que casam com os tokens nomeados
   let mostrados = new Set();
   itensOverview.forEach(it=>{ if(tokens.some(tk=>imovelCasaToken(it, tk))) mostrados.add(it.id); });
+  const sementes = new Set(mostrados);   // matrícula(s) da consulta = foco do relatório
   // '*' sozinho => mostra todos; '506;*' => expande para sobrepostos/desmembrados
   if(curinga){
     if(tokens.length===0) itensOverview.forEach(it=>mostrados.add(it.id));
@@ -6320,16 +6321,28 @@ function aplicarFiltroPorLista(termoRaw){
     const vis = pr && mostrados.has(pr[0]) && mostrados.has(pr[1]);
     p.setMap(vis?map:null);
   });
-  // na lista do painel, mantém só sobreposições entre dois imóveis exibidos
-  const lista = overlapsAtuais.filter(o=>mostrados.has(o.a.id) && mostrados.has(o.b.id));
+  // Lista de sobreposições da tabela/relatório:
+  //  - com curinga "X;*" => SOBREPOSIÇÕES DA(S) MATRÍCULA(S) da consulta (foco nela, mesmo que o outro
+  //    imóvel da sobreposição não esteja na lista) — para o relatório de sobreposição focado;
+  //  - sem curinga => apenas entre os imóveis listados.
+  const focoSeed = curinga && sementes.size>0;
+  const lista = focoSeed
+    ? overlapsAtuais.filter(o=> sementes.has(o.a.id) || sementes.has(o.b.id))
+    : overlapsAtuais.filter(o=> mostrados.has(o.a.id) && mostrados.has(o.b.id));
   overlapsExibidos = lista;
+  const focoMats = [...sementes].map(id=>{ const it=itensOverview.find(x=>x.id===id); return it?(rotuloMat(it.numero_matricula)||it.identificador||('#'+id)):('#'+id); });
+  const focoLabel = focoMats.length===1 ? ('da '+focoMats[0]) : 'das matrículas selecionadas';
   const sub=document.getElementById('ov-sub');
   if(sub){
     const t=contarTipos(lista);
-    sub.textContent = `${matched.length} imóvel(is) · ${t.mat} material(is)` + (t.formal?` + ${t.formal} formal(is)`:'') + ` entre eles` + (curinga?' · com relacionados (*)':` · lista de ${tokens.length} item(ns)`);
+    sub.textContent = focoSeed
+      ? `${lista.length} sobreposição(ões) ${focoLabel} · ${t.mat} material(is)` + (t.formal?` + ${t.formal} formal(is)`:'') + ` · ${matched.length} imóvel(is) no mapa`
+      : `${matched.length} imóvel(is) · ${t.mat} material(is)` + (t.formal?` + ${t.formal} formal(is)`:'') + ` entre eles · lista de ${tokens.length} item(ns)`;
   }
   const btn=document.getElementById('btn-relatorio');
-  if(btn) btn.textContent = lista.length ? 'Gerar relatório dos imóveis filtrados (PDF)' : 'Gerar relatório de sobreposição (PDF)';
+  if(btn) btn.textContent = focoSeed && lista.length
+    ? ('Gerar relatório de sobreposição ' + focoLabel + ' (PDF)')
+    : (lista.length ? 'Gerar relatório dos imóveis filtrados (PDF)' : 'Gerar relatório de sobreposição (PDF)');
   desenharListaOverlaps(lista, termoRaw);
   // ajusta o zoom para enquadrar só os imóveis exibidos
   if(matched.length){
