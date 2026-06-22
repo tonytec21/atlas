@@ -3825,7 +3825,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-ocultar-rotulos (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-balao-dark-fix (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3966,6 +3966,10 @@ header('Expires: 0');
   body.dark-mode .ip-box{background:#1c242e;border-color:#283038}
   body.dark-mode .ip-k{color:#8b97a4}
   body.dark-mode .ip-v{color:#e7edf3}
+  body.dark-mode .ip-inc{border-top-color:rgba(255,255,255,.16)}
+  body.dark-mode .ip-inc-h{color:#f0c14b}
+  body.dark-mode .ip-inc-row .inc-msg{color:#cdd6e0}
+  body.dark-mode .ip-inc-row .inc-msg b{color:#fff}
   body.dark-mode .cor-pop-clear{background:#1c242e;border-color:#283038;color:#e2342f}
   body.dark-mode .cor-pop-clear:hover{background:#2a1a1c;border-color:#a80f1e}
   .cor-pop-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#9aa6b2;margin-bottom:6px}
@@ -5033,7 +5037,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-ocultar-rotulos','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-balao-dark-fix','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
