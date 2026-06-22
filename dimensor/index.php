@@ -3825,7 +3825,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-lista-completa-localizar (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-mapa-categoria (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5037,7 +5037,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-lista-completa-localizar','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-mapa-categoria','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5647,6 +5647,30 @@ function classificarSobrep(inter){
   return { tipo: (larg <= TOL_DIVISA_M ? 'formal' : 'material'), largura_m: larg };
 }
 
+/* Filtro do mapa pela CATEGORIA selecionada no painel: mostra apenas os polígonos/rótulos
+   dos imóveis da categoria ativa, esconde as sobreposições entre imóveis ocultos e
+   (opcionalmente) enquadra a vista nos imóveis visíveis. */
+function categoriaMostraImovel(id){
+  const ci = (typeof imoveisCache!=='undefined') ? imoveisCache.find(x=>String(x.id)===String(id)) : null;
+  return ci ? itemNaCategoria(ci, vistaLista) : true;
+}
+function aplicarCategoriaMapa(ajustarVista){
+  if(modo!=='overview' || !Array.isArray(itensOverview)) return 0;
+  const b = new google.maps.LatLngBounds(); let nVis=0;
+  itensOverview.forEach(it=>{
+    const vis = categoriaMostraImovel(it.id);
+    if(it._poly) it._poly.setMap(vis?map:null);
+    if(it._label) it._label.setMap((vis && !rotulosOcultos)?map:null);
+    if(vis){ nVis++; if(it._poly && it._poly.getPath) it._poly.getPath().forEach(ll=>b.extend(ll)); }
+  });
+  if(Array.isArray(overlapPolys)) overlapPolys.forEach(p=>{
+    const pr=p._pair; const vis = !pr || (categoriaMostraImovel(pr[0]) && categoriaMostraImovel(pr[1]));
+    p.setMap(vis?map:null);
+  });
+  if(ajustarVista && nVis>0 && !b.isEmpty()){ try{ map.fitBounds(b, 40); }catch(_){} }
+  return nVis;
+}
+
 async function verTodos(preservarVista){
   modo='overview';
   document.getElementById('btn-todos').classList.add('active');
@@ -5697,7 +5721,7 @@ async function verTodos(preservarVista){
     poly.addListener('mouseout',  ()=> ocultarHoverTip());
     path.forEach(pt=>bounds.extend(pt));
   });
-  if(!preservarVista) map.fitBounds(bounds,40);
+  if(!preservarVista && ['mapa','todas'].includes(vistaLista)) map.fitBounds(bounds,40);
 
   // detecção de sobreposição (pré-filtro por bounding box + turf.intersect)
   const overlaps = [];
@@ -5761,6 +5785,8 @@ async function verTodos(preservarVista){
   setStatus(overlaps.length? 'warn':'ok',
     overlaps.length? `${overlaps.length} sobreposição(ões) detectada(s) entre ${itens.length} imóveis.`
                    : `${itens.length} imóveis exibidos. Nenhuma sobreposição detectada.`);
+  // aplica a categoria selecionada ao mapa (esconde o que não pertence; enquadra na categoria se restritiva)
+  aplicarCategoriaMapa(!preservarVista && !['mapa','todas'].includes(vistaLista));
 }
 
 /* ===================== CORES DE DESTAQUE DOS IMÓVEIS ===================== */
@@ -5817,6 +5843,27 @@ function buscaCasaItem(it, termoRaw){
   const tokens = raw.split(';').map(s=>s.trim()).filter(Boolean);
   if(!tokens.length) return true;
   return tokens.some(tk=>buscaTokenCasaItem(it, tk));
+}
+
+/* Predicados de categoria — usados tanto pela lista lateral quanto pelo filtro do mapa. */
+function _ehItn03(it){ return String(it.itn03_exclusivo)==='1'; }
+function _temFora(it){ return (it.fora_municipio||'').toString().trim()!==''; }
+function _temParcial(it){ return (it.parcial_json||'').toString().trim()!==''; }
+function _ehEnviado(it){ return String(it.onr_enviado)==='1'; }
+function _ehProntoOnr(it){ return String(it.onr_pronto)==='1' && !_ehEnviado(it); }
+function _ehBloqOnr(it){ return _temFora(it) || String(it.situacao)==='encerrada'; }
+function itemNaCategoria(it, vista){
+  if(vista==='todas') return true;
+  if(vista==='itn03') return _ehItn03(it);
+  if(_ehItn03(it)) return false;           // as demais categorias são só de mapeadas
+  if(vista==='mapa') return true;
+  if(vista==='fora') return _temFora(it);
+  if(vista==='ultrapassa') return _temParcial(it);
+  if(vista==='dentro') return !_temFora(it) && !_temParcial(it);
+  if(vista==='prontas') return _ehProntoOnr(it);
+  if(vista==='enviadas') return _ehEnviado(it);
+  if(vista==='faltando') return !_ehEnviado(it) && !_ehBloqOnr(it);
+  return true;
 }
 function listaMatKey(s){ return (s==null?'':String(s)).split(/[,;]+/).map(x=>matKey(x)).filter(Boolean); }
 /* Rótulo de exibição da matrícula: remove zeros à esquerda (preservando letras/
@@ -5908,6 +5955,7 @@ function localizarNoPainel(it){
   const b=document.getElementById('busca'); if(b) b.value='';
   vistaLista='todas'; if(typeof sincronizarVistaToggle==='function') sincronizarVistaToggle();
   renderLista();
+  if(typeof aplicarCategoriaMapa==='function' && modo==='overview') aplicarCategoriaMapa(false);
   if(sel()){ destacarNoPainel(it.id); return; }
   // lista muito grande/truncada: filtra pela matrícula para garantir que apareça
   const mat=(it.numero_matricula||'').trim();
@@ -6264,17 +6312,7 @@ function renderLista(){
   setCount('vt-count-enviadas', nEnviadas);
   setCount('vt-count-faltando', nFaltando);
   const acts=document.getElementById('itn03-actions'); if(acts) acts.style.display = (vistaLista==='itn03')?'flex':'none';
-  let itens = imoveisCache.filter(it=>{
-    if(vistaLista==='todas') return true;
-    if(vistaLista==='itn03') return ehItn03(it);
-    if(vistaLista==='fora') return !ehItn03(it) && temFora(it);
-    if(vistaLista==='ultrapassa') return !ehItn03(it) && temParcial(it);
-    if(vistaLista==='dentro') return ehDentro(it);
-    if(vistaLista==='prontas') return !ehItn03(it) && ehProntoOnr(it);
-    if(vistaLista==='enviadas') return !ehItn03(it) && ehEnviado(it);
-    if(vistaLista==='faltando') return ehFaltando(it);
-    return !ehItn03(it); // 'mapa': todas as mapeadas
-  });
+  let itens = imoveisCache.filter(it=>itemNaCategoria(it, vistaLista));
   const termoRaw = (document.getElementById('busca').value||'').trim();
   if(termoRaw){
     itens = itens.filter(it=>buscaCasaItem(it, termoRaw));
@@ -7594,6 +7632,9 @@ function verificarPertencimento(geo){
     const v=b.dataset.vista;
     vistaLista = ['itn03','fora','ultrapassa','dentro','todas','prontas','enviadas','faltando'].includes(v) ? v : 'mapa';
     sincronizarVistaToggle(); renderLista();
+    // reflete a categoria no mapa imediatamente
+    if(modo==='overview') aplicarCategoriaMapa(true);
+    else verTodos(); // entra na visão geral; verTodos aplica a categoria no fim
   }));
   const bNova=document.getElementById('btn-itn03-nova'); if(bNova) bNova.addEventListener('click', novaMatriculaItn03);
   const bExpExcl=document.getElementById('btn-itn03-export-excl'); if(bExpExcl) bExpExcl.addEventListener('click', ()=>exportarItn03Lote('exclusivas'));
