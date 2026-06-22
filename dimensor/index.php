@@ -3552,7 +3552,7 @@ if (isset($_POST['acao'])) {
                         onr_status, onr_importation_id, onr_numero_prenotacao, onr_classificacao,
                         onr_nivel_publicidade, onr_descricao, itn03_exclusivo, inconsistencias,
                         situacao, motivo_situacao, matricula_sucessora, fora_municipio, contexto_rural, parcial_json, criado_em
-                 FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 1000"
+                 FROM memoriais_mapeados ORDER BY criado_em DESC, id DESC LIMIT 20000"
             );
             $rows = [];
             while ($res && $row = $res->fetch_assoc()) {
@@ -3825,7 +3825,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-balao-dark-fix (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-lista-completa-localizar (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5037,7 +5037,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-balao-dark-fix','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-lista-completa-localizar','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5569,7 +5569,7 @@ function selecionarImovelDireto(it, ctrl){
   if(!it) return;
   pilhaUltima = {x:-99, y:-99, idx:0, ids:''};
   if(ctrl) toggleSelecao(it);
-  else abrirSeletorCor(it, {latLng: new google.maps.LatLng(centroidOf(it.pts).lat, centroidOf(it.pts).lng)});
+  else { abrirSeletorCor(it, {latLng: new google.maps.LatLng(centroidOf(it.pts).lat, centroidOf(it.pts).lng)}); localizarNoPainel(it); }
 }
 
 function estiloImovel(it){
@@ -5897,6 +5897,22 @@ function destacarNoPainel(id){
   lista.querySelectorAll('.item.destaque').forEach(el=>el.classList.remove('destaque'));
   const el=lista.querySelector('.item[data-id="'+id+'"]');
   if(el){ el.classList.add('destaque'); try{ el.scrollIntoView({block:'nearest',behavior:'smooth'}); }catch(_){ el.scrollIntoView(); } }
+}
+/* Localiza o imóvel no painel mesmo quando ele não está na categoria/busca atual
+   (ex.: fora do município, ou além do limite de exibição): ajusta a visão e destaca. */
+function localizarNoPainel(it){
+  if(!it || it.id==null) return;
+  const sel = ()=>document.querySelector('#saved-list .item[data-id="'+it.id+'"]');
+  if(sel()){ destacarNoPainel(it.id); return; }
+  // não está visível: vai para "Todas" limpando a busca
+  const b=document.getElementById('busca'); if(b) b.value='';
+  vistaLista='todas'; if(typeof sincronizarVistaToggle==='function') sincronizarVistaToggle();
+  renderLista();
+  if(sel()){ destacarNoPainel(it.id); return; }
+  // lista muito grande/truncada: filtra pela matrícula para garantir que apareça
+  const mat=(it.numero_matricula||'').trim();
+  if(b && mat){ b.value=mat; renderLista(); }
+  destacarNoPainel(it.id);
 }
 function abrirSeletorCor(it, e){
   if(!infoWinCor) infoWinCor = new google.maps.InfoWindow();
@@ -6282,6 +6298,9 @@ function renderLista(){
     wrap.innerHTML = '<div class="empty-list">'+vazio+'</div>';
     return;
   }
+  const RENDER_CAP = 2000;
+  let truncadas = 0;
+  if(itens.length > RENDER_CAP){ truncadas = itens.length - RENDER_CAP; itens = itens.slice(0, RENDER_CAP); }
   wrap.innerHTML = itens.map(it=>{
     const sub = [];
     if(it.numero_matricula) sub.push(escapeHtml(rotuloMat(it.numero_matricula)));
@@ -6339,7 +6358,7 @@ function renderLista(){
       <button class="it-edit" title="Editar dados">✎</button>
       <button class="del" title="Excluir">×</button>
     </div>`;
-  }).join('');
+  }).join('') + (truncadas ? `<div class="empty-list" style="opacity:.85;border-top:1px dashed var(--line);margin-top:4px;padding-top:8px">+ ${truncadas} matrícula(s) não exibida(s) aqui — use a <b>busca</b> (ex.: 1746 ou 100-200) ou uma <b>categoria</b> para localizar.</div>` : '');
   wrap.querySelectorAll('.item').forEach(el=>{
     const id = el.dataset.id;
     el.querySelector('.del').onclick = async (e)=>{ e.stopPropagation(); if(!(await swalConfirm('Excluir imóvel?','Esta ação não pode ser desfeita.','Excluir')))return; await post({acao:'excluir', id}); carregarLista(); if(modo==='overview') verTodos(); };
