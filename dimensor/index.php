@@ -3825,7 +3825,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-mapa-categoria (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-rotulos-ocultos-padrao (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4630,7 +4630,7 @@ header('Expires: 0');
           <h3>Imóveis gravados</h3>
           <div class="saved-actions">
             <button class="mini-btn" id="btn-todos">Ver todos no mapa</button>
-            <button class="mini-btn" id="btn-rotulos" title="Ocultar os números das matrículas no mapa">🏷 Ocultar rótulos</button>
+            <button class="mini-btn active" id="btn-rotulos" title="Rótulos ocultos — passe o mouse sobre o imóvel para ver a matrícula">🏷 Mostrar rótulos</button>
             <button class="mini-btn onr" id="btn-onr-lote" title="Enviar todos os imóveis prontos ao Mapa ONR">➤ Enviar prontos</button>
             <button class="mini-btn" id="btn-onr-config" title="Configurar a API do Mapa ONR">⚙</button>
           </div>
@@ -5037,7 +5037,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-mapa-categoria','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-rotulos-ocultos-padrao','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5065,7 +5065,7 @@ function agendarHoverTip(pos, text){
 
 /* Modo "rótulos ocultos": esconde os chips de matrícula no mapa; ao pousar o mouse
    sobre o imóvel, mostra a matrícula imediatamente. */
-let rotulosOcultos = false;
+let rotulosOcultos = true;   // padrão: rótulos ocultos (usuário exibe quando quiser)
 function mostrarHoverTipImediato(pos, text){
   if(!text) return;
   ocultarHoverTip();
