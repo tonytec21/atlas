@@ -3904,7 +3904,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-limite-por-kml (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-rotulos-respeita-filtro (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5120,7 +5120,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-limite-por-kml','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-rotulos-respeita-filtro','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5164,6 +5164,16 @@ function hoverImovel(it, centro){
   }
 }
 function aplicarRotulosVisibilidade(){
+  // Na visão geral, o rótulo só aparece se o polígono do imóvel estiver visível
+  // (respeita o filtro de categoria/lista e o curinga "506;*").
+  if(modo==='overview' && Array.isArray(itensOverview) && itensOverview.length){
+    itensOverview.forEach(it=>{
+      if(!it._label || !it._label.setMap) return;
+      const polyVisivel = !!(it._poly && it._poly.getMap && it._poly.getMap());
+      it._label.setMap((!rotulosOcultos && polyVisivel) ? map : null);
+    });
+    return;
+  }
   labelOverlays.forEach(l=>{ if(l && l.setMap) l.setMap(rotulosOcultos ? null : map); });
 }
 function toggleRotulos(){
@@ -6290,7 +6300,7 @@ function restaurarMapaCompleto(){
   if(modo!=='overview') return;
   if(itensOverview) itensOverview.forEach(it=>{
     if(it._poly)  it._poly.setMap(map);
-    if(it._label) it._label.setMap(map);
+    if(it._label) it._label.setMap(rotulosOcultos ? null : map);
   });
   overlapPolys.forEach(p=>p.setMap(map));
 }
