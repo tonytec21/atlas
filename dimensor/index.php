@@ -3904,7 +3904,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-rotulos-respeita-filtro (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-curinga-um-nivel (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5120,7 +5120,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-rotulos-respeita-filtro','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-curinga-um-nivel','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6220,15 +6220,16 @@ function imovelCasaToken(it, tk){
    - os que se SOBREPÕEM a eles (estão dentro ou pegam um trecho), via sobreposições calculadas;
    - os DESMEMBRADOS relacionados (filhas listadas no matricula_sucessora da semente, e a mãe que lista a semente). */
 function expandirRelacionados(seedIds){
-  const ids = new Set(seedIds);
-  const seedItens = itensOverview.filter(it=>ids.has(it.id));
+  const seeds = new Set(seedIds);   // sementes originais — NÃO crescem durante a varredura
+  const ids = new Set(seedIds);     // resultado (sementes + relacionados diretos)
+  const seedItens = itensOverview.filter(it=>seeds.has(it.id));
   const seedKeys = new Set(seedItens.map(it=>matKey(it.numero_matricula)).filter(Boolean));
-  // 1) sobreposições geométricas (dentro / pegando trecho)
+  // 1) sobreposições geométricas DIRETAS com as sementes (um nível; não transitivo)
   overlapsAtuais.forEach(o=>{
-    if(ids.has(o.a.id)) ids.add(o.b.id);
-    if(ids.has(o.b.id)) ids.add(o.a.id);
+    if(seeds.has(o.a.id)) ids.add(o.b.id);
+    if(seeds.has(o.b.id)) ids.add(o.a.id);
   });
-  // 2) desmembramentos (relação mãe ⇄ filha pelo número da matrícula)
+  // 2) desmembramentos (relação mãe ⇄ filha pelo número da matrícula) das sementes
   itensOverview.forEach(it=>{
     const sucKeys = listaMatKey(it.matricula_sucessora); // matrículas que saíram de 'it'
     if(sucKeys.some(k=>seedKeys.has(k))) ids.add(it.id);  // 'it' é mãe de uma semente
