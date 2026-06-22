@@ -1487,20 +1487,28 @@ function fetchImageBytes($url, &$erro = null) {
 function httpGetText($url, &$erro = null) {
     $erro = '';
     if (function_exists('curl_init')) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 25,
-            CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HTTPHEADER => ['Accept: application/json, application/vnd.geo+json'],
-            CURLOPT_USERAGENT => 'Atlas-Mapeador/1.0',
-        ]);
-        $data = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $cerr = curl_error($ch);
-        curl_close($ch);
-        if ($data !== false && $code >= 200 && $code < 300) return $data;
-        if ($cerr !== '') { $erro = 'cURL: ' . $cerr; }
-        else { $erro = 'HTTP ' . $code . ($data ? ' — ' . substr(strip_tags((string)$data), 0, 200) : ''); }
+        // Tenta 2x; força IPv4 (evita travar ~21s tentando IPv6 em Windows/XAMPP) e usa timeout de conexão curto.
+        for ($i = 0; $i < 2; $i++) {
+            $ch = curl_init($url);
+            $opts = [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 25,
+                CURLOPT_CONNECTTIMEOUT => 12,
+                CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_HTTPHEADER => ['Accept: application/json, application/vnd.geo+json'],
+                CURLOPT_USERAGENT => 'Atlas-Mapeador/1.0',
+            ];
+            if (defined('CURL_IPRESOLVE_V4')) $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+            curl_setopt_array($ch, $opts);
+            $data = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $cerr = curl_error($ch);
+            curl_close($ch);
+            if ($data !== false && $code >= 200 && $code < 300) return $data;
+            if ($cerr !== '') { $erro = 'cURL: ' . $cerr; }
+            else { $erro = 'HTTP ' . $code . ($data ? ' — ' . substr(strip_tags((string)$data), 0, 200) : ''); break; }
+            // repete só em erro de conexão/timeout (não em HTTP de erro)
+        }
         return false;
     }
     if (!ini_get('allow_url_fopen')) { $erro = 'allow_url_fopen desligado'; return false; }
@@ -2113,7 +2121,12 @@ function geminiConfigSalvar($data) {
 }
 /* Procura um imóvel mapeado pelo número da matrícula (exato e depois normalizado). */
 function acharMemorialPorMatricula($conn, $mat) {
-    $norm = function ($s) { return strtolower(preg_replace('/[^0-9a-zA-Z]/', '', (string)$s)); };
+    $norm = function ($s) {
+        $k = strtolower(preg_replace('/[^0-9a-zA-Z]/', '', (string)$s));
+        if ($k === '') return '';
+        $t = ltrim($k, '0');
+        return $t === '' ? '0' : $t;   // ignora zeros à esquerda (00002237 == 2237)
+    };
     $alvo = $norm($mat);
     if ($alvo === '') return null;
     $stmt = $conn->prepare("SELECT id FROM memoriais_mapeados WHERE numero_matricula = ? LIMIT 1");
@@ -2144,7 +2157,12 @@ function acharMemorialParaPdf($conn, $mat, $matDoc = '') {
  *  CICLO DE VIDA DA MATRÍCULA (encerramento / desmembramento) a partir do PDF
  * ==================================================================== */
 /* Normaliza um número de matrícula (só dígitos) para comparação. */
-function matNormalizar($s) { return preg_replace('/\D+/', '', (string)$s); }
+function matNormalizar($s) {
+    $d = preg_replace('/\D+/', '', (string)$s);
+    if ($d === '') return '';
+    $d = ltrim($d, '0');
+    return $d === '' ? '0' : $d;   // matrícula só com zeros -> "0"
+}
 
 /* Recebe array OU string e devolve a lista de matrículas (só dígitos), sem duplicatas. */
 function matriculasLimpar($v) {
@@ -2163,8 +2181,8 @@ function atualizarSituacaoMerge($conn, $id, $situacao, $motivo, array $novasSuc)
     $row = $rs ? $rs->fetch_assoc() : null;
     if (!$row) return false;
     $suc = [];
-    foreach (preg_split('/[;,]/', (string)($row['matricula_sucessora'] ?? '')) as $s) { $s = trim($s); $k = matNormalizar($s); if ($k !== '' && !isset($suc[$k])) $suc[$k] = $s; }
-    foreach ($novasSuc as $s) { $s = trim((string)$s); $k = matNormalizar($s); if ($k !== '' && !isset($suc[$k])) $suc[$k] = $s; }
+    foreach (preg_split('/[;,]/', (string)($row['matricula_sucessora'] ?? '')) as $s) { $s = trim($s); $k = matNormalizar($s); if ($k !== '' && !isset($suc[$k])) $suc[$k] = $k; }
+    foreach ($novasSuc as $s) { $s = trim((string)$s); $k = matNormalizar($s); if ($k !== '' && !isset($suc[$k])) $suc[$k] = $k; }
     $sucStr = implode(', ', array_values($suc));
     $st = $conn->prepare("UPDATE memoriais_mapeados SET situacao = ?, motivo_situacao = ?, matricula_sucessora = ? WHERE id = ?");
     if (!$st) return false;
@@ -2927,6 +2945,8 @@ if (isset($_POST['acao'])) {
             $mun = preg_replace('/\D/', '', (string)($_POST['municipio'] ?? ''));
             if ($mun === '') { echo json_encode(['ok' => false, 'erro' => 'Município não informado.']); exit; }
             $q = (int)($_POST['qualidade'] ?? 4); if ($q < 1 || $q > 4) $q = 4;
+            $cacheDir = __DIR__ . '/anexos';
+            $cacheFile = $cacheDir . '/limite_' . $mun . '_q' . $q . '.geojson';
             // ATENÇÃO: o '+' em "vnd.geo+json" precisa ir codificado (%2B), senão o IBGE
             // interpreta como espaço e devolve HTTP 400.
             $url = 'https://servicodados.ibge.gov.br/api/v3/malhas/municipios/' . rawurlencode($mun)
@@ -2939,11 +2959,23 @@ if (isset($_POST['acao'])) {
                       . '?formato=application/vnd.geo%2Bjson';
                 $err2 = '';
                 $geo = httpGetText($url2, $err2);
-                if ($geo === false) { echo json_encode(['ok' => false, 'erro' => 'Falha ao obter o limite no IBGE: ' . $err]); exit; }
+            }
+            $deCache = false;
+            if ($geo === false || $geo === '') {
+                // IBGE inacessível: usa o limite salvo em cache de uma carga anterior, se houver
+                if (is_file($cacheFile)) { $geo = @file_get_contents($cacheFile); $deCache = ($geo !== false && $geo !== ''); }
+                if (!$deCache) {
+                    echo json_encode(['ok' => false, 'erro' => 'Falha ao obter o limite no IBGE: ' . $err
+                        . '. O servidor não conseguiu acessar servicodados.ibge.gov.br (porta 443) — verifique a conexão/firewall do servidor, ou aguarde, pois após a 1ª carga bem-sucedida o limite fica em cache.']); exit;
+                }
             }
             $gj = json_decode($geo, true);
             if (!is_array($gj) || !isset($gj['type'])) { echo json_encode(['ok' => false, 'erro' => 'GeoJSON inválido do IBGE.']); exit; }
-            echo json_encode(['ok' => true, 'geojson' => $gj], JSON_UNESCAPED_UNICODE);
+            if (!$deCache) { // veio do IBGE: salva em cache p/ próximas cargas / quedas do IBGE
+                if (!is_dir($cacheDir)) @mkdir($cacheDir, 0775, true);
+                @file_put_contents($cacheFile, $geo);
+            }
+            echo json_encode(['ok' => true, 'geojson' => $gj, 'cache' => $deCache], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -2978,6 +3010,7 @@ if (isset($_POST['acao'])) {
             $fonte       = isset($_POST['memorial']) ? (string)$_POST['memorial'] : '';
             $identificador = trim(isset($_POST['identificador']) ? (string)$_POST['identificador'] : '');
             $numMatricula  = trim(isset($_POST['numero_matricula']) ? (string)$_POST['numero_matricula'] : '');
+            if ($numMatricula !== '') $numMatricula = preg_replace('/^0+(?=\d)/', '', $numMatricula); // ignora zeros à esquerda
             $proprietario  = trim(isset($_POST['proprietario']) ? (string)$_POST['proprietario'] : '');
             $cpf           = trim(isset($_POST['cpf']) ? (string)$_POST['cpf'] : '');
             $tipoImovel    = ($_POST['tipo_imovel'] ?? '') === 'rural' ? 'rural' : (($_POST['tipo_imovel'] ?? '') === 'urbano' ? 'urbano' : '');
@@ -3104,6 +3137,7 @@ if (isset($_POST['acao'])) {
             $m = $_POST['motivo_situacao'] ?? '';
             $mot = in_array($m, ['unificacao', 'desmembramento', 'georreferenciamento'], true) ? $m : null;
             $s = trim((string)($_POST['matricula_sucessora'] ?? ''));
+            if ($s !== '') $s = implode(', ', matriculasLimpar($s)); // sem zeros à esquerda e sem repetidas
             $suc = ($s !== '') ? $s : null;
             // coerência: unificação e georreferenciamento encerram a matrícula; desmembramento parcial a mantém ativa
             if ($mot === 'unificacao' || $mot === 'georreferenciamento') $sit = 'encerrada';
@@ -3361,6 +3395,7 @@ if (isset($_POST['acao'])) {
             $id            = (int)($_POST['id'] ?? 0);
             $identificador = trim((string)($_POST['identificador'] ?? ''));
             $numMatricula  = trim((string)($_POST['numero_matricula'] ?? ''));
+            if ($numMatricula !== '') $numMatricula = preg_replace('/^0+(?=\d)/', '', $numMatricula); // ignora zeros à esquerda
             $proprietario  = trim((string)($_POST['proprietario'] ?? ''));
             $cpf           = trim((string)($_POST['cpf'] ?? ''));
             $tipoImovel    = ($_POST['tipo_imovel'] ?? '') === 'rural' ? 'rural' : (($_POST['tipo_imovel'] ?? '') === 'urbano' ? 'urbano' : '');
@@ -3454,6 +3489,7 @@ if (isset($_POST['acao'])) {
         if ($acao === 'itn03_exclusiva_nova') {
             $identificador = trim((string)($_POST['identificador'] ?? ''));
             $numMatricula  = trim((string)($_POST['numero_matricula'] ?? ''));
+            if ($numMatricula !== '') $numMatricula = preg_replace('/^0+(?=\d)/', '', $numMatricula); // ignora zeros à esquerda
             $proprietario  = trim((string)($_POST['proprietario'] ?? ''));
             $cpf           = trim((string)($_POST['cpf'] ?? ''));
             $tipoImovel    = in_array(($_POST['tipo_imovel'] ?? ''), ['urbano', 'rural'], true) ? (string)$_POST['tipo_imovel'] : '';
@@ -3825,7 +3861,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-rotulos-ocultos-padrao (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-busca-curinga-relacionados (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4685,7 +4721,7 @@ header('Expires: 0');
       </div>
       <div class="ov-hint" id="ov-hint">Ctrl+clique (ou clique direito) nos imóveis para selecionar · clique numa sobreposição para o relatório dela</div>
       <div class="ov-search">
-        <input type="text" id="ov-busca" placeholder="Filtrar... (use ; para ver só esses: 744;822;867)">
+        <input type="text" id="ov-busca" placeholder="Filtrar... 744;822 (só essas) · 506;* (506 + sobrepostas/desmembradas)">
         <button id="ov-busca-clear" title="Limpar filtro">×</button>
       </div>
       <div class="ov-itn03">
@@ -5037,7 +5073,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-rotulos-ocultos-padrao','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-busca-curinga-relacionados','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5906,7 +5942,7 @@ function incSevTag(sev){ return sev==='erro'?'ERRO':(sev==='info'?'INFO':'ALERTA
 function infoImovelHTML(it){
   const linhas = [];
   const add=(rot,val)=>{ if(val!==undefined && val!==null && String(val).trim()!=='') linhas.push(`<div class="ip-row"><span class="ip-k">${rot}</span><span class="ip-v">${escapeHtml(String(val))}</span></div>`); };
-  add('Matrícula', it.numero_matricula);
+  add('Matrícula', (it.numero_matricula||'').replace(/^0+(?=\d)/,''));
   add('Identificação', it.identificador);
   add('Proprietário', it.proprietario);
   add('CPF/CNPJ', it.cpf);
@@ -6123,16 +6159,47 @@ function imovelCasaToken(it, tk){
   if(idn.includes(tl)) return true;
   return false;
 }
-// Mostra SOMENTE os imóveis cujas matrículas/identificações foram listadas com ';'
+/* Expande um conjunto de imóveis "semente" para incluir, em um nível:
+   - os que se SOBREPÕEM a eles (estão dentro ou pegam um trecho), via sobreposições calculadas;
+   - os DESMEMBRADOS relacionados (filhas listadas no matricula_sucessora da semente, e a mãe que lista a semente). */
+function expandirRelacionados(seedIds){
+  const ids = new Set(seedIds);
+  const seedItens = itensOverview.filter(it=>ids.has(it.id));
+  const seedKeys = new Set(seedItens.map(it=>matKey(it.numero_matricula)).filter(Boolean));
+  // 1) sobreposições geométricas (dentro / pegando trecho)
+  overlapsAtuais.forEach(o=>{
+    if(ids.has(o.a.id)) ids.add(o.b.id);
+    if(ids.has(o.b.id)) ids.add(o.a.id);
+  });
+  // 2) desmembramentos (relação mãe ⇄ filha pelo número da matrícula)
+  itensOverview.forEach(it=>{
+    const sucKeys = listaMatKey(it.matricula_sucessora); // matrículas que saíram de 'it'
+    if(sucKeys.some(k=>seedKeys.has(k))) ids.add(it.id);  // 'it' é mãe de uma semente
+    const mk = matKey(it.numero_matricula);
+    if(mk && seedItens.some(s=>listaMatKey(s.matricula_sucessora).includes(mk))) ids.add(it.id); // 'it' é filha de uma semente
+  });
+  return ids;
+}
+// Mostra SOMENTE os imóveis cujas matrículas/identificações foram listadas com ';'.
+// Curinga '*': em "506;*", mostra a 506 e todos os sobrepostos/desmembrados dela.
 function aplicarFiltroPorLista(termoRaw){
-  const tokens = termoRaw.split(';').map(s=>s.trim()).filter(Boolean);
-  const mostrados = new Set();
+  const allTokens = termoRaw.split(';').map(s=>s.trim()).filter(Boolean);
+  const curinga = allTokens.includes('*');
+  const tokens = allTokens.filter(t=>t!=='*');
+  // sementes: imóveis que casam com os tokens nomeados
+  let mostrados = new Set();
+  itensOverview.forEach(it=>{ if(tokens.some(tk=>imovelCasaToken(it, tk))) mostrados.add(it.id); });
+  // '*' sozinho => mostra todos; '506;*' => expande para sobrepostos/desmembrados
+  if(curinga){
+    if(tokens.length===0) itensOverview.forEach(it=>mostrados.add(it.id));
+    else mostrados = expandirRelacionados(mostrados);
+  }
   const matched = [];
   itensOverview.forEach(it=>{
-    const ok = tokens.some(tk=>imovelCasaToken(it, tk));
+    const ok = mostrados.has(it.id);
     if(it._poly)  it._poly.setMap(ok?map:null);
-    if(it._label) it._label.setMap(ok?map:null);
-    if(ok){ mostrados.add(it.id); matched.push(it); }
+    if(it._label) it._label.setMap((ok && !rotulosOcultos)?map:null);
+    if(ok) matched.push(it);
   });
   // ANÁLISE DE SOBREPOSIÇÃO entre os imóveis filtrados: mostra só os destaques
   // cujos dois imóveis estão exibidos; esconde os demais.
@@ -6147,7 +6214,7 @@ function aplicarFiltroPorLista(termoRaw){
   const sub=document.getElementById('ov-sub');
   if(sub){
     const t=contarTipos(lista);
-    sub.textContent = `${matched.length} imóvel(is) · ${t.mat} material(is)` + (t.formal?` + ${t.formal} formal(is)`:'') + ` entre eles · lista de ${tokens.length} item(ns)`;
+    sub.textContent = `${matched.length} imóvel(is) · ${t.mat} material(is)` + (t.formal?` + ${t.formal} formal(is)`:'') + ` entre eles` + (curinga?' · com relacionados (*)':` · lista de ${tokens.length} item(ns)`);
   }
   const btn=document.getElementById('btn-relatorio');
   if(btn) btn.textContent = lista.length ? 'Gerar relatório dos imóveis filtrados (PDF)' : 'Gerar relatório de sobreposição (PDF)';
@@ -6574,7 +6641,7 @@ async function abrirEdicao(id){
   else if(it.motivo_situacao==='georreferenciamento') sitSel='georreferenciamento';
   else if(it.situacao==='encerrada' || it.motivo_situacao==='unificacao') sitSel='unificacao';
   document.getElementById('ed-situacao').value = sitSel;
-  edSucList = (it.matricula_sucessora||'').split(',').map(s=>s.trim()).filter(Boolean);
+  edSucList = []; (it.matricula_sucessora||'').split(/[,;]+/).map(s=>matKey(s)).filter(Boolean).forEach(k=>{ if(!edSucList.includes(k)) edSucList.push(k); });
   edRenderSucChips();
   if(typeof edSucFeedback==='function') edSucFeedback('');
   edToggleEnc();
@@ -6676,8 +6743,10 @@ function edAddSuc(){
   const { nums, avisos } = edParseSucessoras(raw);
   let add=0, dup=0;
   for(const v of nums){
-    if(edSucList.some(x=>matKey(x)===matKey(v))){ dup++; continue; }
-    edSucList.push(v); add++;
+    const k = matKey(v);
+    if(!k){ continue; }
+    if(edSucList.some(x=>matKey(x)===k)){ dup++; continue; }
+    edSucList.push(k); add++;
   }
   inp.value=''; inp.focus(); edRenderSucChips();
   let msg = add ? `${add} matrícula(s) adicionada(s)` : 'Nenhuma matrícula nova';
@@ -7326,7 +7395,7 @@ async function mostrarLimite(){
     limiteLayer.forEach(f=> f.getGeometry().forEachLatLng(ll=> bounds.extend(ll)));
     if(!bounds.isEmpty() && modo!=='single') map.fitBounds(bounds, 30);
     const oc=document.getElementById('btn-muni-ocultar'); if(oc) oc.style.display='';
-    muniStatus('ok', 'Limite de ' + limiteNome + ' carregado.');
+    muniStatus('ok', 'Limite de ' + limiteNome + ' carregado.' + (r.cache ? ' (do cache local — IBGE indisponível)' : ''));
     if(window.__ultimoGeo) verificarPertencimento(window.__ultimoGeo);
     verificarTodosPertencimento();   // varre todos os imóveis e bloqueia os que estão fora
   }catch(e){
