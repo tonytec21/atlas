@@ -2143,7 +2143,7 @@ function acharMemorialParaPdf($conn, $mat, $matDoc = '') {
     $id = acharMemorialPorMatricula($conn, $mat);
     if ($id) return $id;
     if ($matDoc !== '' && $matDoc !== $mat) { $id = acharMemorialPorMatricula($conn, $matDoc); if ($id) return $id; }
-    $norm = function ($s) { return strtolower(preg_replace('/[^0-9a-zA-Z]/', '', (string)$s)); };
+    $norm = function ($s) { $k = strtolower(preg_replace('/[^0-9a-zA-Z]/', '', (string)$s)); $t = ltrim($k, '0'); return $t === '' ? ($k === '' ? '' : '0') : $t; };
     $alvos = [];
     foreach ([$mat, $matDoc] as $a) { $n = $norm($a); if ($n !== '') $alvos[$n] = true; }
     if ($alvos) {
@@ -3274,6 +3274,7 @@ if (isset($_POST['acao'])) {
                 echo json_encode(['ok' => false, 'erro' => 'Não foi possível identificar o número da matrícula (nem no nome do arquivo nem no documento). Renomeie o PDF com o número da matrícula.']);
                 exit;
             }
+            $matricula = preg_replace('/^0+(?=\d)/', '', $matricula); // ignora zeros à esquerda (00000356 == 356) — evita registro duplicado
 
             $id = acharMemorialParaPdf($conn, $matricula, $matDoc);
             if ($id) {
@@ -3446,12 +3447,19 @@ if (isset($_POST['acao'])) {
             if ($identificador === '' && $numMatricula !== '') $identificador = $numMatricula;
             if ($identificador === '') { echo json_encode(['ok' => false, 'erro' => 'Informe a identificação ou a matrícula.']); exit; }
 
-            // não permite atribuir uma matrícula que já pertence a OUTRO imóvel
+            // não permite atribuir uma matrícula que já pertence a OUTRO imóvel,
+            // mas só verifica quando a matrícula está REALMENTE sendo alterada (editar os
+            // demais campos de um imóvel existente não pode ser bloqueado por duplicata pré-existente).
             if ($numMatricula !== '') {
-                $dono = acharMemorialPorMatricula($conn, $numMatricula);
-                if ($dono && $dono !== $id) {
-                    echo json_encode(['ok' => false, 'erro' => 'Já existe outro imóvel cadastrado com a matrícula ' . $numMatricula . ' (registro #' . $dono . '). Não é possível duplicar o número da matrícula.']);
-                    exit;
+                $matAtualReg = '';
+                $rsAtual = $conn->query("SELECT numero_matricula FROM memoriais_mapeados WHERE id = " . (int)$id . " LIMIT 1");
+                if ($rsAtual && ($rowA = $rsAtual->fetch_assoc())) $matAtualReg = matNormalizar($rowA['numero_matricula'] ?? '');
+                if (matNormalizar($numMatricula) !== $matAtualReg) {   // está mudando o número da matrícula
+                    $dono = acharMemorialPorMatricula($conn, $numMatricula);
+                    if ($dono && $dono !== $id) {
+                        echo json_encode(['ok' => false, 'erro' => 'Já existe outro imóvel cadastrado com a matrícula ' . $numMatricula . ' (registro #' . $dono . '). Não é possível duplicar o número da matrícula.']);
+                        exit;
+                    }
                 }
             }
 
@@ -3730,6 +3738,33 @@ if (isset($_POST['acao'])) {
             echo json_encode(['ok' => $ok, 'anexos' => $mid > 0 ? anexosListar($conn, $mid) : []], JSON_UNESCAPED_UNICODE); exit;
         }
 
+        if ($acao === 'mapear_texto') {
+            // Mapeia/atualiza a geometria do imóvel a partir de um texto colado:
+            // memorial descritivo (GMS/UTM), lista de coordenadas ou estrutura KML.
+            $mid = (int)($_POST['id'] ?? 0);
+            $conteudo = (string)($_POST['conteudo'] ?? '');
+            if ($mid <= 0) { echo json_encode(['ok' => false, 'erro' => 'Salve o imóvel antes de mapear.']); exit; }
+            if (trim($conteudo) === '') { echo json_encode(['ok' => false, 'erro' => 'Cole o memorial, as coordenadas ou o KML.']); exit; }
+            // auto-detecta KML vs memorial/coordenadas
+            $ehKml = (stripos($conteudo, '<kml') !== false || stripos($conteudo, '<coordinates') !== false || stripos($conteudo, '<placemark') !== false);
+            $origem = $ehKml ? 'kml' : 'memorial';
+            $res = mapearImovelComGeo($conn, $mid, $origem, $conteudo);
+            if (empty($res['ok'])) { echo json_encode(['ok' => false, 'erro' => $res['erro'] ?? 'Não foi possível extrair coordenadas do texto.']); exit; }
+            $geo = $res['geo'];
+            inconsGravar($conn, $mid, detectarInconsistenciasGeo($geo, $origem));
+            if ($ehKml && trim($conteudo) !== '') {
+                anexoSalvarBytes($conn, $mid, $conteudo, ('imovel_' . $mid . '.kml'), 'kml', 'application/vnd.google-earth.kml+xml');
+            }
+            $rs = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = " . (int)$mid . " LIMIT 1");
+            $registro = $rs ? $rs->fetch_assoc() : null;
+            echo json_encode([
+                'ok' => true, 'id' => $mid, 'mapeado' => ['num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha']],
+                'registro' => $registro, 'anexos' => anexosListar($conn, $mid),
+                'mensagem' => 'Geometria aplicada (' . ($ehKml ? 'KML' : 'memorial/coordenadas') . '): ' . $geo['num_vertices'] . ' vértices · ' . number_format($geo['area_ha'], 4, ',', '.') . ' ha. Agora aparece no mapa.'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($acao === 'anexo_upload') {
             $mid = (int)($_POST['id'] ?? 0);
             if ($mid <= 0) { echo json_encode(['ok' => false, 'erro' => 'Salve o imóvel antes de anexar arquivos.']); exit; }
@@ -3904,7 +3939,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-curinga-um-nivel (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-modal-memorial-textarea (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4393,6 +4428,13 @@ header('Expires: 0');
   /* feedback de processamento DENTRO do modal (antes ficava só na barra atrás do modal) */
   .ed-drop.busy{opacity:.6;border-style:solid;cursor:not-allowed}
   .ed-mapear-hint{background:rgba(31,95,165,.10);border:1px solid rgba(31,95,165,.35);color:#1f5fa5;border-radius:9px;padding:9px 11px;font-size:11.5px;line-height:1.45;margin-bottom:9px}
+  .ed-geo-box{margin-top:11px;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .ed-geo-h{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:#9aa6b2;margin-bottom:7px}
+  .ed-geo-text{width:100%;min-height:120px;resize:vertical;font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--ink);background:var(--card,#fff);border:1px solid var(--line);border-radius:8px;padding:9px 10px;box-sizing:border-box}
+  .ed-geo-acts{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .ed-geo-status{font-size:11px;color:#9aa6b2}
+  .ed-geo-status.ok{color:#0d9488}.ed-geo-status.err{color:#e2342f}
+  body.dark-mode .ed-geo-text{background:#1c242e;border-color:#283038;color:#e7edf3}
   .anx-busy{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;font-size:12px;
     border:1px solid var(--line);background:var(--panel);color:var(--ink)}
   .anx-busy.work{border-color:rgba(168,15,30,.4);background:rgba(168,15,30,.06)}
@@ -4902,6 +4944,15 @@ header('Expires: 0');
             </div>
             <input type="file" id="ed-anx-file" accept=".pdf,.kml,application/pdf,application/vnd.google-earth.kml+xml" style="display:none">
             <p class="cor-hint">Os PDFs enviados para cadastro/complemento ficam arquivados aqui para conferência e reprocessamento.</p>
+
+            <div class="ed-geo-box">
+              <div class="ed-geo-h">📐 Memorial / coordenadas / KML</div>
+              <textarea id="ed-geo-text" class="ed-geo-text" placeholder="Cole aqui o memorial descritivo (azimutes/distâncias ou GMS/UTM), uma lista de coordenadas, ou a estrutura do KML. O sistema detecta o formato, extrai os vértices e mapeia a matrícula."></textarea>
+              <div class="ed-geo-acts">
+                <button type="button" class="btn-ghost" id="ed-geo-aplicar">📌 Mapear com este texto</button>
+                <span id="ed-geo-status" class="ed-geo-status"></span>
+              </div>
+            </div>
           </div>
         </div>
        </div>
@@ -5120,7 +5171,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-curinga-um-nivel','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-modal-memorial-textarea','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5923,10 +5974,11 @@ function buscaTokenCasaItem(it, tk){
     if(!isNaN(a)&&!isNaN(b)&&mkNum!=null){ const lo=Math.min(a,b),hi=Math.max(a,b); return mkNum>=lo && mkNum<=hi; }
     return false;
   }
-  // matrícula específica (sem zeros à esquerda)
+  // matrícula específica: se o token é só número, casa EXATO (356 ≠ 2356)
+  const soNumero=/^\d+$/.test(t.replace(/[.\s]/g,''));
   const tkKey = matKey(t);
-  if(tkKey && mk && (mk===tkKey || mk.includes(tkKey))) return true;
-  // texto livre em qualquer campo
+  if(soNumero) return !!(tkKey && mk && mk===tkKey);
+  // texto livre (token com letras) em qualquer campo
   const tl=t.toLowerCase();
   return [it.identificador,it.numero_matricula,it.proprietario,it.cpf,it.tipo_imovel,it.origem]
     .some(c=>(c||'').toString().toLowerCase().includes(tl));
@@ -6211,7 +6263,9 @@ function imovelCasaToken(it, tk){
   const tl=t.toLowerCase();
   const tk2=matKey(t);
   const mk=matKey(it.numero_matricula);
-  if(tk2 && (tk2===mk || (mk && mk.includes(tk2)))) return true;
+  const soNumero=/^\d+$/.test(t.replace(/[.\s]/g,''));
+  if(soNumero) return !!(tk2 && mk && mk===tk2);   // matrícula: match EXATO (356 ≠ 2356)
+  if(tk2 && tk2===mk) return true;                  // token alfanumérico igual à matrícula
   const idn=(it.identificador==null?'':String(it.identificador)).toLowerCase();
   if(idn.includes(tl)) return true;
   return false;
@@ -6657,6 +6711,7 @@ function sincronizarVistaToggle(){
 function novaMatriculaItn03(){
   edNovoItn03 = true;
   edEhExclusiva = true; if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint();
+  if(typeof edResetGeoTexto==='function') edResetGeoTexto();
   document.getElementById('ed-id').value = '';
   document.getElementById('ed-identificador').value = '';
   document.getElementById('ed-matricula').value = '';
@@ -6680,6 +6735,7 @@ async function abrirEdicao(id){
   edNovoItn03 = false;
   edEhExclusiva = String(it.itn03_exclusivo)==='1';
   if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint();
+  if(typeof edResetGeoTexto==='function') edResetGeoTexto();
   const tt=document.getElementById('ed-titulo'); if(tt) tt.textContent='Editar dados do imóvel';
   document.getElementById('ed-id').value = it.id;
   document.getElementById('ed-identificador').value = it.identificador||'';
@@ -7008,6 +7064,31 @@ function edInitDrop(){
   drop.addEventListener('drop', e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag');
     const f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(f) edEnviarArquivo(f); });
   fi.addEventListener('change', ()=>{ const f=fi.files && fi.files[0]; if(f) edEnviarArquivo(f); });
+  const gb=document.getElementById('ed-geo-aplicar');
+  if(gb && !gb.dataset.init){ gb.dataset.init='1'; gb.addEventListener('click', edMapearTexto); }
+}
+
+// Mapeia/atualiza a geometria a partir do texto colado (memorial, coordenadas ou KML).
+function edResetGeoTexto(){ const ta=document.getElementById('ed-geo-text'); if(ta) ta.value=''; const st=document.getElementById('ed-geo-status'); if(st){ st.className='ed-geo-status'; st.textContent=''; } }
+async function edMapearTexto(){
+  const ta=document.getElementById('ed-geo-text'); const st=document.getElementById('ed-geo-status');
+  const setSt=(cls,msg)=>{ if(st){ st.className='ed-geo-status'+(cls?(' '+cls):''); st.textContent=msg; } };
+  const txt = ta ? ta.value.trim() : '';
+  if(edAnxId<=0){ setSt('err','Salve o imóvel antes de mapear.'); return; }
+  if(!txt){ setSt('err','Cole o memorial, as coordenadas ou o KML.'); return; }
+  setSt('','Processando…');
+  const btn=document.getElementById('ed-geo-aplicar'); if(btn) btn.disabled=true;
+  try{
+    const r = await post({acao:'mapear_texto', id:edAnxId, conteudo:txt});
+    if(!r.ok){ setSt('err', r.erro||'Falha ao mapear.'); return; }
+    if(r.registro) edAplicarRegistro(r.registro);
+    if(r.anexos) edRenderAnexos(r.anexos);
+    edEhExclusiva=false; if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint();
+    if(typeof carregarLista==='function') carregarLista();
+    if(typeof modo!=='undefined' && modo==='overview' && typeof verTodos==='function') verTodos();
+    setSt('ok', r.mensagem||'Geometria aplicada.');
+  }catch(e){ setSt('err','Erro ao processar o texto.'); }
+  finally{ if(btn) btn.disabled=false; }
 }
 
 function fecharEdicao(){ edNovoItn03=false; const t=document.getElementById('ed-titulo'); if(t) t.textContent='Editar dados do imóvel'; document.getElementById('modal-edit').classList.remove('show'); }
