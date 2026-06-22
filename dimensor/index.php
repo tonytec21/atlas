@@ -2979,6 +2979,49 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'limite_kml') {
+            // Carrega o limite do município a partir de um KML enviado (sem depender do IBGE).
+            $kml = '';
+            if (isset($_FILES['arquivo']) && is_uploaded_file($_FILES['arquivo']['tmp_name'] ?? '')) {
+                $kml = (string)file_get_contents($_FILES['arquivo']['tmp_name']);
+            } elseif (isset($_POST['kml'])) { $kml = (string)$_POST['kml']; }
+            if (trim($kml) === '') { echo json_encode(['ok' => false, 'erro' => 'Envie um arquivo KML do limite.']); exit; }
+            $pm = parseKml($kml);
+            if (empty($pm)) { echo json_encode(['ok' => false, 'erro' => 'Nenhum polígono encontrado no KML.']); exit; }
+            $multi = [];
+            foreach ($pm as $p) {
+                $ring = [];
+                foreach ($p['pts'] as $pt) { $ring[] = [(float)$pt[1], (float)$pt[0]]; } // GeoJSON: [lng, lat]
+                $n = count($ring);
+                if ($n >= 3) {
+                    if ($ring[0][0] !== $ring[$n - 1][0] || $ring[0][1] !== $ring[$n - 1][1]) $ring[] = $ring[0];
+                    $multi[] = [$ring];
+                }
+            }
+            if (empty($multi)) { echo json_encode(['ok' => false, 'erro' => 'KML sem anéis válidos.']); exit; }
+            $gj = ['type' => 'FeatureCollection', 'features' => [['type' => 'Feature', 'properties' => new stdClass(), 'geometry' => ['type' => 'MultiPolygon', 'coordinates' => $multi]]]];
+            $nome = trim((string)($_POST['nome'] ?? '')) !== '' ? trim((string)$_POST['nome']) : 'limite (KML)';
+            $cacheDir = __DIR__ . '/anexos';
+            if (!is_dir($cacheDir)) @mkdir($cacheDir, 0775, true);
+            @file_put_contents($cacheDir . '/limite_manual.geojson', json_encode($gj, JSON_UNESCAPED_UNICODE));
+            @file_put_contents($cacheDir . '/limite_manual.nome', $nome);
+            echo json_encode(['ok' => true, 'geojson' => $gj, 'nome' => $nome], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'limite_cache') {
+            // Devolve o limite salvo manualmente (KML) anteriormente, se houver — usado como fallback quando o IBGE está fora.
+            $cacheDir = __DIR__ . '/anexos';
+            $f = $cacheDir . '/limite_manual.geojson';
+            if (!is_file($f)) { echo json_encode(['ok' => false, 'erro' => 'Nenhum limite salvo por KML.']); exit; }
+            $geo = @file_get_contents($f);
+            $gj = $geo ? json_decode($geo, true) : null;
+            if (!is_array($gj)) { echo json_encode(['ok' => false, 'erro' => 'Cache de limite inválido.']); exit; }
+            $nome = @file_get_contents($cacheDir . '/limite_manual.nome');
+            echo json_encode(['ok' => true, 'geojson' => $gj, 'nome' => trim((string)($nome ?: 'limite salvo'))], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($acao === 'processar') {
             $memorial = isset($_POST['memorial']) ? (string)$_POST['memorial'] : '';
             $data = buildGeoData($memorial);
@@ -3861,7 +3904,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-busca-curinga-relacionados (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-limite-por-kml (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4622,6 +4665,10 @@ header('Expires: 0');
           <button class="btn-ghost" id="btn-muni-mostrar" style="flex:1">Mostrar limite no mapa</button>
           <button class="btn-ghost" id="btn-muni-ocultar" style="display:none">Ocultar</button>
         </div>
+        <div class="actions" style="margin-top:6px">
+          <button class="btn-ghost" id="btn-muni-kml" style="flex:1" title="Carregar o limite a partir de um arquivo KML (não depende do IBGE)">📂 Carregar limite por KML</button>
+          <input type="file" id="muni-kml-file" accept=".kml,application/vnd.google-earth.kml+xml" style="display:none">
+        </div>
         <div class="status" id="muni-status"></div>
       </div>
 
@@ -5073,7 +5120,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-busca-curinga-relacionados','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-limite-por-kml','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -7375,6 +7422,23 @@ function ocultarLimite(){
   const oc=document.getElementById('btn-muni-ocultar'); if(oc) oc.style.display='none';
 }
 
+// Desenha o limite no mapa a partir de um GeoJSON (vindo do IBGE, do cache ou de um KML).
+function desenharLimite(geojson, nome, sufixo){
+  ocultarLimite();
+  limiteLayer = new google.maps.Data({map:map});
+  limiteLayer.addGeoJson(geojson);
+  limiteLayer.setStyle({fillColor:'#2563eb', fillOpacity:0.06, strokeColor:'#2563eb', strokeOpacity:0.95, strokeWeight:2.5, clickable:false});
+  limiteTurf = limiteToTurf(geojson);
+  limiteNome = nome || 'município';
+  const bounds = new google.maps.LatLngBounds();
+  limiteLayer.forEach(f=> f.getGeometry().forEachLatLng(ll=> bounds.extend(ll)));
+  if(!bounds.isEmpty() && modo!=='single') map.fitBounds(bounds, 30);
+  const oc=document.getElementById('btn-muni-ocultar'); if(oc) oc.style.display='';
+  muniStatus('ok', 'Limite de ' + limiteNome + ' carregado.' + (sufixo||''));
+  if(window.__ultimoGeo) verificarPertencimento(window.__ultimoGeo);
+  verificarTodosPertencimento();   // varre todos os imóveis e bloqueia os que estão fora
+}
+
 async function mostrarLimite(){
   const sel = document.getElementById('muni-list');
   const id = sel ? sel.value : '';
@@ -7384,22 +7448,34 @@ async function mostrarLimite(){
   const st=document.getElementById('muni-status'); if(st) st.style.display='block';
   try{
     const r = await post({acao:'ibge_malha', municipio:id});
-    if(!r.ok || !r.geojson){ muniStatus('err', r.erro || 'Não foi possível obter o limite.'); return; }
-    ocultarLimite();
-    limiteLayer = new google.maps.Data({map:map});
-    limiteLayer.addGeoJson(r.geojson);
-    limiteLayer.setStyle({fillColor:'#2563eb', fillOpacity:0.06, strokeColor:'#2563eb', strokeOpacity:0.95, strokeWeight:2.5, clickable:false});
-    limiteTurf = limiteToTurf(r.geojson);
-    limiteNome = nome || 'município';
-    const bounds = new google.maps.LatLngBounds();
-    limiteLayer.forEach(f=> f.getGeometry().forEachLatLng(ll=> bounds.extend(ll)));
-    if(!bounds.isEmpty() && modo!=='single') map.fitBounds(bounds, 30);
-    const oc=document.getElementById('btn-muni-ocultar'); if(oc) oc.style.display='';
-    muniStatus('ok', 'Limite de ' + limiteNome + ' carregado.' + (r.cache ? ' (do cache local — IBGE indisponível)' : ''));
-    if(window.__ultimoGeo) verificarPertencimento(window.__ultimoGeo);
-    verificarTodosPertencimento();   // varre todos os imóveis e bloqueia os que estão fora
+    if(r.ok && r.geojson){ desenharLimite(r.geojson, nome || 'município', r.cache ? ' (do cache local — IBGE indisponível)' : ''); return; }
+    // IBGE indisponível: tenta o limite salvo por KML
+    const c = await post({acao:'limite_cache'});
+    if(c.ok && c.geojson){ desenharLimite(c.geojson, c.nome || nome || 'município', ' (limite salvo por KML — IBGE indisponível)'); return; }
+    muniStatus('err', (r.erro || 'Não foi possível obter o limite.') + ' Você pode carregar o limite por KML no botão abaixo.');
   }catch(e){
-    muniStatus('err', 'Erro ao carregar o limite municipal.');
+    muniStatus('err', 'Erro ao carregar o limite municipal. Use "Carregar limite por KML".');
+  }
+}
+
+// Carrega o limite a partir de um arquivo KML enviado (não depende do IBGE).
+async function carregarLimiteKml(file){
+  if(!file) return;
+  const sel = document.getElementById('muni-list');
+  const nome = (sel && sel.selectedIndex>=0 && sel.value) ? sel.options[sel.selectedIndex].textContent : (file.name||'limite (KML)').replace(/\.kml$/i,'');
+  muniStatus('', 'Lendo KML do limite…');
+  const st=document.getElementById('muni-status'); if(st) st.style.display='block';
+  try{
+    const fd = new FormData();
+    fd.append('acao','limite_kml');
+    fd.append('arquivo', file);
+    fd.append('nome', nome);
+    const resp = await fetch(location.href, {method:'POST', body:fd});
+    const r = await resp.json();
+    if(!r.ok || !r.geojson){ muniStatus('err', r.erro || 'Não foi possível ler o KML.'); return; }
+    desenharLimite(r.geojson, r.nome || nome, ' (carregado por KML)');
+  }catch(e){
+    muniStatus('err', 'Erro ao processar o KML do limite.');
   }
 }
 
@@ -7679,6 +7755,8 @@ function verificarPertencimento(geo){
   const uf=document.getElementById('muni-uf');
   if(uf) uf.addEventListener('change', e=> carregarMunicipios(e.target.value));
   const bm=document.getElementById('btn-muni-mostrar'); if(bm) bm.addEventListener('click', mostrarLimite);
+  const bk=document.getElementById('btn-muni-kml'); const fk=document.getElementById('muni-kml-file');
+  if(bk && fk){ bk.addEventListener('click', ()=>fk.click()); fk.addEventListener('change', ()=>{ const f=fk.files && fk.files[0]; carregarLimiteKml(f); fk.value=''; }); }
   const bo=document.getElementById('btn-muni-ocultar'); if(bo) bo.addEventListener('click', ()=>{ ocultarLimite(); muniStatus('', ''); });
   montarSeletorCorPainel();
 
