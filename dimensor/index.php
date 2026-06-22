@@ -3825,7 +3825,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-legenda-encerrada (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-ocultar-rotulos (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4626,6 +4626,7 @@ header('Expires: 0');
           <h3>Imóveis gravados</h3>
           <div class="saved-actions">
             <button class="mini-btn" id="btn-todos">Ver todos no mapa</button>
+            <button class="mini-btn" id="btn-rotulos" title="Ocultar os números das matrículas no mapa">🏷 Ocultar rótulos</button>
             <button class="mini-btn onr" id="btn-onr-lote" title="Enviar todos os imóveis prontos ao Mapa ONR">➤ Enviar prontos</button>
             <button class="mini-btn" id="btn-onr-config" title="Configurar a API do Mapa ONR">⚙</button>
           </div>
@@ -5032,7 +5033,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-legenda-encerrada','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-ocultar-rotulos','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -5056,6 +5057,34 @@ function agendarHoverTip(pos, text){
     if(hoverTip){ hoverTip.setMap(null); hoverTip=null; }
     hoverTip = new LabelOverlay(new google.maps.LatLng(pos.lat, pos.lng), text, 'hover');
   }, 2000);
+}
+
+/* Modo "rótulos ocultos": esconde os chips de matrícula no mapa; ao pousar o mouse
+   sobre o imóvel, mostra a matrícula imediatamente. */
+let rotulosOcultos = false;
+function mostrarHoverTipImediato(pos, text){
+  if(!text) return;
+  ocultarHoverTip();
+  hoverTip = new LabelOverlay(new google.maps.LatLng(pos.lat, pos.lng), text, 'hover');
+}
+function hoverImovel(it, centro){
+  if(rotulosOcultos){
+    const mat=(it.numero_matricula||'').trim();
+    const txt = mat ? rotuloMat(mat) : (it.identificador||'');
+    if(txt) mostrarHoverTipImediato(centro, txt);
+  } else {
+    agendarHoverTip(centro, it.identificador);
+  }
+}
+function aplicarRotulosVisibilidade(){
+  labelOverlays.forEach(l=>{ if(l && l.setMap) l.setMap(rotulosOcultos ? null : map); });
+}
+function toggleRotulos(){
+  rotulosOcultos = !rotulosOcultos;
+  aplicarRotulosVisibilidade();
+  ocultarHoverTip();
+  const b=document.getElementById('btn-rotulos');
+  if(b){ b.textContent = rotulosOcultos ? '🏷 Mostrar rótulos' : '🏷 Ocultar rótulos'; b.classList.toggle('active', rotulosOcultos); b.title = rotulosOcultos ? 'Rótulos ocultos — passe o mouse sobre o imóvel para ver a matrícula' : 'Ocultar os números das matrículas no mapa'; }
 }
 
 function fmt(n,d){ return Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
@@ -5419,6 +5448,7 @@ function turfToPaths(geom){
 document.getElementById('btn-todos').onclick = ()=>{
   if(modo==='overview') sairOverview(); else verTodos();
 };
+(function(){ const br=document.getElementById('btn-rotulos'); if(br) br.onclick = toggleRotulos; })();
 document.getElementById('btn-relatorio').onclick = gerarRelatorio;
 
 function sairOverview(){
@@ -5651,13 +5681,15 @@ async function verTodos(preservarVista){
     const centro = centroidOf(it.pts);
     // rótulo padrão: "Mat. <número sem zeros à esquerda>", se existir — agora clicável (seleciona este imóvel)
     const mat = (it.numero_matricula||'').trim();
-    if(mat) it._label = addLabel(centro, rotuloMat(mat), (ev)=>{
+    if(mat){ it._label = addLabel(centro, rotuloMat(mat), (ev)=>{
       const ctrl = ctrlAtivo || (ev && (ev.ctrlKey || ev.metaKey));
       selecionarImovelDireto(it, ctrl);
     }, imovelMorto(it) ? 'morto' : '');
-    // identificação do imóvel: só ao pousar o mouse ~2s
-    poly.addListener('mouseover', ()=> agendarHoverTip(centro, it.identificador));
-    poly.addListener('mousemove', ()=> { if(!hoverTip && !hoverTimer) agendarHoverTip(centro, it.identificador); });
+      if(rotulosOcultos && it._label) it._label.setMap(null);
+    }
+    // hover: identificação após ~2s; com rótulos OCULTOS, mostra a matrícula imediatamente
+    poly.addListener('mouseover', ()=> hoverImovel(it, centro));
+    poly.addListener('mousemove', ()=> { if(!hoverTip && !hoverTimer) hoverImovel(it, centro); });
     poly.addListener('mouseout',  ()=> ocultarHoverTip());
     path.forEach(pt=>bounds.extend(pt));
   });
