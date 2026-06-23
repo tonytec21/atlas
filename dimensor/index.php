@@ -2849,6 +2849,62 @@ function itn03SelectCols() {
 /* "apto para o Mapa da ONR" (mesmo critério do onr_pronto): se está pronto p/ o Mapa, está pronto p/ a carga ITN 03. */
 /* Imóvel marcado como FORA do perímetro do município (não pertence ao cartório). */
 function imovelForaMunicipio($r) { return trim((string)($r['fora_municipio'] ?? '')) !== ''; }
+
+/* ===== Identificação OFFLINE do município de um ponto (base local limites_ma) ===== */
+function _bboxAcumula($coords, &$b) {
+    if (!is_array($coords) || empty($coords)) return;
+    if (is_numeric($coords[0])) {
+        $x = (float)$coords[0]; $y = (float)$coords[1];
+        if ($x < $b[0]) $b[0] = $x; if ($y < $b[1]) $b[1] = $y;
+        if ($x > $b[2]) $b[2] = $x; if ($y > $b[3]) $b[3] = $y; return;
+    }
+    foreach ($coords as $c) _bboxAcumula($c, $b);
+}
+function _pontoEmAnel($lat, $lng, $ring) {
+    $inside = false; $n = count($ring);
+    for ($i = 0, $j = $n - 1; $i < $n; $j = $i++) {
+        $xi = (float)$ring[$i][0]; $yi = (float)$ring[$i][1];   // [lng, lat]
+        $xj = (float)$ring[$j][0]; $yj = (float)$ring[$j][1];
+        $den = ($yj - $yi); if ($den == 0.0) $den = 1e-12;
+        if ((($yi > $lat) !== ($yj > $lat)) && ($lng < ($xj - $xi) * ($lat - $yi) / $den + $xi)) $inside = !$inside;
+    }
+    return $inside;
+}
+function _pontoEmPoligono($lat, $lng, $poly) {
+    if (empty($poly) || empty($poly[0])) return false;
+    if (!_pontoEmAnel($lat, $lng, $poly[0])) return false;           // fora do anel externo
+    for ($k = 1; $k < count($poly); $k++) { if (_pontoEmAnel($lat, $lng, $poly[$k])) return false; } // dentro de um buraco
+    return true;
+}
+function pontoEmGeoJson($lat, $lng, $gj) {
+    if (!is_array($gj)) return false;
+    $t = $gj['type'] ?? '';
+    if ($t === 'FeatureCollection') { foreach (($gj['features'] ?? []) as $f) { if (pontoEmGeoJson($lat, $lng, $f)) return true; } return false; }
+    if ($t === 'Feature') return pontoEmGeoJson($lat, $lng, $gj['geometry'] ?? []);
+    if ($t === 'Polygon') return _pontoEmPoligono($lat, $lng, $gj['coordinates'] ?? []);
+    if ($t === 'MultiPolygon') { foreach (($gj['coordinates'] ?? []) as $poly) { if (_pontoEmPoligono($lat, $lng, $poly)) return true; } return false; }
+    return false;
+}
+/* índice {codigo: {n:nome, b:[minLng,minLat,maxLng,maxLat]}} — do arquivo, do cache, ou gerado dos GeoJSON */
+function bboxIndexMA() {
+    $local = __DIR__ . '/limites_ma/_bboxes.json';
+    if (is_file($local)) { $d = json_decode((string)@file_get_contents($local), true); if (is_array($d) && $d) return $d; }
+    $cache = __DIR__ . '/anexos/_bboxes_ma.json';
+    if (is_file($cache)) { $d = json_decode((string)@file_get_contents($cache), true); if (is_array($d) && $d) return $d; }
+    $dir = __DIR__ . '/limites_ma';
+    if (!is_dir($dir)) return [];
+    $idx = [];
+    foreach (glob($dir . '/*.geojson') as $f) {
+        $base = basename($f); if ($base[0] === '_') continue;
+        $gj = json_decode((string)@file_get_contents($f), true);
+        $feat = $gj['features'][0] ?? null; if (!$feat) continue;
+        $cod = (string)($feat['properties']['CD_MUN'] ?? preg_replace('/\D/', '', $base));
+        $b = [1e9, 1e9, -1e9, -1e9]; _bboxAcumula($feat['geometry']['coordinates'] ?? [], $b);
+        $idx[$cod] = ['n' => (string)($feat['properties']['NM_MUN'] ?? ''), 'b' => $b];
+    }
+    if ($idx && is_dir(__DIR__ . '/anexos')) @file_put_contents($cache, json_encode($idx));
+    return $idx;
+}
 /* Matrícula ENCERRADA (unificação/desmembramento total/georreferenciamento): não pode ser enviada à ONR nem à carga ITN 03. */
 function imovelEncerrado($r) { return strtolower(trim((string)($r['situacao'] ?? ''))) === 'encerrada'; }
 
@@ -2949,6 +3005,30 @@ if (isset($_POST['acao'])) {
             $gj = json_decode($geo, true);
             if (!is_array($gj) || !isset($gj['type'])) { echo json_encode(['ok' => false, 'erro' => 'GeoJSON estadual inválido do IBGE.']); exit; }
             echo json_encode(['ok' => true, 'geojson' => $gj], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($acao === 'municipio_no_ponto') {
+            // Identifica OFFLINE o município de um ponto (lat,lng) pela base local — usado para
+            // descobrir o município vizinho de imóveis fora do limite / que ultrapassam.
+            $lat = isset($_POST['lat']) ? (float)$_POST['lat'] : null;
+            $lng = isset($_POST['lng']) ? (float)$_POST['lng'] : null;
+            if ($lat === null || $lng === null) { echo json_encode(['ok' => false, 'erro' => 'lat/lng ausentes.']); exit; }
+            $idx = bboxIndexMA();
+            if (empty($idx)) { echo json_encode(['ok' => false, 'erro' => 'Base local de municípios indisponível.']); exit; }
+            $dir = __DIR__ . '/limites_ma';
+            foreach ($idx as $cod => $info) {
+                $b = $info['b'];
+                if ($lng < $b[0] || $lng > $b[2] || $lat < $b[1] || $lat > $b[3]) continue; // descarta pelo bounding box
+                $f = $dir . '/' . $cod . '.geojson';
+                if (!is_file($f)) continue;
+                $gj = json_decode((string)@file_get_contents($f), true);
+                if (pontoEmGeoJson($lat, $lng, $gj)) {
+                    echo json_encode(['ok' => true, 'municipio' => $info['n'], 'codigo' => $cod], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            }
+            echo json_encode(['ok' => true, 'municipio' => null]); // não está em nenhum município da base (provável outro estado)
             exit;
         }
 
@@ -3975,7 +4055,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-foco-municipio-serventia (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-municipio-vizinho-offline (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4047,10 +4127,11 @@ header('Expires: 0');
   /* Selo de pertencimento sobre o mapa */
   .muni-badge{position:absolute;left:14px;bottom:120px;z-index:5;display:none;max-width:340px;
     font-family:var(--mono);font-size:11.5px;font-weight:600;line-height:1.35;padding:8px 12px;border-radius:9px;
-    backdrop-filter:blur(10px);box-shadow:var(--ov-shadow);border:1px solid var(--line)}
-  .muni-badge.dentro{background:rgba(31,157,87,.16);border-color:rgba(31,157,87,.5);color:var(--green-text)}
-  .muni-badge.parcial{background:rgba(200,136,31,.16);border-color:rgba(200,136,31,.5);color:var(--amber-text)}
-  .muni-badge.fora{background:var(--red-soft);border-color:rgba(168,15,30,.5);color:var(--red-text)}
+    backdrop-filter:blur(10px);box-shadow:0 6px 22px rgba(0,0,0,.45);background:rgba(14,18,23,.88);color:#fff;border:1px solid rgba(255,255,255,.18)}
+  .muni-badge.dentro{background:rgba(12,38,25,.88);border-color:rgba(31,157,87,.6);color:#7fe0ad}
+  .muni-badge.parcial{background:rgba(46,36,12,.88);border-color:rgba(200,136,31,.65);color:#f4cd6f}
+  .muni-badge.fora{background:rgba(48,16,18,.9);border-color:rgba(226,52,47,.65);color:#ff9a9a}
+  .muni-badge b{color:#fff}
   /* Estilo do limite municipal desenhado (legenda) */
   .legend .sw.muni{background:rgba(37,99,235,.25);border:1px solid #2563eb}
   /* Seletor de cor de destaque (painel) */
@@ -4158,11 +4239,11 @@ header('Expires: 0');
   .empty-list{font-family:var(--mono);font-size:11px;color:var(--faint);padding:6px 2px}
   .map-wrap{position:relative;min-width:0}
   #map{position:absolute;inset:0;background:#0a0d11}
-  .readout{position:absolute;left:14px;bottom:80px;z-index:5;background:rgba(14,18,23,.86);
-    backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:9px;padding:9px 13px;
-    font-family:var(--mono);font-size:11px;color:var(--muted);display:none}
-  .readout b{color:var(--ink);font-weight:500}
-  .readout .dot{color:var(--red-bright)}
+  .readout{position:absolute;left:14px;bottom:80px;z-index:5;background:rgba(14,18,23,.88);
+    backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:9px 13px;
+    font-family:var(--mono);font-size:11px;color:#cbd5e1;display:none;box-shadow:0 6px 22px rgba(0,0,0,.45)}
+  .readout b{color:#fff;font-weight:500}
+  .readout .dot{color:#ff6b6b}
 
   /* KML import */
   .kml-zone{margin-top:11px;display:flex;align-items:center;gap:9px;padding:11px 13px;border:1px dashed var(--line);
@@ -5209,7 +5290,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-foco-municipio-serventia','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-municipio-vizinho-offline','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -7664,6 +7745,12 @@ async function carregarMunicipiosUF(ufCod){
 }
 // Identifica o município que contém um ponto, via IBGE (sem Google Geocoding)
 async function municipioDoPontoIBGE(lat,lng,ufCod){
+  // 1) base LOCAL (offline) — identifica o município do ponto sem depender do IBGE
+  try{
+    const r = await post({acao:'municipio_no_ponto', lat:lat, lng:lng});
+    if(r && r.ok){ return r.municipio ? { municipio:r.municipio, codigo:r.codigo } : null; }
+  }catch(e){}
+  // 2) fallback: malha do IBGE (online)
   if(!ufCod) return null;
   let feats, mapa;
   try{ feats = await carregarMalhaUF(ufCod); }catch(e){ feats=null; }
