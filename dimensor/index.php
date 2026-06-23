@@ -3597,7 +3597,21 @@ if (isset($_POST['acao'])) {
                 $nome = trim($m[1]);
                 $uf   = strtoupper($m[2]);
             }
-            echo json_encode(['ok' => true, 'cidade' => $nome, 'uf' => $uf, 'origem' => $raw], JSON_UNESCAPED_UNICODE);
+            // Resolve o CÓDIGO IBGE do município (preferindo a base local do MA) para foco preciso,
+            // independente de acentos/maiúsculas no cadastro.
+            $codigo = '';
+            $norm = function ($s) { $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string)$s); if ($t === false) $t = (string)$s; return preg_replace('/[^a-z0-9]/', '', strtolower($t)); };
+            if ($nome !== '') {
+                $alvo = $norm($nome);
+                $localLista = __DIR__ . '/limites_ma/_municipios.json';
+                if (($uf === 'MA' || $uf === '21') && is_file($localLista)) {
+                    $d = json_decode((string)@file_get_contents($localLista), true);
+                    if (is_array($d) && !empty($d['municipios'])) {
+                        foreach ($d['municipios'] as $mm) { if ($norm($mm['nome'] ?? '') === $alvo) { $codigo = (string)$mm['id']; break; } }
+                    }
+                }
+            }
+            echo json_encode(['ok' => true, 'cidade' => $nome, 'uf' => $uf, 'codigo' => $codigo, 'origem' => $raw], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -3961,7 +3975,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-limites-locais-ma (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-foco-municipio-serventia (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5161,7 +5175,9 @@ let LabelOverlay = null;
 
 function initMap(){
   map = new google.maps.Map(document.getElementById('map'), {
-    center: {lat:-4.14, lng:-46.9}, zoom: 13,
+    // Centro inicial neutro (visão ampla do estado). O foco real é dado pelo perímetro do
+    // município da serventia (desenharLimite -> fitBounds) ou pelos imóveis (verTodos).
+    center: {lat:-5.0, lng:-45.3}, zoom: 6,
     mapTypeId: 'hybrid',                       // mapa real (satélite + rótulos)
     mapTypeControl: true, streetViewControl: false, fullscreenControl: true,
     backgroundColor:'#0a0d11'
@@ -5193,7 +5209,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-limites-locais-ma','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-foco-municipio-serventia','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -7502,7 +7518,7 @@ function muniStatus(cls, msg){
 }
 
 function normTxt(s){ return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-async function carregarMunicipios(uf, selecionarNome, autoMostrar){
+async function carregarMunicipios(uf, selecionarNome, autoMostrar, codigo){
   const sel = document.getElementById('muni-list');
   if(!sel) return;
   sel.innerHTML = '<option value="">Carregando…</option>';
@@ -7513,6 +7529,12 @@ async function carregarMunicipios(uf, selecionarNome, autoMostrar){
     (r.municipios||[]).forEach(m=> ops.push('<option value="'+m.id+'">'+escapeHtml(m.nome)+'</option>'));
     sel.innerHTML = ops.join('');
     muniStatus('', '');
+    // 1) seleção por CÓDIGO IBGE (precisa, ignora acentos/grafias)
+    if(codigo){
+      const opt = Array.from(sel.options).find(o=> o.value===String(codigo));
+      if(opt){ sel.value = opt.value; if(autoMostrar) mostrarLimite(); return; }
+    }
+    // 2) fallback: seleção por NOME
     if(selecionarNome){
       const limpa = selecionarNome.replace(/\s*[-\/,]\s*[A-Za-z]{2}\s*$/, ''); // remove UF residual (ex.: "Zé Doca-MA")
       const alvo = normTxt(limpa);
@@ -7888,10 +7910,10 @@ function verificarPertencimento(geo){
   montarSeletorCorPainel();
 
   // Município padrão pela serventia (cadastro_serventia.cidade) — recarrega a cada atualização da página
-  let cidade='', ufServ='MA';
-  try{ const s = await post({acao:'serventia_municipio'}); if(s.ok){ cidade=s.cidade||''; ufServ=s.uf||'MA'; } }catch(e){}
+  let cidade='', ufServ='MA', codServ='';
+  try{ const s = await post({acao:'serventia_municipio'}); if(s.ok){ cidade=s.cidade||''; ufServ=s.uf||'MA'; codServ=s.codigo||''; } }catch(e){}
   if(uf && ufServ) uf.value = ufServ;
-  if(uf) await carregarMunicipios(uf.value, cidade, !!cidade); // pré-seleciona e mostra o limite do município padrão
+  if(uf) await carregarMunicipios(uf.value, cidade, !!(cidade||codServ), codServ); // pré-seleciona e foca no município da serventia
 
   // Busca na lista
   const busca=document.getElementById('busca'), bclear=document.getElementById('busca-clear');
