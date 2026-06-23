@@ -2907,6 +2907,17 @@ if (isset($_POST['acao'])) {
             // aceita UF por sigla (MA) ou por código IBGE do estado (21) — ambos funcionam na API
             $uf = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)($_POST['uf'] ?? '')));
             if ($uf === '') { echo json_encode(['ok' => false, 'erro' => 'UF não informada.']); exit; }
+            // 1) base LOCAL (offline) — Maranhão (não depende do IBGE)
+            $localLista = __DIR__ . '/limites_ma/_municipios.json';
+            if (($uf === 'MA' || $uf === '21') && is_file($localLista)) {
+                $j = @file_get_contents($localLista);
+                $d = $j ? json_decode($j, true) : null;
+                if (is_array($d) && !empty($d['municipios'])) {
+                    echo json_encode(['ok' => true, 'municipios' => $d['municipios'], 'fonte' => 'local'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            }
+            // 2) IBGE (online)
             $url = 'https://servicodados.ibge.gov.br/api/v1/localidades/estados/' . rawurlencode($uf) . '/municipios?orderBy=nome';
             $err = '';
             $json = httpGetText($url, $err);
@@ -2944,6 +2955,17 @@ if (isset($_POST['acao'])) {
         if ($acao === 'ibge_malha') {
             $mun = preg_replace('/\D/', '', (string)($_POST['municipio'] ?? ''));
             if ($mun === '') { echo json_encode(['ok' => false, 'erro' => 'Município não informado.']); exit; }
+            // 1) base LOCAL (offline): perímetro do município a partir dos arquivos do IBGE baixados.
+            $localFile = __DIR__ . '/limites_ma/' . $mun . '.geojson';
+            if (is_file($localFile)) {
+                $geo = @file_get_contents($localFile);
+                $gj = $geo ? json_decode($geo, true) : null;
+                if (is_array($gj) && isset($gj['type'])) {
+                    echo json_encode(['ok' => true, 'geojson' => $gj, 'fonte' => 'local'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            }
+            // 2) IBGE (online) + cache
             $q = (int)($_POST['qualidade'] ?? 4); if ($q < 1 || $q > 4) $q = 4;
             $cacheDir = __DIR__ . '/anexos';
             $cacheFile = $cacheDir . '/limite_' . $mun . '_q' . $q . '.geojson';
@@ -3939,7 +3961,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-relatorio-foco-matricula (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-limites-locais-ma (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5171,7 +5193,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-relatorio-foco-matricula','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-limites-locais-ma','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -7553,7 +7575,7 @@ async function mostrarLimite(){
   const st=document.getElementById('muni-status'); if(st) st.style.display='block';
   try{
     const r = await post({acao:'ibge_malha', municipio:id});
-    if(r.ok && r.geojson){ desenharLimite(r.geojson, nome || 'município', r.cache ? ' (do cache local — IBGE indisponível)' : ''); return; }
+    if(r.ok && r.geojson){ desenharLimite(r.geojson, nome || 'município', r.fonte==='local' ? ' (base local IBGE)' : (r.cache ? ' (do cache local — IBGE indisponível)' : '')); return; }
     // IBGE indisponível: tenta o limite salvo por KML
     const c = await post({acao:'limite_cache'});
     if(c.ok && c.geojson){ desenharLimite(c.geojson, c.nome || nome || 'município', ' (limite salvo por KML — IBGE indisponível)'); return; }
