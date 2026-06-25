@@ -2934,6 +2934,214 @@ function itn03ExclusivoFaltam(array $r) {
 }
 function itn03ExclusivoApto(array $r) { return count(itn03ExclusivoFaltam($r)) === 0; }
 
+/* ===================== AUTOTUTELA REGISTRAL =====================
+ * Processo de autotutela registral (Prov. CNJ 195/2025, art. 440-BG do CNN/CN/CNJ-Extra,
+ * incluído pelo Prov. CNJ 149/2023), cabível em casos de ALTA INDAGAÇÃO ou POTENCIAL LITÍGIO
+ * entre titulares de direitos registrados/averbados, com relatório circunstanciado preliminar,
+ * notificação das partes (prazo de manifestação), anuência tácita pela ausência, tentativa de
+ * transação, réplica e, no impasse, remessa ao Juiz Corregedor (art. 214 da LRP). Fundamentos
+ * correlatos: arts. 110, 213 e 214 da Lei 6.015/1973 (LRP) e art. 1.247 do Código Civil. */
+function ensureAutotutela($conn) {
+    $sql = "CREATE TABLE IF NOT EXISTS autotutela_registral (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        numero VARCHAR(40) NULL,
+        prenotacao VARCHAR(40) NULL,
+        data_abertura DATE NULL,
+        fundamento VARCHAR(20) NOT NULL DEFAULT 'litigio',
+        vicio_tipo VARCHAR(40) NULL,
+        objeto MEDIUMTEXT,
+        matriculas TEXT,
+        relatorio_preliminar MEDIUMTEXT,
+        partes MEDIUMTEXT,
+        prazo_dias INT NOT NULL DEFAULT 15,
+        fase VARCHAR(24) NOT NULL DEFAULT 'aberto',
+        decisao MEDIUMTEXT,
+        resultado VARCHAR(20) NULL,
+        ato_saneamento MEDIUMTEXT,
+        oficial VARCHAR(180) NULL,
+        imovel_id INT NULL,
+        observacoes MEDIUMTEXT,
+        criado_em DATETIME NULL,
+        atualizado_em DATETIME NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+    try { $conn->query($sql); } catch (Throwable $e) {}
+    $cols = [];
+    try { $r = $conn->query("SHOW COLUMNS FROM autotutela_registral"); if ($r) while ($x = $r->fetch_assoc()) $cols[$x['Field']] = true; } catch (Throwable $e) {}
+    $add = ['prenotacao'=>"ADD COLUMN prenotacao VARCHAR(40) NULL",'oficial'=>"ADD COLUMN oficial VARCHAR(180) NULL",
+            'ato_saneamento'=>"ADD COLUMN ato_saneamento MEDIUMTEXT",'resultado'=>"ADD COLUMN resultado VARCHAR(20) NULL",
+            'imovel_id'=>"ADD COLUMN imovel_id INT NULL",'observacoes'=>"ADD COLUMN observacoes MEDIUMTEXT"];
+    foreach ($add as $c => $ddl) { if (!isset($cols[$c])) { try { $conn->query("ALTER TABLE autotutela_registral $ddl"); } catch (Throwable $e) {} } }
+}
+/* dados da serventia para o cabeçalho dos documentos (leitura defensiva de cadastro_serventia) */
+function atServentiaInfo($conn) {
+    $info = ['nome' => '', 'cidade' => '', 'uf' => 'MA', 'cns' => '', 'oficial' => ''];
+    try {
+        $r = $conn->query("SELECT * FROM cadastro_serventia ORDER BY id LIMIT 1");
+        if ($r && ($row = $r->fetch_assoc())) {
+            foreach ($row as $k => $v) {
+                $kl = strtolower($k); $v = trim((string)$v); if ($v === '') continue;
+                if ($info['nome']==='' && (strpos($kl,'serventia')!==false||strpos($kl,'denomin')!==false||strpos($kl,'razao')!==false||$kl==='nome')) $info['nome']=$v;
+                if ($info['cidade']==='' && (strpos($kl,'cidade')!==false||strpos($kl,'municipio')!==false)) $info['cidade']=$v;
+                if ((strpos($kl,'uf')!==false||strpos($kl,'estado')!==false) && preg_match('/^[A-Za-z]{2}$/',$v)) $info['uf']=strtoupper($v);
+                if ($info['cns']==='' && strpos($kl,'cns')!==false) $info['cns']=$v;
+                if ($info['oficial']==='' && (strpos($kl,'oficial')!==false||strpos($kl,'titular')!==false||strpos($kl,'responsavel')!==false)) $info['oficial']=$v;
+            }
+        }
+    } catch (Throwable $e) {}
+    if ($info['cidade']!=='' && preg_match('/^(.*?)\s*[-\/,]\s*([A-Za-z]{2})$/u', $info['cidade'], $m)) { $info['cidade']=trim($m[1]); $info['uf']=strtoupper($m[2]); }
+    return $info;
+}
+function atProximoNumero($conn) {
+    $ano = date('Y'); $seq = 1;
+    try {
+        $r = $conn->query("SELECT numero FROM autotutela_registral WHERE numero LIKE 'AT-$ano-%' ORDER BY id DESC LIMIT 1");
+        if ($r && ($row = $r->fetch_assoc()) && preg_match('/AT-\d{4}-(\d+)/', (string)$row['numero'], $m)) $seq = ((int)$m[1]) + 1;
+    } catch (Throwable $e) {}
+    return 'AT-' . $ano . '-' . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+}
+function atFundamentoLabel($f) { return $f === 'alta_indagacao' ? 'alta indagação' : 'potencial litígio entre titulares de direitos'; }
+function atDataBR($d) { $d = trim((string)$d); if ($d === '' || $d === '0000-00-00') return '—'; $t = strtotime($d); return $t ? date('d/m/Y', $t) : $d; }
+function atEscapa($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+
+/* Gera, em PDF (saída inline), os documentos do procedimento conforme a fase/tipo solicitado. */
+function gerarPdfAutotutela($conn, $id, $tipo) {
+    if (file_exists(__DIR__ . '/../oficios/tcpdf/tcpdf.php')) require_once __DIR__ . '/../oficios/tcpdf/tcpdf.php';
+    else require_once __DIR__ . '/tcpdf/tcpdf.php';
+
+    $reg = null;
+    try { $r = $conn->query("SELECT * FROM autotutela_registral WHERE id = " . (int)$id . " LIMIT 1"); if ($r) $reg = $r->fetch_assoc(); } catch (Throwable $e) {}
+    if (!$reg) { header('Content-Type: text/plain; charset=UTF-8'); echo 'Procedimento não encontrado.'; return; }
+
+    $serv = atServentiaInfo($conn);
+    $oficial = trim((string)($reg['oficial'] ?? '')) !== '' ? $reg['oficial'] : ($serv['oficial'] !== '' ? $serv['oficial'] : 'O Oficial de Registro de Imóveis');
+    $partes = json_decode((string)($reg['partes'] ?? '[]'), true); if (!is_array($partes)) $partes = [];
+    $matriculas = trim((string)($reg['matriculas'] ?? ''));
+    $fund = atFundamentoLabel((string)($reg['fundamento'] ?? 'litigio'));
+    $cidUF = trim(($serv['cidade'] !== '' ? $serv['cidade'] : '________________') . '/' . ($serv['uf'] !== '' ? $serv['uf'] : '__'));
+
+    $titulos = [
+        'abertura'   => 'ATO DE ABERTURA DE PROCEDIMENTO DE AUTOTUTELA REGISTRAL',
+        'relatorio'  => 'RELATÓRIO CIRCUNSTANCIADO PRELIMINAR',
+        'notificacao'=> 'NOTIFICAÇÃO – PROCEDIMENTO DE AUTOTUTELA REGISTRAL',
+        'decisao'    => 'DECISÃO E TERMO DE SANEAMENTO REGISTRAL',
+    ];
+    $tipo = isset($titulos[$tipo]) ? $tipo : 'abertura';
+    $tituloDoc = $titulos[$tipo];
+
+    if (!class_exists('AutotutelaPDF')) {
+        class AutotutelaPDF extends TCPDF {
+            public $cabServ = ''; public $cabDoc = '';
+            public function Header() {
+                $timbrado = __DIR__ . '/../style/img/timbrado.png';
+                if (@file_exists($timbrado)) {
+                    $pw = $this->getPageWidth(); $ph = $this->getPageHeight();
+                    $oL=$this->lMargin;$oR=$this->rMargin;$oT=$this->tMargin;$oB=$this->bMargin;$oA=$this->AutoPageBreak;
+                    $this->lMargin=0;$this->rMargin=0;$this->tMargin=0;$this->SetAutoPageBreak(false,0);
+                    @$this->Image($timbrado,0,0,$pw,$ph,'','','',false,300,'',false,false,0,false,false,false);
+                    $this->lMargin=$oL;$this->rMargin=$oR;$this->tMargin=$oT;$this->SetAutoPageBreak($oA,$oB);
+                    $this->SetY($oT);
+                } else {
+                    $this->SetFont('helvetica','B',11);
+                    $this->Cell(0,6,$this->cabServ,0,1,'C');
+                    $this->SetFont('helvetica','',8.5);
+                    $this->Cell(0,4,'Registro de Imóveis',0,1,'C');
+                    $this->Ln(1); $this->SetDrawColor(150,150,150); $this->Line($this->lMargin,$this->GetY(),$this->getPageWidth()-$this->rMargin,$this->GetY()); $this->Ln(3);
+                }
+            }
+            public function Footer() {
+                $this->SetY(-13); $this->SetFont('helvetica','',7.5); $this->SetTextColor(110,110,110);
+                $this->Cell(0,4,'Documento gerado pelo Atlas Dimensor em '.date('d/m/Y H:i').' — Autotutela Registral (Prov. CNJ 195/2025, art. 440-BG; LRP).',0,1,'C');
+                $this->Cell(0,4,'Página '.$this->getAliasNumPage().' de '.$this->getAliasNbPages(),0,0,'C');
+            }
+        }
+    }
+    $pdf = new AutotutelaPDF('P','mm','A4',true,'UTF-8',false);
+    $pdf->cabServ = $serv['nome'] !== '' ? $serv['nome'] : 'OFÍCIO DE REGISTRO DE IMÓVEIS';
+    $pdf->SetCreator('Atlas Dimensor'); $pdf->SetAuthor($pdf->cabServ); $pdf->SetTitle($tituloDoc.' '.$reg['numero']);
+    $pdf->SetMargins(20, 32, 20); $pdf->SetHeaderMargin(5); $pdf->SetFooterMargin(12); $pdf->SetAutoPageBreak(true, 18);
+    $pdf->AddPage();
+
+    $css = '<style>
+        h1{font-size:12px;font-weight:bold;text-align:center;text-transform:uppercase;}
+        .num{font-size:9.5px;text-align:center;color:#444;}
+        .sec{font-size:10px;font-weight:bold;color:#7a0d16;text-transform:uppercase;margin-top:6px;}
+        p{font-size:10.5px;line-height:1.5;text-align:justify;}
+        .small{font-size:9px;color:#555;}
+        table{font-size:9.5px;} td{border:0.4px solid #bbb;padding:3px;}
+        .lbl{color:#555;font-weight:bold;}
+        .assina{font-size:10px;text-align:center;margin-top:26px;}
+    </style>';
+
+    $h  = $css;
+    $h .= '<h1>' . atEscapa($tituloDoc) . '</h1>';
+    $h .= '<div class="num">Procedimento nº <b>' . atEscapa($reg['numero']) . '</b>'
+        . ($reg['prenotacao'] ? ' &nbsp;·&nbsp; Prenotação nº <b>' . atEscapa($reg['prenotacao']) . '</b>' : '')
+        . ' &nbsp;·&nbsp; Abertura: <b>' . atDataBR($reg['data_abertura']) . '</b></div><br>';
+
+    $listaPartes = '';
+    if ($partes) {
+        $listaPartes = '<table cellspacing="0"><tr><td class="lbl" width="34%">Interessado</td><td class="lbl" width="20%">Qualificação</td><td class="lbl" width="16%">Matrícula</td><td class="lbl" width="30%">Situação</td></tr>';
+        foreach ($partes as $p) {
+            $sit = !empty($p['notificado']) ? ('Notificado em ' . atDataBR($p['data_notif'] ?? '')) : 'A notificar';
+            $man = (string)($p['manifestacao'] ?? '');
+            if ($man === 'anuencia') $sit .= ' · anuência';
+            elseif ($man === 'impugnacao') $sit .= ' · impugnação';
+            elseif ($man === 'sem_resposta') $sit .= ' · sem resposta (anuência tácita)';
+            $listaPartes .= '<tr><td>' . atEscapa($p['nome'] ?? '') . ($p['doc']??'' ? '<br><span class="small">' . atEscapa($p['doc']) . '</span>' : '')
+                . '</td><td>' . atEscapa($p['papel'] ?? $p['qualificacao'] ?? '') . '</td><td>' . atEscapa($p['matricula'] ?? '') . '</td><td>' . atEscapa($sit) . '</td></tr>';
+        }
+        $listaPartes .= '</table>';
+    }
+
+    if ($tipo === 'abertura') {
+        $h .= '<p>' . atEscapa($oficial) . ', no uso das atribuições e do <b>poder-dever de autotutela</b> conferido ao registrador de imóveis, com fundamento no <b>art. 440-BG, inciso I, do CNN/CN/CNJ-Extra</b> (Provimento CNJ nº 149/2023, com a redação dada pelo <b>Provimento CNJ nº 195/2025</b>) e nos arts. 213 e 214 da Lei nº 6.015/1973 (LRP) e art. 1.247 do Código Civil, <b>INSTAURA</b> o presente procedimento de autotutela registral, em razão de ' . atEscapa($fund) . '.</p>';
+        $h .= '<div class="sec">Objeto e fatos a apurar (art. 440-BG, II)</div><p>' . nl2br(atEscapa($reg['objeto'] ?? '')) . '</p>';
+        $h .= '<div class="sec">Matrículas/transcrições atingidas</div><p>' . nl2br(atEscapa($matriculas !== '' ? $matriculas : '—')) . '</p>';
+        if ($listaPartes) $h .= '<div class="sec">Partes interessadas a notificar</div>' . $listaPartes;
+        $h .= '<br><p>Para garantia da <b>prioridade registral</b>, determina-se a <b>prenotação</b> deste ato no Livro de Protocolo' . ($reg['prenotacao'] ? ' (nº ' . atEscapa($reg['prenotacao']) . ')' : '') . ', bem como a <b>notificação</b> das partes interessadas para, no prazo de <b>' . (int)$reg['prazo_dias'] . ' (' . atEscapa(numberToExt((int)$reg['prazo_dias'])) . ') dias</b>, manifestarem-se, nos termos do art. 440-BG, III, do CNN/CN/CNJ-Extra.</p>';
+    } elseif ($tipo === 'relatorio') {
+        $h .= '<p>Este <b>relatório circunstanciado preliminar</b> é elaborado nos termos do <b>art. 440-BG, incisos I e II, do CNN/CN/CNJ-Extra</b> (Provimento CNJ nº 149/2023, com a redação do Provimento CNJ nº 195/2025), com o objetivo de relatar, de forma detalhada, o vício identificado e indicar as providências administrativas cabíveis ao seu eventual saneamento.</p>';
+        $h .= '<div class="sec">Objeto</div><p>' . nl2br(atEscapa($reg['objeto'] ?? '')) . '</p>';
+        $h .= '<div class="sec">Matrículas/transcrições atingidas</div><p>' . nl2br(atEscapa($matriculas !== '' ? $matriculas : '—')) . '</p>';
+        $h .= '<div class="sec">Relatório do vício e providências propostas</div><p>' . nl2br(atEscapa($reg['relatorio_preliminar'] ?? '')) . '</p>';
+        if ($listaPartes) $h .= '<div class="sec">Partes interessadas</div>' . $listaPartes;
+    } elseif ($tipo === 'notificacao') {
+        $alvo = '';
+        foreach ($partes as $p) { if (!empty($p['_destacar'])) { $alvo = (string)($p['nome'] ?? ''); break; } }
+        $h .= '<p>Prezado(a) Sr(a). <b>' . atEscapa($alvo !== '' ? $alvo : '________________________________') . '</b>,</p>';
+        $h .= '<p>Com fundamento no <b>art. 440-BG, inciso III, do CNN/CN/CNJ-Extra</b> (Provimento CNJ nº 149/2023, com a redação do Provimento CNJ nº 195/2025), informamos que foi <b>instaurado</b> o procedimento de autotutela registral nº <b>' . atEscapa($reg['numero']) . '</b>, com vistas à análise e eventual saneamento de vício identificado nas matrículas/transcrições: ' . atEscapa($matriculas !== '' ? $matriculas : '—') . '.</p>';
+        $h .= '<div class="sec">Objeto</div><p>' . nl2br(atEscapa($reg['objeto'] ?? '')) . '</p>';
+        if (trim((string)($reg['relatorio_preliminar'] ?? '')) !== '') $h .= '<div class="sec">Síntese do vício apurado</div><p>' . nl2br(atEscapa($reg['relatorio_preliminar'])) . '</p>';
+        $h .= '<p>Fica V.Sa. <b>notificado(a)</b> para, querendo, manifestar-se no prazo de <b>' . (int)$reg['prazo_dias'] . ' (' . atEscapa(numberToExt((int)$reg['prazo_dias'])) . ') dias</b>, a contar do recebimento desta, apresentando concordância, impugnação ou provas que entender pertinentes.</p>';
+        $h .= '<p><b>Advertência:</b> nos termos do <b>art. 440-BG, III, alínea “a”</b>, a <b>ausência de manifestação</b> no prazo será interpretada como <b>anuência tácita</b> à proposta de saneamento, facultando a este Registro a prática dos atos corretivos correspondentes. Havendo impugnação e não havendo transação amigável, os titulares com direitos contraditórios serão notificados para réplica; persistindo o impasse, o feito poderá ser remetido ao <b>Juízo Corregedor competente (art. 214 da LRP)</b>.</p>';
+    } else { // decisao
+        $h .= '<div class="sec">Das manifestações</div>';
+        if ($listaPartes) $h .= $listaPartes; else $h .= '<p>—</p>';
+        $h .= '<div class="sec">Fundamentação e decisão</div><p>' . nl2br(atEscapa($reg['decisao'] ?? '')) . '</p>';
+        $res = (string)($reg['resultado'] ?? '');
+        if ($res === 'saneado' || trim((string)($reg['ato_saneamento'] ?? '')) !== '') {
+            $h .= '<div class="sec">Atos de saneamento determinados</div><p>' . nl2br(atEscapa($reg['ato_saneamento'] ?? '')) . '</p>';
+            $h .= '<p>Com base no <b>art. 440-BG, III, do CNN/CN/CNJ-Extra</b>, presente a anuência (expressa ou tácita) das partes, <b>ficam autorizados e determinados os atos de saneamento registral</b> acima descritos (retificação/averbação), nos termos dos arts. 213 e 110 da LRP.</p>';
+        } elseif ($res === 'remetido') {
+            $h .= '<p>Não tendo havido acordo entre os interessados e remanescendo controvérsia de <b>alta indagação</b>, <b>remetem-se os autos ao Juízo Corregedor competente</b>, na forma do <b>art. 214 da Lei nº 6.015/1973 (LRP)</b>, para deliberação.</p>';
+        } elseif ($res === 'arquivado') {
+            $h .= '<p>Não verificado vício a sanear, ou diante de desistência/perda de objeto, <b>determina-se o arquivamento</b> do presente procedimento.</p>';
+        }
+    }
+
+    $h .= '<div class="assina">' . atEscapa($cidUF) . ', ' . date('d/m/Y') . '.<br><br>_______________________________________<br><b>' . atEscapa($oficial) . '</b><br><span class="small">Oficial de Registro de Imóveis' . ($serv['cns'] !== '' ? ' — CNS ' . atEscapa($serv['cns']) : '') . '</span></div>';
+
+    $pdf->writeHTML($h, true, false, true, false, '');
+    $nome = preg_replace('/[^A-Za-z0-9_\-]/', '_', $tipo . '_' . $reg['numero']) . '.pdf';
+    $pdf->Output($nome, 'I');
+}
+/* extenso simples para prazos pequenos */
+function numberToExt($n) {
+    $u = [0=>'zero',1=>'um',2=>'dois',3=>'três',4=>'quatro',5=>'cinco',6=>'seis',7=>'sete',8=>'oito',9=>'nove',10=>'dez',
+          11=>'onze',12=>'doze',13=>'treze',14=>'catorze',15=>'quinze',20=>'vinte',30=>'trinta',45=>'quarenta e cinco',60=>'sessenta',90=>'noventa']; 
+    return $u[$n] ?? (string)$n;
+}
+
 if (isset($_POST['acao'])) {
 
     /* ----- Relatório de sobreposição em PDF (saída binária, antes do header JSON) ----- */
@@ -2953,12 +3161,112 @@ if (isset($_POST['acao'])) {
         exit;
     }
 
+    /* ----- Documentos da AUTOTUTELA REGISTRAL em PDF (saída binária, antes do header JSON) ----- */
+    if ($_POST['acao'] === 'autotutela_pdf') {
+        ensureTable($conn); ensureAutotutela($conn);
+        $id   = (int)($_POST['id'] ?? 0);
+        $tipo = preg_replace('/[^a-z]/', '', strtolower((string)($_POST['tipo'] ?? 'abertura')));
+        gerarPdfAutotutela($conn, $id, $tipo);
+        exit;
+    }
+
     header('Content-Type: application/json; charset=UTF-8');
     @ini_set('display_errors', '0'); // avisos/deprecations do PHP nunca devem vazar para dentro do JSON (corromperia a resposta)
     ensureTable($conn);
+    ensureAutotutela($conn);
     $acao = $_POST['acao'];
 
     try {
+        if ($acao === 'autotutela_listar') {
+            $itens = [];
+            try {
+                $r = $conn->query("SELECT id,numero,prenotacao,data_abertura,fundamento,vicio_tipo,objeto,matriculas,fase,prazo_dias,resultado,partes,atualizado_em FROM autotutela_registral ORDER BY id DESC");
+                if ($r) while ($row = $r->fetch_assoc()) {
+                    $partes = json_decode((string)($row['partes'] ?? '[]'), true); if (!is_array($partes)) $partes = [];
+                    $row['n_partes'] = count($partes);
+                    $row['n_notificadas'] = count(array_filter($partes, function ($p) { return !empty($p['notificado']); }));
+                    unset($row['partes']);
+                    $itens[] = $row;
+                }
+            } catch (Throwable $e) {}
+            echo json_encode(['ok' => true, 'itens' => $itens], JSON_UNESCAPED_UNICODE); exit;
+        }
+
+        if ($acao === 'autotutela_obter') {
+            $id = (int)($_POST['id'] ?? 0);
+            $reg = null;
+            try { $r = $conn->query("SELECT * FROM autotutela_registral WHERE id = " . $id . " LIMIT 1"); if ($r) $reg = $r->fetch_assoc(); } catch (Throwable $e) {}
+            if (!$reg) { echo json_encode(['ok' => false, 'erro' => 'Procedimento não encontrado.']); exit; }
+            $reg['partes'] = json_decode((string)($reg['partes'] ?? '[]'), true); if (!is_array($reg['partes'])) $reg['partes'] = [];
+            echo json_encode(['ok' => true, 'registro' => $reg], JSON_UNESCAPED_UNICODE); exit;
+        }
+
+        if ($acao === 'autotutela_abrir') {
+            // instaura um novo procedimento (manual ou a partir de uma sobreposição detectada)
+            $numero = atProximoNumero($conn);
+            $fundamento = in_array(($_POST['fundamento'] ?? ''), ['alta_indagacao','litigio'], true) ? $_POST['fundamento'] : 'litigio';
+            $vicio = substr(trim((string)($_POST['vicio_tipo'] ?? '')), 0, 40);
+            $objeto = (string)($_POST['objeto'] ?? '');
+            $matriculas = (string)($_POST['matriculas'] ?? '');
+            $prenotacao = substr(trim((string)($_POST['prenotacao'] ?? '')), 0, 40);
+            $prazo = (int)($_POST['prazo_dias'] ?? 15); if ($prazo < 1 || $prazo > 365) $prazo = 15;
+            $partes = json_decode((string)($_POST['partes'] ?? '[]'), true); if (!is_array($partes)) $partes = [];
+            $imovelId = (int)($_POST['imovel_id'] ?? 0) ?: null;
+            $hoje = date('Y-m-d'); $agora = date('Y-m-d H:i:s');
+            $st = $conn->prepare("INSERT INTO autotutela_registral (numero,prenotacao,data_abertura,fundamento,vicio_tipo,objeto,matriculas,partes,prazo_dias,fase,imovel_id,criado_em,atualizado_em) VALUES (?,?,?,?,?,?,?,?,?, 'aberto', ?,?,?)");
+            $pj = json_encode($partes, JSON_UNESCAPED_UNICODE);
+            $st->bind_param('ssssssssiiss', $numero, $prenotacao, $hoje, $fundamento, $vicio, $objeto, $matriculas, $pj, $prazo, $imovelId, $agora, $agora);
+            $st->execute();
+            $novoId = $conn->insert_id;
+            echo json_encode(['ok' => true, 'id' => $novoId, 'numero' => $numero], JSON_UNESCAPED_UNICODE); exit;
+        }
+
+        if ($acao === 'autotutela_salvar') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'ID ausente.']); exit; }
+            // colunas existentes (defensivo) e atualização apenas dos campos enviados
+            $existe = [];
+            try { $r = $conn->query("SHOW COLUMNS FROM autotutela_registral"); if ($r) while ($x = $r->fetch_assoc()) $existe[$x['Field']] = true; } catch (Throwable $e) {}
+            $map = [
+                'prenotacao' => ['s', fn($v) => substr(trim((string)$v), 0, 40)],
+                'fundamento' => ['s', fn($v) => in_array($v, ['alta_indagacao','litigio'], true) ? $v : 'litigio'],
+                'vicio_tipo' => ['s', fn($v) => substr(trim((string)$v), 0, 40)],
+                'objeto' => ['s', fn($v) => (string)$v],
+                'matriculas' => ['s', fn($v) => (string)$v],
+                'relatorio_preliminar' => ['s', fn($v) => (string)$v],
+                'decisao' => ['s', fn($v) => (string)$v],
+                'ato_saneamento' => ['s', fn($v) => (string)$v],
+                'observacoes' => ['s', fn($v) => (string)$v],
+                'oficial' => ['s', fn($v) => substr(trim((string)$v), 0, 180)],
+                'fase' => ['s', fn($v) => substr(preg_replace('/[^a-z_]/', '', strtolower((string)$v)), 0, 24)],
+                'resultado' => ['s', fn($v) => substr(trim((string)$v), 0, 20)],
+                'prazo_dias' => ['i', fn($v) => max(1, min(365, (int)$v))],
+                'data_abertura' => ['s', fn($v) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$v) ? $v : date('Y-m-d')],
+            ];
+            $sets = []; $types = ''; $vals = [];
+            foreach ($map as $campo => $def) {
+                if (!array_key_exists($campo, $_POST) || !isset($existe[$campo])) continue;
+                $sets[] = "$campo = ?"; $types .= $def[0]; $vals[] = $def[1]($_POST[$campo]);
+            }
+            if (array_key_exists('partes', $_POST) && isset($existe['partes'])) {
+                $partes = json_decode((string)$_POST['partes'], true); if (!is_array($partes)) $partes = [];
+                $sets[] = "partes = ?"; $types .= 's'; $vals[] = json_encode($partes, JSON_UNESCAPED_UNICODE);
+            }
+            $sets[] = "atualizado_em = ?"; $types .= 's'; $vals[] = date('Y-m-d H:i:s');
+            if (!$sets) { echo json_encode(['ok' => false, 'erro' => 'Nada para salvar.']); exit; }
+            $types .= 'i'; $vals[] = $id;
+            $st = $conn->prepare("UPDATE autotutela_registral SET " . implode(', ', $sets) . " WHERE id = ?");
+            $st->bind_param($types, ...$vals);
+            $st->execute();
+            echo json_encode(['ok' => true, 'id' => $id], JSON_UNESCAPED_UNICODE); exit;
+        }
+
+        if ($acao === 'autotutela_excluir') {
+            $id = (int)($_POST['id'] ?? 0);
+            try { $st = $conn->prepare("DELETE FROM autotutela_registral WHERE id = ?"); $st->bind_param('i', $id); $st->execute(); } catch (Throwable $e) {}
+            echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE); exit;
+        }
+
         if ($acao === 'ibge_municipios') {
             // aceita UF por sigla (MA) ou por código IBGE do estado (21) — ambos funcionam na API
             $uf = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)($_POST['uf'] ?? '')));
@@ -4055,7 +4363,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-municipio-vizinho-offline (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-autotutela-registral (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4506,8 +4814,51 @@ header('Expires: 0');
   .modal-f{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);justify-content:flex-end}
   .modal-f .btn-primary,.modal-f .btn-ghost{width:auto;padding:9px 16px}
   /* ===== Modal de edição — largo, responsivo e organizado ===== */
-  #modal-edit .modal-card{max-width:1020px}
-  #modal-edit .modal-b{padding:16px 18px;gap:14px}
+  #modal-edit .modal-card{max-width:1020px}#modal-edit .modal-b{padding:16px 18px;gap:14px}
+  /* ===== Autotutela registral ===== */
+  .mini-btn.at,.btn-report.at{background:rgba(122,13,22,.10);border:1px solid rgba(122,13,22,.45);color:#7a0d16}
+  body.dark-mode .mini-btn.at,body.dark-mode .btn-report.at{background:rgba(226,52,47,.14);border-color:rgba(226,52,47,.5);color:#ffb4b4}
+  .at-card{max-width:980px}
+  .at-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .at-hint{font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+  .at-lista{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto}
+  .at-item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;background:var(--card)}
+  .at-item:hover{border-color:var(--red)}
+  .at-item .at-num{font-family:var(--mono);font-weight:700;font-size:12px;color:var(--ink)}
+  .at-item .at-meta{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+  .at-fase{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);margin-left:auto;white-space:nowrap}
+  .at-fase.f-aberto,.at-fase.f-relatorio,.at-fase.f-notificacao,.at-fase.f-manifestacao{background:rgba(200,136,31,.16);color:var(--amber-text);border-color:rgba(200,136,31,.4)}
+  .at-fase.f-transacao,.at-fase.f-replica,.at-fase.f-decisao,.at-fase.f-saneamento{background:rgba(31,95,165,.14);color:#2f6fb0;border-color:rgba(31,95,165,.4)}
+  .at-fase.f-encerrado{background:rgba(31,157,87,.16);color:var(--green-text);border-color:rgba(31,157,87,.4)}
+  .at-fase.f-remetido,.at-fase.f-arquivado{background:var(--red-soft);color:var(--red-text);border-color:rgba(168,15,30,.4)}
+  .at-voltar{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0;margin-bottom:10px}
+  .at-steps{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px}
+  .at-steps .st{font-size:9.5px;font-family:var(--mono);padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .at-steps .st.on{background:var(--red);color:#fff;border-color:var(--red)}
+  .at-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+  .at-f{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;min-width:0}
+  .at-f label{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .at-f input,.at-f select,.at-f textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;background:var(--card);color:var(--ink);font-family:inherit}
+  .at-f textarea{resize:vertical;font-family:var(--mono);font-size:11.5px;line-height:1.5}
+  .at-sec{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#7a0d16;font-weight:700;margin:8px 0 8px;border-top:1px dashed var(--line);padding-top:12px}
+  body.dark-mode .at-sec{color:#ffb4b4}
+  .at-partes-box{margin-top:4px}
+  .at-parte{border:1px solid var(--line);border-radius:9px;padding:9px;margin-bottom:8px;background:var(--bg-soft,rgba(127,127,127,.04))}
+  .at-parte-row{display:grid;grid-template-columns:1.4fr 1fr .8fr .8fr;gap:8px;margin-bottom:7px}
+  .at-parte-row2{display:grid;grid-template-columns:auto auto 1.2fr auto;gap:10px;align-items:center}
+  .at-parte input,.at-parte select{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:11.5px;background:var(--card);color:var(--ink)}
+  .at-parte .chk{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);white-space:nowrap}
+  .at-parte .rm{background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;line-height:1}
+  .at-docs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0;padding:10px;border:1px dashed var(--line);border-radius:9px}
+  .at-docs-l{font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .btn-doc{background:rgba(31,95,165,.10);border:1px solid rgba(31,95,165,.4);color:#2f6fb0;border-radius:7px;padding:6px 10px;font-size:11.5px;cursor:pointer}
+  body.dark-mode .btn-doc{background:rgba(90,150,220,.16);color:#9cc4ee;border-color:rgba(90,150,220,.45)}
+  .at-form-foot{display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:12px;border-top:1px solid var(--line)}
+  .at-save-status{font-size:11.5px;color:var(--muted)}.at-save-status.ok{color:#0d9488}.at-save-status.err{color:#e2342f}
+  .btn-mini,.btn-mini-prim{border-radius:8px;padding:8px 13px;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .btn-mini-prim{background:var(--red);color:#fff;border-color:var(--red)}
+  .btn-excluir{background:none;border:1px solid rgba(168,15,30,.4);color:var(--red);border-radius:8px;padding:8px 13px;font-size:12px;cursor:pointer}
+  @media(max-width:760px){.at-grid{grid-template-columns:1fr}.at-parte-row{grid-template-columns:1fr 1fr}.at-parte-row2{grid-template-columns:1fr 1fr}}
   .ed-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
   .ed-col{display:flex;flex-direction:column;gap:14px;min-width:0}
   .ed-section{border:1px solid var(--line);border-radius:12px;background:var(--bg);overflow:hidden}
@@ -4875,6 +5226,7 @@ header('Expires: 0');
             <button class="mini-btn active" id="btn-rotulos" title="Rótulos ocultos — passe o mouse sobre o imóvel para ver a matrícula">🏷 Mostrar rótulos</button>
             <button class="mini-btn onr" id="btn-onr-lote" title="Enviar todos os imóveis prontos ao Mapa ONR">➤ Enviar prontos</button>
             <button class="mini-btn" id="btn-onr-config" title="Configurar a API do Mapa ONR">⚙</button>
+            <button class="mini-btn at" id="btn-autotutela" title="Processo de autotutela registral (Prov. CNJ 195/2025, art. 440-BG; LRP)">⚖ Autotutela registral</button>
           </div>
         </div>
         <div class="vista-toggle" id="vista-toggle">
@@ -4936,6 +5288,7 @@ header('Expires: 0');
       <div class="ov-overlaps" id="ov-overlaps"></div>
       <div class="ov-foot">
         <button class="btn-report" id="btn-relatorio">Gerar relatório de sobreposição (PDF)</button>
+        <button class="btn-report at" id="btn-instaurar-at" title="Abrir um procedimento de autotutela registral a partir das sobreposições exibidas">⚖ Instaurar autotutela desta sobreposição</button>
       </div>
     </div>
 
@@ -4973,6 +5326,121 @@ header('Expires: 0');
 <div id="panel-backdrop" class="panel-backdrop"></div>
 
 <!-- Modal: editar dados do imóvel -->
+<div id="modal-autotutela" class="modal-ov">
+  <div class="modal-card at-card">
+    <div class="modal-h">
+      <h3 id="at-titulo">⚖ Autotutela Registral</h3>
+      <button class="modal-x" id="at-fechar" title="Fechar">×</button>
+    </div>
+    <div class="modal-b">
+      <!-- VISÃO LISTA -->
+      <div id="at-view-lista">
+        <div class="at-bar">
+          <button class="btn-mini-prim" id="at-novo">+ Novo procedimento</button>
+          <span class="at-hint">Prov. CNJ nº 195/2025 (art. 440-BG do CNN/CN/CNJ-Extra) · LRP (arts. 110, 213 e 214) · CC art. 1.247</span>
+        </div>
+        <div id="at-lista" class="at-lista"></div>
+      </div>
+
+      <!-- VISÃO FORMULÁRIO -->
+      <div id="at-view-form" style="display:none">
+        <input type="hidden" id="at-id">
+        <button class="at-voltar" id="at-voltar">‹ Voltar à lista</button>
+
+        <div class="at-steps" id="at-steps"></div>
+
+        <div class="at-grid">
+          <div class="at-f"><label>Nº do procedimento</label><input type="text" id="at-numero" readonly></div>
+          <div class="at-f"><label>Prenotação (prioridade registral)</label><input type="text" id="at-prenotacao" placeholder="nº no Livro de Protocolo"></div>
+          <div class="at-f"><label>Data de abertura</label><input type="date" id="at-data"></div>
+          <div class="at-f"><label>Prazo de manifestação (dias)</label><input type="number" id="at-prazo" min="1" max="365" value="15"></div>
+        </div>
+
+        <div class="at-grid">
+          <div class="at-f"><label>Fundamento (art. 440-BG, caput)</label>
+            <select id="at-fundamento">
+              <option value="litigio">Potencial litígio entre titulares</option>
+              <option value="alta_indagacao">Alta indagação (dilação probatória)</option>
+            </select></div>
+          <div class="at-f"><label>Tipo de vício</label>
+            <select id="at-vicio">
+              <option value="sobreposicao">Sobreposição de área</option>
+              <option value="duplicidade">Duplicidade de matrícula</option>
+              <option value="multiplicidade">Multiplicidade de matrículas</option>
+              <option value="erro_material">Erro material na matrícula</option>
+              <option value="georref_erro">Erro na descrição georreferenciada</option>
+              <option value="serventia_incompetente">Serventia territorialmente incompetente</option>
+              <option value="outro">Outro</option>
+            </select></div>
+          <div class="at-f"><label>Fase</label>
+            <select id="at-fase">
+              <option value="aberto">1 · Aberto (ato + prenotação)</option>
+              <option value="relatorio">2 · Relatório preliminar</option>
+              <option value="notificacao">3 · Notificação das partes</option>
+              <option value="manifestacao">4 · Manifestação (prazo)</option>
+              <option value="transacao">5 · Transação</option>
+              <option value="replica">6 · Réplica</option>
+              <option value="decisao">7 · Decisão</option>
+              <option value="saneamento">8 · Saneamento</option>
+              <option value="encerrado">Encerrado</option>
+              <option value="remetido">Remetido ao Corregedor (art. 214 LRP)</option>
+              <option value="arquivado">Arquivado</option>
+            </select></div>
+        </div>
+
+        <div class="at-f"><label>Objeto e fatos a apurar (art. 440-BG, II)</label>
+          <textarea id="at-objeto" rows="3" placeholder="Delimite o objeto e os fatos a serem apurados."></textarea></div>
+        <div class="at-f"><label>Matrículas/transcrições atingidas</label>
+          <input type="text" id="at-matriculas" placeholder="Ex.: 2063; 506"></div>
+
+        <div class="at-f"><label>Relatório circunstanciado preliminar (art. 440-BG, I e II)</label>
+          <textarea id="at-relatorio" rows="4" placeholder="Descreva o vício identificado e as providências de saneamento propostas."></textarea></div>
+
+        <!-- PARTES -->
+        <div class="at-partes-box">
+          <div class="at-sec">Partes interessadas (titulares de direitos a notificar)</div>
+          <div id="at-partes"></div>
+          <button class="btn-mini" id="at-add-parte">+ Adicionar parte</button>
+        </div>
+
+        <!-- DECISÃO -->
+        <div class="at-sec">Decisão e saneamento</div>
+        <div class="at-f"><label>Decisão fundamentada</label>
+          <textarea id="at-decisao" rows="3" placeholder="Síntese das manifestações e fundamentação da decisão."></textarea></div>
+        <div class="at-grid">
+          <div class="at-f"><label>Resultado</label>
+            <select id="at-resultado">
+              <option value="">— em andamento —</option>
+              <option value="saneado">Saneado (atos corretivos)</option>
+              <option value="remetido">Remetido ao Corregedor (art. 214 LRP)</option>
+              <option value="arquivado">Arquivado</option>
+            </select></div>
+          <div class="at-f"><label>Oficial (assinatura)</label><input type="text" id="at-oficial" placeholder="Nome do Oficial / substituto"></div>
+        </div>
+        <div class="at-f"><label>Atos de saneamento determinados (retificação/averbação)</label>
+          <textarea id="at-saneamento" rows="2" placeholder="Ex.: Retificar o memorial da matrícula X; averbar a exclusão da área sobreposta."></textarea></div>
+        <div class="at-f"><label>Observações internas</label><textarea id="at-obs" rows="2"></textarea></div>
+
+        <div class="at-docs">
+          <span class="at-docs-l">Documentos (PDF):</span>
+          <button class="btn-doc" data-doc="abertura">Ato de abertura</button>
+          <button class="btn-doc" data-doc="relatorio">Relatório preliminar</button>
+          <button class="btn-doc" data-doc="notificacao">Notificação</button>
+          <button class="btn-doc" data-doc="decisao">Decisão / Termo</button>
+        </div>
+
+        <div class="at-form-foot">
+          <button class="btn-excluir" id="at-excluir">Excluir</button>
+          <div style="flex:1"></div>
+          <span id="at-save-status" class="at-save-status"></span>
+          <button class="btn-mini-prim" id="at-salvar">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<form id="at-pdf-form" method="POST" target="_blank" style="display:none"><input type="hidden" name="acao" value="autotutela_pdf"><input type="hidden" name="id" id="at-pdf-id"><input type="hidden" name="tipo" id="at-pdf-tipo"></form>
+
 <div id="modal-edit" class="modal-ov">
   <div class="modal-card">
     <div class="modal-h">
@@ -5290,7 +5758,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-municipio-vizinho-offline','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-autotutela-registral','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -7225,6 +7693,190 @@ async function edMapearTexto(){
 
 function fecharEdicao(){ edNovoItn03=false; const t=document.getElementById('ed-titulo'); if(t) t.textContent='Editar dados do imóvel'; document.getElementById('modal-edit').classList.remove('show'); }
 
+/* ===================== AUTOTUTELA REGISTRAL (frontend) ===================== */
+const AT_FASES = [['aberto','Aberto'],['relatorio','Relatório'],['notificacao','Notificação'],['manifestacao','Manifestação'],['transacao','Transação'],['replica','Réplica'],['decisao','Decisão'],['saneamento','Saneamento'],['encerrado','Encerrado']];
+const AT_FASE_LBL = {aberto:'Aberto',relatorio:'Relatório',notificacao:'Notificação',manifestacao:'Manifestação',transacao:'Transação',replica:'Réplica',decisao:'Decisão',saneamento:'Saneamento',encerrado:'Encerrado',remetido:'Remetido (Corregedor)',arquivado:'Arquivado'};
+
+function abrirAutotutela(){ document.getElementById('modal-autotutela').classList.add('show'); atMostrarLista(); atCarregarLista(); }
+function fecharAutotutela(){ document.getElementById('modal-autotutela').classList.remove('show'); }
+function atMostrarLista(){ document.getElementById('at-view-lista').style.display='block'; document.getElementById('at-view-form').style.display='none'; document.getElementById('at-titulo').textContent='⚖ Autotutela Registral'; }
+function atMostrarForm(){ document.getElementById('at-view-lista').style.display='none'; document.getElementById('at-view-form').style.display='block'; }
+
+async function atCarregarLista(){
+  const box=document.getElementById('at-lista'); box.innerHTML='<div class="at-hint">Carregando…</div>';
+  try{
+    const r=await post({acao:'autotutela_listar'});
+    if(!r.ok){ box.innerHTML='<div class="at-hint">Falha ao carregar.</div>'; return; }
+    if(!r.itens.length){ box.innerHTML='<div class="at-hint">Nenhum procedimento. Clique em “+ Novo procedimento” ou instaure a partir de uma sobreposição.</div>'; return; }
+    box.innerHTML='';
+    r.itens.forEach(it=>{
+      const div=document.createElement('div'); div.className='at-item';
+      const faseLbl=AT_FASE_LBL[it.fase]||it.fase;
+      div.innerHTML='<div style="flex:1;min-width:0"><div class="at-num">'+escapeHtml(it.numero||('#'+it.id))+'</div>'
+        +'<div class="at-meta">'+escapeHtml(({sobreposicao:'Sobreposição',duplicidade:'Duplicidade',multiplicidade:'Multiplicidade',erro_material:'Erro material',georref_erro:'Erro georref.',serventia_incompetente:'Serventia incompetente',outro:'Outro'})[it.vicio_tipo]||it.vicio_tipo||'—')
+        +' · Mat. '+escapeHtml(it.matriculas||'—')+'<br>Aberto em '+atDataBR(it.data_abertura)+' · '+(it.n_notificadas||0)+'/'+(it.n_partes||0)+' parte(s) notificada(s)</div></div>'
+        +'<span class="at-fase f-'+escapeHtml(it.fase)+'">'+escapeHtml(faseLbl)+'</span>';
+      div.onclick=()=>atAbrir(it.id);
+      box.appendChild(div);
+    });
+  }catch(e){ box.innerHTML='<div class="at-hint">Erro de comunicação.</div>'; }
+}
+function atDataBR(d){ d=(d||'').toString(); if(!d||d==='0000-00-00') return '—'; const p=d.substr(0,10).split('-'); return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):d; }
+
+async function atAbrir(id){
+  try{
+    const r=await post({acao:'autotutela_obter', id:id});
+    if(!r.ok){ swalToast('error', r.erro||'Não encontrado.'); return; }
+    atPreencherForm(r.registro);
+    atMostrarForm();
+  }catch(e){ swalToast('error','Erro ao abrir.'); }
+}
+
+function atPreencherForm(reg){
+  document.getElementById('at-id').value=reg.id||'';
+  document.getElementById('at-numero').value=reg.numero||'';
+  document.getElementById('at-prenotacao').value=reg.prenotacao||'';
+  document.getElementById('at-data').value=(reg.data_abertura||'').substr(0,10);
+  document.getElementById('at-prazo').value=reg.prazo_dias||15;
+  document.getElementById('at-fundamento').value=reg.fundamento||'litigio';
+  document.getElementById('at-vicio').value=reg.vicio_tipo||'sobreposicao';
+  document.getElementById('at-fase').value=reg.fase||'aberto';
+  document.getElementById('at-objeto').value=reg.objeto||'';
+  document.getElementById('at-matriculas').value=reg.matriculas||'';
+  document.getElementById('at-relatorio').value=reg.relatorio_preliminar||'';
+  document.getElementById('at-decisao').value=reg.decisao||'';
+  document.getElementById('at-resultado').value=reg.resultado||'';
+  document.getElementById('at-oficial').value=reg.oficial||'';
+  document.getElementById('at-saneamento').value=reg.ato_saneamento||'';
+  document.getElementById('at-obs').value=reg.observacoes||'';
+  atRenderPartes(Array.isArray(reg.partes)?reg.partes:[]);
+  atRenderSteps(reg.fase||'aberto');
+  const st=document.getElementById('at-save-status'); if(st){ st.className='at-save-status'; st.textContent=''; }
+}
+function atRenderSteps(fase){
+  const box=document.getElementById('at-steps'); if(!box) return;
+  const idx=AT_FASES.findIndex(f=>f[0]===fase);
+  box.innerHTML=AT_FASES.map((f,i)=>'<span class="st'+(i<=idx&&idx>=0?' on':'')+'">'+(i+1)+'·'+f[1]+'</span>').join('')
+    + (fase==='remetido'?'<span class="st on">→ Corregedor</span>':'') + (fase==='arquivado'?'<span class="st on">Arquivado</span>':'');
+}
+
+function atRenderPartes(lista){
+  const box=document.getElementById('at-partes'); box.innerHTML='';
+  (lista||[]).forEach(p=>atAddParteEl(p));
+}
+function atAddParteEl(p){
+  p=p||{};
+  const box=document.getElementById('at-partes');
+  const el=document.createElement('div'); el.className='at-parte';
+  el.innerHTML=
+    '<div class="at-parte-row">'
+    +'<input class="p-nome" placeholder="Nome do interessado" value="'+escapeHtml(p.nome||'')+'">'
+    +'<input class="p-doc" placeholder="CPF/CNPJ" value="'+escapeHtml(p.doc||'')+'">'
+    +'<select class="p-papel"><option value="titular">Titular</option><option value="confrontante">Confrontante</option><option value="credor">Credor</option><option value="terceiro">Terceiro</option></select>'
+    +'<input class="p-mat" placeholder="Matrícula" value="'+escapeHtml(p.matricula||'')+'">'
+    +'</div>'
+    +'<div class="at-parte-row2">'
+    +'<label class="chk"><input type="checkbox" class="p-notif" '+(p.notificado?'checked':'')+'> Notificado em</label>'
+    +'<input type="date" class="p-datanotif" value="'+escapeHtml((p.data_notif||'').substr(0,10))+'" style="max-width:150px">'
+    +'<select class="p-manif"><option value="">— manifestação —</option><option value="anuencia">Anuência expressa</option><option value="impugnacao">Impugnação</option><option value="sem_resposta">Sem resposta (anuência tácita)</option></select>'
+    +'<button class="rm" title="Remover">✕</button>'
+    +'</div>'
+    +'<input class="p-manieftxt" placeholder="Resumo da manifestação (opcional)" value="'+escapeHtml(p.manif_texto||'')+'" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:11.5px;margin-top:7px;background:var(--card);color:var(--ink)">';
+  el.querySelector('.p-papel').value=p.papel||'titular';
+  el.querySelector('.p-manif').value=p.manifestacao||'';
+  el.querySelector('.rm').onclick=()=>el.remove();
+  box.appendChild(el);
+}
+function atColetarPartes(){
+  const out=[];
+  document.querySelectorAll('#at-partes .at-parte').forEach(el=>{
+    const nome=el.querySelector('.p-nome').value.trim();
+    if(!nome && !el.querySelector('.p-mat').value.trim()) return;
+    out.push({nome:nome, doc:el.querySelector('.p-doc').value.trim(), papel:el.querySelector('.p-papel').value,
+      matricula:el.querySelector('.p-mat').value.trim(), notificado:el.querySelector('.p-notif').checked,
+      data_notif:el.querySelector('.p-datanotif').value, manifestacao:el.querySelector('.p-manif').value,
+      manif_texto:el.querySelector('.p-manieftxt').value.trim()});
+  });
+  return out;
+}
+function atColetarForm(){
+  return {
+    id:document.getElementById('at-id').value,
+    prenotacao:document.getElementById('at-prenotacao').value,
+    data_abertura:document.getElementById('at-data').value,
+    prazo_dias:document.getElementById('at-prazo').value,
+    fundamento:document.getElementById('at-fundamento').value,
+    vicio_tipo:document.getElementById('at-vicio').value,
+    fase:document.getElementById('at-fase').value,
+    objeto:document.getElementById('at-objeto').value,
+    matriculas:document.getElementById('at-matriculas').value,
+    relatorio_preliminar:document.getElementById('at-relatorio').value,
+    decisao:document.getElementById('at-decisao').value,
+    resultado:document.getElementById('at-resultado').value,
+    oficial:document.getElementById('at-oficial').value,
+    ato_saneamento:document.getElementById('at-saneamento').value,
+    observacoes:document.getElementById('at-obs').value,
+    partes:JSON.stringify(atColetarPartes())
+  };
+}
+async function atSalvar(silent){
+  const d=atColetarForm(); if(!d.id){ return false; }
+  const st=document.getElementById('at-save-status');
+  try{
+    const r=await post(Object.assign({acao:'autotutela_salvar'}, d));
+    if(!r.ok){ if(st){st.className='at-save-status err'; st.textContent=r.erro||'Falha ao salvar.';} return false; }
+    if(st && !silent){ st.className='at-save-status ok'; st.textContent='Salvo ✓'; setTimeout(()=>{st.textContent='';},2500); }
+    atRenderSteps(d.fase);
+    return true;
+  }catch(e){ if(st){st.className='at-save-status err'; st.textContent='Erro ao salvar.';} return false; }
+}
+async function atExcluir(){
+  const id=document.getElementById('at-id').value; if(!id) return;
+  if(!confirm('Excluir definitivamente este procedimento de autotutela registral?')) return;
+  try{ await post({acao:'autotutela_excluir', id:id}); }catch(e){}
+  atMostrarLista(); atCarregarLista();
+}
+async function atDoc(tipo){
+  const ok=await atSalvar(true); // salva antes de gerar para refletir edições
+  const id=document.getElementById('at-id').value; if(!id) return;
+  document.getElementById('at-pdf-id').value=id;
+  document.getElementById('at-pdf-tipo').value=tipo;
+  document.getElementById('at-pdf-form').submit();
+}
+async function atNovo(prefill){
+  prefill=prefill||{};
+  try{
+    const r=await post(Object.assign({acao:'autotutela_abrir', fundamento:'litigio', prazo_dias:15}, prefill));
+    if(!r.ok){ swalToast('error', r.erro||'Falha ao abrir.'); return; }
+    await atAbrir(r.id);
+    swalToast('success','Procedimento '+r.numero+' instaurado.');
+  }catch(e){ swalToast('error','Erro ao instaurar.'); }
+}
+// Instaura a partir das sobreposições exibidas (foco) no painel
+function atInstaurarDaSobreposicao(){
+  const lista=(typeof overlapsExibidos!=='undefined' && overlapsExibidos.length)?overlapsExibidos:(typeof overlapsAtuais!=='undefined'?overlapsAtuais:[]);
+  if(!lista.length){ swalToast('info','Não há sobreposições exibidas. Filtre por uma matrícula (ex.: 2063;*) e tente novamente.'); return; }
+  const setMat=new Set(); const partesMap={};
+  lista.forEach(o=>{
+    [o.a,o.b].forEach(im=>{
+      if(!im) return;
+      const mat=(typeof rotuloMat==='function'?rotuloMat(im.numero_matricula):im.numero_matricula)||'';
+      if(mat) setMat.add(mat);
+      const key=mat||(''+im.id);
+      if(!partesMap[key]) partesMap[key]={nome:(im.proprietario||im.identificador||('Titular da matrícula '+mat)), papel:'titular', matricula:mat, notificado:false, manifestacao:''};
+    });
+  });
+  const mats=[...setMat];
+  const prefill={
+    vicio_tipo:'sobreposicao', fundamento:'litigio',
+    matriculas:mats.join('; '),
+    objeto:'Apurar a sobreposição de área identificada entre as matrículas '+mats.join(', ')+', no âmbito do Sistema de Informações Geográficas do Registro de Imóveis (SIG-RI), para eventual saneamento (retificação/averbação).',
+    partes:JSON.stringify(Object.values(partesMap))
+  };
+  fecharAutotutelaOverlapAndOpen(prefill);
+}
+function fecharAutotutelaOverlapAndOpen(prefill){ abrirAutotutela(); setTimeout(()=>atNovo(prefill), 60); }
+
 /* ===================== EXPORTAÇÃO DE CARGA ITN 03 (ONR) ===================== */
 function itn03Baixar(nome, conteudo){
   const blob = new Blob([conteudo], {type:'application/json;charset=utf-8'});
@@ -7995,6 +8647,18 @@ function verificarPertencimento(geo){
   if(bk && fk){ bk.addEventListener('click', ()=>fk.click()); fk.addEventListener('change', ()=>{ const f=fk.files && fk.files[0]; carregarLimiteKml(f); fk.value=''; }); }
   const bo=document.getElementById('btn-muni-ocultar'); if(bo) bo.addEventListener('click', ()=>{ ocultarLimite(); muniStatus('', ''); });
   montarSeletorCorPainel();
+
+  // Autotutela registral
+  const btAt=document.getElementById('btn-autotutela'); if(btAt) btAt.addEventListener('click', abrirAutotutela);
+  const btAtX=document.getElementById('at-fechar'); if(btAtX) btAtX.addEventListener('click', fecharAutotutela);
+  const btAtNovo=document.getElementById('at-novo'); if(btAtNovo) btAtNovo.addEventListener('click', ()=>atNovo());
+  const btAtVoltar=document.getElementById('at-voltar'); if(btAtVoltar) btAtVoltar.addEventListener('click', ()=>{ atMostrarLista(); atCarregarLista(); });
+  const btAtSalvar=document.getElementById('at-salvar'); if(btAtSalvar) btAtSalvar.addEventListener('click', ()=>atSalvar(false));
+  const btAtExcluir=document.getElementById('at-excluir'); if(btAtExcluir) btAtExcluir.addEventListener('click', atExcluir);
+  const btAtAddP=document.getElementById('at-add-parte'); if(btAtAddP) btAtAddP.addEventListener('click', ()=>atAddParteEl({}));
+  document.querySelectorAll('#at-view-form .btn-doc').forEach(b=> b.addEventListener('click', ()=>atDoc(b.getAttribute('data-doc'))));
+  const btInst=document.getElementById('btn-instaurar-at'); if(btInst) btInst.addEventListener('click', atInstaurarDaSobreposicao);
+  const atFase=document.getElementById('at-fase'); if(atFase) atFase.addEventListener('change', ()=>atRenderSteps(atFase.value));
 
   // Município padrão pela serventia (cadastro_serventia.cidade) — recarrega a cada atualização da página
   let cidade='', ufServ='MA', codServ='';
