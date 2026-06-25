@@ -460,16 +460,20 @@ function buildGeoData($memorial) {
         $tab = extractGeoCoordinatesTabela($memorial);
         if (count($tab['pts']) >= 3) { $pts = $tab['pts']; $fonte = 'gms_tabela'; $res = $tab; }
     }
-    if (count($pts) < 3) {                        // 3º UTM (E/N em metros)
+    if (count($pts) < 3) {                        // 3º UTM (E/N em metros) — leiaute clássico
         $utm = extractUTMCoordinates($memorial);
         if (count($utm['pts']) >= 3) { $pts = $utm['pts']; $fonte = 'utm'; }
+    }
+    if (count($pts) < 3) {                        // 4º UTM ROTULADO "<num>-E e <num>-N" / "N=.. E=.."
+        $utr = extractUTMVerticesRotulados($memorial);
+        if (count($utr['pts']) >= 3) { $pts = $utr['pts']; $fonte = 'utm_rotulado'; }
     }
 
     // Reconciliação por caminhamento: corrige vértices com coordenada incoerente
     // (erro de digitação no documento) usando os azimutes/distâncias do memorial.
     $corrigidos = [];
     if (count($pts) >= 3) {
-        $legs = extractTraverseLegs($memorial);
+        $legs = extractTraverseLegsLoose($memorial);
         if (count($legs) >= 3) {
             $rec = reconcileTraverse($pts, $legs);
             if ($rec['usou']) { $pts = $rec['pts']; $corrigidos = $rec['corrigidos']; }
@@ -488,6 +492,239 @@ function buildGeoData($memorial) {
             . 'Confira o desenho antes de gravar.';
     }
     return $data;
+}
+
+/* ====================================================================
+ *  ANÁLISE DE COORDENADAS INVÁLIDAS  (laudo: transcrito x corrigido)
+ *  Detecta vértices com coordenada incoerente (erro de digitação/OCR no
+ *  documento), compara o traçado TRANSCRITO (coordenadas como vieram) com o
+ *  CORRIGIDO (reconstruído pelos azimutes/distâncias do próprio memorial) e
+ *  deixa o usuário escolher qual mapear/gravar.
+ * ==================================================================== */
+
+/** Conserta confusões de OCR (l/I->1, O/o->0) dentro de um token numérico. */
+function repararDigitosOCR($s) {
+    return strtr((string)$s, ['l' => '1', 'L' => '1', 'I' => '1', 'O' => '0', 'o' => '0']);
+}
+
+/** Legs azimute+distância tolerante a OCR (ex.: "l.055,53m" -> 1055,53). */
+function extractTraverseLegsLoose($text) {
+    $t = normalizeGeoText($text);
+    $re = '/azimute\s*(?:de)?\s*(\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"?[^0-9]{0,40}?dist[âa]ncia\s*(?:de)?\s*([\dlLIOo.,]+)\s*m/isu';
+    preg_match_all($re, $t, $m, PREG_SET_ORDER);
+    $legs = [];
+    foreach ($m as $x) {
+        $legs[] = ['az' => dmsToDecimal($x[1], $x[2], $x[3]), 'dist' => brNumero(repararDigitosOCR($x[4]))];
+    }
+    return $legs;
+}
+
+/** Normaliza um rótulo de marco ("M-ll","M 02","M-O7") -> "M-11","M-02","M-07". */
+function _labelMarco($raw) {
+    $raw = strtoupper(trim((string)$raw));
+    $raw = strtr($raw, ['L' => '1', 'I' => '1', 'O' => '0']);
+    if (!preg_match('/(\d{1,3})/', $raw, $mm)) return 'M-?';
+    return 'M-' . str_pad((string)((int)$mm[1]), 2, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Extrai vértices UTM ROTULADOS preservando a ordem do documento, aceitando os
+ * dois leiautes usuais: "<num>-E e <num>-N" (número antes da letra, comum nos
+ * memoriais do INCRA/SIGEF) e "N=<num> E=<num>". Conserta easting fora de faixa
+ * (7 dígitos por digitação) usando a MEDIANA dos eastings válidos como contexto.
+ * Retorna ['utm'=>[[N,E],...], 'pts'=>[[lat,lng],...], 'rotulos'=>[...], 'typos'=>[...], 'e_count','n_count'].
+ */
+function extractUTMVerticesRotulados($rawText, $zone = 23, $south = true) {
+    $t = normalizeGeoText($rawText);
+    $verts = []; // [label, N, E]
+
+    // Leiaute A: rótulo ... <E>-E e <N>-N (número antes da letra)
+    $reA = '/(M[-\s]?[0-9lLIoO]{1,3})[^0-9]{0,80}?UTM["\'\s]*([\d.,]+)\s*-?\s*E\s*e\s*([\d.,]+)\s*-?\s*N/isu';
+    if (preg_match_all($reA, $t, $mA, PREG_SET_ORDER)) {
+        foreach ($mA as $x) {
+            $verts[] = [_labelMarco($x[1]), brNumero(repararDigitosOCR($x[3])), brNumero(repararDigitosOCR($x[2]))];
+        }
+    }
+    // Leiaute B (fallback): rótulo ... N=<num> ... E=<num>
+    if (count($verts) < 3) {
+        $verts = [];
+        $reB = '/(M[-\s]?[0-9lLIoO]{1,3})[^0-9]{0,80}?N\s*=?\s*([\d.,]+)\s*m?[^0-9]{0,20}?E\s*=?\s*([\d.,]+)/isu';
+        if (preg_match_all($reB, $t, $mB, PREG_SET_ORDER)) {
+            foreach ($mB as $x) {
+                $verts[] = [_labelMarco($x[1]), brNumero(repararDigitosOCR($x[2])), brNumero(repararDigitosOCR($x[3]))];
+            }
+        }
+    }
+    if (count($verts) < 3) return ['utm' => [], 'pts' => [], 'rotulos' => [], 'typos' => [], 'e_count' => 0, 'n_count' => 0];
+
+    // remove vértice de fechamento repetido (último ~ primeiro) ANTES de reparar typos
+    $k = count($verts);
+    if ($k > 3 && abs($verts[0][1] - $verts[$k-1][1]) < 0.2 && abs($verts[0][2] - $verts[$k-1][2]) < 0.2) {
+        array_pop($verts);
+    }
+
+    // mediana dos eastings válidos (faixa UTM 100000..999999) para reparar typos
+    $validE = [];
+    foreach ($verts as $vv) { if ($vv[2] >= 100000 && $vv[2] <= 999999) $validE[] = $vv[2]; }
+    $medE = medianaFloat($validE);
+    $typos = [];
+    foreach ($verts as $i => $vv) {
+        $E = $vv[2];
+        if ($E < 100000 || $E > 999999) {
+            $intp = (string)(int)floor(abs($E));
+            $frac = abs($E) - floor(abs($E));
+            $best = null;
+            for ($kk = 0; $kk < strlen($intp); $kk++) {
+                $cand = (int)(substr($intp, 0, $kk) . substr($intp, $kk + 1));
+                if ($cand >= 100000 && $cand <= 999999) {
+                    if ($best === null || abs($cand - $medE) < abs($best - $medE)) $best = $cand;
+                }
+            }
+            if ($best !== null) {
+                $typos[] = $vv[0] . ': easting ' . $intp . ' (' . strlen($intp) . ' díg.) corrigido p/ ' . $best;
+                $verts[$i][2] = (float)$best + $frac;
+            } else {
+                $typos[] = $vv[0] . ': easting ' . $intp . ' fora da faixa UTM e não corrigível automaticamente';
+            }
+        }
+    }
+
+    $utm = []; $pts = []; $rot = [];
+    foreach ($verts as $vv) {
+        $utm[] = [$vv[1], $vv[2]];                       // [N, E]
+        $g = utmToGeo($vv[2], $vv[1], $zone, $south);    // utmToGeo(east, north)
+        $pts[] = [$g[0], $g[1]];
+        $rot[] = $vv[0];
+    }
+    return ['utm' => $utm, 'pts' => $pts, 'rotulos' => $rot, 'typos' => $typos,
+            'e_count' => count($pts), 'n_count' => count($pts)];
+}
+
+/** Área (Gauss) em hectares direto sobre UTM [[N,E],...]. */
+function _areaHaUTM($utm) {
+    $a = 0.0; $n = count($utm);
+    if ($n < 3) return 0.0;
+    for ($i = 0; $i < $n; $i++) {
+        $j = ($i + 1) % $n;
+        $a += $utm[$i][1] * $utm[$j][0] - $utm[$j][1] * $utm[$i][0]; // E_i*N_j - E_j*N_i
+    }
+    return abs($a) / 2.0 / 10000.0;
+}
+
+/**
+ * Laudo de coordenadas: compara o traçado TRANSCRITO (coordenadas do documento)
+ * com o CORRIGIDO (reconstruído pelos azimutes/distâncias). Devolve dois pacotes
+ * de geometria prontos para o mapa + a tabela de divergências por lado.
+ */
+function analisarCoordenadas($memorial, $zone = 23, $south = true) {
+    $vinfo = extractUTMVerticesRotulados($memorial, $zone, $south);
+    if (count($vinfo['utm']) < 3) {
+        return ['ok' => false, 'erro' => 'Não foram encontrados vértices UTM rotulados (mínimo 3). O laudo de coordenadas é específico para memoriais com coordenadas UTM dos marcos (E/N).'];
+    }
+    $utm  = $vinfo['utm'];            // [[N,E],...]
+    $rot  = $vinfo['rotulos'];
+    $v    = count($utm);
+    $legs = extractTraverseLegsLoose($memorial);
+    $temLegs = (count($legs) === $v || count($legs) === $v - 1);
+
+    // ---- pacote TRANSCRITO ----
+    $geoTrans = buildGeoDataFromPoints($vinfo['pts']);
+    $geoTrans['rotulos'] = $rot;
+    $geoTrans['area_ha_utm'] = _areaHaUTM($utm);
+
+    // ---- pacote CORRIGIDO (traverse com âncora robusta por mediana) ----
+    $geoCorr = null; $fechamento = null;
+    if ($temLegs) {
+        $rel = [[0.0, 0.0]];               // caminhamento relativo (N,E): ΔN=d·cos(az), ΔE=d·sin(az)
+        $lim = min(count($legs), $v - 1);
+        for ($i = 0; $i < $lim; $i++) {
+            $az = deg2rad($legs[$i]['az']); $d = (float)$legs[$i]['dist'];
+            $rel[] = [$rel[$i][0] + $d * cos($az), $rel[$i][1] + $d * sin($az)];
+        }
+        while (count($rel) < $v) $rel[] = end($rel);
+        $dN = []; $dE = [];
+        for ($i = 0; $i < $v; $i++) { $dN[] = $utm[$i][0] - $rel[$i][0]; $dE[] = $utm[$i][1] - $rel[$i][1]; }
+        $offN = medianaFloat($dN); $offE = medianaFloat($dE);
+        $corrUTM = [];
+        for ($i = 0; $i < $v; $i++) $corrUTM[] = [$rel[$i][0] + $offN, $rel[$i][1] + $offE];
+        $fn = 0.0; $fe = 0.0;              // erro de fechamento = módulo da soma vetorial das legs
+        foreach ($legs as $lg) { $a = deg2rad($lg['az']); $fn += $lg['dist'] * cos($a); $fe += $lg['dist'] * sin($a); }
+        $fechamento = hypot($fn, $fe);
+        $corrPts = [];
+        foreach ($corrUTM as $u) { $g = utmToGeo($u[1], $u[0], $zone, $south); $corrPts[] = [$g[0], $g[1]]; }
+        $geoCorr = buildGeoDataFromPoints($corrPts);
+        $geoCorr['rotulos'] = $rot;
+        $geoCorr['area_ha_utm'] = _areaHaUTM($corrUTM);
+        $geoCorr['fechamento_m'] = round($fechamento, 2);
+    }
+
+    // ---- tabela de divergências por lado (sobre o TRANSCRITO) ----
+    $tabela = []; $suspeitos = [];
+    for ($i = 0; $i < $v; $i++) {
+        $j = ($i + 1) % $v;
+        $dNs = $utm[$j][0] - $utm[$i][0]; $dEs = $utm[$j][1] - $utm[$i][1];
+        $distC = hypot($dNs, $dEs);
+        $azC = fmod(rad2deg(atan2($dEs, $dNs)) + 360.0, 360.0);
+        $row = ['de' => $rot[$i], 'para' => $rot[$j], 'dist_calc' => round($distC, 2), 'az_calc' => $azC];
+        if ($i < count($legs)) {
+            $azD = $legs[$i]['az']; $distD = (float)$legs[$i]['dist'];
+            $ad = abs($azC - $azD); if ($ad > 180) $ad = 360 - $ad;
+            $susp = (abs($distC - $distD) > 1.0) || ($ad > 0.5);
+            $row['dist_decl'] = round($distD, 2); $row['az_decl'] = $azD; $row['suspeito'] = $susp;
+            if ($susp) { $suspeitos[$rot[$i]] = true; $suspeitos[$rot[$j]] = true; }
+        } else {
+            $row['dist_decl'] = null; $row['az_decl'] = null; $row['suspeito'] = false;
+        }
+        $tabela[] = $row;
+    }
+
+    // ---- área/perímetro declarados no texto ----
+    $tnorm = normalizeGeoText($memorial);
+    $areaDecl = null;
+    if (preg_match('/[áa]rea\s*total\s*\(ha\)\s*([\d.]*\d,\d+)/iu', $tnorm, $ma)) $areaDecl = brNumero($ma[1]);
+    elseif (preg_match('/[áa]rea[^0-9]{0,30}?([\d.]*\d,\d{2,})\s*ha/iu', $tnorm, $ma)) $areaDecl = brNumero($ma[1]);
+    $perDecl = null;
+    if (preg_match('/per[íi]metro[^0-9]{0,20}?([\d.]*\d,\d{2})\s*m/iu', $tnorm, $mp)) $perDecl = brNumero($mp[1]);
+    elseif (preg_match('/com\s+([\d.]*\d,\d{2})\s*m/iu', $tnorm, $mp)) $perDecl = brNumero($mp[1]);
+
+    // ---- recomendação ----
+    $recom = 'transcrito'; $motivoRec = '';
+    if ($geoCorr) {
+        $dCorr = ($areaDecl !== null) ? abs($geoCorr['area_ha_utm'] - $areaDecl) : null;
+        $dTrans = ($areaDecl !== null) ? abs($geoTrans['area_ha_utm'] - $areaDecl) : null;
+        $fechaBem = ($fechamento !== null && $fechamento < 1.0);
+        if ($fechaBem && ($dCorr === null || $dTrans === null || $dCorr <= $dTrans)) {
+            $recom = 'corrigido';
+            $motivoRec = 'O caminhamento por azimutes/distâncias fecha o polígono (erro ' . number_format($fechamento, 2, ',', '.') . ' m)'
+                . ($areaDecl !== null ? ' e a área bate com a declarada (' . number_format($geoCorr['area_ha_utm'], 4, ',', '.') . ' ha ≈ ' . number_format($areaDecl, 4, ',', '.') . ' ha).' : '.');
+        }
+    }
+
+    // ---- resumo textual ----
+    $resumo = [];
+    $resumo[] = $v . ' vértices lidos do memorial' . (count($legs) ? ' e ' . count($legs) . ' lados (azimute+distância).' : '.');
+    if (!empty($vinfo['typos'])) $resumo[] = 'Correção de digitação: ' . implode('; ', $vinfo['typos']) . '.';
+    $resumo[] = 'Transcrito (coordenadas do documento): ' . number_format($geoTrans['area_ha_utm'], 4, ',', '.') . ' ha, perímetro ' . number_format($geoTrans['perimetro_m'], 2, ',', '.') . ' m.';
+    if ($geoCorr) $resumo[] = 'Corrigido (azimutes/distâncias): ' . number_format($geoCorr['area_ha_utm'], 4, ',', '.') . ' ha, perímetro ' . number_format(($perDecl ?? $geoCorr['perimetro_m']), 2, ',', '.') . ' m, fechamento ' . number_format($fechamento, 2, ',', '.') . ' m.';
+    if ($areaDecl !== null) $resumo[] = 'Área declarada no documento: ' . number_format($areaDecl, 4, ',', '.') . ' ha.';
+    $nsusp = count($suspeitos);
+    if ($nsusp) $resumo[] = $nsusp . ' vértice(s) com coordenada incoerente: ' . implode(', ', array_keys($suspeitos)) . '.';
+
+    return [
+        'ok' => true,
+        'zona' => $zone, 'hemisferio' => $south ? 'sul' : 'norte',
+        'num_vertices' => $v, 'num_legs' => count($legs), 'tem_legs' => $temLegs,
+        'typos' => $vinfo['typos'],
+        'area_declarada_ha' => $areaDecl,
+        'perimetro_declarado_m' => $perDecl,
+        'transcrito' => $geoTrans,
+        'corrigido' => $geoCorr,
+        'legs' => $tabela,
+        'vertices_suspeitos' => array_keys($suspeitos),
+        'recomendacao' => $recom,
+        'motivo_recomendacao' => $motivoRec,
+        'resumo' => $resumo,
+    ];
 }
 
 /** Reconstrói o pacote a partir da string "lat,lng lat,lng ..." gravada no banco. */
@@ -3572,6 +3809,12 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'analisar_coords') {
+            $memorial = isset($_POST['memorial']) ? (string)$_POST['memorial'] : '';
+            echo json_encode(analisarCoordenadas($memorial), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($acao === 'processar_kml') {
             $kml = isset($_POST['kml']) ? (string)$_POST['kml'] : '';
             $pm = parseKml($kml);
@@ -3666,7 +3909,10 @@ if (isset($_POST['acao'])) {
                 }
             }
 
-            $data = processarFonte($origem, $fonte);
+            // Geometria escolhida explicitamente pelo usuário no laudo de coordenadas:
+            // grava exatamente o traçado selecionado (corrigido x transcrito).
+            $geoOverride = trim((string)($_POST['geo_wgs84'] ?? ''));
+            $data = ($geoOverride !== '') ? buildGeoDataFromWgs84($geoOverride) : processarFonte($origem, $fonte);
             if (!$data['ok']) {
                 $legs = ($origem === 'kml') ? [] : extractTraverseLegs($fonte);
                 if (count($legs) >= 3) {
@@ -4496,7 +4742,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-autotutela-dark-swal (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-25-laudo-coordenadas (análise de coordenadas inválidas: traçado transcrito x corrigido por azimute/distância, parser UTM rotulado "<num>-E e <num>-N", correção de easting 7-díg e OCR l->1, tabela de divergências por lado, escolha de geometria p/ mapear e gravar) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5220,6 +5466,9 @@ header('Expires: 0');
         <button class="btn-primary" id="btn-map">Mapear</button>
         <button class="btn-save" id="btn-save" disabled>Gravar no banco</button>
       </div>
+      <div class="actions" style="margin-top:7px">
+        <button class="btn-ghost" id="btn-analisar" style="flex:1" title="Valida os marcos: compara as coordenadas transcritas com o caminhamento por azimute/distância e aponta vértices inconsistentes">🔍 Analisar coordenadas (validar marcos)</button>
+      </div>
         </div>
       </details>
 
@@ -5887,6 +6136,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Control'||e.key==='Meta'||
 document.addEventListener('keyup',   e=>{ if(e.key==='Control'||e.key==='Meta') ctrlAtivo=false; });
 window.addEventListener('blur', ()=>{ ctrlAtivo=false; });
 let lastGeo = null, origemAtual = 'memorial', kmlRaw = '', kmlNomeArquivo = '';
+let geoOverrideWgs84 = null; // traçado escolhido no laudo de coordenadas (transcrito x corrigido)
 let modo = 'single';
 let LabelOverlay = null;
 
@@ -5926,7 +6176,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-autotutela-dark-swal','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-25-laudo-coordenadas','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6086,7 +6336,7 @@ function desenhar(geo, nome){
 document.getElementById('btn-map').onclick = async ()=>{
   const memorial = document.getElementById('memorial').value;
   if(!memorial.trim()){ setStatus('err','Cole um memorial descritivo.'); return; }
-  origemAtual='memorial'; resetKmlZone();
+  origemAtual='memorial'; resetKmlZone(); geoOverrideWgs84=null;
   setStatus('warn','Processando…');
   const geo = await post({acao:'processar', memorial});
   if(!geo.ok){
@@ -6102,6 +6352,66 @@ document.getElementById('btn-map').onclick = async ()=>{
   document.getElementById('btn-save').disabled=false;
 };
 
+/* ===================== LAUDO DE COORDENADAS (transcrito x corrigido) ===================== */
+function _fmtAzDec(a){ const g=Math.floor(a), m=Math.floor((a-g)*60), s=Math.round(((a-g)*60-m)*60); return `${g}°${String(m).padStart(2,'0')}'${String(s).padStart(2,'0')}"`; }
+function _ha(x){ return x==null?'—':Number(x).toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4})+' ha'; }
+function renderLaudoHTML(a){
+  const dark=document.body.classList.contains('dark-mode');
+  const bgC=dark?'#0f151c':'#f4f6f9', bd=dark?'#222c38':'#e2e8f0', mut='#8a96a3';
+  const card=(t,v,sub,cor)=>`<div style="flex:1;min-width:130px;background:${bgC};border:1px solid ${bd};border-left:3px solid ${cor};border-radius:9px;padding:9px 11px"><div style="font-size:11px;color:${mut}">${t}</div><div style="font-size:16px;font-weight:700">${v}</div>${sub?`<div style="font-size:11px;color:${mut}">${sub}</div>`:''}</div>`;
+  const tr=a.transcrito, co=a.corrigido;
+  let cards='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
+  cards+=card('Área declarada', _ha(a.area_declarada_ha),'no documento','#3b82f6');
+  cards+=card('Traçado correto', co?_ha(co.area_ha_utm):'—', co?('fechamento '+Number(co.fechamento_m).toLocaleString('pt-BR',{minimumFractionDigits:2})+' m'):'sem azimutes','#10b981');
+  cards+=card('Transcrito (erros)', _ha(tr.area_ha_utm),'coords. do documento','#ef4444');
+  cards+='</div>';
+  let typos='';
+  if(a.typos && a.typos.length) typos='<div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px">⚠ '+a.typos.map(escapeHtml).join('<br>⚠ ')+'</div>';
+  const rows=a.legs.map(l=>{
+    const sc=l.suspeito?(dark?'#2a1416':'#fff1f1'):'transparent';
+    const dd=l.dist_decl==null?'—':Number(l.dist_decl).toLocaleString('pt-BR',{minimumFractionDigits:2});
+    const dc=Number(l.dist_calc).toLocaleString('pt-BR',{minimumFractionDigits:2});
+    const ad=l.az_decl==null?'—':_fmtAzDec(l.az_decl);
+    const ac=_fmtAzDec(l.az_calc);
+    return `<tr style="background:${sc}"><td style="padding:4px 7px;white-space:nowrap">${l.de}→${l.para}</td><td style="text-align:right;padding:4px 7px">${dd}</td><td style="text-align:right;padding:4px 7px">${dc}</td><td style="text-align:right;padding:4px 7px;white-space:nowrap">${ad}</td><td style="text-align:right;padding:4px 7px;white-space:nowrap">${ac}</td><td style="text-align:center;padding:4px 7px">${l.suspeito?'<span style="color:#ef4444;font-weight:700">≠</span>':'<span style="color:#10b981">✓</span>'}</td></tr>`;
+  }).join('');
+  const tabela=`<div style="max-height:230px;overflow:auto;border:1px solid ${bd};border-radius:9px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="position:sticky;top:0;background:${dark?'#161c24':'#eef1f5'}"><th style="text-align:left;padding:6px 7px">Lado</th><th style="text-align:right;padding:6px 7px">Dist. doc.</th><th style="text-align:right;padding:6px 7px">Dist. calc.</th><th style="text-align:right;padding:6px 7px">Azim. doc.</th><th style="text-align:right;padding:6px 7px">Azim. calc.</th><th style="padding:6px 7px">OK</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const resumo='<ul style="margin:10px 0 0;padding-left:18px;font-size:12px;line-height:1.55">'+a.resumo.map(r=>'<li>'+escapeHtml(r)+'</li>').join('')+'</ul>';
+  const rec=a.recomendacao==='corrigido'
+    ? `<div style="margin-top:10px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);border-radius:8px;padding:8px 10px;font-size:12px">✓ Recomendado: <b>traçado correto</b>. ${escapeHtml(a.motivo_recomendacao||'')}</div>`
+    : '';
+  return cards+typos+`<div style="font-size:12px;color:${mut};margin:2px 0 6px">Divergências por lado (vermelho = coordenada do documento inconsistente com o azimute/distância do agrimensor):</div>`+tabela+resumo+rec;
+}
+
+document.getElementById('btn-analisar').onclick = async ()=>{
+  const memorial=document.getElementById('memorial').value;
+  if(!memorial.trim()){ setStatus('err','Cole um memorial descritivo para analisar.'); return; }
+  setStatus('warn','Analisando coordenadas…');
+  const a=await post({acao:'analisar_coords', memorial});
+  if(!a.ok){ setStatus('err', a.erro||'Não foi possível analisar.'); return; }
+  setStatus('ok', a.num_vertices+' vértices analisados.');
+  const nome=document.getElementById('identificador').value.trim();
+  const r=await Swal.fire(Object.assign({
+    title:'Laudo de coordenadas',
+    html:renderLaudoHTML(a),
+    width:'min(920px,96vw)',
+    showCancelButton:true, showDenyButton:!!a.corrigido,
+    confirmButtonText: a.corrigido?'🟢 Mapear traçado correto':'Mapear',
+    denyButtonText:'🔴 Mapear transcrito (com erros)',
+    cancelButtonText:'Fechar',
+    confirmButtonColor:'#10b981', denyButtonColor:'#ef4444', cancelButtonColor:'#6b7785',
+    reverseButtons:false
+  }, swalTema()));
+  let geo=null, qual='';
+  if(r.isConfirmed){ geo = a.corrigido || a.transcrito; qual = a.corrigido?'Traçado correto':'Coordenadas'; }
+  else if(r.isDenied){ geo = a.transcrito; qual = 'Coordenadas transcritas'; }
+  if(!geo) return;
+  origemAtual='memorial'; lastGeo=geo; geoOverrideWgs84=geo.coordenadas_wgs84||null;
+  desenhar(geo, nome);
+  document.getElementById('btn-save').disabled=false;
+  setStatus('ok', qual+' mapeado — confira o desenho e grave.');
+};
+
 /* ===================== GRAVAR ===================== */
 document.getElementById('btn-save').onclick = async ()=>{
   const identificador = document.getElementById('identificador').value.trim();
@@ -6113,7 +6423,8 @@ document.getElementById('btn-save').onclick = async ()=>{
     identificador, numero_matricula,
     proprietario: document.getElementById('proprietario').value.trim(),
     cpf: document.getElementById('cpf').value.trim(),
-    tipo_imovel: document.getElementById('tipo_imovel').value
+    tipo_imovel: document.getElementById('tipo_imovel').value,
+    geo_wgs84: (origemAtual==='memorial' && geoOverrideWgs84) ? geoOverrideWgs84 : ''
   });
   if(!res.ok){ setStatus('err', res.erro || 'Falha ao gravar.'); return; }
   setStatus('ok', res.mensagem);
