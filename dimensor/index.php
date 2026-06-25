@@ -93,6 +93,29 @@ if (isset($_GET['anexo'])) {
     exit;
 }
 
+/* ---------- Download/visualização de anexo da AUTOTUTELA: index.php?at_anexo=<id>[&dl=1] ---------- */
+if (isset($_GET['at_anexo'])) {
+    if (function_exists('ensureAutotutela')) { try { ensureAutotutela($conn); } catch (Throwable $e) {} }
+    $aid = (int)$_GET['at_anexo'];
+    $a = function_exists('atAnexoObter') ? atAnexoObter($conn, $aid) : null;
+    if (!$a) { http_response_code(404); header('Content-Type: text/plain; charset=UTF-8'); echo 'Anexo não encontrado.'; exit; }
+    $caminho = anexosDir() . '/' . $a['arquivo'];
+    if (!is_file($caminho)) { http_response_code(404); header('Content-Type: text/plain; charset=UTF-8'); echo 'Arquivo ausente no servidor.'; exit; }
+    $mime = $a['mime'] ?: 'application/octet-stream';
+    $ext  = strtolower(pathinfo($a['arquivo'], PATHINFO_EXTENSION));
+    if ($mime === 'application/octet-stream') { if ($ext === 'pdf') $mime = 'application/pdf'; elseif (in_array($ext, ['png','jpg','jpeg'], true)) $mime = 'image/' . ($ext === 'jpg' ? 'jpeg' : $ext); }
+    $inline = empty($_GET['dl']) && in_array($ext, ['pdf','png','jpg','jpeg'], true);
+    $nome = preg_replace('/[\r\n"]+/', '', (string)$a['nome_original']);
+    if (!headers_sent()) {
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . $nome . '"');
+        header('Content-Length: ' . filesize($caminho));
+        header('Cache-Control: private, max-age=0, must-revalidate');
+    }
+    readfile($caminho);
+    exit;
+}
+
 /* ====================================================================
  *  BIBLIOTECA DE COORDENADAS
  * ==================================================================== */
@@ -2971,6 +2994,19 @@ function ensureAutotutela($conn) {
             'ato_saneamento'=>"ADD COLUMN ato_saneamento MEDIUMTEXT",'resultado'=>"ADD COLUMN resultado VARCHAR(20) NULL",
             'imovel_id'=>"ADD COLUMN imovel_id INT NULL",'observacoes'=>"ADD COLUMN observacoes MEDIUMTEXT"];
     foreach ($add as $c => $ddl) { if (!isset($cols[$c])) { try { $conn->query("ALTER TABLE autotutela_registral $ddl"); } catch (Throwable $e) {} } }
+    try { $conn->query("CREATE TABLE IF NOT EXISTS autotutela_anexos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        autotutela_id INT NOT NULL,
+        parte_idx INT NOT NULL DEFAULT -1,
+        tipo VARCHAR(30) NULL,
+        nome_original VARCHAR(255) NULL,
+        arquivo VARCHAR(255) NULL,
+        mime VARCHAR(120) NULL,
+        tamanho INT NULL,
+        hash VARCHAR(64) NULL,
+        criado_em DATETIME NULL,
+        INDEX(autotutela_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); } catch (Throwable $e) {}
 }
 /* dados da serventia para o cabeçalho dos documentos (leitura defensiva de cadastro_serventia) */
 function atServentiaInfo($conn) {
@@ -3000,7 +3036,54 @@ function atProximoNumero($conn) {
     return 'AT-' . $ano . '-' . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
 }
 function atFundamentoLabel($f) { return $f === 'alta_indagacao' ? 'alta indagação' : 'potencial litígio entre titulares de direitos'; }
-function atDataBR($d) { $d = trim((string)$d); if ($d === '' || $d === '0000-00-00') return '—'; $t = strtotime($d); return $t ? date('d/m/Y', $t) : $d; }
+/* Geração de texto livre via Gemini (rascunho de relatório/decisão). */
+function geminiGerarTexto($cfg, $prompt) {
+    if (trim((string)($cfg['api_key'] ?? '')) === '') return ['ok' => false, 'erro' => 'Chave da API do Gemini não configurada (⚙ Configurar IA).'];
+    $model = $cfg['default_model'];
+    $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent?key=' . urlencode($cfg['api_key']);
+    $payload = ['contents' => [['parts' => [['text' => $prompt]]]], 'generationConfig' => ['temperature' => 0.35]];
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => 120,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]);
+    $resp = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    if ($resp === false) return ['ok' => false, 'erro' => 'Falha de conexão com o Gemini: ' . $err];
+    $j = json_decode($resp, true);
+    if ($code < 200 || $code >= 300) return ['ok' => false, 'erro' => 'Gemini: ' . ($j['error']['message'] ?? ('HTTP ' . $code))];
+    $txt = trim((string)($j['candidates'][0]['content']['parts'][0]['text'] ?? ''));
+    $txt = trim(preg_replace('/^```\w*|```$/m', '', $txt));
+    if ($txt === '') return ['ok' => false, 'erro' => 'A IA não retornou texto.'];
+    return ['ok' => true, 'texto' => $txt, 'modelo' => $model];
+}
+/* Anexos do procedimento de autotutela (comprovantes por parte). Reaproveita anexosDir()/?at_anexo=. */
+function atAnexoSalvar($conn, $atId, $parteIdx, $bytes, $nome, $tipo, $mime) {
+    $atId = (int)$atId; if ($atId <= 0 || $bytes === '' || $bytes === false) return null;
+    $hash = sha1($bytes); $dir = anexosDir();
+    $ext = strtolower(pathinfo((string)$nome, PATHINFO_EXTENSION)); if ($ext === '' || strlen($ext) > 5) $ext = 'bin';
+    $arquivo = 'at' . $atId . '_' . date('YmdHis') . '_' . substr($hash, 0, 8) . '.' . $ext;
+    if (@file_put_contents($dir . '/' . $arquivo, $bytes) === false) return null;
+    $tam = strlen($bytes); $nome = mb_substr((string)$nome, 0, 250); $agora = date('Y-m-d H:i:s'); $pi = (int)$parteIdx; $tipo = mb_substr((string)$tipo, 0, 30);
+    $st = $conn->prepare("INSERT INTO autotutela_anexos (autotutela_id,parte_idx,tipo,nome_original,arquivo,mime,tamanho,hash,criado_em) VALUES (?,?,?,?,?,?,?,?,?)");
+    if (!$st) { @unlink($dir . '/' . $arquivo); return null; }
+    $st->bind_param('iissssiss', $atId, $pi, $tipo, $nome, $arquivo, $mime, $tam, $hash, $agora);
+    if (!$st->execute()) { @unlink($dir . '/' . $arquivo); return null; }
+    return (int)$st->insert_id;
+}
+function atAnexosListar($conn, $atId) {
+    $out = []; $st = $conn->prepare("SELECT id,parte_idx,tipo,nome_original,arquivo,mime,tamanho,criado_em FROM autotutela_anexos WHERE autotutela_id = ? ORDER BY id DESC");
+    if (!$st) return $out; $id = (int)$atId; $st->bind_param('i', $id); $st->execute(); $rs = $st->get_result();
+    while ($rs && ($r = $rs->fetch_assoc())) $out[] = $r; return $out;
+}
+function atAnexoObter($conn, $id) {
+    $st = $conn->prepare("SELECT * FROM autotutela_anexos WHERE id = ? LIMIT 1"); if (!$st) return null;
+    $id = (int)$id; $st->bind_param('i', $id); $st->execute(); $rs = $st->get_result();
+    return ($rs && ($r = $rs->fetch_assoc())) ? $r : null;
+}
+function atAnexoExcluir($conn, $id) {
+    $a = atAnexoObter($conn, $id); if (!$a) return false;
+    @unlink(anexosDir() . '/' . $a['arquivo']);
+    $st = $conn->prepare("DELETE FROM autotutela_anexos WHERE id = ?"); if (!$st) return false; $id = (int)$id; $st->bind_param('i', $id); return $st->execute();
+}function atDataBR($d) { $d = trim((string)$d); if ($d === '' || $d === '0000-00-00') return '—'; $t = strtotime($d); return $t ? date('d/m/Y', $t) : $d; }
 function atEscapa($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 /* Gera, em PDF (saída inline), os documentos do procedimento conforme a fase/tipo solicitado. */
@@ -3264,7 +3347,57 @@ if (isset($_POST['acao'])) {
         if ($acao === 'autotutela_excluir') {
             $id = (int)($_POST['id'] ?? 0);
             try { $st = $conn->prepare("DELETE FROM autotutela_registral WHERE id = ?"); $st->bind_param('i', $id); $st->execute(); } catch (Throwable $e) {}
+            try { $st = $conn->prepare("DELETE FROM autotutela_anexos WHERE autotutela_id = ?"); $st->bind_param('i', $id); $st->execute(); } catch (Throwable $e) {}
             echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE); exit;
+        }
+
+        if ($acao === 'autotutela_ia') {
+            // Rascunho de relatório preliminar / decisão via IA (Gemini), a partir dos dados do formulário.
+            $alvo = (($_POST['alvo'] ?? '') === 'decisao') ? 'decisao' : 'relatorio';
+            $fund = atFundamentoLabel((string)($_POST['fundamento'] ?? 'litigio'));
+            $vicioMap = ['sobreposicao'=>'sobreposição de área','duplicidade'=>'duplicidade de matrícula','multiplicidade'=>'multiplicidade de matrículas','erro_material'=>'erro material na matrícula','georref_erro'=>'erro na descrição georreferenciada','serventia_incompetente'=>'serventia territorialmente incompetente','outro'=>'vício registral'];
+            $vicio = $vicioMap[(string)($_POST['vicio_tipo'] ?? '')] ?? 'vício registral';
+            $objeto = trim((string)($_POST['objeto'] ?? ''));
+            $matriculas = trim((string)($_POST['matriculas'] ?? ''));
+            $relatorio = trim((string)($_POST['relatorio_preliminar'] ?? ''));
+            $partes = json_decode((string)($_POST['partes'] ?? '[]'), true); if (!is_array($partes)) $partes = [];
+            $pl = [];
+            foreach ($partes as $p) {
+                $m = (string)($p['manifestacao'] ?? '');
+                $ml = $m === 'anuencia' ? 'anuência expressa' : ($m === 'impugnacao' ? 'impugnação' : ($m === 'sem_resposta' ? 'sem resposta (anuência tácita)' : 'sem manifestação registrada'));
+                $pl[] = '- ' . trim(($p['nome'] ?? '(sem nome)') . ' (mat. ' . ($p['matricula'] ?? '—') . ', ' . ($p['papel'] ?? 'titular') . '): ' . $ml . (trim((string)($p['manif_texto'] ?? '')) !== '' ? ' — ' . $p['manif_texto'] : ''));
+            }
+            $partesTxt = $pl ? implode("\n", $pl) : '(sem partes cadastradas)';
+            $base = "Você é o Oficial de Registro de Imóveis conduzindo um PROCESSO DE AUTOTUTELA REGISTRAL na via administrativo-extrajudicial, com fundamento no art. 440-BG do CNN/CN/CNJ-Extra (Provimento CNJ nº 149/2023, com a redação do Provimento CNJ nº 195/2025) e nos arts. 110, 213 e 214 da Lei 6.015/1973 (LRP) e art. 1.247 do Código Civil. Use linguagem técnico-registral, formal e impessoal, em português do Brasil. NÃO invente fatos, nomes, áreas ou números não informados; quando faltar dado, use a lacuna [____]. Não use markdown, títulos com asteriscos nem listas com marcadores; escreva em parágrafos corridos.\n\nDADOS DO PROCEDIMENTO:\n- Tipo de vício: $vicio\n- Fundamento: $fund\n- Matrículas/transcrições atingidas: " . ($matriculas !== '' ? $matriculas : '[____]') . "\n- Objeto e fatos a apurar: " . ($objeto !== '' ? $objeto : '[____]') . "\n- Partes interessadas e manifestações:\n$partesTxt\n";
+            if ($alvo === 'relatorio') {
+                $prompt = $base . "\nTAREFA: redija o RELATÓRIO CIRCUNSTANCIADO PRELIMINAR (art. 440-BG, I e II), descrevendo de forma detalhada o vício material identificado, sua extensão/origem provável e as providências administrativas de saneamento propostas (ex.: retificação de memorial, averbação de exclusão de área, unificação/encerramento), sem decidir o mérito. Entre 2 e 4 parágrafos.";
+            } else {
+                $prompt = $base . "- Síntese do vício (relatório preliminar): " . ($relatorio !== '' ? $relatorio : '[____]') . "\n\nTAREFA: redija a DECISÃO FUNDAMENTADA do oficial, apreciando as manifestações das partes (considerando a anuência expressa ou tácita e eventuais impugnações) e concluindo por uma destas hipóteses, conforme os dados: (a) autorizar os atos de saneamento (retificação/averbação) havendo anuência; (b) remeter os autos ao Juízo Corregedor competente (art. 214 da LRP) em caso de impasse de alta indagação; ou (c) arquivar, se não verificado vício. Entre 2 e 4 parágrafos.";
+            }
+            $r = geminiGerarTexto(geminiConfigLer(), $prompt);
+            if (empty($r['ok'])) { echo json_encode(['ok' => false, 'erro' => $r['erro']], JSON_UNESCAPED_UNICODE); exit; }
+            echo json_encode(['ok' => true, 'texto' => $r['texto'], 'modelo' => $r['modelo']], JSON_UNESCAPED_UNICODE); exit;
+        }
+
+        if ($acao === 'autotutela_anexo_listar') {
+            echo json_encode(['ok' => true, 'anexos' => atAnexosListar($conn, (int)($_POST['id'] ?? 0))], JSON_UNESCAPED_UNICODE); exit;
+        }
+        if ($acao === 'autotutela_anexo_upload') {
+            $id = (int)($_POST['id'] ?? 0); $parteIdx = (int)($_POST['parte_idx'] ?? -1);
+            $tipo = preg_replace('/[^a-z_]/', '', strtolower((string)($_POST['tipo'] ?? 'outro')));
+            if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Salve o procedimento antes de anexar.']); exit; }
+            if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) { echo json_encode(['ok' => false, 'erro' => 'Falha no upload do arquivo.']); exit; }
+            if ($_FILES['file']['size'] > 20 * 1024 * 1024) { echo json_encode(['ok' => false, 'erro' => 'Arquivo acima de 20 MB.']); exit; }
+            $bytes = @file_get_contents($_FILES['file']['tmp_name']);
+            $mime = function_exists('mime_content_type') ? (@mime_content_type($_FILES['file']['tmp_name']) ?: null) : null;
+            $aid = atAnexoSalvar($conn, $id, $parteIdx, $bytes, $_FILES['file']['name'], $tipo, $mime);
+            if (!$aid) { echo json_encode(['ok' => false, 'erro' => 'Não foi possível salvar o anexo.']); exit; }
+            echo json_encode(['ok' => true, 'anexos' => atAnexosListar($conn, $id)], JSON_UNESCAPED_UNICODE); exit;
+        }
+        if ($acao === 'autotutela_anexo_excluir') {
+            $aid = (int)($_POST['anexo_id'] ?? 0); $id = (int)($_POST['id'] ?? 0);
+            atAnexoExcluir($conn, $aid);
+            echo json_encode(['ok' => true, 'anexos' => atAnexosListar($conn, $id)], JSON_UNESCAPED_UNICODE); exit;
         }
 
         if ($acao === 'ibge_municipios') {
@@ -4363,7 +4496,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-autotutela-registral (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-20-autotutela-dark-swal (armazenamento de PDF/KML por imóvel, modal largo responsivo, dropzone + análise IA p/ campos faltantes) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4859,6 +4992,27 @@ header('Expires: 0');
   .btn-mini-prim{background:var(--red);color:#fff;border-color:var(--red)}
   .btn-excluir{background:none;border:1px solid rgba(168,15,30,.4);color:var(--red);border-radius:8px;padding:8px 13px;font-size:12px;cursor:pointer}
   @media(max-width:760px){.at-grid{grid-template-columns:1fr}.at-parte-row{grid-template-columns:1fr 1fr}.at-parte-row2{grid-template-columns:1fr 1fr}}
+  .at-ia{font-size:10px;border:1px solid rgba(31,95,165,.45);background:rgba(31,95,165,.10);color:#2f6fb0;border-radius:6px;padding:2px 8px;cursor:pointer;margin-left:8px;text-transform:none;letter-spacing:0}
+  .at-ia:disabled{opacity:.55;cursor:default}
+  body.dark-mode .at-ia{background:rgba(90,150,220,.16);color:#9cc4ee;border-color:rgba(90,150,220,.45)}
+  .at-anexos-lista{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+  .at-parte-anexos{display:flex;flex-direction:column;gap:5px;margin-top:7px}
+  .at-parte-anexos:empty{display:none}
+  .at-anx{display:flex;align-items:center;gap:8px;font-size:11.5px;background:rgba(127,127,127,.07);border:1px solid var(--line);border-radius:7px;padding:5px 9px}
+  .at-anx a{color:var(--ink);text-decoration:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .at-anx-t{font-size:9.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+  .at-anx-dl{color:#2f6fb0!important;flex:0 0 auto!important}
+  .at-anx-x{background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;line-height:1}
+  .at-up-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .at-up-tipo{border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:11px;background:var(--card);color:var(--ink)}
+  /* Dark mode: força fundo escuro e texto claro em TODOS os controles do modal (inclusive as opções das listas suspensas) */
+  body.dark-mode #modal-autotutela select,
+  body.dark-mode #modal-autotutela input,
+  body.dark-mode #modal-autotutela textarea,
+  body.dark-mode #modal-autotutela .at-up-tipo{background:#1c242e !important;color:#e7edf3 !important;border-color:#2c3743 !important}
+  body.dark-mode #modal-autotutela select option{background:#1c242e !important;color:#e7edf3 !important}
+  body.dark-mode #modal-autotutela input::placeholder,
+  body.dark-mode #modal-autotutela textarea::placeholder{color:#7f8b97}
   .ed-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
   .ed-col{display:flex;flex-direction:column;gap:14px;min-width:0}
   .ed-section{border:1px solid var(--line);border-radius:12px;background:var(--bg);overflow:hidden}
@@ -5393,7 +5547,7 @@ header('Expires: 0');
         <div class="at-f"><label>Matrículas/transcrições atingidas</label>
           <input type="text" id="at-matriculas" placeholder="Ex.: 2063; 506"></div>
 
-        <div class="at-f"><label>Relatório circunstanciado preliminar (art. 440-BG, I e II)</label>
+        <div class="at-f"><label>Relatório circunstanciado preliminar (art. 440-BG, I e II) <button type="button" class="at-ia" data-alvo="relatorio">✨ Gerar com IA</button></label>
           <textarea id="at-relatorio" rows="4" placeholder="Descreva o vício identificado e as providências de saneamento propostas."></textarea></div>
 
         <!-- PARTES -->
@@ -5405,7 +5559,7 @@ header('Expires: 0');
 
         <!-- DECISÃO -->
         <div class="at-sec">Decisão e saneamento</div>
-        <div class="at-f"><label>Decisão fundamentada</label>
+        <div class="at-f"><label>Decisão fundamentada <button type="button" class="at-ia" data-alvo="decisao">✨ Gerar com IA</button></label>
           <textarea id="at-decisao" rows="3" placeholder="Síntese das manifestações e fundamentação da decisão."></textarea></div>
         <div class="at-grid">
           <div class="at-f"><label>Resultado</label>
@@ -5420,6 +5574,20 @@ header('Expires: 0');
         <div class="at-f"><label>Atos de saneamento determinados (retificação/averbação)</label>
           <textarea id="at-saneamento" rows="2" placeholder="Ex.: Retificar o memorial da matrícula X; averbar a exclusão da área sobreposta."></textarea></div>
         <div class="at-f"><label>Observações internas</label><textarea id="at-obs" rows="2"></textarea></div>
+
+        <div class="at-sec">Comprovantes anexados ao procedimento</div>
+        <div id="at-anexos-geral" class="at-anexos-lista"><span class="at-hint">—</span></div>
+        <div class="at-up-row">
+          <select id="at-up-geral-tipo" class="at-up-tipo">
+            <option value="ato">Ato/edital</option>
+            <option value="comprovante_notificacao">Comprovante de notificação</option>
+            <option value="manifestacao">Manifestação</option>
+            <option value="ar">AR/aviso de recebimento</option>
+            <option value="outro">Outro</option>
+          </select>
+          <button type="button" class="btn-mini" id="at-up-geral-btn">📎 Anexar documento geral</button>
+          <input type="file" id="at-up-geral-file" style="display:none" accept=".pdf,.png,.jpg,.jpeg">
+        </div>
 
         <div class="at-docs">
           <span class="at-docs-l">Documentos (PDF):</span>
@@ -5758,7 +5926,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-20-autotutela-registral','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-20-autotutela-dark-swal','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -7751,6 +7919,7 @@ function atPreencherForm(reg){
   document.getElementById('at-obs').value=reg.observacoes||'';
   atRenderPartes(Array.isArray(reg.partes)?reg.partes:[]);
   atRenderSteps(reg.fase||'aberto');
+  atRefreshAnexos();
   const st=document.getElementById('at-save-status'); if(st){ st.className='at-save-status'; st.textContent=''; }
 }
 function atRenderSteps(fase){
@@ -7785,7 +7954,68 @@ function atAddParteEl(p){
   el.querySelector('.p-papel').value=p.papel||'titular';
   el.querySelector('.p-manif').value=p.manifestacao||'';
   el.querySelector('.rm').onclick=()=>el.remove();
+  // anexos por parte
+  const anx=document.createElement('div'); anx.className='at-parte-anexos'; el.appendChild(anx);
+  const up=document.createElement('div'); up.className='at-up-row';
+  up.innerHTML='<select class="p-uptipo at-up-tipo"><option value="comprovante_notificacao">Comprovante de notificação</option><option value="manifestacao">Manifestação</option><option value="ar">AR/aviso de recebimento</option><option value="outro">Outro</option></select>'
+    +'<button type="button" class="btn-mini p-up">📎 Anexar à parte</button><input type="file" class="p-upfile" style="display:none" accept=".pdf,.png,.jpg,.jpeg">';
+  el.appendChild(up);
+  const upBtn=up.querySelector('.p-up'), upFile=up.querySelector('.p-upfile'), upTipo=up.querySelector('.p-uptipo');
+  upBtn.onclick=()=>upFile.click();
+  upFile.onchange=()=>{ const f=upFile.files&&upFile.files[0]; if(f){ const idx=Array.from(document.querySelectorAll('#at-partes .at-parte')).indexOf(el); atUploadAnexo(idx, f, upTipo.value); upFile.value=''; } };
   box.appendChild(el);
+}
+
+/* ---- Anexos (comprovantes) ---- */
+let atAnexosCache=[];
+function atAnexoTipoLbl(t){ return ({ato:'Ato/edital',comprovante_notificacao:'Comprovante de notificação',manifestacao:'Manifestação',ar:'AR',outro:'Documento'})[t]||'Documento'; }
+function atAnexoItemHtml(a){
+  return '<div class="at-anx"><a href="?at_anexo='+a.id+'" target="_blank">📄 '+escapeHtml(a.nome_original||('anexo '+a.id))+'</a>'
+    +'<span class="at-anx-t">'+escapeHtml(atAnexoTipoLbl(a.tipo))+'</span>'
+    +'<a class="at-anx-dl" href="?at_anexo='+a.id+'&dl=1" title="Baixar">⬇</a>'
+    +'<button type="button" class="at-anx-x" data-anx="'+a.id+'" title="Excluir">✕</button></div>';
+}
+function atRenderAnexosUI(){
+  const ger=document.getElementById('at-anexos-geral');
+  if(ger){ const gerais=atAnexosCache.filter(a=>parseInt(a.parte_idx)<0); ger.innerHTML=gerais.length?gerais.map(atAnexoItemHtml).join(''):'<span class="at-hint">—</span>'; }
+  const parts=Array.from(document.querySelectorAll('#at-partes .at-parte'));
+  parts.forEach((el,idx)=>{ const c=el.querySelector('.at-parte-anexos'); if(!c) return; const lst=atAnexosCache.filter(a=>parseInt(a.parte_idx)===idx); c.innerHTML=lst.length?lst.map(atAnexoItemHtml).join(''):''; });
+  document.querySelectorAll('#at-view-form .at-anx-x').forEach(b=> b.onclick=()=>atExcluirAnexo(b.getAttribute('data-anx')));
+}
+async function atRefreshAnexos(){
+  const id=document.getElementById('at-id').value;
+  if(!id){ atAnexosCache=[]; atRenderAnexosUI(); return; }
+  try{ const r=await post({acao:'autotutela_anexo_listar', id:id}); atAnexosCache=(r&&r.ok&&r.anexos)?r.anexos:[]; }catch(e){ atAnexosCache=[]; }
+  atRenderAnexosUI();
+}
+async function atUploadAnexo(parteIdx, file, tipo){
+  await atSalvar(true); // garante id e congela a ordem das partes
+  const id=document.getElementById('at-id').value; if(!id){ swalToast('info','Salve o procedimento antes de anexar.'); return; }
+  const fd=new FormData(); fd.append('acao','autotutela_anexo_upload'); fd.append('id',id); fd.append('parte_idx',parteIdx); fd.append('tipo',tipo||'outro'); fd.append('file',file);
+  try{
+    const r=await fetch(window.location.pathname,{method:'POST',body:fd}).then(x=>x.json());
+    if(!r||!r.ok){ swalToast('error',(r&&r.erro)||'Falha ao anexar.'); return; }
+    atAnexosCache=r.anexos||[]; atRenderAnexosUI(); swalToast('success','Comprovante anexado.');
+  }catch(e){ swalToast('error','Erro ao anexar.'); }
+}
+async function atExcluirAnexo(anxId){
+  const id=document.getElementById('at-id').value;
+  if(!await swalConfirm('Excluir anexo?', 'O arquivo será removido do servidor.', 'Excluir')) return;
+  try{ const r=await post({acao:'autotutela_anexo_excluir', anexo_id:anxId, id:id}); atAnexosCache=(r&&r.anexos)||[]; atRenderAnexosUI(); }catch(e){}
+}
+/* ---- Rascunho com IA (Gemini) ---- */
+async function atGerarIA(alvo){
+  const d=atColetarForm();
+  const btns=document.querySelectorAll('.at-ia'); btns.forEach(b=>b.disabled=true);
+  const st=document.getElementById('at-save-status'); if(st){ st.className='at-save-status'; st.textContent='Gerando '+(alvo==='decisao'?'decisão':'relatório')+' com IA… aguarde.'; }
+  try{
+    const r=await post(Object.assign({acao:'autotutela_ia', alvo:alvo}, d));
+    if(!r.ok){ if(st){st.className='at-save-status err'; st.textContent=r.erro||'Falha na IA.';} return; }
+    const ta=document.getElementById(alvo==='decisao'?'at-decisao':'at-relatorio');
+    if(ta) ta.value=r.texto;
+    if(st){ st.className='at-save-status ok'; st.textContent='Rascunho gerado ✓ — revise e ajuste antes de salvar.'; }
+  }catch(e){ if(st){st.className='at-save-status err'; st.textContent='Erro ao gerar.';} }
+  finally{ btns.forEach(b=>b.disabled=false); }
 }
 function atColetarPartes(){
   const out=[];
@@ -7832,7 +8062,7 @@ async function atSalvar(silent){
 }
 async function atExcluir(){
   const id=document.getElementById('at-id').value; if(!id) return;
-  if(!confirm('Excluir definitivamente este procedimento de autotutela registral?')) return;
+  if(!await swalConfirm('Excluir procedimento?', 'O procedimento de autotutela registral e seus anexos serão excluídos definitivamente.', 'Excluir')) return;
   try{ await post({acao:'autotutela_excluir', id:id}); }catch(e){}
   atMostrarLista(); atCarregarLista();
 }
@@ -8659,6 +8889,9 @@ function verificarPertencimento(geo){
   document.querySelectorAll('#at-view-form .btn-doc').forEach(b=> b.addEventListener('click', ()=>atDoc(b.getAttribute('data-doc'))));
   const btInst=document.getElementById('btn-instaurar-at'); if(btInst) btInst.addEventListener('click', atInstaurarDaSobreposicao);
   const atFase=document.getElementById('at-fase'); if(atFase) atFase.addEventListener('change', ()=>atRenderSteps(atFase.value));
+  document.querySelectorAll('#at-view-form .at-ia').forEach(b=> b.addEventListener('click', ()=>atGerarIA(b.getAttribute('data-alvo'))));
+  const atUpG=document.getElementById('at-up-geral-btn'), atUpGF=document.getElementById('at-up-geral-file'), atUpGT=document.getElementById('at-up-geral-tipo');
+  if(atUpG && atUpGF){ atUpG.addEventListener('click', ()=>atUpGF.click()); atUpGF.addEventListener('change', ()=>{ const f=atUpGF.files&&atUpGF.files[0]; if(f){ atUploadAnexo(-1, f, atUpGT?atUpGT.value:'outro'); atUpGF.value=''; } }); }
 
   // Município padrão pela serventia (cadastro_serventia.cidade) — recarrega a cada atualização da página
   let cidade='', ufServ='MA', codServ='';
