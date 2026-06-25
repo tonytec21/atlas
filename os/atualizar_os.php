@@ -33,10 +33,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->execute();
 
         /* ------------------------------------------------------------------
-        Se o ISS estiver ativado na configuração, recalcule e atualize
-        a linha correspondente (ato = 'ISS') sem criar linhas novas.
+        ISS: o valor já LIQUIDADO é congelado (não aumenta nem reduz).
+        - Calcula o ISS total devido sobre TODOS os emolumentos atuais.
+        - Subtrai o ISS já liquidado (linhas ISS com quantidade_liquidada > 0).
+        - O restante é lançado numa linha de ISS AINDA NÃO liquidada; se todas
+          as linhas de ISS já estiverem liquidadas (ex.: novos atos incluídos
+          depois da liquidação), cria-se uma NOVA linha de ISS para a diferença.
         ------------------------------------------------------------------*/
         if ($issAtivo) {
+            $issDescricao = isset($issCfg['descricao']) ? $issCfg['descricao'] : 'ISS sobre Emolumentos';
+
             /* 1. Soma dos emolumentos dos demais itens (exclui 'ISS') */
             $somaEmol = $conn->prepare("
                 SELECT COALESCE(SUM(emolumentos),0) AS total
@@ -48,24 +54,92 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $somaEmol->execute();
             $totalEmol = (float)$somaEmol->fetchColumn();
 
-            /* 2. Cálculo do ISS */
-            $baseISS  = $totalEmol * 0.88;
-            $valorISS = $baseISS * ($issPercentual / 100);
+            /* 2. ISS total devido sobre TODOS os emolumentos */
+            $baseISS        = $totalEmol * 0.88;
+            $issDevidoTotal = round($baseISS * ($issPercentual / 100), 2);
 
-            /* 3. Atualiza a linha existente (se houver)             */
-            $updISS = $conn->prepare("
-                UPDATE ordens_de_servico_itens
-                SET emolumentos = :valor_emol,
-                    total       = :valor_total
-                WHERE ordem_servico_id = :os_id
-                AND ato = 'ISS'
+            /* 3. ISS já LIQUIDADO -> congelado (não pode aumentar nem reduzir) */
+            $qLiq = $conn->prepare("
+                SELECT COALESCE(SUM(total),0)
+                FROM   ordens_de_servico_itens
+                WHERE  ordem_servico_id = :os_id
+                AND  ato = 'ISS'
+                AND  COALESCE(quantidade_liquidada,0) > 0
+            ");
+            $qLiq->bindParam(':os_id', $os_id);
+            $qLiq->execute();
+            $issLiquidado = (float)$qLiq->fetchColumn();
+
+            /* 4. ISS que ainda pode ser ajustado (sobre emolumentos ainda não cobertos) */
+            $issAjustavel = round($issDevidoTotal - $issLiquidado, 2);
+            if ($issAjustavel < 0) {
+                $issAjustavel = 0; // nunca estorna ISS já liquidado
+            }
+
+            /* 5. Há uma linha de ISS AINDA NÃO liquidada para receber esse valor? */
+            $qFind = $conn->prepare("
+                SELECT id
+                FROM   ordens_de_servico_itens
+                WHERE  ordem_servico_id = :os_id
+                AND  ato = 'ISS'
+                AND  COALESCE(quantidade_liquidada,0) = 0
+                ORDER BY id ASC
                 LIMIT 1
             ");
-            $updISS->bindParam(':valor_emol',  $valorISS);
-            $updISS->bindParam(':valor_total', $valorISS);
-            $updISS->bindParam(':os_id',       $os_id);
-            $updISS->execute();
+            $qFind->bindParam(':os_id', $os_id);
+            $qFind->execute();
+            $issRowId = $qFind->fetchColumn();
+
+            if ($issRowId) {
+                /* 5a. Atualiza a linha de ISS ainda ajustável (NÃO toca nas liquidadas) */
+                $updISS = $conn->prepare("
+                    UPDATE ordens_de_servico_itens
+                    SET emolumentos = :valor_emol,
+                        total       = :valor_total
+                    WHERE id = :id
+                ");
+                $updISS->bindParam(':valor_emol',  $issAjustavel);
+                $updISS->bindParam(':valor_total', $issAjustavel);
+                $updISS->bindParam(':id',          $issRowId);
+                $updISS->execute();
+            } elseif ($issLiquidado > 0 && $issAjustavel > 0) {
+                /* 5b. Só cria nova linha quando JÁ EXISTE ISS liquidado (congelado) e
+                       surgiu ISS novo a cobrar (atos incluídos após a liquidação).
+                       Mantém o comportamento original de NÃO criar ISS do zero. */
+                $insISS = $conn->prepare("
+                    INSERT INTO ordens_de_servico_itens
+                        (ordem_servico_id, ato, quantidade, desconto_legal, descricao,
+                         emolumentos, ferc, fadep, femp, ferrfis, total, quantidade_liquidada)
+                    VALUES
+                        (:os_id, 'ISS', 1, 0, :descricao,
+                         :valor_emol, 0, 0, 0, 0, :valor_total, 0)
+                ");
+                $insISS->bindParam(':os_id',       $os_id);
+                $insISS->bindParam(':descricao',   $issDescricao);
+                $insISS->bindParam(':valor_emol',  $issAjustavel);
+                $insISS->bindParam(':valor_total', $issAjustavel);
+                $insISS->execute();
+            }
         }
+
+        /* ------------------------------------------------------------------
+        Recalcula o total da OS a partir dos próprios itens. Garante que o
+        total_os fique consistente mesmo quando o servidor cria uma nova
+        linha de ISS (que o total enviado pelo cliente ainda não enxergava).
+        ------------------------------------------------------------------*/
+        $recalcTotal = $conn->prepare("
+            SELECT COALESCE(SUM(total),0)
+            FROM   ordens_de_servico_itens
+            WHERE  ordem_servico_id = :os_id
+        ");
+        $recalcTotal->bindParam(':os_id', $os_id);
+        $recalcTotal->execute();
+        $totalOSrecalc = (float)$recalcTotal->fetchColumn();
+
+        $updTotal = $conn->prepare("UPDATE ordens_de_servico SET total_os = :total_os WHERE id = :id");
+        $updTotal->bindParam(':total_os', $totalOSrecalc);
+        $updTotal->bindParam(':id',       $os_id);
+        $updTotal->execute();
 
         // Confirma a transação
         $conn->commit();

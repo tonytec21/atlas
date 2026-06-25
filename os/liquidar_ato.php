@@ -59,55 +59,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             throw new Exception('Ordem de Serviço não encontrada.');
         }
 
-        // Inicializar valores
-        $emolumentos_valor = 0;
-        $ferc_valor = 0;
-        $fadep_valor = 0;
-        $femp_valor = 0;
-        $ferrfis_valor = 0;
-        $total_valor = 0;
-
-        // Verificar se o ato é válido
         // Detectar marcação "(ato isento)" no código do ato
+        // (mantido: usado abaixo apenas para decidir a tabela de destino)
         $atoIsento = isset($item['ato']) && stripos($item['ato'], '(isento)') !== false;
 
-        // Verificar se o ato é válido e NÃO é isento
+        // ===================================================================
+        // LIQUIDAÇÃO == ORÇAMENTO (correção da diferença de 1 centavo)
+        // -------------------------------------------------------------------
+        // Os campos do item (ordens_de_servico_itens) já estão GRAVADOS com o
+        // desconto legal aplicado e arredondados EXATAMENTE como saem no
+        // orçamento (imprimir_os.php). Antes, a liquidação re-buscava o valor
+        // cheio na tabela de emolumentos e reaplicava o desconto; o
+        // arredondamento do meio-centavo (x,xx5) no MySQL (DECIMAL, half-up)
+        // divergia do toFixed() do JS do orçamento (que arredonda p/ baixo),
+        // gerando 1 centavo de diferença em atos como 16.1 e 16.3.18.
+        //
+        // Agora derivamos os valores DOS PRÓPRIOS CAMPOS DO ITEM, com rateio
+        // cumulativo por quantidade (parcela = acumulado agora - já liquidado),
+        // garantindo que liquidações parciais somem exatamente o total do item.
+        // ===================================================================
+        $qtdTotal       = floatval($item['quantidade']);
+        $qtdJaLiquidada = floatval($item['quantidade_liquidada']);
+        $qtdNova        = floatval($nova_quantidade_liquidada);
+
+        $rateioLiquidacao = function ($valorTotalItem) use ($qtdTotal, $qtdJaLiquidada, $qtdNova) {
+            $valorTotalItem = floatval($valorTotalItem);
+            if ($qtdTotal <= 0) {
+                return round($valorTotalItem, 2);
+            }
+            $acumuladoAgora = round($valorTotalItem * $qtdNova        / $qtdTotal, 2);
+            $jaLiquidado    = round($valorTotalItem * $qtdJaLiquidada / $qtdTotal, 2);
+            return round($acumuladoAgora - $jaLiquidado, 2);
+        };
+
+        $emolumentos_valor = $rateioLiquidacao($item['emolumentos']);
+        $ferc_valor        = $rateioLiquidacao($item['ferc']);
+        $fadep_valor       = $rateioLiquidacao($item['fadep']);
+        $femp_valor        = $rateioLiquidacao($item['femp']);
+        $ferrfis_valor     = $rateioLiquidacao($item['ferrfis'] ?? 0);
+        $total_valor       = $rateioLiquidacao($item['total']);
+
+        // Ato válido e NÃO isento -> atos_liquidados; caso contrário -> atos_manuais_liquidados
         if (!$atoIsento && !empty($item['ato']) && !in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
-            // Buscar valores na tabela apropriada
-            $emolumentos_query = $conn->prepare("SELECT * FROM $tabela_emolumentos WHERE ato = ?");
-            $emolumentos_query->bind_param("s", $item['ato']);
-            $emolumentos_query->execute();
-            $emolumentos_result = $emolumentos_query->get_result();
-
-            if ($emolumentos_result->num_rows > 0) {
-                $emolumentos = $emolumentos_result->fetch_assoc();
-
-                $emolumentos_valor = isset($emolumentos['EMOLUMENTOS']) ? floatval($emolumentos['EMOLUMENTOS']) * $quantidade_liquidar : 0;
-                $ferc_valor = isset($emolumentos['FERC']) ? floatval($emolumentos['FERC']) * $quantidade_liquidar : 0;
-                $fadep_valor = isset($emolumentos['FADEP']) ? floatval($emolumentos['FADEP']) * $quantidade_liquidar : 0;
-                $femp_valor = isset($emolumentos['FEMP']) ? floatval($emolumentos['FEMP']) * $quantidade_liquidar : 0;
-                $ferrfis_valor = isset($emolumentos['FERRFIS']) ? floatval($emolumentos['FERRFIS']) * $quantidade_liquidar : 0;
-                $total_valor = isset($emolumentos['TOTAL']) ? floatval($emolumentos['TOTAL']) * $quantidade_liquidar : 0;
-            } else {
-                $emolumentos_valor = floatval($item['emolumentos']) * $quantidade_liquidar;
-                $ferc_valor = floatval($item['ferc']) * $quantidade_liquidar;
-                $fadep_valor = floatval($item['fadep']) * $quantidade_liquidar;
-                $femp_valor = floatval($item['femp']) * $quantidade_liquidar;
-                $ferrfis_valor = isset($item['ferrfis']) ? floatval($item['ferrfis']) * $quantidade_liquidar : 0;
-                $total_valor = floatval($item['total']) * $quantidade_liquidar;
-            }
-
-            $desconto_legal = isset($item['desconto_legal']) ? floatval($item['desconto_legal']) : 0;
-
-            if ($desconto_legal > 0) {
-                $emolumentos_valor *= (1 - $desconto_legal / 100);
-                $ferc_valor *= (1 - $desconto_legal / 100);
-                $fadep_valor *= (1 - $desconto_legal / 100);
-                $femp_valor *= (1 - $desconto_legal / 100);
-                $ferrfis_valor *= (1 - $desconto_legal / 100);
-                $total_valor *= (1 - $desconto_legal / 100);
-            }
-
             if ($emolumentos_valor > 0 || $ferc_valor > 0 || $fadep_valor > 0 || $femp_valor > 0 || $ferrfis_valor > 0 || $total_valor > 0) {
                 $stmt = $conn->prepare("INSERT INTO atos_liquidados (ordem_servico_id, ato, quantidade_liquidada, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, funcionario, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->bind_param("isissssssssss",
@@ -129,13 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         } else {
             // Ato inválido OU isento -> inserir na tabela atos_manuais_liquidados
-            $emolumentos_valor = floatval($item['emolumentos']) * $quantidade_liquidar;
-            $ferc_valor = floatval($item['ferc']) * $quantidade_liquidar;
-            $fadep_valor = floatval($item['fadep']) * $quantidade_liquidar;
-            $femp_valor = floatval($item['femp']) * $quantidade_liquidar;
-            $ferrfis_valor = isset($item['ferrfis']) ? floatval($item['ferrfis']) * $quantidade_liquidar : 0;
-            $total_valor = floatval($item['total']) * $quantidade_liquidar;
-
+            // (valores já calculados acima via rateio cumulativo, batendo com o orçamento)
             $stmt = $conn->prepare("INSERT INTO atos_manuais_liquidados (ordem_servico_id, ato, quantidade_liquidada, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, funcionario, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->bind_param("isissssssssss",
                 $item['ordem_servico_id'],

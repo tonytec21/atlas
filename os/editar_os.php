@@ -930,7 +930,14 @@ try {
                         <?php foreach ($itens as $item): ?>  
                             <tr data-item-id="<?php echo $item['id']; ?>"  
                                 data-ordem_exibicao="<?php echo $item['ordem_exibicao']; ?>"  
-                                <?php if ($item['ato'] === 'ISS') echo 'id="ISS_ROW" data-tipo="iss"'; ?>>  
+                                <?php
+                                    if ($item['ato'] === 'ISS') {
+                                        $issLiqFlag = ((float)($item['quantidade_liquidada'] ?? 0) > 0) ? '1' : '0';
+                                        // id="ISS_ROW" só na linha de ISS AINDA ajustável (não liquidada)
+                                        echo 'data-tipo="iss" data-liquidada="' . $issLiqFlag . '"';
+                                        if ($issLiqFlag === '0') echo ' id="ISS_ROW"';
+                                    }
+                                ?>>  
                                 <td class="ordem"><?php echo $item['ordem_exibicao']; ?></td>  
                                 <td><?php echo $item['ato']; ?></td>  
                                 <td><?php echo $item['quantidade']; ?></td>  
@@ -1225,7 +1232,7 @@ function salvarOrdemExibicao() {
 function atualizarISS () {
     if (!ISS_CONFIG.ativo) return;   // ISS desligado → nada faz
 
-    // Soma dos EMOLUMENTOS (coluna 5), ignorando a própria linha do ISS
+    // Soma dos EMOLUMENTOS (coluna 5), ignorando QUALQUER linha de ISS
     let totalEmol = 0;
     $('#itensTable tr').each(function () {
         if ($(this).data('tipo') !== 'iss') {
@@ -1234,21 +1241,36 @@ function atualizarISS () {
         }
     });
 
-    const baseISS  = totalEmol * 0.88;
-    const valorISS = baseISS * (ISS_CONFIG.percentual / 100);
+    const baseISS        = totalEmol * 0.88;
+    const issDevidoTotal = +(baseISS * (ISS_CONFIG.percentual / 100)).toFixed(2);
 
-    // Cria ou atualiza a linha fixa
+    // ISS já LIQUIDADO (linhas de ISS com data-liquidada="1") -> congelado,
+    // não pode aumentar nem reduzir. Usa o total dessas linhas (coluna 10).
+    let issLiquidado = 0;
+    $('#itensTable tr[data-tipo="iss"][data-liquidada="1"]').each(function () {
+        issLiquidado += parseFloat($(this).find('td').eq(10).text()
+                                  .replace(/\./g, '').replace(',', '.')) || 0;
+    });
+
+    let issAjustavel = +(issDevidoTotal - issLiquidado).toFixed(2);
+    if (issAjustavel < 0) issAjustavel = 0;   // nunca estorna ISS já liquidado
+
+    // Atualiza SOMENTE a linha de ISS ainda ajustável (#ISS_ROW).
     let $linhaISS = $('#ISS_ROW');
 
     /*  ────────────────────────────────────────────────────────────
-        Se não existir ISS na tabela, não fazemos nada.  
-        Assim evitamos criar linhas novas ou duplicadas.
+        Se não houver linha de ISS ajustável (todas já liquidadas), não
+        criamos nada aqui no front. O ISS restante (issAjustavel) será
+        lançado numa nova linha de ISS ao salvar (atualizar_os.php).
     ────────────────────────────────────────────────────────────*/
-    if ($linhaISS.length === 0) return;
+    if ($linhaISS.length === 0) {
+        calcularTotalOS();
+        return;
+    }
 
-    /* Atualiza valores da linha existente */
-    $linhaISS.find('td').eq(5).text(valorISS.toFixed(2).replace('.', ','));
-    $linhaISS.find('td').eq(10).text(valorISS.toFixed(2).replace('.', ','));
+    /* Atualiza a linha de ISS não liquidada com o valor ajustável */
+    $linhaISS.find('td').eq(5).text(issAjustavel.toFixed(2).replace('.', ','));
+    $linhaISS.find('td').eq(10).text(issAjustavel.toFixed(2).replace('.', ','));
 
     /* Recalcula o total geral depois da alteração */
     calcularTotalOS();

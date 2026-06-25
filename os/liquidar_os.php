@@ -58,59 +58,47 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $status = ($quantidadeRestante + $item['quantidade_liquidada'] >= $item['quantidade']) 
                         ? 'liquidado' : 'parcialmente liquidado';
 
-                $emolumentos_valor = 0;
-                $ferc_valor = 0;
-                $fadep_valor = 0;
-                $femp_valor = 0;
-                $ferrfis_valor = 0;
-                $total_valor = 0;
-
                 // Detectar marcação "(ato isento)" no código do ato
+                // (mantido: usado mais abaixo para decidir a tabela de destino)
                 $atoIsento = isset($item['ato']) && stripos($item['ato'], '(isento)') !== false;
 
-                if (!$atoIsento && !empty($item['ato']) && !in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
-                    // Buscar valores na tabela de emolumentos
-                    $emol_query = $conn->prepare("SELECT * FROM $tabela_emolumentos WHERE ato = ?");
-                    $emol_query->bind_param("s", $item['ato']);
-                    $emol_query->execute();
-                    $emol_result = $emol_query->get_result();
+                // ===================================================================
+                // LIQUIDAÇÃO == ORÇAMENTO (correção da diferença de 1 centavo)
+                // -------------------------------------------------------------------
+                // Os campos do item (ordens_de_servico_itens) já estão GRAVADOS com o
+                // desconto legal aplicado e arredondados EXATAMENTE como saem no
+                // orçamento (imprimir_os.php). Antes, a liquidação re-buscava o valor
+                // cheio na tabela de emolumentos e reaplicava o desconto; o
+                // arredondamento do meio-centavo (x,xx5) no MySQL (DECIMAL, half-up)
+                // divergia do toFixed() do JS do orçamento (que arredonda p/ baixo),
+                // gerando 1 centavo de diferença em atos como 16.1 e 16.3.18.
+                //
+                // Agora derivamos os valores DOS PRÓPRIOS CAMPOS DO ITEM. Para suportar
+                // liquidação parcial sem perder/ganhar centavos, usamos rateio
+                // cumulativo: a parcela desta liquidação é (acumulado até agora) menos
+                // (o que já foi liquidado). Assim a soma das parcelas fecha sempre com
+                // o total do orçamento.
+                // ===================================================================
+                $qtdTotal       = floatval($item['quantidade']);
+                $qtdJaLiquidada = floatval($item['quantidade_liquidada']);
+                $qtdNova        = $qtdJaLiquidada + $quantidadeRestante;
 
-                    if ($emol_result->num_rows > 0) {
-                        $emolumentos = $emol_result->fetch_assoc();
-                        $emolumentos_valor = floatval($emolumentos['EMOLUMENTOS']) * $quantidadeRestante;
-                        $ferc_valor = floatval($emolumentos['FERC']) * $quantidadeRestante;
-                        $fadep_valor = floatval($emolumentos['FADEP']) * $quantidadeRestante;
-                        $femp_valor = floatval($emolumentos['FEMP']) * $quantidadeRestante;
-                        $ferrfis_valor = isset($emolumentos['FERRFIS']) ? floatval($emolumentos['FERRFIS']) * $quantidadeRestante : 0;
-                        $total_valor = floatval($emolumentos['TOTAL']) * $quantidadeRestante;
-                    } else {
-                        $emolumentos_valor = floatval($item['emolumentos']) * $quantidadeRestante;
-                        $ferc_valor = floatval($item['ferc']) * $quantidadeRestante;
-                        $fadep_valor = floatval($item['fadep']) * $quantidadeRestante;
-                        $femp_valor = floatval($item['femp']) * $quantidadeRestante;
-                        $ferrfis_valor = isset($item['ferrfis']) ? floatval($item['ferrfis']) * $quantidadeRestante : 0;
-                        $total_valor = floatval($item['total']) * $quantidadeRestante;
+                $rateioLiquidacao = function ($valorTotalItem) use ($qtdTotal, $qtdJaLiquidada, $qtdNova) {
+                    $valorTotalItem = floatval($valorTotalItem);
+                    if ($qtdTotal <= 0) {
+                        return round($valorTotalItem, 2);
                     }
-                } else {
-                    // Isento ou inválido: usar os valores já salvos no item
-                    $emolumentos_valor = floatval($item['emolumentos']) * $quantidadeRestante;
-                    $ferc_valor = floatval($item['ferc']) * $quantidadeRestante;
-                    $fadep_valor = floatval($item['fadep']) * $quantidadeRestante;
-                    $femp_valor = floatval($item['femp']) * $quantidadeRestante;
-                    $ferrfis_valor = isset($item['ferrfis']) ? floatval($item['ferrfis']) * $quantidadeRestante : 0;
-                    $total_valor = floatval($item['total']) * $quantidadeRestante;
-                }
+                    $acumuladoAgora = round($valorTotalItem * $qtdNova        / $qtdTotal, 2);
+                    $jaLiquidado    = round($valorTotalItem * $qtdJaLiquidada / $qtdTotal, 2);
+                    return round($acumuladoAgora - $jaLiquidado, 2);
+                };
 
-                $desconto_legal = floatval($item['desconto_legal'] ?? 0);
-                if ($desconto_legal > 0) {
-                    $factor = (1 - $desconto_legal / 100);
-                    $emolumentos_valor *= $factor;
-                    $ferc_valor *= $factor;
-                    $fadep_valor *= $factor;
-                    $femp_valor *= $factor;
-                    $ferrfis_valor *= $factor;
-                    $total_valor *= $factor;
-                }
+                $emolumentos_valor = $rateioLiquidacao($item['emolumentos']);
+                $ferc_valor        = $rateioLiquidacao($item['ferc']);
+                $fadep_valor       = $rateioLiquidacao($item['fadep']);
+                $femp_valor        = $rateioLiquidacao($item['femp']);
+                $ferrfis_valor     = $rateioLiquidacao($item['ferrfis'] ?? 0);
+                $total_valor       = $rateioLiquidacao($item['total']);
 
                 if (!$atoIsento && !in_array($item['ato'], ['0', '00', '9999', 'ISS'])) {
                     $stmt_insert = $conn->prepare(
