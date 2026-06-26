@@ -727,6 +727,15 @@ function analisarCoordenadas($memorial, $zone = 23, $south = true) {
     ];
 }
 
+/** Laudo de coordenadas só quando há discrepância real (p/ anexar à resposta do PDF). */
+function laudoSeDiscrepante($memorial) {
+    $m = (string)$memorial;
+    if (trim($m) === '') return null;
+    $lau = analisarCoordenadas($m);
+    if (!empty($lau['ok']) && !empty($lau['corrigido']) && (!empty($lau['vertices_suspeitos']) || !empty($lau['typos']))) return $lau;
+    return null;
+}
+
 /** Reconstrói o pacote a partir da string "lat,lng lat,lng ..." gravada no banco. */
 function buildGeoDataFromWgs84($str) {
     $pts = [];
@@ -4105,6 +4114,7 @@ if (isset($_POST['acao'])) {
                     'ok' => true, 'existe' => true, 'criado' => false, 'id' => $id, 'matricula' => $matricula, 'modelo' => $r['modelo'],
                     'campos' => $preenchidos, 'anexo_id' => $anexoId, 'inconsistencias' => array_values($incPdf),
                     'ciclo_vida' => $cv,
+                    'laudo' => laudoSeDiscrepante((string)($d['memorial'] ?? '')),
                     'mensagem' => 'Matrícula ' . $matricula . ' já cadastrada — ' . count($preenchidos) . ' campo(s) complementado(s). PDF arquivado.' . cicloVidaResumo($cv)
                 ], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -4169,6 +4179,7 @@ if (isset($_POST['acao'])) {
                     'vertices_corrigidos' => $geo['vertices_corrigidos'] ?? [],
                     'aviso_geometria' => $geo['aviso_geometria'] ?? '', 'inconsistencias' => array_values($incPdf),
                     'ciclo_vida' => $cv,
+                    'laudo' => laudoSeDiscrepante($memorial),
                     'mensagem' => 'Matrícula ' . $matricula . ' cadastrada e mapeada com ' . $geo['num_vertices'] . ' vértices (' . number_format($geo['area_ha'], 4, ',', '.') . ' ha). ' . count($preenchidos) . ' campo(s) preenchido(s).'
                         . (!empty($geo['aviso_geometria']) ? ' ' . $geo['aviso_geometria'] : '') . cicloVidaResumo($cv)
                 ], JSON_UNESCAPED_UNICODE);
@@ -4585,6 +4596,28 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'atualizar_geometria') {
+            // Aplica a um registro (por id) o traçado escolhido no laudo (correto x transcrito).
+            $mid = (int)($_POST['id'] ?? 0);
+            $wgs = trim((string)($_POST['geo_wgs84'] ?? ''));
+            if ($mid <= 0 || $wgs === '') { echo json_encode(['ok' => false, 'erro' => 'Parâmetros inválidos.']); exit; }
+            $g = buildGeoDataFromWgs84($wgs);
+            if (empty($g['ok'])) { echo json_encode(['ok' => false, 'erro' => 'Geometria inválida.']); exit; }
+            $st = $conn->prepare("UPDATE memoriais_mapeados SET num_vertices=?, area_ha=?, perimetro_m=?, centro_lat=?, centro_lng=?, coordenadas_wgs84=?, coordenadas_utm=?, itn03_exclusivo=0 WHERE id=?");
+            if ($st) {
+                $st->bind_param('iddddssi', $g['num_vertices'], $g['area_ha'], $g['perimetro_m'], $g['centro_lat'], $g['centro_lng'], $g['coordenadas_wgs84'], $g['coordenadas_utm'], $mid);
+                $st->execute();
+            }
+            inconsGravar($conn, $mid, detectarInconsistenciasGeo($g, 'memorial'));
+            $rs = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = " . (int)$mid . " LIMIT 1");
+            $registro = $rs ? $rs->fetch_assoc() : null;
+            echo json_encode([
+                'ok' => true, 'id' => $mid, 'registro' => $registro, 'geo' => $g,
+                'mensagem' => 'Geometria atualizada: ' . $g['num_vertices'] . ' vértices · ' . number_format($g['area_ha'], 4, ',', '.') . ' ha.'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($acao === 'anexo_upload') {
             $mid = (int)($_POST['id'] ?? 0);
             if ($mid <= 0) { echo json_encode(['ok' => false, 'erro' => 'Salve o imóvel antes de anexar arquivos.']); exit; }
@@ -4759,7 +4792,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-25d-laudo-coordenadas (PDF individual agora mostra o modal de resultado igual ao lote; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-25f-laudo-coordenadas (editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5316,7 +5349,7 @@ header('Expires: 0');
   .ed-geo-box{margin-top:11px;border:1px solid var(--line);border-radius:10px;padding:10px}
   .ed-geo-h{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:#9aa6b2;margin-bottom:7px}
   .ed-geo-text{width:100%;min-height:120px;resize:vertical;font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--ink);background:var(--card,#fff);border:1px solid var(--line);border-radius:8px;padding:9px 10px;box-sizing:border-box}
-  .ed-geo-acts{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .ed-geo-acts{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
   .ed-geo-status{font-size:11px;color:#9aa6b2}
   .ed-geo-status.ok{color:#0d9488}.ed-geo-status.err{color:#e2342f}
   body.dark-mode .ed-geo-text{background:#1c242e;border-color:#283038;color:#e7edf3}
@@ -5972,6 +6005,8 @@ header('Expires: 0');
               <textarea id="ed-geo-text" class="ed-geo-text" placeholder="Cole aqui o memorial descritivo (azimutes/distâncias ou GMS/UTM), uma lista de coordenadas, ou a estrutura do KML. O sistema detecta o formato, extrai os vértices e mapeia a matrícula."></textarea>
               <div class="ed-geo-acts">
                 <button type="button" class="btn-ghost" id="ed-geo-aplicar">📌 Mapear com este texto</button>
+                <button type="button" class="btn-ghost" id="ed-btn-analisar" title="Valida os marcos: compara as coordenadas transcritas com o caminhamento por azimute/distância">🔍 Analisar coordenadas (validar marcos)</button>
+                <button type="button" class="btn-ghost" id="ed-btn-revisar" style="display:none;border-color:#f59e0b;color:#f59e0b" title="Coordenadas inconsistentes — escolher entre traçado correto e transcrito (com erros)">⚠ Revisar traçado (coordenadas inconsistentes)</button>
                 <span id="ed-geo-status" class="ed-geo-status"></span>
               </div>
             </div>
@@ -6197,7 +6232,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-25d-laudo-coordenadas','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-25f-laudo-coordenadas','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6392,6 +6427,41 @@ document.getElementById('btn-map').onclick = async ()=>{
 /* ===================== LAUDO DE COORDENADAS (transcrito x corrigido) ===================== */
 function _fmtAzDec(a){ const g=Math.floor(a), m=Math.floor((a-g)*60), s=Math.round(((a-g)*60-m)*60); return `${g}°${String(m).padStart(2,'0')}'${String(s).padStart(2,'0')}"`; }
 function _ha(x){ return x==null?'—':Number(x).toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4})+' ha'; }
+/* Prévia visual (SVG) comparando o traçado correto (verde) e o transcrito (vermelho tracejado). */
+function previewTracadosSVG(a){
+  const co=a.corrigido, tr=a.transcrito;
+  const all=[]; if(co&&co.pts) co.pts.forEach(p=>all.push(p)); if(tr&&tr.pts) tr.pts.forEach(p=>all.push(p));
+  if(all.length<3) return '';
+  let minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
+  all.forEach(p=>{minLat=Math.min(minLat,p[0]);maxLat=Math.max(maxLat,p[0]);minLng=Math.min(minLng,p[1]);maxLng=Math.max(maxLng,p[1]);});
+  const W=360,H=300,pad=30;
+  const dLat=(maxLat-minLat)||1e-6, dLng=(maxLng-minLng)||1e-6;
+  const s=Math.min((W-2*pad)/dLng,(H-2*pad)/dLat);
+  const offX=(W-dLng*s)/2, offY=(H-dLat*s)/2;
+  const X=lng=>(offX+(lng-minLng)*s);
+  const Y=lat=>(H-(offY+(lat-minLat)*s)); // inverte Y (norte p/ cima)
+  const camada=(geo,color,fill,dash)=>{
+    if(!geo||!geo.pts) return '';
+    const pp=geo.pts.map(p=>X(p[1]).toFixed(1)+','+Y(p[0]).toFixed(1)).join(' ');
+    let g=`<polygon points="${pp}" fill="${fill}" stroke="${color}" stroke-width="2" ${dash?'stroke-dasharray="5 4"':''} stroke-linejoin="round"/>`;
+    geo.pts.forEach(p=>{ g+=`<circle cx="${X(p[1]).toFixed(1)}" cy="${Y(p[0]).toFixed(1)}" r="2.6" fill="${color}"/>`; });
+    return g;
+  };
+  const labGeo=co||tr, rot=(labGeo&&labGeo.rotulos)||[];
+  let labels='';
+  if(labGeo&&labGeo.pts) labGeo.pts.forEach((p,i)=>{ labels+=`<text x="${(X(p[1])+4).toFixed(1)}" y="${(Y(p[0])-4).toFixed(1)}" font-size="9" fill="#cbd5e1" font-family="monospace">${rot[i]||('V'+(i+1))}</text>`; });
+  const svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block;margin:0 auto;background:#0b0f14;border:1px solid #222c38;border-radius:9px">
+    <g id="lay-transcrito">${tr?camada(tr,'#ef4444','rgba(239,68,68,.10)',true):''}</g>
+    <g id="lay-correto">${co?camada(co,'#10b981','rgba(16,185,129,.16)',false):''}${labels}</g>
+  </svg>`;
+  const toggles=`<div style="display:flex;gap:16px;justify-content:center;font-size:12px;margin:7px 0 2px;color:#cbd5e1">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked onchange="var e=document.getElementById('lay-correto');if(e)e.style.display=this.checked?'':'none'"><span style="display:inline-block;width:16px;border-top:3px solid #10b981"></span> Traçado correto</label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" ${tr?'':'disabled'} onchange="var e=document.getElementById('lay-transcrito');if(e)e.style.display=this.checked?'':'none'"><span style="display:inline-block;width:16px;border-top:3px dashed #ef4444"></span> Transcrito (c/ erros)</label>
+  </div>`;
+  // transcrito começa oculto
+  return `<div style="margin-bottom:10px">${svg.replace('<g id="lay-transcrito">','<g id="lay-transcrito" style="display:none">')}${toggles}</div>`;
+}
+
 function renderLaudoHTML(a){
   const dark=document.body.classList.contains('dark-mode');
   const bgC=dark?'#0f151c':'#f4f6f9', bd=dark?'#222c38':'#e2e8f0', mut='#8a96a3';
@@ -6417,7 +6487,7 @@ function renderLaudoHTML(a){
   const rec=a.recomendacao==='corrigido'
     ? `<div style="margin-top:10px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);border-radius:8px;padding:8px 10px;font-size:12px">✓ Recomendado: <b>traçado correto</b>. ${escapeHtml(a.motivo_recomendacao||'')}</div>`
     : '';
-  return cards+typos+`<div style="font-size:12px;color:${mut};margin:2px 0 6px">Divergências por lado (vermelho = coordenada do documento inconsistente com o azimute/distância do agrimensor):</div>`+tabela+resumo+rec;
+  return previewTracadosSVG(a)+cards+typos+`<div style="font-size:12px;color:${mut};margin:2px 0 6px">Divergências por lado (vermelho = coordenada do documento inconsistente com o azimute/distância do agrimensor):</div>`+tabela+resumo+rec;
 }
 
 /* Há discrepância real (vértices suspeitos ou typo de coordenada)? */
@@ -6454,6 +6524,32 @@ async function mostrarLaudoCoords(a, nome){
   document.getElementById('btn-save').disabled=false;
   setStatus('ok', qual+' mapeado — confira o desenho e grave.');
   return geo;
+}
+
+/* PDF: oferece escolher o traçado (correto x transcrito) com prévia e grava no registro já criado. */
+async function laudoPdfEscolher(a, matricula, id){
+  const r=await Swal.fire(Object.assign({
+    title:'Traçado da matrícula '+(matricula||''),
+    html: renderLaudoHTML(a),
+    width:'min(940px,96vw)',
+    showCancelButton:true, showDenyButton:!!a.corrigido,
+    confirmButtonText:a.corrigido?'🟢 Usar traçado correto':'Usar',
+    denyButtonText:'🔴 Usar transcrito (com erros)',
+    cancelButtonText:'Decidir depois',
+    confirmButtonColor:'#10b981', denyButtonColor:'#ef4444', cancelButtonColor:'#6b7785'
+  }, swalTema()));
+  let geo=null, qual='';
+  if(r.isConfirmed){ geo=a.corrigido||a.transcrito; qual='correto'; }
+  else if(r.isDenied){ geo=a.transcrito; qual='transcrito (com erros)'; }
+  if(!geo) return; // "Decidir depois" — mantém o traçado já cadastrado; use "Revisar traçado" no registro
+  const res=await post({acao:'salvar', origem:'memorial', numero_matricula:String(matricula||''), identificador:'', geo_wgs84:(geo.coordenadas_wgs84||'')});
+  if(res && res.ok){
+    setStatus('ok','Traçado '+qual+' aplicado à matrícula '+matricula+'.');
+    await carregarLista();
+    if(id) carregarImovel(id); else if(typeof modo!=='undefined' && modo==='overview') verTodos();
+  } else {
+    setStatus('err',(res&&res.erro)||'Não foi possível atualizar o traçado.');
+  }
 }
 
 document.getElementById('btn-analisar').onclick = async ()=>{
@@ -7925,7 +8021,24 @@ async function abrirEdicao(id){
   // os dados ONR completos não vêm na listagem enxuta: busca o registro inteiro
   try {
     const res = await post({acao:'carregar', id});
-    if(res && res.ok && res.registro) edPreencherOnr(res.registro);
+    if(res && res.ok && res.registro){
+      edPreencherOnr(res.registro);
+      // mostra no editar o memorial/KML extraído (origem PDF/KML/manual)
+      const ta=document.getElementById('ed-geo-text');
+      if(ta) ta.value = res.registro.memorial_descritivo || '';
+      // detecta coordenadas inconsistentes e habilita "Revisar traçado"
+      edOcultarRevisar();
+      const memo = res.registro.memorial_descritivo || '';
+      if((res.registro.origem||'')!=='kml' && memo.trim()){
+        post({acao:'analisar_coords', memorial:memo}).then(a=>{
+          if(laudoTemDiscrepancia(a)){
+            edLaudoAtual=a;
+            const b=document.getElementById('ed-btn-revisar'); if(b) b.style.display='';
+            const stt=document.getElementById('ed-geo-status'); if(stt){ stt.className='ed-geo-status'; stt.textContent='⚠ Coordenadas inconsistentes — use "Revisar traçado".'; }
+          }
+        }).catch(()=>{});
+      }
+    }
     if(res && res.ok) edRenderAnexos(res.anexos||[]);
   } catch(e){ edRenderAnexos([]); }
 }
@@ -8224,10 +8337,57 @@ function edInitDrop(){
   fi.addEventListener('change', ()=>{ const f=fi.files && fi.files[0]; if(f) edEnviarArquivo(f); });
   const gb=document.getElementById('ed-geo-aplicar');
   if(gb && !gb.dataset.init){ gb.dataset.init='1'; gb.addEventListener('click', edMapearTexto); }
+  const ab=document.getElementById('ed-btn-analisar');
+  if(ab && !ab.dataset.init){ ab.dataset.init='1'; ab.addEventListener('click', edAnalisarCoords); }
+  const rb=document.getElementById('ed-btn-revisar');
+  if(rb && !rb.dataset.init){ rb.dataset.init='1'; rb.addEventListener('click', ()=>{ edLaudoAtual ? edLaudoAbrir(edLaudoAtual) : edAnalisarCoords(); }); }
 }
 
 // Mapeia/atualiza a geometria a partir do texto colado (memorial, coordenadas ou KML).
 function edResetGeoTexto(){ const ta=document.getElementById('ed-geo-text'); if(ta) ta.value=''; const st=document.getElementById('ed-geo-status'); if(st){ st.className='ed-geo-status'; st.textContent=''; } }
+
+/* ---- Laudo de coordenadas DENTRO do editar (validar marcos / revisar traçado) ---- */
+let edLaudoAtual = null;
+function edOcultarRevisar(){ edLaudoAtual=null; const b=document.getElementById('ed-btn-revisar'); if(b) b.style.display='none'; }
+async function edLaudoAbrir(a){
+  if(!a || !a.ok){ setStatus('err','Sem dados de coordenadas para o laudo.'); return; }
+  const r=await Swal.fire(Object.assign({
+    title:'Laudo de coordenadas — matrícula '+((document.getElementById('ed-matricula')||{}).value||''),
+    html: renderLaudoHTML(a),
+    width:'min(940px,96vw)',
+    showCancelButton:true, showDenyButton:!!a.corrigido,
+    confirmButtonText:a.corrigido?'🟢 Usar traçado correto':'Usar',
+    denyButtonText:'🔴 Usar transcrito (com erros)',
+    cancelButtonText:'Fechar',
+    confirmButtonColor:'#10b981', denyButtonColor:'#ef4444', cancelButtonColor:'#6b7785'
+  }, swalTema()));
+  let geo=null, qual='';
+  if(r.isConfirmed){ geo=a.corrigido||a.transcrito; qual='correto'; }
+  else if(r.isDenied){ geo=a.transcrito; qual='transcrito (com erros)'; }
+  if(!geo) return;
+  const id=+((document.getElementById('ed-id')||{}).value||0);
+  if(!(id>0)){ setStatus('err','Salve o imóvel antes de aplicar o traçado.'); return; }
+  const stt=document.getElementById('ed-geo-status'); if(stt){ stt.className='ed-geo-status'; stt.textContent='Aplicando traçado…'; }
+  const res=await post({acao:'atualizar_geometria', id, geo_wgs84:(geo.coordenadas_wgs84||'')});
+  if(res && res.ok){
+    if(res.registro && typeof edAplicarRegistro==='function') edAplicarRegistro(res.registro);
+    if(typeof carregarLista==='function') await carregarLista();
+    if(typeof carregarImovel==='function') carregarImovel(id);
+    else if(typeof modo!=='undefined' && modo==='overview' && typeof verTodos==='function') verTodos();
+    setStatus('ok','Traçado '+qual+' aplicado à matrícula.');
+    if(stt){ stt.className='ed-geo-status ok'; stt.textContent='Traçado '+qual+' aplicado: '+res.geo.num_vertices+' vértices ('+Number(res.geo.area_ha).toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4})+' ha).'; }
+  } else { setStatus('err',(res&&res.erro)||'Falha ao atualizar a geometria.'); if(stt){ stt.className='ed-geo-status err'; stt.textContent=(res&&res.erro)||'Falha.'; } }
+}
+async function edAnalisarCoords(){
+  const txt=((document.getElementById('ed-geo-text')||{}).value||'').trim();
+  if(!txt){ setStatus('err','Cole/observe o memorial para analisar.'); return; }
+  const stt=document.getElementById('ed-geo-status'); if(stt){ stt.className='ed-geo-status'; stt.textContent='Analisando…'; }
+  const a=await post({acao:'analisar_coords', memorial:txt});
+  if(!a.ok){ setStatus('err', a.erro||'Não foi possível analisar.'); if(stt){ stt.className='ed-geo-status err'; stt.textContent=a.erro||'Falha.'; } return; }
+  if(laudoTemDiscrepancia(a)){ edLaudoAtual=a; const b=document.getElementById('ed-btn-revisar'); if(b) b.style.display=''; }
+  if(stt){ stt.className='ed-geo-status'; stt.textContent=a.num_vertices+' vértices analisados.'; }
+  await edLaudoAbrir(a);
+}
 async function edMapearTexto(){
   const ta=document.getElementById('ed-geo-text'); const st=document.getElementById('ed-geo-status');
   const setSt=(cls,msg)=>{ if(st){ st.className='ed-geo-status'+(cls?(' '+cls):''); st.textContent=msg; } };
@@ -8745,6 +8905,10 @@ async function enviarPdfMatricula(file){
       if(typeof modo!=='undefined' && modo==='overview') verTodos();
     } else if(typeof imovelAtivoId!=='undefined' && imovelAtivoId && String(imovelAtivoId)===String(r.id)){
       carregarImovel(r.id);
+    }
+    // coordenadas inconsistentes? oferece a escolha (traçado correto x transcrito) com prévia
+    if(r.laudo && r.laudo.ok){
+      await laudoPdfEscolher(r.laudo, r.matricula||mat, r.id);
     }
     // mostra o MESMO modal de resultado do lote (cadastro/duplicado + inconsistências)
     const status = r.criado ? 'criado' : 'duplicado';
