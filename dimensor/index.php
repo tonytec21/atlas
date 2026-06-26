@@ -4759,7 +4759,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-25c-laudo-coordenadas (laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-25d-laudo-coordenadas (PDF individual agora mostra o modal de resultado igual ao lote; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -6197,7 +6197,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-25c-laudo-coordenadas','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-25d-laudo-coordenadas','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -8733,7 +8733,11 @@ async function enviarPdfMatricula(file){
     fd.append('matricula', mat);
     fd.append('pdf', file);
     const r = await fetch(window.location.pathname, {method:'POST', body:fd}).then(x=>x.json());
-    if(!r.ok){ setStatus('err', r.erro||'Falha ao processar o PDF.'); return; }
+    if(!r.ok){
+      setStatus('err', r.erro||'Falha ao processar o PDF.');
+      importResultadosModal('Importação de matrícula (PDF)', [{nome:(mat||file.name), status:'erro', id:null, msg:(r.erro||'falha'), inconsistencias:[]}]);
+      return;
+    }
     setStatus('ok', r.mensagem + (r.modelo?(' ('+r.modelo+')'):''));
     await carregarLista();
     if(r.criado){
@@ -8742,7 +8746,17 @@ async function enviarPdfMatricula(file){
     } else if(typeof imovelAtivoId!=='undefined' && imovelAtivoId && String(imovelAtivoId)===String(r.id)){
       carregarImovel(r.id);
     }
-  }catch(e){ setStatus('err','Falha na requisição de processamento.'); }
+    // mostra o MESMO modal de resultado do lote (cadastro/duplicado + inconsistências)
+    const status = r.criado ? 'criado' : 'duplicado';
+    const destino = r.criado ? (r.itn03_exclusivo ? 'itn' : 'mapa') : '';
+    importResultadosModal('Importação de matrícula (PDF)', [{
+      nome:(r.matricula||mat||file.name), status, destino, id:r.id||null,
+      msg:r.mensagem||'', inconsistencias:r.inconsistencias||[]
+    }]);
+  }catch(e){
+    setStatus('err','Falha na requisição de processamento.');
+    importResultadosModal('Importação de matrícula (PDF)', [{nome:(mat||file.name), status:'erro', id:null, msg:'erro de requisição', inconsistencias:[]}]);
+  }
   finally{ if(lbl) lbl.innerHTML='Matrícula ou <b>SIGEF</b> em PDF — mapear via IA <span class="zone-multi">(1 ou vários)</span>'; }
 }
 
