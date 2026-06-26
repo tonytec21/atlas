@@ -3844,6 +3844,12 @@ if (isset($_POST['acao'])) {
             $cpf           = trim(isset($_POST['cpf']) ? (string)$_POST['cpf'] : '');
             $tipoImovel    = ($_POST['tipo_imovel'] ?? '') === 'rural' ? 'rural' : (($_POST['tipo_imovel'] ?? '') === 'urbano' ? 'urbano' : '');
 
+            // Traçado escolhido no laudo de coordenadas (transcrito x corrigido). Quando
+            // presente, sobrescreve a geometria — inclusive de um registro já existente.
+            $geoOverride = trim((string)($_POST['geo_wgs84'] ?? ''));
+            $geoOverrideData = ($geoOverride !== '') ? buildGeoDataFromWgs84($geoOverride) : null;
+            if ($geoOverrideData && empty($geoOverrideData['ok'])) $geoOverrideData = null;
+
             // Identificação principal: usa o campo informado; se vazio, cai para a matrícula
             if ($identificador === '' && $numMatricula !== '') $identificador = $numMatricula;
             if ($identificador === '') {
@@ -3868,6 +3874,16 @@ if (isset($_POST['acao'])) {
                     if ($cpf !== '')          { $sets[] = 'cpf=?';                 $vals[] = $cpf;           $types .= 's'; }
                     if ($tipoImovel !== '')   { $sets[] = 'tipo_imovel=?';         $vals[] = $tipoImovel;    $types .= 's'; }
                     if ($imovelId !== null)   { $sets[] = 'imovel_id=?';           $vals[] = $imovelId;      $types .= 'i'; }
+                    // traçado escolhido no laudo de coordenadas: ATUALIZA a geometria gravada
+                    if ($geoOverrideData) {
+                        $sets[] = 'num_vertices=?';       $vals[] = $geoOverrideData['num_vertices'];       $types .= 'i';
+                        $sets[] = 'area_ha=?';            $vals[] = $geoOverrideData['area_ha'];            $types .= 'd';
+                        $sets[] = 'perimetro_m=?';        $vals[] = $geoOverrideData['perimetro_m'];        $types .= 'd';
+                        $sets[] = 'centro_lat=?';         $vals[] = $geoOverrideData['centro_lat'];         $types .= 'd';
+                        $sets[] = 'centro_lng=?';         $vals[] = $geoOverrideData['centro_lng'];         $types .= 'd';
+                        $sets[] = 'coordenadas_wgs84=?';  $vals[] = $geoOverrideData['coordenadas_wgs84'];  $types .= 's';
+                        $sets[] = 'coordenadas_utm=?';    $vals[] = $geoOverrideData['coordenadas_utm'];    $types .= 's';
+                    }
                     if (!empty($sets)) {
                         $vals[] = $idExistente; $types .= 'i';
                         $stmt = $conn->prepare("UPDATE memoriais_mapeados SET " . implode(', ', $sets) . " WHERE id = ?");
@@ -3903,7 +3919,9 @@ if (isset($_POST['acao'])) {
                         'id' => $idExistente, 'imovel_id' => $imovelId, 'inconsistencias' => array_values($incDup), 'mapeado' => $mapeadoDup,
                         'mensagem' => $mapeadoDup
                             ? ('A matrícula ' . $numMatricula . ' (que estava só na ITN 03) foi MAPEADA com ' . $mapeadoDup['num_vertices'] . ' vértices (' . number_format($mapeadoDup['area_ha'], 4, ',', '.') . ' ha) — agora aparece no mapa.')
-                            : ('A matrícula ' . $numMatricula . ' já estava cadastrada — as informações foram complementadas, sem duplicar o polígono no mapa.')
+                            : ($geoOverrideData
+                                ? ('A matrícula ' . $numMatricula . ' foi ATUALIZADA com o traçado escolhido: ' . $geoOverrideData['num_vertices'] . ' vértices, ' . number_format($geoOverrideData['area_ha'], 4, ',', '.') . ' ha.')
+                                : ('A matrícula ' . $numMatricula . ' já estava cadastrada — as informações foram complementadas, sem duplicar o polígono no mapa.'))
                     ], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
@@ -3911,8 +3929,7 @@ if (isset($_POST['acao'])) {
 
             // Geometria escolhida explicitamente pelo usuário no laudo de coordenadas:
             // grava exatamente o traçado selecionado (corrigido x transcrito).
-            $geoOverride = trim((string)($_POST['geo_wgs84'] ?? ''));
-            $data = ($geoOverride !== '') ? buildGeoDataFromWgs84($geoOverride) : processarFonte($origem, $fonte);
+            $data = $geoOverrideData ? $geoOverrideData : processarFonte($origem, $fonte);
             if (!$data['ok']) {
                 $legs = ($origem === 'kml') ? [] : extractTraverseLegs($fonte);
                 if (count($legs) >= 3) {
@@ -4742,7 +4759,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-25-laudo-coordenadas (análise de coordenadas inválidas: traçado transcrito x corrigido por azimute/distância, parser UTM rotulado "<num>-E e <num>-N", correção de easting 7-díg e OCR l->1, tabela de divergências por lado, escolha de geometria p/ mapear e gravar) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-06-25c-laudo-coordenadas (laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5469,6 +5486,9 @@ header('Expires: 0');
       <div class="actions" style="margin-top:7px">
         <button class="btn-ghost" id="btn-analisar" style="flex:1" title="Valida os marcos: compara as coordenadas transcritas com o caminhamento por azimute/distância e aponta vértices inconsistentes">🔍 Analisar coordenadas (validar marcos)</button>
       </div>
+      <div class="actions" style="margin-top:7px">
+        <button class="btn-ghost" id="btn-revisar-tracado" style="flex:1;display:none;border-color:#f59e0b;color:#f59e0b" title="Este imóvel tem vértices inconsistentes — escolher entre traçado correto e transcrito (com erros)">⚠ Revisar traçado (coordenadas inconsistentes)</button>
+      </div>
         </div>
       </details>
 
@@ -6137,6 +6157,7 @@ document.addEventListener('keyup',   e=>{ if(e.key==='Control'||e.key==='Meta') 
 window.addEventListener('blur', ()=>{ ctrlAtivo=false; });
 let lastGeo = null, origemAtual = 'memorial', kmlRaw = '', kmlNomeArquivo = '';
 let geoOverrideWgs84 = null; // traçado escolhido no laudo de coordenadas (transcrito x corrigido)
+let laudoAtual = null;       // último laudo do memorial atual (habilita "Revisar traçado")
 let modo = 'single';
 let LabelOverlay = null;
 
@@ -6176,7 +6197,7 @@ function initMap(){
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-25-laudo-coordenadas','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-06-25c-laudo-coordenadas','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6336,8 +6357,24 @@ function desenhar(geo, nome){
 document.getElementById('btn-map').onclick = async ()=>{
   const memorial = document.getElementById('memorial').value;
   if(!memorial.trim()){ setStatus('err','Cole um memorial descritivo.'); return; }
-  origemAtual='memorial'; resetKmlZone(); geoOverrideWgs84=null;
+  origemAtual='memorial'; resetKmlZone(); geoOverrideWgs84=null; ocultarRevisar();
   setStatus('warn','Processando…');
+  // 1º detecta a situação de coordenadas inconsistentes — se houver, JÁ oferece a escolha
+  const a = await post({acao:'analisar_coords', memorial});
+  if(a && a.ok && laudoTemDiscrepancia(a)){
+    const nome=document.getElementById('identificador').value.trim();
+    aplicarEstadoLaudo(a);
+    const geo = await mostrarLaudoCoords(a, nome);
+    if(!geo){ // fechou sem escolher → aplica o recomendado e mantém o botão de revisão
+      const rec = (a.recomendacao==='corrigido' && a.corrigido) ? a.corrigido : a.transcrito;
+      origemAtual='memorial'; lastGeo=rec; geoOverrideWgs84=rec.coordenadas_wgs84||null;
+      desenhar(rec, nome);
+      document.getElementById('btn-save').disabled=false;
+      setStatus('warn', (a.recomendacao==='corrigido'?'Traçado correto (recomendado)':'Coordenadas transcritas')+' aplicado — use "Revisar traçado" para trocar antes de gravar.');
+    }
+    return;
+  }
+  // 2º memorial normal (GMS) ou sem discrepância — fluxo direto
   const geo = await post({acao:'processar', memorial});
   if(!geo.ok){
     setStatus('err', `Não foi possível formar um polígono. Encontradas ${geo.lon_count||0} longitude(s) e ${geo.lat_count||0} latitude(s) em GMS — mínimo de 3 vértices válidos.`);
@@ -6383,14 +6420,20 @@ function renderLaudoHTML(a){
   return cards+typos+`<div style="font-size:12px;color:${mut};margin:2px 0 6px">Divergências por lado (vermelho = coordenada do documento inconsistente com o azimute/distância do agrimensor):</div>`+tabela+resumo+rec;
 }
 
-document.getElementById('btn-analisar').onclick = async ()=>{
-  const memorial=document.getElementById('memorial').value;
-  if(!memorial.trim()){ setStatus('err','Cole um memorial descritivo para analisar.'); return; }
-  setStatus('warn','Analisando coordenadas…');
-  const a=await post({acao:'analisar_coords', memorial});
-  if(!a.ok){ setStatus('err', a.erro||'Não foi possível analisar.'); return; }
-  setStatus('ok', a.num_vertices+' vértices analisados.');
-  const nome=document.getElementById('identificador').value.trim();
+/* Há discrepância real (vértices suspeitos ou typo de coordenada)? */
+function laudoTemDiscrepancia(a){
+  return !!(a && a.ok && a.corrigido && ((a.vertices_suspeitos && a.vertices_suspeitos.length) || (a.typos && a.typos.length)));
+}
+/* Mostra/oculta o botão "Revisar traçado" conforme a situação do memorial atual. */
+function aplicarEstadoLaudo(a){
+  laudoAtual = laudoTemDiscrepancia(a) ? a : null;
+  const b=document.getElementById('btn-revisar-tracado');
+  if(b) b.style.display = laudoAtual ? 'block' : 'none';
+}
+function ocultarRevisar(){ laudoAtual=null; const b=document.getElementById('btn-revisar-tracado'); if(b) b.style.display='none'; }
+
+/* Abre o laudo (modal) e aplica a geometria escolhida. Retorna o geo escolhido ou null. */
+async function mostrarLaudoCoords(a, nome){
   const r=await Swal.fire(Object.assign({
     title:'Laudo de coordenadas',
     html:renderLaudoHTML(a),
@@ -6405,11 +6448,35 @@ document.getElementById('btn-analisar').onclick = async ()=>{
   let geo=null, qual='';
   if(r.isConfirmed){ geo = a.corrigido || a.transcrito; qual = a.corrigido?'Traçado correto':'Coordenadas'; }
   else if(r.isDenied){ geo = a.transcrito; qual = 'Coordenadas transcritas'; }
-  if(!geo) return;
+  if(!geo) return null;
   origemAtual='memorial'; lastGeo=geo; geoOverrideWgs84=geo.coordenadas_wgs84||null;
   desenhar(geo, nome);
   document.getElementById('btn-save').disabled=false;
   setStatus('ok', qual+' mapeado — confira o desenho e grave.');
+  return geo;
+}
+
+document.getElementById('btn-analisar').onclick = async ()=>{
+  const memorial=document.getElementById('memorial').value;
+  if(!memorial.trim()){ setStatus('err','Cole um memorial descritivo para analisar.'); return; }
+  setStatus('warn','Analisando coordenadas…');
+  const a=await post({acao:'analisar_coords', memorial});
+  if(!a.ok){ setStatus('err', a.erro||'Não foi possível analisar.'); return; }
+  setStatus('ok', a.num_vertices+' vértices analisados.');
+  aplicarEstadoLaudo(a);
+  await mostrarLaudoCoords(a, document.getElementById('identificador').value.trim());
+};
+
+/* Botão de revisão (reaparece na edição só para imóveis com coordenadas inconsistentes). */
+document.getElementById('btn-revisar-tracado').onclick = async ()=>{
+  const nome=document.getElementById('identificador').value.trim();
+  if(laudoAtual){ await mostrarLaudoCoords(laudoAtual, nome); return; }
+  const memorial=document.getElementById('memorial').value;
+  if(!memorial.trim()){ setStatus('err','Memorial vazio.'); return; }
+  const a=await post({acao:'analisar_coords', memorial});
+  if(!a.ok){ setStatus('err', a.erro||'Não foi possível analisar.'); return; }
+  aplicarEstadoLaudo(a);
+  await mostrarLaudoCoords(a, nome);
 };
 
 /* ===================== GRAVAR ===================== */
@@ -7680,6 +7747,7 @@ async function carregarImovel(id){
   if(!res.ok || !res.geo.ok){ setStatus('err','Não foi possível carregar este registro.'); return; }
   const reg = res.registro;
   origemAtual = reg.origem || 'memorial';
+  geoOverrideWgs84 = null; // carregou geometria salva — sem traçado de laudo pendente
   kmlRaw = origemAtual==='kml' ? (reg.memorial_descritivo||'') : '';
   document.getElementById('memorial').value = reg.memorial_descritivo || '';
   document.getElementById('identificador').value = reg.identificador||'';
@@ -7696,6 +7764,17 @@ async function carregarImovel(id){
   mostrarEncInfo(reg);
   document.getElementById('btn-save').disabled=false;
   setStatus('ok', `Carregado: ${reg.identificador} (${res.geo.num_vertices} vértices).`);
+  // Conferência: se o memorial deste registro tem coordenadas inconsistentes,
+  // habilita "Revisar traçado" para alternar entre correto e transcrito.
+  ocultarRevisar();
+  if((reg.origem||'memorial')!=='kml' && (reg.memorial_descritivo||'').trim()){
+    post({acao:'analisar_coords', memorial: reg.memorial_descritivo}).then(a=>{
+      if(laudoTemDiscrepancia(a)){
+        aplicarEstadoLaudo(a);
+        setStatus('warn','Este imóvel tem coordenadas inconsistentes — use "Revisar traçado" para conferir/alterar o desenho.');
+      }
+    }).catch(()=>{});
+  }
   abrirPainelMobile();
 }
 
