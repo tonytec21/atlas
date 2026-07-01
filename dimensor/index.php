@@ -71,6 +71,43 @@ if (isset($_GET['diag_staticmap'])) {
     exit;
 }
 
+/* ---------- Visão 3D própria (independe do Map Tiles API) ---------- */
+/* Textura de satélite (proxy Static Maps, chave no servidor): ?m3d_tile=1&clat=&clng=&z= */
+if (isset($_GET['m3d_tile'])) {
+    $clat = (float)($_GET['clat'] ?? 0); $clng = (float)($_GET['clng'] ?? 0);
+    $z = max(1, min(21, (int)($_GET['z'] ?? 17)));
+    $url = 'https://maps.googleapis.com/maps/api/staticmap?center=' . $clat . ',' . $clng
+         . '&zoom=' . $z . '&size=640x640&scale=2&maptype=satellite&format=jpg&key=' . GMAPS_STATIC_KEY;
+    $err = '';
+    $img = fetchImageBytes($url, $err);
+    if ($img === false) { http_response_code(502); header('Content-Type: text/plain'); echo 'erro tile: ' . $err; exit; }
+    header('Content-Type: image/jpeg'); header('Cache-Control: public, max-age=86400');
+    echo $img; exit;
+}
+/* Elevações (proxy Elevation API): ?m3d_elev=1&pts=lat,lng|lat,lng|... -> {ok, elev:[...]} */
+if (isset($_GET['m3d_elev'])) {
+    header('Content-Type: application/json; charset=UTF-8');
+    $pts = (string)($_GET['pts'] ?? '');
+    $locs = [];
+    foreach (explode('|', $pts) as $p) { $p = trim($p); if ($p !== '' && strpos($p, ',') !== false) $locs[] = $p; }
+    if (!$locs) { echo json_encode(['ok' => false, 'erro' => 'sem pontos']); exit; }
+    $locs = array_slice($locs, 0, 512);
+    $url = 'https://maps.googleapis.com/maps/api/elevation/json?locations=' . rawurlencode(implode('|', $locs)) . '&key=' . GMAPS_STATIC_KEY;
+    $raw = false;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true]);
+        $raw = curl_exec($ch); curl_close($ch);
+    } elseif (ini_get('allow_url_fopen')) {
+        $raw = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 12]]));
+    }
+    if ($raw === false || $raw === null || $raw === '') { echo json_encode(['ok' => false, 'erro' => 'sem resposta']); exit; }
+    $j = json_decode($raw, true);
+    if (!is_array($j) || ($j['status'] ?? '') !== 'OK') { echo json_encode(['ok' => false, 'erro' => ($j['status'] ?? 'falha'), 'detalhe' => ($j['error_message'] ?? '')]); exit; }
+    $elev = array_map(function ($r) { return round((float)($r['elevation'] ?? 0), 2); }, $j['results']);
+    echo json_encode(['ok' => true, 'elev' => $elev]); exit;
+}
+
 /* ---------- Download/visualização de anexo: dimensor/index.php?anexo=<id>[&dl=1] ---------- */
 if (isset($_GET['anexo'])) {
     $aid = (int)$_GET['anexo'];
@@ -879,6 +916,7 @@ function ensureTable($conn) {
         coordenadas_wgs84 MEDIUMTEXT,
         coordenadas_utm MEDIUMTEXT,
         cor VARCHAR(20) NULL DEFAULT NULL,
+        cor_linha VARCHAR(20) NULL DEFAULT NULL,
         cor_opacidade DECIMAL(3,2) NULL DEFAULT NULL,
         numero_matricula VARCHAR(60) NULL DEFAULT NULL,
         proprietario TEXT NULL DEFAULT NULL,
@@ -907,6 +945,7 @@ function ensureTable($conn) {
         'cpf'              => "ADD COLUMN cpf TEXT NULL DEFAULT NULL",
         'tipo_imovel'      => "ADD COLUMN tipo_imovel VARCHAR(12) NULL DEFAULT NULL",
         'cor_opacidade'    => "ADD COLUMN cor_opacidade DECIMAL(3,2) NULL DEFAULT NULL",
+        'cor_linha'        => "ADD COLUMN cor_linha VARCHAR(20) NULL DEFAULT NULL",
         // ---- Atributos do shapefile ONR (Mapa do Registro de Imóveis) ----
         'nome_imo'         => "ADD COLUMN nome_imo VARCHAR(180) NULL DEFAULT NULL",
         'dat_mat'          => "ADD COLUMN dat_mat VARCHAR(20) NULL DEFAULT NULL",
@@ -4465,7 +4504,7 @@ if (isset($_POST['acao'])) {
         if ($acao === 'listar') {
             $res = $conn->query(
                 "SELECT id, identificador, tipo_identificador, origem, imovel_id, num_vertices,
-                        area_ha, perimetro_m, centro_lat, centro_lng, cor, cor_opacidade,
+                        area_ha, perimetro_m, centro_lat, centro_lng, cor, cor_linha, cor_opacidade,
                         numero_matricula, proprietario, cpf, tipo_imovel, cnm, municipio, uf,
                         onr_status, onr_importation_id, onr_numero_prenotacao, onr_classificacao,
                         onr_nivel_publicidade, onr_descricao, itn03_exclusivo, inconsistencias,
@@ -4494,7 +4533,7 @@ if (isset($_POST['acao'])) {
         if ($acao === 'listar_geo') {
             // Devolve todos os polígonos (lat/lng) para a visão geral e detecção de sobreposição
             $res = $conn->query(
-                "SELECT id, identificador, tipo_identificador, origem, area_ha, cor, cor_opacidade,
+                "SELECT id, identificador, tipo_identificador, origem, area_ha, cor, cor_linha, cor_opacidade,
                         numero_matricula, proprietario, cpf, tipo_imovel,
                         situacao, motivo_situacao, matricula_sucessora, fora_municipio, coordenadas_wgs84
                  FROM memoriais_mapeados ORDER BY id"
@@ -4514,6 +4553,7 @@ if (isset($_POST['acao'])) {
                         'origem' => $row['origem'],
                         'area_ha' => (float)$row['area_ha'],
                         'cor' => $row['cor'],
+                        'cor_linha' => $row['cor_linha'],
                         'cor_opacidade' => $row['cor_opacidade'] !== null ? (float)$row['cor_opacidade'] : null,
                         'numero_matricula' => $row['numero_matricula'],
                         'proprietario' => $row['proprietario'],
@@ -4533,26 +4573,46 @@ if (isset($_POST['acao'])) {
 
         if ($acao === 'salvar_cor') {
             $id = (int)($_POST['id'] ?? 0);
-            $cor = strtolower(trim((string)($_POST['cor'] ?? '')));
             if ($id <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel inválido.']); exit; }
-            // Aceita apenas hex (#rrggbb) ou vazio (limpar). NUNCA aceita tons de vermelho (reservado a sobreposição).
-            if ($cor !== '') {
-                if (!preg_match('/^#[0-9a-f]{6}$/', $cor)) { echo json_encode(['ok' => false, 'erro' => 'Cor inválida.']); exit; }
-                $r = hexdec(substr($cor, 1, 2)); $g = hexdec(substr($cor, 3, 2)); $b = hexdec(substr($cor, 5, 2));
-                if ($r >= 150 && $g <= 90 && $b <= 90) { echo json_encode(['ok' => false, 'erro' => 'O vermelho é reservado para sobreposições.']); exit; }
-            }
+            // valida um hex de destaque (não aceita vermelho, reservado a sobreposição)
+            $validaCor = function($c) {
+                if ($c === '') return true;
+                if (!preg_match('/^#[0-9a-f]{6}$/', $c)) return false;
+                $r = hexdec(substr($c, 1, 2)); $g = hexdec(substr($c, 3, 2)); $b = hexdec(substr($c, 5, 2));
+                return !($r >= 150 && $g <= 90 && $b <= 90);
+            };
+            // Cada atributo é atualizado só se veio no POST (permite mudar linha, preenchimento ou intensidade em separado).
+            $temCor   = array_key_exists('cor', $_POST);
+            $temLinha = array_key_exists('cor_linha', $_POST);
+            $temOp    = array_key_exists('opacidade', $_POST);
+            $cor = strtolower(trim((string)($_POST['cor'] ?? '')));
+            $corLinha = strtolower(trim((string)($_POST['cor_linha'] ?? '')));
+            if ($temCor && !$validaCor($cor)) { echo json_encode(['ok' => false, 'erro' => ($cor !== '' && preg_match('/^#[0-9a-f]{6}$/', $cor)) ? 'O vermelho é reservado para sobreposições.' : 'Cor inválida.']); exit; }
+            if ($temLinha && !$validaCor($corLinha)) { echo json_encode(['ok' => false, 'erro' => ($corLinha !== '' && preg_match('/^#[0-9a-f]{6}$/', $corLinha)) ? 'O vermelho é reservado para sobreposições.' : 'Cor da linha inválida.']); exit; }
             $valor = ($cor === '') ? null : $cor;
+            $valorLinha = ($corLinha === '') ? null : $corLinha;
             // Intensidade (opacidade do preenchimento): limitada entre 0.08 e 0.55 para não fechar o mapa
             $op = null;
-            if (isset($_POST['opacidade']) && $_POST['opacidade'] !== '') {
+            if ($temOp && $_POST['opacidade'] !== '') {
                 $op = (float)$_POST['opacidade'];
                 if ($op < 0.08) $op = 0.08;
                 if ($op > 0.55) $op = 0.55;
             }
-            $stmt = $conn->prepare("UPDATE memoriais_mapeados SET cor = ?, cor_opacidade = ? WHERE id = ?");
-            $stmt->bind_param('sdi', $valor, $op, $id);
-            $stmt->execute();
-            echo json_encode(['ok' => true, 'id' => $id, 'cor' => $valor, 'cor_opacidade' => $op], JSON_UNESCAPED_UNICODE);
+            $sets = []; $vals = []; $types = '';
+            if ($temCor)   { $sets[] = 'cor = ?';           $vals[] = $valor;      $types .= 's'; }
+            if ($temLinha) { $sets[] = 'cor_linha = ?';     $vals[] = $valorLinha; $types .= 's'; }
+            if ($temOp)    { $sets[] = 'cor_opacidade = ?'; $vals[] = $op;         $types .= 'd'; }
+            if (!empty($sets)) {
+                $vals[] = $id; $types .= 'i';
+                $stmt = $conn->prepare("UPDATE memoriais_mapeados SET " . implode(', ', $sets) . " WHERE id = ?");
+                $stmt->bind_param($types, ...$vals);
+                $stmt->execute();
+            }
+            $resp = ['ok' => true, 'id' => $id];
+            if ($temCor)   $resp['cor'] = $valor;
+            if ($temLinha) $resp['cor_linha'] = $valorLinha;
+            if ($temOp)    $resp['cor_opacidade'] = $op;
+            echo json_encode($resp, JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -4792,7 +4852,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atlas Dimensor — Atlas</title>
-<!-- ATLAS-DIMENSOR-BUILD: 2026-06-25f-laudo-coordenadas (editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-DIMENSOR-BUILD: 2026-07-01c-visao-3d (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4874,6 +4934,7 @@ header('Expires: 0');
   /* Seletor de cor de destaque (painel) */
   .cor-box{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
   .cor-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:4px}
+  .cor-sub-lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-top:6px}
   .cor-sw{width:100%;aspect-ratio:1/1;min-height:24px;border-radius:7px;border:2px solid transparent;cursor:pointer;
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);transition:transform .1s;padding:0}
   .cor-sw:hover{transform:scale(1.08)}
@@ -4976,6 +5037,32 @@ header('Expires: 0');
   .empty-list{font-family:var(--mono);font-size:11px;color:var(--faint);padding:6px 2px}
   .map-wrap{position:relative;min-width:0}
   #map{position:absolute;inset:0;background:#0a0d11}
+  /* ---- Controles 3D ---- */
+  .ctrl-3d{position:absolute;top:60px;left:14px;z-index:7;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+  .c3d-btn{background:#fff;color:#1f2937;border:none;border-radius:8px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.35);display:flex;align-items:center;gap:6px}
+  .c3d-btn:hover{background:#f1f5f9}
+  .c3d-row{display:flex;gap:6px;background:#fff;border-radius:8px;padding:5px;box-shadow:0 1px 5px rgba(0,0,0,.35)}
+  .c3d-mini{background:#f1f5f9;border:none;border-radius:6px;padding:6px 9px;font-size:13px;cursor:pointer;color:#1f2937;line-height:1}
+  .c3d-mini:hover{background:#e2e8f0}
+  .c3d-mini.on{background:#0e1217;color:#fff;outline:2px solid #10b981}
+  .c3d-mini.wide{font-weight:600}
+  body.dark-mode .c3d-btn,body.dark-mode .c3d-row{background:#1c242e;color:#e7edf3}
+  body.dark-mode .c3d-btn:hover{background:#243040}
+  body.dark-mode .c3d-mini{background:#283445;color:#e7edf3}
+  body.dark-mode .c3d-mini:hover{background:#31445a}
+  .modal-3d-card{position:fixed;inset:3vh 3vw;background:#0a0d11;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .modal-3d-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#11161d;color:#e7edf3;border-bottom:1px solid #222c38;font-weight:600;font-size:14px}
+  .modal-3d-host{flex:1;min-height:0;position:relative;background:#0a0d11}
+  .modal-3d-host gmp-map-3d,.modal-3d-host .gmp-map-3d{width:100%;height:100%;display:block}
+  .modal-3d-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:#cbd5e1;font-size:14px;line-height:1.6}
+  .modal-3d-foot{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;padding:8px 12px;background:#11161d;color:#9aa6b2;border-top:1px solid #222c38;font-size:12px}
+  .modal-3d-foot.alert{color:#fbbf24}
+  .m3d-link{display:inline-flex;align-items:center;gap:5px;background:#283445;color:#e7edf3;text-decoration:none;border-radius:7px;padding:6px 11px;font-weight:600;font-size:12px}
+  .m3d-link:hover{background:#31445a}
+  .m3d-legend{position:absolute;top:56px;left:12px;z-index:4;background:rgba(9,12,16,.84);border:1px solid #222c38;border-radius:10px;padding:9px 11px;max-width:240px;max-height:62%;overflow:auto;font-size:12px;color:#e7edf3;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+  .m3d-legend h4{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa6b2}
+  .m3d-legend .row{display:flex;align-items:center;gap:7px;margin:3px 0;line-height:1.2}
+  .m3d-legend .sw{width:13px;height:13px;border-radius:3px;flex:none;border:1px solid rgba(255,255,255,.28)}
   .readout{position:absolute;left:14px;bottom:80px;z-index:5;background:rgba(14,18,23,.88);
     backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:9px 13px;
     font-family:var(--mono);font-size:11px;color:#cbd5e1;display:none;box-shadow:0 6px 22px rgba(0,0,0,.45)}
@@ -5665,13 +5752,16 @@ header('Expires: 0');
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path></svg>
           Cor de destaque do imóvel
         </p>
+        <div class="cor-sub-lbl">Preenchimento (fundo)</div>
         <div class="cor-grid" id="cor-grid"></div>
+        <div class="cor-sub-lbl" style="margin-top:9px">Linha (contorno)</div>
+        <div class="cor-grid" id="cor-grid-linha"></div>
         <div class="op-wrap">
           <span class="op-lbl">Intensidade</span>
           <input type="range" id="cor-op" class="op-range" min="0.08" max="0.55" step="0.01" value="0.18">
         </div>
         <button type="button" class="btn-ghost" id="cor-clear" style="margin-top:8px;width:100%">Remover destaque</button>
-        <p class="cor-hint">Dica: clique sobre um imóvel no mapa (em "Ver todos") para destacá-lo também. O vermelho é reservado a sobreposições.</p>
+        <p class="cor-hint">Dica: defina cores diferentes para o <b>fundo</b> e a <b>linha</b> quando houver imóveis vizinhos ou desmembramentos. Clique sobre um imóvel no mapa (em "Ver todos") para destacá-lo. O vermelho é reservado a sobreposições.</p>
       </div>
 
       <div class="saved">
@@ -5712,6 +5802,14 @@ header('Expires: 0');
 
   <div class="map-wrap">
     <div id="map"></div>
+    <div id="ctrl-3d" class="ctrl-3d">
+      <button id="btn-3d" class="c3d-btn" title="Ver o imóvel em 3D fotorrealista (relevo do terreno)">🧊 Ver em 3D</button>
+      <div class="c3d-row">
+        <button id="btn-3d-tilt" class="c3d-mini" title="Inclinar/desinclinar o mapa (visão oblíqua)">⤢ Inclinar</button>
+        <button id="btn-3d-left" class="c3d-mini" title="Girar à esquerda" style="display:none">⟲</button>
+        <button id="btn-3d-right" class="c3d-mini" title="Girar à direita" style="display:none">⟳</button>
+      </div>
+    </div>
     <button id="btn-toggle-panel" class="toggle-panel" title="Mostrar/ocultar painel" aria-label="Mostrar ou ocultar painel">
       <svg class="ic-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
       <svg class="ic-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -5910,6 +6008,24 @@ header('Expires: 0');
   </div>
 </div>
 <form id="at-pdf-form" method="POST" target="_blank" style="display:none"><input type="hidden" name="acao" value="autotutela_pdf"><input type="hidden" name="id" id="at-pdf-id"><input type="hidden" name="tipo" id="at-pdf-tipo"></form>
+
+<div id="modal-3d" class="modal-ov">
+  <div class="modal-3d-card">
+    <div class="modal-3d-bar">
+      <span>🧊 <span id="m3d-title">Visão 3D do imóvel</span></span>
+      <span style="flex:1"></span>
+      <button id="m3d-close" class="modal-x" title="Fechar">×</button>
+    </div>
+    <div id="m3d-host" class="modal-3d-host"></div>
+    <div id="m3d-legend" class="m3d-legend" style="display:none"></div>
+    <div id="m3d-msg" class="modal-3d-msg" style="display:none"></div>
+    <div class="modal-3d-foot" id="m3d-foot">
+      <span id="m3d-foot-txt">Arraste para girar · role o mouse para aproximar. Abrir também em:</span>
+      <a id="m3d-earth" class="m3d-link" target="_blank" rel="noopener" href="#">🌐 Google Earth</a>
+      <a id="m3d-maps" class="m3d-link" target="_blank" rel="noopener" href="#">🗺 Google Maps (satélite)</a>
+    </div>
+  </div>
+</div>
 
 <div id="modal-edit" class="modal-ov">
   <div class="modal-card">
@@ -6229,10 +6345,515 @@ function initMap(){
 
   carregarLista();
   verTodos();   // abre a visão geral com todos os imóveis ao entrar
+  wire3D();     // controles de visão 3D
   iniciarPollLista();   // sincronização multiusuário (sem refresh da página)
 }
 window.initMap = initMap;
-console.info('%cAtlas Dimensor — build 2026-06-25f-laudo-coordenadas','color:#0ea5e9;font-weight:bold');
+
+/* ======================= VISÃO 3D ======================= */
+/* Alvo do 3D: imóvel em foco (recém-mapeado) ou o ativo na visão geral. */
+function imovel3DAlvo(){
+  // 1) imóvel ativo (aberto/gravado) — tem id, permite localizar as sobreposições
+  if(typeof imovelAtivoId!=='undefined' && imovelAtivoId){
+    const it=(itensOverview||[]).find(x=>x.id===imovelAtivoId);
+    if(it && Array.isArray(it.pts) && it.pts.length>=3) return it;
+  }
+  // 2) geometria recém-desenhada (pode não estar salva)
+  if(typeof lastGeo!=='undefined' && lastGeo && Array.isArray(lastGeo.pts) && lastGeo.pts.length>=3)
+    return {pts:lastGeo.pts, cor:lastGeo.cor, cor_linha:lastGeo.cor_linha, identificador:(document.getElementById('identificador')||{}).value||''};
+  return null;
+}
+function centro3D(pts){ let la=0,ln=0; pts.forEach(p=>{la+=p[0];ln+=p[1];}); return {lat:la/pts.length, lng:ln/pts.length}; }
+function metros3D(a,b){ const R=6378137, la=(a[0]+b[0])/2*Math.PI/180; const x=(b[1]-a[1])*Math.PI/180*Math.cos(la), y=(b[0]-a[0])*Math.PI/180; return Math.hypot(x,y)*R; }
+function rangeParaImovel(it){
+  if(!it||!it.pts||it.pts.length<2) return 900;
+  let minLa=Infinity,maxLa=-Infinity,minLn=Infinity,maxLn=-Infinity;
+  it.pts.forEach(p=>{minLa=Math.min(minLa,p[0]);maxLa=Math.max(maxLa,p[0]);minLn=Math.min(minLn,p[1]);maxLn=Math.max(maxLn,p[1]);});
+  return Math.max(400, Math.min(6000, metros3D([minLa,minLn],[maxLa,maxLn])*2.4));
+}
+
+/* (1) Inclinação/rotação no PRÓPRIO mapa (visão oblíqua) */
+let tiltOn=false, heading3D=0;
+function set3DTilt(on){
+  tiltOn=on; heading3D=0;
+  const b=document.getElementById('btn-3d-tilt'), l=document.getElementById('btn-3d-left'), r=document.getElementById('btn-3d-right');
+  if(b) b.classList.toggle('on', on);
+  if(l) l.style.display=on?'':'none';
+  if(r) r.style.display=on?'':'none';
+  if(!map) return;
+  if(on){
+    const mt=map.getMapTypeId(); if(mt!=='satellite'&&mt!=='hybrid') map.setMapTypeId('hybrid');
+    if(map.getZoom()<16) map.setZoom(17);
+    map.setHeading(0); map.setTilt(45);
+    setStatus('ok','Mapa inclinado. Use ⟲ ⟳ para girar. Em áreas rurais o relevo real fica melhor no botão "Ver em 3D".');
+  } else { map.setTilt(0); map.setHeading(0); }
+}
+function rot3D(d){ if(!map) return; heading3D=(heading3D+d+360)%360; map.setHeading(heading3D); if((map.getTilt()||0)<45) map.setTilt(45); }
+
+/* (2) 3D PRÓPRIO — satélite + relevo servidos pelo backend (independe do Map Tiles API) */
+let m3dLatLng=null, three3D=null, m3dGoogleEl=null;
+function carregarThree(cb){
+  if(window.THREE){ cb(); return; }
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  s.onload=()=>cb(); s.onerror=()=>cb(new Error('Falha ao carregar a biblioteca 3D.'));
+  document.head.appendChild(s);
+}
+function _mpp3D(z,lat){ return 156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2,z); }
+// Projeção Web Mercator em pixels (para recortar a textura no perímetro do município)
+function projPx3D(lat,lng,z){ const s=256*Math.pow(2,z); const x=(lng+180)/360*s; const sinL=Math.sin(lat*Math.PI/180); const y=(0.5 - Math.log((1+sinL)/(1-sinL))/(4*Math.PI))*s; return {x,y}; }
+// Plano de mosaico: escolhe o MAIOR zoom (mais detalhe) cujo município caiba numa grade N×N (N<=3).
+function planoTiles3D(covTotal, clat){
+  for(let z=17; z>=9; z--){ const tm=640*_mpp3D(z,clat); const N=Math.ceil(covTotal/tm); if(N<=3) return {z, N, tm, cov:N*tm}; }
+  const z=9, tm=640*_mpp3D(9,clat); const N=Math.min(3, Math.max(1, Math.ceil(covTotal/tm))); return {z, N, tm, cov:N*tm};
+}
+// Anéis do limite do município (usa o já carregado; senão tenta o cache salvo). Retorna [[lat,lng],...] por anel.
+async function limiteRings3D(){
+  let geom = (typeof limiteTurf!=='undefined' && limiteTurf && limiteTurf.geometry) ? limiteTurf.geometry : null;
+  let nome = (typeof limiteNome!=='undefined' ? limiteNome : '') || '';
+  if(!geom){
+    try{
+      const c = await post({acao:'limite_cache'});
+      if(c && c.ok && c.geojson){ const f=limiteToTurf(c.geojson); if(f && f.geometry){ geom=f.geometry; nome=c.nome||nome||'município'; } }
+    }catch(_){}
+  }
+  if(!geom){
+    // fallback: usa o município selecionado no seletor (base IBGE local, offline)
+    try{
+      const sel=document.getElementById('muni-list'); const id=sel?sel.value:'';
+      if(id){ const r=await post({acao:'ibge_malha', municipio:id});
+        if(r && r.ok && r.geojson){ const f=limiteToTurf(r.geojson); if(f && f.geometry){ geom=f.geometry; nome=(sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].textContent:'')||nome||'município'; } } }
+    }catch(_){}
+  }
+  const rings=[];
+  const pushPoly=(poly)=>{ (poly||[]).forEach(r=>{
+    if(!r || r.length<3) return;
+    // subamostra anéis muito densos (desempenho)
+    const step = r.length>1600 ? Math.ceil(r.length/1600) : 1;
+    const out=[]; for(let i=0;i<r.length;i+=step){ out.push([r[i][1], r[i][0]]); }
+    if(out.length && (out[0][0]!==out[out.length-1][0] || out[0][1]!==out[out.length-1][1])) out.push([r[0][1], r[0][0]]);
+    if(out.length>=3) rings.push(out);
+  }); };
+  if(geom){
+    if(geom.type==='Polygon') pushPoly(geom.coordinates);
+    else if(geom.type==='MultiPolygon') (geom.coordinates||[]).forEach(pc=>pushPoly(pc));
+  }
+  return {rings, nome};
+}
+let _g3d=null;
+async function abrir3D(){
+  // Espelha o que está VISÍVEL no mapa (respeita o filtro do painel, ex.: "2063;*").
+  const getOpt=(poly,k)=>{ try{ return poly.get(k); }catch(_){ return null; } };
+  const props=[];
+  (itensOverview||[]).forEach(it=>{
+    if(!it._poly || !(it._poly.getMap && it._poly.getMap())) return;
+    if(!Array.isArray(it.pts) || it.pts.length<3) return;
+    const cor = getOpt(it._poly,'strokeColor') || getOpt(it._poly,'fillColor') || ((typeof corBaseImovel==='function')?corBaseImovel(it):'#5b96e6');
+    props.push({pts:it.pts, corMapa:cor, id:it.id, nome:(it.identificador||it.numero_matricula||'').toString()});
+  });
+  if(!props.length){
+    // Sem consulta no painel: usa o imóvel ativo/aberto (ou a geometria desenhada) — "ver imóvel isolado".
+    const alvo = (typeof imovel3DAlvo==='function') ? imovel3DAlvo() : null;
+    if(alvo && Array.isArray(alvo.pts) && alvo.pts.length>=3){
+      let cor = alvo.cor || alvo.cor_linha;
+      if(!cor && alvo._poly){ cor = getOpt(alvo._poly,'strokeColor') || getOpt(alvo._poly,'fillColor'); }
+      if(!cor && typeof corBaseImovel==='function'){ try{ cor = corBaseImovel(alvo); }catch(_){} }
+      props.push({pts:alvo.pts, corMapa:cor||'#5b96e6', id:alvo.id, nome:(alvo.identificador||alvo.numero_matricula||'').toString()});
+    }
+  }
+  if(!props.length){ setStatus('err','Nada visível no mapa para ver em 3D. Faça uma consulta no painel (ex.: 2063;*) ou abra um imóvel.'); return; }
+  const LIMITE=140; let focoIds=null;
+  if(props.length>LIMITE && typeof imovelAtivoId!=='undefined' && imovelAtivoId){
+    focoIds=new Set([imovelAtivoId]);
+    (overlapPolys||[]).forEach(p=>{ if(p._pair && p._pair.includes(imovelAtivoId)){ p._pair.forEach(id=>focoIds.add(id)); } });
+  }
+  const propsUsar = focoIds ? props.filter(p=>focoIds.has(p.id)) : (props.length>LIMITE ? props.slice(0,LIMITE) : props);
+  const sobrepos=[];
+  (overlapPolys||[]).forEach(p=>{
+    if(!(p.getMap && p.getMap())) return;
+    if(focoIds && p._pair && !p._pair.some(id=>focoIds.has(id))) return;
+    const cor = getOpt(p,'fillColor') || (p._tipo==='morto'?'#9aa3ad':'#e2342f');
+    const tipo = p._tipo || (cor && cor.toLowerCase()==='#9aa3ad' ? 'morto':'material');
+    const paths = p.getPaths ? p.getPaths().getArray() : (p.getPath?[p.getPath()]:[]);
+    paths.forEach(path=>{ const ring=path.getArray().map(ll=>[ll.lat(), ll.lng()]); if(ring.length>=3) sobrepos.push({ring, cor, tipo}); });
+  });
+  const temSobrep = sobrepos.some(s=>s.tipo!=='morto');
+  // cores distintas por matrícula quando há sobreposição (vermelho reservado à sobreposição)
+  let legenda=null;
+  const PAL=['#2563eb','#16a34a','#f59e0b','#7c3aed','#0891b2','#db2777','#65a30d','#0d9488','#ea580c','#4f46e5','#0284c7','#a16207','#be185d','#15803d','#b45309','#6d28d9'];
+  if(temSobrep && propsUsar.length<=PAL.length){
+    legenda=[];
+    propsUsar.forEach((pr,i)=>{ pr.corUsar=PAL[i%PAL.length]; legenda.push({cor:pr.corUsar, nome:pr.nome||('#'+pr.id)}); });
+  } else {
+    propsUsar.forEach(pr=>{ pr.corUsar=pr.corMapa; });
+  }
+  let limite={rings:[],nome:''}; try{ limite=await limiteRings3D(); }catch(_){}
+  _g3d={propsUsar, sobrepos, temSobrep, legenda, limite};
+  document.getElementById('modal-3d').classList.add('show');
+  await render3DGoogle();
+}
+async function render3D(){
+  if(!_g3d) return;
+  const {propsUsar, sobrepos, legenda, limite} = _g3d;
+  let minLa=Infinity,maxLa=-Infinity,minLn=Infinity,maxLn=-Infinity;
+  const acc=p=>{minLa=Math.min(minLa,p[0]);maxLa=Math.max(maxLa,p[0]);minLn=Math.min(minLn,p[1]);maxLn=Math.max(maxLn,p[1]);};
+  propsUsar.forEach(pr=>pr.pts.forEach(acc));
+  const clat=(minLa+maxLa)/2, clng=(minLn+maxLn)/2, coslat=Math.cos(clat*Math.PI/180);
+  const spanE=(maxLn-minLn)*111320*coslat, spanN=(maxLa-minLa)*110540, maxSpan=Math.max(spanE,spanN,50);
+  const mppNeeded=(maxSpan*1.6)/640;
+  const z=Math.max(10,Math.min(20,Math.floor(Math.log2(156543.03392*coslat/mppNeeded))));
+  const mpp=_mpp3D(z,clat), cov=640*mpp;
+  m3dLatLng={lat:clat,lng:clng};
+  const nOver=sobrepos.filter(s=>s.tipo!=='morto').length;
+  const ea=document.getElementById('m3d-earth'), ma=document.getElementById('m3d-maps');
+  if(ea) ea.href=`https://earth.google.com/web/@${clat},${clng},300a,${Math.round(cov*1.4)}d,35y,0h,55t,0r`;
+  if(ma) ma.href=`https://www.google.com/maps/@${clat},${clng},${z}z/data=!3m1!1e3`;
+  const ttl=document.getElementById('m3d-title'); if(ttl) ttl.textContent = `Visão 3D · ${propsUsar.length} imóvel(is)` + (nOver?(' · '+nOver+' sobrep.'):'');
+  renderLegenda3D(legenda);
+  const host=document.getElementById('m3d-host'), msg=document.getElementById('m3d-msg');
+  fechar3DCena(); host.style.display='block'; host.innerHTML='';
+  msg.style.display='flex'; msg.textContent='Carregando satélite e relevo…';
+  try{
+    await new Promise((res,rej)=>carregarThree(e=>e?rej(e):res()));
+    const seg=20, grid=[], locs=[];
+    for(let j=0;j<=seg;j++){ for(let i=0;i<=seg;i++){
+      const u=i/seg, v=j/seg, we=(u-0.5)*cov, wn=(v-0.5)*cov;
+      const la=clat+wn/110540, ln=clng+we/(111320*coslat);
+      grid.push({u,v,we,wn}); locs.push(la.toFixed(6)+','+ln.toFixed(6));
+    }}
+    let elev=null;
+    try{
+      const r=await fetch(window.location.pathname+'?m3d_elev=1&pts='+encodeURIComponent(locs.join('|')));
+      const j=await r.json(); if(j && j.ok && Array.isArray(j.elev) && j.elev.length===grid.length) elev=j.elev;
+    }catch(_){}
+    montarCena3D(host, {seg,cov,clat,clng,coslat,z,grid,elev,props:propsUsar,sobrepos,limiteRings:limite.rings,limiteNome:limite.nome});
+    const ft2=document.getElementById('m3d-foot-txt');
+    if(ft2) ft2.innerHTML = (nOver?'<b style="color:#e2342f">■</b> vermelho = sobreposição · ':'') + (limite.rings.length?'<b style="color:#2563eb">▬</b> limite'+(limite.nome?(' de '+limite.nome):'')+' · ':'') + 'rótulo = matrícula. <b>Arraste = girar</b> · botão direito (ou Shift) + arraste = mover · roda = zoom.';
+    msg.style.display='none';
+    setStatus('ok', nOver ? ('Visão 3D — '+nOver+' sobreposição(ões) em vermelho.') : 'Visão 3D carregada.');
+  }catch(e){
+    host.style.display='none'; msg.style.display='flex';
+    msg.innerHTML='Não foi possível montar o 3D embutido. Use os links do rodapé (Google Earth / Maps).';
+  }
+}
+let _ctl3D=null;
+function instalarControles3D(map3d, host){
+  let mode=null, sx=0, sy=0, sh=0, st=0, sLat=0, sLng=0, sAlt=0, sRange=0;
+  const down=(e)=>{
+    if(e.pointerType!=='mouse' || e.button!==0 || e.ctrlKey) return; // toque/2dedos e ctrl ficam nativos
+    mode = e.shiftKey ? 'pan' : 'orbit';
+    sx=e.clientX; sy=e.clientY; sh=map3d.heading||0; st=map3d.tilt||0;
+    const c=map3d.center||{}; sLat=c.lat||0; sLng=c.lng||0; sAlt=c.altitude||0; sRange=map3d.range||1000;
+    try{ map3d.stopCameraAnimation(); }catch(_){}
+    host.style.cursor = mode==='pan' ? 'grabbing' : 'move';
+    e.stopPropagation(); e.preventDefault();
+  };
+  const move=(e)=>{
+    if(!mode) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    if(mode==='orbit'){
+      let h=sh + dx*0.35, t=st + dy*0.25; if(t<0)t=0; if(t>85)t=85;
+      map3d.heading=h; map3d.tilt=t;
+    } else {
+      const mPerPx=Math.max(0.05, sRange/Math.max(1,host.clientHeight));
+      const hr=sh*Math.PI/180, brR=hr+Math.PI/2;
+      let east=0, north=0;
+      east += -dx*mPerPx*Math.sin(brR); north += -dx*mPerPx*Math.cos(brR);
+      east +=  dy*mPerPx*Math.sin(hr);  north +=  dy*mPerPx*Math.cos(hr);
+      const dLat=north/110540, dLng=east/((111320*Math.cos(sLat*Math.PI/180))||1);
+      map3d.center={lat:sLat+dLat, lng:sLng+dLng, altitude:sAlt};
+    }
+    e.stopPropagation(); e.preventDefault();
+  };
+  const up=(e)=>{ if(mode){ mode=null; host.style.cursor='grab'; e.stopPropagation(); } };
+  try{ map3d.addEventListener('pointerdown', down, true); }catch(_){}
+  window.addEventListener('pointermove', move, true);
+  window.addEventListener('pointerup', up, true);
+  host.style.cursor='grab';
+  _ctl3D={move, up};
+}
+(function removerBannerAlpha(){
+  function limpar(){
+    try{
+      document.querySelectorAll('div,section,aside').forEach(n=>{
+        if(n.dataset && n.dataset.g3dBanner) return;
+        const t=(n.textContent||'');
+        if(t.length<220 && (/canal\s+alfa/i.test(t) || /development purposes/i.test(t) || (/API\s+Maps\s+JavaScript/i.test(t) && /desenvolvimento/i.test(t)))){
+          try{ n.style.setProperty('display','none','important'); }catch(_){}
+          if(n.dataset) n.dataset.g3dBanner='1';
+        }
+      });
+    }catch(_){}
+  }
+  if(document.readyState!=='loading') limpar(); else document.addEventListener('DOMContentLoaded', limpar);
+  try{ new MutationObserver(limpar).observe(document.documentElement,{childList:true,subtree:true}); }catch(_){}
+  let k=0; const iv=setInterval(()=>{ limpar(); if(++k>60) clearInterval(iv); }, 500);
+})();
+function hexA3D(hex, a){
+  hex=(hex||'#888888').toString().replace('#',''); if(hex.length===3) hex=hex.split('').map(c=>c+c).join('');
+  const r=parseInt(hex.substr(0,2),16)||136, g=parseInt(hex.substr(2,2),16)||136, b=parseInt(hex.substr(4,2),16)||136;
+  return `rgba(${r},${g},${b},${a})`;
+}
+function mostrarFallback3D(txt){
+  const host=document.getElementById('m3d-host'), msg=document.getElementById('m3d-msg');
+  if(host){ host.style.display='none'; host.innerHTML=''; }
+  if(msg){ msg.style.display='flex';
+    msg.innerHTML=txt+'<br><br>Abra no <b>Google Earth</b> (rodapé) ou use o <a href="#" id="m3d-alt" style="color:#8ab4ff;text-decoration:underline">visualizador com relevo (alternativo)</a>.';
+    const alt=document.getElementById('m3d-alt'); if(alt) alt.onclick=(e)=>{ e.preventDefault(); render3D(); };
+  }
+}
+async function render3DGoogle(){
+  if(!_g3d) return;
+  const {propsUsar, sobrepos, legenda, limite} = _g3d;
+  let minLa=Infinity,maxLa=-Infinity,minLn=Infinity,maxLn=-Infinity;
+  const acc=p=>{minLa=Math.min(minLa,p[0]);maxLa=Math.max(maxLa,p[0]);minLn=Math.min(minLn,p[1]);maxLn=Math.max(maxLn,p[1]);};
+  propsUsar.forEach(pr=>pr.pts.forEach(acc));
+  const clat=(minLa+maxLa)/2, clng=(minLn+maxLn)/2, coslat=Math.cos(clat*Math.PI/180);
+  const spanE=(maxLn-minLn)*111320*coslat, spanN=(maxLa-minLa)*110540, diag=Math.hypot(spanE,spanN);
+  const range=Math.max(500, Math.min(12000, diag*2.2));
+  m3dLatLng={lat:clat,lng:clng};
+  const nOver=sobrepos.filter(s=>s.tipo!=='morto').length;
+  const ea=document.getElementById('m3d-earth'), ma=document.getElementById('m3d-maps');
+  if(ea) ea.href=`https://earth.google.com/web/@${clat},${clng},300a,${Math.round(range*1.4)}d,35y,0h,55t,0r`;
+  if(ma) ma.href=`https://www.google.com/maps/@${clat},${clng},2000m/data=!3m1!1e3`;
+  const ttl=document.getElementById('m3d-title'); if(ttl) ttl.textContent=`Visão 3D · ${propsUsar.length} imóvel(is)`+(nOver?(' · '+nOver+' sobrep.'):'');
+  renderLegenda3D(legenda);
+  const ft=document.getElementById('m3d-foot-txt'); if(ft) ft.innerHTML=(nOver?'<b style="color:#e2342f">■</b> vermelho = sobreposição · ':'')+(limite.rings.length?'<b style="color:#2563eb">▬</b> limite · ':'')+'rótulo = matrícula · 3D fotorrealista do Google. Arraste = girar · Shift+arraste = mover · roda = zoom.';
+  document.getElementById('modal-3d').classList.add('show');
+  const host=document.getElementById('m3d-host'), msg=document.getElementById('m3d-msg');
+  fechar3DCena(); host.style.display='block'; host.innerHTML='';
+  msg.style.display='flex'; msg.textContent='Carregando 3D do Google…';
+  try{
+    const lib = await google.maps.importLibrary('maps3d');
+    const { Map3DElement, Polygon3DElement, Marker3DElement, Polyline3DElement, AltitudeMode, MapMode } = lib;
+    if(!Map3DElement) throw new Error('Map3DElement indisponível');
+    const map3d = new Map3DElement({ center:{lat:clat, lng:clng, altitude:0}, range, tilt:62, heading:0, mode:(MapMode?MapMode.HYBRID:'HYBRID') });
+    map3d.style.width='100%'; map3d.style.height='100%';
+    host.innerHTML=''; host.appendChild(map3d);
+    m3dGoogleEl=map3d;
+    instalarControles3D(map3d, host);
+    let ok3d=false; const marcar=()=>{ ok3d=true; const mm=document.getElementById('m3d-msg'); if(mm) mm.style.display='none'; };
+    ['gmp-centerchange','gmp-steadychange','gmp-click'].forEach(ev=>{ try{ map3d.addEventListener(ev, marcar, {once:true}); }catch(_){} });
+    clearTimeout(window.__g3dT);
+    window.__g3dT=setTimeout(()=>{ if(!ok3d) mostrarFallback3D('Não foi possível carregar o 3D fotorrealista do Google — verifique se a <b>Map Tiles API</b> está ativada e o faturamento habilitado no projeto da sua chave.'); }, 8000);
+    const addPoly=(pts, cor, H, isOver)=>{
+      try{
+        const outer=pts.map(p=>({lat:p[0], lng:p[1], altitude:H}));
+        const poly=new Polygon3DElement({
+          outerCoordinates: outer, altitudeMode: AltitudeMode.RELATIVE_TO_GROUND, extruded: true,
+          fillColor: hexA3D(cor, isOver?0.55:0.45), strokeColor: cor, strokeWidth: isOver?3:2, drawsOccludedSegments: true
+        });
+        map3d.append(poly);
+      }catch(_){}
+    };
+    propsUsar.forEach(pr=> addPoly(pr.pts, pr.corUsar||pr.corMapa||'#5b96e6', 60, false));
+    sobrepos.forEach(s=>{ const material=s.tipo!=='morto'; addPoly(s.ring, material?'#e2342f':(s.cor||'#9aa3ad'), material?95:45, material); });
+    if(Marker3DElement){
+      propsUsar.forEach(pr=>{ if(!pr.nome) return; let la=0,ln=0; pr.pts.forEach(p=>{la+=p[0];ln+=p[1];}); la/=pr.pts.length; ln/=pr.pts.length;
+        try{ const mk=new Marker3DElement({ position:{lat:la, lng:ln, altitude:70}, altitudeMode:AltitudeMode.RELATIVE_TO_GROUND, label:pr.nome, extruded:true }); map3d.append(mk); }catch(_){}
+      });
+    }
+    if(limite.rings && limite.rings.length && Polyline3DElement){
+      limite.rings.forEach(r=>{ try{ const pl=new Polyline3DElement({ coordinates:r.map(p=>({lat:p[0],lng:p[1]})), altitudeMode:AltitudeMode.CLAMP_TO_GROUND, strokeColor:'#2563eb', strokeWidth:2 }); map3d.append(pl); }catch(_){} });
+    }
+  }catch(e){
+    mostrarFallback3D('O 3D fotorrealista do Google não está disponível nesta conta (Map Tiles API não ativada ou versão indisponível).');
+  }
+}
+function renderLegenda3D(legenda){
+  const el=document.getElementById('m3d-legend'); if(!el) return;
+  if(!legenda || !legenda.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.innerHTML='<h4>Matrículas</h4>'+legenda.map(l=>`<div class="row"><span class="sw" style="background:${l.cor}"></span>${escapeHtml(l.nome)}</div>`).join('')
+    +'<div class="row" style="margin-top:7px;border-top:1px solid #222c38;padding-top:6px"><span class="sw" style="background:#e2342f"></span>sobreposição</div>';
+  el.style.display='block';
+}
+function montarCena3D(host, P){
+  const THREE=window.THREE;
+  const w=host.clientWidth||900, h=host.clientHeight||600, seg=P.seg, cov=P.cov;
+  const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0a0d11);
+  const camera=new THREE.PerspectiveCamera(55, w/h, 1, cov*30);
+  const renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1)); renderer.setSize(w,h);
+  if(THREE.sRGBEncoding!==undefined) renderer.outputEncoding=THREE.sRGBEncoding;
+  host.appendChild(renderer.domElement);
+  let minE=Infinity,maxE=-Infinity; if(P.elev) P.elev.forEach(e=>{minE=Math.min(minE,e);maxE=Math.max(maxE,e);});
+  const relevo=P.elev?(maxE-minE):0;
+  const exag = relevo>0 ? Math.max(1.2, Math.min(6, 45/relevo)) : 1;  // relevos suaves ganham destaque
+  const yAt=(k)=> P.elev ? (P.elev[k]-minE)*exag : 0;
+  const pos=[], uv=[], idx=[];
+  P.grid.forEach((g,k)=>{ pos.push(g.we, yAt(k), -g.wn); uv.push(g.u, g.v); });
+  for(let j=0;j<seg;j++){ for(let i=0;i<seg;i++){ const a=j*(seg+1)+i,b=a+1,c=a+(seg+1),d=c+1; idx.push(a,c,b, b,c,d); } }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv,2));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  const tileUrl=window.location.pathname+`?m3d_tile=1&clat=${P.clat}&clng=${P.clng}&z=${P.z}`;
+  const groundMat=new THREE.MeshStandardMaterial({color:0x3a4a3a, roughness:1, metalness:0, side:THREE.DoubleSide});
+  const aplicarTex=(tex)=>{ if(THREE.sRGBEncoding!==undefined) tex.encoding=THREE.sRGBEncoding; if('colorSpace' in tex && THREE.SRGBColorSpace) tex.colorSpace=THREE.SRGBColorSpace; groundMat.map=tex; groundMat.color.set(0xffffff); groundMat.needsUpdate=true; };
+  const falhaTex=()=>{ const f=document.getElementById('m3d-foot-txt'); if(f) f.innerHTML='Satélite indisponível (verifique a <b>Static Maps API</b>) — mostrando o terreno.'; };
+  if(P.tilePlan){
+    // Mosaico de tiles: carrega o mapa COMPLETO do município (N×N imagens) e recorta ao perímetro.
+    const TP=P.tilePlan, N=TP.N, TS=1280, cvS=N*TS;
+    const cv=document.createElement('canvas'); cv.width=cvS; cv.height=cvS; const cx=cv.getContext('2d');
+    cx.fillStyle='#0a0d11'; cx.fillRect(0,0,cvS,cvS);
+    let feitos=0; const total=N*N; let algum=false;
+    const finalizar=()=>{
+      if(!algum){ falhaTex(); return; }
+      if(P.clip && P.clip.length){ try{
+        cx.globalCompositeOperation='destination-in';
+        const cpx=projPx3D(TP.clat,TP.clng,TP.z);
+        cx.beginPath();
+        P.clip.forEach(ring=>{ ring.forEach((pt,i)=>{ const q=projPx3D(pt[0],pt[1],TP.z); const X=cvS/2+(q.x-cpx.x)*2, Y=cvS/2+(q.y-cpx.y)*2; i?cx.lineTo(X,Y):cx.moveTo(X,Y); }); cx.closePath(); });
+        cx.fillStyle='#fff'; cx.fill('evenodd');
+        cx.globalCompositeOperation='source-over';
+      }catch(e){} }
+      const tex=new THREE.CanvasTexture(cv); aplicarTex(tex);
+      groundMat.transparent=true; groundMat.alphaTest=0.04; groundMat.needsUpdate=true;
+    };
+    for(let j=0;j<N;j++){ for(let i=0;i<N;i++){
+      const offE=(i-(N-1)/2)*TP.tm, offN=((N-1)/2-j)*TP.tm;
+      const tlat=TP.clat+offN/110540, tlng=TP.clng+offE/(111320*TP.coslat);
+      const img=new Image();
+      img.onload=(function(ii,jj){ return ()=>{ try{ cx.drawImage(img, ii*TS, jj*TS, TS, TS); algum=true; }catch(_){} if(++feitos>=total) finalizar(); }; })(i,j);
+      img.onerror=()=>{ if(++feitos>=total) finalizar(); };
+      img.src=window.location.pathname+`?m3d_tile=1&clat=${tlat}&clng=${tlng}&z=${TP.z}`;
+    }}
+  } else if(P.clip && P.clip.length){
+    // recorta a imagem de satélite ao perímetro do município (fora do limite fica transparente)
+    const img=new Image();
+    img.onload=()=>{ try{
+      const S=1280, cv=document.createElement('canvas'); cv.width=S; cv.height=S; const cx=cv.getContext('2d');
+      cx.drawImage(img,0,0,S,S);
+      cx.globalCompositeOperation='destination-in';
+      const cpx=projPx3D(P.clat,P.clng,P.z);
+      cx.beginPath();
+      P.clip.forEach(ring=>{ ring.forEach((pt,i)=>{ const q=projPx3D(pt[0],pt[1],P.z); const X=S/2+(q.x-cpx.x)*2, Y=S/2+(q.y-cpx.y)*2; i?cx.lineTo(X,Y):cx.moveTo(X,Y); }); cx.closePath(); });
+      cx.fillStyle='#fff'; cx.fill('evenodd');
+      const tex=new THREE.CanvasTexture(cv); aplicarTex(tex);
+      groundMat.transparent=true; groundMat.alphaTest=0.04; groundMat.needsUpdate=true;
+    }catch(e){ groundMat.color.set(0x3a4a3a); } };
+    img.onerror=falhaTex; img.src=tileUrl;
+  } else {
+    new THREE.TextureLoader().load(tileUrl, aplicarTex, undefined, falhaTex);
+  }
+  const mesh=new THREE.Mesh(geo, groundMat); scene.add(mesh);
+  const elevAt=(la,ln)=>{
+    if(!P.elev) return 0;
+    const u=(ln-P.clng)*(111320*P.coslat)/cov+0.5, v=(la-P.clat)*110540/cov+0.5;
+    const fi=Math.max(0,Math.min(seg-1e-3,u*seg)), fj=Math.max(0,Math.min(seg-1e-3,v*seg));
+    const i0=Math.floor(fi), j0=Math.floor(fj), tx=fi-i0, ty=fj-j0, e=(ii,jj)=>yAt(jj*(seg+1)+ii);
+    return e(i0,j0)*(1-tx)*(1-ty)+e(i0+1,j0)*tx*(1-ty)+e(i0,j0+1)*(1-tx)*ty+e(i0+1,j0+1)*tx*ty;
+  };
+  const HBASE=Math.max(50, cov*0.05);        // altura de referência do prisma (profundidade visível)
+  // rótulo (matrícula) como sprite que sempre encara a câmera
+  function makeLabel3D(text, corHex){
+    const fs=44, pad=18;
+    const c=document.createElement('canvas'), g=c.getContext('2d');
+    g.font=`bold ${fs}px Arial, sans-serif`;
+    const tw=Math.ceil(g.measureText(text).width);
+    c.width=tw+pad*2; c.height=fs+pad*2;
+    const w=c.width, h=c.height, r=16;
+    g.font=`bold ${fs}px Arial, sans-serif`;
+    g.beginPath(); g.moveTo(r,0); g.arcTo(w,0,w,h,r); g.arcTo(w,h,0,h,r); g.arcTo(0,h,0,0,r); g.arcTo(0,0,w,0,r); g.closePath();
+    g.fillStyle='rgba(9,12,16,0.86)'; g.fill(); g.lineWidth=4; g.strokeStyle=corHex||'#ffffff'; g.stroke();
+    g.fillStyle='#fff'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(text, w/2, h/2+2);
+    const tex=new THREE.CanvasTexture(c); tex.minFilter=THREE.LinearFilter;
+    const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false, depthWrite:false}));
+    spr.userData.aspect = w/h; spr.renderOrder=6;      // escala é ajustada por quadro (tamanho fixo na tela)
+    return spr;
+  }
+  const labels3D=[];
+  // desenha um imóvel como PRISMA 3D (volume/profundidade)
+  function addPrisma(pts, corHex, opac, hFactor, isOver, rotulo){
+    if(!pts || pts.length<3) return;
+    const col=new THREE.Color(corHex);
+    const ring=pts.map(p=>{ const x=(p[1]-P.clng)*(111320*P.coslat), z=-(p[0]-P.clat)*110540; return {x, z, yb:elevAt(p[0],p[1])}; });
+    let topBase=-Infinity; ring.forEach(r=>{ if(r.yb>topBase) topBase=r.yb; });
+    const topY=topBase + HBASE*hFactor;
+    const wallPos=[];
+    for(let i=0;i<ring.length;i++){ const a=ring[i], b=ring[(i+1)%ring.length];
+      wallPos.push(a.x,a.yb,a.z, b.x,b.yb,b.z, b.x,topY,b.z, a.x,a.yb,a.z, b.x,topY,b.z, a.x,topY,a.z); }
+    const wgeo=new THREE.BufferGeometry(); wgeo.setAttribute('position',new THREE.Float32BufferAttribute(wallPos,3)); wgeo.computeVertexNormals();
+    const wmesh=new THREE.Mesh(wgeo, new THREE.MeshStandardMaterial({color:col, roughness:.75, metalness:.05, transparent:true, opacity:opac, side:THREE.DoubleSide, depthWrite:false}));
+    if(isOver) wmesh.renderOrder=2; scene.add(wmesh);
+    try{
+      const shape=new THREE.Shape(); ring.forEach((r,i)=>{ const y=-r.z; i?shape.lineTo(r.x,y):shape.moveTo(r.x,y); });
+      const capGeo=new THREE.ShapeGeometry(shape); capGeo.rotateX(-Math.PI/2); capGeo.translate(0, topY, 0);
+      const cmesh=new THREE.Mesh(capGeo, new THREE.MeshStandardMaterial({color:col, roughness:.6, metalness:.05, transparent:true, opacity:Math.min(.65,opac+.08), side:THREE.DoubleSide, depthWrite:false}));
+      if(isOver) cmesh.renderOrder=2; scene.add(cmesh);
+    }catch(_){}
+    const topLine=ring.map(r=>new THREE.Vector3(r.x, topY, r.z)); topLine.push(topLine[0].clone());
+    const lm=new THREE.Line(new THREE.BufferGeometry().setFromPoints(topLine), new THREE.LineBasicMaterial({color:col})); if(isOver) lm.renderOrder=3; scene.add(lm);
+    const baseLine=ring.map(r=>new THREE.Vector3(r.x, r.yb+2, r.z)); baseLine.push(baseLine[0].clone());
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(baseLine), new THREE.LineBasicMaterial({color:col, transparent:true, opacity:.55})));
+    if(rotulo){
+      let cx=0,cz=0; ring.forEach(r=>{cx+=r.x;cz+=r.z;}); cx/=ring.length; cz/=ring.length;
+      const spr=makeLabel3D(rotulo, corHex); spr.position.set(cx, topY + cov*0.02, cz); scene.add(spr); labels3D.push(spr);
+    }
+  }
+  const corAtivo=(typeof imovelAtivoId!=='undefined')?imovelAtivoId:null;
+  (P.props||[]).forEach(pr=> addPrisma(pr.pts, pr.corUsar||pr.corMapa||'#5b96e6', (pr.id&&pr.id===corAtivo)?0.5:0.34, 1.0, false, pr.nome));   // imóveis (cores distintas p/ sobreposição) + rótulo
+  (P.sobrepos||[]).forEach(s=>{
+    const material = s.tipo!=='morto';
+    addPrisma(s.ring, s.cor||(material?'#e2342f':'#9aa3ad'), material?0.62:0.4, material?1.12:1.0, material);         // sobreposições (mesmas regras do mapa)
+  });
+  // limite do município (mesma cor azul do mapa), rente ao terreno
+  (P.limiteRings||[]).forEach(ring=>{
+    const v=ring.map(p=>{ const x=(p[1]-P.clng)*(111320*P.coslat), z=-(p[0]-P.clat)*110540; return new THREE.Vector3(x, elevAt(p[0],p[1])+6, z); });
+    if(v.length>=2){ const lm=new THREE.Line(new THREE.BufferGeometry().setFromPoints(v), new THREE.LineBasicMaterial({color:0x2563eb})); lm.renderOrder=1; scene.add(lm); }
+  });
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  scene.add(new THREE.HemisphereLight(0xffffff,0x223344,1.15));
+  const dir=new THREE.DirectionalLight(0xffffff,0.6); dir.position.set(cov*0.3, cov*0.7, cov*0.2); scene.add(dir);
+  const target=new THREE.Vector3(0, relevo?(maxE-minE)*exag*0.3:0, 0);
+  let radius=cov*0.85, azim=0, polar=0.95;
+  function updCam(){ const sp=Math.sin(polar),cp=Math.cos(polar); camera.position.set(target.x+radius*sp*Math.sin(azim), target.y+radius*cp, target.z+radius*sp*Math.cos(azim)); camera.lookAt(target); }
+  updCam();
+  const el=renderer.domElement; el.style.cursor='grab'; el.oncontextmenu=e=>e.preventDefault();
+  function panXZ(dx,dy){
+    const k=(radius*1.04)/(host.clientHeight||600);           // ~metros por pixel na altura do alvo
+    const fx=-Math.sin(azim), fz=-Math.cos(azim);             // "frente" no chão (rumo ao alvo)
+    const rx=Math.cos(azim),  rz=-Math.sin(azim);             // "direita"
+    target.x += (dx*rx + dy*fx)*k;  target.z += (dx*rz + dy*fz)*k;  updCam();   // "pegar e puxar" o mapa
+  }
+  let modo=null, lx=0, ly=0, pinch=0, mx=0, my=0;
+  const md=e=>{ modo=(e.button===2||e.shiftKey)?'mover':'girar'; lx=e.clientX; ly=e.clientY; el.style.cursor='grabbing'; };
+  const mm=e=>{ if(!modo) return; const dx=e.clientX-lx, dy=e.clientY-ly; lx=e.clientX; ly=e.clientY;
+    if(modo==='mover') panXZ(dx,dy); else { azim-=dx*0.006; polar=Math.max(0.12,Math.min(1.45,polar-dy*0.006)); updCam(); } };
+  const mu=()=>{ modo=null; el.style.cursor='grab'; };
+  el.addEventListener('mousedown', md); window.addEventListener('mousemove', mm); window.addEventListener('mouseup', mu);
+  const wh=e=>{ e.preventDefault(); radius=Math.max(cov*0.05,Math.min(cov*4,radius*(e.deltaY>0?1.1:0.9))); updCam(); };
+  el.addEventListener('wheel', wh, {passive:false});
+  const ts=e=>{ if(e.touches.length===1){ modo='girar'; lx=e.touches[0].clientX; ly=e.touches[0].clientY; }
+    else if(e.touches.length===2){ modo='multi'; pinch=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); mx=(e.touches[0].clientX+e.touches[1].clientX)/2; my=(e.touches[0].clientY+e.touches[1].clientY)/2; } };
+  const tmv=e=>{ if(modo==='girar'&&e.touches.length===1){ const dx=e.touches[0].clientX-lx, dy=e.touches[0].clientY-ly; lx=e.touches[0].clientX; ly=e.touches[0].clientY; azim-=dx*0.006; polar=Math.max(0.12,Math.min(1.45,polar-dy*0.006)); updCam(); }
+    else if(e.touches.length===2){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); if(pinch) radius=Math.max(cov*0.05,Math.min(cov*4,radius*(pinch/d))); pinch=d; const cxm=(e.touches[0].clientX+e.touches[1].clientX)/2, cym=(e.touches[0].clientY+e.touches[1].clientY)/2; panXZ(cxm-mx, cym-my); mx=cxm; my=cym; }
+    e.preventDefault(); };
+  const te=()=>{ modo=null; };
+  el.addEventListener('touchstart', ts, {passive:false}); el.addEventListener('touchmove', tmv, {passive:false}); el.addEventListener('touchend', te);
+  const _tanHalf=Math.tan(55*Math.PI/360), _fracLbl=0.038;   // altura do rótulo ~3,8% da tela (fixo)
+  let raf; (function loop(){ raf=requestAnimationFrame(loop);
+    for(let i=0;i<labels3D.length;i++){ const s=labels3D[i], d=camera.position.distanceTo(s.position), H=_fracLbl*2*d*_tanHalf; s.scale.set(H*(s.userData.aspect||3), H, 1); }
+    renderer.render(scene,camera);
+  })();
+  const onResize=()=>{ const W=host.clientWidth,H=host.clientHeight; if(W&&H){camera.aspect=W/H;camera.updateProjectionMatrix();renderer.setSize(W,H);} };
+  window.addEventListener('resize',onResize); setTimeout(onResize,60);
+  three3D={ rotar:(d)=>{ azim+=d; updCam(); }, inclinar:(d)=>{ polar=Math.max(0.12,Math.min(1.45,polar+d)); updCam(); }, zoom:(f)=>{ radius=Math.max(cov*0.05,Math.min(cov*4,radius*f)); updCam(); },
+    dispose(){ try{cancelAnimationFrame(raf);}catch(_){} window.removeEventListener('resize',onResize); window.removeEventListener('mousemove',mm); window.removeEventListener('mouseup',mu); try{renderer.dispose();}catch(_){} try{host.innerHTML='';}catch(_){} } };
+}
+function fechar3DCena(){ if(three3D){ try{three3D.dispose();}catch(_){}; three3D=null; } }
+function abrirEarth(lat,lng){ window.open(`https://earth.google.com/web/@${lat},${lng},300a,900d,35y,0h,60t,0r`, '_blank', 'noopener'); }
+function fechar3D(){ clearTimeout(window.__g3dT); if(_ctl3D){ try{ window.removeEventListener('pointermove',_ctl3D.move,true); window.removeEventListener('pointerup',_ctl3D.up,true); }catch(_){}; _ctl3D=null; } fechar3DCena(); m3dGoogleEl=null; document.getElementById('modal-3d').classList.remove('show'); const h=document.getElementById('m3d-host'); if(h) h.innerHTML=''; const lg=document.getElementById('m3d-legend'); if(lg){ lg.style.display='none'; lg.innerHTML=''; } }
+function wire3D(){
+  const on=(id,ev,fn)=>{ const el=document.getElementById(id); if(el && !el.dataset.init){ el.dataset.init='1'; el.addEventListener(ev, fn); } };
+  on('btn-3d','click', abrir3D);
+  on('btn-3d-tilt','click', ()=>set3DTilt(!tiltOn));
+  on('btn-3d-left','click', ()=>rot3D(-30));
+  on('btn-3d-right','click', ()=>rot3D(30));
+  on('m3d-close','click', fechar3D);
+}
+
+console.info('%cAtlas Dimensor — build 2026-07-01p-3d-imovel-isolado','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6899,10 +7520,10 @@ document.getElementById('ov-hide').onclick = ()=>{
   document.getElementById('overview-panel').classList.remove('show');
   if(modo==='overview') document.getElementById('ov-reopen').classList.add('show');
 };
-document.getElementById('ov-reopen').onclick = ()=>{
+function reabrirOverview(){
   document.getElementById('ov-reopen').classList.remove('show');
   document.getElementById('overview-panel').classList.add('show');
-};
+}
 
 /* ---- seleção de imóveis (Ctrl+clique) ---- */
 
@@ -6949,9 +7570,10 @@ function estiloImovel(it){
   if(!it._poly) return;
   const sel = selecionados.has(it.id);
   const base = corBaseImovel(it);
+  const linha = corLinhaImovel(it);
   it._poly.setOptions(sel
-    ? {strokeColor:'#f59e0b', strokeWeight:2.5, fillColor:'#f59e0b', fillOpacity:.30, zIndex:3}
-    : {strokeColor:base, strokeOpacity:strokeOpacImovel(it), strokeWeight:imovelMorto(it)?1:1.5, fillColor:base, fillOpacity:opacidadeImovel(it), zIndex:imovelMorto(it)?0:1});
+    ? {strokeColor:'#f59e0b', strokeWeight:2.5, fillColor:'#f59e0b', fillOpacity:.30, zIndex:5}
+    : {strokeColor:linha, strokeOpacity:strokeOpacImovel(it), strokeWeight:imovelMorto(it)?1:1.8, fillColor:base, fillOpacity:opacidadeImovel(it), zIndex:zIndexImovel(it)});
 }
 function atualizarSelBar(){
   const n=selecionados.size;
@@ -7067,8 +7689,9 @@ async function verTodos(preservarVista){
   itens.forEach(it=>{
     const path = it.pts.map(p=>({lat:p[0],lng:p[1]}));
     const base = corBaseImovel(it);
-    const poly = new google.maps.Polygon({paths:path,strokeColor:base,strokeOpacity:strokeOpacImovel(it),
-      strokeWeight:imovelMorto(it)?1:1.5,fillColor:base,fillOpacity:opacidadeImovel(it),map:map,zIndex:imovelMorto(it)?0:1});
+    const linha = corLinhaImovel(it);
+    const poly = new google.maps.Polygon({paths:path,strokeColor:linha,strokeOpacity:strokeOpacImovel(it),
+      strokeWeight:imovelMorto(it)?1:1.8,fillColor:base,fillOpacity:opacidadeImovel(it),map:map,zIndex:zIndexImovel(it)});
     it._poly = poly;
     poly.addListener('click',(e)=>{
       const ctrl = ctrlAtivo || (e && e.domEvent && (e.domEvent.ctrlKey || e.domEvent.metaKey));
@@ -7258,6 +7881,23 @@ function corBaseImovel(it){
   if(imovelMorto(it)) return '#9aa3ad';                 // cinza "morto"
   return (it && corValida(it.cor)) ? it.cor : COR_PADRAO;
 }
+/* Cor da LINHA (contorno). Se não houver cor de linha própria, usa a cor de preenchimento
+   (comportamento antigo de cor única). Imóvel "morto" segue cinza. */
+function corLinhaImovel(it){
+  if(imovelMorto(it)) return '#6b7280';
+  return (it && corValida(it.cor_linha)) ? it.cor_linha : corBaseImovel(it);
+}
+/* Imóvel "mãe": deu origem a outra(s) matrícula(s) por desmembramento/unificação, ou foi
+   encerrado. Deve ficar POR BAIXO no mapa (zIndex menor), mesmo se cadastrado depois. */
+function imovelMae(it){
+  if(!it) return false;
+  if(imovelMorto(it)) return true;                      // encerrada
+  const mot=(it.motivo_situacao||'').toString().toLowerCase();
+  if(mot==='desmembramento' || mot==='unificacao' || mot==='georreferenciamento') return true;
+  return (it.matricula_sucessora||'').toString().trim()!=='';   // originou outra(s)
+}
+/* zIndex de empilhamento: mãe/encerrada por baixo (0), imóveis "vivos" por cima (2). */
+function zIndexImovel(it){ return imovelMae(it) ? 0 : 2; }
 function opacidadeImovel(it){
   if(imovelMorto(it)) return 0.05;                      // bem apagado
   let o = (it && it.cor_opacidade!=null) ? parseFloat(it.cor_opacidade) : OPACIDADE_PADRAO;
@@ -7339,13 +7979,17 @@ function localizarNoPainel(it){
 function abrirSeletorCor(it, e){
   if(!infoWinCor) infoWinCor = new google.maps.InfoWindow();
   const atual = corValida(it.cor) ? it.cor.toLowerCase() : '';
+  const atualLinha = corValida(it.cor_linha) ? it.cor_linha.toLowerCase() : '';
   const op = opacidadeImovel(it);
   infoWinCor.setContent(`<div class="cor-pop" id="cor-pop">
     <div class="cor-pop-t">Informações do imóvel</div>
     <div class="ip-box">${infoImovelHTML(it)}</div>
     <details class="cor-pop-acc">
       <summary class="cor-pop-lbl cor-pop-acc-sum">Cor de destaque</summary>
-      <div class="cor-pop-grid" style="margin-top:8px">${swatchesHTML(atual)}</div>
+      <div class="cor-pop-lbl" style="margin-top:8px">Preenchimento (fundo)</div>
+      <div class="cor-pop-grid" id="cor-pop-grid-fill" style="margin-top:5px">${swatchesHTML(atual)}</div>
+      <div class="cor-pop-lbl" style="margin-top:9px">Linha (contorno)</div>
+      <div class="cor-pop-grid" id="cor-pop-grid-linha" style="margin-top:5px">${swatchesHTML(atualLinha)}</div>
       <div class="cor-pop-lbl" style="margin-top:9px">Intensidade</div>
       <input type="range" id="cor-pop-op" class="op-range" min="${OPAC_MIN}" max="${OPAC_MAX}" step="0.01" value="${op}">
       <button type="button" class="cor-pop-clear" id="cor-pop-clear">Remover destaque</button>
@@ -7357,78 +8001,118 @@ function abrirSeletorCor(it, e){
   destacarNoPainel(it.id);
   google.maps.event.addListenerOnce(infoWinCor, 'domready', ()=>{
     const pop = document.getElementById('cor-pop'); if(!pop) return;
-    let corSel = atual;
-    pop.querySelectorAll('.cor-sw').forEach(b=> b.addEventListener('click', ()=>{
+    let corSel = atual, linhaSel = atualLinha;
+    const gridFill = document.getElementById('cor-pop-grid-fill');
+    const gridLinha = document.getElementById('cor-pop-grid-linha');
+    if(gridFill) gridFill.querySelectorAll('.cor-sw').forEach(b=> b.addEventListener('click', ()=>{
       corSel = b.dataset.cor;
-      pop.querySelectorAll('.cor-sw').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+      gridFill.querySelectorAll('.cor-sw').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
       const opv = parseFloat(document.getElementById('cor-pop-op').value);
-      window.__setCorImovel(it.id, corSel, opv);
+      window.__setCorImovel(it.id, {cor:corSel, opacidade:opv});
+    }));
+    if(gridLinha) gridLinha.querySelectorAll('.cor-sw').forEach(b=> b.addEventListener('click', ()=>{
+      linhaSel = b.dataset.cor;
+      gridLinha.querySelectorAll('.cor-sw').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+      window.__setCorImovel(it.id, {corLinha:linhaSel});
     }));
     const opEl = document.getElementById('cor-pop-op');
-    if(opEl) opEl.addEventListener('change', ()=>{ if(corSel) window.__setCorImovel(it.id, corSel, parseFloat(opEl.value)); });
+    if(opEl) opEl.addEventListener('change', ()=>{ window.__setCorImovel(it.id, {opacidade: parseFloat(opEl.value)}); });
     const clr = document.getElementById('cor-pop-clear');
-    if(clr) clr.addEventListener('click', ()=>{ corSel=''; window.__setCorImovel(it.id, '', null); });
+    if(clr) clr.addEventListener('click', ()=>{ corSel=''; linhaSel=''; window.__setCorImovel(it.id, {cor:'', corLinha:'', opacidade:null}); });
   });
 }
 
-// Salva cor + intensidade e recolore ao vivo (visão geral, lista e foco)
-window.__setCorImovel = async function(id, hex, opac){
+// Salva cor(es) + intensidade e recolore ao vivo. opts = {cor?, corLinha?, opacidade?}
+// (cada campo só é enviado/atualizado se informado — permite mudar linha, fundo ou intensidade em separado)
+window.__setCorImovel = async function(id, opts){
+  opts = opts || {};
   try{
-    const params = {acao:'salvar_cor', id:id, cor:hex};
-    if(opac!=null && !isNaN(opac)) params.opacidade = opac;
+    const params = {acao:'salvar_cor', id:id};
+    if(opts.cor !== undefined) params.cor = opts.cor;
+    if(opts.corLinha !== undefined) params.cor_linha = opts.corLinha;
+    if(opts.opacidade!=null && !isNaN(opts.opacidade)) params.opacidade = opts.opacidade;
     const r = await post(params);
     if(!r.ok){ setStatus('err', r.erro || 'Não foi possível salvar a cor.'); return; }
-    const novaCor = r.cor || null;
-    const novaOp = (r.cor_opacidade!=null) ? parseFloat(r.cor_opacidade) : null;
-    const cacheIt = (imoveisCache||[]).find(x=>String(x.id)===String(id));
-    if(cacheIt){ cacheIt.cor = novaCor; cacheIt.cor_opacidade = novaOp; }
+    const novaCor   = ('cor' in r) ? (r.cor||null) : undefined;
+    const novaLinha = ('cor_linha' in r) ? (r.cor_linha||null) : undefined;
+    const novaOp    = ('cor_opacidade' in r && r.cor_opacidade!=null) ? parseFloat(r.cor_opacidade) : (('cor_opacidade' in r)?null:undefined);
+    const aplicar = (obj)=>{ if(!obj) return;
+      if(novaCor!==undefined)   obj.cor = novaCor;
+      if(novaLinha!==undefined) obj.cor_linha = novaLinha;
+      if(novaOp!==undefined)    obj.cor_opacidade = novaOp;
+    };
+    aplicar((imoveisCache||[]).find(x=>String(x.id)===String(id)));
     const ov = (itensOverview||[]).find(x=>x.id===id);
-    if(ov){ ov.cor = novaCor; ov.cor_opacidade = novaOp;
+    if(ov){ aplicar(ov);
       if(ov._poly && !selecionados.has(ov.id)){
-        const base = corBaseImovel(ov);
-        ov._poly.setOptions({strokeColor:base, fillColor:base, fillOpacity:opacidadeImovel(ov)});
+        ov._poly.setOptions({strokeColor:corLinhaImovel(ov), fillColor:corBaseImovel(ov), fillOpacity:opacidadeImovel(ov), zIndex:zIndexImovel(ov)});
       }
     }
     if(imovelEditandoId === id){
-      imovelEditandoCor = novaCor; imovelEditandoOpac = novaOp;
-      marcarSwatchPainel(novaCor); ajustarSliderPainel(novaOp);
+      if(novaCor!==undefined)   imovelEditandoCor = novaCor;
+      if(novaLinha!==undefined) imovelEditandoLinha = novaLinha;
+      if(novaOp!==undefined)    imovelEditandoOpac = novaOp;
+      marcarSwatchPainel(imovelEditandoCor); marcarSwatchLinhaPainel(imovelEditandoLinha); ajustarSliderPainel(imovelEditandoOpac);
       if(polygon){
-        const base = corValida(novaCor) ? novaCor : '#e2342f';
-        polygon.setOptions({strokeColor: base, fillColor: base, fillOpacity: (novaOp!=null?novaOp:0.22)});
+        const fill = corValida(imovelEditandoCor) ? imovelEditandoCor : '#e2342f';
+        const stroke = corValida(imovelEditandoLinha) ? imovelEditandoLinha : fill;
+        polygon.setOptions({strokeColor: stroke, fillColor: fill, fillOpacity: (imovelEditandoOpac!=null?imovelEditandoOpac:0.22)});
       }
     }
     renderLista();
-    setStatus('ok', hex ? 'Cor/intensidade salvas.' : 'Destaque removido.');
+    setStatus('ok', (opts.cor===''&&opts.corLinha==='')?'Destaque removido.':'Cores atualizadas.');
   }catch(e){ setStatus('err','Erro ao salvar a cor.'); }
 };
 
 /* ---- Seletor de cor no painel (ao editar/gravar um imóvel) ---- */
-let imovelEditandoId = null, imovelEditandoCor = null, imovelEditandoOpac = null;
+let imovelEditandoId = null, imovelEditandoCor = null, imovelEditandoLinha = null, imovelEditandoOpac = null;
 
 function montarSeletorCorPainel(){
-  const box = document.getElementById('cor-grid'); if(!box) return;
-  box.innerHTML = swatchesHTML('');
-  box.querySelectorAll('.cor-sw').forEach(b=> b.addEventListener('click', ()=>{
-    if(!imovelEditandoId) return;
-    const op = document.getElementById('cor-op');
-    window.__setCorImovel(imovelEditandoId, b.dataset.cor, op?parseFloat(op.value):null);
-  }));
+  const box = document.getElementById('cor-grid');
+  if(box){
+    box.innerHTML = swatchesHTML('');
+    box.querySelectorAll('.cor-sw').forEach(b=> b.addEventListener('click', ()=>{
+      if(!imovelEditandoId) return;
+      const op = document.getElementById('cor-op');
+      window.__setCorImovel(imovelEditandoId, {cor:b.dataset.cor, opacidade: op?parseFloat(op.value):null});
+    }));
+  }
+  const boxL = document.getElementById('cor-grid-linha');
+  if(boxL){
+    boxL.innerHTML = swatchesHTML('');
+    boxL.querySelectorAll('.cor-sw').forEach(b=> b.addEventListener('click', ()=>{
+      if(!imovelEditandoId) return;
+      window.__setCorImovel(imovelEditandoId, {corLinha:b.dataset.cor});
+    }));
+  }
   const clr = document.getElementById('cor-clear');
-  if(clr) clr.addEventListener('click', ()=>{ if(imovelEditandoId) window.__setCorImovel(imovelEditandoId, '', null); });
+  if(clr) clr.addEventListener('click', ()=>{ if(imovelEditandoId) window.__setCorImovel(imovelEditandoId, {cor:'', corLinha:'', opacidade:null}); });
   const op = document.getElementById('cor-op');
-  if(op) op.addEventListener('change', ()=>{ if(imovelEditandoId && imovelEditandoCor) window.__setCorImovel(imovelEditandoId, imovelEditandoCor, parseFloat(op.value)); });
+  if(op) op.addEventListener('change', ()=>{ if(imovelEditandoId) window.__setCorImovel(imovelEditandoId, {opacidade: parseFloat(op.value)}); });
 }
 function marcarSwatchPainel(cor){
   const box = document.getElementById('cor-grid'); if(!box) return;
   const c = (cor||'').toLowerCase();
   box.querySelectorAll('.cor-sw').forEach(b=> b.classList.toggle('sel', b.dataset.cor===c));
 }
+function marcarSwatchLinhaPainel(cor){
+  const box = document.getElementById('cor-grid-linha'); if(!box) return;
+  const c = (cor||'').toLowerCase();
+  box.querySelectorAll('.cor-sw').forEach(b=> b.classList.toggle('sel', b.dataset.cor===c));
+}
 function ajustarSliderPainel(op){ const s=document.getElementById('cor-op'); if(s) s.value = (op!=null&&!isNaN(op))?op:OPACIDADE_PADRAO; }
-function abrirCorPainel(id, cor, opac){
-  imovelEditandoId = id; imovelEditandoCor = corValida(cor)?cor:null; imovelEditandoOpac = (opac!=null)?parseFloat(opac):null;
+function abrirCorPainel(id, cor, opac, corLinha){
+  imovelEditandoId = id;
+  imovelEditandoCor = corValida(cor)?cor:null;
+  imovelEditandoLinha = corValida(corLinha)?corLinha:null;
+  imovelEditandoOpac = (opac!=null)?parseFloat(opac):null;
   const sec = document.getElementById('cor-box'); if(sec) sec.style.display = id ? 'block' : 'none';
-  marcarSwatchPainel(imovelEditandoCor); ajustarSliderPainel(imovelEditandoOpac);
-  if(polygon && corValida(cor)) polygon.setOptions({strokeColor:cor, fillColor:cor, fillOpacity:(imovelEditandoOpac!=null?imovelEditandoOpac:0.22)});
+  marcarSwatchPainel(imovelEditandoCor); marcarSwatchLinhaPainel(imovelEditandoLinha); ajustarSliderPainel(imovelEditandoOpac);
+  if(polygon){
+    const fill = corValida(cor)?cor:null;
+    const stroke = corValida(corLinha)?corLinha:(fill||null);
+    if(fill || stroke) polygon.setOptions({strokeColor: (stroke||'#e2342f'), fillColor:(fill||'#e2342f'), fillOpacity:(imovelEditandoOpac!=null?imovelEditandoOpac:0.22)});
+  }
 }
 
 function infoImovel(it){
@@ -7855,7 +8539,7 @@ async function carregarImovel(id){
   resetKmlZone();
   lastGeo = res.geo;
   desenhar(res.geo, reg.identificador);
-  abrirCorPainel(id, reg.cor, reg.cor_opacidade);
+  abrirCorPainel(id, reg.cor, reg.cor_opacidade, reg.cor_linha);
   preencherOnr(reg); onrPreencherGeometria(res.geo); onrSetAtivo(id, reg.identificador);
   mostrarEncInfo(reg);
   document.getElementById('btn-save').disabled=false;
@@ -9602,9 +10286,49 @@ function tornarArrastavel(painel, handle){
   if(ov){ tornarArrastavel(ov, ov.querySelector('.ovh')); }
   const kp = document.getElementById('kml-panel');
   if(kp){ tornarArrastavel(kp, kp.querySelector('.ovh')); }
+  const rp = document.getElementById('ov-reopen');
+  if(rp){ tornarArrastavelBtn(rp, reabrirOverview); }
 })();
+
+/* Arrasto para um BOTÃO: move se o ponteiro andar (>4px); clique puro executa a ação. */
+function tornarArrastavelBtn(el, onClick){
+  let ox=0, oy=0, sx=0, sy=0, moved=false, drag=false;
+  function inicio(e){
+    const ev = e.touches ? e.touches[0] : e;
+    const rect = el.getBoundingClientRect();
+    const pp = el.offsetParent ? el.offsetParent.getBoundingClientRect() : {left:0, top:0};
+    ox = ev.clientX - rect.left; oy = ev.clientY - rect.top; sx = ev.clientX; sy = ev.clientY; moved = false; drag = true;
+    el.style.left = (rect.left - pp.left) + 'px'; el.style.top = (rect.top - pp.top) + 'px'; el.style.right = 'auto';
+    document.addEventListener('mousemove', mover);
+    document.addEventListener('mouseup', fim);
+    document.addEventListener('touchmove', mover, {passive:false});
+    document.addEventListener('touchend', fim);
+  }
+  function mover(e){
+    if(!drag) return;
+    const ev = e.touches ? e.touches[0] : e;
+    if(Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 4) moved = true;
+    if(!moved) return;
+    const pp = el.offsetParent.getBoundingClientRect();
+    let x = ev.clientX - pp.left - ox, y = ev.clientY - pp.top - oy;
+    x = Math.max(0, Math.min(x, pp.width - el.offsetWidth));
+    y = Math.max(0, Math.min(y, pp.height - el.offsetHeight));
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    if(e.cancelable) e.preventDefault();
+  }
+  function fim(e){
+    drag = false;
+    document.removeEventListener('mousemove', mover);
+    document.removeEventListener('mouseup', fim);
+    document.removeEventListener('touchmove', mover);
+    document.removeEventListener('touchend', fim);
+    if(!moved && typeof onClick === 'function') onClick(e);
+  }
+  el.addEventListener('mousedown', inicio);
+  el.addEventListener('touchstart', inicio, {passive:false});
+}
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
-<script async src="https://maps.googleapis.com/maps/api/js?key=<?= GMAPS_KEY ?>&callback=initMap&loading=async"></script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=<?= GMAPS_KEY ?>&v=alpha&callback=initMap&loading=async"></script>
 </body>
 </html>
