@@ -5063,6 +5063,10 @@ header('Expires: 0');
   .m3d-legend h4{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa6b2}
   .m3d-legend .row{display:flex;align-items:center;gap:7px;margin:3px 0;line-height:1.2}
   .m3d-legend .sw{width:13px;height:13px;border-radius:3px;flex:none;border:1px solid rgba(255,255,255,.28)}
+  .ov-legend-2d{margin:10px;background:rgba(9,12,16,.86);border:1px solid #222c38;border-radius:10px;padding:9px 11px;max-width:230px;max-height:52vh;overflow:auto;font-size:12px;color:#e7edf3;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+  .ov-legend-2d h4{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa6b2}
+  .ov-legend-2d .row{display:flex;align-items:center;gap:7px;margin:3px 0;line-height:1.2}
+  .ov-legend-2d .sw{width:13px;height:13px;border-radius:3px;flex:none;border:1px solid rgba(255,255,255,.28)}
   .readout{position:absolute;left:14px;bottom:80px;z-index:5;background:rgba(14,18,23,.88);
     backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:9px 13px;
     font-family:var(--mono);font-size:11px;color:#cbd5e1;display:none;box-shadow:0 6px 22px rgba(0,0,0,.45)}
@@ -6392,6 +6396,23 @@ function rot3D(d){ if(!map) return; heading3D=(heading3D+d+360)%360; map.setHead
 
 /* (2) 3D PRÓPRIO — satélite + relevo servidos pelo backend (independe do Map Tiles API) */
 let m3dLatLng=null, three3D=null, m3dGoogleEl=null;
+const PALETA_MAT=['#2563eb','#16a34a','#f59e0b','#7c3aed','#0891b2','#db2777','#65a30d','#0d9488','#ea580c','#4f46e5','#0284c7','#a16207','#be185d','#15803d','#b45309','#6d28d9'];
+// Cor MANUAL definida no imóvel (via seletor de cor), se houver.
+function corManualImovel(it){ return (it && typeof corValida==='function' && corValida(it.cor)) ? it.cor : null; }
+// Cor FIXA (não deve ser substituída pela paleta): manual do usuário, ou cinza para imóvel "morto"/encerrado.
+function corFixaImovel(it){
+  if(it && typeof imovelMorto==='function' && imovelMorto(it)) return '#9aa3ad';
+  return corManualImovel(it);
+}
+// Atribui cores a uma lista ordenada: mantém a cor fixa (manual/morto) e dá cores da paleta aos demais,
+// evitando colidir com cores fixas já usadas. Retorna array de cores paralelo a `items`.
+function atribuirCoresLista(items, getFixa){
+  const usadas=new Set();
+  (items||[]).forEach(it=>{ const f=getFixa(it); if(f) usadas.add(String(f).toLowerCase()); });
+  let pi=0;
+  const prox=()=>{ let c, g=0; do{ c=PALETA_MAT[pi%PALETA_MAT.length]; pi++; g++; }while(usadas.has(c.toLowerCase()) && g<=PALETA_MAT.length*2); usadas.add(c.toLowerCase()); return c; };
+  return (items||[]).map(it=>{ const f=getFixa(it); return f || prox(); });
+}
 function carregarThree(cb){
   if(window.THREE){ cb(); return; }
   const s=document.createElement('script');
@@ -6449,7 +6470,7 @@ async function abrir3D(){
     if(!it._poly || !(it._poly.getMap && it._poly.getMap())) return;
     if(!Array.isArray(it.pts) || it.pts.length<3) return;
     const cor = getOpt(it._poly,'strokeColor') || getOpt(it._poly,'fillColor') || ((typeof corBaseImovel==='function')?corBaseImovel(it):'#5b96e6');
-    props.push({pts:it.pts, corMapa:cor, id:it.id, nome:(it.identificador||it.numero_matricula||'').toString()});
+    props.push({pts:it.pts, corMapa:cor, id:it.id, nome:(it.identificador||it.numero_matricula||'').toString(), corFixa:corFixaImovel(it)});
   });
   if(!props.length){
     // Sem consulta no painel: usa o imóvel ativo/aberto (ou a geometria desenhada) — "ver imóvel isolado".
@@ -6458,7 +6479,7 @@ async function abrir3D(){
       let cor = alvo.cor || alvo.cor_linha;
       if(!cor && alvo._poly){ cor = getOpt(alvo._poly,'strokeColor') || getOpt(alvo._poly,'fillColor'); }
       if(!cor && typeof corBaseImovel==='function'){ try{ cor = corBaseImovel(alvo); }catch(_){} }
-      props.push({pts:alvo.pts, corMapa:cor||'#5b96e6', id:alvo.id, nome:(alvo.identificador||alvo.numero_matricula||'').toString()});
+      props.push({pts:alvo.pts, corMapa:cor||'#5b96e6', id:alvo.id, nome:(alvo.identificador||alvo.numero_matricula||'').toString(), corFixa:corFixaImovel(alvo)});
     }
   }
   if(!props.length){ setStatus('err','Nada visível no mapa para ver em 3D. Faça uma consulta no painel (ex.: 2063;*) ou abra um imóvel.'); return; }
@@ -6478,12 +6499,16 @@ async function abrir3D(){
     paths.forEach(path=>{ const ring=path.getArray().map(ll=>[ll.lat(), ll.lng()]); if(ring.length>=3) sobrepos.push({ring, cor, tipo}); });
   });
   const temSobrep = sobrepos.some(s=>s.tipo!=='morto');
-  // cores distintas por matrícula quando há sobreposição (vermelho reservado à sobreposição)
+  // Cores distintas por matrícula: mantém cor manual/morto; demais recebem paleta.
+  // Ativa quando há sobreposição, cores manuais, OU o mapa já veio colorido por um filtro "X;*"
+  // (inclui desmembramentos, mesmo sem sobreposição material).
+  const temManual = propsUsar.some(pr=>pr.corFixa);
+  const jaDistinto = new Set(propsUsar.map(pr=>String(pr.corMapa||'').toLowerCase())).size>1;
   let legenda=null;
-  const PAL=['#2563eb','#16a34a','#f59e0b','#7c3aed','#0891b2','#db2777','#65a30d','#0d9488','#ea580c','#4f46e5','#0284c7','#a16207','#be185d','#15803d','#b45309','#6d28d9'];
-  if(temSobrep && propsUsar.length<=PAL.length){
+  if(propsUsar.length>=2 && propsUsar.length<=PALETA_MAT.length && (temSobrep || temManual || jaDistinto)){
+    const cores=atribuirCoresLista(propsUsar, pr=>pr.corFixa);
     legenda=[];
-    propsUsar.forEach((pr,i)=>{ pr.corUsar=PAL[i%PAL.length]; legenda.push({cor:pr.corUsar, nome:pr.nome||('#'+pr.id)}); });
+    propsUsar.forEach((pr,i)=>{ pr.corUsar=cores[i]; legenda.push({cor:pr.corUsar, nome:pr.nome||('#'+pr.id)}); });
   } else {
     propsUsar.forEach(pr=>{ pr.corUsar=pr.corMapa; });
   }
@@ -6494,7 +6519,7 @@ async function abrir3D(){
 }
 async function render3D(){
   if(!_g3d) return;
-  const {propsUsar, sobrepos, legenda, limite} = _g3d;
+  const {propsUsar, sobrepos, legenda, limite, temSobrep} = _g3d;
   let minLa=Infinity,maxLa=-Infinity,minLn=Infinity,maxLn=-Infinity;
   const acc=p=>{minLa=Math.min(minLa,p[0]);maxLa=Math.max(maxLa,p[0]);minLn=Math.min(minLn,p[1]);maxLn=Math.max(maxLn,p[1]);};
   propsUsar.forEach(pr=>pr.pts.forEach(acc));
@@ -6509,7 +6534,7 @@ async function render3D(){
   if(ea) ea.href=`https://earth.google.com/web/@${clat},${clng},300a,${Math.round(cov*1.4)}d,35y,0h,55t,0r`;
   if(ma) ma.href=`https://www.google.com/maps/@${clat},${clng},${z}z/data=!3m1!1e3`;
   const ttl=document.getElementById('m3d-title'); if(ttl) ttl.textContent = `Visão 3D · ${propsUsar.length} imóvel(is)` + (nOver?(' · '+nOver+' sobrep.'):'');
-  renderLegenda3D(legenda);
+  renderLegenda3D(legenda, temSobrep);
   const host=document.getElementById('m3d-host'), msg=document.getElementById('m3d-msg');
   fechar3DCena(); host.style.display='block'; host.innerHTML='';
   msg.style.display='flex'; msg.textContent='Carregando satélite e relevo…';
@@ -6604,7 +6629,7 @@ function mostrarFallback3D(txt){
 }
 async function render3DGoogle(){
   if(!_g3d) return;
-  const {propsUsar, sobrepos, legenda, limite} = _g3d;
+  const {propsUsar, sobrepos, legenda, limite, temSobrep} = _g3d;
   let minLa=Infinity,maxLa=-Infinity,minLn=Infinity,maxLn=-Infinity;
   const acc=p=>{minLa=Math.min(minLa,p[0]);maxLa=Math.max(maxLa,p[0]);minLn=Math.min(minLn,p[1]);maxLn=Math.max(maxLn,p[1]);};
   propsUsar.forEach(pr=>pr.pts.forEach(acc));
@@ -6617,7 +6642,7 @@ async function render3DGoogle(){
   if(ea) ea.href=`https://earth.google.com/web/@${clat},${clng},300a,${Math.round(range*1.4)}d,35y,0h,55t,0r`;
   if(ma) ma.href=`https://www.google.com/maps/@${clat},${clng},2000m/data=!3m1!1e3`;
   const ttl=document.getElementById('m3d-title'); if(ttl) ttl.textContent=`Visão 3D · ${propsUsar.length} imóvel(is)`+(nOver?(' · '+nOver+' sobrep.'):'');
-  renderLegenda3D(legenda);
+  renderLegenda3D(legenda, temSobrep);
   const ft=document.getElementById('m3d-foot-txt'); if(ft) ft.innerHTML=(nOver?'<b style="color:#e2342f">■</b> vermelho = sobreposição · ':'')+(limite.rings.length?'<b style="color:#2563eb">▬</b> limite · ':'')+'rótulo = matrícula · 3D fotorrealista do Google. Arraste = girar · Shift+arraste = mover · roda = zoom.';
   document.getElementById('modal-3d').classList.add('show');
   const host=document.getElementById('m3d-host'), msg=document.getElementById('m3d-msg');
@@ -6660,11 +6685,11 @@ async function render3DGoogle(){
     mostrarFallback3D('O 3D fotorrealista do Google não está disponível nesta conta (Map Tiles API não ativada ou versão indisponível).');
   }
 }
-function renderLegenda3D(legenda){
+function renderLegenda3D(legenda, temSobrep){
   const el=document.getElementById('m3d-legend'); if(!el) return;
   if(!legenda || !legenda.length){ el.style.display='none'; el.innerHTML=''; return; }
   el.innerHTML='<h4>Matrículas</h4>'+legenda.map(l=>`<div class="row"><span class="sw" style="background:${l.cor}"></span>${escapeHtml(l.nome)}</div>`).join('')
-    +'<div class="row" style="margin-top:7px;border-top:1px solid #222c38;padding-top:6px"><span class="sw" style="background:#e2342f"></span>sobreposição</div>';
+    +(temSobrep!==false?'<div class="row" style="margin-top:7px;border-top:1px solid #222c38;padding-top:6px"><span class="sw" style="background:#e2342f"></span>sobreposição</div>':'');
   el.style.display='block';
 }
 function montarCena3D(host, P){
@@ -6853,7 +6878,7 @@ function wire3D(){
   on('m3d-close','click', fechar3D);
 }
 
-console.info('%cAtlas Dimensor — build 2026-07-01p-3d-imovel-isolado','color:#0ea5e9;font-weight:bold');
+console.info('%cAtlas Dimensor — build 2026-07-02a-legenda-cor-manual-desmembramento','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -6955,6 +6980,8 @@ function limparSingle(){
   const ei=document.getElementById('enc-info'); if(ei) ei.style.display='none';
 }
 function limparOverview(){
+  if(ovLegendEl){ ovLegendEl.style.display='none'; ovLegendEl.innerHTML=''; }
+  (itensOverview||[]).forEach(it=>{ it._corOrig=null; });
   overviewPolys.forEach(p=>p.setMap(null)); overviewPolys=[];
   overlapPolys.forEach(p=>p.setMap(null)); overlapPolys=[];
   limparLabels();
@@ -8206,8 +8233,62 @@ function expandirRelacionados(seedIds){
   return ids;
 }
 // Mostra SOMENTE os imóveis cujas matrículas/identificações foram listadas com ';'.
+// Legenda de cores por matrícula no mapa 2D (espelha a do 3D quando há sobreposição material).
+let ovLegendEl=null;
+function ovLegendGet(){
+  if(ovLegendEl) return ovLegendEl;
+  const d=document.createElement('div'); d.id='ov-legend'; d.className='ov-legend-2d'; d.style.display='none';
+  ovLegendEl=d;
+  try{ if(map && map.controls) map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(d); }catch(_){}
+  return d;
+}
+function renderOvLegend2D(legenda, temSobrep){
+  const el=ovLegendGet();
+  if(!legenda || !legenda.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.innerHTML='<h4>Matrículas</h4>'+legenda.map(l=>`<div class="row"><span class="sw" style="background:${l.cor}"></span>${escapeHtml(l.nome)}</div>`).join('')
+    +(temSobrep?'<div class="row" style="margin-top:7px;border-top:1px solid #222c38;padding-top:6px"><span class="sw" style="background:#e2342f"></span>sobreposição</div>':'');
+  el.style.display='block';
+}
+function _snapCorImovel(it){
+  if(it._poly && !it._corOrig){
+    try{ it._corOrig={ s: it._poly.get('strokeColor'), f: it._poly.get('fillColor'), fo: it._poly.get('fillOpacity') }; }catch(_){ it._corOrig={}; }
+  }
+}
+function restaurarCoresDistintas2D(){
+  (itensOverview||[]).forEach(it=>{
+    if(it._poly && it._corOrig){
+      try{ it._poly.setOptions({strokeColor:it._corOrig.s, fillColor:it._corOrig.f, fillOpacity:it._corOrig.fo}); }catch(_){}
+      it._corOrig=null;
+    }
+  });
+  if(ovLegendEl){ ovLegendEl.style.display='none'; ovLegendEl.innerHTML=''; }
+}
+// Colore cada imóvel exibido + legenda. Ativa quando: filtro curinga "X;*" (inclui desmembramentos,
+// mesmo sem sobreposição material), OU há sobreposição material, OU algum imóvel tem cor manual.
+// Mantém a cor MANUAL de quem já tem; imóvel "morto" fica cinza; os demais recebem cor da paleta.
+function aplicarCoresDistintas2D(matched, lista, curinga){
+  const temMat = (lista||[]).some(o=>o && o.tipo!=='formal');
+  const temManual = (matched||[]).some(it=>corManualImovel(it));
+  const ativar = matched && matched.length>=2 && matched.length<=PALETA_MAT.length && (curinga || temMat || temManual);
+  if(!ativar){ if(ovLegendEl){ ovLegendEl.style.display='none'; ovLegendEl.innerHTML=''; } return; }
+  const cores = atribuirCoresLista(matched, corFixaImovel);
+  const legenda=[];
+  matched.forEach((it,i)=>{
+    const cor=cores[i];
+    const fixa=corFixaImovel(it);        // manual do usuário ou cinza (morto): não recolore o polígono
+    if(!fixa){
+      _snapCorImovel(it);
+      if(it._poly){ try{ it._poly.setOptions({strokeColor:cor, fillColor:cor, fillOpacity:Math.max(0.28, it._poly.get('fillOpacity')||0.28)}); }catch(_){} }
+    }
+    const morto = (typeof imovelMorto==='function' && imovelMorto(it));
+    const nome = (rotuloMat(it.numero_matricula)||it.identificador||('#'+it.id)) + (morto?' (encerrada)':'');
+    legenda.push({cor, nome});
+  });
+  renderOvLegend2D(legenda, temMat);
+}
 // Curinga '*': em "506;*", mostra a 506 e todos os sobrepostos/desmembrados dela.
 function aplicarFiltroPorLista(termoRaw){
+  restaurarCoresDistintas2D();
   const allTokens = termoRaw.split(';').map(s=>s.trim()).filter(Boolean);
   const curinga = allTokens.includes('*');
   const tokens = allTokens.filter(t=>t!=='*');
@@ -8243,6 +8324,7 @@ function aplicarFiltroPorLista(termoRaw){
     ? overlapsAtuais.filter(o=> sementes.has(o.a.id) || sementes.has(o.b.id))
     : overlapsAtuais.filter(o=> mostrados.has(o.a.id) && mostrados.has(o.b.id));
   overlapsExibidos = lista;
+  aplicarCoresDistintas2D(matched, lista, curinga);
   const focoMats = [...sementes].map(id=>{ const it=itensOverview.find(x=>x.id===id); return it?(rotuloMat(it.numero_matricula)||it.identificador||('#'+id)):('#'+id); });
   const focoLabel = focoMats.length===1 ? ('da '+focoMats[0]) : 'das matrículas selecionadas';
   const sub=document.getElementById('ov-sub');
@@ -8279,6 +8361,7 @@ function aplicarFiltroPorLista(termoRaw){
 // Restaura todos os imóveis e sobreposições no mapa (desfaz o filtro por lista)
 function restaurarMapaCompleto(){
   if(modo!=='overview') return;
+  restaurarCoresDistintas2D();
   if(itensOverview) itensOverview.forEach(it=>{
     if(it._poly)  it._poly.setMap(map);
     if(it._label) it._label.setMap(rotulosOcultos ? null : map);
