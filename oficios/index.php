@@ -2,6 +2,10 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 
+// Módulo de assinatura eletrônica: garante as colunas de assinatura na tabela
+require_once __DIR__ . '/assinatura_config.php';
+try { assin_ensure_schema(); } catch (Throwable $e) { /* segue sem travar a listagem */ }
+
 $servername = "localhost";
 $username = "root";
 $password = "";
@@ -535,6 +539,7 @@ include(__DIR__ . '/../menu.php');
                     </thead>
                     <tbody id="oficioTable">
                         <?php foreach ($oficios as $oficio) : ?>
+                            <?php $assinado = !empty($oficio['assinado']); ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($oficio['numero']); ?></td>
                                 <td data-order="<?php echo date('Y-m-d', strtotime($oficio['data'])); ?>"><?php echo date('d/m/Y', strtotime($oficio['data'])); ?></td>
@@ -543,9 +548,14 @@ include(__DIR__ . '/../menu.php');
                                 <td><?php echo htmlspecialchars($oficio['cargo']); ?></td>
                                 <td><?php echo htmlspecialchars($oficio['dados_complementares']); ?></td>
                                 <td data-cell="acoes">
-                                    <button class="btn btn-info btn-sm btn-table" title="Visualizar ofício" onclick="viewOficio('<?php echo $oficio['numero']; ?>')"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                    <button class="btn btn-sm btn-table <?php echo ($oficio['status'] == 1 ? 'btn-secondary' : 'btn-warning'); ?>" title="Editar ofício" onclick="editOficio('<?php echo $oficio['numero']; ?>')" <?php if ($oficio['status'] == 1) echo 'disabled'; ?>><i class="fa fa-pencil" aria-hidden="true"></i></button>
+                                    <button class="btn btn-info btn-sm btn-table" title="Visualizar ofício" onclick="viewOficio('<?php echo $oficio['numero']; ?>', <?php echo $assinado ? 'true' : 'false'; ?>)"><i class="fa fa-eye" aria-hidden="true"></i></button>
+                                    <button class="btn btn-sm btn-table <?php echo (($oficio['status'] == 1 || $assinado) ? 'btn-secondary' : 'btn-warning'); ?>" title="<?php echo $assinado ? 'Ofício assinado — edição bloqueada' : 'Editar ofício'; ?>" onclick="editOficio('<?php echo $oficio['numero']; ?>')" <?php if ($oficio['status'] == 1 || $assinado) echo 'disabled'; ?>><i class="fa fa-pencil" aria-hidden="true"></i></button>
                                     <button class="btn btn-sm btn-primary btn-table" title="Anexos" onclick="viewAttachments('<?php echo $oficio['numero']; ?>')"><i class="fa fa-paperclip" aria-hidden="true"></i></button>
+                                    <button class="btn btn-sm btn-table <?php echo $assinado ? 'btn-secondary' : 'btn-success'; ?>"
+                                            title="<?php echo $assinado ? 'Ofício assinado digitalmente' : 'Assinar digitalmente'; ?>"
+                                            onclick="assinarOficio('<?php echo $oficio['numero']; ?>', <?php echo $assinado ? 'true' : 'false'; ?>)">
+                                        <i class="fa <?php echo $assinado ? 'fa-check-circle' : 'fa-pencil-square-o'; ?>" aria-hidden="true"></i>
+                                    </button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -578,6 +588,9 @@ include(__DIR__ . '/../menu.php');
                     <div class="left-actions">
                         <button type="button" class="btn btn-primary btn-pill" id="lockButton">
                             <i class="fa fa-lock" aria-hidden="true"></i> Travar Edição
+                        </button>
+                        <button type="button" class="btn btn-success btn-pill" id="signButton">
+                            <i class="fa fa-pencil-square-o" aria-hidden="true"></i> Assinar Digitalmente
                         </button>
                     </div>
                     <div class="right-actions">
@@ -840,7 +853,18 @@ include(__DIR__ . '/../menu.php');
             });
         });
 
-        function viewOficio(numero) {
+        function viewOficio(numero, assinado) {
+            // Ofício JÁ ASSINADO: carrega o PDF assinado salvo (não regenera)
+            // e bloqueia assinar/bloquear.
+            if (assinado) {
+                $('#oficioPDF').attr('src', 'view_signed_oficio.php?numero=' + encodeURIComponent(numero) + '&t=' + Date.now());
+                $('#signButton').hide();
+                $('#lockButton').hide();
+                $('#viewOficioModal').modal('show');
+                return;
+            }
+
+            $('#signButton').show();
             // Primeiro, verificamos o JSON de configuração
             $.ajax({
                 url: '../style/configuracao.json',
@@ -879,6 +903,11 @@ include(__DIR__ . '/../menu.php');
                     // Define a ação para o botão de bloqueio
                     $('#lockButton').off('click').on('click', function() {
                         lockOficio(numero);
+                    });
+
+                    // Define a ação para o botão de assinatura digital
+                    $('#signButton').off('click').on('click', function() {
+                        assinarOficio(numero);
                     });
 
                 },
@@ -983,6 +1012,24 @@ include(__DIR__ . '/../menu.php');
 
         function editOficio(numero) {
             window.location.href = 'edit_oficio.php?numero=' + numero;
+        }
+
+        // Abre a tela de assinatura eletrônica (certificado digital via Assinador SERPRO)
+        function assinarOficio(numero, assinado) {
+            if (assinado) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Ofício já assinado',
+                        text: 'Este ofício já foi assinado digitalmente e não pode ser assinado novamente. Use "Visualizar" para abrir o documento assinado.',
+                        confirmButtonText: 'Entendi'
+                    });
+                } else {
+                    alert('Este ofício já foi assinado digitalmente.');
+                }
+                return;
+            }
+            window.location.href = 'assinar-oficio.php?numero=' + encodeURIComponent(numero);
         }
 
         function lockOficio(numero) {
