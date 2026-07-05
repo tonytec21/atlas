@@ -185,8 +185,8 @@ function h($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
                             <div><div class="nm"><?php echo h($oficio['assinante'] ?? '—'); ?></div><div class="cg"><?php echo h($oficio['cargo_assinante'] ?? ''); ?></div></div>
                         </div>
                         <div class="mt-3">
-                            <label class="d-flex justify-content-between mb-1" style="font-size:.84rem;font-weight:600">Largura do selo <span id="wVal" style="color:var(--sig-azul);font-weight:700">38%</span></label>
-                            <input id="sealW" class="sig-range" type="range" min="0.28" max="0.55" step="0.01" value="0.38">
+                            <label class="d-flex justify-content-between mb-1" style="font-size:.84rem;font-weight:600">Largura do selo <span id="wVal" style="color:var(--sig-azul);font-weight:700">24%</span></label>
+                            <input id="sealW" class="sig-range" type="range" min="0.20" max="0.55" step="0.01" value="0.24">
                         </div>
                     </div>
                 </div>
@@ -226,7 +226,7 @@ function h($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     var CARGO  = <?php echo json_encode($oficio['cargo_assinante'] ?? ''); ?>;
     var C = window.SerproSignerClient;
     var serproOnline = false;
-    var seal = { page:null, xn:null, yn:null, wn:0.38 };
+    var seal = { page:null, xn:null, yn:null, wn:0.24 };
 
     if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.js';
 

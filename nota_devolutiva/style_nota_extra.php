@@ -116,11 +116,7 @@ body.dark-mode .table thead th { background: linear-gradient(135deg, #0f172a 0%,
 #tabelaResultados tbody tr:nth-child(4) { animation-delay: 0.2s; }
 #tabelaResultados tbody tr:nth-child(5) { animation-delay: 0.25s; }
 
-/* SCROLLBAR */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bg-light); border-radius: var(--radius-full); }
-::-webkit-scrollbar-thumb { background: var(--secondary-color); border-radius: var(--radius-full); }
-::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+/* SCROLLBAR — removido para usar a barra padrão do sistema (igual ao módulo de ofícios) */
 
 /* PRINT */
 @media print { .modal-footer, .btn-close, .status-controls { display: none !important; } .modal-content { box-shadow: none !important; border: 1px solid #ddd !important; } .nota-content { max-height: none !important; overflow: visible !important; } }

@@ -426,6 +426,9 @@ $conn->close();
             box-shadow: 0 0 0 3px rgba(102,176,255,.15) inset;
         }
         body.dark-mode .upload-progress { background: rgba(255,255,255,.12); }
+    
+        /* Titulos das colunas como escritos (so a inicial maiuscula), sem CAIXA ALTA herdada */
+        #tabelaResultados thead th, table.data-layout thead th { text-transform: none !important; letter-spacing: normal !important; }
     </style>
 </head>
 <body class="light-mode">
@@ -533,15 +536,15 @@ include(__DIR__ . '/../menu.php');
                             <th>Assunto</th>
                             <th>Destinatário</th>
                             <th>Cargo</th>
-                            <th style="width: 15%;">Dados Complementares</th>
+                            <th style="width: 15%;">Complementos</th>
                             <th style="width: 10%;">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="oficioTable">
                         <?php foreach ($oficios as $oficio) : ?>
-                            <?php $assinado = !empty($oficio['assinado']); ?>
+                            <?php $assinado = !empty($oficio['assinado']); $ordKey = (int)($oficio['id'] ?? 0); if (preg_match('~^\s*(\d+)\s*/\s*(\d+)\s*$~', (string)$oficio['numero'], $mk)) { $ordKey = ((int)$mk[2]) * 1000000 + (int)$mk[1]; } elseif (preg_match('~(\d+)~', (string)$oficio['numero'], $mk)) { $ordKey = (int)$mk[1]; } ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($oficio['numero']); ?></td>
+                                <td data-order="<?php echo $ordKey; ?>"><?php echo htmlspecialchars($oficio['numero']); ?></td>
                                 <td data-order="<?php echo date('Y-m-d', strtotime($oficio['data'])); ?>"><?php echo date('d/m/Y', strtotime($oficio['data'])); ?></td>
                                 <td><?php echo htmlspecialchars($oficio['assunto']); ?></td>
                                 <td><?php echo htmlspecialchars($oficio['destinatario']); ?></td>
@@ -712,7 +715,7 @@ include(__DIR__ . '/../menu.php');
             // DataTables
             $('#tabelaResultados').DataTable({
                 "language": { "url": "../style/Portuguese-Brasil.json" },
-                "order": [[1, 'desc']],
+                "order": [[0, 'desc']],
                 "autoWidth": false
             });
 

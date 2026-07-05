@@ -8,9 +8,10 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.27/dist/sweetalert2.all.min.js"></script>  
 <script>  
     $(document).ready(function() {  
-        $('#tabelaResultados').DataTable({  
+        $('#tabelaNotas').DataTable({  
             "language": { "url": "../style/Portuguese-Brasil.json" },  
-            "order": [[0, 'desc']],  
+            "order": [[0, 'desc']],
+            "autoWidth": false,  
             "pageLength": 25,  
             "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]]  
         });  

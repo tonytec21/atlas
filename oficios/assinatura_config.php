@@ -282,7 +282,7 @@ function assin_draw_seal_box($pdf, $a)
 
     // Dimensões do selo (mm)
     $w = $a['wn'] * $pw;
-    $w = max(45, min($w, $pw - 8));           // limites de sanidade
+    $w = max(40, min($w, $pw - 8));           // limites de sanidade
     $h = $w * 0.42;                            // proporção agradável
     $x = $a['xn'] * $pw;
     $y = $a['yn'] * $ph;
