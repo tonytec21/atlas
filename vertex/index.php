@@ -524,6 +524,55 @@ function reconcileTraverse(array $pts, array $legs, $zone = 23, $south = true, $
     return ['pts' => $novoPts, 'corrigidos' => $corrig, 'usou' => true];
 }
 
+/** Extrai a ÁREA declarada no documento e devolve em m². Ex.: "Área: 246,8798 m²" / "área de 12,5 ha". */
+function extractDeclaredArea($text) {
+    $t = normalizeGeoText($text);
+    if (!preg_match('/[áa]rea[\s:]*(?:de\s*)?([\d.,]+)\s*(m²|m2|ha|hectares?)/iu', $t, $mm)) return null;
+    $num = brNumero($mm[1]);
+    $un = strtolower($mm[2]);
+    if (strpos($un, 'h') === 0) $num *= 10000.0; // ha/hectare -> m²
+    return ($num > 0) ? $num : null;
+}
+
+/** Lados (azimute+distância) de TABELAS "PARA | AZIMUTE | DISTÂNCIA": o azimute vem SEM a palavra
+ *  "azimute" e SEM letra de hemisfério (o lookahead exclui coordenadas), seguido da distância.
+ *  Ex.: '... 44°28'19.7"W  P2  285°,27' 21,60"  4,50' -> az 285°27'21.60", dist 4,50. */
+function extractTraverseLegsTabela($text) {
+    $t = normalizeGeoText($text);
+    $re = '/(\d{1,3})\s*°\s*,?\s*(\d{1,2})\s*\'\s*([\d.,]+)\s*"(?!\s*[NSLOEW])[^0-9]{0,8}?([\d.,]+)/iu';
+    preg_match_all($re, $t, $m, PREG_SET_ORDER);
+    $legs = [];
+    foreach ($m as $x) {
+        $az = dmsToDecimal($x[1], $x[2], $x[3]);
+        $dist = brNumero($x[4]);
+        if ($az >= 0 && $az <= 360 && $dist > 0) $legs[] = ['az' => $az, 'dist' => $dist];
+    }
+    return $legs;
+}
+
+/** Reconstrói o polígono INTEIRO pela forma do caminhamento (azimute+distância), posicionando-o
+ *  pela mediana das coordenadas escritas (a posição vem das coordenadas; a forma, do traçado). */
+function traverseAnchoredPolygon(array $pts, array $legs, $zone = 23, $south = true) {
+    $v = count($pts); $nl = count($legs);
+    if ($v < 3 || ($nl !== $v && $nl !== $v - 1)) return null;
+    $U = [];
+    foreach ($pts as $p) { $u = geoToUTM($p[0], $p[1], $zone); $U[] = [$u[1], $u[0]]; } // [N,E]
+    $rel = [[0.0, 0.0]];
+    for ($i = 0; $i < $v - 1; $i++) {
+        $az = deg2rad($legs[$i]['az']); $d = (float)$legs[$i]['dist'];
+        $rel[] = [$rel[$i][0] + $d * cos($az), $rel[$i][1] + $d * sin($az)];
+    }
+    $dN = []; $dE = [];
+    for ($i = 0; $i < $v; $i++) { $dN[] = $U[$i][0] - $rel[$i][0]; $dE[] = $U[$i][1] - $rel[$i][1]; }
+    $offN = medianaFloat($dN); $offE = medianaFloat($dE);
+    $out = [];
+    for ($i = 0; $i < $v; $i++) {
+        $g = utmToGeo($rel[$i][1] + $offE, $rel[$i][0] + $offN, $zone, $south);
+        $out[] = [$g[0], $g[1]];
+    }
+    return $out;
+}
+
 /** Monta o pacote a partir do texto de um memorial descritivo (GMS). */
 function buildGeoData($memorial) {
     $res = extractGeoCoordinates($memorial);   // 1º GMS rotulado (Longitude:/Latitude:)
@@ -545,12 +594,36 @@ function buildGeoData($memorial) {
     // Reconciliação por caminhamento: corrige vértices com coordenada incoerente
     // (erro de digitação no documento) usando os azimutes/distâncias do memorial.
     $corrigidos = [];
+    $avisoTrav = '';
     if (count($pts) >= 3) {
         $invalidos = $res['invalidos'] ?? []; // vértices com minuto/segundo >= 60 (erro claro)
         $legs = extractTraverseLegsLoose($memorial);
+        if (count($legs) < max(3, count($pts) - 1)) {           // formato tabular (sem a palavra "azimute")
+            $legsTab = extractTraverseLegsTabela($memorial);
+            if (count($legsTab) > count($legs)) $legs = $legsTab;
+        }
         if (count($legs) >= 3) {
             $rec = reconcileTraverse($pts, $legs, 23, true, 5.0, $invalidos);
             if ($rec['usou']) { $pts = $rec['pts']; $corrigidos = $rec['corrigidos']; }
+        }
+        // Coordenadas ARREDONDADAS (comum em plantas): se o traçado (azimute+distância) fecha
+        // com a ÁREA DECLARADA muito melhor que as coordenadas, usa a forma do traçado —
+        // posição pelas coordenadas, forma pelo caminhamento. A área declarada é o juiz.
+        $declM2 = extractDeclaredArea($memorial);
+        if ($declM2 !== null && empty($corrigidos)
+            && (count($legs) === count($pts) || count($legs) === count($pts) - 1)) {
+            $trav = traverseAnchoredPolygon($pts, $legs, 23, true);
+            if ($trav) {
+                $aCoord = polygonAreaHa($pts) * 10000.0;   // m²
+                $aTrav  = polygonAreaHa($trav) * 10000.0;  // m²
+                $errCoord = abs($aCoord - $declM2);
+                $errTrav  = abs($aTrav - $declM2);
+                if ($errTrav < $errCoord && $errCoord > max(1.0, 0.03 * $declM2)) {
+                    $pts = $trav;
+                    $avisoTrav = 'Forma reconstruída pelos azimutes/distâncias do documento (a tabela de coordenadas estava arredondada). '
+                        . 'A área agora confere com a declarada (' . number_format($declM2, 4, ',', '.') . ' m²). Confira o desenho antes de gravar.';
+                }
+            }
         }
     }
 
@@ -564,6 +637,8 @@ function buildGeoData($memorial) {
         $data['aviso_geometria'] = 'Atenção: ' . count($corrigidos) . ' vértice(s) com coordenada inconsistente no documento '
             . '(' . $rotulos . ') foram reconstruídos a partir dos azimutes/distâncias do próprio memorial. '
             . 'Confira o desenho antes de gravar.';
+    } elseif ($avisoTrav !== '') {
+        $data['aviso_geometria'] = $avisoTrav;
     }
     return $data;
 }
@@ -2675,7 +2750,7 @@ COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
    "registro_anterior_matricula": número da matrícula ANTERIOR da qual ESTA se originou, citada no registro de abertura/R-1 (ex.: 'imóvel havido por desmembramento da matrícula 1.234' => 1234). Apenas o número. Senão "",
    "registro_anterior_tipo": como ESTA se originou da anterior — 'desmembramento', 'unificacao' ou 'georreferenciamento' — senão ""
 },
-"memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. Pode ser: (a) texto corrido começando em 'Inicia-se a descrição...'; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; ou (c) uma TABELA do SIGEF/INCRA com colunas Código, Longitude, Latitude — neste caso transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'). Inclua todos os vértices; não converta, não arredonde, não omita nenhum
+"memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. Pode ser: (a) texto corrido começando em 'Inicia-se a descrição...'; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; ou (c) uma TABELA (SIGEF/INCRA ou planta topográfica) com colunas de Latitude/Longitude — neste caso transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'). IMPORTANTE: se a tabela/documento também trouxer os LADOS entre os pontos (colunas PARA/AZIMUTE/DISTÂNCIA), transcreva CADA lado numa linha própria no formato 'De P1 Para P2, azimute 285°27'21,60", distância 4,50 m' (um lado por linha) — isso permite reconstruir a forma exata quando as coordenadas vêm arredondadas. E se o documento informar ÁREA e/ou PERÍMETRO totais, inclua-os ao final tal como aparecem (ex.: 'Área: 246,8798 m² Perímetro: 113,4541 m'). Inclua todos os vértices e todos os lados; não converta, não arredonde, não omita nenhum
 }
 PROMPT;
 }
@@ -4981,7 +5056,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-03j-tabela-hemisferio (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-03m-prompt-azimute-area (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5144,6 +5219,12 @@ header('Expires: 0');
   .stat .v{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.5px}
   .stat .u{font-size:12px;color:var(--faint);font-weight:400}
   .stat .k{font-size:10px;color:var(--muted);margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px}
+  .ed-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:0 0 16px}
+  .ed-stat{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 11px}
+  .ed-stat .v{font-family:var(--mono);font-size:17px;font-weight:600;letter-spacing:-.5px}
+  .ed-stat .u{font-size:11px;color:var(--faint);font-weight:400}
+  .ed-stat .k{font-size:9.5px;color:var(--muted);margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.7px}
+  @media (max-width:760px){ .ed-stats{grid-template-columns:1fr 1fr} }
   .saved{margin-top:24px}
   .saved h3{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);margin:0 0 10px}
   .item{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
@@ -6190,6 +6271,12 @@ header('Expires: 0');
     </div>
     <input type="hidden" id="ed-id">
     <div class="modal-b">
+      <div class="ed-stats" id="ed-stats">
+        <div class="ed-stat"><div class="v" id="eds-vtx">—</div><div class="k">Vértices</div></div>
+        <div class="ed-stat"><div class="v" id="eds-area">—</div><div class="k" id="eds-area-k">Área (UTM 23S)</div></div>
+        <div class="ed-stat"><div class="v" id="eds-per">—</div><div class="k">Perímetro</div></div>
+        <div class="ed-stat"><div class="v" id="eds-cen" style="font-size:12px">—</div><div class="k">Centro lat,lng</div></div>
+      </div>
       <div class="ed-grid">
        <div class="ed-col">
         <div class="ed-section">
@@ -7029,7 +7116,7 @@ function wire3D(){
   on('m3d-close','click', fechar3D);
 }
 
-console.info('%cVertex — build 2026-07-03j-tabela-hemisferio','color:#0ea5e9;font-weight:bold');
+console.info('%cVertex — build 2026-07-03m-prompt-azimute-area','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -7094,6 +7181,36 @@ function toggleRotulos(){
 }
 
 function fmt(n,d){ return Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+// Área por tipo: rural (ou indefinido) em hectares; urbano em m² (fica estranho lote pequeno em ha).
+function fmtArea(ha, tipo){
+  ha = Number(ha)||0;
+  if(tipo==='urbano'){ return { val: fmt(ha*10000, 2), un: 'm²', k: 'Área (m²)' }; }
+  return { val: fmt(ha, 4), un: 'ha', k: 'Área (UTM 23S)' };
+}
+// Perímetro em metros quando < 1 km; em km acima disso.
+function fmtPerimetro(m){
+  m = Number(m)||0;
+  return (m >= 1000) ? { val: fmt(m/1000, 3), un: 'km' } : { val: fmt(m, 1), un: 'm' };
+}
+let edItemAtual = null;
+function edRenderStats(it){
+  if(!it) return;
+  const tipo = (document.getElementById('ed-tipo')||{}).value || it.tipo_imovel || '';
+  const g = (id)=>document.getElementById(id);
+  if(g('eds-vtx')) g('eds-vtx').textContent = (it.num_vertices!=null && it.num_vertices!=='') ? it.num_vertices : '—';
+  if(g('eds-area')){
+    if(it.area_ha!=null && it.area_ha!==''){ const a=fmtArea(it.area_ha,tipo); g('eds-area').innerHTML = a.val+' <span class="u">'+a.un+'</span>'; if(g('eds-area-k')) g('eds-area-k').textContent=a.k; }
+    else { g('eds-area').textContent='—'; }
+  }
+  if(g('eds-per')){
+    if(it.perimetro_m!=null && it.perimetro_m!==''){ const p=fmtPerimetro(it.perimetro_m); g('eds-per').innerHTML = p.val+' <span class="u">'+p.un+'</span>'; }
+    else { g('eds-per').textContent='—'; }
+  }
+  if(g('eds-cen')){
+    g('eds-cen').textContent = (it.centro_lat!=null && it.centro_lng!=null && it.centro_lat!=='' && it.centro_lng!=='')
+      ? (Number(it.centro_lat).toFixed(5)+', '+Number(it.centro_lng).toFixed(5)) : '—';
+  }
+}
 function swalTema(){
   const dark = document.body.classList.contains('dark-mode');
   return { background: dark ? '#161c24' : '#ffffff', color: dark ? '#e6edf3' : '#1f2733' };
@@ -7184,11 +7301,7 @@ function desenhar(geo, nome){
   // rótulo com nome/matrícula no centro do imóvel
   addLabel({lat:geo.centro_lat, lng:geo.centro_lng}, nome);
 
-  document.getElementById('stats').style.display='grid';
-  document.getElementById('s-vtx').textContent = geo.num_vertices;
-  document.getElementById('s-area').innerHTML = fmt(geo.area_ha,4)+'<span class="u"> ha</span>';
-  document.getElementById('s-per').innerHTML  = fmt(geo.perimetro_m/1000,3)+'<span class="u"> km</span>';
-  document.getElementById('s-cen').textContent = Number(geo.centro_lat).toFixed(5)+', '+Number(geo.centro_lng).toFixed(5);
+  // (stats do imóvel — vértices/área/perímetro/centro — agora ficam no modal de edição, não no painel)
 
   const ro=document.getElementById('readout'); ro.style.display='block';
   document.getElementById('ro-name').textContent = nome || 'Imóvel';
@@ -8995,6 +9108,7 @@ function novaMatriculaItn03(){
 async function abrirEdicao(id){
   const it = imoveisCache.find(x=>String(x.id)===String(id));
   if(!it) return;
+  edItemAtual = it;
   edNovoItn03 = false;
   edEhExclusiva = String(it.itn03_exclusivo)==='1';
   if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint();
@@ -9011,6 +9125,7 @@ async function abrirEdicao(id){
   if(!edProps.length) edProps=[{nome:'',doc:''}];
   edRenderProps();
   document.getElementById('ed-tipo').value = it.tipo_imovel||'';
+  edRenderStats(it);
   const ctxSel=document.getElementById('ed-contexto-rural'); if(ctxSel) ctxSel.value = (it.contexto_rural!=null?String(it.contexto_rural):'');
   if(typeof edToggleContextoRural==='function') edToggleContextoRural();
   let sitSel='ativa';
@@ -10498,7 +10613,7 @@ function verificarPertencimento(geo){
   const bNova=document.getElementById('btn-itn03-nova'); if(bNova) bNova.addEventListener('click', novaMatriculaItn03);
   const bExpExcl=document.getElementById('btn-itn03-export-excl'); if(bExpExcl) bExpExcl.addEventListener('click', ()=>exportarItn03Lote('exclusivas'));
   const esit=document.getElementById('ed-situacao'); if(esit) esit.addEventListener('change', edToggleEnc);
-  const etipo=document.getElementById('ed-tipo'); if(etipo) etipo.addEventListener('change', edToggleContextoRural);
+  const etipo=document.getElementById('ed-tipo'); if(etipo) etipo.addEventListener('change', ()=>{ edToggleContextoRural(); edRenderStats(edItemAtual); });
   const epadd=document.getElementById('ed-prop-add'); if(epadd) epadd.addEventListener('click', edAddProp);
   // máscara CPF/CNPJ no campo do formulário principal
   const cpfMain=document.getElementById('cpf');
