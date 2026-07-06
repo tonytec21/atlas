@@ -169,18 +169,28 @@ function normalizeGeoText($text) {
 }
 
 /**
- * Extrai coordenadas GMS SEM rótulo (tabela SIGEF: colunas Longitude/Latitude).
- * Exige o sinal NEGATIVO (coordenadas BR são negativas) — azimutes são positivos,
- * então não são confundidos. Classifica por grandeza: |grau|>=20 = longitude.
+ * Extrai coordenadas GMS SEM rótulo (tabela SIGEF/planta: colunas Longitude/Latitude).
+ * Uma coordenada é reconhecida pelo SINAL: ou tem "-" antes do grau (padrão SIGEF),
+ * ou tem a LETRA de hemisfério depois (N/S/L/O/E/W). Ângulos/azimutes (positivos e
+ * sem hemisfério) são ignorados — assim não se confunde "285°27'21" (azimute) com
+ * coordenada. Classifica lat/lon pela letra (quando houver) ou pela grandeza (|grau|>=20 = lon).
  */
 function extractGeoCoordinatesTabela($rawText) {
     $t = normalizeGeoText($rawText);
-    preg_match_all('/(-\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"/u', $t, $m, PREG_SET_ORDER);
+    $re = '/(-?\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"(?:\s*([NSLOEW])(?=e\s|[^A-Za-z]|$))?/iu';
+    preg_match_all($re, $t, $m, PREG_SET_ORDER);
     $lons = []; $lats = [];
     foreach ($m as $x) {
-        $deg = abs((float) preg_replace('/[^\d]/', '', $x[1]));
+        $temMinus = (strpos($x[1], '-') !== false);
+        $hem = isset($x[4]) ? strtoupper($x[4]) : '';
+        if (!$temMinus && $hem === '') continue; // sem sinal nem hemisfério = azimute/ângulo -> ignora
         $val = dmsToDecimal($x[1], $x[2], $x[3]);
-        if ($deg >= 20) $lons[] = $val; else $lats[] = $val;
+        if ($hem === 'S' || $hem === 'O' || $hem === 'W')      $val = -abs($val);
+        elseif ($hem === 'N' || $hem === 'L' || $hem === 'E')  $val =  abs($val);
+        $deg = abs((float) preg_replace('/[^\d]/', '', $x[1]));
+        $ehLon = in_array($hem, ['L', 'O', 'E', 'W'], true) ? true
+               : (in_array($hem, ['N', 'S'], true) ? false : ($deg >= 20));
+        if ($ehLon) $lons[] = $val; else $lats[] = $val;
     }
     $n = min(count($lons), count($lats));
     $pts = [];
@@ -188,7 +198,7 @@ function extractGeoCoordinatesTabela($rawText) {
         $lat = $lats[$i]; $lng = $lons[$i];
         if ($lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) $pts[] = [$lat, $lng];
     }
-    return ['pts' => $pts, 'lon_count' => count($lons), 'lat_count' => count($lats)];
+    return ['pts' => $pts, 'lon_count' => count($lons), 'lat_count' => count($lats), 'invalidos' => []];
 }
 
 /** Converte Graus/Minutos/Segundos para grau decimal. */
@@ -4971,7 +4981,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-03i-segundos-invalidos-reconciliacao (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-03j-tabela-hemisferio (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -7019,7 +7029,7 @@ function wire3D(){
   on('m3d-close','click', fechar3D);
 }
 
-console.info('%cVertex — build 2026-07-03i-segundos-invalidos-reconciliacao','color:#0ea5e9;font-weight:bold');
+console.info('%cVertex — build 2026-07-03j-tabela-hemisferio','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
