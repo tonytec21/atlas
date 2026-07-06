@@ -1,665 +1,245 @@
 <?php
-include(__DIR__ . '/session_check.php');
-checkSession();
-include(__DIR__ . '/db_connection.php');
-include(__DIR__ . '/checar_acesso_de_administrador.php');
-date_default_timezone_set('America/Sao_Paulo');
+require_once __DIR__ . '/session_check.php'; checkSession();
+require_once __DIR__ . '/config.php';
+cap_ensure_schema();
 
-// Função para atualizar recorrências automaticamente
-function atualizarRecorrencias($conn) {
-    // Atualiza contas com recorrência mensal
-    $sql_mensal = "UPDATE contas_a_pagar 
-                   SET data_vencimento = DATE_ADD(data_vencimento, INTERVAL 1 MONTH), status = 'Pendente'
-                   WHERE recorrencia = 'Mensal' AND status = 'Pago' AND data_vencimento < CURDATE()";
-    $conn->query($sql_mensal);
+$conn = cap_db();
+$hoje = date('Y-m-d');
+$cfg = cap_settings_get();
+$CSRF = cap_csrf_token();
+$CATS = cap_categorias();
+$RECS = cap_recorrencias();
+function hh($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
-    // Atualiza contas com recorrência semanal
-    $sql_semanal = "UPDATE contas_a_pagar 
-                    SET data_vencimento = DATE_ADD(data_vencimento, INTERVAL 1 WEEK), status = 'Pendente'
-                    WHERE recorrencia = 'Semanal' AND status = 'Pago' AND data_vencimento < CURDATE()";
-    $conn->query($sql_semanal);
+/* ---------------- Filtros ---------------- */
+$f_texto = trim((string)($_GET['texto'] ?? ''));
+$f_cat   = trim((string)($_GET['categoria'] ?? ''));
+$f_rec   = trim((string)($_GET['recorrencia'] ?? ''));
+$f_mes   = trim((string)($_GET['mes'] ?? ''));            // formato YYYY-MM
+$f_status= isset($_GET['status']) ? trim((string)$_GET['status']) : 'aberto'; // padrão: em aberto
+$hasFilter = ($f_texto!=='' || $f_cat!=='' || $f_rec!=='' || $f_mes!=='' || (isset($_GET['status']) && $f_status!=='aberto'));
 
-    // Atualiza contas com recorrência anual
-    $sql_anual = "UPDATE contas_a_pagar 
-                  SET data_vencimento = DATE_ADD(data_vencimento, INTERVAL 1 YEAR), status = 'Pendente'
-                  WHERE recorrencia = 'Anual' AND status = 'Pago' AND data_vencimento < CURDATE()";
-    $conn->query($sql_anual);
+$where = []; $types = ''; $vals = [];
+if ($f_texto !== '') { $where[] = "(titulo LIKE ? OR fornecedor LIKE ? OR descricao LIKE ?)"; $like = "%$f_texto%"; $types.='sss'; array_push($vals,$like,$like,$like); }
+if ($f_cat !== '')   { $where[] = "categoria = ?"; $types.='s'; $vals[]=$f_cat; }
+if ($f_rec !== '')   { $where[] = "recorrencia = ?"; $types.='s'; $vals[]=$f_rec; }
+if ($f_mes !== '' && preg_match('~^\d{4}-\d{2}$~',$f_mes)) { $where[] = "DATE_FORMAT(data_vencimento,'%Y-%m') = ?"; $types.='s'; $vals[]=$f_mes; }
+switch ($f_status) {
+    case 'aberto':   $where[] = "status='Pendente'"; break;
+    case 'vencidas': $where[] = "status='Pendente' AND data_vencimento < CURDATE()"; break;
+    case 'pago':     $where[] = "status='Pago'"; break;
+    case 'todas': default: break;
 }
+$sql = "SELECT * FROM contas_a_pagar" . (count($where) ? (" WHERE " . implode(' AND ', $where)) : "") . " ORDER BY data_vencimento ASC, id DESC";
+$stmt = $conn->prepare($sql);
+if ($types !== '') $stmt->bind_param($types, ...$vals);
+$stmt->execute();
+$contas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 
-// Atualizar as contas recorrentes
-atualizarRecorrencias($conn);
+/* ---------------- KPIs ---------------- */
+function cap_scalar($conn,$sql){ $r=$conn->query($sql); $row=$r?$r->fetch_row():[0]; return $row?$row[0]:0; }
+$kpi_aberto_val = (float)cap_scalar($conn, "SELECT COALESCE(SUM(valor),0) FROM contas_a_pagar WHERE status='Pendente'");
+$kpi_aberto_qtd = (int)cap_scalar($conn, "SELECT COUNT(*) FROM contas_a_pagar WHERE status='Pendente'");
+$kpi_venc_val   = (float)cap_scalar($conn, "SELECT COALESCE(SUM(valor),0) FROM contas_a_pagar WHERE status='Pendente' AND data_vencimento < CURDATE()");
+$kpi_venc_qtd   = (int)cap_scalar($conn, "SELECT COUNT(*) FROM contas_a_pagar WHERE status='Pendente' AND data_vencimento < CURDATE()");
+$diasAviso = max(1,(int)($cfg['dias_aviso'] ?? 7));
+$kpi_prox_val   = (float)cap_scalar($conn, "SELECT COALESCE(SUM(valor),0) FROM contas_a_pagar WHERE status='Pendente' AND data_vencimento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL $diasAviso DAY)");
+$kpi_prox_qtd   = (int)cap_scalar($conn, "SELECT COUNT(*) FROM contas_a_pagar WHERE status='Pendente' AND data_vencimento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL $diasAviso DAY)");
+$kpi_pago_mes   = (float)cap_scalar($conn, "SELECT COALESCE(SUM(valor),0) FROM contas_a_pagar WHERE status='Pago' AND data_pagamento IS NOT NULL AND DATE_FORMAT(data_pagamento,'%Y-%m')=DATE_FORMAT(CURDATE(),'%Y-%m')");
 
-// Buscando contas prestes a vencer (com 1 dia de antecedência) e vencidas
-$sql_prestes_vencer = "SELECT * FROM contas_a_pagar WHERE data_vencimento = CURDATE() + INTERVAL 1 DAY AND status = 'Pendente'";
-$sql_vencidas = "SELECT * FROM contas_a_pagar WHERE data_vencimento < CURDATE() AND status = 'Pendente'";
+/* Gráfico: em aberto por categoria */
+$catLabels=[]; $catVals=[];
+$rc = $conn->query("SELECT COALESCE(NULLIF(categoria,''),'Sem categoria') cat, SUM(valor) t FROM contas_a_pagar WHERE status='Pendente' GROUP BY cat ORDER BY t DESC");
+while($rc && $row=$rc->fetch_assoc()){ $catLabels[]=$row['cat']; $catVals[]=(float)$row['t']; }
 
-$contas_prestes_vencer = $conn->query($sql_prestes_vencer)->fetch_all(MYSQLI_ASSOC);
-$contas_vencidas = $conn->query($sql_vencidas)->fetch_all(MYSQLI_ASSOC);
+/* Gráfico: pagamentos últimos 6 meses */
+$evLabels=[]; $evVals=[];
+for($i=5;$i>=0;$i--){ $m=date('Y-m', strtotime("-$i month")); $evLabels[]=date('m/Y', strtotime($m.'-01'));
+   $evVals[] = (float)cap_scalar($conn, "SELECT COALESCE(SUM(valor),0) FROM contas_a_pagar WHERE status='Pago' AND data_pagamento IS NOT NULL AND DATE_FORMAT(data_pagamento,'%Y-%m')='".$conn->real_escape_string($m)."'"); }
 
+/* Doughnut: a vencer vs vencidas (valores) */
+$aVencerVal = max(0, $kpi_aberto_val - $kpi_venc_val);
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contas a Pagar</title>
-    <link rel="stylesheet" href="../style/css/bootstrap.min.css">
-    <link rel="stylesheet" href="../style/css/font-awesome.min.css">
-    <link rel="stylesheet" href="../style/css/style.css">
-    <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
-    <link rel="icon" href="../style/img/favicon.png" type="image/png">
-
-    <style>
-        .pago {
-            background-color: #d4edda !important; /* Verde clara */
-        }
-
-        .vencida {
-            background-color: #f8d7da !important; /* Vermelha clara */
-        }
-
-        .prestes-vencer {
-            background-color: #fff3cd !important; /* Amarela clara */
-        }
-        .btn-success2 {
-            margin-bottom: 5px;
-            font-size: 20px;
-            width: 40px;
-            height: 40px;
-            border-radius: 5px;
-            border: none;
-        }
-
-        #modalVisualizarComprovante .modal-dialog, #visualizarModal .modal-dialog {
-            height: 100vh; 
-            display: flex; 
-            flex-direction: column; 
-        }
-
-        #modalVisualizarComprovante .modal-content, #visualizarModal .modal-content {
-            height: 95%;
-        }
-
-        #modalVisualizarComprovante .modal-body, #visualizarModal .modal-body {
-            flex-grow: 1;
-            padding: 0; 
-        }
-
-        #modalVisualizarComprovante #comprovante_visualizacao, #visualizarModal #anexo_visualizacao {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-
-        .btn-close {
-            outline: none;
-            border: none; 
-            background: none;
-            padding: 0; 
-            font-size: 1.5rem;
-            cursor: pointer; 
-            transition: transform 0.2s ease;
-        }
-
-        .btn-close:hover {
-            transform: scale(2.10);
-        }
-
-        .btn-close:focus {
-            outline: none;
-        }
-
-
-    </style>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas - Contas a Pagar</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="../style/css/font-awesome.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap4.min.css">
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+<link rel="stylesheet" href="../style/css/style.css">
+<link rel="icon" href="../style/img/favicon.png" type="image/png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<?php include(__DIR__ . '/complementos/style_padrao.php'); ?>
+<style>
+    :root{ --cap:#4f46e5; --cap2:#2563eb; }
+    #main .container{ padding-bottom:120px; }
+    /* KPIs */
+    .kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-bottom:16px; }
+    .kpi{ background:#fff; border:1px solid #e5e9f0; border-radius:16px; padding:16px 18px; box-shadow:0 8px 22px rgba(15,23,42,.05); display:flex; gap:14px; align-items:center; }
+    .kpi .ic{ width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.2rem;flex:0 0 auto; }
+    .kpi .lb{ color:#64748b; font-size:.82rem; font-weight:600; } .kpi .vl{ font-size:1.35rem; font-weight:800; line-height:1.15; }
+    .kpi .sub{ color:#94a3b8; font-size:.76rem; }
+    .kpi.k-aberto .ic{ background:linear-gradient(135deg,#4f46e5,#2563eb);} .kpi.k-venc .ic{ background:linear-gradient(135deg,#ef4444,#b91c1c);}
+    .kpi.k-prox .ic{ background:linear-gradient(135deg,#f59e0b,#d97706);} .kpi.k-pago .ic{ background:linear-gradient(135deg,#16a34a,#15803d);}
+    body.dark-mode .kpi{ background:#23272a; border-color:rgba(255,255,255,.07); }
+    /* cards de gráfico */
+    .chart-card{ background:#fff; border:1px solid #e5e9f0; border-radius:16px; padding:16px; box-shadow:0 8px 22px rgba(15,23,42,.05); height:100%; }
+    .chart-card h6{ font-weight:800; margin:0 0 10px; font-size:.9rem; } .chart-card canvas{ max-height:240px; }
+    body.dark-mode .chart-card{ background:#23272a; border-color:rgba(255,255,255,.07); }
+    /* status badges */
+    .st-badge{ display:inline-block; padding:3px 10px; border-radius:999px; font-size:.76rem; font-weight:700; }
+    .st-Pendente{ background:#dbeafe; color:#1d4ed8; } .st-Atrasado{ background:#fee2e2; color:#b91c1c; } .st-Pago{ background:#dcfce7; color:#166534; }
+    /* modal header padrão */
+    .cap-modal .modal-header{ background:linear-gradient(135deg,var(--cap),var(--cap2)); color:#fff; border:0; padding:16px 20px; }
+    .cap-close{ border:0;background:rgba(255,255,255,.18);color:#fff;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer; }
+    .cap-close:hover{ background:rgba(255,255,255,.34); transform:rotate(90deg); transition:.15s; }
+    .cap-modal .modal-content{ border:0; border-radius:16px; overflow:hidden; }
+    /* input-chip select nativo */
+    .input-chip select, .input-chip input{ border:none;outline:none;width:100%;background:transparent;color:inherit; }
+    /* dropzone (anexos) */
+    .cap-dz{ border:2.5px dashed #c7d2fe; border-radius:16px; background:linear-gradient(180deg,#f8faff,#eef3ff); padding:26px 18px; text-align:center; cursor:pointer; transition:.2s; }
+    .cap-dz:hover{ border-color:var(--cap2); } .cap-dz.drag{ border-color:var(--cap2); background:#e0e9ff; transform:scale(1.01); }
+    .cap-dz .ic{ width:56px;height:56px;border-radius:50%;background:#dbeafe;color:var(--cap2);display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 10px; }
+    .ax-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; }
+    .ax-item{ display:flex;align-items:center;gap:11px;padding:11px;border:1px solid #eef1f6;border-radius:14px;background:#fff; }
+    .ax-item .fi{ width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.05rem;flex:0 0 auto; }
+    .ax-item .nm{ font-weight:700;font-size:.86rem;word-break:break-word; } .ax-item .sub{ color:#94a3b8;font-size:.74rem; }
+    .ax-item .acts button{ border:0;background:#eef2f7;color:#334155;width:32px;height:32px;border-radius:9px;cursor:pointer; margin-left:4px; }
+    .ax-queue .q{ display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #eef1f6;border-radius:10px;margin-top:8px; }
+    .ax-queue .bar{ height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin-top:5px; } .ax-queue .bar>i{ display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cap),var(--cap2)); }
+    #axViewerBody iframe, #axViewerBody img{ width:100%;height:66vh;border:0;object-fit:contain;background:#f4f6fa;border-radius:12px; }
+    body.dark-mode .ax-item{ background:#23272a;border-color:rgba(255,255,255,.07); }
+</style>
 </head>
-
 <body class="light-mode">
-    <?php include(__DIR__ . '/../menu.php'); ?>
+<?php include(__DIR__ . '/../menu.php'); ?>
 
-    <div id="main" class="main-content">
-        <div class="container">
-            <h3>Pesquisar Contas a Pagar</h3>
-            <hr>
-            <form id="pesquisarForm" method="GET">
-                <div class="form-row">
-                    <div class="form-group col-md-6">
-                        <label for="titulo">Título:</label>
-                        <input type="text" class="form-control" id="titulo" name="titulo">
-                    </div>
-                    <div class="form-group col-md-2">
-                        <label for="valor">Valor:</label>
-                        <input type="text" class="form-control" id="valor" name="valor">
-                    </div>
-                    <div class="form-group col-md-2">
-                        <label for="data_vencimento">Data de Vencimento:</label>
-                        <input type="date" class="form-control" id="data_vencimento" name="data_vencimento">
-                    </div>
-                    <div class="form-group col-md-2">
-                        <label for="recorrencia">Recorrência:</label>
-                        <select class="form-control" id="recorrencia" name="recorrencia">
-                            <option value="">Todas</option>
-                            <option value="Nenhuma">Nenhuma</option>
-                            <option value="Mensal">Mensal</option>
-                            <option value="Semanal">Semanal</option>
-                            <option value="Anual">Anual</option>
-                        </select>
-                    </div>
-                    <div class="form-group col-md-2">
-                        <label for="mes_referencia">Mês de Referência:</label>
-                        <input type="month" class="form-control" id="mes_referencia" name="mes_referencia">
-                    </div>
-                    <div class="form-group col-md-2">
-                        <label for="status">Status:</label>
-                        <select class="form-control" id="status" name="status">
-                            <option value="">Todos</option>
-                            <option value="Pendente">Pendente</option>
-                            <option value="Pago">Pago</option>
-                        </select>
-                    </div>
-                    <div class="form-group col-md-8">
-                        <label for="descricao">Descrição:</label>
-                        <input class="form-control" id="descricao" name="descricao" rows="2"></input>
-                    </div>
+<div id="main" class="main-content">
+    <div class="container">
+
+        <!-- HERO -->
+        <section class="page-hero">
+            <div class="title-row">
+                <div class="title-icon"><i class="fa fa-money"></i></div>
+                <div style="flex:1;min-width:0">
+                    <h1>Contas a Pagar</h1>
+                    <div class="subtitle muted">Controle de despesas: cadastre contas recorrentes ou avulsas, acompanhe vencimentos e receba alertas por e-mail.</div>
                 </div>
-                <div class="row mb-12">
-                    <div class="col-md-6">
-                        <button type="submit" style="width: 100%; color: #fff!important" class="btn btn-primary">
-                            <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
-                        </button>
-                    </div>
-                    <div class="col-md-6">
-                        <button type="button" style="width: 100%; color: #fff!important" class="btn btn-success" onclick="window.location.href='cadastrar.php'">
-                            <i class="fa fa-plus" aria-hidden="true"></i> Cadastrar Conta
-                        </button>
-                    </div>
-                </div>
-
-            </form>
-            <hr>
-            <div class="table-responsive">
-                <h5>Resultados da Pesquisa</h5>
-                <table id="tabelaResultados" class="table table-striped table-bordered" style="zoom: 90%">
-                    <thead>
-                        <tr>
-                            <th style="width: 20%;">Título</th>
-                            <th style="width: 10%;">Valor</th>
-                            <th style="width: 15%;">Data de Vencimento</th>
-                            <th style="width: 25%;">Descrição</th>
-                            <th style="width: 10%;">Recorrência</th>
-                            <th style="width: 8%;">Status</th>
-                            <th style="width: 12%;">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $conditions = [];
-                        $params = [];
-                        $filtered = false;
-
-                        if (!empty($_GET['titulo'])) {
-                            $conditions[] = "titulo LIKE ?";
-                            $params[] = '%' . $_GET['titulo'] . '%';
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['valor'])) {
-                            $conditions[] = "valor = ?";
-                            $params[] = $_GET['valor'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['data_vencimento'])) {
-                            $conditions[] = "data_vencimento = ?";
-                            $params[] = $_GET['data_vencimento'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['recorrencia'])) {
-                            $conditions[] = "recorrencia = ?";
-                            $params[] = $_GET['recorrencia'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['mes_referencia'])) {
-                            $conditions[] = "DATE_FORMAT(data_vencimento, '%Y-%m') = ?";
-                            $params[] = $_GET['mes_referencia'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['status']) && $_GET['status'] != '') {
-                            $conditions[] = "status = ?";
-                            $params[] = $_GET['status'];
-                        } else {
-                            $conditions[] = "status != 'Cancelado'";
-                        }
-
-                        if (!empty($_GET['descricao'])) {
-                            $conditions[] = "descricao LIKE ?";
-                            $params[] = '%' . $_GET['descricao'] . '%';
-                            $filtered = true;
-                        }
-
-                        // Construção da SQL
-                        if ($conditions) {
-                            $sql = "SELECT * FROM contas_a_pagar WHERE " . implode(' AND ', $conditions);
-                        } else {
-                            $sql = "SELECT * FROM contas_a_pagar WHERE status = 'Pendente'";
-                        }
-
-                        $sql .= ' ORDER BY data_vencimento ASC';
-
-                        $stmt = $conn->prepare($sql);
-                        if (!empty($params)) {
-                            $stmt->bind_param(str_repeat('s', count($params)), ...$params);
-                        }
-                        $stmt->execute();
-                        $result = $stmt->get_result();
-
-                        while ($conta = $result->fetch_assoc()) {
-                            ?>
-                            <tr class="<?php echo ($conta['status'] == 'Pago') ? 'pago' : ((strtotime($conta['data_vencimento']) < strtotime('today')) ? 'vencida' : ((strtotime($conta['data_vencimento']) == strtotime('+1 day')) ? 'prestes-vencer' : '')); ?>">
-                                <td><?php echo $conta['titulo']; ?></td>
-                                <td><?php echo 'R$ ' . number_format($conta['valor'], 2, ',', '.'); ?></td>
-                                <td><?php echo date('d/m/Y', strtotime($conta['data_vencimento'])); ?></td>
-                                <td><?php echo $conta['descricao']; ?></td>
-                                <td><?php echo $conta['recorrencia']; ?></td>
-                                <td><?php echo $conta['status']; ?></td>
-                                <td>
-                                    <button class="btn btn-info btn-sm" title="Visualizar Anexo" onclick="visualizarAnexo('<?php echo $conta['caminho_anexo']; ?>')" style="margin-bottom: 5px;"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                    <button class="btn btn-edit btn-sm" title="Editar Conta" onclick="editarConta('<?php echo $conta['id']; ?>')" style="margin-bottom: 5px;"><i class="fa fa-pencil" aria-hidden="true"></i></button>
-                                    <button class="btn btn-delete btn-sm" title="Cancelar Conta" onclick="excluirConta('<?php echo $conta['id']; ?>')" style="margin-bottom: 5px;"><i class="fa fa-trash" aria-hidden="true"></i></button>
-                                    <button class="btn btn-success2 btn-sm" title="Definir como Pago" onclick="definirComoPago('<?php echo $conta['id']; ?>')" style="margin-bottom: 5px;"><i class="fa fa-check" aria-hidden="true"></i></button>
-                                    <?php
-                                        // Verifique se existe um comprovante para a conta atual no banco de dados
-                                        $comprovante_sql = "SELECT caminho_comprovante FROM contas_pagas_comprovante WHERE id_conta = ?";
-                                        $stmt_comprovante = $conn->prepare($comprovante_sql);
-                                        $stmt_comprovante->bind_param('i', $conta['id']);
-                                        $stmt_comprovante->execute();
-                                        $result_comprovante = $stmt_comprovante->get_result();
-                                        
-                                        if ($result_comprovante->num_rows > 0) {
-                                            $comprovante = $result_comprovante->fetch_assoc();
-                                            // Se já existir um comprovante, mostrar o botão de visualização
-                                            echo '<button class="btn btn-info btn-sm" title="Visualizar Comprovante" onclick="visualizarComprovante(\'' . $comprovante['caminho_comprovante'] . '\')" style="margin-bottom: 5px;"><i class="fa fa-paperclip" aria-hidden="true"></i></button>';
-                                        } else {
-                                            // Se não existir um comprovante, mostrar o botão de anexo
-                                            echo '<button class="btn btn-secondary btn-sm" style="margin-bottom: 5px;width: 40px;height: 40px;" title="Anexar Comprovante" onclick="abrirModalAnexo(' . $conta['id'] . ')" style="margin-bottom: 5px;"><i class="fa fa-paperclip" aria-hidden="true"></i></button>';
-                                        }
-                                        ?>
-                                </td>
-                            </tr>
-                            <?php
-                        }
-                        ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal para visualização do anexo -->
-    <div class="modal fade" id="visualizarModal" tabindex="-1" role="dialog" aria-labelledby="visualizarModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="visualizarModalLabel">Visualizar Anexo</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <iframe id="anexo_visualizacao" frameborder="0"></iframe>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-primary btn-pill" data-bs-toggle="modal" data-bs-target="#contaModal" onclick="capNovaConta()"><i class="fa fa-plus"></i> Nova conta</button>
+                    <a class="btn btn-soft btn-pill" href="relatorios.php"><i class="fa fa-bar-chart"></i> Relatórios</a>
+                    <button class="btn btn-soft btn-pill" data-bs-toggle="modal" data-bs-target="#configModal"><i class="fa fa-cog"></i> Configurações</button>
                 </div>
             </div>
+        </section>
+
+        <!-- KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi k-aberto"><div class="ic"><i class="fa fa-wallet"></i></div><div><div class="lb">Em aberto</div><div class="vl"><?php echo cap_money($kpi_aberto_val); ?></div><div class="sub"><?php echo $kpi_aberto_qtd; ?> conta(s)</div></div></div>
+            <div class="kpi k-venc"><div class="ic"><i class="fa fa-exclamation-triangle"></i></div><div><div class="lb">Vencidas</div><div class="vl"><?php echo cap_money($kpi_venc_val); ?></div><div class="sub"><?php echo $kpi_venc_qtd; ?> conta(s)</div></div></div>
+            <div class="kpi k-prox"><div class="ic"><i class="fa fa-clock-o"></i></div><div><div class="lb">A vencer (<?php echo $diasAviso; ?> dias)</div><div class="vl"><?php echo cap_money($kpi_prox_val); ?></div><div class="sub"><?php echo $kpi_prox_qtd; ?> conta(s)</div></div></div>
+            <div class="kpi k-pago"><div class="ic"><i class="fa fa-check-circle"></i></div><div><div class="lb">Pago no mês</div><div class="vl"><?php echo cap_money($kpi_pago_mes); ?></div><div class="sub"><?php echo date('m/Y'); ?></div></div></div>
         </div>
-    </div>
 
-    <!-- Modal para Contas Vencidas e Prestes a Vencer -->
-    <div class="modal fade" id="contasModal" tabindex="-1" role="dialog" aria-labelledby="contasModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="contasModalLabel">Contas Vencidas e Prestes a Vencer</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <h5>Contas Vencidas</h5>
-                    <?php if (!empty($contas_vencidas)) { ?>
-                        <table class="table table-striped table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Título</th>
-                                    <th>Valor</th>
-                                    <th>Data de Vencimento</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($contas_vencidas as $conta) { ?>
-                                    <tr class="vencida">
-                                        <td><?php echo $conta['titulo']; ?></td>
-                                        <td><?php echo 'R$ ' . number_format($conta['valor'], 2, ',', '.'); ?></td>
-                                        <td><?php echo date('d/m/Y', strtotime($conta['data_vencimento'])); ?></td>
-                                        <td><?php echo $conta['status']; ?></td>
-                                    </tr>
-                                <?php } ?>
-                            </tbody>
-                        </table>
-                    <?php } else { ?>
-                        <p>Nenhuma conta vencida.</p>
-                    <?php } ?>
+        <!-- GRÁFICOS -->
+        <div class="row g-3 mb-1">
+            <div class="col-12 col-lg-4"><div class="chart-card"><h6><i class="fa fa-pie-chart text-primary"></i> Situação (em aberto)</h6><canvas id="chartStatus"></canvas></div></div>
+            <div class="col-12 col-lg-4"><div class="chart-card"><h6><i class="fa fa-tags text-primary"></i> Em aberto por categoria</h6><canvas id="chartCat"></canvas></div></div>
+            <div class="col-12 col-lg-4"><div class="chart-card"><h6><i class="fa fa-line-chart text-primary"></i> Pagamentos (6 meses)</h6><canvas id="chartEvol"></canvas></div></div>
+        </div>
 
-                    <h5>Contas Prestes a Vencer</h5>
-                    <?php if (!empty($contas_prestes_vencer)) { ?>
-                        <table class="table table-striped table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Título</th>
-                                    <th>Valor</th>
-                                    <th>Data de Vencimento</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($contas_prestes_vencer as $conta) { ?>
-                                    <tr class="prestes-vencer">
-                                        <td><?php echo $conta['titulo']; ?></td>
-                                        <td><?php echo 'R$ ' . number_format($conta['valor'], 2, ',', '.'); ?></td>
-                                        <td><?php echo date('d/m/Y', strtotime($conta['data_vencimento'])); ?></td>
-                                        <td><?php echo $conta['status']; ?></td>
-                                    </tr>
-                                <?php } ?>
-                            </tbody>
-                        </table>
-                    <?php } else { ?>
-                        <p>Nenhuma conta prestes a vencer.</p>
-                    <?php } ?>
-
-                </div>
-
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                </div>
+        <!-- FILTROS -->
+        <form id="searchForm" method="GET" class="filter-card mt-3">
+            <div class="section-title">Filtros</div>
+            <div class="section-sub">Refine por texto, categoria, recorrência, mês de vencimento e situação.</div>
+            <div class="row">
+                <div class="col-12 col-md-3 mb-3"><label class="form-label small text-muted mb-1">Buscar</label>
+                    <div class="input-chip"><i class="fa fa-search"></i><input type="text" name="texto" placeholder="Título, fornecedor…" value="<?php echo hh($f_texto); ?>"></div></div>
+                <div class="col-6 col-md-2 mb-3"><label class="form-label small text-muted mb-1">Categoria</label>
+                    <div class="input-chip"><i class="fa fa-tag"></i><select name="categoria"><option value="">Todas</option>
+                        <?php foreach($CATS as $c): ?><option value="<?php echo hh($c); ?>" <?php echo $f_cat===$c?'selected':''; ?>><?php echo hh($c); ?></option><?php endforeach; ?>
+                    </select></div></div>
+                <div class="col-6 col-md-2 mb-3"><label class="form-label small text-muted mb-1">Recorrência</label>
+                    <div class="input-chip"><i class="fa fa-repeat"></i><select name="recorrencia"><option value="">Todas</option>
+                        <?php foreach($RECS as $r): ?><option value="<?php echo hh($r); ?>" <?php echo $f_rec===$r?'selected':''; ?>><?php echo hh($r); ?></option><?php endforeach; ?>
+                    </select></div></div>
+                <div class="col-6 col-md-2 mb-3"><label class="form-label small text-muted mb-1">Mês (venc.)</label>
+                    <div class="input-chip"><i class="fa fa-calendar"></i><input type="month" name="mes" value="<?php echo hh($f_mes); ?>"></div></div>
+                <div class="col-6 col-md-3 mb-3"><label class="form-label small text-muted mb-1">Situação</label>
+                    <div class="input-chip"><i class="fa fa-flag"></i><select name="status">
+                        <option value="aberto" <?php echo $f_status==='aberto'?'selected':''; ?>>Em aberto</option>
+                        <option value="vencidas" <?php echo $f_status==='vencidas'?'selected':''; ?>>Vencidas</option>
+                        <option value="pago" <?php echo $f_status==='pago'?'selected':''; ?>>Pagas</option>
+                        <option value="todas" <?php echo $f_status==='todas'?'selected':''; ?>>Todas</option>
+                    </select></div></div>
             </div>
-        </div>
-    </div>
-
-    <!-- Modal para Anexar Comprovante -->
-    <div class="modal fade" id="modalAnexo" tabindex="-1" role="dialog" aria-labelledby="modalAnexoLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 20%;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalAnexoLabel">Anexar Comprovante de Pagamento</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <form id="formAnexo" enctype="multipart/form-data">
-                        <input type="hidden" name="id_conta" id="id_conta_anexo">
-                        <div class="form-group">
-                            <label for="comprovante">Selecione o comprovante:</label>
-                            <input type="file" class="form-control" id="comprovante" name="comprovante" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Enviar</button>
-                    </form>
-                </div>
+            <div class="filter-actions mt-1">
+                <button type="submit" class="btn btn-primary btn-pill"><i class="fa fa-filter"></i> Filtrar</button>
+                <button type="button" class="btn btn-success btn-pill" data-bs-toggle="modal" data-bs-target="#contaModal" onclick="capNovaConta()"><i class="fa fa-plus"></i> Nova conta</button>
+                <?php if ($hasFilter): ?><a href="index.php" class="btn btn-soft btn-pill"><i class="fa fa-times"></i> Limpar</a><?php endif; ?>
             </div>
+        </form>
+
+        <!-- TABELA -->
+        <div class="table-responsive table-wrap mt-3">
+            <h5 class="mb-2">Contas</h5>
+            <table id="tabelaContas" class="table table-striped table-bordered data-layout" style="width:100%">
+                <thead><tr>
+                    <th>Vencimento</th><th>Título</th><th>Categoria</th><th>Fornecedor</th>
+                    <th>Valor</th><th>Recorrência</th><th>Situação</th><th style="width:14%">Ações</th>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($contas as $c):
+                    $stt = cap_status_efetivo($c); $pago = ($c['status']==='Pago'); ?>
+                    <tr>
+                        <td data-label="Vencimento" data-order="<?php echo date('Y-m-d', strtotime($c['data_vencimento'])); ?>"><?php echo date('d/m/Y', strtotime($c['data_vencimento'])); ?></td>
+                        <td data-label="Título"><?php echo hh($c['titulo']); ?></td>
+                        <td data-label="Categoria"><?php echo hh($c['categoria'] ?? ''); ?></td>
+                        <td data-label="Fornecedor"><?php echo hh($c['fornecedor'] ?? ''); ?></td>
+                        <td data-label="Valor" data-order="<?php echo (float)$c['valor']; ?>"><?php echo cap_money($c['valor']); ?></td>
+                        <td data-label="Recorrência"><?php echo hh($c['recorrencia']); ?></td>
+                        <td data-label="Situação"><span class="st-badge st-<?php echo $stt; ?>"><?php echo $stt; ?></span></td>
+                        <td data-cell="acoes">
+                            <?php if (!$pago): ?>
+                                <button class="btn btn-success btn-sm btn-table" title="Marcar como paga" onclick="capPagar(<?php echo (int)$c['id']; ?>)"><i class="fa fa-check"></i></button>
+                                <button class="btn btn-warning btn-sm btn-table" title="Editar" onclick="capEditar(<?php echo (int)$c['id']; ?>)"><i class="fa fa-pencil"></i></button>
+                            <?php else: ?>
+                                <span class="btn btn-sm btn-table" style="background:#dcfce7;color:#166534;cursor:default" title="Paga em <?php echo $c['data_pagamento']?date('d/m/Y',strtotime($c['data_pagamento'])):''; ?>"><i class="fa fa-check-circle"></i></span>
+                            <?php endif; ?>
+                            <button class="btn btn-primary btn-sm btn-table" title="Anexos" onclick="capAnexos(<?php echo (int)$c['id']; ?>,'<?php echo hh($c['titulo']); ?>')"><i class="fa fa-paperclip"></i></button>
+                            <button class="btn btn-danger btn-sm btn-table" title="Excluir" onclick="capExcluir(<?php echo (int)$c['id']; ?>)"><i class="fa fa-trash"></i></button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
 
-    <!-- Modal para Visualizar Comprovante -->
-    <div class="modal fade" id="modalVisualizarComprovante" tabindex="-1" role="dialog" aria-labelledby="modalVisualizarComprovanteLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalVisualizarComprovanteLabel">Visualizar Comprovante</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <iframe id="comprovante_visualizacao"  frameborder="0"></iframe>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                </div>
-            </div>
-        </div>
-    </div>
+<?php include(__DIR__ . '/complementos/modais.php'); ?>
 
-    <script src="../script/jquery-3.5.1.min.js"></script>
-    <script src="../script/bootstrap.min.js"></script>
-    <script src="../script/bootstrap.bundle.min.js"></script>
-    <script src="../script/jquery.dataTables.min.js"></script>
-    <script src="../script/dataTables.bootstrap4.min.js"></script>
-    <script src="../script/jquery.mask.min.js"></script>
-    <script src='../script/sweetalert2.js'></script>
-    <script>
-        $(document).ready(function() {
-            // Inicializa a máscara de moeda no campo de valor
-            $('#valor').mask('000.000.000.000.000,00', {reverse: true});
-
-        });
-
-        $(document).ready(function() {
-            $('#tabelaResultados').DataTable({
-                "language": {
-                    "url": "../style/Portuguese-Brasil.json"
-                }
-            });
-        });
-
-        // Função para visualizar o anexo em um modal
-        function visualizarAnexo(caminhoAnexo) {
-            if (caminhoAnexo) {
-                $('#anexo_visualizacao').attr('src', caminhoAnexo);
-                $('#visualizarModal').modal('show');
-            } else {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Sem Anexo',
-                    text: 'Nenhum anexo disponível para esta conta.',
-                    confirmButtonText: 'OK'
-                });
-            }
-        }
-
-        // Função para editar a conta
-        function editarConta(id) {
-            window.location.href = 'editar_conta.php?id=' + id;
-        }
-
-        // Função para cancelar a conta (definir status como "Cancelado")
-        function excluirConta(id) {
-            Swal.fire({
-                title: 'Tem certeza?',
-                text: "Deseja realmente cancelar esta conta?",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Sim, cancelar!',
-                cancelButtonText: 'Não, cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        url: 'excluir_conta.php',
-                        type: 'POST',
-                        data: { id: id },
-                        success: function(response) {
-                            var res = JSON.parse(response);
-                            if (res.success) {
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: 'Cancelada!',
-                                    text: 'Conta cancelada com sucesso.',
-                                    confirmButtonText: 'OK'
-                                }).then(() => {
-                                    window.location.reload();
-                                });
-                            } else {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Erro!',
-                                    text: 'Erro ao cancelar a conta: ' + res.message,
-                                    confirmButtonText: 'OK'
-                                });
-                            }
-                        },
-                        error: function() {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro!',
-                                text: 'Erro ao cancelar a conta.',
-                                confirmButtonText: 'OK'
-                            });
-                        }
-                    });
-                }
-            });
-        }
-
-        // Função para definir a conta como paga
-        function definirComoPago(id) {
-            Swal.fire({
-                title: 'Tem certeza?',
-                text: "Deseja realmente definir esta conta como paga?",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Sim, definir!',
-                cancelButtonText: 'Não'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        url: 'definir_pago.php',
-                        type: 'POST',
-                        data: { id: id },
-                        success: function(response) {
-                            var res = JSON.parse(response);
-                            if (res.success) {
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: 'Marcada como paga!',
-                                    text: 'Conta marcada como paga com sucesso.',
-                                    confirmButtonText: 'OK'
-                                }).then(() => {
-                                    window.location.reload();
-                                });
-                            } else {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Erro!',
-                                    text: 'Erro ao marcar a conta como paga: ' + res.message,
-                                    confirmButtonText: 'OK'
-                                });
-                            }
-                        },
-                        error: function() {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro!',
-                                text: 'Erro ao marcar a conta como paga.',
-                                confirmButtonText: 'OK'
-                            });
-                        }
-                    });
-                }
-            });
-        }
-
-        function visualizarComprovante(caminho_comprovante) {
-            // Se o comprovante existe, mostrar no modal
-            if (caminho_comprovante) {
-                $('#comprovante_visualizacao').attr('src', caminho_comprovante);
-                $('#modalVisualizarComprovante').modal('show');
-            } else {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Sem Comprovante',
-                    text: 'Nenhum comprovante disponível para esta conta.',
-                    confirmButtonText: 'OK'
-                });
-            }
-        }
-
-        // Função para abrir modal do comprovante
-        $('#formAnexo').on('submit', function(e) {
-            e.preventDefault();
-
-            var formData = new FormData(this);
-            
-            $.ajax({
-                url: 'upload_comprovante.php',  // Arquivo PHP que vai lidar com o upload
-                type: 'POST',
-                data: formData,
-                contentType: false,
-                processData: false,
-                success: function(response) {
-                    console.log(response); // Exibe a resposta no console
-                    var res;
-                    try {
-                        res = JSON.parse(response);  // Valida a resposta JSON
-                    } catch (error) {
-                        console.error('Erro ao processar JSON: ', error, response);
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro!',
-                            text: 'Erro ao processar a resposta do servidor.',
-                            confirmButtonText: 'OK'
-                        });
-                        return;
-                    }
-
-                    if (res.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Sucesso!',
-                            text: 'Comprovante enviado com sucesso.',
-                            confirmButtonText: 'OK'
-                        }).then(() => {
-                            $('#modalAnexo').modal('hide');
-                            window.location.reload();
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro!',
-                            text: 'Erro ao enviar o comprovante: ' + res.message,
-                            confirmButtonText: 'OK'
-                        });
-                    }
-                },
-                error: function() {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro!',
-                        text: 'Erro ao enviar o comprovante.',
-                        confirmButtonText: 'OK'
-                    });
-                }
-            });
-        });
-
-
-
-
-        $(document).ready(function() {
-            // Abre o modal automaticamente ao carregar a página, se houver contas vencidas ou prestes a vencer
-            <?php if (!empty($contas_prestes_vencer) || !empty($contas_vencidas)) { ?>
-                $('#contasModal').modal('show');
-            <?php } ?>
-        });
-
-        function abrirModalAnexo(id_conta) {
-            $('#id_conta_anexo').val(id_conta);  // Insere o ID da conta no campo oculto
-            $('#modalAnexo').modal('show');  // Abre o modal de upload
-        }
-
-    </script>
-
-    <?php include(__DIR__ . '/../rodape.php'); ?>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<?php @include(__DIR__ . '/../rodape.php'); ?>
+<script>
+window.CAP = {
+    csrf: <?php echo json_encode($CSRF); ?>,
+    chartStatus: { aVencer: <?php echo json_encode(round($aVencerVal,2)); ?>, vencidas: <?php echo json_encode(round($kpi_venc_val,2)); ?> },
+    chartCat: { labels: <?php echo json_encode($catLabels, JSON_UNESCAPED_UNICODE); ?>, vals: <?php echo json_encode($catVals); ?> },
+    chartEvol: { labels: <?php echo json_encode($evLabels); ?>, vals: <?php echo json_encode($evVals); ?> }
+};
+</script>
+<script src="complementos/app.js"></script>
 </body>
-
 </html>

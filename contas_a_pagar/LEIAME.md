@@ -1,0 +1,53 @@
+# Contas a Pagar (Atlas) — módulo recriado
+
+Controle de despesas: cadastro de contas recorrentes (mensal/semanal/anual) ou
+avulsas, com dashboard, gráficos, relatórios, anexos modernos e **alertas por
+e-mail** de contas vencidas e a vencer.
+
+## Novidades
+
+- **Dashboard** (`index.php`): KPIs (em aberto, vencidas, a vencer, pago no mês),
+  3 gráficos (Chart.js): situação, por categoria e pagamentos dos últimos 6 meses.
+- **Cadastro/edição em modal** com campos no padrão do módulo de notas
+  (`page-hero`, `filter-card`, `input-chip`), máscara de moeda e categorias.
+- **Recorrência**: ao marcar como paga, se for recorrente, a próxima parcela é
+  gerada automaticamente (com tratamento de fim de mês, ex.: 31/01 → 28/02).
+- **Situação automática**: contas pendentes vencidas aparecem como *Atrasado*.
+- **Anexos modernos** (modal com *drag & drop*, progresso, **visualização de PDF
+  e imagens dentro do sistema** ou em nova aba; download apenas para o que não
+  tem prévia, como ZIP).
+- **Relatórios** (`relatorios.php`): filtro por período/base (vencimento ou
+  pagamento)/categoria/situação, totais, gráficos e **exportação CSV**.
+- **Notificações por e-mail** configuráveis (`Configurações`): e-mail de destino,
+  dias de antecedência, e SMTP próprio (host/porta/segurança/usuário/senha/
+  remetente). A senha não é reexibida e é mantida se o campo ficar vazio.
+
+## Envio automático de alertas
+
+O SMTP **não fica mais fixo no código** — vai para a tabela `contas_config`.
+Para envio automático, agende `enviar_alertas.php`:
+
+- Windows (Agendador de Tarefas) ou Linux (cron), 1x ao dia:
+  `php C:\...\contas_a_pagar\enviar_alertas.php`
+- Ou acesse a URL do arquivo autenticado (requer sessão) — o botão
+  **“Enviar alerta agora”** nas Configurações faz um teste imediato.
+
+## Segurança
+
+- **CSRF** em todas as ações que gravam; **prepared statements** em tudo.
+- Upload validado (whitelist de extensão, 20 MB, checagem de MIME, nome
+  aleatório) e `.htaccess` (`php_flag engine off`) na pasta `anexos/`.
+- `anexos_baixar.php` com *path-guard* (`realpath`) e `X-Content-Type-Options`.
+
+## Tabelas (criadas/migradas automaticamente)
+
+- `contas_a_pagar` (estendida: `categoria`, `fornecedor`, `data_pagamento`,
+  `origem_id`, `created_at`).
+- `conta_anexos` (anexos por conta).
+- `contas_config` (linha única id=1: e-mail, dias de aviso, SMTP…).
+
+## Dependências
+
+- `../menu.php`, `../rodape.php`, `../style/…` (um nível acima do módulo).
+- PHPMailer (já incluído na pasta `PHPMailer/`).
+- Bibliotecas via CDN: Bootstrap 5, DataTables, Chart.js, SweetAlert2, FontAwesome.
