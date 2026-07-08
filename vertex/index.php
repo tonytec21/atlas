@@ -573,6 +573,80 @@ function traverseAnchoredPolygon(array $pts, array $legs, $zone = 23, $south = t
     return $out;
 }
 
+/** Converte um token numérico de coordenada UTM respeitando o padrão BR.
+ *  Diferente de brNumero(): aqui "9.222.799" é milhar (9222799), não 9222,799 —
+ *  o que evita confundir CPF/nº de processo com coordenada. */
+function numeroUTMToken($raw) {
+    $raw = trim((string)$raw);
+    if (strpos($raw, ',') !== false) {                         // vírgula = decimal; pontos = milhar
+        $p = strrpos($raw, ',');
+        $int = preg_replace('/\D/', '', substr($raw, 0, $p));
+        $dec = preg_replace('/\D/', '', substr($raw, $p + 1));
+        return (float)(($int === '' ? '0' : $int) . '.' . ($dec === '' ? '0' : $dec));
+    }
+    if (preg_match('/^\d{1,3}(\.\d{3})+$/', $raw)) {           // só separador de milhar
+        return (float) preg_replace('/\D/', '', $raw);
+    }
+    if (substr_count($raw, '.') === 1) {                       // ponto decimal (OCR/EN)
+        $p = strrpos($raw, '.');
+        $int = preg_replace('/\D/', '', substr($raw, 0, $p));
+        $dec = preg_replace('/\D/', '', substr($raw, $p + 1));
+        return (float)(($int === '' ? '0' : $int) . '.' . ($dec === '' ? '0' : $dec));
+    }
+    return (float) preg_replace('/\D/', '', $raw);
+}
+
+/**
+ * Extrai vértices de TABELAS UTM cujas colunas são rotuladas só no CABEÇALHO
+ * (ex.: plantas de levantamento topográfico: "De | Para | Coord. N(Y) | Coord. E(X) | Distância").
+ * As linhas trazem apenas os números, sem as letras N/E — então a classificação é pela GRANDEZA:
+ * northing (7-8 dígitos) e easting (6 dígitos), pareados localmente (em qualquer ordem).
+ * Usa "shapes" estritos para não confundir CPF (662.695.803), CEP, datas ou nº de processo.
+ */
+function extractUTMTabelaSimples($rawText, $zone = 23, $south = true) {
+    $vazio = ['pts' => [], 'utm' => [], 'e_count' => 0, 'n_count' => 0];
+    $t = normalizeGeoText($rawText);
+    $shapeN = '\d{1,2}\.\d{3}\.\d{3}(?:,\d+)?|\d{7,8}(?:[.,]\d+)?';
+    $shapeE = '\d{3}\.\d{3}(?:,\d+)?|\d{6}(?:[.,]\d+)?';
+    $re = '/(?<![\d.,])(' . $shapeN . '|' . $shapeE . ')(?![\d.,]*\d)/u';
+    preg_match_all($re, $t, $m, PREG_SET_ORDER);
+
+    $tokens = [];
+    foreach ($m as $x) {
+        $raw = $x[1];
+        if ($raw[0] === '0') continue;                       // coordenada UTM não começa com zero
+        $val = numeroUTMToken($raw);
+        $ip  = (int) floor(abs($val));
+        if ($ip >= 1000000 && $ip <= 10000000)      $tokens[] = ['N', $val];
+        elseif ($ip >= 100000 && $ip <= 999999)     $tokens[] = ['E', $val];
+    }
+    // pareamento local: 1 N + 1 E consecutivos (qualquer ordem) = 1 vértice
+    $pares = []; $pN = null; $pE = null; $nn = 0; $ne = 0;
+    foreach ($tokens as $tk) {
+        if ($tk[0] === 'N') { $pN = $tk[1]; $nn++; } else { $pE = $tk[1]; $ne++; }
+        if ($pN !== null && $pE !== null) { $pares[] = [$pN, $pE]; $pN = null; $pE = null; }
+    }
+    if (count($pares) < 3) return $vazio;
+
+    // remove vértice de fechamento repetido (último == primeiro)
+    $k = count($pares);
+    if ($k > 3 && abs($pares[0][0] - $pares[$k-1][0]) < 0.05 && abs($pares[0][1] - $pares[$k-1][1]) < 0.05) {
+        array_pop($pares);
+    }
+    // sanidade: vértices de um mesmo imóvel devem estar próximos (< 100 km)
+    $maxd = 0.0;
+    foreach ($pares as $a) foreach ($pares as $b) { $d = hypot($a[0]-$b[0], $a[1]-$b[1]); if ($d > $maxd) $maxd = $d; }
+    if ($maxd > 100000) return $vazio;
+
+    $pts = [];
+    foreach ($pares as $p) {
+        $g = utmToGeo($p[1], $p[0], $zone, $south);           // (east, north)
+        if ($g[0] < -34 || $g[0] > 6 || $g[1] < -74 || $g[1] > -34) return $vazio; // fora do Brasil
+        $pts[] = [$g[0], $g[1]];
+    }
+    return ['pts' => $pts, 'utm' => $pares, 'e_count' => $ne, 'n_count' => $nn];
+}
+
 /** Monta o pacote a partir do texto de um memorial descritivo (GMS). */
 function buildGeoData($memorial) {
     $res = extractGeoCoordinates($memorial);   // 1º GMS rotulado (Longitude:/Latitude:)
@@ -589,6 +663,10 @@ function buildGeoData($memorial) {
     if (count($pts) < 3) {                        // 4º UTM ROTULADO "<num>-E e <num>-N" / "N=.. E=.."
         $utr = extractUTMVerticesRotulados($memorial);
         if (count($utr['pts']) >= 3) { $pts = $utr['pts']; $fonte = 'utm_rotulado'; }
+    }
+    if (count($pts) < 3) {                        // 5º TABELA UTM só com números (colunas N(Y)/E(X) no cabeçalho)
+        $uts = extractUTMTabelaSimples($memorial);
+        if (count($uts['pts']) >= 3) { $pts = $uts['pts']; $fonte = 'utm_tabela'; }
     }
 
     // Reconciliação por caminhamento: corrige vértices com coordenada incoerente
@@ -2750,7 +2828,7 @@ COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
    "registro_anterior_matricula": número da matrícula ANTERIOR da qual ESTA se originou, citada no registro de abertura/R-1 (ex.: 'imóvel havido por desmembramento da matrícula 1.234' => 1234). Apenas o número. Senão "",
    "registro_anterior_tipo": como ESTA se originou da anterior — 'desmembramento', 'unificacao' ou 'georreferenciamento' — senão ""
 },
-"memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. Pode ser: (a) texto corrido começando em 'Inicia-se a descrição...'; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; ou (c) uma TABELA (SIGEF/INCRA ou planta topográfica) com colunas de Latitude/Longitude — neste caso transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'). IMPORTANTE: se a tabela/documento também trouxer os LADOS entre os pontos (colunas PARA/AZIMUTE/DISTÂNCIA), transcreva CADA lado numa linha própria no formato 'De P1 Para P2, azimute 285°27'21,60", distância 4,50 m' (um lado por linha) — isso permite reconstruir a forma exata quando as coordenadas vêm arredondadas. E se o documento informar ÁREA e/ou PERÍMETRO totais, inclua-os ao final tal como aparecem (ex.: 'Área: 246,8798 m² Perímetro: 113,4541 m'). Inclua todos os vértices e todos os lados; não converta, não arredonde, não omita nenhum
+"memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. Pode ser: (a) texto corrido começando em 'Inicia-se a descrição...'; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; (c) uma TABELA (SIGEF/INCRA ou planta topográfica) com colunas de Latitude/Longitude — neste caso transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'); ou (d) uma TABELA de LEVANTAMENTO TOPOGRÁFICO com colunas de coordenadas UTM tipo 'Coord. N(Y)' e 'Coord. E(X)' — neste caso transcreva cada vértice numa linha própria PREFIXANDO os valores, no formato 'P1 N=9.222.799,638 E=445.517,024' (mantenha os números exatamente como estão, sem converter nem arredondar). IMPORTANTE: se a tabela/documento também trouxer os LADOS entre os pontos (colunas PARA/AZIMUTE/DISTÂNCIA), transcreva CADA lado numa linha própria no formato 'De P1 Para P2, azimute 285°27'21,60", distância 4,50 m' (um lado por linha) — isso permite reconstruir a forma exata quando as coordenadas vêm arredondadas. E se o documento informar ÁREA e/ou PERÍMETRO totais, inclua-os ao final tal como aparecem (ex.: 'Área: 246,8798 m² Perímetro: 113,4541 m'). Inclua todos os vértices e todos os lados; não converta, não arredonde, não omita nenhum
 }
 PROMPT;
 }
@@ -5056,7 +5134,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-03m-prompt-azimute-area (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-03n-utm-tabela-topografica (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -7116,7 +7194,7 @@ function wire3D(){
   on('m3d-close','click', fechar3D);
 }
 
-console.info('%cVertex — build 2026-07-03m-prompt-azimute-area','color:#0ea5e9;font-weight:bold');
+console.info('%cVertex — build 2026-07-03n-utm-tabela-topografica','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
