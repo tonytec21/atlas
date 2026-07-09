@@ -37,12 +37,13 @@ if (($_GET['export'] ?? '') === 'csv') {
     header('Content-Disposition: attachment; filename="relatorio_contas_'.$de.'_'.$ate.'.csv"');
     echo "\xEF\xBB\xBF"; // BOM p/ Excel
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['Vencimento','Título','Categoria','Fornecedor','Valor','Recorrência','Situação','Pagamento'], ';');
+    fputcsv($out, ['Vencimento','Título','Categoria','Fornecedor','Valor','Recorrência','Situação','Pagamento','Forma','Conta'], ';');
     foreach ($rows as $c) {
         fputcsv($out, [
             date('d/m/Y', strtotime($c['data_vencimento'])), $c['titulo'], $c['categoria'], $c['fornecedor'],
             number_format((float)$c['valor'],2,',','.'), $c['recorrencia'], cap_status_efetivo($c),
-            $c['data_pagamento'] ? date('d/m/Y', strtotime($c['data_pagamento'])) : ''
+            $c['data_pagamento'] ? date('d/m/Y', strtotime($c['data_pagamento'])) : '',
+            $c['forma_pagamento'] ?? '', $c['conta_origem'] ? cap_nome_conta($c['conta_origem']) : ''
         ], ';');
     }
     fclose($out); exit;
@@ -145,7 +146,7 @@ $qs = http_build_query(['de'=>$de,'ate'=>$ate,'base'=>$baseSel,'categoria'=>$cat
         <div class="table-responsive table-wrap mt-3">
             <h5 class="mb-2">Detalhamento</h5>
             <table id="tabelaContas" class="table table-striped table-bordered data-layout" style="width:100%">
-                <thead><tr><th>Vencimento</th><th>Título</th><th>Categoria</th><th>Fornecedor</th><th>Valor</th><th>Situação</th><th>Pagamento</th></tr></thead>
+                <thead><tr><th>Vencimento</th><th>Título</th><th>Categoria</th><th>Fornecedor</th><th>Valor</th><th>Situação</th><th>Pagamento</th><th>Forma</th></tr></thead>
                 <tbody>
                 <?php foreach($rows as $c): $st=cap_status_efetivo($c); ?>
                     <tr>
@@ -156,6 +157,7 @@ $qs = http_build_query(['de'=>$de,'ate'=>$ate,'base'=>$baseSel,'categoria'=>$cat
                         <td data-label="Valor" data-order="<?php echo (float)$c['valor']; ?>"><?php echo cap_money($c['valor']); ?></td>
                         <td data-label="Situação"><span class="st-badge st-<?php echo $st; ?>"><?php echo $st; ?></span></td>
                         <td data-label="Pagamento"><?php echo $c['data_pagamento']?date('d/m/Y',strtotime($c['data_pagamento'])):'—'; ?></td>
+                        <td data-label="Forma"><?php echo $c['forma_pagamento']?hr($c['forma_pagamento']):'—'; ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
