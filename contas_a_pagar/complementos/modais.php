@@ -136,6 +136,60 @@
   </div>
 </div>
 
+<!-- ============ MODAL TRANSFERÊNCIA ENTRE CONTAS VIRTUAIS ============ -->
+<div class="modal fade cap-modal" id="transferirModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#0ea5e9,#2563eb)">
+        <div class="d-flex align-items-center gap-2">
+          <span style="width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center"><i class="fa fa-exchange"></i></span>
+          <div><div style="font-weight:800;font-size:1.05rem">Transferir entre contas</div><div style="font-size:.8rem;opacity:.9">Ex.: depositar a espécie no banco</div></div>
+        </div>
+        <button type="button" class="cap-close" data-bs-dismiss="modal"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-md-5">
+            <label class="form-label small text-muted mb-1">De (origem)</label>
+            <div class="input-chip"><i class="fa fa-arrow-circle-o-up"></i><select id="tr_origem">
+              <?php foreach(cap_contas_virtuais() as $cod=>$m): ?><option value="<?php echo $cod; ?>" <?php echo $cod==='especie'?'selected':''; ?>><?php echo htmlspecialchars($m['nome']); ?></option><?php endforeach; ?>
+            </select></div>
+          </div>
+          <div class="col-12 col-md-2 text-center d-none d-md-block"><button type="button" class="btn btn-light btn-sm" id="trSwap" title="Inverter"><i class="fa fa-exchange"></i></button></div>
+          <div class="col-12 col-md-5">
+            <label class="form-label small text-muted mb-1">Para (destino)</label>
+            <div class="input-chip"><i class="fa fa-arrow-circle-o-down"></i><select id="tr_destino">
+              <?php foreach(cap_contas_virtuais() as $cod=>$m): ?><option value="<?php echo $cod; ?>" <?php echo $cod==='banco'?'selected':''; ?>><?php echo htmlspecialchars($m['nome']); ?></option><?php endforeach; ?>
+            </select></div>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-1">
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-muted mb-1">Valor (R$) *</label>
+            <div class="input-chip"><i class="fa fa-money"></i><input type="text" id="tr_valor" inputmode="decimal" placeholder="0,00"></div>
+            <button type="button" class="btn btn-link btn-sm p-0 mt-1" id="trTudo">Usar todo o saldo disponível</button>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-muted mb-1">Data</label>
+            <div class="input-chip"><i class="fa fa-calendar"></i><input type="date" id="tr_data"></div>
+          </div>
+          <div class="col-12">
+            <label class="form-label small text-muted mb-1">Observação</label>
+            <div class="input-chip"><i class="fa fa-comment-o"></i><input type="text" id="tr_obs" placeholder="Ex.: Depósito do malote em 09/07"></div>
+          </div>
+        </div>
+
+        <div id="tr_saldo_box" class="pg-saldo mt-3"><i class="fa fa-wallet"></i> <span id="tr_saldo_txt">—</span></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" id="trConfirmBtn" onclick="capConfirmarTransferencia()"><i class="fa fa-exchange"></i> Transferir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL ANEXOS ============ -->
 <div class="modal fade cap-modal" id="anexosModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-md-down">

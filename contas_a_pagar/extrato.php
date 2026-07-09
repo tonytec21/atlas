@@ -42,6 +42,25 @@ while ($x = $r2->fetch_assoc()) {
               'obs'=>trim(($x['categoria']??'').' '.($x['forma_pagamento']?('· '.$x['forma_pagamento']):'')), 'valor'=>-(float)$x['valor']];
 }
 $st2->close();
+
+/* Transferências entre contas virtuais */
+$stt = $conn->prepare("SELECT id, data_transferencia, origem, destino, valor, observacao, usuario FROM conta_transferencias WHERE (origem=? OR destino=?) AND data_transferencia BETWEEN ? AND ? ORDER BY data_transferencia");
+$stt->bind_param('ssss', $conta, $conta, $de, $ate); $stt->execute();
+$r3 = $stt->get_result();
+while ($x = $r3->fetch_assoc()) {
+    $entrou = ($x['destino'] === $conta);
+    if ($entrou) $entPeriodo += (float)$x['valor']; else $saiPeriodo += (float)$x['valor'];
+    $outra = cap_nome_conta($entrou ? $x['origem'] : $x['destino']);
+    $mov[] = [
+        'data'  => $x['data_transferencia'],
+        'tipo'  => $entrou ? 'entrada' : 'saida',
+        'desc'  => 'Transferência · ' . ($entrou ? ('recebida de ' . $outra) : ('enviada para ' . $outra)),
+        'obs'   => trim(($x['observacao'] ?? '') . ($x['usuario'] ? (' · ' . $x['usuario']) : '')),
+        'valor' => $entrou ? (float)$x['valor'] : -(float)$x['valor'],
+        'transf_id' => (int)$x['id'],
+    ];
+}
+$stt->close();
 usort($mov, function($a,$b){ return strcmp($a['data'],$b['data']); });
 ?>
 <!DOCTYPE html>
@@ -113,10 +132,10 @@ usort($mov, function($a,$b){ return strcmp($a['data'],$b['data']); });
     <div class="table-responsive table-wrap mt-3">
       <h5 class="mb-2">Movimentações</h5>
       <table id="tabelaContas" class="table table-striped table-bordered data-layout" style="width:100%">
-        <thead><tr><th>Data</th><th>Descrição</th><th>Observação</th><th>Valor</th></tr></thead>
+        <thead><tr><th>Data</th><th>Descrição</th><th>Observação</th><th>Valor</th><th style="width:8%">Ações</th></tr></thead>
         <tbody>
         <?php if (!$mov): ?>
-          <tr><td colspan="4" class="text-center text-muted py-4">Nenhuma movimentação no período.</td></tr>
+          <tr><td colspan="5" class="text-center text-muted py-4">Nenhuma movimentação no período.</td></tr>
         <?php else: foreach ($mov as $m): ?>
           <tr>
             <td data-label="Data"><?php echo date('d/m/Y', strtotime($m['data'])); ?></td>
@@ -124,6 +143,11 @@ usort($mov, function($a,$b){ return strcmp($a['data'],$b['data']); });
             <td data-label="Observação"><?php echo he($m['obs']); ?></td>
             <td data-label="Valor" class="<?php echo $m['tipo']==='entrada'?'mv-ent':'mv-sai'; ?>">
               <?php echo ($m['tipo']==='entrada'?'+ ':'− ') . cap_money(abs($m['valor'])); ?></td>
+            <td data-cell="acoes">
+              <?php if (!empty($m['transf_id'])): ?>
+                <button type="button" class="btn btn-danger btn-sm btn-table js-estornar" data-id="<?php echo (int)$m['transf_id']; ?>" title="Estornar transferência"><i class="fa fa-undo"></i></button>
+              <?php else: ?><span class="text-muted">—</span><?php endif; ?>
+            </td>
           </tr>
         <?php endforeach; endif; ?>
         </tbody>
@@ -134,5 +158,19 @@ usort($mov, function($a,$b){ return strcmp($a['data'],$b['data']); });
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <?php @include(__DIR__ . '/../rodape.php'); ?>
+<script>
+(function(){
+  var CSRF = <?php echo json_encode(cap_csrf_token()); ?>;
+  document.addEventListener('click', async function(ev){
+    var b = ev.target.closest('.js-estornar'); if(!b) return;
+    var ok = window.confirm('Estornar esta transferência? Os saldos serão recalculados.');
+    if(!ok) return;
+    var body = new URLSearchParams({csrf:CSRF, id:b.dataset.id}).toString();
+    var r = await fetch('transferencia_excluir.php', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body, credentials:'same-origin'});
+    var j = await r.json();
+    if(j.success){ location.reload(); } else { alert(j.message || 'Falha ao estornar.'); }
+  });
+})();
+</script>
 </body>
 </html>

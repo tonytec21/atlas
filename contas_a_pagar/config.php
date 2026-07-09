@@ -92,6 +92,15 @@ function cap_saldos()
         $cod = $row['conta_origem'];
         if (isset($out[$cod])) $out[$cod]['saidas'] += (float)$row['t'];
     }
+
+    // Transferências entre contas virtuais (saem da origem, entram no destino)
+    $r3 = $conn->query("SELECT origem, destino, COALESCE(SUM(valor),0) t FROM conta_transferencias GROUP BY origem, destino");
+    while ($r3 && $row = $r3->fetch_assoc()) {
+        $o = $row['origem']; $d = $row['destino']; $t = (float)$row['t'];
+        if (isset($out[$o])) $out[$o]['saidas']   += $t;
+        if (isset($out[$d])) $out[$d]['entradas'] += $t;
+    }
+
     foreach ($out as $cod => $v) $out[$cod]['saldo'] = $v['entradas'] - $v['saidas'];
     return $out;
 }
@@ -157,6 +166,18 @@ function cap_ensure_schema()
         enviado_por VARCHAR(120) NULL,
         enviado_em DATETIME NOT NULL,
         INDEX idx_conta (conta_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $conn->query("CREATE TABLE IF NOT EXISTS conta_transferencias (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        data_transferencia DATE NOT NULL,
+        origem VARCHAR(10) NOT NULL,
+        destino VARCHAR(10) NOT NULL,
+        valor DECIMAL(12,2) NOT NULL,
+        observacao VARCHAR(255) NULL,
+        usuario VARCHAR(120) NULL,
+        created_at DATETIME NULL,
+        INDEX idx_data (data_transferencia)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $conn->query("CREATE TABLE IF NOT EXISTS contas_config (
