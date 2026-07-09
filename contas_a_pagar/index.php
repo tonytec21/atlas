@@ -60,6 +60,11 @@ for($i=5;$i>=0;$i--){ $m=date('Y-m', strtotime("-$i month")); $evLabels[]=date('
 
 /* Doughnut: a vencer vs vencidas (valores) */
 $aVencerVal = max(0, $kpi_aberto_val - $kpi_venc_val);
+
+/* Contas virtuais (saldo vindo do módulo Controle de Caixa) */
+$SALDOS = cap_saldos();
+$temCaixa = cap_tem_deposito_caixa();
+$FORMAS = cap_formas_pagamento();
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -88,6 +93,16 @@ $aVencerVal = max(0, $kpi_aberto_val - $kpi_venc_val);
     .kpi.k-aberto .ic{ background:linear-gradient(135deg,#4f46e5,#2563eb);} .kpi.k-venc .ic{ background:linear-gradient(135deg,#ef4444,#b91c1c);}
     .kpi.k-prox .ic{ background:linear-gradient(135deg,#f59e0b,#d97706);} .kpi.k-pago .ic{ background:linear-gradient(135deg,#16a34a,#15803d);}
     body.dark-mode .kpi{ background:#23272a; border-color:rgba(255,255,255,.07); }
+    /* contas virtuais */
+    .vconta{ display:flex; gap:14px; align-items:center; background:#fff; border:1px solid #e5e9f0; border-radius:16px; padding:16px 18px; box-shadow:0 8px 22px rgba(15,23,42,.05); height:100%; }
+    .vconta .vc-ic{ width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;flex:0 0 auto; }
+    .vconta.especie .vc-ic{ background:linear-gradient(135deg,#16a34a,#15803d); } .vconta.banco .vc-ic{ background:linear-gradient(135deg,#2563eb,#4f46e5); }
+    .vconta .vc-lb{ color:#64748b;font-size:.8rem;font-weight:700; } .vconta .vc-vl{ font-size:1.5rem;font-weight:800;line-height:1.15; }
+    .vconta .vc-sub{ color:#94a3b8;font-size:.76rem; }
+    body.dark-mode .vconta{ background:#23272a;border-color:rgba(255,255,255,.07); }
+    /* saldo no modal de pagamento */
+    .pg-saldo{ display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:#f1f5f9;font-size:.85rem;font-weight:600; }
+    .pg-saldo.neg{ background:#fee2e2;color:#b91c1c; } .pg-saldo.ok{ background:#dcfce7;color:#166534; }
     /* cards de gráfico */
     .chart-card{ background:#fff; border:1px solid #e5e9f0; border-radius:16px; padding:16px; box-shadow:0 8px 22px rgba(15,23,42,.05); height:100%; }
     .chart-card h6{ font-weight:800; margin:0 0 10px; font-size:.9rem; } .chart-card canvas{ max-height:240px; }
@@ -134,6 +149,7 @@ $aVencerVal = max(0, $kpi_aberto_val - $kpi_venc_val);
                 <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-primary btn-pill" data-bs-toggle="modal" data-bs-target="#contaModal" onclick="capNovaConta()"><i class="fa fa-plus"></i> Nova conta</button>
                     <a class="btn btn-soft btn-pill" href="relatorios.php"><i class="fa fa-bar-chart"></i> Relatórios</a>
+                    <a class="btn btn-soft btn-pill" href="extrato.php"><i class="fa fa-exchange"></i> Extrato</a>
                     <button class="btn btn-soft btn-pill" data-bs-toggle="modal" data-bs-target="#configModal"><i class="fa fa-cog"></i> Configurações</button>
                 </div>
             </div>
@@ -147,7 +163,25 @@ $aVencerVal = max(0, $kpi_aberto_val - $kpi_venc_val);
             <div class="kpi k-pago"><div class="ic"><i class="fa fa-check-circle"></i></div><div><div class="lb">Pago no mês</div><div class="vl"><?php echo cap_money($kpi_pago_mes); ?></div><div class="sub"><?php echo date('m/Y'); ?></div></div></div>
         </div>
 
-        <!-- GRÁFICOS -->
+        <!-- CONTAS VIRTUAIS (saldo do cartório) -->
+        <div class="row g-3 mb-1">
+            <?php foreach (cap_contas_virtuais() as $cod => $m): $s = $SALDOS[$cod]; $neg = $s['saldo'] < 0; ?>
+            <div class="col-12 col-md-6">
+                <div class="vconta <?php echo $cod; ?>">
+                    <div class="vc-ic"><i class="fa <?php echo hh($m['icone']); ?>"></i></div>
+                    <div style="flex:1;min-width:0">
+                        <div class="vc-lb">Conta virtual · <?php echo hh($m['nome']); ?></div>
+                        <div class="vc-vl" style="<?php echo $neg?'color:#b91c1c':''; ?>"><?php echo cap_money($s['saldo']); ?></div>
+                        <div class="vc-sub">Entradas <?php echo cap_money($s['entradas']); ?> · Saídas <?php echo cap_money($s['saidas']); ?></div>
+                    </div>
+                    <a class="btn btn-sm btn-soft btn-pill" href="extrato.php?conta=<?php echo $cod; ?>"><i class="fa fa-list"></i> Extrato</a>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php if (!$temCaixa): ?>
+            <div class="alert alert-warning py-2 mt-2" style="font-size:.85rem"><i class="fa fa-exclamation-triangle"></i> Tabela <code>deposito_caixa</code> (Controle de Caixa) não encontrada — os saldos das contas virtuais aparecem zerados.</div>
+        <?php endif; ?>
         <div class="row g-3 mb-1">
             <div class="col-12 col-lg-4"><div class="chart-card"><h6><i class="fa fa-pie-chart text-primary"></i> Situação (em aberto)</h6><canvas id="chartStatus"></canvas></div></div>
             <div class="col-12 col-lg-4"><div class="chart-card"><h6><i class="fa fa-tags text-primary"></i> Em aberto por categoria</h6><canvas id="chartCat"></canvas></div></div>
@@ -204,16 +238,16 @@ $aVencerVal = max(0, $kpi_aberto_val - $kpi_venc_val);
                         <td data-label="Fornecedor"><?php echo hh($c['fornecedor'] ?? ''); ?></td>
                         <td data-label="Valor" data-order="<?php echo (float)$c['valor']; ?>"><?php echo cap_money($c['valor']); ?></td>
                         <td data-label="Recorrência"><?php echo hh($c['recorrencia']); ?></td>
-                        <td data-label="Situação"><span class="st-badge st-<?php echo $stt; ?>"><?php echo $stt; ?></span></td>
+                        <td data-label="Situação"><span class="st-badge st-<?php echo $stt; ?>"><?php echo $stt; ?></span><?php if($pago && $c['forma_pagamento']): ?><div class="text-muted" style="font-size:.72rem;margin-top:2px"><i class="fa fa-<?php echo $c['conta_origem']==='especie'?'money':($c['conta_origem']==='banco'?'university':'circle-o'); ?>"></i> <?php echo hh($c['forma_pagamento']); ?></div><?php endif; ?></td>
                         <td data-cell="acoes">
                             <?php if (!$pago): ?>
-                                <button class="btn btn-success btn-sm btn-table" title="Marcar como paga" onclick="capPagar(<?php echo (int)$c['id']; ?>)"><i class="fa fa-check"></i></button>
-                                <button class="btn btn-warning btn-sm btn-table" title="Editar" onclick="capEditar(<?php echo (int)$c['id']; ?>)"><i class="fa fa-pencil"></i></button>
+                                <button type="button" class="btn btn-success btn-sm btn-table js-pagar" title="Registrar pagamento" data-id="<?php echo (int)$c['id']; ?>" data-titulo="<?php echo hh($c['titulo']); ?>" data-valor="<?php echo (float)$c['valor']; ?>"><i class="fa fa-check"></i></button>
+                                <button type="button" class="btn btn-warning btn-sm btn-table js-editar" title="Editar" data-id="<?php echo (int)$c['id']; ?>"><i class="fa fa-pencil"></i></button>
                             <?php else: ?>
-                                <span class="btn btn-sm btn-table" style="background:#dcfce7;color:#166534;cursor:default" title="Paga em <?php echo $c['data_pagamento']?date('d/m/Y',strtotime($c['data_pagamento'])):''; ?>"><i class="fa fa-check-circle"></i></span>
+                                <span class="btn btn-sm btn-table" style="background:#dcfce7;color:#166534;cursor:default" title="Paga em <?php echo $c['data_pagamento']?date('d/m/Y',strtotime($c['data_pagamento'])):''; ?><?php echo $c['forma_pagamento']?' · '.hh($c['forma_pagamento']):''; ?>"><i class="fa fa-check-circle"></i></span>
                             <?php endif; ?>
-                            <button class="btn btn-primary btn-sm btn-table" title="Anexos" onclick="capAnexos(<?php echo (int)$c['id']; ?>,'<?php echo hh($c['titulo']); ?>')"><i class="fa fa-paperclip"></i></button>
-                            <button class="btn btn-danger btn-sm btn-table" title="Excluir" onclick="capExcluir(<?php echo (int)$c['id']; ?>)"><i class="fa fa-trash"></i></button>
+                            <button type="button" class="btn btn-primary btn-sm btn-table js-anexos" title="Anexos" data-id="<?php echo (int)$c['id']; ?>" data-titulo="<?php echo hh($c['titulo']); ?>"><i class="fa fa-paperclip"></i></button>
+                            <button type="button" class="btn btn-danger btn-sm btn-table js-excluir" title="Excluir" data-id="<?php echo (int)$c['id']; ?>"><i class="fa fa-trash"></i></button>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -235,6 +269,10 @@ $aVencerVal = max(0, $kpi_aberto_val - $kpi_venc_val);
 <script>
 window.CAP = {
     csrf: <?php echo json_encode($CSRF); ?>,
+    saldos: <?php echo json_encode($SALDOS); ?>,
+    formas: <?php echo json_encode($FORMAS, JSON_UNESCAPED_UNICODE); ?>,
+    contasNome: <?php echo json_encode(['especie'=>cap_nome_conta('especie'),'banco'=>cap_nome_conta('banco')], JSON_UNESCAPED_UNICODE); ?>,
+    hoje: <?php echo json_encode(date('Y-m-d')); ?>,
     chartStatus: { aVencer: <?php echo json_encode(round($aVencerVal,2)); ?>, vencidas: <?php echo json_encode(round($kpi_venc_val,2)); ?> },
     chartCat: { labels: <?php echo json_encode($catLabels, JSON_UNESCAPED_UNICODE); ?>, vals: <?php echo json_encode($catVals); ?> },
     chartEvol: { labels: <?php echo json_encode($evLabels); ?>, vals: <?php echo json_encode($evVals); ?> }

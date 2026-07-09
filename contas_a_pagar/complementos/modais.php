@@ -97,6 +97,45 @@
   </div>
 </div>
 
+<!-- ============ MODAL PAGAMENTO ============ -->
+<div class="modal fade cap-modal" id="pagarModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#16a34a,#15803d)">
+        <div class="d-flex align-items-center gap-2">
+          <span style="width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center"><i class="fa fa-check"></i></span>
+          <div><div style="font-weight:800;font-size:1.05rem">Registrar pagamento</div><div style="font-size:.8rem;opacity:.9" id="pg_titulo">—</div></div>
+        </div>
+        <button type="button" class="cap-close" data-bs-dismiss="modal"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="pg_id"><input type="hidden" id="pg_valor">
+        <div class="mb-3 text-center">
+          <div class="text-muted small">Valor da conta</div>
+          <div style="font-size:1.6rem;font-weight:800" id="pg_valor_fmt">R$ 0,00</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-muted mb-1">Forma de pagamento *</label>
+          <div class="input-chip"><i class="fa fa-credit-card"></i><select id="pg_forma">
+            <?php foreach(cap_formas_pagamento() as $f=>$conta): ?>
+              <option value="<?php echo htmlspecialchars($f, ENT_QUOTES); ?>" data-conta="<?php echo $conta; ?>"><?php echo htmlspecialchars($f); ?></option>
+            <?php endforeach; ?>
+          </select></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-muted mb-1">Data do pagamento</label>
+          <div class="input-chip"><i class="fa fa-calendar"></i><input type="date" id="pg_data"></div>
+        </div>
+        <div id="pg_saldo_box" class="pg-saldo"><i class="fa fa-wallet"></i> <span id="pg_saldo_txt">—</span></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-success" id="pgConfirmBtn" onclick="capConfirmarPagamento()"><i class="fa fa-check"></i> Confirmar pagamento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL ANEXOS ============ -->
 <div class="modal fade cap-modal" id="anexosModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-md-down">

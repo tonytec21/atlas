@@ -83,12 +83,50 @@
     }catch(e){ if(window.Swal) Swal.fire('Erro', e.message,'error'); btn.disabled=false; }
   };
 
-  window.capPagar = async function(id){
-    var ok = window.Swal ? (await Swal.fire({icon:'question',title:'Marcar como paga?',text:'Se for recorrente, a próxima parcela será gerada automaticamente.',showCancelButton:true,confirmButtonText:'Sim, paga',cancelButtonText:'Cancelar',confirmButtonColor:'#16a34a'})).isConfirmed : confirm('Marcar como paga?');
-    if(!ok) return;
-    try{ var r=await postForm('definir_pago.php',{id:id}); if(!r.success) throw new Error(r.message||'Falha.'); toast('success','Paga'); setTimeout(function(){ location.reload(); },700); }
-    catch(e){ if(window.Swal) Swal.fire('Erro', e.message,'error'); }
+  /* ---------------- pagamento (contas virtuais) ---------------- */
+  function brl(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function contaDaForma(){ var o=$('#pg_forma').options[$('#pg_forma').selectedIndex]; return o ? (o.getAttribute('data-conta')||'') : ''; }
+  function atualizaSaldoBox(){
+    var box=$('#pg_saldo_box'), txt=$('#pg_saldo_txt'), conta=contaDaForma(), valor=parseFloat($('#pg_valor').value||'0');
+    box.classList.remove('ok','neg');
+    if(!conta){ txt.textContent='Esta forma não movimenta as contas virtuais.'; return; }
+    var s=(CAP.saldos&&CAP.saldos[conta]) ? CAP.saldos[conta].saldo : 0;
+    var nome=(CAP.contasNome&&CAP.contasNome[conta])||conta;
+    var depois = s - valor;
+    txt.textContent = nome + ': ' + brl(s) + ' → após o pagamento: ' + brl(depois);
+    box.classList.add(depois < 0 ? 'neg' : 'ok');
+  }
+  window.capPagar = function(id, titulo, valor){
+    $('#pg_id').value=parseInt(id,10)||0; $('#pg_valor').value=parseFloat(valor)||0;
+    $('#pg_titulo').textContent=titulo||'';
+    $('#pg_valor_fmt').textContent=brl(valor);
+    $('#pg_data').value=CAP.hoje||'';
+    $('#pg_forma').selectedIndex=0;
+    atualizaSaldoBox();
+    bsModal('pagarModal').show();
   };
+  window.capConfirmarPagamento = async function(forcar){
+    var btn=$('#pgConfirmBtn'); btn.disabled=true;
+    var data={ id:$('#pg_id').value, forma_pagamento:$('#pg_forma').value, data_pagamento:$('#pg_data').value };
+    if(forcar===true) data.forcar='1';
+    try{
+      var r=await postForm('definir_pago.php', data);
+      if(!r.success && r.saldo_insuficiente){
+        btn.disabled=false;
+        var ok = window.Swal ? (await Swal.fire({icon:'warning',title:'Saldo insuficiente',
+              html:'Conta <b>'+r.conta_nome+'</b><br>Disponível: <b>'+r.saldo_fmt+'</b><br>Valor: <b>'+r.valor_fmt+'</b><br><br>Deseja registrar mesmo assim (saldo ficará negativo)?',
+              showCancelButton:true, confirmButtonText:'Registrar assim mesmo', cancelButtonText:'Cancelar', confirmButtonColor:'#d97706'})).isConfirmed
+            : confirm(r.message + ' Registrar mesmo assim?');
+        if(ok) return capConfirmarPagamento(true);
+        return;
+      }
+      if(!r.success) throw new Error(r.message||'Falha.');
+      bsModal('pagarModal').hide();
+      if(window.Swal) Swal.fire({icon:'success',title:'Pagamento registrado',text:r.message,timer:2600,showConfirmButton:false});
+      setTimeout(function(){ location.reload(); }, 1200);
+    }catch(e){ if(window.Swal) Swal.fire('Erro', e.message,'error'); btn.disabled=false; }
+  };
+
   window.capExcluir = async function(id){
     var ok = window.Swal ? (await Swal.fire({icon:'warning',title:'Excluir conta?',text:'Esta ação não pode ser desfeita.',showCancelButton:true,confirmButtonText:'Excluir',cancelButtonText:'Cancelar',confirmButtonColor:'#dc3545'})).isConfirmed : confirm('Excluir conta?');
     if(!ok) return;
@@ -203,9 +241,23 @@
     $('#axBack').addEventListener('click', axShowList);
   }
 
+  /* ---------------- ligação dos botões da tabela (delegação) ---------------- */
+  function initAcoes(){
+    var tabela = document.getElementById('tabelaContas');
+    if(!tabela) return;
+    tabela.addEventListener('click', function(ev){
+      var b = ev.target.closest('button'); if(!b) return;
+      if(b.classList.contains('js-pagar'))   return capPagar(b.dataset.id, b.dataset.titulo, parseFloat(b.dataset.valor||'0'));
+      if(b.classList.contains('js-editar'))  return capEditar(b.dataset.id);
+      if(b.classList.contains('js-anexos'))  return capAnexos(b.dataset.id, b.dataset.titulo);
+      if(b.classList.contains('js-excluir')) return capExcluir(b.dataset.id);
+    });
+  }
+
   /* ---------------- init ---------------- */
   document.addEventListener('DOMContentLoaded', function(){
-    initCharts(); initTable(); initAnexosDz();
+    initCharts(); initTable(); initAnexosDz(); initAcoes();
     var v=$('#c_valor'); if(v) maskMoney(v);
+    var pf=$('#pg_forma'); if(pf) pf.addEventListener('change', atualizaSaldoBox);
   });
 })();

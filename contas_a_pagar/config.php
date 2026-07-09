@@ -19,6 +19,83 @@ function cap_recorrencias()
     return ['Nenhuma','Mensal','Semanal','Anual'];
 }
 
+/* ------------------------------------------------------------------
+ * Contas virtuais (saldo do cartório, alimentado pelo módulo Caixa)
+ *  - 'especie' : depósitos registrados como "Espécie"
+ *  - 'banco'   : depósitos "Depósito Bancário" e "Transferência"
+ * ------------------------------------------------------------------ */
+function cap_contas_virtuais()
+{
+    return [
+        'especie' => ['nome' => 'Espécie (dinheiro)', 'icone' => 'fa-money',       'tipos' => ['Espécie']],
+        'banco'   => ['nome' => 'Saldo bancário',     'icone' => 'fa-university',  'tipos' => ['Depósito Bancário','Transferência']],
+    ];
+}
+
+/** Formas de pagamento e a conta virtual que cada uma consome. */
+function cap_formas_pagamento()
+{
+    return [
+        'Espécie'               => 'especie',
+        'PIX'                   => 'banco',
+        'Transferência'         => 'banco',
+        'Boleto'                => 'banco',
+        'Débito automático'     => 'banco',
+        'Cartão de Débito'      => 'banco',
+        'Cartão de Crédito'     => 'banco',
+        'Outro (não afeta saldo)' => '',
+    ];
+}
+function cap_conta_da_forma($forma)
+{
+    $m = cap_formas_pagamento();
+    return $m[$forma] ?? '';
+}
+function cap_nome_conta($cod)
+{
+    $c = cap_contas_virtuais();
+    return $c[$cod]['nome'] ?? '—';
+}
+
+/** Existe a tabela de depósitos do módulo Caixa? */
+function cap_tem_deposito_caixa()
+{
+    $conn = cap_db();
+    $r = $conn->query("SHOW TABLES LIKE 'deposito_caixa'");
+    return $r && $r->num_rows > 0;
+}
+
+/**
+ * Saldos das contas virtuais.
+ * saldo = (depósitos do módulo Caixa) − (contas pagas debitadas naquela conta)
+ * @return array ['especie'=>['entradas'=>x,'saidas'=>y,'saldo'=>z], 'banco'=>[...]]
+ */
+function cap_saldos()
+{
+    cap_ensure_schema();
+    $conn = cap_db();
+    $out = [];
+    foreach (cap_contas_virtuais() as $cod => $meta) $out[$cod] = ['entradas'=>0.0,'saidas'=>0.0,'saldo'=>0.0];
+
+    // Entradas (depósitos)
+    if (cap_tem_deposito_caixa()) {
+        $r = $conn->query("SELECT tipo_deposito, COALESCE(SUM(valor_do_deposito),0) t FROM deposito_caixa GROUP BY tipo_deposito");
+        while ($r && $row = $r->fetch_assoc()) {
+            foreach (cap_contas_virtuais() as $cod => $meta) {
+                if (in_array($row['tipo_deposito'], $meta['tipos'], true)) $out[$cod]['entradas'] += (float)$row['t'];
+            }
+        }
+    }
+    // Saídas (contas pagas)
+    $r2 = $conn->query("SELECT conta_origem, COALESCE(SUM(valor),0) t FROM contas_a_pagar WHERE status='Pago' AND conta_origem IN ('especie','banco') GROUP BY conta_origem");
+    while ($r2 && $row = $r2->fetch_assoc()) {
+        $cod = $row['conta_origem'];
+        if (isset($out[$cod])) $out[$cod]['saidas'] += (float)$row['t'];
+    }
+    foreach ($out as $cod => $v) $out[$cod]['saldo'] = $v['entradas'] - $v['saidas'];
+    return $out;
+}
+
 /* ------------------------------------------------------------------ DB */
 function cap_db()
 {
@@ -59,6 +136,8 @@ function cap_ensure_schema()
         'categoria'      => "VARCHAR(60) NULL AFTER titulo",
         'fornecedor'     => "VARCHAR(180) NULL AFTER categoria",
         'data_pagamento' => "DATE NULL AFTER status",
+        'forma_pagamento'=> "VARCHAR(40) NULL AFTER data_pagamento",
+        'conta_origem'   => "VARCHAR(10) NULL AFTER forma_pagamento",
         'origem_id'      => "INT NULL AFTER caminho_anexo",
         'created_at'     => "DATETIME NULL",
     ];

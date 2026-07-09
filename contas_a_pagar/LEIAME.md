@@ -22,6 +22,31 @@ e-mail** de contas vencidas e a vencer.
   dias de antecedência, e SMTP próprio (host/porta/segurança/usuário/senha/
   remetente). A senha não é reexibida e é mantida se o campo ficar vazio.
 
+## Contas virtuais (integração com o Controle de Caixa)
+
+Duas "contas" do cartório, alimentadas pelos **depósitos** do módulo Caixa
+(tabela `deposito_caixa`, coluna `tipo_deposito`):
+
+| Conta virtual | Alimentada por |
+|---|---|
+| **Espécie (dinheiro)** | depósitos `Espécie` |
+| **Saldo bancário** | depósitos `Depósito Bancário` e `Transferência` |
+
+Ao clicar em **pagar**, o sistema pergunta a **forma de pagamento** e debita a
+conta correspondente:
+
+- `Espécie` → debita a conta **Espécie**
+- `PIX`, `Transferência`, `Boleto`, `Débito automático`, `Cartão de Débito/Crédito` → debita o **Saldo bancário**
+- `Outro (não afeta saldo)` → registra o pagamento sem movimentar as contas
+
+O modal mostra o saldo atual e o **saldo após o pagamento**. Se não houver saldo,
+o sistema avisa e só prossegue com confirmação explícita (fica negativo).
+
+**Saldo é derivado** (depósitos − contas pagas naquela conta), então excluir ou
+estornar uma conta paga devolve o saldo automaticamente — não há risco de o saldo
+"descolar" da realidade. Há uma página de **Extrato** (`extrato.php`) por conta,
+com entradas (depósitos), saídas (pagamentos), filtro por período e totais.
+
 ## Envio automático de alertas
 
 O SMTP **não fica mais fixo no código** — vai para a tabela `contas_config`.
