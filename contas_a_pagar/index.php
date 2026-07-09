@@ -150,7 +150,6 @@ $FORMAS = cap_formas_pagamento();
                     <button class="btn btn-primary btn-pill" data-bs-toggle="modal" data-bs-target="#contaModal" onclick="capNovaConta()"><i class="fa fa-plus"></i> Nova conta</button>
                     <a class="btn btn-soft btn-pill" href="relatorios.php"><i class="fa fa-bar-chart"></i> Relatórios</a>
                     <a class="btn btn-soft btn-pill" href="extrato.php"><i class="fa fa-list"></i> Extrato</a>
-                    <button type="button" class="btn btn-soft btn-pill js-transferir" data-origem="especie"><i class="fa fa-exchange"></i> Transferir</button>
                     <button class="btn btn-soft btn-pill" data-bs-toggle="modal" data-bs-target="#configModal"><i class="fa fa-cog"></i> Configurações</button>
                 </div>
             </div>
@@ -175,10 +174,7 @@ $FORMAS = cap_formas_pagamento();
                         <div class="vc-vl" style="<?php echo $neg?'color:#b91c1c':''; ?>"><?php echo cap_money($s['saldo']); ?></div>
                         <div class="vc-sub">Entradas <?php echo cap_money($s['entradas']); ?> · Saídas <?php echo cap_money($s['saidas']); ?></div>
                     </div>
-                    <div class="d-flex flex-column gap-1">
-                        <button type="button" class="btn btn-sm btn-soft btn-pill js-transferir" data-origem="<?php echo $cod; ?>" title="Transferir para a outra conta"><i class="fa fa-exchange"></i> Transferir</button>
-                        <a class="btn btn-sm btn-soft btn-pill" href="extrato.php?conta=<?php echo $cod; ?>"><i class="fa fa-list"></i> Extrato</a>
-                    </div>
+                    <a class="btn btn-sm btn-soft btn-pill" href="extrato.php?conta=<?php echo $cod; ?>"><i class="fa fa-list"></i> Extrato</a>
                 </div>
             </div>
             <?php endforeach; ?>

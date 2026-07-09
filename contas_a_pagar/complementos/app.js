@@ -241,68 +241,6 @@
     $('#axBack').addEventListener('click', axShowList);
   }
 
-  /* ---------------- transferência entre contas virtuais ---------------- */
-  function trSaldoOrigem(){
-    var o=$('#tr_origem').value;
-    return (CAP.saldos && CAP.saldos[o]) ? CAP.saldos[o].saldo : 0;
-  }
-  function trAtualizaBox(){
-    var box=$('#tr_saldo_box'), txt=$('#tr_saldo_txt');
-    var o=$('#tr_origem').value, d=$('#tr_destino').value;
-    box.classList.remove('ok','neg');
-    if(o===d){ txt.textContent='Escolha contas diferentes para origem e destino.'; box.classList.add('neg'); return; }
-    var s=trSaldoOrigem(), v=parseFloat(($('#tr_valor').value||'0').replace(/\./g,'').replace(',','.'))||0;
-    var nomeO=(CAP.contasNome&&CAP.contasNome[o])||o, nomeD=(CAP.contasNome&&CAP.contasNome[d])||d;
-    txt.textContent = nomeO+': '+brl(s)+' → '+brl(s-v)+'   ·   '+nomeD+' recebe '+brl(v);
-    box.classList.add((s - v) < 0 ? 'neg' : 'ok');
-  }
-  window.capTransferir = function(origem){
-    var o = origem || 'especie';
-    $('#tr_origem').value = o;
-    $('#tr_destino').value = (o === 'especie') ? 'banco' : 'especie';
-    $('#tr_valor').value=''; $('#tr_obs').value=''; $('#tr_data').value=CAP.hoje||'';
-    trAtualizaBox();
-    bsModal('transferirModal').show();
-  };
-  window.capConfirmarTransferencia = async function(forcar){
-    var o=$('#tr_origem').value, d=$('#tr_destino').value;
-    if(o===d){ if(window.Swal) Swal.fire('Atenção','Origem e destino devem ser diferentes.','warning'); return; }
-    var valorTxt=$('#tr_valor').value.trim();
-    if(!valorTxt || (parseFloat(valorTxt.replace(/\./g,'').replace(',','.'))||0) <= 0){ if(window.Swal) Swal.fire('Atenção','Informe um valor maior que zero.','warning'); return; }
-    var btn=$('#trConfirmBtn'); btn.disabled=true;
-    var data={ origem:o, destino:d, valor:valorTxt, data_transferencia:$('#tr_data').value, observacao:$('#tr_obs').value };
-    if(forcar===true) data.forcar='1';
-    try{
-      var r=await postForm('transferir.php', data);
-      if(!r.success && r.saldo_insuficiente){
-        btn.disabled=false;
-        var ok = window.Swal ? (await Swal.fire({icon:'warning',title:'Saldo insuficiente',
-             html:'Conta <b>'+r.conta_nome+'</b><br>Disponível: <b>'+r.saldo_fmt+'</b><br>Valor: <b>'+r.valor_fmt+'</b><br><br>Transferir mesmo assim (saldo ficará negativo)?',
-             showCancelButton:true, confirmButtonText:'Transferir assim mesmo', cancelButtonText:'Cancelar', confirmButtonColor:'#d97706'})).isConfirmed
-           : confirm(r.message+' Continuar?');
-        if(ok) return capConfirmarTransferencia(true);
-        return;
-      }
-      if(!r.success) throw new Error(r.message||'Falha.');
-      bsModal('transferirModal').hide();
-      if(window.Swal) Swal.fire({icon:'success',title:'Transferência registrada',text:r.message,timer:2400,showConfirmButton:false});
-      setTimeout(function(){ location.reload(); }, 1100);
-    }catch(e){ if(window.Swal) Swal.fire('Erro', e.message,'error'); btn.disabled=false; }
-  };
-  function initTransferencia(){
-    if(!$('#tr_origem')) return;
-    var mv=$('#tr_valor'); if(mv) maskMoney(mv);
-    ['#tr_origem','#tr_destino'].forEach(function(sel){ $(sel).addEventListener('change', trAtualizaBox); });
-    $('#tr_valor').addEventListener('input', trAtualizaBox);
-    $('#trSwap').addEventListener('click', function(){ var o=$('#tr_origem').value; $('#tr_origem').value=$('#tr_destino').value; $('#tr_destino').value=o; trAtualizaBox(); });
-    $('#trTudo').addEventListener('click', function(){ setMoney($('#tr_valor'), Math.max(0, trSaldoOrigem())); trAtualizaBox(); });
-    // botões "Transferir" do hero e dos cards
-    document.addEventListener('click', function(ev){
-      var b = ev.target.closest('.js-transferir'); if(!b) return;
-      ev.preventDefault(); capTransferir(b.dataset.origem || 'especie');
-    });
-  }
-
   /* ---------------- ligação dos botões da tabela (delegação) ---------------- */
   function initAcoes(){
     var tabela = document.getElementById('tabelaContas');
@@ -317,9 +255,17 @@
   }
 
   /* ---------------- init ---------------- */
+  function safe(nome, fn){ try{ fn(); }catch(e){ console.error('[contas] falha em '+nome+':', e); } }
   document.addEventListener('DOMContentLoaded', function(){
-    initCharts(); initTable(); initAnexosDz(); initAcoes(); initTransferencia();
-    var v=$('#c_valor'); if(v) maskMoney(v);
-    var pf=$('#pg_forma'); if(pf) pf.addEventListener('change', atualizaSaldoBox);
+    // as ações (pagar/editar/anexos/excluir) são registradas primeiro e de forma isolada,
+    // para que uma falha em gráficos/tabela nunca deixe os botões sem efeito.
+    safe('acoes', initAcoes);
+    safe('pagamento', function(){
+      var pf=$('#pg_forma'); if(pf) pf.addEventListener('change', atualizaSaldoBox);
+      var v=$('#c_valor'); if(v) maskMoney(v);
+    });
+    safe('anexos', initAnexosDz);
+    safe('tabela', initTable);
+    safe('graficos', initCharts);
   });
 })();
