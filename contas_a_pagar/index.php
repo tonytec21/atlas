@@ -173,7 +173,7 @@ $FORMAS = cap_formas_pagamento();
                     <div style="flex:1;min-width:0">
                         <div class="vc-lb">Conta virtual · <?php echo hh($m['nome']); ?></div>
                         <div class="vc-vl" style="<?php echo $neg?'color:#b91c1c':''; ?>"><?php echo cap_money($s['saldo']); ?></div>
-                        <div class="vc-sub">Entradas <?php echo cap_money($s['entradas']); ?> · Saídas <?php echo cap_money($s['saidas']); ?></div>
+                        <div class="vc-sub">Entradas <?php echo cap_money($s['entradas']); ?> · Saídas <?php echo cap_money($s['saidas']); ?><?php if($cod==='banco' && cap_tem_pagamento_os()): ?> · inclui recebimentos de O.S. (não-espécie)<?php endif; ?></div>
                     </div>
                     <a class="btn btn-sm btn-soft btn-pill" href="extrato.php?conta=<?php echo $cod; ?>"><i class="fa fa-list"></i> Extrato</a>
                 </div>

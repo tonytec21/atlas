@@ -67,6 +67,26 @@ function cap_tem_deposito_caixa()
     return $r && $r->num_rows > 0;
 }
 
+/** Existe a tabela de pagamentos do módulo de O.S.? */
+function cap_tem_pagamento_os()
+{
+    $conn = cap_db();
+    $r = $conn->query("SHOW TABLES LIKE 'pagamento_os'");
+    return $r && $r->num_rows > 0;
+}
+
+/**
+ * A qual conta virtual pertence uma forma de recebimento da O.S.
+ * Regra do cartório: SOMENTE "Espécie" entra na conta espécie; todo o resto
+ * (PIX, Transferência, Crédito, Débito, Boleto, Cheque…) entra no Saldo bancário.
+ */
+function cap_conta_recebimento_os($forma)
+{
+    $f = mb_strtolower(trim((string)$forma), 'UTF-8');
+    if ($f === 'espécie' || $f === 'especie' || $f === 'dinheiro') return 'especie';
+    return 'banco';
+}
+
 /**
  * Saldos das contas virtuais.
  * saldo = (depósitos do módulo Caixa) − (contas pagas debitadas naquela conta)
@@ -79,7 +99,7 @@ function cap_saldos()
     $out = [];
     foreach (cap_contas_virtuais() as $cod => $meta) $out[$cod] = ['entradas'=>0.0,'saidas'=>0.0,'saldo'=>0.0];
 
-    // Entradas (depósitos)
+    // Entradas (depósitos do Caixa)
     if (cap_tem_deposito_caixa()) {
         $r = $conn->query("SELECT tipo_deposito, COALESCE(SUM(valor_do_deposito),0) t FROM deposito_caixa GROUP BY tipo_deposito");
         while ($r && $row = $r->fetch_assoc()) {
@@ -87,6 +107,17 @@ function cap_saldos()
                 if (in_array($row['tipo_deposito'], $meta['tipos'], true)) $out[$cod]['entradas'] += (float)$row['t'];
             }
         }
+    }
+
+    // Entradas (recebimentos de O.S.): SOMENTE o que não é espécie vai ao banco.
+    // A espécie recebida na O.S. não é somada aqui — ela é depositada depois pelo
+    // módulo Caixa (como depósito "Espécie"), evitando dupla contagem.
+    if (cap_tem_pagamento_os()) {
+        $r = $conn->query("SELECT COALESCE(SUM(total_pagamento),0) t FROM pagamento_os
+                           WHERE status='pago'
+                             AND LOWER(TRIM(forma_de_pagamento)) NOT IN ('espécie','especie','dinheiro')");
+        $row = $r ? $r->fetch_row() : [0];
+        $out['banco']['entradas'] += (float)($row[0] ?? 0);
     }
     // Saídas (contas pagas)
     $r2 = $conn->query("SELECT conta_origem, COALESCE(SUM(valor),0) t FROM contas_a_pagar WHERE status='Pago' AND conta_origem IN ('especie','banco') GROUP BY conta_origem");

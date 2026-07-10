@@ -62,6 +62,26 @@ while ($x = $r3->fetch_assoc()) {
     ];
 }
 $stt->close();
+
+/* Entradas de O.S. (recebimentos não-espécie) — aparecem apenas na conta bancária */
+if ($conta === 'banco' && cap_tem_pagamento_os()) {
+    $so = $conn->prepare("SELECT data_pagamento, cliente, total_pagamento, forma_de_pagamento, ordem_de_servico_id
+                          FROM pagamento_os
+                          WHERE status='pago'
+                            AND LOWER(TRIM(forma_de_pagamento)) NOT IN ('espécie','especie','dinheiro')
+                            AND DATE(data_pagamento) BETWEEN ? AND ?
+                          ORDER BY data_pagamento");
+    $so->bind_param('ss', $de, $ate); $so->execute();
+    $ro = $so->get_result();
+    while ($x = $ro->fetch_assoc()) {
+        $entPeriodo += (float)$x['total_pagamento'];
+        $os = $x['ordem_de_servico_id'] ? ('O.S. #'.$x['ordem_de_servico_id']) : 'O.S.';
+        $mov[] = ['data'=>$x['data_pagamento'],'tipo'=>'entrada',
+                  'desc'=>'Recebimento '.$os.' · '.$x['forma_de_pagamento'],
+                  'obs'=>$x['cliente'] ?? '', 'valor'=>(float)$x['total_pagamento']];
+    }
+    $so->close();
+}
 usort($mov, function($a,$b){ return strcmp($a['data'],$b['data']); });
 ?>
 <!DOCTYPE html>

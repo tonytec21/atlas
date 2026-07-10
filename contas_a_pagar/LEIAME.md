@@ -29,8 +29,13 @@ Duas "contas" do cartório, alimentadas pelos **depósitos** do módulo Caixa
 
 | Conta virtual | Alimentada por |
 |---|---|
-| **Espécie (dinheiro)** | depósitos `Espécie` |
-| **Saldo bancário** | depósitos `Depósito Bancário` e `Transferência` |
+| **Espécie (dinheiro)** | depósitos `Espécie` (módulo Caixa) |
+| **Saldo bancário** | depósitos `Depósito Bancário`/`Transferência` (Caixa) **+ recebimentos de O.S. que não são espécie** (PIX, Transferência, Crédito, Débito, Boleto, Cheque…) |
+
+> **Recebimentos de O.S.:** o módulo lê a tabela `pagamento_os` (`status='pago'`).
+> Tudo que **não** é espécie entra direto no **Saldo bancário**. A **espécie** da
+> O.S. **não** é somada aqui de propósito — ela é depositada depois pelo módulo
+> Caixa (como depósito "Espécie"), então contá-la aqui geraria dupla contagem.
 
 Ao clicar em **pagar**, o sistema pergunta a **forma de pagamento** e debita a
 conta correspondente:
