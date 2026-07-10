@@ -158,6 +158,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             error_log('[liquidar_ato][rastreio] ' . $eR->getMessage());
         }
 
+        // ===== NFS-e Nacional: só dispara quando TODOS os atos estiverem
+        // liquidados (o próprio hook verifica). Best-effort. =====
+        try {
+            if (PHP_VERSION_ID < 80100) { throw new Exception('PHP < 8.1: NFS-e desabilitada.'); }
+            require_once(__DIR__ . '/nfse/nfse_lib.php');
+            nfse_hook_pos_liquidacao((int)$item['ordem_servico_id']);
+        } catch (Throwable $eN) {
+            error_log('[liquidar_ato][nfse] ' . $eN->getMessage());
+        }
+
         echo json_encode(['success' => true]);
     } catch (Exception $e) {
         $conn->rollback();

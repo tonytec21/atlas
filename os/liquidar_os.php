@@ -153,7 +153,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             error_log('[liquidar_os][rastreio] ' . $eR->getMessage());
         }
 
-        echo json_encode(['success' => true]);
+        // ===== NFS-e Nacional: a liquidação é o fato gerador (best-effort) =====
+        // O depósito prévio é adiantamento e não gera nota; só aqui, com o ato
+        // efetivamente praticado, a DPS pode ser transmitida.
+        $nfse_resultado = null;
+        try {
+            if (PHP_VERSION_ID < 80100) { throw new Exception('PHP < 8.1: NFS-e desabilitada.'); }
+            require_once(__DIR__ . '/nfse/nfse_lib.php');
+            nfse_hook_pos_liquidacao((int)$os_id);
+            $nfse_notas = nfse_notas_da_os((int)$os_id);
+            if (!empty($nfse_notas)) {
+                $nfse_resultado = [
+                    'status' => $nfse_notas[0]['status'],
+                    'chave'  => $nfse_notas[0]['chave_acesso'],
+                ];
+            }
+        } catch (Throwable $eN) {
+            error_log('[liquidar_os][nfse] ' . $eN->getMessage());
+        }
+
+        echo json_encode(['success' => true, 'nfse' => $nfse_resultado]);
     } catch (Exception $e) {
         $conn->rollback();
         echo json_encode(['error' => 'Erro ao liquidar atos: ' . $e->getMessage()]);

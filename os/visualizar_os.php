@@ -1439,6 +1439,20 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
             </div>  
         </form>  
 
+        <!-- ===================== NFS-e NACIONAL ===================== -->
+        <?php
+        // Painel da NFS-e. Só renderiza se a integração estiver ativa.
+        // Nunca derruba a página: erros ficam confinados ao próprio include.
+        try {
+            if (PHP_VERSION_ID >= 80100 && is_file(__DIR__ . '/nfse/nfse_painel_os.php')) {
+                $__nfse_os_id = (int) $os_id;
+                include(__DIR__ . '/nfse/nfse_painel_os.php');
+            }
+        } catch (Throwable $__eNfse) {
+            error_log('[visualizar_os][nfse] ' . $__eNfse->getMessage());
+        }
+        ?>
+
         <!-- ===================== ITENS DA OS ===================== -->  
         <div id="osItens" class="mt-4">
             <div class="d-flex justify-content-between align-items-center mb-3">

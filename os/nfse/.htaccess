@@ -1,0 +1,4 @@
+# Impede que o vendor/ e a chave mestra sejam servidos diretamente.
+RedirectMatch 403 ^/.*/nfse/vendor/.*$
+RedirectMatch 403 ^/.*/nfse/certs/.*$
+RedirectMatch 403 ^/.*/nfse/composer\.(json|lock)$

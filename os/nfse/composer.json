@@ -1,0 +1,18 @@
+{
+    "name": "atlas/os-nfse-nacional",
+    "description": "Integração do módulo de O.S. do Atlas com o Emissor Nacional da NFS-e (serviços notariais e de registro).",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "ext-openssl": "*",
+        "ext-curl": "*",
+        "ext-dom": "*",
+        "ext-zlib": "*",
+        "nfse-nacional/nfse-php": "^1.20@beta"
+    },
+    "minimum-stability": "beta",
+    "prefer-stable": true,
+    "config": {
+        "optimize-autoloader": true
+    }
+}
