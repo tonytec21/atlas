@@ -177,7 +177,7 @@ function normalizeGeoText($text) {
  */
 function extractGeoCoordinatesTabela($rawText) {
     $t = normalizeGeoText($rawText);
-    $re = '/(-?\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"(?:\s*([NSLOEW])(?=e\s|[^A-Za-z]|$))?/iu';
+    $re = '/(-?\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"(?:\s*([NSLOW])e?(?![A-Za-z]))?/iu';
     preg_match_all($re, $t, $m, PREG_SET_ORDER);
     $lons = []; $lats = [];
     foreach ($m as $x) {
@@ -216,7 +216,7 @@ function dmsToDecimal($deg, $min, $sec) {
  *  N/L/E = positivo) — memoriais SIGEF/georref. costumam usar "…\" S" / "…\" W"
  *  em vez do sinal "-" antes do grau. */
 function extractByLabel($text, $label) {
-    $re = '/' . $label . '(?:itude)?\s*[:.]?\s*(-?\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"(?:\s*([NSLOEW])(?=e\s|[^A-Za-z]|$))?/iu';
+    $re = '/' . $label . '(?:itude)?\s*[:.]?\s*(-?\s*\d+)\s*°\s*(\d+)\s*\'\s*([\d.,]+)\s*"(?:\s*([NSLOW])e?(?![A-Za-z]))?/iu';
     preg_match_all($re, $text, $m, PREG_SET_ORDER);
     $out = [];
     foreach ($m as $x) {
@@ -648,6 +648,44 @@ function extractUTMTabelaSimples($rawText, $zone = 23, $south = true) {
 }
 
 /** Monta o pacote a partir do texto de um memorial descritivo (GMS). */
+/** Lados no formato SIGEF/INCRA narrativo: "135°20' e 1.311,26 m até o vértice ...". */
+function extractTraverseLegsSigef($text) {
+    $t = normalizeGeoText($text);
+    $re = '/(\d{1,3})\s*°\s*(\d{1,2})?\s*\'?\s*e\s+([\d.]+(?:,\d+)?)\s*m\s+at[ée]/isu';
+    preg_match_all($re, $t, $m, PREG_SET_ORDER);
+    $legs = [];
+    foreach ($m as $x) {
+        $az = dmsToDecimal($x[1], $x[2] ?? '', '');
+        $dist = brNumero($x[3]);
+        if ($az >= 0 && $az <= 360 && $dist > 0) $legs[] = ['az' => $az, 'dist' => $dist];
+    }
+    return $legs;
+}
+
+/** Reconstrói o polígono a partir de UM vértice-âncora (coordenada) + os lados (azimute/distância).
+ *  Serve quando o documento traz só a coordenada inicial e depois azimutes/distâncias (ou quando a
+ *  transcrição perdeu as demais coordenadas). Azimutes geodésicos a partir do Norte de quadrícula. */
+function traverseFromAnchor(array $anchor, array $legs, $zone = 23, $south = true) {
+    if (count($legs) < 3) return [];
+    $u = geoToUTM($anchor[0], $anchor[1], $zone); // [east, north]
+    $E = $u[0]; $N = $u[1];
+    $pts = [[$anchor[0], $anchor[1]]];
+    foreach ($legs as $leg) {
+        $az = deg2rad((float)$leg['az']); $d = (float)$leg['dist'];
+        $E += $d * sin($az); $N += $d * cos($az);
+        $g = utmToGeo($E, $N, $zone, $south);
+        $pts[] = [$g[0], $g[1]];
+    }
+    // remove o vértice de fechamento (último ~ primeiro) quando o traçado fecha
+    $k = count($pts);
+    if ($k > 3) {
+        $a = geoToUTM($pts[0][0], $pts[0][1], $zone);
+        $b = geoToUTM($pts[$k-1][0], $pts[$k-1][1], $zone);
+        if (hypot($a[0]-$b[0], $a[1]-$b[1]) < 1.0) array_pop($pts);
+    }
+    return $pts;
+}
+
 /** Região de referência = centroide dos imóveis já cadastrados (para detectar zona UTM errada). */
 function refRegiaoImoveis($conn) {
     $r = @$conn->query("SELECT AVG(centro_lat) la, AVG(centro_lng) lo FROM memoriais_mapeados
@@ -703,6 +741,24 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
         if (count($uts['pts']) >= 3) { $pts = $uts['pts']; $fonte = 'utm_tabela'; $utmPares = $uts['utm'] ?? null; }
     }
 
+    // 6º FALLBACK POR ÂNCORA: sem vértices suficientes por coordenada, mas há 1 vértice inicial +
+    // lados (azimute/distância) — reconstrói o polígono a partir da âncora. Cobre memoriais SIGEF
+    // cuja transcrição perdeu as coordenadas dos demais vértices, mantendo só a inicial e os lados.
+    $avisoAncora = '';
+    if (count($pts) < 3 && count($pts) >= 1) {
+        $legsA = extractTraverseLegsLoose($memorial);
+        if (count($legsA) < 3) { $t2 = extractTraverseLegsSigef($memorial);  if (count($t2) > count($legsA)) $legsA = $t2; }
+        if (count($legsA) < 3) { $t3 = extractTraverseLegsTabela($memorial);  if (count($t3) > count($legsA)) $legsA = $t3; }
+        if (count($legsA) >= 3) {
+            $poly = traverseFromAnchor($pts[0], $legsA, 23, true);
+            if (count($poly) >= 3) {
+                $pts = $poly; $fonte = 'traverse_ancora';
+                $avisoAncora = 'Vértices reconstruídos a partir da coordenada inicial e dos azimutes/distâncias do memorial '
+                    . '(a transcrição não trouxe as coordenadas dos demais vértices). Confira o desenho antes de gravar.';
+            }
+        }
+    }
+
     // ZONA UTM AUTOMÁTICA (só nos casos peculiares): a conversão padrão é a zona 23S. Se ela cair
     // longe (>150 km) da região dos imóveis já cadastrados, testa zonas vizinhas e adota a coerente.
     // Sem imóveis de referência (base vazia), mantém 23 — comportamento antigo.
@@ -726,6 +782,10 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
         if (count($legs) < max(3, count($pts) - 1)) {           // formato tabular (sem a palavra "azimute")
             $legsTab = extractTraverseLegsTabela($memorial);
             if (count($legsTab) > count($legs)) $legs = $legsTab;
+        }
+        if (count($legs) < max(3, count($pts) - 1)) {           // formato SIGEF "135°20' e 1.311,26 m até"
+            $legsSig = extractTraverseLegsSigef($memorial);
+            if (count($legsSig) > count($legs)) $legs = $legsSig;
         }
         if (count($legs) >= 3) {
             $rec = reconcileTraverse($pts, $legs, 23, true, 5.0, $invalidos);
@@ -767,6 +827,9 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
     }
     if ($avisoZona !== '') {
         $data['aviso_geometria'] = trim($avisoZona . ' ' . ($data['aviso_geometria'] ?? ''));
+    }
+    if ($avisoAncora !== '') {
+        $data['aviso_geometria'] = trim($avisoAncora . ' ' . ($data['aviso_geometria'] ?? ''));
     }
     return $data;
 }
@@ -2878,7 +2941,7 @@ COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
    "registro_anterior_matricula": número da matrícula ANTERIOR da qual ESTA se originou, citada no registro de abertura/R-1 (ex.: 'imóvel havido por desmembramento da matrícula 1.234' => 1234). Apenas o número. Senão "",
    "registro_anterior_tipo": como ESTA se originou da anterior — 'desmembramento', 'unificacao' ou 'georreferenciamento' — senão ""
 },
-"memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. Pode ser: (a) texto corrido começando em 'Inicia-se a descrição...'; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; (c) uma TABELA (SIGEF/INCRA ou planta topográfica) com colunas de Latitude/Longitude — neste caso transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'); ou (d) uma TABELA de LEVANTAMENTO TOPOGRÁFICO com colunas de coordenadas UTM tipo 'Coord. N(Y)' e 'Coord. E(X)' — neste caso transcreva cada vértice numa linha própria PREFIXANDO os valores, no formato 'P1 N=9.222.799,638 E=445.517,024' (mantenha os números exatamente como estão, sem converter nem arredondar). IMPORTANTE: se a tabela/documento também trouxer os LADOS entre os pontos (colunas PARA/AZIMUTE/DISTÂNCIA), transcreva CADA lado numa linha própria no formato 'De P1 Para P2, azimute 285°27'21,60", distância 4,50 m' (um lado por linha) — isso permite reconstruir a forma exata quando as coordenadas vêm arredondadas. E se o documento informar ÁREA e/ou PERÍMETRO totais, inclua-os ao final tal como aparecem (ex.: 'Área: 246,8798 m² Perímetro: 113,4541 m'). Inclua todos os vértices e todos os lados; não converta, não arredonde, não omita nenhum
+"memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. REGRA PRINCIPAL E OBRIGATÓRIA: sempre que o documento trouxer a Longitude e a Latitude (ou Norte/Este UTM) de cada vértice, transcreva TODAS elas — nunca omita as coordenadas, mesmo que também existam azimutes e distâncias. Os formatos possíveis: (a) texto corrido começando em 'Inicia-se a descrição...' com as coordenadas de cada vértice entre parênteses (ex.: '(Longitude: -45°37'17,183", Latitude: -07°08'36,589")') — transcreva cada par Longitude/Latitude; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; (c) uma TABELA (SIGEF/INCRA ou planta) com colunas de Latitude/Longitude — transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'); ou (d) uma TABELA de LEVANTAMENTO TOPOGRÁFICO com colunas UTM 'Coord. N(Y)'/'Coord. E(X)' — transcreva cada vértice PREFIXANDO os valores (ex.: 'P1 N=9.222.799,638 E=445.517,024'). ADICIONALMENTE (nunca no lugar das coordenadas): se houver azimutes e distâncias entre os pontos, inclua também cada lado numa linha própria no formato 'De P1 Para P2, azimute 285°27'21,60", distância 4,50 m'. E se o documento informar ÁREA e/ou PERÍMETRO totais, inclua-os ao final tal como aparecem (ex.: 'Área: 246,8798 m² Perímetro: 113,4541 m'). Inclua TODOS os vértices com suas coordenadas; não converta, não arredonde, não omita nenhuma coordenada
 }
 PROMPT;
 }
@@ -5187,7 +5250,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-03o-utm-zona-auto (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-03q-ancora-sigef-load (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5821,6 +5884,10 @@ header('Expires: 0');
   .import-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:var(--ink)}
   .import-meta{margin-top:14px;font-size:12px;color:var(--faint)}
   .import-file{margin-top:4px;font-size:11.5px;color:var(--ink);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)}
+  @keyframes import-spin{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
+  .import-ov.indet .import-ring svg{animation:import-spin .9s linear infinite}
+  .import-ov.indet .import-ring .ring-fg{transition:none}
+  .import-ov.indet .import-pct{font-size:0}
   /* ===== Modal de resultados da importação ===== */
   .impres-resumo{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
   .impres-chip{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid var(--line)}
@@ -7247,7 +7314,7 @@ function wire3D(){
   on('m3d-close','click', fechar3D);
 }
 
-console.info('%cVertex — build 2026-07-03o-utm-zona-auto','color:#0ea5e9;font-weight:bold');
+console.info('%cVertex — build 2026-07-03q-ancora-sigef-load','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -7704,9 +7771,20 @@ async function lerLoteKml(files){
 const IMPORT_RING_LEN = 326.7;
 function importProgressShow(titulo, total){
   const ov=document.getElementById('import-ov'); if(!ov) return;
+  ov.classList.remove('indet');
   const t=document.getElementById('import-ttl'); if(t) t.textContent = titulo||'Importando…';
   importProgressUpdate(0, total||1, '');
   ov.classList.add('show');
+}
+// Modo indeterminado (1 arquivo): anel girando + "Lendo com IA…" (não há % por etapa).
+function importProgressIndeterminado(titulo, nome){
+  const ov=document.getElementById('import-ov'); if(!ov) return;
+  ov.classList.add('show','indet');
+  const t=document.getElementById('import-ttl'); if(t) t.textContent = titulo||'Processando…';
+  const fg=document.getElementById('import-ring-fg'); if(fg) fg.style.strokeDashoffset = (IMPORT_RING_LEN*0.72).toFixed(1);
+  const p=document.getElementById('import-pct'); if(p) p.textContent = '';
+  const m=document.getElementById('import-meta'); if(m) m.textContent = 'Lendo com IA…';
+  const fn=document.getElementById('import-file'); if(fn) fn.textContent = nome||'';
 }
 function importProgressUpdate(done, total, nome){
   total = total||1; const pct = Math.max(0, Math.min(100, Math.round(done/total*100)));
@@ -7715,7 +7793,7 @@ function importProgressUpdate(done, total, nome){
   const m=document.getElementById('import-meta'); if(m) m.textContent = `${Math.min(done,total)} de ${total}`;
   const fn=document.getElementById('import-file'); if(fn) fn.textContent = nome||'';
 }
-function importProgressHide(){ const ov=document.getElementById('import-ov'); if(ov) ov.classList.remove('show'); }
+function importProgressHide(){ const ov=document.getElementById('import-ov'); if(ov){ ov.classList.remove('show'); ov.classList.remove('indet'); } }
 
 let impresIdsInc = [];
 function incLinhasHTML(inc){
@@ -10142,6 +10220,7 @@ async function enviarPdfMatricula(file){
   const lbl=document.getElementById('pdf-mat-label');
   if(lbl) lbl.innerHTML='Processando <b>'+escapeHtml(mat||'PDF')+'</b>…';
   setStatus('warn','Lendo o PDF com IA e identificando a matrícula…');
+  importProgressIndeterminado('Lendo o PDF com IA', mat||file.name);
   try{
     const fd=new FormData();
     fd.append('acao','processar_pdf_matricula');
@@ -10149,6 +10228,7 @@ async function enviarPdfMatricula(file){
     if(escopoBase==='projetos') fd.append('is_projeto','1');
     fd.append('pdf', file);
     const r = await fetch(window.location.pathname, {method:'POST', body:fd}).then(x=>x.json());
+    importProgressHide();
     if(!r.ok){
       setStatus('err', r.erro||'Falha ao processar o PDF.');
       importResultadosModal('Importação de matrícula (PDF)', [{nome:(mat||file.name), status:'erro', id:null, msg:(r.erro||'falha'), inconsistencias:[]}]);
@@ -10174,10 +10254,11 @@ async function enviarPdfMatricula(file){
       msg:r.mensagem||'', inconsistencias:r.inconsistencias||[]
     }]);
   }catch(e){
+    importProgressHide();
     setStatus('err','Falha na requisição de processamento.');
     importResultadosModal('Importação de matrícula (PDF)', [{nome:(mat||file.name), status:'erro', id:null, msg:'erro de requisição', inconsistencias:[]}]);
   }
-  finally{ if(lbl) lbl.innerHTML='Matrícula ou <b>SIGEF</b> em PDF — mapear via IA <span class="zone-multi">(1 ou vários)</span>'; }
+  finally{ importProgressHide(); if(lbl) lbl.innerHTML='Matrícula ou <b>SIGEF</b> em PDF — mapear via IA <span class="zone-multi">(1 ou vários)</span>'; }
 }
 
 /* Processa VÁRIOS PDFs em fila (sequencial — respeita o limite/ordem da IA). */
