@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/session_check.php'; checkSession();
+require_once __DIR__ . '/guard_acesso.php'; cap_guard('json');
 require_once __DIR__ . '/config.php';
 $id=(int)($_GET['id']??0); if($id<=0){ http_response_code(400); die('ID inválido.'); }
 $conn=cap_db();

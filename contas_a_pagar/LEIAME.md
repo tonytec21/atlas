@@ -57,7 +57,27 @@ Para envio automático, agende `enviar_alertas.php`:
 - Ou acesse a URL do arquivo autenticado (requer sessão) — o botão
   **“Enviar alerta agora”** nas Configurações faz um teste imediato.
 
-## Segurança
+## Controle de acesso
+
+Só acessam o módulo:
+- usuários com `nivel_de_acesso = 'administrador'`, **ou**
+- usuários cujo `funcionarios.acesso_adicional` contenha `Controle de Contas a Pagar`.
+
+A verificação (`guard_acesso.php`) roda no **servidor**, logo após `checkSession()`,
+em **todas as páginas** (`index`, `relatorios`, `extrato`) e **todos os endpoints**
+(salvar/editar/pagar/excluir, config, alertas, saldos, transferências e anexos).
+Páginas mostram aviso e redirecionam; endpoints respondem `403` em JSON e o front
+avisa e retorna ao início. Não há como acessar dados chamando um endpoint direto.
+
+## Formas de pagamento e conta debitada
+
+| Forma | Conta virtual debitada |
+|---|---|
+| Espécie | Espécie (dinheiro) |
+| PIX, Transferência, TED/DOC, Boleto, Débito automático, Cartão de Débito, Cartão de Crédito, **Centrais Eletrônicas** | **Saldo bancário** |
+| Outro (não afeta saldo) | — (não movimenta) |
+
+## Segurança técnica
 
 - **CSRF** em todas as ações que gravam; **prepared statements** em tudo.
 - Upload validado (whitelist de extensão, 20 MB, checagem de MIME, nome

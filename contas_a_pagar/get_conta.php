@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/session_check.php'; checkSession();
+require_once __DIR__ . '/guard_acesso.php'; cap_guard('json');
 require_once __DIR__ . '/config.php';
 header('Content-Type: application/json; charset=utf-8');
 try {

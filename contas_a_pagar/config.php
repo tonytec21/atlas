@@ -36,13 +36,15 @@ function cap_contas_virtuais()
 function cap_formas_pagamento()
 {
     return [
-        'Espécie'               => 'especie',
-        'PIX'                   => 'banco',
-        'Transferência'         => 'banco',
-        'Boleto'                => 'banco',
-        'Débito automático'     => 'banco',
-        'Cartão de Débito'      => 'banco',
-        'Cartão de Crédito'     => 'banco',
+        'Espécie'                 => 'especie', // única que debita o dinheiro em espécie
+        'PIX'                     => 'banco',
+        'Transferência'           => 'banco',
+        'TED/DOC'                 => 'banco',
+        'Boleto'                  => 'banco',
+        'Débito automático'       => 'banco',
+        'Cartão de Débito'        => 'banco',
+        'Cartão de Crédito'       => 'banco',
+        'Centrais Eletrônicas'    => 'banco',
         'Outro (não afeta saldo)' => '',
     ];
 }

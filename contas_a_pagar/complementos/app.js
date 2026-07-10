@@ -11,7 +11,13 @@
   async function postForm(url, data){
     data.csrf = CSRF;
     var r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams(data).toString(), credentials:'same-origin' });
-    var t = await r.text(); try{ return JSON.parse(t); }catch(e){ throw new Error('Resposta inválida: '+t.slice(0,150)); }
+    var t = await r.text(); var j;
+    try{ j = JSON.parse(t); }catch(e){ throw new Error('Resposta inválida: '+t.slice(0,150)); }
+    if (j && j.acesso_negado) {
+      if (window.Swal) Swal.fire({icon:'error',title:'Acesso negado',text:j.message||'Sem permissão.'}).then(function(){ location.href='index.php'; });
+      throw new Error(j.message || 'Acesso negado.');
+    }
+    return j;
   }
   function toast(icon, title){ if(window.Swal) Swal.fire({icon:icon,title:title,toast:true,position:'top-end',showConfirmButton:false,timer:2200}); }
 
