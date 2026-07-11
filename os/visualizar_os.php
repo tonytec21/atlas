@@ -135,6 +135,14 @@ $pagamentos_query->execute();
 $pagamentos_result = $pagamentos_query->get_result();
 $pagamentos = $pagamentos_result->fetch_all(MYSQLI_ASSOC);
 
+// Comprovantes de pagamento (anexos por linha de pagamento)
+require_once __DIR__ . '/pagamento_anexos_config.php';
+try {
+    pa_ensure_schema();
+    $__pa_csrf = pa_csrf_token();
+    $__pa_counts = pa_contagens(array_map(function($p){ return (int)$p['id']; }, $pagamentos));
+} catch (Throwable $__e) { $__pa_csrf = ''; $__pa_counts = []; }
+
 // Buscar dados das devoluções
 $devolucoes_query = $conn->prepare("SELECT * FROM devolucao_os WHERE ordem_de_servico_id = ?");
 $devolucoes_query->bind_param("i", $os_id);
@@ -1243,6 +1251,45 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                 display: none;
             }
         }
+
+    /* ===== Comprovantes de pagamento ===== */
+    /* desfoque do modal que fica atrás quando outro abre por cima */
+    .modal .modal-dialog{ transition: filter .2s ease, opacity .2s ease; }
+    .modal.is-behind .modal-dialog{ filter: blur(4px); opacity:.85; pointer-events:none; }
+    .pa-forma-lbl{ color:var(--text-secondary); font-weight:600; }
+    .modal-modern .modal-title{ color:var(--text-primary); }
+    #paViewerTitle{ color:var(--text-primary); }
+    .btn-attach{ background:#0ea5e9; color:#fff; position:relative; border:0; padding:0 12px; border-radius:var(--radius-md); font-size:13px; }
+    .btn-attach:hover{ background:#0284c7; color:#fff; transform:translateY(-2px); box-shadow:var(--shadow-lg); }
+    /* ações da linha (clipe + lixeira) perfeitamente simétricas */
+    .pa-acts{ display:inline-flex; align-items:center; gap:6px; }
+    .pa-acts .btn-attach, .pa-acts .btn-delete{ height:32px; min-width:38px; padding:0 12px; margin:0; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; line-height:1; box-sizing:border-box; }
+    .pa-acts .btn-attach i, .pa-acts .btn-delete i{ line-height:1; font-size:14px; }
+    .pa-badge{ position:absolute; top:-7px; right:-7px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:#94a3b8; color:#fff; font-size:10px; font-weight:700; line-height:17px; text-align:center; display:none; }
+    .pa-badge.on{ display:inline-block; background:#16a34a; }
+    .pa-drop{ position:relative; border:2px dashed var(--border-secondary); border-radius:16px; background:var(--bg-secondary); padding:26px 18px; text-align:center; cursor:pointer; transition:.18s; }
+    .pa-drop:hover{ border-color:#0ea5e9; background:var(--bg-tertiary); }
+    .pa-drop.drag{ border-color:#0ea5e9; background:var(--bg-tertiary); transform:scale(1.005); }
+    .pa-drop-ic{ width:56px; height:56px; margin:0 auto 10px; border-radius:50%; background:linear-gradient(135deg,#0ea5e9,#6366f1); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.5rem; box-shadow:0 8px 20px rgba(14,165,233,.32); }
+    .pa-drop-t{ font-weight:700; color:var(--text-primary); }
+    .pa-drop-s{ font-size:.85rem; color:var(--text-secondary); margin-top:2px; }
+    .pa-link{ color:#0ea5e9; font-weight:600; text-decoration:underline; }
+    .pa-progress{ height:6px; background:var(--bg-tertiary); border-radius:999px; overflow:hidden; margin-top:14px; display:none; }
+    .pa-progress.show{ display:block; }
+    .pa-bar{ height:100%; width:0; background:linear-gradient(90deg,#0ea5e9,#6366f1); transition:width .2s; }
+    .pa-lista{ display:flex; flex-direction:column; gap:8px; }
+    .pa-empty{ color:var(--text-tertiary); font-size:.88rem; text-align:center; padding:16px; }
+    .pa-item{ display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--border-primary); border-radius:12px; background:var(--bg-elevated); }
+    .pa-item .ic{ width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.1rem; flex:0 0 auto; }
+    .pa-item .ic.pdf{ background:#dc2626; } .pa-item .ic.img{ background:#0891b2; }
+    .pa-item .meta{ flex:1; min-width:0; }
+    .pa-item .nm{ font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pa-item .sub{ font-size:.76rem; color:var(--text-tertiary); }
+    .pa-item .acts{ display:flex; gap:6px; flex:0 0 auto; }
+    .pa-item .acts .btn{ padding:4px 9px; }
+    .pa-viewer{ width:100%; height:78vh; background:#0f172a; display:flex; align-items:center; justify-content:center; }
+    .pa-viewer iframe{ width:100%; height:100%; border:0; background:#fff; }
+    .pa-viewer img{ max-width:100%; max-height:100%; object-fit:contain; }
     </style>  
 </head>  
 <body>  
@@ -1254,9 +1301,14 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
         <div class="container-fluid">  
             <div class="row justify-content-center align-items-center g-2 header-actions">  
                 <div class="col-auto">  
-                    <button type="button" class="btn btn-primary btn-sm" onclick="imprimirOS()">  
-                        <i class="fa fa-print" aria-hidden="true"></i> Imprimir OS  
-                    </button>  
+                    <div class="btn-group" role="group" aria-label="Ordem de Serviço">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="imprimirOS()">  
+                            <i class="fa fa-print" aria-hidden="true"></i> Imprimir OS  
+                        </button>  
+                        <button type="button" class="btn btn-dark btn-sm" onclick="assinarDocOS()" title="Assinar a O.S./orçamento com certificado digital">  
+                            <i class="fa fa-file-signature" aria-hidden="true"></i> Assinar OS  
+                        </button>  
+                    </div>
                 </div>  
                 <div class="col-auto" id="receiptButtons" style="<?php echo ($total_pagamentos > 0) ? '' : 'display:none'; ?>">
                     <div class="btn-group" role="group" aria-label="Recibos">
@@ -1265,6 +1317,9 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         </button>
                         <button type="button" class="btn btn-receipt-a4 btn-sm" onclick="imprimirReciboA4()">
                             <i class="fa fa-print" aria-hidden="true"></i> Recibo A4
+                        </button>
+                        <button type="button" class="btn btn-dark btn-sm" onclick="assinarReciboA4()" title="Assinar o Recibo A4 com certificado digital">
+                            <i class="fa fa-file-signature" aria-hidden="true"></i> Assinar A4
                         </button>
                     </div>
                 </div>
@@ -1969,11 +2024,23 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                                 <td><?php echo $dataPagtoBr; ?></td>  
                                 <td><?php echo htmlspecialchars($pagamento['funcionario']); ?></td>  
                                 <td>  
+                                    <div class="pa-acts">
+                                    <?php $__podeAnexo = pa_forma_permite_anexo($pagamento['forma_de_pagamento']); $__nAnx = (int)($__pa_counts[(int)$pagamento['id']] ?? 0); ?>
+                                    <?php if ($__podeAnexo): ?>
+                                        <button type="button" title="Comprovante de pagamento"
+                                                class="btn btn-attach btn-sm js-pa-open"
+                                                data-pid="<?php echo (int)$pagamento['id']; ?>"
+                                                data-forma="<?php echo htmlspecialchars($pagamento['forma_de_pagamento'], ENT_QUOTES); ?>">
+                                            <i class="fa fa-paperclip" aria-hidden="true"></i>
+                                            <span class="pa-badge<?php echo $__nAnx>0?' on':''; ?>" data-pid="<?php echo (int)$pagamento['id']; ?>"><?php echo $__nAnx; ?></span>
+                                        </button>
+                                    <?php endif; ?>
                                     <?php if ($canDelete): ?>  
                                         <button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(<?php echo $pagamento['id']; ?>)">  
                                             <i class="fa fa-trash" aria-hidden="true"></i>  
                                         </button>  
                                     <?php endif; ?>  
+                                    </div>
                                 </td>  
                             </tr>  
                             <?php endforeach; ?>  
@@ -2064,6 +2131,57 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
         </div>  
     </div>  
 </div>  
+
+<!-- ===================== MODAL DE COMPROVANTE DE PAGAMENTO ===================== -->
+<div class="modal fade modal-modern" id="paAnexoModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header modern">
+                <div class="d-flex align-items-center">
+                    <span class="md-title-icon mr-2"><i class="fa fa-paperclip"></i></span>
+                    <h5 class="modal-title m-0">Comprovante de pagamento <small id="paFormaLbl" class="pa-forma-lbl"></small></h5>
+                </div>
+                <button type="button" class="btn-close modern" data-dismiss="modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="paPagamentoId" value="">
+                <div id="paDrop" class="pa-drop">
+                    <input type="file" id="paFile" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,application/pdf,image/*" hidden>
+                    <div class="pa-drop-inner">
+                        <div class="pa-drop-ic"><i class="fa fa-cloud-upload"></i></div>
+                        <div class="pa-drop-t">Arraste o comprovante aqui</div>
+                        <div class="pa-drop-s">ou <span class="pa-link">clique para selecionar</span> · PDF, JPG, PNG, GIF, WEBP (até 15 MB)</div>
+                    </div>
+                    <div class="pa-progress" id="paProgress"><div class="pa-bar" id="paBar"></div></div>
+                </div>
+
+                <h6 class="section-title mt-3">Comprovantes anexados</h6>
+                <div id="paLista" class="pa-lista"><div class="pa-empty">Carregando…</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Visualizador embutido (PDF/imagem) -->
+<div class="modal fade modal-modern" id="paViewerModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header modern">
+                <div class="d-flex align-items-center">
+                    <span class="md-title-icon mr-2"><i class="fa fa-file"></i></span>
+                    <h5 class="modal-title m-0" id="paViewerTitle">Visualizar comprovante</h5>
+                </div>
+                <div class="d-flex align-items-center" style="gap:8px">
+                    <a id="paViewerDownload" class="btn btn-light btn-sm" href="#" target="_blank" title="Abrir em nova aba"><i class="fa fa-external-link"></i></a>
+                    <button type="button" class="btn-close modern" data-dismiss="modal" aria-label="Close">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body p-0">
+                <div id="paViewerBody" class="pa-viewer"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- ===================== MODAL DE REPASSE ===================== -->  
 <div class="modal fade modal-modern" id="repasseModal" tabindex="-1" role="dialog" aria-labelledby="repasseModalLabel" aria-hidden="true">  
@@ -2429,6 +2547,8 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
     });
 
 var pagamentos = <?php echo json_encode($pagamentos); ?>;
+var PA_COUNTS = <?php echo json_encode(($__pa_counts ?? []) ?: (object)[]); ?>;
+function paPermiteAnexo(f){ f = String(f||'').trim().toLowerCase(); return !(f==='espécie' || f==='especie' || f==='dinheiro'); }
 var liquidacaoItemId = null;
 var quantidadeTotal = 0;
 var quantidadeLiquidadaAtual = 0;
@@ -2737,11 +2857,158 @@ $(document).ready(function() {
     function imprimirReciboA4() {
         if (<?php echo (float)$total_pagamentos; ?> <= 0) return; 
         window.open('recibo_a4.php?id=<?php echo $os_id; ?>', '_blank');
+    }
+    function assinarDocOS() {
+        window.open('assinar-os.php?tipo=os&id=<?php echo $os_id; ?>', '_blank');
+    }
+    function assinarReciboA4() {
+        if (<?php echo (float)$total_pagamentos; ?> <= 0) { alert('Não há pagamento registrado para gerar o recibo.'); return; }
+        window.open('assinar-os.php?tipo=recibo_a4&id=<?php echo $os_id; ?>', '_blank');
     }
 
     function editarOS() {
         window.location.href = 'editar_os.php?id=<?php echo $os_id; ?>';
     }
+
+    /* ===== Comprovantes de pagamento ===== */
+    (function(){
+      var PA_CSRF = <?php echo json_encode($__pa_csrf); ?>;
+
+      // Correção de modais empilhados (Bootstrap): ao fechar um modal que estava
+      // por cima de outro, o body perde 'modal-open' e o scroll do modal de baixo
+      // trava. Repõe 'modal-open' enquanto houver algum modal ainda visível.
+      // Também desfoca o(s) modal(is) de trás, mantendo nítido só o do topo.
+      if (window.jQuery) {
+        function paRefreshModalStack() {
+          var vis = jQuery('.modal.show, .modal.in').filter(':visible').toArray();
+          jQuery('.modal').removeClass('is-behind');
+          if (vis.length > 1) {
+            jQuery('body').addClass('modal-open');
+            // topo = maior z-index
+            var top = vis.reduce(function (a, b) {
+              return (parseInt(jQuery(b).css('z-index'), 10) || 0) >= (parseInt(jQuery(a).css('z-index'), 10) || 0) ? b : a;
+            });
+            vis.forEach(function (m) { if (m !== top) jQuery(m).addClass('is-behind'); });
+          } else if (vis.length === 1) {
+            jQuery('body').addClass('modal-open');
+          }
+        }
+        jQuery(document).on('shown.bs.modal hidden.bs.modal', '.modal', paRefreshModalStack);
+      }
+      var $ = function(id){ return document.getElementById(id); };
+      function bs(id){ var el=$(id); return (window.jQuery)? jQuery(el) : null; }
+      function showModal(id){ if(window.jQuery){ jQuery('#'+id).modal('show'); } }
+      function hideModal(id){ if(window.jQuery){ jQuery('#'+id).modal('hide'); } }
+
+      function humanSize(n){ n=+n||0; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
+      async function post(url, formData){
+        formData.append('csrf', PA_CSRF);
+        var r = await fetch(url, {method:'POST', body:formData, credentials:'same-origin'});
+        var t = await r.text(); try{ return JSON.parse(t); }catch(e){ throw new Error('Resposta inválida: '+t.slice(0,140)); }
+      }
+      function setBadge(pid, n){
+        document.querySelectorAll('.pa-badge[data-pid="'+pid+'"]').forEach(function(b){ b.textContent=n; b.classList.toggle('on', n>0); });
+      }
+
+      // Abrir modal de anexos
+      document.addEventListener('click', function(ev){
+        var btn = ev.target.closest('.js-pa-open'); if(!btn) return;
+        var pid = btn.getAttribute('data-pid'), forma = btn.getAttribute('data-forma')||'';
+        $('paPagamentoId').value = pid;
+        $('paFormaLbl').textContent = forma ? ('· '+forma) : '';
+        resetDrop(); carregarLista(pid);
+        showModal('paAnexoModal');
+      });
+
+      function resetDrop(){ $('paProgress').classList.remove('show'); $('paBar').style.width='0'; if($('paFile')) $('paFile').value=''; }
+
+      async function carregarLista(pid){
+        var box = $('paLista'); box.innerHTML = '<div class="pa-empty">Carregando…</div>';
+        try{
+          var r = await fetch('pa_listar.php?pagamento_id='+encodeURIComponent(pid), {credentials:'same-origin'});
+          var j = await r.json();
+          if(!j.success) throw new Error(j.message||'Falha ao listar.');
+          setBadge(pid, j.itens.length);
+          if(!j.itens.length){ box.innerHTML = '<div class="pa-empty">Nenhum comprovante anexado ainda.</div>'; return; }
+          box.innerHTML = '';
+          j.itens.forEach(function(it){
+            var row = document.createElement('div'); row.className='pa-item';
+            var ic = document.createElement('div'); ic.className='ic '+(it.is_pdf?'pdf':'img');
+            ic.innerHTML = '<i class="fa fa-'+(it.is_pdf?'file-pdf-o':'image')+'"></i>';
+            var meta = document.createElement('div'); meta.className='meta';
+            meta.innerHTML = '<div class="nm"></div><div class="sub"></div>';
+            meta.querySelector('.nm').textContent = it.nome;
+            meta.querySelector('.sub').textContent = (it.enviado_em||'') + (it.tamanho? (' · '+humanSize(it.tamanho)) : '') + (it.enviado_por? (' · '+it.enviado_por) : '');
+            var acts = document.createElement('div'); acts.className='acts';
+            var bView = document.createElement('button'); bView.type='button'; bView.className='btn btn-primary btn-sm'; bView.title='Visualizar'; bView.innerHTML='<i class="fa fa-eye"></i>';
+            bView.addEventListener('click', function(){ abrirViewer(it); });
+            var bDel = document.createElement('button'); bDel.type='button'; bDel.className='btn btn-delete btn-sm'; bDel.title='Excluir'; bDel.innerHTML='<i class="fa fa-trash"></i>';
+            bDel.addEventListener('click', function(){ excluir(it.id, pid); });
+            acts.appendChild(bView); acts.appendChild(bDel);
+            row.appendChild(ic); row.appendChild(meta); row.appendChild(acts);
+            box.appendChild(row);
+          });
+        }catch(e){ box.innerHTML = '<div class="pa-empty">Erro: '+e.message+'</div>'; }
+      }
+
+      function abrirViewer(it){
+        $('paViewerTitle').textContent = it.nome;
+        $('paViewerDownload').href = it.url;
+        var body = $('paViewerBody'); body.innerHTML='';
+        if(it.is_pdf){
+          var ifr = document.createElement('iframe'); ifr.src = it.url; body.appendChild(ifr);
+        } else {
+          var img = document.createElement('img'); img.src = it.url; img.alt = it.nome; body.appendChild(img);
+        }
+        showModal('paViewerModal');
+      }
+
+      async function excluir(id, pid){
+        if(window.Swal){
+          var r = await Swal.fire({icon:'warning',title:'Excluir comprovante?',text:'Esta ação não pode ser desfeita.',showCancelButton:true,confirmButtonText:'Excluir',cancelButtonText:'Cancelar',confirmButtonColor:'#dc2626'});
+          if(!r.isConfirmed) return;
+        } else if(!confirm('Excluir este comprovante?')) return;
+        var fd = new FormData(); fd.append('id', id);
+        try{ var j = await post('pa_excluir.php', fd); if(!j.success) throw new Error(j.message||'Falha.'); carregarLista(pid); }
+        catch(e){ if(window.Swal) Swal.fire('Erro', e.message, 'error'); else alert(e.message); }
+      }
+
+      async function enviar(file){
+        var pid = $('paPagamentoId').value;
+        var okExt = /\.(pdf|jpe?g|png|gif|webp)$/i.test(file.name);
+        if(!okExt){ if(window.Swal) Swal.fire('Formato inválido','Use PDF, JPG, PNG, GIF ou WEBP.','warning'); return; }
+        if(file.size > 15*1024*1024){ if(window.Swal) Swal.fire('Arquivo grande','O limite é 15 MB.','warning'); return; }
+        var fd = new FormData(); fd.append('pagamento_id', pid); fd.append('arquivo', file);
+        $('paProgress').classList.add('show'); $('paBar').style.width='15%';
+        try{
+          // progresso simples com XHR para feedback real
+          var j = await new Promise(function(resolve, reject){
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST','pa_upload.php',true); xhr.withCredentials = true;
+            xhr.upload.onprogress = function(e){ if(e.lengthComputable){ $('paBar').style.width = Math.max(15, Math.round(e.loaded/e.total*100)) + '%'; } };
+            xhr.onload = function(){ try{ resolve(JSON.parse(xhr.responseText)); }catch(err){ reject(new Error('Resposta inválida.')); } };
+            xhr.onerror = function(){ reject(new Error('Falha de rede.')); };
+            fd.append('csrf', PA_CSRF);
+            xhr.send(fd);
+          });
+          $('paBar').style.width='100%';
+          if(!j.success) throw new Error(j.message||'Falha no upload.');
+          setTimeout(function(){ resetDrop(); }, 400);
+          carregarLista(pid);
+        }catch(e){ resetDrop(); if(window.Swal) Swal.fire('Erro', e.message, 'error'); else alert(e.message); }
+      }
+
+      // Dropzone
+      var drop = $('paDrop'), input = $('paFile');
+      if(drop){
+        drop.addEventListener('click', function(ev){ if(ev.target.closest('.pa-progress')) return; input.click(); });
+        input.addEventListener('change', function(){ if(input.files && input.files[0]) enviar(input.files[0]); });
+        ['dragenter','dragover'].forEach(function(evt){ drop.addEventListener(evt, function(e){ e.preventDefault(); e.stopPropagation(); drop.classList.add('drag'); }); });
+        ['dragleave','drop'].forEach(function(evt){ drop.addEventListener(evt, function(e){ e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag'); }); });
+        drop.addEventListener('drop', function(e){ var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(f) enviar(f); });
+      }
+    })();
+
 
     // Função para adicionar pagamento
     function adicionarPagamento() {
@@ -2899,15 +3166,24 @@ $(document).ready(function() {
             const linhaYmd  = isNaN(linhaDate.getTime()) ? '' : ymdInSaoPaulo(linhaDate);
             const canDelete = !<?php echo $has_liquidated ? 'true':'false'; ?> && (linhaYmd === todayYmd);
 
+            var acoesHtml = '';
+            if (paPermiteAnexo(pagamento.forma_de_pagamento)) {
+                var _n = (PA_COUNTS && PA_COUNTS[pagamento.id]) ? PA_COUNTS[pagamento.id] : 0;
+                var _forma = String(pagamento.forma_de_pagamento || '').replace(/"/g, '&quot;');
+                acoesHtml += '<button type="button" title="Comprovante de pagamento" class="btn btn-attach btn-sm js-pa-open" data-pid="' + pagamento.id + '" data-forma="' + _forma + '">' +
+                             '<i class="fa fa-paperclip" aria-hidden="true"></i>' +
+                             '<span class="pa-badge' + (_n > 0 ? ' on' : '') + '" data-pid="' + pagamento.id + '">' + _n + '</span></button> ';
+            }
+            if (canDelete) {
+                acoesHtml += '<button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(' + pagamento.id + ')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
+            }
+
             var cols = [
                 pagamento.forma_de_pagamento || '',
                 'R$ ' + valor.toFixed(2).replace('.', ','),
                 formatarDataBr(pagamento.data_pagamento || ''),
                 pagamento.funcionario || '',
-                canDelete ? `<button type="button" title="Remover" class="btn btn-delete btn-sm"
-                                onclick="confirmarRemocaoPagamento(${pagamento.id})">
-                                <i class="fa fa-trash" aria-hidden="true"></i>
-                            </button>` : ''
+                '<div class="pa-acts">' + acoesHtml + '</div>'
             ];
 
             if (dt) {

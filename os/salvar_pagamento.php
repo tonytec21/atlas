@@ -22,7 +22,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bind_param("isddss", $os_id, $cliente, $total_os, $valor_pagamento, $forma_pagamento, $funcionario);
         $stmt->execute();
 
-        echo json_encode(['success' => true]);
+        echo json_encode([
+            'success' => true,
+            'pagamento_id' => $stmt->insert_id,
+            'data_pagamento' => date('Y-m-d H:i:s')
+        ]);
     } catch (Exception $e) {
         echo json_encode(['error' => 'Erro ao salvar pagamento: ' . $e->getMessage()]);
     }

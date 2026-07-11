@@ -895,6 +895,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                             <th>Apresentante</th>
                                             <th>Forma de Pagamento</th>
                                             <th>Total</th>
+                                            <th>Comprovante</th>
                                         </tr>
                                     </thead>
                                     <tbody id="detalhesPagamentos"></tbody>
@@ -1668,6 +1669,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <td>${pagamento.cliente}</td>
                                 <td>${pagamento.forma_de_pagamento}</td>
                                 <td>${formatCurrency(pagamento.total_pagamento)}</td>
+                                <td>${((parseInt(pagamento.anexos_count,10) > 0 || parseInt(pagamento.os_anexos_count,10) > 0)) ? `<button title="Visualizar comprovante" class="btn btn-info btn-sm btn-icon" onclick="verComprovantePagamento(${pagamento.pagamento_id || 0}, ${pagamento.ordem_de_servico_id || 0})"><i class="fa fa-paperclip" aria-hidden="true"></i></button>` : ''}</td>
                             </tr>
                         `);
                     });
@@ -2423,5 +2425,148 @@ date_default_timezone_set('America/Sao_Paulo');
         });
     </script>
     <?php include(__DIR__ . '/../rodape.php'); ?>
+
+<!-- ===== Comprovantes de pagamento (Caixa) ===== -->
+<div class="modal fade" id="caixaAnexoEscolhaModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff">
+        <h5 class="modal-title"><i class="fa fa-paperclip"></i> Comprovantes do pagamento</h5>
+        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="opacity:.9"><span aria-hidden="true">&times;</span></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted" style="font-size:.9rem">Este pagamento tem mais de um comprovante. Escolha qual visualizar:</p>
+        <div id="caixaAnexoLista" class="ca-lista"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="caixaAnexoViewerModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f172a;color:#fff">
+        <h5 class="modal-title" id="caixaViewerTitle"><i class="fa fa-file"></i> Comprovante</h5>
+        <div>
+          <a id="caixaViewerDownload" class="btn btn-light btn-sm" href="#" target="_blank" title="Abrir em nova aba"><i class="fa fa-external-link"></i></a>
+          <button type="button" class="close text-white ml-2" data-dismiss="modal" aria-label="Close" style="opacity:.9"><span aria-hidden="true">&times;</span></button>
+        </div>
+      </div>
+      <div class="modal-body p-0">
+        <div id="caixaViewerBody" class="ca-viewer"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .ca-lista{ display:flex; flex-direction:column; gap:8px; }
+  .ca-item{ display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid #e5e9f0; border-radius:12px; background:#fff; }
+  .ca-item .ic{ width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.1rem; flex:0 0 auto; }
+  .ca-item .ic.pdf{ background:#dc2626; } .ca-item .ic.img{ background:#0891b2; }
+  .ca-item .meta{ flex:1; min-width:0; }
+  .ca-item .nm{ font-weight:600; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ca-item .sub{ font-size:.76rem; color:#94a3b8; }
+  .ca-item .ca-view-btn{ flex:0 0 auto; width:38px; height:38px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; }
+  .ca-item .ca-view-btn i{ font-size:15px; }
+  .ca-viewer{ width:100%; height:78vh; background:#0f172a; display:flex; align-items:center; justify-content:center; }
+  .ca-viewer iframe{ width:100%; height:100%; border:0; background:#fff; }
+  .ca-viewer img{ max-width:100%; max-height:100%; object-fit:contain; }
+  /* desfoque do modal de trás quando outro abre por cima */
+  .modal .modal-dialog{ transition: filter .2s ease, opacity .2s ease; }
+  .modal.is-behind .modal-dialog{ filter: blur(4px); opacity:.85; pointer-events:none; }
+</style>
+
+<script>
+(function(){
+  function humanSize(n){ n=+n||0; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
+  function isPdfName(nm){ return /\.pdf$/i.test(String(nm||'')); }
+
+  window.verComprovantePagamento = async function(pid, osId){
+    try{
+      var itens = [];
+      // 1) comprovantes vinculados diretamente ao pagamento
+      if (pid && parseInt(pid,10) > 0) {
+        try{
+          var r = await fetch('../os/pa_listar.php?pagamento_id=' + encodeURIComponent(pid), {credentials:'same-origin'});
+          var j = await r.json();
+          if (j.success && j.itens && j.itens.length) {
+            itens = j.itens.map(function(it){
+              return { nome: it.nome, is_pdf: it.is_pdf, enviado_em: it.enviado_em, tamanho: it.tamanho,
+                       viewUrl: '../os/pa_ver.php?id=' + encodeURIComponent(it.id) };
+            });
+          }
+        }catch(e){ /* segue para o fallback */ }
+      }
+      // 2) fallback: anexos gerais da O.S. (modal "Anexos")
+      if (!itens.length && osId && parseInt(osId,10) > 0) {
+        var fd = new URLSearchParams(); fd.append('os_id', osId);
+        var r2 = await fetch('../os/obter_anexos.php', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString(), credentials:'same-origin'});
+        var j2 = await r2.json();
+        if (j2.success && j2.anexos && j2.anexos.length) {
+          itens = j2.anexos.map(function(a){
+            var nome = a.caminho_anexo;
+            return { nome: nome, is_pdf: isPdfName(nome),
+                     enviado_em: a.data ? String(a.data).substring(0,16).replace('T',' ') : '',
+                     tamanho: null,
+                     viewUrl: '../os/anexos/' + encodeURIComponent(osId) + '/' + encodeURIComponent(nome) };
+          });
+        }
+      }
+
+      if (!itens.length){
+        if(window.Swal) Swal.fire('Sem comprovante','Nenhum comprovante encontrado para este pagamento.','info'); else alert('Nenhum comprovante.');
+        return;
+      }
+      if (itens.length === 1){ abrirVisualizadorCaixa(itens[0]); }
+      else { mostrarEscolhaAnexos(itens); }
+    }catch(e){ if(window.Swal) Swal.fire('Erro', e.message, 'error'); else alert('Erro: ' + e.message); }
+  };
+
+  function mostrarEscolhaAnexos(itens){
+    var box = document.getElementById('caixaAnexoLista'); box.innerHTML = '';
+    itens.forEach(function(it){
+      var row = document.createElement('div'); row.className = 'ca-item';
+      var ic = document.createElement('div'); ic.className = 'ic ' + (it.is_pdf ? 'pdf' : 'img');
+      ic.innerHTML = '<i class="fa fa-' + (it.is_pdf ? 'file-pdf-o' : 'file-image-o') + '"></i>';
+      var meta = document.createElement('div'); meta.className = 'meta';
+      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = it.nome;
+      var sub = document.createElement('div'); sub.className = 'sub';
+      sub.textContent = (it.enviado_em || '') + (it.tamanho ? (' · ' + humanSize(it.tamanho)) : '');
+      meta.appendChild(nm); meta.appendChild(sub);
+      var btn = document.createElement('button'); btn.type='button'; btn.className='btn btn-info btn-sm ca-view-btn'; btn.title='Visualizar'; btn.innerHTML='<i class="fa fa-eye"></i>';
+      btn.addEventListener('click', function(){ $('#caixaAnexoEscolhaModal').modal('hide'); setTimeout(function(){ abrirVisualizadorCaixa(it); }, 250); });
+      row.appendChild(ic); row.appendChild(meta); row.appendChild(btn);
+      box.appendChild(row);
+    });
+    $('#caixaAnexoEscolhaModal').modal('show');
+  }
+
+  function abrirVisualizadorCaixa(it){
+    document.getElementById('caixaViewerTitle').innerHTML = '<i class="fa fa-file"></i> ' + (it.nome || 'Comprovante');
+    document.getElementById('caixaViewerDownload').href = it.viewUrl;
+    var body = document.getElementById('caixaViewerBody'); body.innerHTML = '';
+    if(it.is_pdf){ var ifr = document.createElement('iframe'); ifr.src = it.viewUrl; body.appendChild(ifr); }
+    else { var img = document.createElement('img'); img.src = it.viewUrl; img.alt = it.nome || ''; body.appendChild(img); }
+    $('#caixaAnexoViewerModal').modal('show');
+  }
+
+  // Modais empilhados: mantém o scroll e desfoca o(s) modal(is) de trás.
+  function caRefreshModalStack(){
+    var vis = $('.modal.show, .modal.in').filter(':visible').toArray();
+    $('.modal').removeClass('is-behind');
+    if (vis.length > 1) {
+      $('body').addClass('modal-open');
+      var top = vis.reduce(function(a,b){
+        return (parseInt($(b).css('z-index'),10)||0) >= (parseInt($(a).css('z-index'),10)||0) ? b : a;
+      });
+      vis.forEach(function(m){ if (m !== top) $(m).addClass('is-behind'); });
+    } else if (vis.length === 1) {
+      $('body').addClass('modal-open');
+    }
+  }
+  $(document).on('shown.bs.modal hidden.bs.modal', '.modal', caRefreshModalStack);
+})();
+</script>
 </body>
 </html>

@@ -1,6 +1,8 @@
 <?php
 include(__DIR__ . '/session_check.php');
 checkSession();
+// Modo captura: quando incluído pelo fluxo de assinatura, retorna os bytes do PDF em vez de enviar ao navegador.
+$__CAP_CAPTURE__ = (defined('OS_PDF_CAPTURE') || (isset($_GET['__capture']) && $_GET['__capture']=='1'));
 require_once('../oficios/tcpdf/tcpdf.php');
 include(__DIR__ . '/db_connection2.php');
 
@@ -511,7 +513,7 @@ if (isset($_GET['id'])) {
     $pdf->writeHTML($html_pagamentos, true, false, true, false, '');
 
     // Assinatura
-    $pdf->Ln(8);
+    $pdf->Ln(16);
     $pdf->SetFont('helvetica', '', 9);
     $pdf->Cell(0, 4, '__________________________________', 0, 1, 'C');
     $pdf->SetFont('helvetica', 'B', 9);
@@ -544,6 +546,7 @@ if (isset($_GET['id'])) {
         $pdf->MultiCell(0, 4, 'Ou acesse: ' . $rastreioUrl, 0, 'C', false, 1);
     }
 
+    if ($__CAP_CAPTURE__) { $GLOBALS['__CAP_PDF_BYTES__'] = $pdf->Output('doc.pdf', 'S'); return; }
     $pdf->Output('Recibo nº ' . $os_id . '.pdf', 'I');
 } else {
     echo json_encode(['status' => 'error', 'message' => 'ID não fornecido']);

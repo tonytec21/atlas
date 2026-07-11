@@ -41,7 +41,11 @@ try {
         $atos_manuais = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Pagamentos
-        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento
+        $__temAnexos = false; try { $__st = $conn->query("SHOW TABLES LIKE 'pagamento_os_anexos'"); $__temAnexos = $__st && $__st->fetch(); } catch (\Throwable $e) {}
+        $__temAnexosOs = false; try { $__st2 = $conn->query("SHOW TABLES LIKE 'anexos_os'"); $__temAnexosOs = $__st2 && $__st2->fetch(); } catch (\Throwable $e) {}
+        $__anexSel = $__temAnexos ? ', (SELECT COUNT(*) FROM pagamento_os_anexos a WHERE a.pagamento_id = po.id) AS anexos_count' : ', 0 AS anexos_count';
+        $__anexSel .= $__temAnexosOs ? ", (SELECT COUNT(*) FROM anexos_os aa WHERE aa.ordem_servico_id = os.id AND aa.status = 'ativo') AS os_anexos_count" : ', 0 AS os_anexos_count';
+        $sql = 'SELECT po.id AS pagamento_id, os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento' . $__anexSel . '
                 FROM pagamento_os po
                 JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
                 WHERE DATE(po.data_pagamento) = :data';
@@ -171,7 +175,11 @@ try {
         $atos_manuais = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Pagamentos
-        $sql = 'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento
+        $__temAnexos = false; try { $__st = $conn->query("SHOW TABLES LIKE 'pagamento_os_anexos'"); $__temAnexos = $__st && $__st->fetch(); } catch (\Throwable $e) {}
+        $__temAnexosOs = false; try { $__st2 = $conn->query("SHOW TABLES LIKE 'anexos_os'"); $__temAnexosOs = $__st2 && $__st2->fetch(); } catch (\Throwable $e) {}
+        $__anexSel = $__temAnexos ? ', (SELECT COUNT(*) FROM pagamento_os_anexos a WHERE a.pagamento_id = po.id) AS anexos_count' : ', 0 AS anexos_count';
+        $__anexSel .= $__temAnexosOs ? ", (SELECT COUNT(*) FROM anexos_os aa WHERE aa.ordem_servico_id = os.id AND aa.status = 'ativo') AS os_anexos_count" : ', 0 AS os_anexos_count';
+        $sql = 'SELECT po.id AS pagamento_id, os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento' . $__anexSel . '
                 FROM pagamento_os po
                 JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
                 WHERE po.funcionario = :funcionario AND DATE(po.data_pagamento) = :data';
