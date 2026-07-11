@@ -273,5 +273,17 @@
     safe('anexos', initAnexosDz);
     safe('tabela', initTable);
     safe('graficos', initCharts);
+    safe('fundos', function(){
+      var b = document.getElementById('btnSyncFundos'); if(!b) return;
+      b.addEventListener('click', async function(){
+        b.disabled = true; var html = b.innerHTML; b.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Sincronizando…';
+        try{
+          var r = await postForm('fundos_sync.php', {});
+          if(!r.success) throw new Error(r.message || 'Falha.');
+          if(window.Swal) await Swal.fire({icon:'success',title:'Fundos sincronizados',text:r.message,timer:2600,showConfirmButton:false});
+          location.reload();
+        }catch(e){ if(window.Swal) Swal.fire('Erro', e.message, 'error'); b.disabled=false; b.innerHTML=html; }
+      });
+    });
   });
 })();

@@ -101,3 +101,23 @@ avisa e retorna ao início. Não há como acessar dados chamando um endpoint dir
 - `../menu.php`, `../rodape.php`, `../style/…` (um nível acima do módulo).
 - PHPMailer (já incluído na pasta `PHPMailer/`).
 - Bibliotecas via CDN: Bootstrap 5, DataTables, Chart.js, SweetAlert2, FontAwesome.
+
+## Fundos do selo (FERJ, FERC, FEMP, FADEP, FERRFIS)
+
+Gerados automaticamente a partir da tabela `relatorios_analiticos` (Relatórios
+Analíticos do portal do selo, importados no fluxo de caixa). Para cada período,
+o sistema soma o valor de cada fundo e cria uma conta a pagar:
+
+| Fundo | Periodicidade | Acúmulo | Vencimento |
+|---|---|---|---|
+| **FERJ**, **FERC** | Semanal | segunda a domingo | **segunda-feira subsequente** |
+| **FEMP**, **FADEP**, **FERRFIS** | Mensal | dia 1 ao fim do mês | **dia 10 do mês seguinte** |
+
+Cada fundo vira uma conta **separada** (categoria "Fundos (Selos)", fornecedor =
+nome do fundo). Considera apenas selos válidos (`cancelado=0`, `isento=0`,
+`diferido=0`), igual ao total de selos do caixa.
+
+**Sincronização:** roda sozinha ao abrir o módulo (no máximo 1x a cada 5 min) e
+pode ser forçada pelo botão **"Sincronizar fundos"** no topo. É idempotente
+(upsert por período): enquanto o período está aberto, o valor da conta é
+atualizado conforme novos selos entram; contas **já pagas não são alteradas**.

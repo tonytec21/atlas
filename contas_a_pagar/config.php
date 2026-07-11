@@ -12,11 +12,145 @@ date_default_timezone_set('America/Fortaleza'); // Maranhão (UTC-3)
 function cap_categorias()
 {
     return ['Aluguel','Água','Energia','Internet/Telefone','Impostos','Fornecedores',
-            'Salários','Manutenção','Software/Assinaturas','Financiamento','Outros'];
+            'Salários','Manutenção','Software/Assinaturas','Financiamento','Fundos (Selos)','Outros'];
 }
 function cap_recorrencias()
 {
     return ['Nenhuma','Mensal','Semanal','Anual'];
+}
+
+/* ==================================================================
+ * FUNDOS DO SELO (a partir de relatorios_analiticos)
+ *  - FERJ, FERC : semanais  (segunda a domingo → vence na 2ª subsequente)
+ *  - FEMP, FADEP, FERRFIS : mensais (dia 1 ao fim → vence dia 10 do mês seguinte)
+ * ================================================================== */
+function cap_fundos_def()
+{
+    return [
+        'FERJ'    => ['coluna' => 'ferj',    'periodicidade' => 'semanal', 'nome' => 'FERJ'],
+        'FERC'    => ['coluna' => 'ferc',    'periodicidade' => 'semanal', 'nome' => 'FERC'],
+        'FEMP'    => ['coluna' => 'femp',    'periodicidade' => 'mensal',  'nome' => 'FEMP'],
+        'FADEP'   => ['coluna' => 'fadep',   'periodicidade' => 'mensal',  'nome' => 'FADEP'],
+        'FERRFIS' => ['coluna' => 'ferrfis', 'periodicidade' => 'mensal',  'nome' => 'FERRFIS'],
+    ];
+}
+
+function cap_tem_relatorios_analiticos()
+{
+    $conn = cap_db();
+    $r = $conn->query("SHOW TABLES LIKE 'relatorios_analiticos'");
+    if (!$r || $r->num_rows === 0) return false;
+    // confere se as colunas dos fundos existem
+    $cols = [];
+    $rc = $conn->query("SHOW COLUMNS FROM relatorios_analiticos");
+    while ($rc && $row = $rc->fetch_assoc()) $cols[strtolower($row['Field'])] = true;
+    foreach (['ferj','ferc','femp','fadep','ferrfis','selagem'] as $need)
+        if (!isset($cols[$need])) return false;
+    return true;
+}
+
+/**
+ * Sincroniza as contas de fundos a partir dos selos.
+ * Cria/atualiza uma conta por fundo e período (upsert por origem_selo).
+ * Não sobrescreve contas já pagas. Considera apenas selos válidos
+ * (cancelado=0, isento=0, diferido=0), igual ao total de selos do caixa.
+ *
+ * @param bool $force ignora o intervalo mínimo entre sincronizações.
+ * @return array resumo com quantidades criadas/atualizadas.
+ */
+function cap_sync_fundos_selo($force = false)
+{
+    cap_ensure_schema();
+    $conn = cap_db();
+    $res = ['criadas' => 0, 'atualizadas' => 0, 'ignoradas_pagas' => 0, 'periodos' => 0, 'ok' => false, 'motivo' => ''];
+
+    if (!cap_tem_relatorios_analiticos()) { $res['motivo'] = 'Tabela relatorios_analiticos indisponível.'; return $res; }
+
+    // throttle: no máximo 1 sync a cada 5 min (a menos que forçado)
+    if (!$force) {
+        $cfg = cap_settings_get();
+        $ult = $cfg['fundos_sync_em'] ?? null;
+        if ($ult && (time() - strtotime($ult)) < 300) { $res['ok'] = true; $res['motivo'] = 'throttle'; return $res; }
+    }
+
+    $filtro = "cancelado=0 AND isento=0 AND diferido=0";
+
+    // -------- SEMANAIS: FERJ, FERC (segunda a domingo) --------
+    $sqlSem = "SELECT DATE_SUB(DATE(selagem), INTERVAL WEEKDAY(selagem) DAY) AS ini,
+                      COALESCE(SUM(ferj),0) AS ferj, COALESCE(SUM(ferc),0) AS ferc
+               FROM relatorios_analiticos
+               WHERE $filtro
+               GROUP BY ini";
+    $rs = $conn->query($sqlSem);
+    while ($rs && $row = $rs->fetch_assoc()) {
+        $ini = $row['ini']; if (!$ini) continue;
+        $fim = date('Y-m-d', strtotime($ini . ' +6 day'));       // domingo
+        $venc = date('Y-m-d', strtotime($ini . ' +7 day'));      // segunda subsequente
+        $label = date('d/m', strtotime($ini)) . ' a ' . date('d/m/Y', strtotime($fim));
+        foreach (['FERJ' => (float)$row['ferj'], 'FERC' => (float)$row['ferc']] as $fundo => $valor) {
+            if ($valor <= 0.0001) continue;
+            $res['periodos']++;
+            $chave = $fundo . '|S|' . $ini;
+            $titulo = $fundo . ' - Semana ' . $label;
+            cap_upsert_fundo($conn, $chave, $fundo, $titulo, $valor, $venc, $res);
+        }
+    }
+
+    // -------- MENSAIS: FEMP, FADEP, FERRFIS --------
+    $sqlMes = "SELECT DATE_FORMAT(selagem,'%Y-%m') AS mes,
+                      COALESCE(SUM(femp),0) AS femp, COALESCE(SUM(fadep),0) AS fadep, COALESCE(SUM(ferrfis),0) AS ferrfis
+               FROM relatorios_analiticos
+               WHERE $filtro
+               GROUP BY mes";
+    $rm = $conn->query($sqlMes);
+    while ($rm && $row = $rm->fetch_assoc()) {
+        $mes = $row['mes']; if (!$mes) continue;
+        $primeiro = $mes . '-01';
+        $venc = date('Y-m-10', strtotime($primeiro . ' +1 month')); // dia 10 do mês seguinte
+        $label = date('m/Y', strtotime($primeiro));
+        foreach (['FEMP' => (float)$row['femp'], 'FADEP' => (float)$row['fadep'], 'FERRFIS' => (float)$row['ferrfis']] as $fundo => $valor) {
+            if ($valor <= 0.0001) continue;
+            $res['periodos']++;
+            $chave = $fundo . '|M|' . $mes;
+            $titulo = $fundo . ' - ' . $label;
+            cap_upsert_fundo($conn, $chave, $fundo, $titulo, $valor, $venc, $res);
+        }
+    }
+
+    @$conn->query("UPDATE contas_config SET fundos_sync_em=NOW() WHERE id=1");
+    $res['ok'] = true;
+    return $res;
+}
+
+/** Upsert de uma conta de fundo por chave (origem_selo). Não mexe em contas pagas. */
+function cap_upsert_fundo($conn, $chave, $fundo, $titulo, $valor, $venc, &$res)
+{
+    $stmt = $conn->prepare("SELECT id, status, valor, data_vencimento, titulo FROM contas_a_pagar WHERE origem_selo=? LIMIT 1");
+    $stmt->bind_param('s', $chave); $stmt->execute();
+    $ex = $stmt->get_result()->fetch_assoc(); $stmt->close();
+
+    if ($ex) {
+        if ($ex['status'] === 'Pago') { $res['ignoradas_pagas']++; return; }
+        $mudou = abs((float)$ex['valor'] - $valor) > 0.0001
+              || (string)$ex['data_vencimento'] !== $venc
+              || (string)$ex['titulo'] !== $titulo;
+        if ($mudou) {
+            $u = $conn->prepare("UPDATE contas_a_pagar SET valor=?, data_vencimento=?, titulo=? WHERE id=?");
+            $u->bind_param('dssi', $valor, $venc, $titulo, $ex['id']);
+            $u->execute(); $u->close();
+            $res['atualizadas']++;
+        }
+        return;
+    }
+    $cat = 'Fundos (Selos)'; $forn = $fundo; $rec = 'Nenhuma'; $func = '(automático)';
+    $desc = 'Gerado automaticamente a partir dos Relatórios Analíticos do selo.';
+    $agora = date('Y-m-d H:i:s');
+    $ins = $conn->prepare("INSERT INTO contas_a_pagar
+        (titulo, categoria, fornecedor, valor, data_vencimento, descricao, recorrencia, funcionario, status, origem_selo, created_at)
+        VALUES (?,?,?,?,?,?,?,?, 'Pendente', ?, ?)");
+    $ins->bind_param('sssdssssss', $titulo, $cat, $forn, $valor, $venc, $desc, $rec, $func, $chave, $agora);
+    $ins->execute(); $ins->close();
+    $res['criadas']++;
 }
 
 /* ------------------------------------------------------------------
@@ -181,12 +315,20 @@ function cap_ensure_schema()
         'forma_pagamento'=> "VARCHAR(40) NULL AFTER data_pagamento",
         'conta_origem'   => "VARCHAR(10) NULL AFTER forma_pagamento",
         'origem_id'      => "INT NULL AFTER caminho_anexo",
+        'origem_selo'    => "VARCHAR(48) NULL",
         'created_at'     => "DATETIME NULL",
     ];
     foreach ($cols as $c => $def) {
-        $r = $conn->query("SHOW COLUMNS FROM contas_a_pagar LIKE '" . $conn->real_escape_string($c) . "'");
-        if ($r && $r->num_rows === 0) @$conn->query("ALTER TABLE contas_a_pagar ADD COLUMN `$c` $def");
+        try {
+            $r = $conn->query("SHOW COLUMNS FROM contas_a_pagar LIKE '" . $conn->real_escape_string($c) . "'");
+            if ($r && $r->num_rows === 0) $conn->query("ALTER TABLE contas_a_pagar ADD COLUMN `$c` $def");
+        } catch (Throwable $e) { /* coluna opcional; não bloqueia */ }
     }
+    // índice único para permitir upsert das contas de fundos por período
+    try {
+        $ri = $conn->query("SHOW INDEX FROM contas_a_pagar WHERE Key_name='uniq_origem_selo'");
+        if ($ri && $ri->num_rows === 0) $conn->query("ALTER TABLE contas_a_pagar ADD UNIQUE KEY uniq_origem_selo (origem_selo)");
+    } catch (Throwable $e) { /* índice é opcional; segue sem bloquear */ }
 
     $conn->query("CREATE TABLE IF NOT EXISTS conta_anexos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -225,8 +367,13 @@ function cap_ensure_schema()
         smtp_pass VARCHAR(255) NULL,
         smtp_from_email VARCHAR(180) NULL,
         smtp_from_name VARCHAR(120) NULL,
-        ultimo_envio DATETIME NULL
+        ultimo_envio DATETIME NULL,
+        fundos_sync_em DATETIME NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    try {
+        $rc = $conn->query("SHOW COLUMNS FROM contas_config LIKE 'fundos_sync_em'");
+        if ($rc && $rc->num_rows === 0) $conn->query("ALTER TABLE contas_config ADD COLUMN fundos_sync_em DATETIME NULL");
+    } catch (Throwable $e) { /* opcional */ }
     // linha única
     $conn->query("INSERT IGNORE INTO contas_config (id, dias_aviso, notif_ativo) VALUES (1, 3, 1)");
 

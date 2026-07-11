@@ -3,6 +3,8 @@ require_once __DIR__ . '/session_check.php'; checkSession();
 require_once __DIR__ . '/guard_acesso.php'; cap_guard();
 require_once __DIR__ . '/config.php';
 cap_ensure_schema();
+// Sincroniza automaticamente as contas de fundos do selo (throttled internamente).
+try { cap_sync_fundos_selo(false); } catch (Throwable $e) { /* não bloqueia o dashboard */ }
 
 $conn = cap_db();
 $hoje = date('Y-m-d');
@@ -151,6 +153,7 @@ $FORMAS = cap_formas_pagamento();
                     <button class="btn btn-primary btn-pill" data-bs-toggle="modal" data-bs-target="#contaModal" onclick="capNovaConta()"><i class="fa fa-plus"></i> Nova conta</button>
                     <a class="btn btn-soft btn-pill" href="relatorios.php"><i class="fa fa-bar-chart"></i> Relatórios</a>
                     <a class="btn btn-soft btn-pill" href="extrato.php"><i class="fa fa-list"></i> Extrato</a>
+                    <button type="button" class="btn btn-soft btn-pill" id="btnSyncFundos" title="Recalcular FERJ/FERC/FEMP/FADEP/FERRFIS a partir dos selos"><i class="fa fa-refresh"></i> Sincronizar fundos</button>
                     <button class="btn btn-soft btn-pill" data-bs-toggle="modal" data-bs-target="#configModal"><i class="fa fa-cog"></i> Configurações</button>
                 </div>
             </div>
