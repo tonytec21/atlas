@@ -1303,10 +1303,6 @@ $mode_query->close();
                         <i class="fas fa-eye"></i>
                         <span>Ver Contas a Pagar</span>
                     </a>
-                    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/contas_a_pagar/cadastrar.php'?>" class="menu-link">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>Cadastrar Contas a Pagar</span>
-                    </a>
                 </div>
             </div>
             <?php endif; ?>
