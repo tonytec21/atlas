@@ -1,1330 +1,539 @@
 <?php
-// Inclui os arquivos de conexão e sessão
-include 'db_connection.php';
-include 'session_check.php';
-checkSession();
-date_default_timezone_set('America/Sao_Paulo');
+require_once __DIR__ . '/session_check.php'; checkSession();
+require_once __DIR__ . '/helpers.php';
+notas_ensure_schema();
 
-// Obtém o nome do usuário da sessão
 $username = $_SESSION['username'];
+$CSRF     = notas_csrf();
+$org      = notas_org_get($username);
+$cats     = $org['cats'];
+$minhas        = notas_listar_proprias($username);
+$compartilhadas = notas_listar_compartilhadas_comigo($username);
+$paleta = notas_paleta();
 
-// Verifica se o formulário foi enviado
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $titulo = $_POST['titulo'] ?? '';
-    $conteudo = $_POST['conteudo'] ?? '';
-    $cor = $_POST['cor'] ?? '#F6EAC2'; // Cor padrão (Amarelo Pastel)
+function nh($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
-    // Cria o diretório para o usuário, se não existir
-    $userDirectory = 'lembretes/' . $username;
-    if (!file_exists($userDirectory)) {
-        mkdir($userDirectory, 0777, true);
-    }
-
-    // Salva o lembrete em um arquivo
-    $arquivoNome = $userDirectory . '/' . time() . '.txt';
-    $conteudoLembrete = "Título: $titulo\n\nConteúdo:\n$conteudo";
-    file_put_contents($arquivoNome, $conteudoLembrete);
-
-    // Caminho do arquivo JSON específico para a nota
-    $noteId = basename($arquivoNome, '.txt'); 
-    $noteColorFile = $userDirectory . '/' . $noteId . '.json';
-
-    // Dados a serem salvos no JSON específico
-    $noteColorData = [
-        'id' => $noteId,
-        'cor' => $cor
-    ];
-
-    // Salva a cor em um arquivo JSON individual
-    file_put_contents($noteColorFile, json_encode($noteColorData, JSON_PRETTY_PRINT));
-
-
-    // Retorna a notificação para exibição na página
-    echo "<div class='notification'>Lembrete criado com sucesso!<button class='close-btn'>&times;</button></div>";
-    exit();
+function render_postit($n, $modo) {
+    $rot = (crc32($n['id']) % 5) - 2;
+    $data = date('d/m/Y', $n['updated']);
+    $canEdit = ($modo === 'own') || !empty($n['can_edit']);
+    $cat = $n['cat'] ?? '';
+    $html = $n['content_html'] ?? '';
+    $text = $n['content_text'] ?? '';
+    ?>
+    <article class="postit" style="--cor: <?php echo nh($n['color']); ?>; --rot: <?php echo $rot; ?>deg;"
+             data-id="<?php echo nh($n['id']); ?>" data-owner="<?php echo nh($n['owner']); ?>"
+             data-color="<?php echo nh($n['color']); ?>" data-mode="<?php echo $modo; ?>"
+             data-canedit="<?php echo $canEdit ? '1' : '0'; ?>" data-cat="<?php echo nh($cat); ?>"
+             data-title="<?php echo nh($n['title']); ?>" data-content="<?php echo nh($html); ?>"
+             data-text="<?php echo nh($text); ?>">
+        <span class="tape" aria-hidden="true"></span>
+        <div class="postit-in">
+            <?php if ($modo === 'shared'): ?>
+                <div class="pin-shared"><i class="fa-solid fa-user-group"></i> <?php echo nh(notas_nome_usuario($n['owner'])); ?></div>
+            <?php elseif ($cat !== ''): ?>
+                <div class="pin-cat"><i class="fa-solid fa-tag"></i> <?php echo nh($cat); ?></div>
+            <?php endif; ?>
+            <h3 class="postit-title"><?php echo nh($n['title'] !== '' ? $n['title'] : 'Sem título'); ?></h3>
+            <div class="postit-body"><?php echo $html !== '' ? $html : '<span class="muted">(sem conteúdo)</span>'; ?></div>
+            <div class="postit-foot">
+                <span class="postit-date"><i class="fa-regular fa-clock"></i> <?php echo $data; ?></span>
+                <div class="postit-actions">
+                    <button class="pa js-view" title="Abrir"><i class="fa-regular fa-eye"></i></button>
+                    <?php if ($modo === 'own'): ?>
+                        <button class="pa js-color" title="Cor"><i class="fa-solid fa-palette"></i></button>
+                        <button class="pa js-share" title="Compartilhar"><i class="fa-solid fa-share-nodes"></i></button>
+                    <?php endif; ?>
+                    <button class="pa js-del" title="<?php echo $modo === 'own' ? 'Excluir' : 'Remover da minha lista'; ?>"><i class="fa-regular fa-trash-can"></i></button>
+                </div>
+            </div>
+        </div>
+        <span class="dogear" aria-hidden="true"></span>
+    </article>
+    <?php
 }
-
-
-// Diretórios do usuário e da lixeira
-$userDirectory = 'lembretes/' . $username;
-$lixeiraDirectory = 'lixeira/' . $username;
-$orderFile = $userDirectory . '/order.json';
-
-// Verifica se os diretórios do usuário e da lixeira existem, se não, cria
-if (!file_exists($userDirectory)) {
-    mkdir($userDirectory, 0777, true);
-}
-if (!file_exists($lixeiraDirectory)) {
-    mkdir($lixeiraDirectory, 0777, true);
-}
-
-// Lista os arquivos de lembrete no diretório do usuário
-$arquivos = glob($userDirectory . '/*.txt');
-
-// Carrega a ordem e grupos dos lembretes do arquivo JSON
-$orderData = [];
-if (file_exists($orderFile)) {
-    $orderData = json_decode(file_get_contents($orderFile), true);
-}
-
-// Ordena os arquivos conforme o JSON ou coloca no grupo "Novos"
-$groupedFiles = isset($orderData['groups']) ? $orderData['groups'] : ['Novos' => []];
-foreach ($arquivos as $arquivo) {
-    $filename = basename($arquivo);
-    $found = false;
-    foreach ($groupedFiles as $groupName => $files) {
-        if (in_array($filename, $files)) {
-            $found = true;
-            break;
-        }
-    }
-    if (!$found) {
-        $groupedFiles['Novos'][] = $filename;
-    }
-}
-
-$orderData['groups'] = $groupedFiles;
 ?>
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Visualizar Anotações</title>
-    <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="../style/css/bootstrap.min.css">
-    <link rel="stylesheet" href="../style/css/font-awesome.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.css">  
-    <link rel="stylesheet" href="../style/css/style.css">
-    <style>
-
-        .sortable-ghost {  
-            opacity: 0.4;  
-            background-color: #f0f0f0;  
-            border: 2px dashed #ccc;  
-        }  
-
-        .sortable-drag {  
-            opacity: 0.8;  
-            transform: scale(1.05);  
-            background-color: #fff;  
-            box-shadow: 0 5px 15px rgba(0,0,0,0.15);  
-        }  
-
-        .sortable-chosen {  
-            background-color: #fff;  
-            box-shadow: 0 5px 15px rgba(0,0,0,0.15);  
-        }  
-
-        .card, .group {  
-            transition: all 0.3s ease;  
-        }  
-
-        .card-container > * {  
-            transition: transform 0.3s ease;  
-        }  
-
-        .group-header {  
-            cursor: grab;  
-        }  
-
-
-
-        /* Espaçamento e estilo dos cards */  
-.card {  
-    margin: 10px;  
-    transition: transform 0.2s ease, box-shadow 0.2s ease;  
-}  
-
-/* Estilo quando está arrastando */  
-.sortable-ghost {  
-    opacity: 0;  
-    background-color: #f8f9fa;  
-    border: 2px dashed #dee2e6;  
-    margin: 15px;  
-    height: 150px; /* ajuste conforme a altura dos seus post-its */  
-}  
-
-/* Efeito de hover nos cards */  
-.card:hover {  
-    transform: translateY(-2px);  
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);  
-}  
-
-/* Espaço para drop */  
-.card-container {  
-    min-height: 200px;  
-    padding: 15px;  
-    transition: background-color 0.2s ease;  
-}  
-
-/* Estilo quando está arrastando sobre o container */  
-.card-container.sortable-drag-container {  
-    background-color: rgba(0,0,0,0.02);  
-}  
-
-/* Espaço entre os cards */  
-.card-container > .card:not(:last-child) {  
-    margin-bottom: 15px;  
-}  
-
-/* Animação suave para todos os movimentos */  
-.card-container > * {  
-    transition: all 0.3s ease;  
-}
-
-        
-        .btn-close {
-            outline: none;
-            border: none; 
-            background: none;
-            padding: 0; 
-            font-size: 1.5rem; 
-            cursor: pointer; 
-            transition: transform 0.2s ease;
-        }
-
-        .btn-close:hover {
-            transform: scale(2.10);
-        }
-
-        .btn-close:focus {
-            outline: none;
-        }
-
-        .create-group-expansion {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 50px;
-            margin-bottom: 50px;
-        }
-
-        .create-group-expansion a {
-            color: #6c6b6b;
-            text-decoration: none;
-            font-size: 1em;
-            cursor: pointer;
-            transition: color 0.3s;
-        }
-
-        .create-group-expansion a:hover {
-            color: #0056b3;
-        }
-
-        .line {
-            flex-grow: 1;
-            border: none;
-            border-top: 1px solid #ccc;
-            margin: 0 10px;
-        }
-
-
-        .card {
-            position: relative;
-            width: 500px;
-            height: 300px;
-            padding: 15px;
-            border-radius: 4px;
-            color: #000 !important;
-            background-color: #f8f9fa;
-            box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), 
-                        0 0 5px rgba(0, 0, 0, 0.1), 
-                        -5px -5px 15px rgba(255, 255, 255, 0.5);
-            cursor: grab;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        /* Efeito de hover */
-        .card:hover {
-            transform: scale(1.02);
-            box-shadow: 8px 8px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        /* Canto solto (pseudo-elemento) */
-        .card::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0) 100%);
-            clip-path: polygon(0 0, 100% 0, 0 100%);
-            transform: rotate(2deg);
-            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
-        }
-
-
-        .card-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            justify-content: flex-start;
-            margin-bottom: 20px;
-            min-height: 50px;
-            border: 1px dashed transparent;
-        }
-        .card-container.drag-over {
-            border: 1px dashed #007bff;
-        }
-        /* .card {
-            width: 300px;
-            height: 300px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            cursor: grab;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        } */
-
-        .card-content {
-            flex: 1;
-            overflow-y: auto;
-            max-height: 200px;
-            word-wrap: break-word;
-            white-space: normal; 
-        }
-
-        .btn-delete {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-left: 90%;
-            width: 30px;
-            height: 30px;
-            font-size: 10px;
-            margin-bottom: -3px !important;
-        }
-        .btn-delete:hover {
-            background-color: #c82333;
-        }
-        .group-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-        .group-container {
-            margin-top: 20px;
-        }
-        .group-name {
-            font-size: 1.3em;
-            cursor: pointer;
-        }
-        .search-bar {
-            /* margin-bottom: 20px; */
-        }
-
-        .color-circle.selected {
-            border: 2px solid #000;
-        }
-
-        /* Ajusta o tamanho dos círculos */
-        .color-circle {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.2);
-            border: 1px solid #ddd;
-        }
-
-        /* Responsividade para o container */
-        #editColorPicker {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px; /* Espaçamento entre os círculos */
-            justify-content: flex-start; /* Alinha os círculos à esquerda */
-        }
-
-        /* Adaptação para tamanhos menores */
-        @media (max-width: 768px) {
-            .color-circle {
-                width: 35px;
-                height: 35px;
-            }
-        }
-
-        /* Adaptação para telas muito pequenas */
-        @media (max-width: 576px) {
-            .color-circle {
-                width: 30px;
-                height: 30px;
-            }
-        }
-
-
-    </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas · Anotações</title>
+<link rel="icon" href="../style/img/favicon.png">
+<link rel="stylesheet" href="../style/css/bootstrap.min.css">
+<link rel="stylesheet" href="../style/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@600;700&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{ --nt-primary:#4f46e5; --nt-primary2:#7c3aed; --nt-bg:#f1f5f9; --nt-text:#0f172a; --nt-muted:#64748b; --nt-card:#ffffff; --nt-border:#e5e9f0; }
+body.dark-mode{ --nt-bg:#0f1216; --nt-text:#e5e7eb; --nt-muted:#9aa4b2; --nt-card:#1c2126; --nt-border:rgba(255,255,255,.08); }
+#main .container{ max-width:1320px; padding-bottom:120px; }
+.page-hero{ background:var(--nt-card); border:1px solid var(--nt-border); border-radius:20px; padding:22px 24px; box-shadow:0 12px 34px rgba(15,23,42,.06); margin:6px 0 18px; }
+.page-hero .title-row{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.page-hero .title-icon{ width:56px; height:56px; border-radius:16px; flex:0 0 auto; background:linear-gradient(135deg,var(--nt-primary),var(--nt-primary2)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.5rem; box-shadow:0 10px 24px rgba(79,70,229,.34); }
+.page-hero h1{ font-size:1.5rem; font-weight:800; margin:0; color:var(--nt-text); letter-spacing:-.02em; }
+.page-hero .subtitle{ color:var(--nt-muted); font-size:.92rem; margin-top:2px; }
+.hero-actions{ margin-left:auto; display:flex; gap:10px; flex-wrap:wrap; }
+.btn-pill{ border-radius:999px; font-weight:600; padding:10px 18px; border:0; display:inline-flex; align-items:center; gap:8px; cursor:pointer; transition:.18s; }
+.btn-primary-g{ background:linear-gradient(135deg,var(--nt-primary),var(--nt-primary2)); color:#fff; box-shadow:0 10px 24px rgba(79,70,229,.32); }
+.btn-primary-g:hover{ transform:translateY(-2px); box-shadow:0 14px 30px rgba(79,70,229,.42); color:#fff; }
+.btn-soft{ background:var(--nt-bg); color:var(--nt-text); border:1px solid var(--nt-border); }
+.btn-soft:hover{ background:var(--nt-border); }
+.nt-controls{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+.nt-tabs{ display:inline-flex; background:var(--nt-card); border:1px solid var(--nt-border); border-radius:999px; padding:4px; box-shadow:0 6px 18px rgba(15,23,42,.05); }
+.nt-tab{ border:0; background:transparent; color:var(--nt-muted); font-weight:700; font-size:.9rem; padding:9px 18px; border-radius:999px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:.16s; }
+.nt-tab .cnt{ background:var(--nt-bg); color:var(--nt-muted); border-radius:999px; font-size:.74rem; padding:1px 8px; font-weight:800; }
+.nt-tab.active{ background:linear-gradient(135deg,var(--nt-primary),var(--nt-primary2)); color:#fff; box-shadow:0 8px 18px rgba(79,70,229,.3); }
+.nt-tab.active .cnt{ background:rgba(255,255,255,.25); color:#fff; }
+.nt-search{ margin-left:auto; display:flex; align-items:center; gap:8px; background:var(--nt-card); border:1px solid var(--nt-border); border-radius:999px; padding:8px 16px; min-width:230px; }
+.nt-search i{ color:var(--nt-muted); } .nt-search input{ border:0; outline:0; background:transparent; color:var(--nt-text); width:100%; font-size:.9rem; }
+.nt-cats{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+.nt-cat{ position:relative; display:inline-flex; align-items:center; gap:7px; background:var(--nt-card); border:1px solid var(--nt-border); color:var(--nt-text); font-weight:600; font-size:.85rem; padding:7px 14px; border-radius:999px; cursor:pointer; transition:.15s; user-select:none; }
+.nt-cat:hover{ border-color:var(--nt-primary); }
+.nt-cat.active{ background:linear-gradient(135deg,var(--nt-primary),var(--nt-primary2)); color:#fff; border-color:transparent; box-shadow:0 6px 14px rgba(79,70,229,.28); }
+.nt-cat.drop-hover{ outline:2px dashed var(--nt-primary); outline-offset:2px; transform:scale(1.05); }
+.nt-cat .cat-tools{ display:none; gap:2px; margin-left:2px; }
+.nt-cat:hover .cat-tools{ display:inline-flex; }
+.nt-cat .ct{ width:18px; height:18px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:.7rem; background:rgba(0,0,0,.06); }
+.nt-cat.active .ct{ background:rgba(255,255,255,.25); }
+.nt-cat-new{ border-style:dashed; color:var(--nt-muted); }
+.board{ display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:24px; align-items:start; min-height:60px; }
+.postit{ position:relative; }
+.postit.sortable-ghost{ opacity:.35; }
+.postit.sortable-chosen .postit-in{ transform:rotate(0) scale(1.03); }
+.postit-in{ position:relative; background:linear-gradient(180deg, rgba(255,255,255,.35), rgba(0,0,0,.02)), var(--cor); border-radius:3px 3px 5px 5px; padding:20px 18px 14px; min-height:120px; transform:rotate(var(--rot)); transform-origin:center top; box-shadow:0 1px 1px rgba(0,0,0,.05),0 6px 10px -4px rgba(0,0,0,.18),0 16px 30px -12px rgba(0,0,0,.28); transition:transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s; color:#1f2937; cursor:grab; }
+.postit-in::before{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none; background-image:repeating-linear-gradient(180deg, transparent 0 27px, rgba(0,0,0,.045) 27px 28px); opacity:.5; mix-blend-mode:multiply; }
+.postit:hover .postit-in{ transform:rotate(0deg) translateY(-6px) scale(1.02); box-shadow:0 2px 2px rgba(0,0,0,.06),0 14px 20px -8px rgba(0,0,0,.24),0 30px 50px -16px rgba(0,0,0,.36); z-index:3; }
+.tape{ position:absolute; top:-11px; left:50%; transform:translateX(-50%) rotate(-2.5deg); width:96px; height:26px; z-index:4; background:linear-gradient(135deg, rgba(255,255,255,.55), rgba(203,213,225,.35)); border:1px solid rgba(255,255,255,.4); box-shadow:0 2px 6px rgba(0,0,0,.12); border-radius:2px; }
+.tape::after{ content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg, rgba(255,255,255,.25) 0 6px, transparent 6px 12px); }
+.dogear{ position:absolute; right:0; bottom:0; width:0; height:0; border-style:solid; border-width:0 0 22px 22px; border-color:transparent transparent rgba(0,0,0,.10) transparent; border-radius:0 0 4px 0; transform:rotate(var(--rot)); }
+.postit-title{ font-family:'Caveat',cursive; font-weight:700; font-size:1.55rem; line-height:1.05; margin:2px 0 8px; color:#111827; word-break:break-word; }
+.postit-body{ font-family:'Kalam',cursive; font-size:.98rem; line-height:1.4; color:#374151; word-break:break-word; margin:0 0 12px; max-height:220px; overflow:hidden; -webkit-mask-image:linear-gradient(180deg,#000 80%, transparent); mask-image:linear-gradient(180deg,#000 80%, transparent); }
+.postit-body b, .postit-body strong{ font-weight:700; } .postit-body u{ text-decoration:underline; } .postit-body i, .postit-body em{ font-style:italic; }
+.postit-body .muted{ color:rgba(0,0,0,.4); }
+.postit-foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; border-top:1px dashed rgba(0,0,0,.14); padding-top:8px; }
+.postit-date{ font-size:.72rem; color:rgba(0,0,0,.5); font-weight:600; display:inline-flex; align-items:center; gap:5px; }
+.postit-actions{ display:flex; gap:4px; opacity:0; transform:translateY(4px); transition:.2s; }
+.postit:hover .postit-actions{ opacity:1; transform:none; }
+.pa{ width:30px; height:30px; border:0; border-radius:9px; background:rgba(255,255,255,.55); color:#334155; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:.15s; }
+.pa:hover{ background:#fff; color:var(--nt-primary); transform:translateY(-1px); box-shadow:0 4px 10px rgba(0,0,0,.14); }
+.pin-shared, .pin-cat{ display:inline-flex; align-items:center; gap:6px; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:#3730a3; background:rgba(255,255,255,.55); border-radius:999px; padding:3px 9px; margin-bottom:8px; }
+.pin-cat{ color:#334155; }
+.empty{ grid-column:1/-1; text-align:center; padding:70px 20px; color:var(--nt-muted); }
+.empty i{ font-size:3rem; opacity:.35; margin-bottom:14px; }
+.empty h5{ font-weight:800; color:var(--nt-text); }
+.nt-modal .modal-content{ border:0; border-radius:20px; overflow:hidden; box-shadow:0 30px 70px rgba(2,6,23,.4); }
+.nt-modal .modal-header{ background:linear-gradient(135deg,var(--nt-primary),var(--nt-primary2)); color:#fff; border:0; padding:16px 22px; }
+.nt-modal .modal-title{ font-weight:800; display:flex; align-items:center; gap:10px; }
+.nt-close{ border:0; width:38px; height:38px; border-radius:11px; background:rgba(255,255,255,.18); color:#fff; cursor:pointer; transition:.15s; }
+.nt-close:hover{ background:rgba(255,255,255,.34); transform:rotate(90deg); }
+.nt-field{ margin-bottom:14px; }
+.nt-field label{ font-size:.82rem; font-weight:700; color:var(--nt-muted); margin-bottom:6px; display:block; }
+.nt-input{ width:100%; border:1px solid var(--nt-border); border-radius:12px; padding:11px 14px; font-size:.95rem; color:var(--nt-text); background:var(--nt-card); outline:none; transition:.15s; font-family:'Inter',sans-serif; }
+.nt-input:focus{ border-color:var(--nt-primary); box-shadow:0 0 0 3px rgba(79,70,229,.14); }
+.rt-toolbar{ display:flex; gap:6px; margin-bottom:8px; }
+.rt-btn{ width:36px; height:34px; border:1px solid var(--nt-border); background:var(--nt-card); color:var(--nt-text); border-radius:9px; cursor:pointer; font-weight:800; transition:.14s; display:inline-flex; align-items:center; justify-content:center; }
+.rt-btn:hover{ border-color:var(--nt-primary); color:var(--nt-primary); }
+.rt-btn.on{ background:var(--nt-primary); color:#fff; border-color:transparent; }
+.rt-editor{ width:100%; min-height:160px; max-height:340px; overflow:auto; border:1px solid var(--nt-border); border-radius:12px; padding:12px 14px; font-size:.98rem; line-height:1.5; color:var(--nt-text); background:var(--nt-card); outline:none; font-family:'Inter',sans-serif; }
+.rt-editor:focus{ border-color:var(--nt-primary); box-shadow:0 0 0 3px rgba(79,70,229,.14); }
+.rt-editor:empty:before{ content:attr(data-ph); color:var(--nt-muted); }
+.rt-editor u{ text-decoration:underline; } .rt-editor b{ font-weight:700; } .rt-editor i{ font-style:italic; }
+.swatches{ display:flex; flex-wrap:wrap; gap:10px; }
+.swatch{ width:34px; height:34px; border-radius:50%; cursor:pointer; border:2px solid rgba(0,0,0,.08); box-shadow:0 3px 8px rgba(0,0,0,.12); transition:.15s; position:relative; }
+.swatch:hover{ transform:scale(1.12); }
+.swatch.sel{ border-color:var(--nt-primary); box-shadow:0 0 0 3px rgba(79,70,229,.28); }
+.swatch.sel::after{ content:"\f00c"; font-family:"Font Awesome 6 Free"; font-weight:900; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:rgba(0,0,0,.55); font-size:.8rem; }
+.share-list{ display:flex; flex-direction:column; gap:8px; margin-top:6px; max-height:210px; overflow:auto; }
+.share-row{ display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--nt-border); border-radius:12px; }
+.share-row .av{ width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--nt-primary),var(--nt-primary2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto; }
+.share-row .nm{ flex:1; min-width:0; font-weight:600; color:var(--nt-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.view-paper{ background:var(--cor,#FEF08A); border-radius:8px; padding:22px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.05); }
+.view-title{ font-family:'Caveat',cursive; font-weight:700; font-size:2rem; color:#111827; margin:0 0 10px; }
+.view-body{ font-family:'Kalam',cursive; color:#1f2937; line-height:1.5; }
+.view-body b{ font-weight:700; } .view-body u{ text-decoration:underline; } .view-body i{ font-style:italic; }
+.drag-hint{ font-size:.78rem; color:var(--nt-muted); margin-left:auto; display:inline-flex; align-items:center; gap:6px; }
+</style>
 </head>
-<body>
-    <?php include(__DIR__ . '/../menu.php'); ?>
-    <div id="main" class="main-content">
-        <div class="container">
-            <h3 class="mt-4">Suas Anotações</h3>
+<body class="light-mode">
+<?php include(__DIR__ . '/../menu.php'); ?>
+<div id="main" class="main-content">
+  <div class="container">
 
-            <!-- Barra de pesquisa e botão "Nova Nota" -->
-            <div class="d-flex align-items-center mb-4">
-                <input type="text" id="searchBar" class="form-control search-bar mr-2" placeholder="Pesquisar anotações...">
-                <button class="btn btn-success" id="novaNotaBtn" style="flex: 0 0 10%;"><i class="fa fa-plus-circle" aria-hidden="true"></i> Nova Nota</button>
-            </div>
-
-            <hr>
-
-            <!-- Container de grupos -->
-            <div id="group-container" class="group-container">
-                <?php
-                // Verifica se o grupo "Novos" contém algum card
-                if (!empty($groupedFiles['Novos'])) {
-                    // Renderiza o grupo "Novos" primeiro
-                    echo '<div class="group">';
-                    echo '<div class="group-header" onclick="toggleGroup(this)">';
-                    echo '<span class="group-name" contenteditable="true" onblur="editGroupName(\'Novos\', this.innerText)">Novos</span>';
-                    echo '<i class="fa fa-chevron-down toggle-icon"></i>';
-                    echo '</div>';
-                    echo '<div class="card-container" data-group="Novos">';
-
-                    // Para cada arquivo de nota, busca a cor correspondente no arquivo JSON individual
-                    $notaCores = [];
-                    foreach ($arquivos as $arquivo) {
-                        $noteId = basename($arquivo, '.txt'); 
-                        $noteColorFile = $userDirectory . '/' . $noteId . '.json'; 
-
-                        if (file_exists($noteColorFile)) {
-                            $noteColorData = json_decode(file_get_contents($noteColorFile), true);
-                            if (json_last_error() === JSON_ERROR_NONE && isset($noteColorData['cor'])) {
-                                $notaCores[$noteId] = $noteColorData['cor']; 
-                            } else {
-                                // Log de erro se o JSON não for válido
-                                error_log("Erro ao interpretar o arquivo JSON: " . json_last_error_msg());
-                            }
-                        } else {
-                            $notaCores[$noteId] = '#F6EAC2';
-                        }
-                    }
-
-
-                    foreach ($groupedFiles['Novos'] as $filename) {
-                        if (file_exists($userDirectory . '/' . $filename)) {
-                            $noteId = basename($filename, '.txt'); 
-                            $cor = $notaCores[$noteId] ?? '#F6EAC2'; 
-
-                            $conteudo = file_get_contents($userDirectory . '/' . $filename);
-                            $linhas = explode("\n", $conteudo);
-                            $titulo = '';
-                            $corpo = '';
-
-                            foreach ($linhas as $linha) {
-                                if (stripos($linha, 'Título:') === 0) {
-                                    $titulo = trim(substr($linha, strlen('Título:')));
-                                } elseif (stripos($linha, 'Conteúdo:') === 0) {
-                                    $corpo = trim(substr($linha, strlen('Conteúdo:'))) . "\n";
-                                } else {
-                                    $corpo .= $linha . "\n";
-                                }
-                            }
-
-                            echo '<div class="card" draggable="true" style="background-color: ' . htmlspecialchars($cor) . ';" data-filename="' . $filename . '" onclick="openModal(\'' . $filename . '\')">';
-                            echo '<h6><strong>' . htmlspecialchars($titulo) . '</strong></h6>';
-                            echo '<div class="card-content">';
-                            echo '<div>' . nl2br(htmlspecialchars($corpo)) . '</div>';
-                            echo '</div>';
-                            echo '<button class="btn-delete mt-2" title="Excluir" onclick="event.stopPropagation(); moveToTrash(\'' . $filename . '\')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
-                            echo '</div>';
-                        }
-                    }
-
-
-                    echo '</div>'; 
-                    echo '</div>'; 
-                }
-
-                // Carrega o arquivo JSON de cores e mapeia por ID
-                $notaCores = [];
-                foreach ($arquivos as $arquivo) {
-                    $noteId = basename($arquivo, '.txt');
-                    $noteColorFile = $userDirectory . '/' . $noteId . '.json'; 
-
-                    if (file_exists($noteColorFile)) {
-                        $noteColorData = json_decode(file_get_contents($noteColorFile), true);
-                        if (json_last_error() === JSON_ERROR_NONE && isset($noteColorData['cor'])) {
-                            $notaCores[$noteId] = $noteColorData['cor']; 
-                        } else {
-                            // Log de erro se o JSON não for válido
-                            error_log("Erro ao interpretar o arquivo JSON: " . json_last_error_msg());
-                        }
-                    } else {
-                        $notaCores[$noteId] = '#F6EAC2'; 
-                    }
-                }
-
-                // Renderiza os outros grupos
-                foreach ($orderData['groups'] as $groupName => $group) {
-                    // Pula o grupo "Novos" para evitar duplicação
-                    if ($groupName === 'Novos') {
-                        continue;
-                    }
-
-                    echo '<div class="group">';
-                    echo '<div class="group-header">'; 
-
-                    // Adiciona o nome do grupo e a linha horizontal
-                    echo '<span class="group-name" contenteditable="true" onblur="editGroupName(\'' . $groupName . '\', this.innerText)">' . htmlspecialchars($groupName) . '</span>';
-                    echo '<hr style="flex-grow: 1; border: none; border-top: 1px solid #ccc; margin: 0 10px;">'; // Linha horizontal
-
-                    // Verifica se o grupo está vazio para exibir o ícone apropriado
-                    if (empty($group)) {
-                        $cleanGroupName = str_replace(["\n", "\r"], ' ', $groupName);
-                        echo '<i class="fa fa-times" aria-hidden="true" data-group-name="' . htmlspecialchars($cleanGroupName, ENT_QUOTES, 'UTF-8') . '" onclick="deleteGroup(this)"></i>';
-                        
-
-                    } else {
-                        echo '<i class="fa fa-chevron-down toggle-icon" onclick="toggleGroup(this)"></i>';
-                    }
-
-                    echo '</div>';
-                    echo '<div class="card-container" data-group="' . $groupName . '">';
-
-                    foreach ($group as $filename) {
-                        if (file_exists($userDirectory . '/' . $filename)) {
-                            $noteId = basename($filename, '.txt'); 
-                            // Aplica a cor da nota ou a cor padrão
-                            $cor = isset($notaCores[$noteId]) ? $notaCores[$noteId] : '#F6EAC2';
-                    
-                            $conteudo = file_get_contents($userDirectory . '/' . $filename);
-                            $linhas = explode("\n", $conteudo);
-                            $titulo = '';
-                            $corpo = '';
-                    
-                            foreach ($linhas as $linha) {
-                                if (stripos($linha, 'Título:') === 0) {
-                                    $titulo = trim(substr($linha, strlen('Título:')));
-                                } elseif (stripos($linha, 'Conteúdo:') === 0) {
-                                    $corpo = trim(substr($linha, strlen('Conteúdo:'))) . "\n";
-                                } else {
-                                    $corpo .= $linha . "\n";
-                                }
-                            }
-                    
-                            echo '<div class="card" draggable="true" style="background-color: ' . htmlspecialchars($cor) . ';" data-filename="' . $filename . '" onclick="openModal(\'' . $filename . '\')">';
-                            echo '<h6><strong>' . htmlspecialchars($titulo) . '</strong></h6>';
-                            echo '<div class="card-content">';
-                            echo '<div>' . nl2br(htmlspecialchars($corpo)) . '</div>';
-                            echo '</div>';
-                            echo '<button class="btn-delete mt-2" title="Excluir" onclick="event.stopPropagation(); moveToTrash(\'' . $filename . '\')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
-                            echo '</div>';
-                        }
-                    }
-                    
-
-                    echo '</div>'; 
-                    echo '</div>'; 
-                }
-                ?>
-            </div>
-            <!-- Novo "Criar Novo Grupo" com linhas horizontais -->
-            <div id="create-group-expansion" class="create-group-expansion">
-                <hr class="line">
-                <a href="javascript:void(0);" onclick="createGroup()">+ Criar Novo Grupo</a>
-                <hr class="line"> 
-            </div>
-
+    <section class="page-hero">
+      <div class="title-row">
+        <div class="title-icon"><i class="fa-solid fa-note-sticky"></i></div>
+        <div style="min-width:0">
+          <h1>Anotações</h1>
+          <div class="subtitle">Post-its coloridos com categorias. Arraste para organizar, formate o texto e compartilhe.</div>
         </div>
+        <div class="hero-actions">
+          <button class="btn-pill btn-primary-g" id="btnNova"><i class="fa-solid fa-plus"></i> Nova anotação</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="nt-controls">
+      <div class="nt-tabs">
+        <button class="nt-tab active" data-tab="minhas"><i class="fa-solid fa-user"></i> Minhas <span class="cnt"><?php echo count($minhas); ?></span></button>
+        <button class="nt-tab" data-tab="compartilhadas"><i class="fa-solid fa-user-group"></i> Compartilhadas <span class="cnt"><?php echo count($compartilhadas); ?></span></button>
+      </div>
+      <div class="nt-search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="busca" placeholder="Buscar anotação..."></div>
     </div>
 
-    <!-- Modal para visualização e edição do lembrete -->
-    <div class="modal fade" id="noteModal" tabindex="-1" role="dialog" aria-labelledby="noteModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 60%">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Editar anotação</h5>
-                        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                <form id="editNoteForm" method="post" class="mt-4">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="noteTitle" class="form-label">Título:</label>
-                            <input type="text" id="noteTitle" name="titulo" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="noteContent" class="form-label">Conteúdo:</label>
-                            <textarea id="noteContent" name="conteudo" rows="5" class="form-control" required></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label for="noteColor" class="form-label">Cor:</label>
-                            <div id="editColorPicker" class="d-flex flex-wrap gap-2">
-                                <div class="color-circle" style="background-color: #ABDEE6;" data-color="#ABDEE6"></div>
-                                <div class="color-circle" style="background-color: #CBAACB;" data-color="#CBAACB"></div>
-                                <div class="color-circle" style="background-color: #FFFFB5;" data-color="#FFFFB5"></div>
-                                <div class="color-circle" style="background-color: #FFCCB6;" data-color="#FFCCB6"></div>
-                                <div class="color-circle" style="background-color: #F3B0C3;" data-color="#F3B0C3"></div>
-                                <div class="color-circle" style="background-color: #C6DBDA;" data-color="#C6DBDA"></div>
-                                <div class="color-circle" style="background-color: #FEE1E8;" data-color="#FEE1E8"></div>
-                                <div class="color-circle" style="background-color: #FED7C3;" data-color="#FED7C3"></div>
-                                <div class="color-circle" style="background-color: #F6EAC2;" data-color="#F6EAC2"></div>
-                                <div class="color-circle" style="background-color: #ECD5E3;" data-color="#ECD5E3"></div>
-                                <div class="color-circle" style="background-color: #FF968A;" data-color="#FF968A"></div>
-                                <div class="color-circle" style="background-color: #FFAEA5;" data-color="#FFAEA5"></div>
-                                <div class="color-circle" style="background-color: #FFC5BF;" data-color="#FFC5BF"></div>
-                                <div class="color-circle" style="background-color: #FFD8BE;" data-color="#FFD8BE"></div>
-                                <div class="color-circle" style="background-color: #FFC8A2;" data-color="#FFC8A2"></div>
-                                <div class="color-circle" style="background-color: #D4F0F0;" data-color="#D4F0F0"></div>
-                                <div class="color-circle" style="background-color: #8FCACA;" data-color="#8FCACA"></div>
-                                <div class="color-circle" style="background-color: #CCE2CB;" data-color="#CCE2CB"></div>
-                                <div class="color-circle" style="background-color: #B6CFB6;" data-color="#B6CFB6"></div>
-                                <div class="color-circle" style="background-color: #97C1A9;" data-color="#97C1A9"></div>
-                                <div class="color-circle" style="background-color: #FCB9AA;" data-color="#FCB9AA"></div>
-                                <div class="color-circle" style="background-color: #FFDBCC;" data-color="#FFDBCC"></div>
-                                <div class="color-circle" style="background-color: #ECEAE4;" data-color="#ECEAE4"></div>
-                                <div class="color-circle" style="background-color: #A2E1DB;" data-color="#A2E1DB"></div>
-                                <div class="color-circle" style="background-color: #55CBCD;" data-color="#55CBCD"></div>
-                            </div>
-                        </div>
-
-                        <input type="hidden" id="selectedEditColor" name="cor" value="">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-success" onclick="saveNote()">Salvar</button>
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                    </div>
-                </form>
-            </div>
+    <div class="nt-cats" id="catBar">
+      <div class="nt-cat active" data-cat="__all"><i class="fa-solid fa-layer-group"></i> Todas</div>
+      <?php foreach ($cats as $c): ?>
+        <div class="nt-cat" data-cat="<?php echo nh($c); ?>">
+          <i class="fa-solid fa-tag"></i> <span class="cat-name"><?php echo nh($c); ?></span>
+          <span class="cat-tools">
+            <span class="ct js-cat-edit" title="Renomear"><i class="fa-solid fa-pen"></i></span>
+            <span class="ct js-cat-del" title="Excluir"><i class="fa-solid fa-xmark"></i></span>
+          </span>
         </div>
+      <?php endforeach; ?>
+      <div class="nt-cat nt-cat-new" id="btnNovaCat"><i class="fa-solid fa-plus"></i> Nova categoria</div>
+      <span class="drag-hint"><i class="fa-solid fa-arrows-up-down-left-right"></i> Arraste uma nota até uma categoria</span>
     </div>
 
-    <!-- Modal para criar nova nota -->
-    <div class="modal fade" id="novaNotaModal" tabindex="-1" role="dialog" aria-labelledby="novaNotaModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document" style="width: 60%">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="novaNotaModalLabel">Criar Nota</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                <form id="novaNotaForm" method="post">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="titulo" class="form-label">Título:</label>
-                            <input type="text" id="titulo" name="titulo" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="conteudo" class="form-label">Conteúdo:</label>
-                            <textarea id="conteudo" name="conteudo" rows="5" class="form-control" required></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label for="noteColor" class="form-label">Cor:</label>
-                            <div id="editColorPicker" class="d-flex flex-wrap gap-2">
-                                <div class="color-circle" style="background-color: #ABDEE6;" data-color="#ABDEE6"></div>
-                                <div class="color-circle" style="background-color: #CBAACB;" data-color="#CBAACB"></div>
-                                <div class="color-circle" style="background-color: #FFFFB5;" data-color="#FFFFB5"></div>
-                                <div class="color-circle" style="background-color: #FFCCB6;" data-color="#FFCCB6"></div>
-                                <div class="color-circle" style="background-color: #F3B0C3;" data-color="#F3B0C3"></div>
-                                <div class="color-circle" style="background-color: #C6DBDA;" data-color="#C6DBDA"></div>
-                                <div class="color-circle" style="background-color: #FEE1E8;" data-color="#FEE1E8"></div>
-                                <div class="color-circle" style="background-color: #FED7C3;" data-color="#FED7C3"></div>
-                                <div class="color-circle" style="background-color: #F6EAC2;" data-color="#F6EAC2"></div>
-                                <div class="color-circle" style="background-color: #ECD5E3;" data-color="#ECD5E3"></div>
-                                <div class="color-circle" style="background-color: #FF968A;" data-color="#FF968A"></div>
-                                <div class="color-circle" style="background-color: #FFAEA5;" data-color="#FFAEA5"></div>
-                                <div class="color-circle" style="background-color: #FFC5BF;" data-color="#FFC5BF"></div>
-                                <div class="color-circle" style="background-color: #FFD8BE;" data-color="#FFD8BE"></div>
-                                <div class="color-circle" style="background-color: #FFC8A2;" data-color="#FFC8A2"></div>
-                                <div class="color-circle" style="background-color: #D4F0F0;" data-color="#D4F0F0"></div>
-                                <div class="color-circle" style="background-color: #8FCACA;" data-color="#8FCACA"></div>
-                                <div class="color-circle" style="background-color: #CCE2CB;" data-color="#CCE2CB"></div>
-                                <div class="color-circle" style="background-color: #B6CFB6;" data-color="#B6CFB6"></div>
-                                <div class="color-circle" style="background-color: #97C1A9;" data-color="#97C1A9"></div>
-                                <div class="color-circle" style="background-color: #FCB9AA;" data-color="#FCB9AA"></div>
-                                <div class="color-circle" style="background-color: #FFDBCC;" data-color="#FFDBCC"></div>
-                                <div class="color-circle" style="background-color: #ECEAE4;" data-color="#ECEAE4"></div>
-                                <div class="color-circle" style="background-color: #A2E1DB;" data-color="#A2E1DB"></div>
-                                <div class="color-circle" style="background-color: #55CBCD;" data-color="#55CBCD"></div>
-                            </div>
-                        </div>
-
-                        <input type="hidden" id="selectedColor" name="cor" value="#F6EAC2">
-
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-success" id="salvarNotaBtn">Criar Nota</button>
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+    <div class="board" id="board-minhas">
+      <?php if (!$minhas): ?>
+        <div class="empty"><i class="fa-regular fa-note-sticky"></i><h5>Nenhuma anotação ainda</h5><p>Clique em “Nova anotação” para começar.</p></div>
+      <?php else: foreach ($minhas as $n): render_postit($n, 'own'); endforeach; endif; ?>
     </div>
 
-    <script src="../script/jquery-3.5.1.min.js"></script>
-    <script src="../script/bootstrap.min.js"></script>
-    <script src="../script/sweetalert2.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>  
-
-<script>  
-document.addEventListener('DOMContentLoaded', function() {  
-    // Para os cards dentro dos grupos  
-    // const containers = document.querySelectorAll('.card-container');  
-    // containers.forEach(container => {  
-    //     new Sortable(container, {  
-    //         group: 'shared',  
-    //         animation: 150,  
-    //         easing: "cubic-bezier(0.4, 0, 0.2, 1)",  
-    //         dragClass: "sortable-drag",  
-    //         ghostClass: "sortable-ghost",  
-    //         chosenClass: "sortable-chosen",  
-    //         onEnd: function(evt) {  
-    //             updateOrder();  
-    //         }  
-    //     });  
-    // });  
-
-    // Para os grupos  
-    new Sortable(document.getElementById('group-container'), {  
-        animation: 150,  
-        handle: '.group-header',  
-        onEnd: function() {  
-            updateOrder();  
-        }  
-    });  
-});  
-
-// Mantém a mesma função updateOrder que você já tem  
-function updateOrder() {  
-    const groups = {};  
-    document.querySelectorAll('.group').forEach(group => {  
-        const groupName = group.querySelector('.group-name').textContent.trim();  
-        const notes = Array.from(group.querySelectorAll('.card')).map(card => card.dataset.filename);  
-        groups[groupName] = notes;  
-    });  
-
-    fetch('save_order.php', {  
-        method: 'POST',  
-        headers: {  
-            'Content-Type': 'application/json',  
-        },  
-        body: JSON.stringify({ groups: groups })  
-    });  
-}  
-
-        // Abrir o modal ao clicar no botão "Nova Nota"
-        $('#novaNotaBtn').on('click', function() {
-            $('#novaNotaModal').modal('show');
-        });
-
-        // Função para fechar a notificação
-        $('.notification .close-btn').on('click', function() {
-            $(this).parent().hide();
-        });
-
-        // Salvar nota via AJAX ao clicar no botão "Criar Lembrete" no modal
-        $('#salvarNotaBtn').on('click', function() {
-            var titulo = $('#titulo').val();
-            var conteudo = $('#conteudo').val();
-
-            $.ajax({
-                url: '', // A URL para o mesmo arquivo
-                method: 'POST',
-                data: {
-                    titulo: titulo,
-                    conteudo: conteudo
-                },
-                success: function(response) {
-                    // Exibir a notificação de sucesso usando SweetAlert2
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: 'Nota criada com sucesso!',
-                        showConfirmButton: false,
-                        timer: 2000
-                    }).then(() => {
-                        // Atualizar a página após fechar o alerta
-                        location.reload();
-                    });
-
-                    // Limpar os campos do formulário e fechar o modal
-                    $('#novaNotaForm')[0].reset();
-                    $('#novaNotaModal').modal('hide');
-                },
-                error: function() {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro!',
-                        text: 'Erro ao criar a nota.',
-                        showConfirmButton: false,
-                        timer: 2000
-                    });
-                }
-            });
-        });
-
-        
-        // Função para mover o arquivo para a lixeira com confirmação
-        function moveToTrash(filename) {
-            Swal.fire({
-                title: 'Tem certeza?',
-                text: 'Tem certeza que deseja excluir esta nota?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Sim, excluir',
-                cancelButtonText: 'Não, cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Realiza a requisição AJAX para mover o arquivo para a lixeira e remover do JSON
-                    $.ajax({
-                        url: 'delete_note.php',
-                        method: 'POST',
-                        data: { filename: filename },
-                        success: function(response) {
-                            const data = JSON.parse(response);
-                            if (data.status === 'success') {
-                                document.querySelector(`.card[data-filename='${filename}']`).remove();
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: 'Excluído!',
-                                    text: 'A nota foi movida para a lixeira e removida do arquivo de cores com sucesso.'
-                                });
-                            } else {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Erro',
-                                    text: data.message || 'Erro ao excluir a nota.'
-                                });
-                            }
-                        },
-                        error: function() {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro',
-                                text: 'Erro ao excluir a nota.'
-                            });
-                        }
-                    });
-                }
-            });
-        }
-
-
-
-        // Função para alternar a exibição dos grupos
-        function toggleGroup(header) {
-            // Seleciona o grupo ao qual o cabeçalho pertence
-            const group = header.closest('.group');
-            if (!group) {
-                console.error('Erro: O grupo não foi encontrado.');
-                return;
-            }
-
-            // Seleciona o contêiner dentro do grupo
-            const container = group.querySelector('.card-container');
-            if (container) {
-                // Alterna a exibição do contêiner
-                container.style.display = container.style.display === 'none' ? 'flex' : 'none';
-
-                // Alterna o ícone
-                const icon = header.querySelector('.toggle-icon');
-                if (icon) {
-                    icon.classList.toggle('fa-chevron-down');
-                    icon.classList.toggle('fa-chevron-up');
-                }
-            } else {
-                console.error('Erro: O container do grupo não foi encontrado.');
-            }
-        }
-
-        // Função para criar um novo grupo de cards
-        function createGroup() {
-            const groupName = prompt('Digite o nome do novo grupo:');
-            if (groupName) {
-                // Cria o div do grupo
-                const groupDiv = document.createElement('div');
-                groupDiv.classList.add('group');
-
-                // Cria o cabeçalho do grupo
-                const groupHeader = document.createElement('div');
-                groupHeader.classList.add('group-header');
-                groupHeader.onclick = function() { toggleGroup(groupHeader); };
-
-                // Nome do grupo
-                const groupNameSpan = document.createElement('span');
-                groupNameSpan.classList.add('group-name');
-                groupNameSpan.setAttribute('contenteditable', 'true');
-                groupNameSpan.innerText = groupName;
-                groupNameSpan.onblur = function() { editGroupName(groupName, groupNameSpan.innerText); };
-                groupHeader.appendChild(groupNameSpan);
-
-                // Ícone de alternância
-                const toggleIcon = document.createElement('i');
-                toggleIcon.classList.add('fa', 'fa-chevron-down', 'toggle-icon');
-                groupHeader.appendChild(toggleIcon);
-
-                // Adiciona o cabeçalho ao grupo
-                groupDiv.appendChild(groupHeader);
-
-                // Cria o contêiner para os cartões
-                const container = document.createElement('div');
-                container.classList.add('card-container');
-                container.style.display = 'flex'; // Inicialmente definido como flex
-                groupDiv.appendChild(container);
-
-                // Adiciona eventos de arrastar e soltar
-                addDragAndDropEvents(container);
-
-                // Adiciona o grupo ao contêiner principal
-                document.getElementById('group-container').appendChild(groupDiv);
-
-                // Salva o novo grupo no arquivo JSON
-                updateOrder();
-            }
-        }
-
-
-        // Função para editar o nome do grupo
-        function editGroupName(oldName, newName) {
-            if (oldName !== newName && newName.trim() !== '') {
-                document.querySelectorAll(`[data-group='${oldName}']`).forEach(container => {
-                    container.setAttribute('data-group', newName);
-                });
-                updateOrder();
-            }
-        }
-
-        // Função para pesquisar por título ou conteúdo
-        document.getElementById('searchBar').addEventListener('input', function() {
-            const searchValue = this.value.toLowerCase();
-            document.querySelectorAll('.card').forEach(card => {
-                const titleElement = card.querySelector('h6');
-                const contentElement = card.querySelector('.card-content');
-
-                // Verifica se os elementos existem
-                const title = titleElement ? titleElement.innerText.toLowerCase() : '';
-                const content = contentElement ? contentElement.innerText.toLowerCase() : '';
-
-                // Exibe ou oculta o card com base na pesquisa
-                if (title.includes(searchValue) || content.includes(searchValue)) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-        });
-
-        // Drag and drop para organização dos cards
-        let draggedCard = null;
-
-        document.querySelectorAll('.card').forEach(card => {
-            card.addEventListener('dragstart', function() {
-                draggedCard = card;
-                setTimeout(() => this.classList.add('dragging'), 0);
-            });
-
-            card.addEventListener('dragend', function() {
-                setTimeout(() => this.classList.remove('dragging'), 0);
-                draggedCard = null;
-                updateOrder();
-            });
-        });
-
-        // Adiciona eventos de arrastar e soltar aos contêineres
-        function addDragAndDropEvents(container) {
-            container.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                container.classList.add('drag-over'); // Adiciona classe para indicar área de drop
-                const afterElement = getDragAfterElement(container, e.clientY);
-                if (afterElement == null) {
-                    container.appendChild(draggedCard);
-                } else {
-                    container.insertBefore(draggedCard, afterElement);
-                }
-            });
-
-            container.addEventListener('dragleave', function() {
-                container.classList.remove('drag-over'); // Remove a indicação ao sair da área
-            });
-
-            container.addEventListener('drop', function() {
-                container.classList.remove('drag-over'); // Remove a indicação ao soltar
-
-                // Chama a função para salvar a nova ordem no servidor
-                updateOrder();
-
-                // Recarrega a página após a atualização dos dados
-                setTimeout(function() {
-                    location.reload();
-                }, 500); // Aguarda 500ms para garantir que a atualização seja concluída
-            });
-        }
-
-        document.querySelectorAll('.card-container').forEach(container => {
-            addDragAndDropEvents(container); // Adiciona eventos a todos os contêineres de grupo
-        });
-
-        function getDragAfterElement(container, y) {
-            const draggableElements = [...container.querySelectorAll('.card:not(.dragging)')];
-
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = y - box.top - box.height / 2;
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
-
-        // Função para salvar a nova ordem dos cards e grupos
-        function updateOrder() {
-            const order = { groups: {} };
-            const colors = {}; // Objeto para salvar cores associadas a cada nota
-
-            document.querySelectorAll('.card-container').forEach(container => {
-                const groupName = container.getAttribute('data-group') || 'Novos';
-                order.groups[groupName] = [];
-
-                container.querySelectorAll('.card').forEach(card => {
-                    const filename = card.getAttribute('data-filename');
-                    const color = card.style.backgroundColor; // Obtém a cor do card
-                    order.groups[groupName].push(filename);
-
-                    // Adiciona a cor ao objeto colors
-                    colors[filename] = color;
-                });
-            });
-
-            $.ajax({
-                url: 'save_order.php',
-                method: 'POST',
-                data: {
-                    order: JSON.stringify(order),
-                    colors: JSON.stringify(colors) // Envia as cores junto com a ordem
-                },
-                success: function(response) {
-                    if (response !== 'success') {
-                        alert('Erro ao salvar a nova ordem.');
-                    }
-                },
-                error: function() {
-                    alert('Erro ao salvar a nova ordem.');
-                }
-            });
-        }
-
-
-        let currentFilename = '';
-
-        // Função para abrir o modal com o conteúdo do lembrete
-        function openModal(filename) {
-            currentFilename = filename;
-
-            // Solicitação AJAX para obter o conteúdo do arquivo .txt e a cor associada
-            $.ajax({
-                url: 'read_note.php',
-                method: 'POST',
-                data: { filename: currentFilename },
-                success: function(response) {
-                    try {
-                        const data = JSON.parse(response);
-
-                        if (data.status === 'success') {
-                            document.getElementById('noteTitle').value = data.title;
-                            document.getElementById('noteContent').value = data.content;
-
-                            // Atualiza a cor selecionada
-                            const colorCircles = document.querySelectorAll('#editColorPicker .color-circle');
-                            colorCircles.forEach(circle => {
-                                circle.classList.remove('selected');
-                                if (circle.dataset.color === data.color) {
-                                    circle.classList.add('selected');
-                                    document.getElementById('selectedEditColor').value = data.color;
-                                }
-                            });
-
-                            $('#noteModal').modal('show');
-                        } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro ao abrir o lembrete',
-                                text: data.message || 'Erro desconhecido.'
-                            });
-                        }
-                    } catch (e) {
-                        console.error('Erro ao processar a resposta:', e);
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro ao processar resposta',
-                            text: 'Erro ao processar a resposta do servidor.'
-                        });
-                    }
-                },
-                error: function() {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro na solicitação',
-                        text: 'Erro ao fazer a solicitação para ler o lembrete.'
-                    });
-                }
-            });
-        }
-
-        // Função para salvar as alterações no lembrete
-        function saveNote() {
-            const newTitle = document.getElementById('noteTitle').value.trim();
-            const newContent = document.getElementById('noteContent').value.trim();
-            const newColor = document.getElementById('selectedEditColor').value; // Obtém a cor selecionada
-
-            if (!newTitle || !newContent) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Aviso!',
-                    text: 'Preencha todos os campos antes de salvar.'
-                });
-                return;
-            }
-
-            $.ajax({
-                url: 'save_note.php',
-                method: 'POST',
-                data: {
-                    filename: currentFilename,
-                    title: newTitle,
-                    content: newContent
-                },
-                success: function(response) {
-                    try {
-                        const data = JSON.parse(response);
-                        if (data.status === 'success') {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Sucesso!',
-                                text: data.message,
-                                showConfirmButton: false,
-                                timer: 2000
-                            }).then(() => {
-                                updateCardContent(newTitle, newContent); // Atualiza conteúdo na página
-                                $('#noteModal').modal('hide');
-                            });
-                        } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Erro!',
-                                text: data.message
-                            });
-                        }
-                    } catch (e) {
-                        console.error('Erro ao processar a resposta:', e);
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro ao processar resposta',
-                            text: 'Erro ao processar a resposta do servidor.'
-                        });
-                    }
-                },
-                error: function() {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro!',
-                        text: 'Erro ao salvar a nota. Tente novamente.'
-                    });
-                }
-            });
-
-            // Atualiza a cor da nota separadamente
-            $.ajax({
-                url: 'update_color.php',
-                method: 'POST',
-                data: {
-                    note_id: currentFilename.replace('.txt', ''),
-                    color: newColor
-                },
-                success: function(response) {
-                    const data = JSON.parse(response);
-                    if (data.status === 'success') {
-                        // Atualiza a cor diretamente no card
-                        document.querySelector(`.card[data-filename='${currentFilename}']`).style.backgroundColor = newColor;
-                    }
-                },
-                error: function() {
-                    console.error('Erro ao atualizar a cor.');
-                }
-            });
-        }
-
-        // Função para atualizar o título e conteúdo do card na página
-        function updateCardContent(title, content) {
-            const card = document.querySelector(`.card[data-filename='${currentFilename}']`);
-            if (card) {
-                card.querySelector('h6 strong').innerText = title;
-                card.querySelector('.card-content div').innerHTML = nl2br(content);
-            }
-        }
-
-        // Função para converter quebra de linha em <br>
-        function nl2br(str) {
-            return str.replace(/\n/g, '<br>');
-        }
-
-
-
-        // Função para excluir grupos vazios
-        function deleteGroup(element) {
-            // Solicita confirmação usando SweetAlert2
-            Swal.fire({
-                title: 'Tem certeza?',
-                text: 'Tem certeza que deseja excluir este grupo?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Sim, excluir',
-                cancelButtonText: 'Não, cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Obtém o nome do grupo a partir do atributo data-group-name e remove espaços extras
-                    const groupName = element.getAttribute('data-group-name').trim();
-
-                    // Escapa o nome do grupo para uso no seletor CSS
-                    const escapedGroupName = CSS.escape(groupName);
-
-                    // Remove o grupo do DOM
-                    const groupElement = document.querySelector(`[data-group="${escapedGroupName}"]`);
-                    if (groupElement) {
-                        groupElement.parentElement.remove();
-                    } else {
-                        console.error(`Grupo não encontrado: ${groupName}`);
-                    }
-
-                    // Atualiza o arquivo JSON
-                    updateOrder();
-                }
-            });
-        }
-
-        // Função para criar um novo grupo de cards
-        function createGroup() {
-            const groupName = 'Novo Grupo';
-
-            // Cria os elementos do novo grupo
-            const container = document.createElement('div');
-            container.classList.add('card-container');
-            container.setAttribute('data-group', groupName);
-            addDragAndDropEvents(container); // Adiciona os eventos de arrastar e soltar
-
-            const groupDiv = document.createElement('div');
-            groupDiv.classList.add('group');
-
-            const groupHeader = document.createElement('div');
-            groupHeader.classList.add('group-header');
-
-            const groupNameSpan = document.createElement('span');
-            groupNameSpan.classList.add('group-name');
-            groupNameSpan.setAttribute('contenteditable', 'true');
-            groupNameSpan.innerText = groupName;
-            groupNameSpan.onblur = function() { editGroupName(groupName, groupNameSpan.innerText); };
-            groupHeader.appendChild(groupNameSpan);
-
-            const toggleIcon = document.createElement('i');
-            toggleIcon.classList.add('fa', 'fa-chevron-down', 'toggle-icon');
-            groupHeader.appendChild(toggleIcon);
-
-            groupDiv.appendChild(groupHeader);
-            groupDiv.appendChild(container);
-            document.getElementById('group-container').appendChild(groupDiv);
-
-            // Seleciona o nome do grupo para edição
-            groupNameSpan.focus();
-            document.execCommand('selectAll', false, null);
-
-            // Salva o novo grupo no arquivo JSON
-            updateOrder();
-        }
-
-        // Recarrega a página ao fechar o modal "noteModal"
-            $('#noteModal').on('hidden.bs.modal', function () {
-            location.reload();
-        });
-
-        document.querySelectorAll('.color-circle').forEach((circle) => {
-            circle.addEventListener('click', function () {
-                // Remove a seleção anterior
-                document.querySelectorAll('.color-circle').forEach((c) => c.classList.remove('selected'));
-                
-                // Marca a cor selecionada
-                this.classList.add('selected');
-                
-                // Atualiza o valor do campo oculto
-                document.getElementById('selectedColor').value = this.dataset.color;
-            });
-        });
-
-        $('#salvarNotaBtn').on('click', function () {
-            var titulo = $('#titulo').val();
-            var conteudo = $('#conteudo').val();
-            var cor = $('#selectedColor').val(); // Obtém a cor selecionada
-
-            $.ajax({
-                url: '',
-                method: 'POST',
-                data: {
-                    titulo: titulo,
-                    conteudo: conteudo,
-                    cor: cor // Envia a cor junto com os dados
-                },
-                success: function (response) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: 'Nota criada com sucesso!',
-                        showConfirmButton: false,
-                        timer: 2000
-                    }).then(() => {
-                        location.reload();
-                    });
-
-                    $('#novaNotaForm')[0].reset();
-                    $('#novaNotaModal').modal('hide');
-                },
-                error: function () {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro!',
-                        text: 'Erro ao criar a nota.',
-                        showConfirmButton: false,
-                        timer: 2000
-                    });
-                }
-            });
-        });
-
-        document.querySelectorAll('#editColorPicker .color-circle').forEach((circle) => {
-            circle.addEventListener('click', function () {
-                // Remove a seleção anterior
-                document.querySelectorAll('#editColorPicker .color-circle').forEach((c) => c.classList.remove('selected'));
-
-                // Marca a cor selecionada
-                this.classList.add('selected');
-
-                // Atualiza o valor do campo oculto
-                document.getElementById('selectedEditColor').value = this.dataset.color;
-            });
-        });
-
-    </script>
-    <?php include(__DIR__ . '/../rodape.php'); ?>
+    <div class="board" id="board-compartilhadas" style="display:none">
+      <?php if (!$compartilhadas): ?>
+        <div class="empty"><i class="fa-regular fa-share-from-square"></i><h5>Nada compartilhado com você ainda</h5><p>Quando alguém compartilhar uma anotação, ela aparece aqui.</p></div>
+      <?php else: foreach ($compartilhadas as $n): render_postit($n, 'shared'); endforeach; endif; ?>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL CRIAR/EDITAR -->
+<div class="modal fade nt-modal" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-pen-to-square"></i> <span id="editTitle">Nova anotação</span></div>
+        <button class="nt-close" data-bs-dismiss="modal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="f_id"><input type="hidden" id="f_owner">
+        <div class="nt-field"><label>Título</label><input class="nt-input" id="f_title" maxlength="180" placeholder="Ex.: Ligar para o cartório"></div>
+        <div class="nt-field"><label>Conteúdo</label>
+          <div class="rt-toolbar">
+            <button type="button" class="rt-btn" data-cmd="bold" title="Negrito (Ctrl+B)" style="font-family:serif">B</button>
+            <button type="button" class="rt-btn" data-cmd="italic" title="Itálico (Ctrl+I)" style="font-style:italic;font-family:serif">I</button>
+            <button type="button" class="rt-btn" data-cmd="underline" title="Sublinhado (Ctrl+U)" style="text-decoration:underline">U</button>
+          </div>
+          <div class="rt-editor" id="f_content" contenteditable="true" data-ph="Escreva sua anotação..."></div>
+        </div>
+        <div class="nt-field" id="f_color_wrap"><label>Cor do post-it</label>
+          <div class="swatches">
+            <?php foreach ($paleta as $nome => $hex): ?>
+              <span class="swatch" data-color="<?php echo nh($hex); ?>" style="background:<?php echo nh($hex); ?>" title="<?php echo nh(ucfirst($nome)); ?>"></span>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border:0;padding:0 22px 20px">
+        <button class="btn-pill btn-soft" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn-pill btn-primary-g" id="btnSalvar"><i class="fa-solid fa-check"></i> Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COMPARTILHAR -->
+<div class="modal fade nt-modal" id="shareModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><div class="modal-title"><i class="fa-solid fa-share-nodes"></i> Compartilhar anotação</div>
+        <button class="nt-close" data-bs-dismiss="modal"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="sh_id">
+        <div class="nt-field"><label>Adicionar usuário</label>
+          <div style="display:flex; gap:8px">
+            <select class="nt-input" id="sh_user" style="flex:1"><option value="">Carregando…</option></select>
+            <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--nt-muted);white-space:nowrap"><input type="checkbox" id="sh_edit"> pode editar</label>
+            <button class="btn-pill btn-primary-g" id="btnAddShare" style="padding:10px 14px"><i class="fa-solid fa-plus"></i></button>
+          </div>
+        </div>
+        <label style="font-size:.82rem;font-weight:700;color:var(--nt-muted)">Compartilhada com</label>
+        <div class="share-list" id="sh_list"><div class="text-muted" style="font-size:.85rem;padding:8px">Ninguém ainda.</div></div>
+      </div>
+      <div class="modal-footer" style="border:0;padding:0 22px 20px">
+        <button class="btn-pill btn-soft" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COR -->
+<div class="modal fade nt-modal" id="colorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:380px">
+    <div class="modal-content">
+      <div class="modal-header"><div class="modal-title"><i class="fa-solid fa-palette"></i> Cor do post-it</div>
+        <button class="nt-close" data-bs-dismiss="modal"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="c_id">
+        <div class="swatches" id="c_swatches">
+          <?php foreach ($paleta as $nome => $hex): ?>
+            <span class="swatch" data-color="<?php echo nh($hex); ?>" style="background:<?php echo nh($hex); ?>" title="<?php echo nh(ucfirst($nome)); ?>"></span>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VISUALIZAR -->
+<div class="modal fade nt-modal" id="viewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><div class="modal-title"><i class="fa-regular fa-eye"></i> Anotação</div>
+        <button class="nt-close" data-bs-dismiss="modal"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="modal-body">
+        <div class="view-paper" id="v_paper"><h2 class="view-title" id="v_title"></h2><div class="view-body" id="v_body"></div></div>
+      </div>
+      <div class="modal-footer" style="border:0;padding:0 22px 20px">
+        <button class="btn-pill btn-soft" data-bs-dismiss="modal">Fechar</button>
+        <button class="btn-pill btn-primary-g" id="v_edit" style="display:none"><i class="fa-solid fa-pen-to-square"></i> Editar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var CSRF = <?php echo json_encode($CSRF); ?>;
+  var ME   = <?php echo json_encode($username); ?>;
+  var $  = function(s,c){ return (c||document).querySelector(s); };
+  var $$ = function(s,c){ return Array.prototype.slice.call((c||document).querySelectorAll(s)); };
+  function modal(id){ return bootstrap.Modal.getOrCreateInstance(document.getElementById(id)); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];}); }
+  async function post(url,data){ data.csrf=CSRF; var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(data).toString(),credentials:'same-origin'}); var t=await r.text(); try{return JSON.parse(t);}catch(e){throw new Error('Resposta inválida: '+t.slice(0,140));} }
+
+  var boardMinhas = $('#board-minhas');
+  var catAtual = '__all';
+
+  $$('.nt-tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      $$('.nt-tab').forEach(function(x){ x.classList.remove('active'); }); t.classList.add('active');
+      var tab=t.dataset.tab, minhas=(tab==='minhas');
+      $('#board-minhas').style.display=minhas?'':'none';
+      $('#board-compartilhadas').style.display=minhas?'none':'';
+      $('#catBar').style.display=minhas?'':'none';
+      aplicaFiltro();
+    });
+  });
+
+  function aplicaFiltro(){
+    var q=($('#busca').value||'').toLowerCase().trim();
+    var minhas=$('.nt-tab.active').dataset.tab==='minhas';
+    var board=minhas?'#board-minhas':'#board-compartilhadas';
+    $$('.postit',$(board)).forEach(function(p){
+      var okCat=!minhas || catAtual==='__all' || (p.dataset.cat||'')===catAtual;
+      var hay=((p.dataset.title||'')+' '+(p.dataset.text||'')).toLowerCase();
+      var okQ=!q || hay.indexOf(q)>=0;
+      p.style.display=(okCat && okQ)?'':'none';
+    });
+  }
+  $('#busca').addEventListener('input', aplicaFiltro);
+
+  function atualizarPinCat(card, cat){
+    var inner=card.querySelector('.postit-in'); var pin=card.querySelector('.pin-cat');
+    if(cat===''){ if(pin) pin.remove(); return; }
+    if(!pin){ pin=document.createElement('div'); pin.className='pin-cat'; inner.insertBefore(pin, inner.querySelector('.postit-title')); }
+    pin.innerHTML='<i class="fa-solid fa-tag"></i> '+esc(cat);
+  }
+  function bindCatChip(chip){
+    chip.addEventListener('click', function(ev){
+      if(ev.target.closest('.cat-tools')) return;
+      $$('.nt-cat',$('#catBar')).forEach(function(x){ x.classList.remove('active'); });
+      chip.classList.add('active'); catAtual=chip.dataset.cat; aplicaFiltro();
+    });
+    var ed=chip.querySelector('.js-cat-edit'), dl=chip.querySelector('.js-cat-del');
+    if(ed) ed.addEventListener('click', function(e){ e.stopPropagation(); renomearCat(chip.dataset.cat); });
+    if(dl) dl.addEventListener('click', function(e){ e.stopPropagation(); excluirCat(chip.dataset.cat); });
+    Sortable.create(chip, { group:{name:'notas', pull:true, put:true}, sort:false,
+      onAdd:function(evt){
+        var card=evt.item, cat=(chip.dataset.cat==='__all'?'':chip.dataset.cat);
+        card.dataset.cat=cat; boardMinhas.appendChild(card);
+        atualizarPinCat(card, cat); salvarOrg(); aplicaFiltro();
+        Swal.fire({toast:true,position:'bottom-end',icon:'success',title:'Movida para “'+(cat===''?'Todas':cat)+'”',timer:1500,showConfirmButton:false});
+      }
+    });
+  }
+  $$('.nt-cat',$('#catBar')).forEach(function(c){ if(c.id!=='btnNovaCat') bindCatChip(c); });
+
+  $('#btnNovaCat').addEventListener('click', async function(){
+    var r=await Swal.fire({title:'Nova categoria',input:'text',inputPlaceholder:'Ex.: Trabalho',showCancelButton:true,confirmButtonText:'Criar',cancelButtonText:'Cancelar',confirmButtonColor:'#4f46e5'});
+    if(!r.isConfirmed || !r.value) return;
+    try{ var res=await post('cat_criar.php',{nome:r.value}); if(!res.success) throw new Error(res.message||'Falha.'); location.reload(); }catch(e){ Swal.fire('Erro', e.message, 'error'); }
+  });
+  async function renomearCat(nome){
+    var r=await Swal.fire({title:'Renomear categoria',input:'text',inputValue:nome,showCancelButton:true,confirmButtonText:'Salvar',cancelButtonText:'Cancelar',confirmButtonColor:'#4f46e5'});
+    if(!r.isConfirmed || !r.value || r.value===nome) return;
+    try{ var res=await post('cat_renomear.php',{de:nome,para:r.value}); if(!res.success) throw new Error(res.message); location.reload(); }catch(e){ Swal.fire('Erro',e.message,'error'); }
+  }
+  async function excluirCat(nome){
+    var r=await Swal.fire({icon:'warning',title:'Excluir categoria “'+nome+'”?',text:'As anotações dela ficarão sem categoria (não serão apagadas).',showCancelButton:true,confirmButtonText:'Excluir',cancelButtonText:'Cancelar',confirmButtonColor:'#dc2626'});
+    if(!r.isConfirmed) return;
+    try{ var res=await post('cat_excluir.php',{nome:nome}); if(!res.success) throw new Error(res.message); location.reload(); }catch(e){ Swal.fire('Erro',e.message,'error'); }
+  }
+
+  if(boardMinhas){
+    Sortable.create(boardMinhas, { group:{name:'notas', pull:true, put:true}, animation:160, filter:'.empty',
+      draggable:'.postit', ghostClass:'sortable-ghost', chosenClass:'sortable-chosen', onEnd:function(){ salvarOrg(); } });
+  }
+  function salvarOrg(){
+    var itens=$$('.postit',boardMinhas).map(function(p,i){ return {id:p.dataset.id, cat:p.dataset.cat||'', ord:i}; });
+    post('org_salvar.php',{itens:JSON.stringify(itens)}).catch(function(){});
+  }
+
+  var editor=$('#f_content');
+  $$('.rt-btn').forEach(function(b){
+    b.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    b.addEventListener('click', function(){
+      editor.focus();
+      try{ document.execCommand('styleWithCSS', false, false); }catch(_){}
+      document.execCommand(b.dataset.cmd, false, null);
+      sincronizaBotoes();
+    });
+  });
+  function sincronizaBotoes(){ $$('.rt-btn').forEach(function(b){ try{ b.classList.toggle('on', document.queryCommandState(b.dataset.cmd)); }catch(_){} }); }
+  editor.addEventListener('keyup', sincronizaBotoes);
+  editor.addEventListener('mouseup', sincronizaBotoes);
+
+  function bindSwatches(container,onPick){
+    $$('.swatch',container).forEach(function(s){ s.addEventListener('click', function(){ $$('.swatch',container).forEach(function(x){x.classList.remove('sel');}); s.classList.add('sel'); if(onPick) onPick(s.dataset.color); }); });
+  }
+  var novaCor='<?php echo nh(array_values($paleta)[0]); ?>';
+  bindSwatches($('#f_color_wrap'), function(c){ novaCor=c; });
+
+  $('#btnNova').addEventListener('click', function(){
+    $('#editTitle').textContent='Nova anotação';
+    $('#f_id').value=''; $('#f_owner').value=ME; $('#f_title').value=''; editor.innerHTML='';
+    $('#f_color_wrap').style.display='';
+    $$('.swatch',$('#f_color_wrap')).forEach(function(x,i){ x.classList.toggle('sel', i===0); });
+    novaCor=$$('.swatch',$('#f_color_wrap'))[0].dataset.color;
+    sincronizaBotoes(); modal('editModal').show();
+    setTimeout(function(){ $('#f_title').focus(); }, 300);
+  });
+  function abrirEdicao(card){
+    $('#editTitle').textContent='Editar anotação';
+    $('#f_id').value=card.dataset.id; $('#f_owner').value=card.dataset.owner;
+    $('#f_title').value=card.dataset.title; editor.innerHTML=card.dataset.content||'';
+    $('#f_color_wrap').style.display=(card.dataset.mode==='own')?'':'none';
+    sincronizaBotoes(); modal('editModal').show();
+  }
+  $('#btnSalvar').addEventListener('click', async function(){
+    var id=$('#f_id').value, owner=$('#f_owner').value||ME;
+    var payload={ title:$('#f_title').value, content:editor.innerHTML, owner:owner };
+    try{
+      var r; if(!id){ payload.color=novaCor; r=await post('nota_criar.php',payload); }
+      else { payload.id=id; r=await post('nota_salvar.php',payload); }
+      if(!r.success) throw new Error(r.message||'Falha.');
+      modal('editModal').hide(); location.reload();
+    }catch(e){ Swal.fire('Erro', e.message, 'error'); }
+  });
+
+  document.addEventListener('click', function(ev){
+    var btn=ev.target.closest('.pa');
+    if(btn){ var card=ev.target.closest('.postit');
+      if(btn.classList.contains('js-view'))  return verNota(card);
+      if(btn.classList.contains('js-color')) return abrirCor(card);
+      if(btn.classList.contains('js-share')) return abrirShare(card);
+      if(btn.classList.contains('js-del'))   return excluir(card);
+      return;
+    }
+    var card=ev.target.closest('.postit'); if(!card) return;
+    verNota(card);
+  });
+
+  var cardView=null;
+  function verNota(card){
+    cardView=card;
+    $('#v_title').textContent=card.dataset.title||'Sem título';
+    $('#v_body').innerHTML=card.dataset.content||'';
+    $('#v_paper').style.setProperty('--cor', card.dataset.color);
+    $('#v_edit').style.display=(card.dataset.canedit==='1')?'':'none';
+    modal('viewModal').show();
+  }
+  $('#v_edit').addEventListener('click', function(){
+    if(!cardView) return;
+    var c=cardView;
+    modal('viewModal').hide();
+    setTimeout(function(){ abrirEdicao(c); }, 250);
+  });
+
+  function abrirCor(card){
+    $('#c_id').value=card.dataset.id;
+    $$('.swatch',$('#c_swatches')).forEach(function(s){ s.classList.toggle('sel', s.dataset.color.toUpperCase()===(card.dataset.color||'').toUpperCase()); });
+    modal('colorModal').show();
+  }
+  bindSwatches($('#c_swatches'), async function(c){
+    var id=$('#c_id').value;
+    try{ var r=await post('nota_cor.php',{id:id,color:c,owner:ME}); if(!r.success) throw new Error(r.message);
+      var card=$('.postit[data-id="'+CSS.escape(id)+'"]'); if(card){ card.style.setProperty('--cor',r.color); card.dataset.color=r.color; }
+      modal('colorModal').hide();
+    }catch(e){ Swal.fire('Erro',e.message,'error'); }
+  });
+
+  async function excluir(card){
+    var own=card.dataset.mode==='own';
+    var q=await Swal.fire({icon:'warning',title:own?'Excluir anotação?':'Remover da sua lista?',
+      text:own?'Ela irá para a lixeira e deixará de ser compartilhada.':'Você deixará de ver esta anotação.',
+      showCancelButton:true,confirmButtonText:own?'Excluir':'Remover',cancelButtonText:'Cancelar',confirmButtonColor:'#dc2626'});
+    if(!q.isConfirmed) return;
+    try{ var r=await post('nota_excluir.php',{id:card.dataset.id,owner:card.dataset.owner}); if(!r.success) throw new Error(r.message);
+      card.style.transition='.25s'; card.style.opacity='0'; card.style.transform='scale(.9)'; setTimeout(function(){ location.reload(); },260);
+    }catch(e){ Swal.fire('Erro',e.message,'error'); }
+  }
+
+  var usuariosCache=null;
+  async function carregarUsuarios(){ if(usuariosCache) return usuariosCache; var r=await fetch('nota_usuarios.php',{credentials:'same-origin'}); var j=await r.json(); usuariosCache=(j.success?j.usuarios:[]); return usuariosCache; }
+  async function abrirShare(card){
+    $('#sh_id').value=card.dataset.id;
+    var sel=$('#sh_user'); sel.innerHTML='<option value="">Carregando…</option>';
+    var us=await carregarUsuarios();
+    sel.innerHTML='<option value="">Selecione um usuário…</option>'+us.map(function(u){return '<option value="'+esc(u.usuario)+'">'+esc(u.nome)+'</option>';}).join('');
+    await renderShareList(card.dataset.id); modal('shareModal').show();
+  }
+  async function renderShareList(id){
+    var box=$('#sh_list'); box.innerHTML='<div class="text-muted" style="font-size:.85rem;padding:8px">Carregando…</div>';
+    var r=await fetch('nota_compartilhamentos.php?id='+encodeURIComponent(id),{credentials:'same-origin'}); var j=await r.json();
+    var arr=(j.success?j.compartilhamentos:[]);
+    if(!arr.length){ box.innerHTML='<div class="text-muted" style="font-size:.85rem;padding:8px">Ninguém ainda.</div>'; return; }
+    box.innerHTML='';
+    arr.forEach(function(s){
+      var row=document.createElement('div'); row.className='share-row';
+      var ini=(s.nome||s.shared_with||'?').trim().charAt(0).toUpperCase();
+      row.innerHTML='<div class="av">'+esc(ini)+'</div><div class="nm">'+esc(s.nome||s.shared_with)+(parseInt(s.can_edit,10)?' <span style="font-size:.7rem;color:var(--nt-muted)">(edita)</span>':'')+'</div>';
+      var del=document.createElement('button'); del.className='pa'; del.title='Remover'; del.style.background='#fee2e2'; del.style.color='#b91c1c'; del.innerHTML='<i class="fa-solid fa-xmark"></i>';
+      del.addEventListener('click', async function(){ try{ var rr=await post('nota_descompartilhar.php',{id:id,usuario:s.shared_with}); if(!rr.success) throw new Error(rr.message); renderShareList(id); }catch(e){ Swal.fire('Erro',e.message,'error'); } });
+      row.appendChild(del); box.appendChild(row);
+    });
+  }
+  $('#btnAddShare').addEventListener('click', async function(){
+    var id=$('#sh_id').value, user=$('#sh_user').value, canEdit=$('#sh_edit').checked?1:0;
+    if(!user){ Swal.fire('Atenção','Escolha um usuário.','warning'); return; }
+    try{ var r=await post('nota_compartilhar.php',{id:id,usuario:user,can_edit:canEdit}); if(!r.success) throw new Error(r.message);
+      $('#sh_user').value=''; $('#sh_edit').checked=false; renderShareList(id);
+      Swal.fire({icon:'success',title:'Compartilhada',text:r.message,timer:1800,showConfirmButton:false});
+    }catch(e){ Swal.fire('Erro',e.message,'error'); }
+  });
+
+})();
+</script>
+<?php @include(__DIR__ . '/../rodape.php'); ?>
 </body>
 </html>
