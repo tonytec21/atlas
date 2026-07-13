@@ -3,7 +3,7 @@
  * =====================================================================
  * ATLAS O.S. — Integração NFS-e Nacional (Emissor Nacional / SEFIN)
  * ---------------------------------------------------------------------
- * ATLAS-NFSE-BUILD: 2026-07-13p-sem-pAliq-municipio-aderente
+ * ATLAS-NFSE-BUILD: 2026-07-13s-fuso-fortaleza-alinhado
  *   (auto-reempacota .pfx RC2-40 -> AES-256 no upload/emissao)
  *
  * Base normativa adotada (ver INSTALACAO.md para o detalhamento):
@@ -30,7 +30,7 @@ define('ATLAS_NFSE_DIR', __DIR__);
 define('ATLAS_NFSE_CERTS_DIR', __DIR__ . DIRECTORY_SEPARATOR . 'certs');
 define('ATLAS_NFSE_KEYFILE', ATLAS_NFSE_CERTS_DIR . DIRECTORY_SEPARATOR . '.nfse.key');
 
-date_default_timezone_set('America/Sao_Paulo');
+date_default_timezone_set('America/Fortaleza');
 
 /* =====================================================================
  * 1. AUTOLOAD / DISPONIBILIDADE DO SDK
@@ -140,6 +140,15 @@ function nfse_pdo(): PDO
     require_once __DIR__ . '/../db_connection.php';
     $pdo = getDatabaseConnection();
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // Alinha o fuso do MySQL ao do PHP (America/Fortaleza = -03:00), para que
+    // NOW() e a exibição com date()/strtotime() usem o mesmo horário. O formato
+    // de offset não depende das tabelas de fuso nomeadas (que o XAMPP não traz).
+    try {
+        $pdo->exec("SET time_zone = '-03:00'");
+    } catch (\Throwable $e) {
+        // Sem permissão para trocar o fuso da sessão: segue com o padrão do servidor.
+    }
 
     return $pdo;
 }

@@ -75,6 +75,11 @@ $__esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
         <a class="btn btn-outline-secondary btn-sm" href="nfse/nfse_xml.php?nota_id=<?= (int) $__nfse_ativa['id'] ?>">
           <i class="fa fa-download"></i> XML
         </a>
+        <?php if (!empty($__nfse_ativa['chave_acesso'])): ?>
+        <a class="btn btn-outline-success btn-sm" target="_blank" title="Imprimir recibo térmico" href="nfse/nfse_recibo.php?nota_id=<?= (int) $__nfse_ativa['id'] ?>">
+          <i class="fa fa-print"></i> Recibo
+        </a>
+        <?php endif; ?>
         <button class="btn btn-outline-info btn-sm" onclick="nfseSincronizar(<?= (int) $__nfse_ativa['id'] ?>)">
           <i class="fa fa-refresh"></i> Sincronizar
         </button>
@@ -138,7 +143,10 @@ $__esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 
     <?php
     $__rejeitadas = array_filter($__nfse_notas, static fn($n) => $n['status'] === 'rejeitada');
-    if ($__rejeitadas):
+    // Oculta a rejeição antiga quando a O.S. já tem uma NFS-e válida (autorizada,
+    // processando ou cancelada) — o erro anterior deixa de ser relevante.
+    $__temValida = (bool) array_filter($__nfse_notas, static fn($n) => in_array($n['status'], ['autorizada', 'processando', 'cancelada'], true));
+    if ($__rejeitadas && !$__temValida):
         $__ultima = reset($__rejeitadas);
     ?>
       <div class="alert alert-danger mt-3 mb-0" style="font-size:.8rem">
