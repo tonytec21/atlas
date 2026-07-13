@@ -3,7 +3,8 @@
  * =====================================================================
  * ATLAS O.S. — Integração NFS-e Nacional (Emissor Nacional / SEFIN)
  * ---------------------------------------------------------------------
- * ATLAS-NFSE-BUILD: 2026-07-09-integracao-emissor-nacional
+ * ATLAS-NFSE-BUILD: 2026-07-13d-cIntContrib-alfanumerico
+ *   (auto-reempacota .pfx RC2-40 -> AES-256 no upload/emissao)
  *
  * Base normativa adotada (ver INSTALACAO.md para o detalhamento):
  *  - LC 116/2003, item 21.01 da lista anexa  -> cTribNac 210101
@@ -46,17 +47,61 @@ function nfse_autoload(): bool
     }
 
     $candidatos = [
-        __DIR__ . '/vendor/autoload.php',
-        __DIR__ . '/../vendor/autoload.php',
-        __DIR__ . '/../../vendor/autoload.php',
+        __DIR__ . '/vendor',
+        __DIR__ . '/../vendor',
+        __DIR__ . '/../../vendor',
     ];
 
-    foreach ($candidatos as $path) {
-        if (is_file($path)) {
-            require_once $path;
-            $ok = class_exists('\\Nfse\\Nfse');
-            return $ok;
+    foreach ($candidatos as $dir) {
+        if (!is_file($dir . '/autoload.php')) {
+            continue;
         }
+
+        require_once $dir . '/autoload.php';
+
+        // A raiz do Atlas costuma ter seu proprio vendor/ e carrega o Composer
+        // antes deste modulo, curto-circuitando o autoloader do SDK. Para
+        // garantir a resolucao de forma independente, montamos um ClassLoader a
+        // partir dos mapas do Composer DESTE modulo e o registramos com prepend.
+        // Auto-carregamos o ClassLoader.php do modulo caso ainda nao exista.
+        $clFile = $dir . '/composer/ClassLoader.php';
+        if (!class_exists('\\Composer\\Autoload\\ClassLoader', false) && is_file($clFile)) {
+            require_once $clFile;
+        }
+        if (class_exists('\\Composer\\Autoload\\ClassLoader', false)) {
+            try {
+                $loader = new \Composer\Autoload\ClassLoader();
+
+                $psr4 = $dir . '/composer/autoload_psr4.php';
+                if (is_file($psr4)) {
+                    foreach ((array) require $psr4 as $ns => $paths) {
+                        $loader->setPsr4($ns, $paths);
+                    }
+                }
+
+                $psr0 = $dir . '/composer/autoload_namespaces.php';
+                if (is_file($psr0)) {
+                    foreach ((array) require $psr0 as $ns => $paths) {
+                        $loader->set($ns, $paths);
+                    }
+                }
+
+                $cmap = $dir . '/composer/autoload_classmap.php';
+                if (is_file($cmap)) {
+                    $m = require $cmap;
+                    if (is_array($m) && $m) {
+                        $loader->addClassMap($m);
+                    }
+                }
+
+                $loader->register(true); // prepend: SDK do modulo tem prioridade
+            } catch (\Throwable $e) {
+                error_log('[nfse_autoload] fallback ClassLoader: ' . $e->getMessage());
+            }
+        }
+
+        $ok = class_exists('\\Nfse\\Nfse');
+        return $ok;
     }
 
     $ok = class_exists('\\Nfse\\Nfse');
@@ -352,12 +397,207 @@ function nfse_pendencias(array $cfg): array
  * 6. CERTIFICADO A1
  * ===================================================================== */
 
+/* ---------------------------------------------------------------------
+ * 6.0  COMPATIBILIDADE OpenSSL 3  (reempacotamento de .pfx legado)
+ * ---------------------------------------------------------------------
+ * Muitos certificados A1 da ICP-Brasil vem cifrados com RC2-40/3DES,
+ * algoritmos que o OpenSSL 3 moveu para o provider "legacy" e desabilitou
+ * por padrao. Nesses casos openssl_pkcs12_read() falha com
+ * "error:0308010C ... unsupported". Em vez de exigir intervencao manual,
+ * reempacotamos o .pfx para AES-256 (PBES2/PBKDF2) usando o binario
+ * openssl (que o proprio XAMPP ja inclui) e seguimos normalmente.
+ * ------------------------------------------------------------------- */
+
+/**
+ * Localiza um binario openssl utilizavel. Devolve o caminho ou null.
+ * Pode ser fixado via constante NFSE_OPENSSL_BIN.
+ */
+function nfse_openssl_bin(): ?string
+{
+    static $cache = false;
+    if ($cache !== false) {
+        return $cache;
+    }
+
+    $candidatos = [];
+    if (defined('NFSE_OPENSSL_BIN') && NFSE_OPENSSL_BIN) {
+        $candidatos[] = NFSE_OPENSSL_BIN;
+    }
+
+    if (stripos(PHP_OS, 'WIN') === 0) {
+        $candidatos[] = 'C:\\xampp\\apache\\bin\\openssl.exe';
+        $candidatos[] = dirname(PHP_BINARY) . '\\openssl.exe';
+        $candidatos[] = 'openssl.exe';
+        $candidatos[] = 'openssl';
+    } else {
+        $candidatos[] = '/usr/bin/openssl';
+        $candidatos[] = 'openssl';
+    }
+
+    foreach ($candidatos as $bin) {
+        [$rc] = nfse_exec($bin, ['version'], null, false);
+        if ($rc === 0) {
+            return $cache = $bin;
+        }
+    }
+
+    return $cache = null;
+}
+
+/**
+ * Executa um binario externo SEM shell (proc_open com args em array,
+ * evitando problemas de escape/quoting no Windows).
+ *
+ * @param array<int,string>         $args
+ * @param array<string,string>|null $env  Variaveis extras (senha via env:).
+ * @return array{0:int,1:string,2:string}  [returnCode, stdout, stderr]
+ */
+function nfse_exec(string $bin, array $args, ?array $env = null, bool $capturar = true): array
+{
+    $cmd  = array_merge([$bin], $args);
+    $spec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+
+    // env explicito no Windows SUBSTITUI o ambiente inteiro; reinjeta o essencial.
+    $envFinal = null;
+    if ($env !== null) {
+        $envFinal = $env;
+        foreach (['PATH', 'Path', 'SystemRoot', 'windir', 'TEMP', 'TMP', 'COMSPEC'] as $k) {
+            $v = getenv($k);
+            if ($v !== false && !isset($envFinal[$k])) {
+                $envFinal[$k] = $v;
+            }
+        }
+    }
+
+    $proc = @proc_open($cmd, $spec, $pipes, null, $envFinal);
+    if (!is_resource($proc)) {
+        return [127, '', 'Nao foi possivel iniciar o processo: ' . $bin];
+    }
+
+    fclose($pipes[0]);
+    $out = $capturar ? stream_get_contents($pipes[1]) : '';
+    $err = $capturar ? stream_get_contents($pipes[2]) : '';
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $rc = proc_close($proc);
+
+    return [$rc, (string) $out, (string) $err];
+}
+
+/**
+ * Garante que o .pfx seja legivel pelo OpenSSL 3 do PHP. Se usar cifra
+ * legada, reempacota para AES-256 e devolve o novo binario.
+ *
+ * @return array{0:string,1:bool}  [pfxBinario, foiReempacotado]
+ */
+function nfse_normalizar_pfx(string $pfxBinario, string $senha): array
+{
+    // Caminho rapido: certificados modernos caem aqui.
+    $tmp = [];
+    if (@openssl_pkcs12_read($pfxBinario, $tmp, $senha)) {
+        return [$pfxBinario, false];
+    }
+
+    // So reempacota se o motivo for cifra nao suportada; senao devolve o
+    // original para o chamador tratar (senha errada, arquivo corrompido...).
+    $erros = '';
+    while ($m = openssl_error_string()) {
+        $erros .= $m . '; ';
+    }
+    $ehLegado = str_contains($erros, 'unsupported')
+        || str_contains($erros, 'digital envelope routines')
+        || str_contains($erros, '0308010C');
+
+    if (!$ehLegado) {
+        return [$pfxBinario, false];
+    }
+
+    $openssl = nfse_openssl_bin();
+    if ($openssl === null) {
+        throw new RuntimeException(
+            'Este certificado usa cifra legada (RC2-40/3DES) que o OpenSSL 3 do PHP recusa, ' .
+            'e nao encontrei o binario "openssl" para reempacota-lo automaticamente. ' .
+            'Inclua o openssl no PATH (o XAMPP traz em C:\\xampp\\apache\\bin\\openssl.exe) ' .
+            'ou defina a constante NFSE_OPENSSL_BIN com o caminho completo.'
+        );
+    }
+
+    $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'atlas_nfse';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0700, true);
+    }
+    $sfx  = bin2hex(random_bytes(8));
+    $fIn  = $dir . DIRECTORY_SEPARATOR . "in_{$sfx}.pfx";
+    $fPem = $dir . DIRECTORY_SEPARATOR . "mid_{$sfx}.pem";   // chave em claro: apagado no finally
+    $fOut = $dir . DIRECTORY_SEPARATOR . "out_{$sfx}.pfx";
+
+    // Senha via env: (nao aparece na lista de processos).
+    $env = ['NFSE_PFX_PASSIN' => $senha, 'NFSE_PFX_PASSOUT' => $senha];
+
+    try {
+        if (file_put_contents($fIn, $pfxBinario) === false) {
+            throw new RuntimeException('Nao foi possivel gravar o arquivo temporario do certificado.');
+        }
+
+        // Passo 1: .pfx legado -> PEM (provider legacy explicito).
+        [$rc, , $err] = nfse_exec($openssl, [
+            'pkcs12', '-legacy', '-in', $fIn, '-nodes',
+            '-passin', 'env:NFSE_PFX_PASSIN', '-out', $fPem,
+        ], $env);
+
+        // OpenSSL 1.1.x nao conhece "-legacy": repete sem a flag.
+        if ($rc !== 0 && stripos($err, 'legacy') !== false) {
+            [$rc, , $err] = nfse_exec($openssl, [
+                'pkcs12', '-in', $fIn, '-nodes',
+                '-passin', 'env:NFSE_PFX_PASSIN', '-out', $fPem,
+            ], $env);
+        }
+        if ($rc !== 0 || !is_file($fPem) || filesize($fPem) === 0) {
+            throw new RuntimeException(
+                'Falha ao ler o certificado legado (senha incorreta ou arquivo invalido). ' . trim($err)
+            );
+        }
+
+        // Passo 2: PEM -> .pfx moderno (AES-256-CBC + MAC sha256).
+        [$rc, , $err] = nfse_exec($openssl, [
+            'pkcs12', '-export', '-in', $fPem,
+            '-passout', 'env:NFSE_PFX_PASSOUT', '-out', $fOut,
+            '-keypbe', 'AES-256-CBC', '-certpbe', 'AES-256-CBC', '-macalg', 'sha256',
+        ], $env);
+        if ($rc !== 0 || !is_file($fOut) || filesize($fOut) === 0) {
+            throw new RuntimeException('Falha ao reempacotar o certificado para cifra moderna. ' . trim($err));
+        }
+
+        $novo = file_get_contents($fOut);
+        if ($novo === false || $novo === '') {
+            throw new RuntimeException('O certificado reempacotado ficou vazio.');
+        }
+
+        // Confirma que agora o PHP le.
+        $chk = [];
+        if (!openssl_pkcs12_read($novo, $chk, $senha)) {
+            throw new RuntimeException('O certificado reempacotado ainda nao pode ser lido pelo PHP.');
+        }
+
+        return [$novo, true];
+    } finally {
+        foreach ([$fIn, $fPem, $fOut] as $f) {
+            if (is_file($f)) {
+                @unlink($f);
+            }
+        }
+    }
+}
+
 /**
  * Lê o .pfx, valida a senha, extrai titular/validade e devolve os metadados.
  * NÃO grava nada — quem grava é nfse_salvar_certificado().
  */
 function nfse_inspecionar_pfx(string $pfxBinario, string $senha): array
 {
+    // Compat. OpenSSL 3: reempacota automaticamente .pfx com cifra legada (RC2-40).
+    [$pfxBinario] = nfse_normalizar_pfx($pfxBinario, $senha);
+
     $certs = [];
     if (!openssl_pkcs12_read($pfxBinario, $certs, $senha)) {
         $erros = '';
@@ -369,14 +609,11 @@ function nfse_inspecionar_pfx(string $pfxBinario, string $senha): array
             throw new RuntimeException('Certificado com chave inferior a 2048 bits, rejeitado pelas políticas de segurança. Use um A1 atual.');
         }
 
-        // OpenSSL 3 (PHP 8.1+) recusa o RC2-40 usado por muitas AC brasileiras.
+        // Fallback: normalmente nfse_normalizar_pfx() ja resolveu o RC2-40 acima.
         if (str_contains($erros, 'unsupported') || str_contains($erros, 'digital envelope routines')) {
             throw new RuntimeException(
-                'O OpenSSL 3 do PHP recusou este .pfx porque ele usa cifra legada (RC2-40). ' .
-                'Reempacote o certificado com: ' .
-                'openssl pkcs12 -legacy -in original.pfx -nodes -out tmp.pem  →  ' .
-                'openssl pkcs12 -export -in tmp.pem -out novo.pfx  — e envie o novo.pfx. ' .
-                'Alternativamente, habilite o provider "legacy" no openssl.cnf do XAMPP. ' .
+                'Este .pfx usa cifra legada (RC2-40) e o reempacotamento automatico nao pode ser aplicado. ' .
+                'Confirme se o binario openssl esta acessivel (constante NFSE_OPENSSL_BIN). ' .
                 'Detalhe OpenSSL: ' . trim($erros)
             );
         }
@@ -411,7 +648,11 @@ function nfse_inspecionar_pfx(string $pfxBinario, string $senha): array
 
 function nfse_salvar_certificado(string $pfxBinario, string $senha, string $nomeArquivo): array
 {
+    // Normaliza uma unica vez e guarda o .pfx ja compativel com o OpenSSL 3.
+    [$pfxBinario, $reempacotado] = nfse_normalizar_pfx($pfxBinario, $senha);
+
     $meta = nfse_inspecionar_pfx($pfxBinario, $senha);
+    $meta['reempacotado'] = $reempacotado;
 
     if ($meta['vencido']) {
         throw new RuntimeException('Certificado vencido em ' . date('d/m/Y', strtotime($meta['valido_ate'])) . '.');
@@ -471,6 +712,9 @@ function nfse_context(?array $cfg = null): \Nfse\Http\NfseContext
     $pfx   = nfse_decrypt($cfg['cert_blob']);
     $senha = nfse_decrypt($cfg['cert_senha']) ?? '';
 
+    // Certificados gravados antes desta correcao podem estar com cifra legada.
+    [$pfx] = nfse_normalizar_pfx($pfx, $senha);
+
     $ambiente = ($cfg['ambiente'] === '1')
         ? \Nfse\Enums\TipoAmbiente::Producao
         : \Nfse\Enums\TipoAmbiente::Homologacao;
@@ -482,6 +726,25 @@ function nfse_context(?array $cfg = null): \Nfse\Http\NfseContext
         codigoMunicipio: $cfg['cod_municipio'] ?: null,
         certificateContent: $pfx
     );
+}
+
+/**
+ * Instancia o cliente do SDK garantindo que o autoloader do modulo ja esteja
+ * registrado ANTES da resolucao da classe do cliente.
+ *
+ * Detalhe critico: ao passar o contexto como argumento do construtor, o PHP
+ * resolve (e autoloada) a classe do cliente ANTES de avaliar o argumento -- e
+ * o registro do autoloader do modulo acontece dentro de nfse_context() via
+ * nfse_autoload(). Se o vendor/ da raiz do Atlas for carregado primeiro, a
+ * classe nao existe nesse instante. Chamar nfse_autoload() aqui, numa
+ * instrucao anterior ao new, elimina o problema. Sem type-hint de retorno de
+ * proposito, para nao forcar a resolucao antecipada da classe.
+ */
+function nfse_cliente(?array $cfg = null)
+{
+    nfse_autoload();
+    $contexto = nfse_context($cfg);
+    return new \Nfse\Nfse($contexto);
 }
 
 /* =====================================================================
@@ -674,6 +937,8 @@ function nfse_so_digitos(?string $v): string
 
 function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $linha = null): array
 {
+    nfse_autoload();
+
     $doc      = nfse_so_digitos($cfg['prest_doc']);
     $codMun   = $cfg['cod_municipio'];
     $serie    = (string) $cfg['serie_dps'];
@@ -748,7 +1013,14 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
     if (!empty($cfg['cnae'])) {
         $cServ['cCNAE'] = nfse_so_digitos($cfg['cnae']);
     }
-    $cServ['cIntContrib'] = 'OS-' . (int) $apuracao['os']['id'];
+    // cIntContrib deve casar com TSCodigoInternoContribuinte = [a-zA-Z0-9]{1,20}
+    // (schema nacional). O hifen quebra a validacao (erro E1235 da SEFIN), entao
+    // usamos apenas caracteres alfanumericos.
+    $cIntContrib = preg_replace('/[^A-Za-z0-9]/', '', 'OS' . (int) $apuracao['os']['id']);
+    if ($cIntContrib === '' || $cIntContrib === null) {
+        $cIntContrib = 'OS' . (int) $apuracao['os']['id'];
+    }
+    $cServ['cIntContrib'] = substr($cIntContrib, 0, 20);
 
     // ------- Valores -------
     if ($linha !== null) {
@@ -917,7 +1189,7 @@ function nfse_emitir_os_interno(int $osId, bool $forcar = false): array
     }
 
     $pdo = nfse_pdo();
-    $nfse = new \Nfse\Nfse(nfse_context($cfg));
+    $nfse = nfse_cliente($cfg);
 
     $individual = ($cfg['modo_emissao'] === 'individualizado') || nfse_exige_individualizacao();
     $lotes = $individual ? $apuracao['itens'] : [null];
@@ -1079,7 +1351,7 @@ function nfse_cancelar(int $notaId, string $cMotivo, string $xMotivo): array
         $evento['infPedReg']['CPFAutor'] = $doc;
     }
 
-    $nfse = new \Nfse\Nfse(nfse_context($cfg));
+    $nfse = nfse_cliente($cfg);
     $resposta = $nfse->contribuinte()->cancelar(new \Nfse\Dto\Nfse\PedRegEventoData($evento));
 
     $pdo->prepare(
@@ -1102,7 +1374,7 @@ function nfse_cancelar(int $notaId, string $cMotivo, string $xMotivo): array
 
 function nfse_consultar_chave(string $chave): ?object
 {
-    $nfse = new \Nfse\Nfse(nfse_context());
+    $nfse = nfse_cliente();
     return $nfse->contribuinte()->consultar($chave);
 }
 
@@ -1134,7 +1406,7 @@ function nfse_testar_convenio(?string $codMunicipio = null): array
         throw new RuntimeException('Informe o código IBGE do município.');
     }
 
-    $nfse = new \Nfse\Nfse(nfse_context($cfg));
+    $nfse = nfse_cliente($cfg);
     $params = $nfse->contribuinte()->consultarParametrosConvenio($cod);
 
     return ['ok' => true, 'parametros' => $params];
@@ -1149,7 +1421,7 @@ function nfse_consultar_aliquota(?string $codMunicipio = null, ?string $competen
     $cod = $codMunicipio ?: $cfg['cod_municipio'];
     $comp = $competencia ?: date('Y-m-d');
 
-    $nfse = new \Nfse\Nfse(nfse_context($cfg));
+    $nfse = nfse_cliente($cfg);
     $res = $nfse->contribuinte()->consultarAliquota($cod, $cfg['ctrib_nac'] ?: '210101', $comp);
 
     return ['ok' => true, 'aliquotas' => $res];

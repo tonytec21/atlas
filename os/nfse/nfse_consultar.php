@@ -22,7 +22,7 @@ try {
 
     // Sem chave, a nota nunca chegou a ser autorizada. Tenta pela DPS.
     if (empty($nota['chave_acesso'])) {
-        $nfse = new \Nfse\Nfse(nfse_context());
+        $nfse = nfse_cliente();
         $resp = $nfse->contribuinte()->consultarDps($nota['id_dps']);
 
         if (!empty($resp->chaveAcesso)) {
