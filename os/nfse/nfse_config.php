@@ -393,6 +393,24 @@ $chk = static fn($k) => !empty($cfg[$k]) ? 'checked' : '';
                 </div>
               </div>
 
+              <div class="form-row">
+                <div class="form-group col-md-6">
+                  <label for="reg_ap_trib_sn">Regime de apuração (Simples Nacional)</label>
+                  <select class="form-control" id="reg_ap_trib_sn" name="reg_ap_trib_sn">
+                    <option value="" <?= $sel('reg_ap_trib_sn', '') ?>>— (não optante)</option>
+                    <option value="1" <?= $sel('reg_ap_trib_sn', '1') ?>>1 — Federais e ISSQN pelo SN</option>
+                    <option value="2" <?= $sel('reg_ap_trib_sn', '2') ?>>2 — Federais pelo SN, ISSQN pelo regime normal</option>
+                    <option value="3" <?= $sel('reg_ap_trib_sn', '3') ?>>3 — MEI</option>
+                  </select>
+                  <div class="helper">Obrigatório para optantes do Simples Nacional (ME/EPP ou MEI); a SEFIN recusa a DPS sem este campo. Ignorado para não optantes.</div>
+                </div>
+                <div class="form-group col-md-6">
+                  <label for="p_tot_trib_sn">% total de tributos (Simples Nacional)</label>
+                  <input type="text" class="form-control" id="p_tot_trib_sn" name="p_tot_trib_sn" value="<?= $v('p_tot_trib_sn') ?>" placeholder="ex.: 6,00">
+                  <div class="helper">Alíquota efetiva do Simples (pTotTribSN), exigida no totTrib para optantes. Deixe 0 para não optantes; num optante, se ficar 0 o sistema usa 6,00.</div>
+                </div>
+              </div>
+
               <div class="alert alert-secondary mb-0" style="font-size:.82rem">
                 <b>Simulação:</b> emolumentos de R$ 100,00 →
                 base R$ <span id="simBase">88,00</span> → ISSQN R$ <span id="simIss">4,40</span>.

@@ -82,7 +82,8 @@ try {
                 cod_municipio = :cmun, serie_dps = :serie, ultimo_numero_dps = :ndps,
                 ctrib_nac = :ctnac, ctrib_mun = :ctmun, cnae = :cnae,
                 base_calculo = :base, reducao_base = :red, aliquota_iss = :aliq,
-                reg_esp_trib = :regesp, op_simp_nac = :simples, cst_piscofins = :cst,
+                reg_esp_trib = :regesp, op_simp_nac = :simples, reg_ap_trib_sn = :regap,
+                p_tot_trib_sn = :ptotsn, cst_piscofins = :cst,
                 atualizado_em = NOW(), atualizado_por = :usr
             WHERE id = 1";
 
@@ -115,6 +116,8 @@ try {
         ':aliq'    => $aliquota,
         ':regesp'  => $s('reg_esp_trib', '4'),
         ':simples' => $s('op_simp_nac', '1'),
+        ':regap'   => in_array($s('reg_ap_trib_sn', ''), ['1', '2', '3'], true) ? $s('reg_ap_trib_sn') : null,
+        ':ptotsn'  => max(0.0, (float) str_replace(',', '.', (string) ($_POST['p_tot_trib_sn'] ?? 0))),
         ':cst'     => $s('cst_piscofins', '08'),
         ':usr'     => $_SESSION['username'] ?? 'sistema',
     ]);

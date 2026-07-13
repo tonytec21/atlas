@@ -3,7 +3,7 @@
  * =====================================================================
  * ATLAS O.S. — Integração NFS-e Nacional (Emissor Nacional / SEFIN)
  * ---------------------------------------------------------------------
- * ATLAS-NFSE-BUILD: 2026-07-13d-cIntContrib-alfanumerico
+ * ATLAS-NFSE-BUILD: 2026-07-13m-chave-50digitos-consulta-storage
  *   (auto-reempacota .pfx RC2-40 -> AES-256 no upload/emissao)
  *
  * Base normativa adotada (ver INSTALACAO.md para o detalhamento):
@@ -259,6 +259,8 @@ function nfse_migrar(?PDO $pdo = null): void
             aliquota_iss        DECIMAL(5,2)    NOT NULL DEFAULT 5.00,
             reg_esp_trib        VARCHAR(2)      NOT NULL DEFAULT '4',
             op_simp_nac         VARCHAR(1)      NOT NULL DEFAULT '1',
+            reg_ap_trib_sn      VARCHAR(1)      NULL,
+            p_tot_trib_sn       DECIMAL(5,2)    NOT NULL DEFAULT 0.00,
             cst_piscofins       VARCHAR(2)      NOT NULL DEFAULT '08',
 
             cert_nome           VARCHAR(255)    NULL,
@@ -331,6 +333,33 @@ function nfse_migrar(?PDO $pdo = null): void
     if (!is_file($ht)) {
         @file_put_contents($ht, "Require all denied\n<IfModule !mod_authz_core.c>\n  Order deny,allow\n  Deny from all\n</IfModule>\n");
     }
+    // Migração incremental (instalações anteriores): garante a coluna do regime
+    // de apuração do Simples Nacional, exigida para optantes (opSimpNac 2 ou 3).
+    $temRegAp = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'nfse_config'
+            AND COLUMN_NAME = 'reg_ap_trib_sn'"
+    )->fetchColumn();
+    if ($temRegAp === 0) {
+        $pdo->exec("ALTER TABLE nfse_config ADD COLUMN reg_ap_trib_sn VARCHAR(1) NULL AFTER op_simp_nac");
+    }
+
+    // Percentual total de tributos do Simples Nacional (pTotTribSN), usado no
+    // totTrib quando o prestador é optante do Simples.
+    $temPTot = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'nfse_config'
+            AND COLUMN_NAME = 'p_tot_trib_sn'"
+    )->fetchColumn();
+    if ($temPTot === 0) {
+        $pdo->exec("ALTER TABLE nfse_config ADD COLUMN p_tot_trib_sn DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER reg_ap_trib_sn");
+    }
+
+    // Normaliza chaves gravadas com o prefixo "NFS" ("NFS"+50 = 53 chars) para os
+    // 50 dígitos usados nas consultas/eventos e no portal. Só toca linhas sujas.
+    $pdo->exec("UPDATE nfse_notas SET chave_acesso = SUBSTRING(chave_acesso, 4) WHERE chave_acesso LIKE 'NFS%' AND CHAR_LENGTH(chave_acesso) = 53");
 }
 
 function nfse_log(string $evento, string $mensagem, string $nivel = 'info', ?int $osId = null, ?int $notaId = null): void
@@ -952,10 +981,30 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
     );
 
     // ------- Prestador -------
+    // tpEmit = 1 => o próprio prestador emite a DPS. Nesse caso a SEFIN só
+    // aceita no <prest> a identificação (CNPJ/CPF), a IM e o regTrib. Nome,
+    // endereço, fone e e-mail vêm do cadastro do prestador no CNC do município
+    // e NÃO podem ser informados (erros E0128, xNome do prestador etc.).
+    $tpEmit = '1'; // EmitenteDPS::Prestador
+    $prestEhEmitente = ($tpEmit === '1');
+
     $prest = [
         (strlen($doc) === 14 ? 'CNPJ' : 'CPF') => $doc,
-        'xNome' => mb_substr((string) $cfg['prest_nome'], 0, 150, 'UTF-8'),
-        'end'   => [
+        'regTrib' => [
+            'opSimpNac'  => (string) $cfg['op_simp_nac'],   // 1 = Não optante
+            'regEspTrib' => (string) $cfg['reg_esp_trib'],  // 4 = Notário ou Registrador
+        ],
+    ];
+
+    // IM é aceita (e exigida por muitos municípios) mesmo com o prestador emitente.
+    if (!empty($cfg['prest_im'])) {
+        $prest['IM'] = $cfg['prest_im'];
+    }
+
+    // Nome, endereço, fone e e-mail só entram quando o emitente NÃO é o prestador.
+    if (!$prestEhEmitente) {
+        $prest['xNome'] = mb_substr((string) $cfg['prest_nome'], 0, 150, 'UTF-8');
+        $prest['end'] = [
             'endNac' => [
                 'cMun' => $codMun,
                 'CEP'  => nfse_so_digitos($cfg['prest_cep']),
@@ -963,24 +1012,27 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
             'xLgr'    => mb_substr((string) $cfg['prest_logradouro'], 0, 255, 'UTF-8'),
             'nro'     => mb_substr((string) $cfg['prest_numero'], 0, 60, 'UTF-8'),
             'xBairro' => mb_substr((string) $cfg['prest_bairro'], 0, 60, 'UTF-8'),
-        ],
-        'regTrib' => [
-            'opSimpNac'  => (string) $cfg['op_simp_nac'],   // 1 = Não optante
-            'regEspTrib' => (string) $cfg['reg_esp_trib'],  // 4 = Notário ou Registrador
-        ],
-    ];
+        ];
+        if (!empty($cfg['prest_complemento'])) {
+            $prest['end']['xCpl'] = mb_substr((string) $cfg['prest_complemento'], 0, 156, 'UTF-8');
+        }
+        if (!empty($cfg['prest_fone'])) {
+            $prest['fone'] = nfse_so_digitos($cfg['prest_fone']);
+        }
+        if (!empty($cfg['prest_email'])) {
+            $prest['email'] = $cfg['prest_email'];
+        }
+    }
 
-    if (!empty($cfg['prest_complemento'])) {
-        $prest['end']['xCpl'] = mb_substr((string) $cfg['prest_complemento'], 0, 156, 'UTF-8');
-    }
-    if (!empty($cfg['prest_im'])) {
-        $prest['IM'] = $cfg['prest_im'];
-    }
-    if (!empty($cfg['prest_fone'])) {
-        $prest['fone'] = nfse_so_digitos($cfg['prest_fone']);
-    }
-    if (!empty($cfg['prest_email'])) {
-        $prest['email'] = $cfg['prest_email'];
+    // Optante do Simples Nacional exige o regime de apuração dos tributos.
+    // opSimpNac: 2 = MEI, 3 = ME/EPP. Sem isso a SEFIN recusa (erro E0166).
+    $opSimp = (string) $cfg['op_simp_nac'];
+    if (in_array($opSimp, ['2', '3'], true)) {
+        $regAp = (string) ($cfg['reg_ap_trib_sn'] ?? '');
+        if (!in_array($regAp, ['1', '2', '3'], true)) {
+            $regAp = ($opSimp === '2') ? '3' : '1'; // MEI => 3; ME/EPP => 1 (tudo pelo SN)
+        }
+        $prest['regTrib']['regApTribSN'] = $regAp;
     }
 
     // ------- Tomador (facultativo em 2026: "Tomador não informado") -------
@@ -1038,19 +1090,51 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
     $baseCalculo  = round($valorServico - $valorReducao, 2);
     $valorIss     = round($baseCalculo * (float) $apuracao['aliquota'] / 100, 2);
 
+    // A SEFIN proíbe informar pAliq em dois cenários:
+    //  (a) prestador com regime especial de tributação (regEspTrib != 0), ex.:
+    //      4 = Notário/Registrador ("...possui algum regime especial");
+    //  (b) optante do Simples (opSimpNac 2/3) apurando o ISSQN FORA do SN
+    //      (regApTribSN 2 ou 3) com convênio do município ativo — a alíquota é
+    //      definida pelo município (erro E0635).
+    $regEsp = trim((string) ($cfg['reg_esp_trib'] ?? ''));
+    $temRegimeEspecial = ($regEsp !== '' && (int) $regEsp !== 0);
+
+    $opSimp  = (string) ($cfg['op_simp_nac'] ?? '1');
+    $regApSn = (string) ($cfg['reg_ap_trib_sn'] ?? '');
+    $issPeloMunicipio = (in_array($opSimp, ['2', '3'], true) && in_array($regApSn, ['2', '3'], true));
+
+    $informarAliquota = !$temRegimeEspecial && !$issPeloMunicipio;
+
+    $tribMun = [
+        'tribISSQN'  => 1,  // Operação tributável
+        'tpRetISSQN' => 1,  // Não retido — o notário é o contribuinte
+    ];
+    if ($informarAliquota) {
+        $tribMun['pAliq'] = (float) $apuracao['aliquota'];
+    }
+
+    $trib = [
+        'tribMun' => $tribMun,
+        'tribFed' => [
+            'piscofins' => ['CST' => $cfg['cst_piscofins'] ?: '08'],
+        ],
+    ];
+    // totTrib é obrigatório no XSD (é um choice). Não optante: indTotTrib = 0.
+    // Optante do Simples: o indTotTrib é proibido (E0712); a via válida é o
+    // percentual total de tributos do SN (pTotTribSN), que deve ser > 0.
+    if (!in_array($opSimp, ['2', '3'], true)) {
+        $trib['totTrib'] = ['indTotTrib' => 0];
+    } else {
+        $pTotSN = (float) ($cfg['p_tot_trib_sn'] ?? 0);
+        if ($pTotSN <= 0) {
+            $pTotSN = 6.00; // fallback; ajuste para a alíquota efetiva do Simples
+        }
+        $trib['totTrib'] = ['pTotTribSN' => $pTotSN];
+    }
+
     $valores = [
         'vServPrest' => ['vServ' => $valorServico],
-        'trib' => [
-            'tribMun' => [
-                'tribISSQN'  => 1,  // Operação tributável
-                'tpRetISSQN' => 1,  // Não retido — o notário é o contribuinte
-                'pAliq'      => (float) $apuracao['aliquota'],
-            ],
-            'tribFed' => [
-                'piscofins' => ['CST' => $cfg['cst_piscofins'] ?: '08'],
-            ],
-            'totTrib' => ['indTotTrib' => 0],
-        ],
+        'trib' => $trib,
     ];
 
     if ($pReducao > 0) {
@@ -1065,7 +1149,7 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
         'serie'    => $serie,
         'nDPS'     => (string) $numeroDps,
         'dCompet'  => date('Y-m-d'),
-        'tpEmit'   => '1', // EmitenteDPS::Prestador (string-backed)
+        'tpEmit'   => $tpEmit, // EmitenteDPS::Prestador (string-backed)
         'cLocEmi'  => $codMun,
         'prest'    => $prest,
         'serv'     => [
@@ -1237,7 +1321,7 @@ function nfse_emitir_os_interno(int $osId, bool $forcar = false): array
         try {
             $resultado = $nfse->contribuinte()->emitir($montado['dps']);
 
-            $chave = $resultado->infNfse->id ?? null;
+            $chave = nfse_chave50($resultado->infNfse->id ?? null) ?: null;
             $upd = $pdo->prepare(
                 "UPDATE nfse_notas
                     SET status = 'autorizada', chave_acesso = :chave, numero_nfse = :num,
@@ -1329,13 +1413,21 @@ function nfse_cancelar(int $notaId, string $cMotivo, string $xMotivo): array
 
     $doc = nfse_so_digitos($cfg['prest_doc']);
 
+    // A chave de acesso é gravada a partir do Id da NFS-e ("NFS" + 50 dígitos),
+    // mas o elemento chNFSe e o Id do evento (PRE[0-9]{56}) exigem só os 50
+    // dígitos. Removemos o prefixo/qualquer não-dígito.
+    $chNFSe = preg_replace('/\D/', '', (string) $nota['chave_acesso']);
+    if (strlen((string) $chNFSe) !== 50) {
+        throw new RuntimeException('Chave de acesso da NFS-e inválida para cancelamento (esperado 50 dígitos).');
+    }
+
     $evento = [
         'versao' => '1.01',
         'infPedReg' => [
             'tpAmb'      => (int) $cfg['ambiente'],
             'verAplic'   => ATLAS_NFSE_VERSAO,
             'dhEvento'   => date('c'),
-            'chNFSe'     => $nota['chave_acesso'],
+            'chNFSe'     => $chNFSe,
             'tipoEvento' => '101101',
             'e101101'    => [
                 'xDesc'   => 'Cancelamento de NFS-e',
@@ -1372,10 +1464,20 @@ function nfse_cancelar(int $notaId, string $cMotivo, string $xMotivo): array
  * 13. CONSULTAS
  * ===================================================================== */
 
+/**
+ * Normaliza a chave de acesso da NFS-e para os 50 dígitos exigidos pelas APIs
+ * do Ambiente Nacional e pelo portal. A chave costuma vir do Id da NFS-e
+ * ("NFS" + 50 dígitos); aqui removemos o prefixo/qualquer caractere não numérico.
+ */
+function nfse_chave50(?string $chave): string
+{
+    return preg_replace('/\D/', '', (string) $chave);
+}
+
 function nfse_consultar_chave(string $chave): ?object
 {
     $nfse = nfse_cliente();
-    return $nfse->contribuinte()->consultar($chave);
+    return $nfse->contribuinte()->consultar(nfse_chave50($chave));
 }
 
 function nfse_notas_da_os(int $osId): array
@@ -1415,6 +1517,20 @@ function nfse_testar_convenio(?string $codMunicipio = null): array
 /**
  * Alíquota vigente do serviço 210101 no município, direto do Ambiente Nacional.
  */
+/**
+ * Formata o código de tributação nacional para o formato exigido pela consulta
+ * de alíquota: 9 dígitos em 00.00.00.000. O cTribNac tem 6 dígitos (ex.: 210101
+ * = 21.01.01); completamos o desdobramento com 000 quando ausente.
+ */
+function nfse_formatar_cod_servico(string $codigo): string
+{
+    $d = preg_replace('/\D/', '', $codigo);
+    if (strlen($d) === 6) {
+        $d .= '000';
+    }
+    $d = str_pad(substr($d, 0, 9), 9, '0', STR_PAD_RIGHT);
+    return substr($d, 0, 2) . '.' . substr($d, 2, 2) . '.' . substr($d, 4, 2) . '.' . substr($d, 6, 3);
+}
 function nfse_consultar_aliquota(?string $codMunicipio = null, ?string $competencia = null): array
 {
     $cfg = nfse_config(true);
@@ -1422,7 +1538,8 @@ function nfse_consultar_aliquota(?string $codMunicipio = null, ?string $competen
     $comp = $competencia ?: date('Y-m-d');
 
     $nfse = nfse_cliente($cfg);
-    $res = $nfse->contribuinte()->consultarAliquota($cod, $cfg['ctrib_nac'] ?: '210101', $comp);
+    $codServico = nfse_formatar_cod_servico($cfg['ctrib_nac'] ?: '210101');
+    $res = $nfse->contribuinte()->consultarAliquota($cod, $codServico, $comp);
 
     return ['ok' => true, 'aliquotas' => $res];
 }
