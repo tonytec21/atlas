@@ -154,6 +154,10 @@ $brl = static fn($v) => 'R$ ' . number_format((float) $v, 2, ',', '.');
             <td><?= $badge($n['status']) ?></td>
             <td><small><?= $n['criado_em'] ? date('d/m/Y H:i', strtotime($n['criado_em'])) : '—' ?></small></td>
             <td class="text-nowrap">
+              <?php if (in_array($n['status'], ['autorizada', 'cancelada'], true) && $n['chave_acesso']): ?>
+                <a class="btn btn-outline-primary btn-sm" title="DANFSe (PDF)" target="_blank" href="nfse_danfse.php?nota_id=<?= (int) $n['id'] ?>"><i class="fa fa-file-pdf-o"></i></a>
+                <a class="btn btn-outline-success btn-sm" title="Recibo (impressora térmica)" target="_blank" href="nfse_recibo.php?nota_id=<?= (int) $n['id'] ?>"><i class="fa fa-print"></i></a>
+              <?php endif; ?>
               <?php if ($n['xml_nfse']): ?>
                 <a class="btn btn-outline-secondary btn-sm" title="Baixar XML" href="nfse_xml.php?nota_id=<?= (int) $n['id'] ?>"><i class="fa fa-file-code-o"></i></a>
               <?php endif; ?>

@@ -360,7 +360,15 @@ $chk = static fn($k) => !empty($cfg[$k]) ? 'checked' : '';
                 <div class="form-group col-md-3">
                   <label for="reducao_base">Redução da base (%)</label>
                   <input type="number" step="0.01" min="0" max="100" class="form-control" id="reducao_base" name="reducao_base" value="<?= $v('reducao_base', '12.00') ?>">
-                  <div class="helper">Vai no grupo <code>vDedRed/pDR</code>. O módulo já usa 12% (fator 0,88).</div>
+                  <div class="helper">Ex.: 12% (fator 0,88) para os fundos estaduais.</div>
+                </div>
+                <div class="form-group col-md-3">
+                  <label for="reducao_modo">Forma da redução</label>
+                  <select class="form-control" id="reducao_modo" name="reducao_modo">
+                    <option value="grupo" <?= $sel('reducao_modo', 'grupo') ?>>Grupo de dedução (vDedRed)</option>
+                    <option value="embutida" <?= $sel('reducao_modo', 'embutida') ?>>Embutida no valor do serviço</option>
+                  </select>
+                  <div class="helper">"Embutida" já reduz o <code>vServ</code> e não envia <code>vDedRed</code>. Use quando o município recusa o grupo de dedução (erro E0440).</div>
                 </div>
                 <div class="form-group col-md-3">
                   <label for="cst_piscofins">CST PIS/COFINS</label>

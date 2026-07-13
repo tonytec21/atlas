@@ -81,7 +81,7 @@ try {
                 prest_fone = :pfone, prest_email = :pmail,
                 cod_municipio = :cmun, serie_dps = :serie, ultimo_numero_dps = :ndps,
                 ctrib_nac = :ctnac, ctrib_mun = :ctmun, cnae = :cnae,
-                base_calculo = :base, reducao_base = :red, aliquota_iss = :aliq,
+                base_calculo = :base, reducao_base = :red, reducao_modo = :redmodo, aliquota_iss = :aliq,
                 reg_esp_trib = :regesp, op_simp_nac = :simples, reg_ap_trib_sn = :regap,
                 p_tot_trib_sn = :ptotsn, cst_piscofins = :cst,
                 atualizado_em = NOW(), atualizado_por = :usr
@@ -113,6 +113,7 @@ try {
         ':cnae'    => nfse_so_digitos($s('cnae', '')) ?: null,
         ':base'    => $base,
         ':red'     => $reducao,
+        ':redmodo' => in_array(($_POST['reducao_modo'] ?? 'grupo'), ['grupo', 'embutida'], true) ? $_POST['reducao_modo'] : 'grupo',
         ':aliq'    => $aliquota,
         ':regesp'  => $s('reg_esp_trib', '4'),
         ':simples' => $s('op_simp_nac', '1'),

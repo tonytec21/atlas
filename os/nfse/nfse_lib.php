@@ -3,7 +3,7 @@
  * =====================================================================
  * ATLAS O.S. — Integração NFS-e Nacional (Emissor Nacional / SEFIN)
  * ---------------------------------------------------------------------
- * ATLAS-NFSE-BUILD: 2026-07-13m-chave-50digitos-consulta-storage
+ * ATLAS-NFSE-BUILD: 2026-07-13o-reducao-embutida-vServ
  *   (auto-reempacota .pfx RC2-40 -> AES-256 no upload/emissao)
  *
  * Base normativa adotada (ver INSTALACAO.md para o detalhamento):
@@ -256,6 +256,7 @@ function nfse_migrar(?PDO $pdo = null): void
 
             base_calculo        VARCHAR(20)     NOT NULL DEFAULT 'emolumentos',
             reducao_base        DECIMAL(5,2)    NOT NULL DEFAULT 12.00,
+            reducao_modo        VARCHAR(10)     NOT NULL DEFAULT 'grupo',
             aliquota_iss        DECIMAL(5,2)    NOT NULL DEFAULT 5.00,
             reg_esp_trib        VARCHAR(2)      NOT NULL DEFAULT '4',
             op_simp_nac         VARCHAR(1)      NOT NULL DEFAULT '1',
@@ -355,6 +356,16 @@ function nfse_migrar(?PDO $pdo = null): void
     )->fetchColumn();
     if ($temPTot === 0) {
         $pdo->exec("ALTER TABLE nfse_config ADD COLUMN p_tot_trib_sn DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER reg_ap_trib_sn");
+    }
+
+    $temRedMod = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'nfse_config'
+            AND COLUMN_NAME = 'reducao_modo'"
+    )->fetchColumn();
+    if ($temRedMod === 0) {
+        $pdo->exec("ALTER TABLE nfse_config ADD COLUMN reducao_modo VARCHAR(10) NOT NULL DEFAULT 'grupo' AFTER reducao_base");
     }
 
     // Normaliza chaves gravadas com o prefixo "NFS" ("NFS"+50 = 53 chars) para os
@@ -1090,6 +1101,15 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
     $baseCalculo  = round($valorServico - $valorReducao, 2);
     $valorIss     = round($baseCalculo * (float) $apuracao['aliquota'] / 100, 2);
 
+    // Forma de aplicar a redução de base:
+    //  'grupo'    -> envia vServ cheio + grupo vDedRed/pDR (transparente);
+    //  'embutida' -> reduz o próprio vServ e NÃO envia vDedRed. Necessário para
+    //                municípios que recusam o grupo de dedução (erro E0440).
+    $modoReducao     = (string) ($cfg['reducao_modo'] ?? 'grupo');
+    $reducaoEmbutida = ($modoReducao === 'embutida' && $pReducao > 0);
+    $vServEnviado     = $reducaoEmbutida ? $baseCalculo : $valorServico;
+    $valorReducaoNota = $reducaoEmbutida ? 0.0 : $valorReducao;
+
     // A SEFIN proíbe informar pAliq em dois cenários:
     //  (a) prestador com regime especial de tributação (regEspTrib != 0), ex.:
     //      4 = Notário/Registrador ("...possui algum regime especial");
@@ -1133,11 +1153,11 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
     }
 
     $valores = [
-        'vServPrest' => ['vServ' => $valorServico],
+        'vServPrest' => ['vServ' => $vServEnviado],
         'trib' => $trib,
     ];
 
-    if ($pReducao > 0) {
+    if ($pReducao > 0 && !$reducaoEmbutida) {
         $valores['vDedRed'] = ['pDR' => $pReducao];
     }
 
@@ -1171,8 +1191,8 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
     return [
         'dps'           => $dps,
         'id_dps'        => $idDps,
-        'valor_servico' => $valorServico,
-        'valor_reducao' => $valorReducao,
+        'valor_servico' => $vServEnviado,
+        'valor_reducao' => $valorReducaoNota,
         'base_calculo'  => $baseCalculo,
         'valor_iss'     => $valorIss,
         'tomador_doc'   => $tomadorDoc ?: null,
@@ -1478,6 +1498,39 @@ function nfse_consultar_chave(string $chave): ?object
 {
     $nfse = nfse_cliente();
     return $nfse->contribuinte()->consultar(nfse_chave50($chave));
+}
+
+/**
+ * Reúne os dados necessários para imprimir a NFS-e (DANFSe A4 e recibo térmico):
+ * a nota, a configuração do prestador, a chave de 50 dígitos, a URL de consulta
+ * pública do Portal Nacional e os indicadores de homologação/cancelamento.
+ */
+function nfse_nota_impressao(int $notaId): array
+{
+    nfse_migrar();
+    $cfg = nfse_config(false);
+
+    $st = nfse_pdo()->prepare("SELECT * FROM nfse_notas WHERE id = ?");
+    $st->execute([$notaId]);
+    $nota = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$nota) {
+        throw new RuntimeException('NFS-e não encontrada.');
+    }
+
+    $chave = nfse_chave50($nota['chave_acesso'] ?? '');
+    // URL de consulta pública do Portal Nacional (conteúdo do QR Code) — NT 008/2026.
+    $consultaUrl = $chave !== ''
+        ? 'https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=' . $chave
+        : '';
+
+    return [
+        'nota'         => $nota,
+        'cfg'          => $cfg,
+        'chave'        => $chave,
+        'consulta_url' => $consultaUrl,
+        'homologacao'  => ((string) ($nota['ambiente'] ?? '2')) === '2',
+        'cancelada'    => ($nota['status'] ?? '') === 'cancelada',
+    ];
 }
 
 function nfse_notas_da_os(int $osId): array
