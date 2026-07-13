@@ -3,7 +3,7 @@
  * =====================================================================
  * ATLAS O.S. — Integração NFS-e Nacional (Emissor Nacional / SEFIN)
  * ---------------------------------------------------------------------
- * ATLAS-NFSE-BUILD: 2026-07-13o-reducao-embutida-vServ
+ * ATLAS-NFSE-BUILD: 2026-07-13p-sem-pAliq-municipio-aderente
  *   (auto-reempacota .pfx RC2-40 -> AES-256 no upload/emissao)
  *
  * Base normativa adotada (ver INSTALACAO.md para o detalhamento):
@@ -1110,28 +1110,21 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
     $vServEnviado     = $reducaoEmbutida ? $baseCalculo : $valorServico;
     $valorReducaoNota = $reducaoEmbutida ? 0.0 : $valorReducao;
 
-    // A SEFIN proíbe informar pAliq em dois cenários:
-    //  (a) prestador com regime especial de tributação (regEspTrib != 0), ex.:
-    //      4 = Notário/Registrador ("...possui algum regime especial");
-    //  (b) optante do Simples (opSimpNac 2/3) apurando o ISSQN FORA do SN
-    //      (regApTribSN 2 ou 3) com convênio do município ativo — a alíquota é
-    //      definida pelo município (erro E0635).
-    $regEsp = trim((string) ($cfg['reg_esp_trib'] ?? ''));
-    $temRegimeEspecial = ($regEsp !== '' && (int) $regEsp !== 0);
-
-    $opSimp  = (string) ($cfg['op_simp_nac'] ?? '1');
-    $regApSn = (string) ($cfg['reg_ap_trib_sn'] ?? '');
-    $issPeloMunicipio = (in_array($opSimp, ['2', '3'], true) && in_array($regApSn, ['2', '3'], true));
-
-    $informarAliquota = !$temRegimeEspecial && !$issPeloMunicipio;
+    // Alíquota (pAliq): para municípios ADERENTES ao ambiente nacional (convênio
+    // ATIVO), a alíquota é definida pela parametrização do CNC e NÃO pode ser
+    // informada na DPS. A SEFIN recusa em todos os cenários já observados:
+    //  - prestador com regime especial de tributação (regEspTrib != 0);
+    //  - optante do Simples com ISSQN fora do SN (erro E0635);
+    //  - não optante, opSimpNac = 1 (erro E0617).
+    // Como só emitimos via emissor nacional para municípios aderentes, NÃO
+    // enviamos pAliq. A alíquota configurada continua usada apenas no cálculo
+    // local do valor do ISS (exibição/registro) e deve coincidir com a do CNC.
+    $opSimp = (string) ($cfg['op_simp_nac'] ?? '1'); // usado adiante (totTrib)
 
     $tribMun = [
         'tribISSQN'  => 1,  // Operação tributável
-        'tpRetISSQN' => 1,  // Não retido — o notário é o contribuinte
+        'tpRetISSQN' => 1,  // Não retido — o prestador é o contribuinte
     ];
-    if ($informarAliquota) {
-        $tribMun['pAliq'] = (float) $apuracao['aliquota'];
-    }
 
     $trib = [
         'tribMun' => $tribMun,
