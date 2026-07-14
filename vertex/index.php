@@ -5250,7 +5250,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-03q-ancora-sigef-load (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-03r-desmembramento-cadeia (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -7314,7 +7314,7 @@ function wire3D(){
   on('m3d-close','click', fechar3D);
 }
 
-console.info('%cVertex — build 2026-07-03q-ancora-sigef-load','color:#0ea5e9;font-weight:bold');
+console.info('%cVertex — build 2026-07-03r-desmembramento-cadeia','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -8277,6 +8277,7 @@ async function verTodos(preservarVista){
   if(!preservarVista && ['mapa','todas'].includes(vistaLista)) map.fitBounds(bounds,40);
 
   // detecção de sobreposição (pré-filtro por bounding box + turf.intersect)
+  const mapaSuc = construirMapaSucessao(itens);   // cadeia de desmembramentos (transitiva)
   const overlaps = [];
   for(let i=0;i<itens.length;i++){
     for(let j=i+1;j<itens.length;j++){
@@ -8292,17 +8293,18 @@ async function verTodos(preservarVista){
           if(areaHa < 0.0001) continue; // ignora toques de borda
           // Desmembramento: o trecho coincidente com a nova matrícula é "morto" (cinza), não conflito.
           // A matrícula-mãe continua ativa; apenas este trecho fica destacado.
-          if(ehDesmembramentoPar(itens[i], itens[j])){
+          if(ehDesmembramentoPar(itens[i], itens[j], mapaSuc)){
             turfToPaths(inter.geometry).forEach(path=>{
               const op = new google.maps.Polygon({paths:path,strokeColor:'#9aa3ad',
                 strokeOpacity:.55,strokeWeight:1,fillColor:'#9aa3ad',fillOpacity:.5,map:map,zIndex:4,clickable:false});
               op._pair=[itens[i].id, itens[j].id]; op._tipo='morto';
               overlapPolys.push(op);
             });
-            // exceção: se o trecho cobre ~toda a matrícula-mãe, ela fica "morta" por completo
+            // exceção: se o trecho cobre ~toda a matrícula-mãe (ancestral), ela fica "morta" por completo
+            const ki=matKey(itens[i].numero_matricula), kj=matKey(itens[j].numero_matricula);
             let mae=null;
-            if(itens[i].motivo_situacao==='desmembramento' && listaMatKey(itens[i].matricula_sucessora).includes(matKey(itens[j].numero_matricula))) mae=itens[i];
-            else if(itens[j].motivo_situacao==='desmembramento' && listaMatKey(itens[j].matricula_sucessora).includes(matKey(itens[i].numero_matricula))) mae=itens[j];
+            if(ehDescendenteMat(mapaSuc, ki, kj)) mae=itens[i];        // i é ancestral de j
+            else if(ehDescendenteMat(mapaSuc, kj, ki)) mae=itens[j];   // j é ancestral de i
             if(mae && mae.area_ha>0 && (areaHa/mae.area_ha)>=0.98 && mae._poly){
               mae._poly.setOptions({strokeColor:'#9aa3ad',strokeOpacity:.4,strokeWeight:1,fillColor:'#9aa3ad',fillOpacity:.05,zIndex:0});
             }
@@ -8429,10 +8431,43 @@ function rotuloMat(s){
   return 'Mat. ' + n;
 }
 /* A e B têm relação de desmembramento? (uma lista a outra como matrícula sucessora) */
-function ehDesmembramentoPar(a,b){
+// Grafo de sucessão: matrícula-mãe -> sucessoras DIRETAS (a partir de matricula_sucessora de cada item).
+function construirMapaSucessao(itens){
+  const mapa = new Map();
+  (itens||[]).forEach(it=>{
+    const k = matKey(it.numero_matricula);
+    if(!k) return;
+    const filhos = listaMatKey(it.matricula_sucessora);
+    if(!filhos.length) return;
+    let set = mapa.get(k); if(!set){ set = new Set(); mapa.set(k, set); }
+    filhos.forEach(f=>{ if(f && f!==k) set.add(f); });
+  });
+  return mapa;
+}
+// ancKey é ancestral (direto OU indireto) de descKey? Percorre a cadeia com guarda de ciclo.
+function ehDescendenteMat(mapaSuc, ancKey, descKey){
+  if(!mapaSuc || !ancKey || !descKey || ancKey===descKey) return false;
+  const vis = new Set(); const fila = [ancKey];
+  while(fila.length){
+    const cur = fila.shift();
+    const filhos = mapaSuc.get(cur);
+    if(!filhos) continue;
+    for(const f of filhos){
+      if(f===descKey) return true;
+      if(!vis.has(f)){ vis.add(f); fila.push(f); }
+    }
+  }
+  return false;
+}
+// Par de desmembramento: um é ancestral do outro na CADEIA de sucessão (cobre desmembramentos
+// indiretos, ex.: 7103 -> 7123 -> 7158, então 7103 x 7158 também é desmembramento, não conflito).
+function ehDesmembramentoPar(a,b,mapaSuc){
   const an=matKey(a.numero_matricula), bn=matKey(b.numero_matricula);
-  return (a.motivo_situacao==='desmembramento' && bn && listaMatKey(a.matricula_sucessora).includes(bn)) ||
-         (b.motivo_situacao==='desmembramento' && an && listaMatKey(b.matricula_sucessora).includes(an));
+  if(!an || !bn) return false;
+  if(mapaSuc) return ehDescendenteMat(mapaSuc, an, bn) || ehDescendenteMat(mapaSuc, bn, an);
+  // fallback (sem grafo): sucessão direta
+  return (a.motivo_situacao==='desmembramento' && listaMatKey(a.matricula_sucessora).includes(bn)) ||
+         (b.motivo_situacao==='desmembramento' && listaMatKey(b.matricula_sucessora).includes(an));
 }
 function corBaseImovel(it){
   if(imovelMorto(it)) return '#9aa3ad';                 // cinza "morto"
