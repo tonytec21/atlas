@@ -7,16 +7,19 @@ Build: `ATLAS-PROV213-BUILD: 2026-07-09-conformidade-cnj-213`
 1. Copie a pasta `prov213/` para dentro de `atlas/` (fica irmã de `os/`, `caixa/`, etc.).
 2. Edite **apenas** `config.php`: credenciais do banco e, se necessário, os caminhos candidatos de
    `session_check.php` e do TCPDF.
-3. Acesse uma vez `http://SEU_HOST/atlas/prov213/install.php`.
-4. Adicione o link no `menu.php` do Atlas:
+3. Adicione o link no `menu.php` do Atlas:
 
 ```html
 <a href="prov213/index.php"><i class="fa fa-shield"></i> Provimento 213</a>
 ```
 
-5. Reinicie o Apache (OPcache) e faça `Ctrl+F5`.
-6. Remova ou renomeie `install.php`.
-7. Abra `configuracao.php` e preencha serventia, CNS, titular e a **arrecadação bruta semestral**.
+4. Pronto. **O schema é criado automaticamente no primeiro acesso** ao módulo — não é
+   preciso rodar `install.php` em cada cartório. Abra `configuracao.php` e preencha
+   serventia, CNS, titular e a **arrecadação bruta semestral**.
+
+`install.php` continua disponível para conferência ou para forçar a atualização do
+schema após um deploy, mas é opcional. A cada mudança de estrutura, basta subir
+`P213_SCHEMA_VERSION` em `p213_migrate.php`: no próximo acesso a migração roda sozinha.
 
 ## Estrutura
 

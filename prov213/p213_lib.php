@@ -5,6 +5,10 @@
  */
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/p213_migrate.php';
+// p213_evid.php é carregado no rodapé (seção 11), mas o auto-provisionamento em
+// p213_db() precisa de p213_evid_dir(); o require lá embaixo garante a definição
+// antes de qualquer SELECT, pois nada consulta o banco durante a inclusão dos arquivos.
 
 // ---------------------------------------------------------------------------
 // 1. Sessão (reaproveita o padrão do Atlas, com fallback)
@@ -27,6 +31,14 @@ function p213_db() {
     mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
     $conn = new mysqli(P213_DB_HOST, P213_DB_USER, P213_DB_PASS, P213_DB_NAME);
     $conn->set_charset(P213_DB_CHARSET);
+
+    // Auto-provisionamento: cria/atualiza o schema no primeiro acesso ao módulo,
+    // dispensando rodar install.php cliente a cliente. Barato nos acessos seguintes.
+    if (function_exists('p213_ensure_schema') && empty($GLOBALS['__p213_migrating'])) {
+        $GLOBALS['__p213_migrating'] = true;   // evita recursão (a migração usa p213_db)
+        try { p213_ensure_schema($conn); } catch (Throwable $e) { /* não derruba a página */ }
+        $GLOBALS['__p213_migrating'] = false;
+    }
     return $conn;
 }
 

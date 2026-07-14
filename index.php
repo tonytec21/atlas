@@ -862,7 +862,22 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                 }  
             }  
         ?>  
-        
+
+        <!-- Conformidade — Provimento 213 (ativo para todos os clientes) -->  
+        <div class="module-card" id="card-prov213">  
+            <div class="card-header">  
+                <span class="card-badge badge-juridico">Conformidade</span>  
+                <div class="card-icon" style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff">  
+                    <i class="fa fa-shield"></i>  
+                </div>  
+            </div>  
+            <h3 class="card-title">Provimento 213</h3>  
+            <p class="card-description">Diagnóstico de conformidade ao Provimento CN-CNJ n. 213/2026, com evidências, termos e relatórios.</p>  
+            <button class="card-button" style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff" onclick="window.location.href='prov213/index.php'">  
+                <i class="fa fa-arrow-right"></i> Acessar Módulo  
+            </button>  
+        </div>  
+
         <!-- Arquivamentos -->  
         <div class="module-card" id="card-arquivamento">  
             <div class="card-header">  
