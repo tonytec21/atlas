@@ -33,6 +33,7 @@ $P213_TCPDF_CANDIDATES = [
     __DIR__ . '/../tcpdf/tcpdf.php',
     __DIR__ . '/../vendor/tecnickcom/tcpdf/tcpdf.php',
     __DIR__ . '/../os/tcpdf/tcpdf.php',
+    __DIR__ . '/../oficios/tcpdf/tcpdf.php',
     __DIR__ . '/../../tcpdf/tcpdf.php',
 ];
 
