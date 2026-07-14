@@ -6,7 +6,7 @@
  */
 
 // Suba este número sempre que o schema mudar; força uma nova verificação.
-if (!defined('P213_SCHEMA_VERSION')) define('P213_SCHEMA_VERSION', 3);
+if (!defined('P213_SCHEMA_VERSION')) define('P213_SCHEMA_VERSION', 4);
 
 /**
  * Cria/atualiza todas as tabelas e colunas. Idempotente e barato:
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS p213_config (
   subclasse_manual  VARCHAR(2)    NULL,
   modelo_solucao    VARCHAR(30)   NOT NULL DEFAULT 'propria',
   gemini_api_key    VARCHAR(160)  NOT NULL DEFAULT '',
-  gemini_modelo     VARCHAR(60)   NOT NULL DEFAULT 'gemini-2.0-flash',
+  gemini_modelo     VARCHAR(60)   NOT NULL DEFAULT 'gemini-3.5-flash',
   atualizado_em     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS p213_meta (
     $colunas = [
         'p213_config' => [
             'gemini_api_key' => "ALTER TABLE p213_config ADD COLUMN gemini_api_key VARCHAR(160) NOT NULL DEFAULT ''",
-            'gemini_modelo'  => "ALTER TABLE p213_config ADD COLUMN gemini_modelo VARCHAR(60) NOT NULL DEFAULT 'gemini-2.0-flash'",
+            'gemini_modelo'  => "ALTER TABLE p213_config ADD COLUMN gemini_modelo VARCHAR(60) NOT NULL DEFAULT 'gemini-3.5-flash'",
         ],
     ];
     foreach ($colunas as $tab => $cols) {
@@ -178,6 +178,15 @@ CREATE TABLE IF NOT EXISTS p213_meta (
 
     // linha padrão de configuração
     try { $conn->query("INSERT IGNORE INTO p213_config (id) VALUES (1)"); } catch (Throwable $e) {}
+
+    // migração de dados: modelos Gemini já desligados pelo Google -> modelo ativo
+    try {
+        $conn->query("UPDATE p213_config
+                      SET gemini_modelo = 'gemini-3.5-flash'
+                      WHERE gemini_modelo IN
+                        ('gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-pro','gemini-1.5-flash','')");
+        if ($conn->affected_rows > 0) $rel['colunas'] += 0; // apenas normalização de dados
+    } catch (Throwable $e) { /* coluna pode não existir em bases muito antigas; o ALTER acima cria */ }
 
     // pré-popula respostas (idempotente) — depende do catálogo em p213_lib.php
     if (function_exists('p213_catalogo')) {

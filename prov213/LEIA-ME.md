@@ -56,7 +56,7 @@ Tabelas: `p213_config`, `p213_respostas`, `p213_ativos`, `p213_incidentes`,
 
 ## Assistente de IA (Gemini) — opcional
 
-Chave e modelo em `configuracao.php`. Três recursos:
+Chave e modelo em `configuracao.php` (modelos ativos: Gemini 3.5 Flash — padrão, 3.1 Pro e 3.1 Flash-Lite). Três recursos:
 
 1. **Sugerir evidências** por requisito, com tipo e instrução prática de obtenção.
 2. **Redigir a descrição** da evidência para o dossiê, em tom técnico-jurídico.

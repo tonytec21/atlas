@@ -189,7 +189,7 @@ function p213_gemini_config() {
     $cfg = p213_config();
     return [
         'key'    => isset($cfg['gemini_api_key']) ? trim($cfg['gemini_api_key']) : '',
-        'modelo' => !empty($cfg['gemini_modelo']) ? $cfg['gemini_modelo'] : 'gemini-2.0-flash',
+        'modelo' => !empty($cfg['gemini_modelo']) ? $cfg['gemini_modelo'] : 'gemini-3.5-flash',
     ];
 }
 

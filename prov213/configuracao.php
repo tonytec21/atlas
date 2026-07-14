@@ -126,8 +126,10 @@ p213_nav('configuracao.php');
                    value="<?= p213_esc(isset($cfg['gemini_api_key']) ? $cfg['gemini_api_key'] : '') ?>"></div>
           <div class="p213-field"><label class="p213-label">Modelo</label>
             <select id="gemini_modelo" class="p213-in">
-              <?php foreach (['gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-pro','gemini-1.5-flash'] as $m): ?>
-                <option <?= (isset($cfg['gemini_modelo']) ? $cfg['gemini_modelo'] : 'gemini-2.0-flash') === $m ? 'selected' : '' ?>><?= $m ?></option>
+              <?php foreach (['gemini-3.5-flash' => 'Gemini 3.5 Flash (recomendado)',
+                             'gemini-3.1-pro' => 'Gemini 3.1 Pro (reasoning avançado)',
+                             'gemini-3.1-flash-lite' => 'Gemini 3.1 Flash-Lite (mais econômico)'] as $mv => $ml): ?>
+                <option value="<?= $mv ?>" <?= (isset($cfg['gemini_modelo']) ? $cfg['gemini_modelo'] : 'gemini-3.5-flash') === $mv ? 'selected' : '' ?>><?= $ml ?></option>
               <?php endforeach; ?>
             </select></div>
         </div>
