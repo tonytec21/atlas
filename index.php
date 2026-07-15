@@ -994,6 +994,30 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             }
         ?>
 
+        <!-- Atlas Forja — Ferramentas de PDF -->
+        <?php
+            $configForja = __DIR__ . '/forja/config_forja.json';
+            if (file_exists($configForja)) {
+                $cfgForja = json_decode(file_get_contents($configForja), true);
+                if (isset($cfgForja['forja_ativo']) && $cfgForja['forja_ativo'] === 'S') {
+                    echo '
+                        <div class="module-card" id="card-forja">
+                            <div class="card-header">
+                                <span class="card-badge" style="background:rgba(234,88,12,.15);color:#ea580c">Ferramentas</span>
+                                <div class="card-icon" style="background:linear-gradient(135deg,#ea580c 0%,#c2410c 100%);color:#fff">
+                                    <i class="fa fa-wrench"></i>
+                                </div>
+                            </div>
+                            <h3 class="card-title">Forja</h3>
+                            <p class="card-description">Comprima PDFs, converta PDF em imagens, junte, divida e converta Word ↔ PDF.</p>
+                            <button class="card-button" style="background:linear-gradient(135deg,#ea580c 0%,#c2410c 100%);color:#fff" onclick="window.location.href=\'forja/index.php\'">
+                                <i class="fa fa-arrow-right"></i> Acessar Módulo
+                            </button>
+                        </div>';
+                }
+            }
+        ?>
+
         <!-- Devolutiva -->  
         <div class="module-card" id="card-notas-devolutivas">  
             <div class="card-header">  
