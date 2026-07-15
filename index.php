@@ -953,6 +953,23 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             </button>  
         </div>  
 
+        <!-- Atlas Signum — Assinatura Eletrônica -->
+        <?php if (file_exists(__DIR__ . '/signum/index.php')): ?>
+        <div class="module-card" id="card-signum">
+            <div class="card-header">
+                <span class="card-badge" style="background:rgba(37,99,235,.15);color:#2563eb">Assinatura</span>
+                <div class="card-icon" style="background:linear-gradient(135deg,#2563eb 0%,#1e40af 100%);color:#fff">
+                    <i class="fa fa-pencil-square-o"></i>
+                </div>
+            </div>
+            <h3 class="card-title">Atlas Signum</h3>
+            <p class="card-description">Assine PDFs em PAdES (ICP-Brasil) com certificado A1 ou token A3 pelo Assinador SERPRO.</p>
+            <button class="card-button" style="background:linear-gradient(135deg,#2563eb 0%,#1e40af 100%);color:#fff" onclick="window.location.href='signum/index.php'">
+                <i class="fa fa-arrow-right"></i> Acessar Módulo
+            </button>
+        </div>
+        <?php endif; ?>
+
         <!-- Devolutiva -->  
         <div class="module-card" id="card-notas-devolutivas">  
             <div class="card-header">  
