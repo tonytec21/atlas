@@ -962,13 +962,37 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                     <i class="fa fa-pencil-square-o"></i>
                 </div>
             </div>
-            <h3 class="card-title">Atlas Signum</h3>
-            <p class="card-description">Assine PDFs em PAdES (ICP-Brasil) com certificado A1 ou token A3 pelo Assinador SERPRO.</p>
+            <h3 class="card-title">Signum</h3>
+            <p class="card-description">Assine PDFs com certificado (ICP-Brasil) A1 ou token A3.</p>
             <button class="card-button" style="background:linear-gradient(135deg,#2563eb 0%,#1e40af 100%);color:#fff" onclick="window.location.href='signum/index.php'">
                 <i class="fa fa-arrow-right"></i> Acessar Módulo
             </button>
         </div>
         <?php endif; ?>
+
+        <!-- Atlas Iris — Extração de Texto (OCR) -->
+        <?php
+            $configIris = __DIR__ . '/iris/config_iris.json';
+            if (file_exists($configIris)) {
+                $cfgIris = json_decode(file_get_contents($configIris), true);
+                if (isset($cfgIris['iris_ativo']) && $cfgIris['iris_ativo'] === 'S') {
+                    echo '
+                        <div class="module-card" id="card-iris">
+                            <div class="card-header">
+                                <span class="card-badge" style="background:rgba(192,38,211,.15);color:#c026d3">Extração</span>
+                                <div class="card-icon" style="background:linear-gradient(135deg,#c026d3 0%,#7e22ce 100%);color:#fff">
+                                    <i class="fa fa-eye"></i>
+                                </div>
+                            </div>
+                            <h3 class="card-title">Iris</h3>
+                            <p class="card-description">Extraia o texto de imagens e PDFs na íntegra com IA.</p>
+                            <button class="card-button" style="background:linear-gradient(135deg,#c026d3 0%,#7e22ce 100%);color:#fff" onclick="window.location.href=\'iris/index.php\'">
+                                <i class="fa fa-arrow-right"></i> Acessar Módulo
+                            </button>
+                        </div>';
+                }
+            }
+        ?>
 
         <!-- Devolutiva -->  
         <div class="module-card" id="card-notas-devolutivas">  
