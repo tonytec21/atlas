@@ -414,6 +414,27 @@ function forja_imagens_para_pdf($imagens, $modo = 'imagem')
 }
 
 
+/**
+ * Garante que o PDF seja legível pelo parser gratuito do FPDI. PDFs salvos com
+ * object streams / xref comprimido (PDF 1.5+) não são suportados; nesse caso
+ * normaliza via Ghostscript (reescreve como PDF 1.4) e devolve o novo caminho.
+ */
+function forja_pdf_compativel_fpdi($src)
+{
+    forja_load_libs();
+    $fpdi = 'setasign\\Fpdi\\Tcpdf\\Fpdi';
+    try { $t = new $fpdi(); $t->setSourceFile($src); return $src; }
+    catch (Throwable $e) { /* provável compressão não suportada — normaliza abaixo */ }
+    $gs = forja_gs_bin();
+    if (!$gs) throw new RuntimeException('Este PDF usa uma compressão (object streams, PDF 1.5+) que o leitor interno não abre, e o Ghostscript — necessário para convertê-lo — não está configurado.');
+    $out = forja_dir_tmp() . '/norm_' . bin2hex(random_bytes(5)) . '.pdf';
+    forja_exec(escapeshellarg($gs) . ' -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH -sOutputFile=' . escapeshellarg($out) . ' ' . escapeshellarg($src));
+    if (!is_file($out) || filesize($out) < 100) throw new RuntimeException('Não foi possível normalizar este PDF para leitura.');
+    try { $t = new $fpdi(); $t->setSourceFile($out); }
+    catch (Throwable $e) { @unlink($out); throw new RuntimeException('Este PDF não pôde ser processado, mesmo após a normalização.'); }
+    return $out;
+}
+
 function forja_juntar_pdfs($pdfs)
 {
     forja_load_libs();
@@ -422,6 +443,7 @@ function forja_juntar_pdfs($pdfs)
     $pdf->setPrintHeader(false); $pdf->setPrintFooter(false); $pdf->SetAutoPageBreak(false);
     $total = 0;
     foreach ($pdfs as $p) {
+        $p = forja_pdf_compativel_fpdi($p);
         $n = $pdf->setSourceFile($p);
         for ($i = 1; $i <= $n; $i++) {
             $tpl = $pdf->importPage($i); $s = $pdf->getTemplateSize($tpl);
@@ -440,6 +462,7 @@ function forja_juntar_pdfs($pdfs)
 function forja_dividir_pdf($src, $modo = 'partes', $valor = 2)
 {
     forja_load_libs();
+    $src = forja_pdf_compativel_fpdi($src);
     $fpdi = 'setasign\\Fpdi\\Tcpdf\\Fpdi';
     $contador = new $fpdi();
     $total = $contador->setSourceFile($src);
