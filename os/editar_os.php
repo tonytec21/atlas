@@ -1399,7 +1399,15 @@ function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
                                 fadep: fadep.toFixed(2).replace('.', ','),
                                 femp: femp.toFixed(2).replace('.', ','),
                                 ferrfis: ferrfis.toFixed(2).replace('.', ','),
-                                total: (emolumentos + ferc + fadep + femp + ferrfis).toFixed(2).replace('.', ',')
+                                total: (emolumentos + ferc + fadep + femp + ferrfis).toFixed(2).replace('.', ','),
+                                base: {
+                                    emol:      parseFloat(response.EMOLUMENTOS) || 0,
+                                    ferc:      parseFloat(response.FERC) || 0,
+                                    fadep:     parseFloat(response.FADEP) || 0,
+                                    femp:      parseFloat(response.FEMP) || 0,
+                                    ferrfis:   parseFloat(response.FERRFIS || 0) || 0,
+                                    isExcecao: ATOS_SEM_VALOR.includes(ato.trim())
+                                }
                             });
                         }
                     },
@@ -1419,21 +1427,82 @@ function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
 
 
 
+// ===================== ESTADO DO ATO BUSCADO =====================
+// Guarda os valores UNITÁRIOS (sem quantidade e sem desconto) do último ato
+// buscado, para recalcular automaticamente ao alterar a quantidade/desconto e
+// impedir que se salve o valor de uma quantidade antiga.
+var __atoState = null;
+
+// Recalcula os campos de valor a partir do ato buscado + qtd/desconto atuais.
+function aplicarCalculoAto() {
+    if (!__atoState) return false;
+    var quantidade = parseInt($('#quantidade').val(), 10);
+    if (!quantidade || quantidade < 1) quantidade = 1;
+    var desconto = (parseFloat($('#desconto_legal').val()) || 0) / 100;
+
+    var emol    = __atoState.emol    * quantidade * (1 - desconto);
+    var ferc    = __atoState.ferc    * quantidade * (1 - desconto);
+    var fadep   = __atoState.fadep   * quantidade * (1 - desconto);
+    var femp    = __atoState.femp    * quantidade * (1 - desconto);
+    var ferrfis = __atoState.ferrfis * quantidade * (1 - desconto);
+
+    if (__atoState.isExcecao) { emol = ferc = fadep = femp = ferrfis = 0; }
+
+    $('#emolumentos').val(emol.toFixed(2).replace('.', ','));
+    $('#ferc').val(ferc.toFixed(2).replace('.', ','));
+    $('#fadep').val(fadep.toFixed(2).replace('.', ','));
+    $('#femp').val(femp.toFixed(2).replace('.', ','));
+    $('#ferrfis').val(ferrfis.toFixed(2).replace('.', ','));
+    $('#total').val((emol + ferc + fadep + femp + ferrfis).toFixed(2).replace('.', ','));
+    return true;
+}
+
+// Invalida o ato buscado (ex.: código do ato alterado) e limpa os campos,
+// forçando nova busca antes de adicionar.
+function invalidarAtoBuscado() {
+    __atoState = null;
+    $('#descricao').val('');
+    $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').val('');
+    $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').prop('readonly', true);
+}
+
 function buscarAto() {
     var ato = $('#ato').val();
     var quantidade = $('#quantidade').val();
     var descontoLegal = $('#desconto_legal').val();
 
     buscarAtoPorQuantidade(ato, quantidade, descontoLegal, function(values) {
+        // Guarda os valores UNITÁRIOS do ato para recálculo automático.
+        __atoState = {
+            ato:       ato.trim(),
+            emol:      values.base.emol,
+            ferc:      values.base.ferc,
+            fadep:     values.base.fadep,
+            femp:      values.base.femp,
+            ferrfis:   values.base.ferrfis,
+            isExcecao: values.base.isExcecao
+        };
         $('#descricao').val(values.descricao);
-        $('#emolumentos').val(values.emolumentos);
-        $('#ferc').val(values.ferc);
-        $('#fadep').val(values.fadep);
-        $('#femp').val(values.femp);
-        $('#ferrfis').val(values.ferrfis);
-        $('#total').val(values.total);
+        // Volta os campos de valor para somente-leitura (caso viessem do modo manual).
+        $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').prop('readonly', true);
+        // Preenche com a quantidade/desconto atuais.
+        aplicarCalculoAto();
     });
 }
+
+// Recalcula/invalida ao alterar quantidade, desconto ou o código do ato.
+$(document).ready(function() {
+    $('#quantidade, #desconto_legal').on('input change', function() {
+        if (__atoState && $('#ato').val().trim() === __atoState.ato) {
+            aplicarCalculoAto();
+        }
+    });
+    $('#ato').on('input', function() {
+        if (__atoState && $(this).val().trim() !== __atoState.ato) {
+            invalidarAtoBuscado();
+        }
+    });
+});
 
 function adicionarISS() {
     var totalEmolumentos = 0;
@@ -1515,6 +1584,7 @@ function adicionarISS() {
 }
 
 function adicionarAtoManual() {
+    __atoState = null;   // modo manual: valores digitados pelo usuário
     $('#ato').val('0');                  
     $('#descricao').val('').prop('readonly', false);
     $('#emolumentos').val('0,00').prop('readonly', false);
@@ -1528,6 +1598,16 @@ function adicionarAtoManual() {
 function adicionarItem() {
     var os_id = $('#os_id').val();
     var ato = $('#ato').val();
+    // Proteção contra valores da quantidade antiga: se um ato foi buscado,
+    // recalcula com a quantidade/desconto atuais; se o código do ato mudou
+    // desde a busca, exige nova busca antes de adicionar.
+    if (typeof __atoState !== 'undefined' && __atoState) {
+        if (ato.trim() !== __atoState.ato) {
+            showAlert('O código do ato foi alterado após a busca. Clique em "Buscar Ato" novamente antes de adicionar.', 'error');
+            return;
+        }
+        aplicarCalculoAto();
+    }
     var quantidade = $('#quantidade').val();
     var descontoLegal = $('#desconto_legal').val();
     var descricao = $('#descricao').val();
