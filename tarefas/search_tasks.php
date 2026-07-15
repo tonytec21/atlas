@@ -58,7 +58,14 @@ $sql = "SELECT tarefas.*, categorias.titulo AS categoria_titulo, origem.titulo A
         WHERE 1=1";
 
 // 🔥 Controle de acesso
-if ($nivelAcesso === 'usuario' && !$temAcessoTotal) {
+// Exceção: qualquer usuário pode LOCALIZAR uma tarefa específica pesquisando pelo
+// número do Protocolo Geral (tarefas.id). Como esse filtro é uma correspondência
+// EXATA de ID, o resultado se limita a essa única tarefa — permitindo apenas o
+// acompanhamento do andamento, sem expor a lista de tarefas de terceiros.
+// A restrição de responsável/revisor continua valendo para qualquer OUTRA busca.
+$buscaPorProtocoloGeral = !empty($protocol);
+
+if ($nivelAcesso === 'usuario' && !$temAcessoTotal && !$buscaPorProtocoloGeral) {
     $sql .= " AND (tarefas.status = 'Concluída' OR tarefas.funcionario_responsavel = '$nomeCompleto' OR tarefas.revisor = '$nomeCompleto')";
 }
 
