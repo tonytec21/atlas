@@ -1,0 +1,24 @@
+# Atlas Forja — eleva os limites de upload para arquivos grandes (até 200 MB).
+# Protegido por <IfModule>: se o PHP não rodar como módulo do Apache, é ignorado
+# sem causar erro (nesse caso, ajuste os mesmos valores no php.ini do XAMPP).
+<IfModule php_module>
+    php_value upload_max_filesize 200M
+    php_value post_max_size 210M
+    php_value memory_limit 512M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+</IfModule>
+<IfModule mod_php.c>
+    php_value upload_max_filesize 200M
+    php_value post_max_size 210M
+    php_value memory_limit 512M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 200M
+    php_value post_max_size 210M
+    php_value memory_limit 512M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+</IfModule>
