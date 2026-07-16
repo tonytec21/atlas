@@ -662,28 +662,74 @@ function extractTraverseLegsSigef($text) {
     return $legs;
 }
 
-/** Reconstrói o polígono a partir de UM vértice-âncora (coordenada) + os lados (azimute/distância).
- *  Serve quando o documento traz só a coordenada inicial e depois azimutes/distâncias (ou quando a
- *  transcrição perdeu as demais coordenadas). Azimutes geodésicos a partir do Norte de quadrícula. */
+/** Extrator TOLERANTE de lados "azimute(°min'seg) [sep] distância [m] até ..." — cobre memoriais
+ *  antigos/OCR sujo: segundos no azimute, "97°67'" (min>60 vira grau), "260.023'" (ponto no lugar
+ *  do °), separadores variados (e / ; / vírgula), distância com pontos/vírgulas/espaços trocados,
+ *  e término em "até o M-13" ou "até o vértice ...". */
+function extractTraverseLegsMarco($text) {
+    $t = normalizeGeoText($text);
+    $re = '/(\d{1,3})\s*[°.]\s*(\d{1,3})\s*\'\s*(\d{0,2})\s*"?\s*[^0-9]{0,28}?([\d][\d.,\s]*?)\s*m?\s*,?\s*at[ée]\b/isu';
+    preg_match_all($re, $t, $m, PREG_SET_ORDER);
+    $legs = [];
+    foreach ($m as $x) {
+        $az = dmsToDecimal($x[1], $x[2] ?? '', $x[3] ?? '');       // min>60 já entra como grau
+        $dist = brNumero(preg_replace('/\s+/', '', $x[4]));        // remove espaços do OCR
+        if ($az >= 0 && $az <= 360 && $dist > 0 && $dist < 1000000) $legs[] = ['az' => $az, 'dist' => $dist];
+    }
+    return $legs;
+}
+
+/** Âncora em UTM: "coordenadas UTM 557341-20 e 9553121-35N" (o '-' é o decimal do OCR).
+ *  Classifica por grandeza (easting ~6 díg., northing 7-8) e devolve [lat,lng] na zona informada. */
+function extractAnchorUTM($text, $zone = 23, $south = true) {
+    $t = normalizeGeoText($text);
+    if (!preg_match('/coordenadas?\s+UTM\s+([0-9][0-9.\- ]*?)\s+e\s+([0-9][0-9.\- ]*?)\s*N/isu', $t, $mm)) return null;
+    $num = function ($raw) {
+        $raw = preg_replace('/\s+/', '', $raw);
+        $raw = str_replace('-', ',', $raw);       // '-' do OCR = separador decimal
+        return brNumero($raw);
+    };
+    $a = $num($mm[1]); $b = $num($mm[2]);
+    // 'a' deve ser easting (~6 díg.), 'b' northing (7-8 díg.); corrige se vierem trocados
+    $E = $a; $N = $b;
+    if (!($E >= 100000 && $E < 1000000 && $N >= 1000000 && $N <= 10000000)) {
+        if ($b >= 100000 && $b < 1000000 && $a >= 1000000 && $a <= 10000000) { $E = $b; $N = $a; }
+        else return null;
+    }
+    $g = utmToGeo($E, $N, $zone, $south);
+    if ($g[0] < -34 || $g[0] > 6 || $g[1] < -74 || $g[1] > -34) return null;
+    return [$g[0], $g[1]];
+}
+
+/** Reconstrói o polígono a partir de UM vértice-âncora + os lados (azimute/distância).
+ *  Se o traçado FECHA (último ~ primeiro), aplica ajuste de Bowditch (distribui o erro de
+ *  fechamento proporcional ao comprimento) e descarta o vértice de fechamento.
+ *  Devolve ['pts'=>[[lat,lng]...], 'misfech'=>m, 'perim'=>m]. */
 function traverseFromAnchor(array $anchor, array $legs, $zone = 23, $south = true) {
-    if (count($legs) < 3) return [];
+    if (count($legs) < 3) return null;
     $u = geoToUTM($anchor[0], $anchor[1], $zone); // [east, north]
-    $E = $u[0]; $N = $u[1];
-    $pts = [[$anchor[0], $anchor[1]]];
+    $E0 = $u[0]; $N0 = $u[1];
+    $rawE = [$E0]; $rawN = [$N0]; $cum = [0.0]; $tot = 0.0;
+    $E = $E0; $N = $N0;
     foreach ($legs as $leg) {
         $az = deg2rad((float)$leg['az']); $d = (float)$leg['dist'];
         $E += $d * sin($az); $N += $d * cos($az);
-        $g = utmToGeo($E, $N, $zone, $south);
+        $rawE[] = $E; $rawN[] = $N; $tot += $d; $cum[] = $tot;
+    }
+    $k = count($rawE);
+    $dE = $rawE[$k-1] - $E0; $dN = $rawN[$k-1] - $N0;
+    $misfech = hypot($dE, $dN);
+    $fechou = ($tot > 0 && $misfech < 0.06 * $tot);   // último volta ~ao início => traçado fechado
+    $pts = [[$anchor[0], $anchor[1]]];
+    $limite = $fechou ? ($k - 1) : $k;                // se fecha, descarta o vértice de fechamento
+    for ($i = 1; $i < $limite; $i++) {
+        $Ea = $rawE[$i]; $Na = $rawN[$i];
+        if ($fechou && $tot > 0) { $f = $cum[$i] / $tot; $Ea -= $dE * $f; $Na -= $dN * $f; } // Bowditch
+        $g = utmToGeo($Ea, $Na, $zone, $south);
         $pts[] = [$g[0], $g[1]];
     }
-    // remove o vértice de fechamento (último ~ primeiro) quando o traçado fecha
-    $k = count($pts);
-    if ($k > 3) {
-        $a = geoToUTM($pts[0][0], $pts[0][1], $zone);
-        $b = geoToUTM($pts[$k-1][0], $pts[$k-1][1], $zone);
-        if (hypot($a[0]-$b[0], $a[1]-$b[1]) < 1.0) array_pop($pts);
-    }
-    return $pts;
+    if (count($pts) < 3) return null;
+    return ['pts' => $pts, 'misfech' => $misfech, 'perim' => $tot];
 }
 
 /** Região de referência = centroide dos imóveis já cadastrados (para detectar zona UTM errada). */
@@ -741,20 +787,30 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
         if (count($uts['pts']) >= 3) { $pts = $uts['pts']; $fonte = 'utm_tabela'; $utmPares = $uts['utm'] ?? null; }
     }
 
-    // 6º FALLBACK POR ÂNCORA: sem vértices suficientes por coordenada, mas há 1 vértice inicial +
-    // lados (azimute/distância) — reconstrói o polígono a partir da âncora. Cobre memoriais SIGEF
-    // cuja transcrição perdeu as coordenadas dos demais vértices, mantendo só a inicial e os lados.
+    // 6º FALLBACK POR ÂNCORA: sem vértices suficientes por coordenada, mas há 1 vértice inicial
+    // (geográfico OU UTM) + lados (azimute/distância) — reconstrói o polígono a partir da âncora,
+    // fechando por Bowditch quando o traçado fecha. Cobre memoriais antigos/OCR e SIGEF cuja
+    // transcrição trouxe só a coordenada inicial.
     $avisoAncora = '';
-    if (count($pts) < 3 && count($pts) >= 1) {
-        $legsA = extractTraverseLegsLoose($memorial);
+    if (count($pts) < 3) {
+        $legsA = extractTraverseLegsMarco($memorial);                                             // tolerante (OCR sujo)
+        if (count($legsA) < 3) { $t1 = extractTraverseLegsLoose($memorial);  if (count($t1) > count($legsA)) $legsA = $t1; }
         if (count($legsA) < 3) { $t2 = extractTraverseLegsSigef($memorial);  if (count($t2) > count($legsA)) $legsA = $t2; }
-        if (count($legsA) < 3) { $t3 = extractTraverseLegsTabela($memorial);  if (count($t3) > count($legsA)) $legsA = $t3; }
+        if (count($legsA) < 3) { $t3 = extractTraverseLegsTabela($memorial); if (count($t3) > count($legsA)) $legsA = $t3; }
         if (count($legsA) >= 3) {
-            $poly = traverseFromAnchor($pts[0], $legsA, 23, true);
-            if (count($poly) >= 3) {
-                $pts = $poly; $fonte = 'traverse_ancora';
-                $avisoAncora = 'Vértices reconstruídos a partir da coordenada inicial e dos azimutes/distâncias do memorial '
-                    . '(a transcrição não trouxe as coordenadas dos demais vértices). Confira o desenho antes de gravar.';
+            $anchor = (count($pts) >= 1) ? $pts[0] : extractAnchorUTM($memorial, 23, true);       // geográfica ou UTM
+            if ($anchor) {
+                $poly = traverseFromAnchor($anchor, $legsA, 23, true);
+                if ($poly && count($poly['pts']) >= 3) {
+                    $pts = $poly['pts']; $fonte = 'traverse_ancora';
+                    $avisoAncora = 'Vértices reconstruídos a partir da coordenada inicial e dos azimutes/distâncias do memorial.';
+                    if (($poly['perim'] ?? 0) > 0 && ($poly['misfech'] ?? 0) > 0.005 * $poly['perim']) {
+                        $avisoAncora .= ' O traçado tinha erro de fechamento de ' . number_format($poly['misfech'], 1, ',', '.')
+                            . ' m em ' . number_format($poly['perim'], 0, ',', '.') . ' m de perímetro (possível imprecisão de OCR); '
+                            . 'foi ajustado automaticamente (Bowditch).';
+                    }
+                    $avisoAncora .= ' Confira o desenho antes de gravar.';
+                }
             }
         }
     }
@@ -5250,7 +5306,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-03r-desmembramento-cadeia (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-03s-ancora-utm-ocr-bowditch (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -7314,7 +7370,7 @@ function wire3D(){
   on('m3d-close','click', fechar3D);
 }
 
-console.info('%cVertex — build 2026-07-03r-desmembramento-cadeia','color:#0ea5e9;font-weight:bold');
+console.info('%cVertex — build 2026-07-03s-ancora-utm-ocr-bowditch','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
