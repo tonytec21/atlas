@@ -12,6 +12,9 @@ if (!isset($_GET['data'])) {
 
 $data = $_GET['data'];
 $conn = getDatabaseConnection();
+/* Collation compatível (mesmo tratamento do detalhes_fluxo_caixa) para o JOIN dos selos */
+$conn->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+$conn->exec("SET collation_connection = 'utf8mb4_unicode_ci'");
 
 function fetchData($sql, $params = [])
 {
@@ -101,6 +104,36 @@ $repasseCredor = fetchData(
     $params
 );
 
+// ================= Selos (importados do Relatório Analítico) =================
+// Mapeia r.usuario (nome completo) -> f.usuario via funcionarios.nome_completo.
+// No unificado traz TODOS os colaboradores, indicando o que cada um emitiu na data.
+// Valor informativo (não entra no cálculo do Total em Caixa).
+$selos = fetchData(
+    "SELECT
+        f.usuario        AS funcionario,
+        r.numero_selo    AS numero_selo,
+        r.ato            AS ato,
+        r.tipo           AS tipo,
+        r.selagem        AS selagem,
+        r.emolumentos    AS emolumentos,
+        r.ferj           AS ferj,
+        r.fadep          AS fadep,
+        r.ferc           AS ferc,
+        r.femp           AS femp,
+        r.ferrfis        AS ferrfis,
+        r.total          AS total
+     FROM relatorios_analiticos r
+     INNER JOIN funcionarios f
+             ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+              = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+     WHERE DATE(r.selagem) = :data
+       AND r.cancelado = 0
+       AND r.isento    = 0
+       AND r.diferido  = 0
+     ORDER BY f.usuario, r.numero_selo",
+    $params
+);
+
 // ================= Calcular totais =================
 $totalAtos = array_sum(array_column($atos, 'total'));
 $totalAtosManuais = array_sum(array_column($atosManuais, 'total'));
@@ -131,6 +164,7 @@ $totalDepositos = array_sum(array_column($depositos, 'valor_do_deposito'));
 $totalSaldoTransportado = array_sum(array_column($saldoTransportado, 'valor_transportado'));
 $totalSaldoInicial = array_sum(array_column($saldoInicial, 'saldo_inicial'));
 $totalRepasseCredor = array_sum(array_column($repasseCredor, 'total_repasse'));
+$totalSelos = array_sum(array_column($selos, 'total'));
 
 $totalRecebidoEmEspecie = $totalPorForma['Espécie'] ?? 0;
 
@@ -185,6 +219,7 @@ $cards = [
     'Saídas e Despesas' => $totalSaidas,
     'Depósito do Caixa' => $totalDepositos,
     'Saldo Transportado' => $totalSaldoTransportado,
+    'Total em Selos' => $totalSelos,
     'Repasse a Credores' => $totalRepasseCredor,
     'Total em Caixa' => $totalEmCaixa
 ];
@@ -200,6 +235,7 @@ $cardColors = [
     'Saídas e Despesas' => '#dc3545',
     'Depósito do Caixa' => '#17a2b8',
     'Saldo Transportado' => '#34495e',
+    'Total em Selos' => '#0b5394',
     'Repasse a Credores' => '#64748b',
     'Total em Caixa' => '#343a40'
 ];
@@ -377,6 +413,25 @@ renderTable($pdf, 'Saldo Transportado',
         ucfirst(strtolower($s['status']))
     ], $saldoTransportado),
     ['DATA CAIXA'=>'20%', 'DATA TRANSPORTE'=>'20%', 'VALOR (R$)'=>'15%', 'FUNCIONÁRIO'=>'25%', 'STATUS'=>'20%']
+);
+
+renderTable($pdf, 'Selos',
+    ['FUNCIONÁRIO', 'Nº SELO', 'ATO', 'TIPO', 'SELAGEM', 'EMOLUMENTOS', 'FERJ', 'FADEP', 'FERC', 'FEMP', 'FERRFIS', 'TOTAL (R$)'],
+    array_map(fn($s) => [
+        $s['funcionario'],
+        $s['numero_selo'],
+        $s['ato'],
+        $s['tipo'],
+        $s['selagem'] ? date('d/m/Y', strtotime($s['selagem'])) : '',
+        number_format($s['emolumentos'], 2, ',', '.'),
+        number_format($s['ferj'], 2, ',', '.'),
+        number_format($s['fadep'], 2, ',', '.'),
+        number_format($s['ferc'], 2, ',', '.'),
+        number_format($s['femp'], 2, ',', '.'),
+        number_format($s['ferrfis'], 2, ',', '.'),
+        number_format($s['total'], 2, ',', '.')
+    ], $selos),
+    ['FUNCIONÁRIO'=>'14%', 'Nº SELO'=>'11%', 'ATO'=>'8%', 'TIPO'=>'8%', 'SELAGEM'=>'9%', 'EMOLUMENTOS'=>'9%', 'FERJ'=>'7%', 'FADEP'=>'7%', 'FERC'=>'6%', 'FEMP'=>'6%', 'FERRFIS'=>'7%', 'TOTAL (R$)'=>'8%']
 );
 
 renderTable($pdf, 'Repasse a Credores',
