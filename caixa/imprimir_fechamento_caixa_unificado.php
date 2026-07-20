@@ -195,7 +195,7 @@ class PDF extends TCPDF
     {
         $this->SetY(-15);
         $this->SetFont('helvetica', 'I', 8);
-        $this->Cell(0, 10, 'Página '.$this->getAliasNumPage().' de '.$this->getAliasNbPages(), 0, 0, 'L');
+        $this->Cell(0, 10, 'Página '.$this->getAliasNumPage().' de '.$this->getAliasNbPages(), 0, 0, 'R');
     }
 }
 
@@ -420,7 +420,7 @@ renderTable($pdf, 'Selos',
     array_map(fn($s) => [
         $s['funcionario'],
         $s['numero_selo'],
-        $s['ato'],
+        mb_strimwidth($s['ato'], 0, 34, '...', 'UTF-8'),
         $s['tipo'],
         $s['selagem'] ? date('d/m/Y', strtotime($s['selagem'])) : '',
         number_format($s['emolumentos'], 2, ',', '.'),
@@ -431,7 +431,7 @@ renderTable($pdf, 'Selos',
         number_format($s['ferrfis'], 2, ',', '.'),
         number_format($s['total'], 2, ',', '.')
     ], $selos),
-    ['FUNCIONÁRIO'=>'14%', 'Nº SELO'=>'11%', 'ATO'=>'8%', 'TIPO'=>'8%', 'SELAGEM'=>'9%', 'EMOLUMENTOS'=>'9%', 'FERJ'=>'7%', 'FADEP'=>'7%', 'FERC'=>'6%', 'FEMP'=>'6%', 'FERRFIS'=>'7%', 'TOTAL (R$)'=>'8%']
+    ['FUNCIONÁRIO'=>'13%', 'Nº SELO'=>'10%', 'ATO'=>'16%', 'TIPO'=>'8%', 'SELAGEM'=>'8%', 'EMOLUMENTOS'=>'8%', 'FERJ'=>'6%', 'FADEP'=>'6%', 'FERC'=>'6%', 'FEMP'=>'6%', 'FERRFIS'=>'6%', 'TOTAL (R$)'=>'7%']
 );
 
 renderTable($pdf, 'Repasse a Credores',
