@@ -5358,7 +5358,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-03t-onr-correcao-cpf (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -7423,7 +7423,7 @@ function wire3D(){
   on('m3d-close','click', fechar3D);
 }
 
-console.info('%cVertex — build 2026-07-03t-onr-correcao-cpf','color:#0ea5e9;font-weight:bold');
+console.info('%cVertex — build 2026-07-03u-valida-doc-salvar','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -9429,6 +9429,23 @@ function edAtualizaBadge(i){
 function edAddProp(){ edProps.push({nome:'',doc:''}); edRenderProps();
   const wrap=document.getElementById('ed-prop-list'); if(wrap){ const ins=wrap.querySelectorAll('.prop-nome'); if(ins.length) ins[ins.length-1].focus(); }
 }
+/* Valida os documentos dos proprietários ANTES de salvar. Um CPF/CNPJ inválido (dígito verificador
+   errado — ex.: RG lançado por engano) NÃO é salvo: o campo é deixado em branco e o usuário é
+   alertado. Retorna true se havia inválido (limpou e alertou) — nesse caso o salvamento é interrompido. */
+async function edValidarDocs(){
+  const inval = [];
+  edProps.forEach((p,i)=>{ const doc=(p.doc||'').trim(); if(doc && docValido(doc)===false) inval.push({i, nome:(p.nome||'').trim(), doc}); });
+  if(!inval.length) return false;
+  inval.forEach(x=> edProps[x.i].doc='');     // deixa o campo sem preenchimento
+  edRenderProps();
+  const lista = inval.map(x=> '• '+(x.nome? escapeHtml(x.nome)+': ':'')+'<b>'+escapeHtml(x.doc)+'</b>').join('<br>');
+  await Swal.fire(Object.assign({}, swalTema(), {
+    title: 'Documento inválido',
+    html: 'O CPF/CNPJ abaixo é <b>inválido</b> (dígito verificador incorreto — pode ser um RG lançado no lugar do CPF) e foi <b>deixado em branco</b>:<br><br>'+lista+'<br><br>Informe o número correto ou salve sem o documento.',
+    icon: 'warning', confirmButtonText: 'Entendi'
+  }));
+  return true;
+}
 
 let edNovoItn03 = false;
 function sincronizarVistaToggle(){
@@ -10227,10 +10244,9 @@ async function salvarEdicao(){
     const inp=document.getElementById('ed-sucessora-input'); if(inp) inp.focus();
     return;
   }
-  // proprietários: coleta, valida documentos e junta por vírgula (alinhados por posição)
+  // proprietários: valida CPF/CNPJ — inválido não é salvo (campo fica em branco + alerta), o resto segue
+  if(await edValidarDocs()) return;
   const props = edProps.map(p=>({nome:(p.nome||'').trim(), doc:(p.doc||'').trim()})).filter(p=>p.nome||p.doc);
-  const invalidos = props.filter(p=>p.doc && docValido(p.doc)===false);
-  if(invalidos.length){ setStatus('err','Documento inválido: '+invalidos.map(p=>p.doc).join(', ')+'. Corrija para salvar.'); return; }
   const proprietario = props.map(p=>p.nome).join(', ');
   const cpf = props.map(p=>p.doc).join(', ');
   if(edNovoItn03){
@@ -10335,9 +10351,8 @@ async function consultarStatusOnr(id){
 async function enviarCorrecaoOnr(){
   const id = document.getElementById('ed-id').value;
   if(!id) return;
+  if(await edValidarDocs()) return;   // CPF/CNPJ inválido: limpa o campo + alerta, não reenvia
   const props = edProps.map(p=>({nome:(p.nome||'').trim(), doc:(p.doc||'').trim()})).filter(p=>p.nome||p.doc);
-  const invalidos = props.filter(p=>p.doc && docValido(p.doc)===false);
-  if(invalidos.length){ setStatus('err','Documento inválido: '+invalidos.map(p=>p.doc).join(', ')+'. Corrija o CPF/CNPJ antes de enviar a correção.'); return; }
   if(!(await swalConfirm('Enviar correção à ONR?','Os dados atuais serão salvos e reenviados ao Mapa ONR como RETIFICAÇÃO (classificação 4), gerando uma nova importação. Continuar?','Enviar correção'))) return;
   const cls=document.getElementById('eonr_onr_classificacao'); if(cls) cls.value='4';   // Retificação
   const proprietario = props.map(p=>p.nome).join(', ');
