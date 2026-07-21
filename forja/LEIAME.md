@@ -10,6 +10,7 @@ Instale como a pasta `forja/` no mesmo nível de `oficios/` (usa `../menu.php`, 
 - **Imagens → PDF** — junta várias imagens (PNG/JPG) em um PDF (tamanho da imagem ou ajustado em A4).
 - **Dividir PDF** — divide um PDF em N partes (ou N páginas por parte), entregue em um ZIP.
 - **Word → PDF** e **PDF → Word** — conversão via LibreOffice headless.
+- **União múltipla (lote)** — combina um Lado A comum (ex.: portaria) com cada PDF do Lado B, gerando um PDF por item do Lado B (ZIP).
 - **Juntar PDFs** — combina vários PDFs em um só, na ordem escolhida.
 
 ## Ferramentas externas

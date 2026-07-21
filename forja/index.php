@@ -95,6 +95,7 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
       <button class="tab" data-tab="pdf2img"><i class="fa fa-file-image-o"></i> PDF → Imagens</button>
       <button class="tab" data-tab="img2pdf"><i class="fa fa-file-pdf-o"></i> Imagens → PDF</button>
       <button class="tab" data-tab="juntar"><i class="fa fa-object-group"></i> Juntar PDFs</button>
+      <button class="tab" data-tab="multiplo"><i class="fa fa-clone"></i> União múltipla</button>
       <button class="tab" data-tab="dividir"><i class="fa fa-scissors"></i> Dividir PDF</button>
       <button class="tab" data-tab="word2pdf"><i class="fa fa-file-word-o"></i> Word → PDF</button>
       <button class="tab" data-tab="pdf2word"><i class="fa fa-file-word-o"></i> PDF → Word</button>
@@ -164,6 +165,26 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
       </div>
     </div>
 
+    <!-- UNIÃO MÚLTIPLA (LOTE) -->
+    <div class="panel" id="panel-multiplo">
+      <div class="fj-card">
+        <p style="color:var(--fj-muted);font-size:.88rem;margin:0 0 14px">Combine um <b>Lado A</b> (comum a todos, ex.: a portaria) com cada arquivo do <b>Lado B</b>. Gera um PDF por item do Lado B — cada um = Lado A + aquele arquivo — tudo num ZIP.</p>
+        <label style="font-weight:700;color:var(--fj-text);font-size:.9rem">Lado A — comum a todos</label>
+        <div class="dz" data-dz="ladoA" style="margin:8px 0 4px"><div class="dz-ic"><i class="fa fa-thumb-tack"></i></div><div class="dz-t">PDF(s) do Lado A</div><div class="dz-s">ex.: a portaria · pode ter mais de um</div><input type="file" accept="application/pdf" multiple hidden></div>
+        <div class="flist" data-list="ladoA"></div>
+        <label style="font-weight:700;color:var(--fj-text);font-size:.9rem;margin-top:6px;display:block">Lado B — um resultado por arquivo</label>
+        <div class="dz" data-dz="ladoB" style="margin:8px 0 4px"><div class="dz-ic"><i class="fa fa-files-o"></i></div><div class="dz-t">PDFs do Lado B</div><div class="dz-s">cada um vira: Lado A + este arquivo</div><input type="file" accept="application/pdf" multiple hidden></div>
+        <div class="flist" data-list="ladoB"></div>
+        <div class="opts">
+          <label>Ordem:</label>
+          <select class="inp" id="posMultiplo"><option value="antes" selected>Lado A antes</option><option value="depois">Lado A depois</option></select>
+          <button class="fj-pill fj-pri" id="btnMultiplo" disabled style="margin-left:auto"><i class="fa fa-bolt"></i> Gerar em lote</button>
+        </div>
+        <div class="spin" data-spin="multiplo"><div class="s"></div><div style="font-weight:700;color:var(--fj-text)">Gerando os PDFs…</div></div>
+        <div class="result" data-result="multiplo"></div>
+      </div>
+    </div>
+
     <!-- DIVIDIR -->
     <div class="panel" id="panel-dividir">
       <div class="fj-card">
@@ -217,8 +238,8 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
 (function(){
   "use strict";
   var CSRF=<?php echo json_encode($CSRF); ?>;
-  var arquivos={comprimir:[],pdf2img:[],img2pdf:[],juntar:[],dividir:[],word2pdf:[],pdf2word:[]};
-  var multi={comprimir:false,pdf2img:false,img2pdf:true,juntar:true,dividir:false,word2pdf:false,pdf2word:false};
+  var arquivos={comprimir:[],pdf2img:[],img2pdf:[],juntar:[],dividir:[],word2pdf:[],pdf2word:[],ladoA:[],ladoB:[]};
+  var multi={comprimir:false,pdf2img:false,img2pdf:true,juntar:true,dividir:false,word2pdf:false,pdf2word:false,ladoA:true,ladoB:true};
   function $(s,c){ return (c||document).querySelector(s); }
   function humano(n){ n=+n; if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
   function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -278,6 +299,7 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
     $('#btnDividir').disabled  = arquivos.dividir.length===0;
     $('#btnWord2Pdf').disabled = arquivos.word2pdf.length===0;
     $('#btnPdf2Word').disabled = arquivos.pdf2word.length===0;
+    $('#btnMultiplo').disabled = arquivos.ladoA.length===0 || arquivos.ladoB.length===0;
   }
   function spin(key,on){ document.querySelector('[data-spin="'+key+'"]').style.display=on?'block':'none'; }
   function showResult(key,html){ var r=document.querySelector('[data-result="'+key+'"]'); r.innerHTML=html; r.style.display='block'; }
@@ -321,6 +343,20 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
     try{ var j=await processar('juntar','juntar_pdf.php',{},this);
       showResult('juntar', baixarHtml(j.token,'PDF único', j.paginas+' página(s) · '+humano(j.tamanho)));
     }catch(e){ Swal.fire('Erro',e.message,'error'); }
+  });
+  $('#btnMultiplo').addEventListener('click',async function(){
+    var btn=this, fd=new FormData();
+    fd.append('csrf',CSRF); fd.append('posicao',document.getElementById('posMultiplo').value);
+    arquivos.ladoA.forEach(function(f){ fd.append('ladoA[]', f); });
+    arquivos.ladoB.forEach(function(f){ fd.append('ladoB[]', f); });
+    btn.disabled=true; spin('multiplo',true); document.querySelector('[data-result="multiplo"]').style.display='none';
+    try{
+      var r=await fetch('juntar_multiplo.php',{method:'POST',body:fd,credentials:'same-origin'});
+      var t=await r.text(); var j; try{ j=JSON.parse(t); }catch(e){ throw new Error('Resposta inválida: '+t.slice(0,160)); }
+      if(j.status!=='success') throw new Error(j.message||'Falha ao gerar.');
+      showResult('multiplo', baixarHtml(j.token,'Resultados (ZIP)', j.total+' PDF(s) gerado(s)'));
+    }catch(e){ Swal.fire('Erro',e.message,'error'); }
+    finally{ spin('multiplo',false); btn.disabled=false; atualizarBotoes(); }
   });
   var modoDiv=document.getElementById('modoDividir');
   if(modoDiv) modoDiv.addEventListener('change',function(){

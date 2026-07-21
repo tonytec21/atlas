@@ -458,6 +458,53 @@ function forja_juntar_pdfs($pdfs)
     return ['path' => $out, 'paginas' => $total];
 }
 
+/**
+ * União em lote: um Lado A comum (1+ PDFs) combinado com CADA item do Lado B,
+ * gerando um PDF por item do Lado B. $posicao: 'antes' (A+B) | 'depois' (B+A).
+ * $bItens: array de ['path'=>, 'nome'=>]. Devolve um ZIP.
+ */
+function forja_juntar_multiplo($aPaths, $bItens, $posicao = 'antes')
+{
+    forja_load_libs();
+    if (!$aPaths)  throw new RuntimeException('Envie ao menos um PDF no Lado A.');
+    if (!$bItens)  throw new RuntimeException('Envie ao menos um PDF no Lado B.');
+    $fpdi = 'setasign\\Fpdi\\Tcpdf\\Fpdi';
+    $aNorm = array_map('forja_pdf_compativel_fpdi', $aPaths);   // normaliza o Lado A uma vez
+
+    $dir = forja_dir_out() . '/multi_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4);
+    @mkdir($dir, 0775, true);
+    $zip = forja_dir_out() . '/uniao_multipla_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.zip';
+    $za = new ZipArchive();
+    if ($za->open($zip, ZipArchive::CREATE) !== true) throw new RuntimeException('Não foi possível criar o ZIP.');
+
+    $usados = []; $n = 0;
+    foreach ($bItens as $b) {
+        $bNorm = forja_pdf_compativel_fpdi($b['path']);
+        $ordem = ($posicao === 'depois') ? array_merge([$bNorm], $aNorm) : array_merge($aNorm, [$bNorm]);
+        $pdf = new $fpdi('P', 'mm', 'A4', true, 'UTF-8');
+        $pdf->setPrintHeader(false); $pdf->setPrintFooter(false); $pdf->SetAutoPageBreak(false);
+        foreach ($ordem as $src) {
+            $cnt = $pdf->setSourceFile($src);
+            for ($i = 1; $i <= $cnt; $i++) {
+                $tpl = $pdf->importPage($i); $sz = $pdf->getTemplateSize($tpl);
+                $pdf->AddPage($sz['orientation'], [$sz['width'], $sz['height']]);
+                $pdf->useTemplate($tpl, 0, 0, $sz['width'], $sz['height'], true);
+            }
+        }
+        $base = preg_replace('~[^A-Za-z0-9_\- ]~', '_', pathinfo($b['nome'], PATHINFO_FILENAME));
+        if ($base === '') $base = 'resultado';
+        $nome = $base . '.pdf'; $k = 1;
+        while (isset($usados[mb_strtolower($nome)])) { $nome = $base . '_' . (++$k) . '.pdf'; }
+        $usados[mb_strtolower($nome)] = 1;
+        $out = $dir . '/' . $nome;
+        $pdf->Output($out, 'F');
+        $za->addFile($out, $nome);
+        $n++;
+    }
+    $za->close();
+    return ['zip' => $zip, 'total' => $n];
+}
+
 /** Divide um PDF em partes. $modo: partes (N partes) | paginas (N páginas por parte). Devolve um ZIP. */
 function forja_dividir_pdf($src, $modo = 'partes', $valor = 2)
 {
@@ -512,10 +559,10 @@ function forja_dividir_pdf($src, $modo = 'partes', $valor = 2)
 }
 
 /** Salva os uploads (arquivo[]) em tmp e devolve [['path','nome'], ...] na ordem enviada. */
-function forja_salvar_uploads($somentePdf = false, $somenteImg = false, $word = false)
+function forja_salvar_uploads($somentePdf = false, $somenteImg = false, $word = false, $campo = 'arquivo')
 {
-    if (empty($_FILES['arquivo'])) throw new RuntimeException('Nenhum arquivo recebido. Verifique se o arquivo não excede o limite do servidor (php.ini).');
-    $f = $_FILES['arquivo'];
+    if (empty($_FILES[$campo])) throw new RuntimeException('Nenhum arquivo recebido. Verifique se o arquivo não excede o limite do servidor (php.ini).');
+    $f = $_FILES[$campo];
     $names = is_array($f['name']) ? $f['name'] : [$f['name']];
     $tmps  = is_array($f['tmp_name']) ? $f['tmp_name'] : [$f['tmp_name']];
     $errs  = is_array($f['error']) ? $f['error'] : [$f['error']];
