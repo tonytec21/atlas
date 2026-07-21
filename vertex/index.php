@@ -1587,6 +1587,17 @@ function detectarInconsistenciasPdf($d, $geo = null) {
     if (trim((string)($d['municipio'] ?? '')) === '') $inc[] = ['sev' => 'alerta', 'msg' => 'Município não identificado no documento.'];
     if (trim((string)($d['uf'] ?? '')) === '')        $inc[] = ['sev' => 'alerta', 'msg' => 'UF não identificada no documento.'];
     if (trim((string)($d['proprietario'] ?? '')) === '') $inc[] = ['sev' => 'alerta', 'msg' => 'Proprietário(s) atual(is) não identificado(s) na cadeia de registros/averbações.'];
+    // CPF/CNPJ de cada titular: valida dígitos verificadores (um RG lançado por engano no lugar do CPF não passa)
+    $nomesDoc = preg_split('/\s*,\s*/', (string)($d['proprietario'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+    $docsDoc  = preg_split('/\s*,\s*/', (string)($d['cpf'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+    foreach ($docsDoc as $i => $doc) {
+        $dg = preg_replace('/\D/', '', $doc);
+        if ($dg === '') continue;
+        if (!cpfCnpjValido($dg)) {
+            $quem = trim((string)($nomesDoc[$i] ?? ''));
+            $inc[] = ['sev' => 'alerta', 'msg' => 'CPF/CNPJ' . ($quem !== '' ? ' de "' . $quem . '"' : '') . ' inválido ("' . $doc . '") — verifique; pode ter sido lido o RG no lugar do CPF. Corrija antes de enviar ao Mapa ONR.'];
+        }
+    }
     if (is_array($geo)) {
         if (!empty($geo['aviso_geometria'])) $inc[] = ['sev' => 'alerta', 'msg' => 'Geometria: ' . $geo['aviso_geometria']];
         $vc = $geo['vertices_corrigidos'] ?? [];
@@ -1933,6 +1944,17 @@ function onrEnviarImovel($conn, $id) {
     if (($row['onr_numero_prenotacao'] ?? '') === '') $faltam[] = 'número da prenotação';
     if (($row['onr_descricao'] ?? '') === '') $faltam[] = 'descrição';
     if ($faltam) return ['ok' => false, 'mensagem' => 'Faltam dados ONR: ' . implode(', ', $faltam) . '.'];
+
+    // valida CPF/CNPJ dos titulares (dígitos verificadores): impede enviar um RG lançado por engano
+    $nomesT = preg_split('/\s*,\s*/', (string)($row['proprietario'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+    $docsT  = preg_split('/\s*,\s*/', (string)($row['cpf'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+    foreach ($docsT as $i => $doc) {
+        $dg = preg_replace('/\D/', '', $doc);
+        if ($dg !== '' && !cpfCnpjValido($dg)) {
+            $quem = trim((string)($nomesT[$i] ?? ''));
+            return ['ok' => false, 'mensagem' => 'CPF/CNPJ' . ($quem !== '' ? ' de "' . $quem . '"' : '') . ' inválido ("' . $doc . '") — provável RG lançado no lugar do CPF. Corrija o documento do titular antes de enviar ao Mapa ONR.'];
+        }
+    }
 
     // gera shapefile em diretório temporário
     $dir = sys_get_temp_dir() . '/onr_' . $id . '_' . uniqid();
@@ -2955,7 +2977,7 @@ COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
 "uf": sigla do estado (2 letras),
 "cep": CEP do imóvel (8 dígitos, só números); se não constar no documento, informe o CEP GERAL do município,
 "proprietario": nome(s) do(s) TITULAR(es) ATUAL(is) conforme a regra acima; separe vários por vírgula,
-"cpf": CPF ou CNPJ do(s) titular(es) atual(is), na MESMA ordem de "proprietario", separados por vírgula,
+"cpf": CPF ou CNPJ do(s) titular(es) atual(is), na MESMA ordem de "proprietario", separados por vírgula. IMPORTANTE: extraia SOMENTE o CPF (11 dígitos, rotulado 'CPF') ou o CNPJ (14 dígitos, rotulado 'CNPJ'). NUNCA use o RG/Identidade/documento de identidade no lugar do CPF — o RG costuma vir rotulado 'RG', 'nº', 'SSP', 'Identidade' ou com órgão emissor, tem menos dígitos e dígito verificador diferente. Se de um titular constar só o RG e não o CPF, deixe o campo VAZIO para esse titular (não invente, não use o RG),
 "rel_jur": relação jurídica do titular principal por extenso (ex.: propriedade, usufruto, nua-propriedade, promessa de compra e venda),
 "dat_ini": data (dd/mm/aaaa) do ATO que originou a relação jurídica atual (a data do registro/averbação da última transmissão eficaz),
 "per_rel": percentual/fração do titular principal (ex.: 100%, 50%, 1/2),
@@ -2963,7 +2985,7 @@ COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
    // UMA entrada por TITULAR ATUAL. Liste todos. Cada objeto:
    {
      "nome": nome completo,
-     "cpf_cnpj": CPF (11) ou CNPJ (14) — pode conter máscara,
+     "cpf_cnpj": CPF (11 dígitos) ou CNPJ (14 dígitos) — pode conter máscara. NUNCA o RG/Identidade (rotulado 'RG'/'SSP'/'Identidade', com órgão emissor); se só houver RG, deixe vazio,
      "estrangeiro": true se a nacionalidade NÃO for brasileira, senão false,
      "nacionalidade": nacionalidade por extenso (ex.: brasileira, argentina, portuguesa),
      "estado_civil": estado civil por extenso (solteiro, casado, separado, divorciado, viúvo, união estável),
@@ -3293,6 +3315,36 @@ function itn03MunicipioCod($uf2, $nome) {
     return $cache[$uf2][$alvo] ?? null;
 }
 /* mapeia uma linha de memoriais_mapeados -> objeto "imóvel" da ITN 03; acumula avisos por imóvel. */
+/* Validação de dígitos verificadores — distingue CPF/CNPJ REAL de um RG (que não passa no cálculo). */
+function cpfValido($cpf) {
+    $cpf = preg_replace('/\D/', '', (string)$cpf);
+    if (strlen($cpf) !== 11 || preg_match('/^(\d)\1{10}$/', $cpf)) return false;
+    for ($t = 9; $t < 11; $t++) {
+        $d = 0;
+        for ($c = 0; $c < $t; $c++) $d += (int)$cpf[$c] * (($t + 1) - $c);
+        $d = ((10 * $d) % 11) % 10;
+        if ((int)$cpf[$t] !== $d) return false;
+    }
+    return true;
+}
+function cnpjValido($cnpj) {
+    $cnpj = preg_replace('/\D/', '', (string)$cnpj);
+    if (strlen($cnpj) !== 14 || preg_match('/^(\d)\1{13}$/', $cnpj)) return false;
+    $p1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+    $p2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+    $s = 0; for ($i = 0; $i < 12; $i++) $s += (int)$cnpj[$i] * $p1[$i];
+    $d1 = $s % 11; $d1 = ($d1 < 2) ? 0 : 11 - $d1;
+    if ((int)$cnpj[12] !== $d1) return false;
+    $s = 0; for ($i = 0; $i < 13; $i++) $s += (int)$cnpj[$i] * $p2[$i];
+    $d2 = $s % 11; $d2 = ($d2 < 2) ? 0 : 11 - $d2;
+    return (int)$cnpj[13] === $d2;
+}
+/* CPF (11) OU CNPJ (14) com dígitos verificadores válidos. Um RG lançado por engano NÃO passa. */
+function cpfCnpjValido($doc) {
+    $d = preg_replace('/\D/', '', (string)$doc);
+    return (strlen($d) === 11 && cpfValido($d)) || (strlen($d) === 14 && cnpjValido($d));
+}
+
 /* Detecta se algum titular é a UNIÃO FEDERAL (CNPJ 00.394.411/... ou nome "União Federal"). */
 function itn03EhUniaoTitulares($pessoas) {
     foreach ((array)$pessoas as $p) {
@@ -3365,7 +3417,7 @@ function itn03ImovelDaLinha(array $r, array &$avisos) {
         foreach ($qual as $p) {
             $nome = trim((string)($p['nome'] ?? '')) ?: 'Proprietário não informado';
             $doc  = itn03Dig($p['cpf_cnpj'] ?? '');
-            if ($doc === '' || (strlen($doc) !== 11 && strlen($doc) !== 14)) { $doc = '00000000000'; $avisos[] = "$rotulo: CPF/CNPJ de \"$nome\" ausente/ inválido (preencher)."; }
+            if ($doc === '' || !cpfCnpjValido($doc)) { $avisos[] = "$rotulo: CPF/CNPJ de \"$nome\" ausente/inválido — verifique (pode ter sido lido o RG). Preencher."; $doc = '00000000000'; }
             $estr = !empty($p['estrangeiro']); if ($estr) $temEstrangeiro = true;
             $ec   = itn03MapEstadoCivil($p['estado_civil'] ?? '');
             $perc = itn03PercentualNum($p['percentual'] ?? ''); if ($perc === null) $perc = round(100 / $np, 2);
@@ -3399,7 +3451,7 @@ function itn03ImovelDaLinha(array $r, array &$avisos) {
         $perCol = ($np === 1) ? itn03PercentualNum($r['per_rel'] ?? '') : null; // per_rel = % do principal; com vários, divide igualmente
         foreach ($nomes as $i => $nome) {
             $doc = itn03Dig($cpfs[$i] ?? ($cpfs[0] ?? ''));
-            if ($doc === '' || (strlen($doc) !== 11 && strlen($doc) !== 14)) { $doc = '00000000000'; $avisos[] = "$rotulo: CPF/CNPJ de \"$nome\" ausente/ inválido (preencher)."; }
+            if ($doc === '' || !cpfCnpjValido($doc)) { $avisos[] = "$rotulo: CPF/CNPJ de \"$nome\" ausente/inválido — verifique (pode ter sido lido o RG). Preencher."; $doc = '00000000000'; }
             $pessoas[] = [
                 'nome_completo' => $nome, 'cpf_cnpj' => $doc, 'estrangeiro' => false,
                 'estado_civil' => 1, 'condicao_parte' => 2, 'relacao_juridica' => $relCod,
@@ -5306,7 +5358,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-03s-ancora-utm-ocr-bowditch (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-03t-onr-correcao-cpf (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -6700,6 +6752,7 @@ header('Expires: 0');
     <div class="modal-f">
       <button class="btn-ghost" id="ed-cancelar2" onclick="fecharEdicao()">Cancelar</button>
       <button class="btn-ghost" id="ed-itn03" title="Gerar a carga ITN 03 desta matrícula (precisa estar pronta para o Mapa ONR)">⤓ Carga ITN 03</button>
+      <button class="btn-ghost" id="ed-onr-correcao" style="display:none;border-color:#0d9488;color:#0d9488" title="Reenviar este imóvel ao Mapa ONR como RETIFICAÇÃO (correção dos dados já enviados)">↻ Enviar correção à ONR</button>
       <button class="btn-primary" id="ed-salvar">Salvar alterações</button>
     </div>
   </div>
@@ -7370,7 +7423,7 @@ function wire3D(){
   on('m3d-close','click', fechar3D);
 }
 
-console.info('%cVertex — build 2026-07-03s-ancora-utm-ocr-bowditch','color:#0ea5e9;font-weight:bold');
+console.info('%cVertex — build 2026-07-03t-onr-correcao-cpf','color:#0ea5e9;font-weight:bold');
 
 function centroidOf(pts){
   let la=0,ln=0; pts.forEach(p=>{ la+=p[0]; ln+=p[1]; });
@@ -9409,6 +9462,8 @@ async function abrirEdicao(id){
   const it = imoveisCache.find(x=>String(x.id)===String(id));
   if(!it) return;
   edItemAtual = it;
+  // botão de correção/retificação: só para imóveis já enviados ao Mapa ONR
+  (function(){ const b=document.getElementById('ed-onr-correcao'); if(b){ const env = String(it.onr_enviado)==='1' || (it.onr_importation_id||'').toString().trim()!==''; b.style.display = env ? '' : 'none'; } })();
   edNovoItn03 = false;
   edEhExclusiva = String(it.itn03_exclusivo)==='1';
   if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint();
@@ -10275,6 +10330,38 @@ async function consultarStatusOnr(id){
   setStatus('ok','Status ONR: '+r.status);
   carregarLista();
 }
+// Reenvia UM imóvel já enviado ao Mapa ONR como RETIFICAÇÃO (correção dos dados). Salva os dados
+// corrigidos, força a classificação "4 — Retificação" e gera uma nova importação na ONR.
+async function enviarCorrecaoOnr(){
+  const id = document.getElementById('ed-id').value;
+  if(!id) return;
+  const props = edProps.map(p=>({nome:(p.nome||'').trim(), doc:(p.doc||'').trim()})).filter(p=>p.nome||p.doc);
+  const invalidos = props.filter(p=>p.doc && docValido(p.doc)===false);
+  if(invalidos.length){ setStatus('err','Documento inválido: '+invalidos.map(p=>p.doc).join(', ')+'. Corrija o CPF/CNPJ antes de enviar a correção.'); return; }
+  if(!(await swalConfirm('Enviar correção à ONR?','Os dados atuais serão salvos e reenviados ao Mapa ONR como RETIFICAÇÃO (classificação 4), gerando uma nova importação. Continuar?','Enviar correção'))) return;
+  const cls=document.getElementById('eonr_onr_classificacao'); if(cls) cls.value='4';   // Retificação
+  const proprietario = props.map(p=>p.nome).join(', ');
+  const cpf = props.map(p=>p.doc).join(', ');
+  importProgressIndeterminado('Enviando correção à ONR', document.getElementById('ed-matricula').value||'');
+  try{
+    // 1) salva os dados corrigidos (inclui os campos ONR e a classificação de retificação)
+    const s = await post(Object.assign({acao:'atualizar_imovel', id,
+      identificador: document.getElementById('ed-identificador').value.trim(),
+      numero_matricula: document.getElementById('ed-matricula').value.trim(),
+      proprietario, cpf,
+      tipo_imovel: document.getElementById('ed-tipo').value,
+      contexto_rural: (document.getElementById('ed-contexto-rural')||{}).value || ''
+    }, edColetarOnr()));
+    if(!s.ok){ importProgressHide(); setStatus('err', s.erro||'Falha ao salvar os dados corrigidos.'); return; }
+    // 2) reenvia à ONR — nova importação (retificação)
+    const r = await post({acao:'enviar_onr', id});
+    importProgressHide();
+    if(!r.ok){ setStatus('err','Falha ao enviar a correção: '+(r.mensagem||'')); return; }
+    setStatus('ok','Correção enviada à ONR (retificação).'+(r.importation_id?(' · ID: '+r.importation_id):''));
+    await carregarLista();
+    fecharEdicao();
+  }catch(e){ importProgressHide(); setStatus('err','Falha na requisição da correção.'); }
+}
 async function enviarTodosOnr(){
   const prontos = (imoveisCache||[]).filter(it=> String(it.onr_pronto)==='1' && String(it.onr_enviado)!=='1').length;
   if(prontos===0){ setStatus('warn','Nenhum imóvel pronto para envio (faltam dados ONR ou já enviados).'); return; }
@@ -10939,6 +11026,7 @@ function verificarPertencimento(geo){
   if(tImo && cat){ tImo.addEventListener('change', ()=>{ cat.value = tImo.value || ''; }); }
   // Envio ONR (lote + configuração)
   const blote=document.getElementById('btn-onr-lote'); if(blote) blote.addEventListener('click', enviarTodosOnr);
+  const bcor=document.getElementById('ed-onr-correcao'); if(bcor) bcor.addEventListener('click', enviarCorrecaoOnr);
   const bcfg=document.getElementById('btn-onr-config'); if(bcfg) bcfg.addEventListener('click', abrirConfigOnr);
   const cfgov=document.getElementById('modal-onr-config'); if(cfgov) cfgov.addEventListener('click', e=>{ if(e.target===cfgov) fecharConfigOnr(); });
   // IA (Gemini): zona de PDF de matrícula + configuração
