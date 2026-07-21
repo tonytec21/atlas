@@ -60,7 +60,9 @@
   window.capNovaConta = function(){
     $('#contaForm').reset(); $('#c_id').value=''; $('#c_valor').value='';
     $('#contaModalTitle').textContent='Nova conta';
-    $('#c_recorrencia').value='Nenhuma';
+    $('#c_recorrencia').value='Nenhuma'; $('#c_recorrencia').disabled=false;
+    var sc=$('#c_parc_switch_col'); if(sc) sc.style.display='block';
+    if($('#c_parc_on')){ $('#c_parc_on').checked=false; $('#c_parc_n').value='2'; $('#c_parc_tipo').value='total'; capToggleParc(false); }
   };
   window.capEditar = async function(id){
     try{
@@ -70,17 +72,42 @@
       $('#c_id').value=c.id; $('#c_titulo').value=c.titulo||''; setMoney($('#c_valor'), c.valor);
       $('#c_venc').value=(c.data_vencimento||'').substr(0,10);
       $('#c_categoria').value=c.categoria||''; $('#c_recorrencia').value=c.recorrencia||'Nenhuma';
-      $('#c_fornecedor').value=c.fornecedor||''; $('#c_descricao').value=c.descricao||'';
+      $('#c_fornecedor').value=c.fornecedor||''; $('#c_nota_fiscal').value=c.nota_fiscal||''; $('#c_descricao').value=c.descricao||'';
       $('#contaModalTitle').textContent='Editar conta';
+      var sc=$('#c_parc_switch_col'); if(sc) sc.style.display='none';
+      if($('#c_parc_on')){ $('#c_parc_on').checked=false; capToggleParc(false); }
+      $('#c_recorrencia').disabled=false;
       bsModal('contaModal').show();
     }catch(e){ if(window.Swal) Swal.fire('Erro', e.message,'error'); }
   };
+  function capParseMoney(s){ s=String(s||'').replace(/R\$|\s/g,''); if(s.indexOf(',')>-1){ s=s.replace(/\./g,'').replace(',','.'); } var n=parseFloat(s); return isNaN(n)?0:n; }
+  function capToggleParc(on){
+    var box=$('#c_parc_box'); if(box) box.style.display = on ? 'block' : 'none';
+    var rec=$('#c_recorrencia'); if(rec){ rec.disabled = !!on; if(on) rec.value='Nenhuma'; }
+    if(on) capParcPreview();
+  }
+  function capParcPreview(){
+    var prev=$('#c_parc_prev'); if(!prev) return;
+    var n=parseInt($('#c_parc_n').value||'0',10), tipo=$('#c_parc_tipo').value, total=capParseMoney($('#c_valor').value);
+    if(!(n>=2)){ prev.textContent='Informe 2 ou mais parcelas.'; return; }
+    var perc, tot; if(tipo==='parcela'){ perc=total; tot=total*n; } else { perc=total/n; tot=total; }
+    prev.innerHTML = n+'x de <strong>'+brl(perc)+'</strong> · total '+brl(tot);
+  }
+  function initParcelamento(){
+    var on=$('#c_parc_on'); if(!on) return;
+    on.addEventListener('change', function(){ capToggleParc(this.checked); });
+    var n=$('#c_parc_n'), t=$('#c_parc_tipo'), v=$('#c_valor');
+    if(n) n.addEventListener('input', capParcPreview);
+    if(t) t.addEventListener('change', capParcPreview);
+    if(v) v.addEventListener('input', function(){ if($('#c_parc_on') && $('#c_parc_on').checked) capParcPreview(); });
+  }
   window.capSalvarConta = async function(){
     var form=$('#contaForm');
     if(!form.reportValidity()) return;
     var id=$('#c_id').value.trim();
     var data={ id:id, titulo:$('#c_titulo').value, valor:$('#c_valor').value, data_vencimento:$('#c_venc').value,
-               categoria:$('#c_categoria').value, recorrencia:$('#c_recorrencia').value, fornecedor:$('#c_fornecedor').value, descricao:$('#c_descricao').value };
+               categoria:$('#c_categoria').value, recorrencia:$('#c_recorrencia').value, fornecedor:$('#c_fornecedor').value, nota_fiscal:$('#c_nota_fiscal').value, descricao:$('#c_descricao').value };
+    if(!id && $('#c_parc_on') && $('#c_parc_on').checked){ data.parcelar='1'; data.parcelas=$('#c_parc_n').value; data.parcela_tipo=$('#c_parc_tipo').value; }
     var btn=$('#contaSalvarBtn'); btn.disabled=true;
     try{
       var r=await postForm(id? 'atualizar_conta.php':'salvar_conta.php', data);
@@ -271,6 +298,7 @@
       var v=$('#c_valor'); if(v) maskMoney(v);
     });
     safe('anexos', initAnexosDz);
+    safe('parcelamento', initParcelamento);
     safe('tabela', initTable);
     safe('graficos', initCharts);
     safe('fundos', function(){

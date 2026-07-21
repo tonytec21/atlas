@@ -293,6 +293,7 @@ function cap_ensure_schema()
         titulo VARCHAR(180) NOT NULL,
         categoria VARCHAR(60) NULL,
         fornecedor VARCHAR(180) NULL,
+        nota_fiscal VARCHAR(60) NULL,
         valor DECIMAL(12,2) NOT NULL DEFAULT 0,
         data_vencimento DATE NOT NULL,
         descricao TEXT NULL,
@@ -302,6 +303,9 @@ function cap_ensure_schema()
         data_pagamento DATE NULL,
         caminho_anexo VARCHAR(255) NULL,
         origem_id INT NULL,
+        parcela_num INT NULL,
+        parcela_total INT NULL,
+        parcela_grupo VARCHAR(40) NULL,
         created_at DATETIME NULL,
         INDEX idx_venc (data_vencimento),
         INDEX idx_status (status)
@@ -311,6 +315,10 @@ function cap_ensure_schema()
     $cols = [
         'categoria'      => "VARCHAR(60) NULL AFTER titulo",
         'fornecedor'     => "VARCHAR(180) NULL AFTER categoria",
+        'nota_fiscal'    => "VARCHAR(60) NULL AFTER fornecedor",
+        'parcela_num'    => "INT NULL",
+        'parcela_total'  => "INT NULL",
+        'parcela_grupo'  => "VARCHAR(40) NULL",
         'data_pagamento' => "DATE NULL AFTER status",
         'forma_pagamento'=> "VARCHAR(40) NULL AFTER data_pagamento",
         'conta_origem'   => "VARCHAR(10) NULL AFTER forma_pagamento",

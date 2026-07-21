@@ -13,6 +13,7 @@ try {
     if ($titulo === '') throw new RuntimeException('Informe o título da conta.');
     $categoria = trim((string)($_POST['categoria'] ?? ''));
     $fornecedor = trim((string)($_POST['fornecedor'] ?? ''));
+    $nota_fiscal = trim((string)($_POST['nota_fiscal'] ?? ''));
     $valor = cap_parse_money($_POST['valor'] ?? '0');
     $venc = trim((string)($_POST['data_vencimento'] ?? ''));
     if ($venc === '' || !strtotime($venc)) throw new RuntimeException('Data de vencimento inválida.');
@@ -21,8 +22,8 @@ try {
     $descricao = trim((string)($_POST['descricao'] ?? ''));
 
     $conn = cap_db();
-    $stmt = $conn->prepare("UPDATE contas_a_pagar SET titulo=?, categoria=?, fornecedor=?, valor=?, data_vencimento=?, descricao=?, recorrencia=? WHERE id=?");
-    $stmt->bind_param('sssdsssi', $titulo, $categoria, $fornecedor, $valor, $venc, $descricao, $recorrencia, $id);
+    $stmt = $conn->prepare("UPDATE contas_a_pagar SET titulo=?, categoria=?, fornecedor=?, nota_fiscal=?, valor=?, data_vencimento=?, descricao=?, recorrencia=? WHERE id=?");
+    $stmt->bind_param('ssssdsssi', $titulo, $categoria, $fornecedor, $nota_fiscal, $valor, $venc, $descricao, $recorrencia, $id);
     if (!$stmt->execute()) throw new RuntimeException('Erro ao atualizar: ' . $stmt->error);
     $stmt->close();
     echo json_encode(['success'=>true,'message'=>'Conta atualizada com sucesso!'], JSON_UNESCAPED_UNICODE);

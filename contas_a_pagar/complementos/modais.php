@@ -1,6 +1,11 @@
 <?php /* complementos/modais.php — modais: conta (cadastro/edição), configurações e anexos */ ?>
 
 <!-- ============ MODAL CONTA (cadastro/edição) ============ -->
+<style>
+  .cap-parc-box{ border:1px dashed #c7d2fe; border-radius:12px; background:#f5f8ff; padding:12px 14px; }
+  .cap-parc-box .prev{ font-weight:600; }
+  body.dark-mode .cap-parc-box{ border-color:rgba(129,140,248,.5); background:rgba(99,102,241,.10); }
+</style>
 <div class="modal fade cap-modal" id="contaModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
     <div class="modal-content">
@@ -29,8 +34,31 @@
               <div class="input-chip"><i class="fa fa-repeat"></i><select name="recorrencia" id="c_recorrencia">
                 <?php foreach($RECS as $r): ?><option value="<?php echo htmlspecialchars($r, ENT_QUOTES); ?>"><?php echo htmlspecialchars($r); ?></option><?php endforeach; ?>
               </select></div></div>
+            <div class="col-12 mb-2" id="c_parc_switch_col">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="c_parc_on">
+                <label class="form-check-label small" for="c_parc_on"><strong>Parcelar</strong> — gerar contas mensais (ex.: 4x)</label>
+              </div>
+            </div>
+            <div class="col-12 mb-3" id="c_parc_box" style="display:none">
+              <div class="cap-parc-box">
+                <div class="row align-items-end g-2">
+                  <div class="col-6 col-md-3"><label class="form-label small text-muted mb-1">Nº de parcelas</label>
+                    <div class="input-chip"><i class="fa fa-list-ol"></i><input type="number" id="c_parc_n" min="2" max="120" step="1" value="2"></div></div>
+                  <div class="col-6 col-md-5"><label class="form-label small text-muted mb-1">O valor informado é</label>
+                    <div class="input-chip"><i class="fa fa-calculator"></i><select id="c_parc_tipo">
+                      <option value="total">Valor total (dividir entre as parcelas)</option>
+                      <option value="parcela">Valor de cada parcela</option>
+                    </select></div></div>
+                  <div class="col-12 col-md-4"><div class="prev text-primary" id="c_parc_prev">—</div></div>
+                </div>
+                <div class="small text-muted mt-2"><i class="fa fa-info-circle"></i> A 1ª parcela vence na data acima; as demais são mensais. A recorrência é ignorada quando parcelado.</div>
+              </div>
+            </div>
             <div class="col-12 col-md-8 mb-3"><label class="form-label small text-muted mb-1">Fornecedor</label>
               <div class="input-chip"><i class="fa fa-truck"></i><input type="text" name="fornecedor" id="c_fornecedor" placeholder="Ex.: Equatorial Energia"></div></div>
+            <div class="col-6 col-md-4 mb-3"><label class="form-label small text-muted mb-1">Nota fiscal</label>
+              <div class="input-chip"><i class="fa fa-file-text-o"></i><input type="text" name="nota_fiscal" id="c_nota_fiscal" placeholder="Opcional"></div></div>
             <div class="col-12 mb-2"><label class="form-label small text-muted mb-1">Descrição / observações</label>
               <textarea class="form-control" name="descricao" id="c_descricao" rows="2" placeholder="Opcional"></textarea></div>
           </div>
