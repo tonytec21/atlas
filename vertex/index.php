@@ -2293,7 +2293,7 @@ function staticMapUrlSobreposicao($polyA, $polyB, $rings, $key) {
 function staticMapUrlImovel($pts, $key) {
     if (count($pts) < 3) return '';
     $params = ['size=640x360', 'scale=2', 'maptype=hybrid', 'format=png'];
-    $params[] = 'path=' . rawurlencode('color:0xe2342fff|weight:3|fillcolor:0xe2342f33|enc:' . encodePolyline(closeRing($pts)));
+    $params[] = 'path=' . rawurlencode('color:0x1d4ed8ff|weight:3|fillcolor:0x1d4ed833|enc:' . encodePolyline(closeRing($pts)));
     // marcadores pequenos nos vértices (ajudam a localizar os pontos citados nas inconsistências)
     if (count($pts) <= 60) {
         $locs = [];
@@ -5544,10 +5544,10 @@ header('Expires: 0');
     --line:#E3E8F0; --line-2:#CFD8E4;
     /* Tinta */
     --ink:#152030; --muted:#48586C; --faint:#7C8BA0;
-    /* Marca — lacre cartorial */
-    --red:#B01224; --red-bright:#D5182C; --red-deep:#8C0E1D;
+    /* Marca — gradiente Vertex (teal → azul, igual ao card do módulo) */
+    --red:#1571B0; --red-bright:#0D9488; --red-deep:#1D4ED8;
     --red-soft:color-mix(in srgb, var(--red-bright) 9%, transparent);
-    --red-text:#A81222;
+    --red-text:#0F6E96;
     /* Acentos funcionais */
     --teal:#0E8F80; --blue:#2563EB; --violet:#7C3AED;
     --green:#178A4F; --green-text:#0F6B3B;
@@ -5576,9 +5576,9 @@ header('Expires: 0');
     --bg:#0A0F16; --panel:#111823; --panel-2:#18212E; --card:var(--panel);
     --line:#243040; --line-2:#33455C;
     --ink:#E8EEF6; --muted:#97A6B8; --faint:#64748B;
-    --red:#C21A2C; --red-bright:#EF4051; --red-deep:#8C0E1D;
+    --red:#1D84C4; --red-bright:#14B8A6; --red-deep:#2563EB;
     --red-soft:color-mix(in srgb, var(--red-bright) 14%, transparent);
-    --red-text:#F39AA2;
+    --red-text:#5EEAD4;
     --teal:#22B3A2; --blue:#5B8DEF; --violet:#A78BFA;
     --green:#2FB871; --green-text:#7FE0AD;
     --amber:#E0A63A; --amber-text:#EFC77E;
@@ -5637,7 +5637,7 @@ header('Expires: 0');
   /* Marca */
   .brand{display:flex;align-items:center;gap:11px;margin-right:2px}
   .mark{width:36px;height:36px;border-radius:11px;flex:none;display:grid;place-items:center;
-    background:linear-gradient(140deg, var(--red-bright) 0%, var(--red-deep) 100%);
+    background:linear-gradient(135deg, var(--red-bright) 0%, var(--red-deep) 100%);
     box-shadow:0 4px 12px -4px color-mix(in srgb, var(--red-bright) 60%, transparent),
       inset 0 1px 0 rgba(255,255,255,.25)}
   .mark svg{width:19px;height:19px}
@@ -5794,7 +5794,7 @@ header('Expires: 0');
     transition:filter .15s,background .15s,border-color .15s,color .15s,transform .15s,box-shadow .15s}
   .actions{display:flex;gap:10px;margin-top:14px}
   .btn-primary{flex:1;padding:12px 14px;border-radius:11px;font-weight:650;color:#fff;
-    background:linear-gradient(160deg, var(--red-bright), var(--red));
+    background:linear-gradient(135deg, var(--red-bright) 0%, var(--red-deep) 100%);
     box-shadow:0 8px 20px -10px color-mix(in srgb, var(--red-bright) 65%, transparent),
       inset 0 1px 0 rgba(255,255,255,.18)}
   .btn-primary:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.05);
@@ -6266,7 +6266,7 @@ header('Expires: 0');
   .ov-none{font-family:var(--mono);font-size:11px;color:var(--green-text);padding:10px 6px}
   .ov-foot{padding:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
   .btn-report{width:100%;padding:11px;border-radius:10px;font-size:12.5px;font-weight:600;color:#fff;
-    background:linear-gradient(160deg, var(--red-bright), var(--red));
+    background:linear-gradient(135deg, var(--red-bright) 0%, var(--red-deep) 100%);
     box-shadow:0 6px 16px -8px color-mix(in srgb, var(--red-bright) 60%, transparent)}
   .btn-report:hover{filter:brightness(1.06)}
   .ov-reopen{position:absolute;top:60px;right:14px;z-index:6;display:none;align-items:center;gap:8px;
@@ -6378,9 +6378,9 @@ header('Expires: 0');
   .cor-pop-lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#7C8BA0;margin-bottom:6px}
   .cor-pop-grid{display:grid;grid-template-columns:repeat(6,22px);gap:6px}
   .cor-pop .cor-sw{width:22px;height:22px;aspect-ratio:auto;min-height:0}
-  .cor-pop-clear{margin-top:11px;width:100%;font-size:11px;font-weight:600;color:#A81222;
+  .cor-pop-clear{margin-top:11px;width:100%;font-size:11px;font-weight:600;color:var(--red-text);
     background:#fff;border:1px solid #E3E8F0;border-radius:8px;padding:6px}
-  .cor-pop-clear:hover{background:#FBF0F1;border-color:#B01224}
+  .cor-pop-clear:hover{background:color-mix(in srgb, var(--red-bright) 8%, #fff);border-color:var(--red)}
   .cor-pop-acc{margin-top:2px}
   .cor-pop-acc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;
     margin-bottom:0;padding:4px 0;user-select:none}
@@ -6419,8 +6419,8 @@ header('Expires: 0');
   body.dark-mode .ip-inc-h{color:#F0C14B}
   body.dark-mode .ip-inc-row .inc-msg{color:#CDD6E0}
   body.dark-mode .ip-inc-row .inc-msg b{color:#fff}
-  body.dark-mode .cor-pop-clear{background:#18212E;border-color:#243040;color:#EF4051}
-  body.dark-mode .cor-pop-clear:hover{background:#2A1A1C;border-color:#B01224}
+  body.dark-mode .cor-pop-clear{background:#18212E;border-color:#243040;color:var(--red-text)}
+  body.dark-mode .cor-pop-clear:hover{background:color-mix(in srgb, var(--red-bright) 14%, var(--panel));border-color:var(--red)}
 
   /* ─── 24. MODAIS ────────────────────────────────────────────────── */
   .modal-ov{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;
@@ -8455,7 +8455,7 @@ async function swalConfirm(titulo, texto, confirmar){
   const r = await Swal.fire(Object.assign({
     title:titulo, text:texto||'', icon:'question', showCancelButton:true,
     confirmButtonText:confirmar||'Confirmar', cancelButtonText:'Cancelar',
-    confirmButtonColor:'#a80f1e', cancelButtonColor:'#6b7785', reverseButtons:true
+    confirmButtonColor:'#1571B0', cancelButtonColor:'#6b7785', reverseButtons:true
   }, swalTema()));
   return r.isConfirmed;
 }
@@ -8602,14 +8602,14 @@ function desenhar(geo, nome){
 
   const path = geo.pts.map(p=>({lat:p[0], lng:p[1]}));
   polygon = new google.maps.Polygon({
-    paths:path, strokeColor:'#e2342f', strokeOpacity:.95, strokeWeight:2,
-    fillColor:'#a80f1e', fillOpacity:.22, map:map
+    paths:path, strokeColor:'#1D4ED8', strokeOpacity:.95, strokeWeight:2,
+    fillColor:'#1D4ED8', fillOpacity:.22, map:map
   });
   geo.pts.forEach((p,i)=>{
     vertexMarkers.push(new google.maps.Marker({
       position:{lat:p[0],lng:p[1]}, map:map,
       icon:{path:google.maps.SymbolPath.CIRCLE, scale:4, fillColor:'#0e1217',
-            fillOpacity:1, strokeColor:'#e2342f', strokeWeight:2},
+            fillOpacity:1, strokeColor:'#0D9488', strokeWeight:2},
       title:'V'+(i+1)
     }));
   });
@@ -9810,7 +9810,7 @@ window.__setCorImovel = async function(id, opts){
       if(novaOp!==undefined)    imovelEditandoOpac = novaOp;
       marcarSwatchPainel(imovelEditandoCor); marcarSwatchLinhaPainel(imovelEditandoLinha); ajustarSliderPainel(imovelEditandoOpac);
       if(polygon){
-        const fill = corValida(imovelEditandoCor) ? imovelEditandoCor : '#e2342f';
+        const fill = corValida(imovelEditandoCor) ? imovelEditandoCor : '#1D4ED8';
         const stroke = corValida(imovelEditandoLinha) ? imovelEditandoLinha : fill;
         polygon.setOptions({strokeColor: stroke, fillColor: fill, fillOpacity: (imovelEditandoOpac!=null?imovelEditandoOpac:0.22)});
       }
@@ -9867,7 +9867,7 @@ function abrirCorPainel(id, cor, opac, corLinha){
   if(polygon){
     const fill = corValida(cor)?cor:null;
     const stroke = corValida(corLinha)?corLinha:(fill||null);
-    if(fill || stroke) polygon.setOptions({strokeColor: (stroke||'#e2342f'), fillColor:(fill||'#e2342f'), fillOpacity:(imovelEditandoOpac!=null?imovelEditandoOpac:0.22)});
+    if(fill || stroke) polygon.setOptions({strokeColor: (stroke||'#1D4ED8'), fillColor:(fill||'#1D4ED8'), fillOpacity:(imovelEditandoOpac!=null?imovelEditandoOpac:0.22)});
   }
 }
 
@@ -10395,7 +10395,7 @@ async function focarImovelConfronto(reg, geo){
       vertexMarkers.push(new google.maps.Marker({
         position:{lat:p[0],lng:p[1]}, map:map,
         icon:{path:google.maps.SymbolPath.CIRCLE, scale:4, fillColor:'#0e1217',
-              fillOpacity:1, strokeColor:'#e2342f', strokeWeight:2},
+              fillOpacity:1, strokeColor:'#0D9488', strokeWeight:2},
         title:'V'+(i+1)
       }));
     });
@@ -11286,7 +11286,7 @@ function itn03MostrarAvisos(avisos, contexto){
          + '<ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.6">' + itens + '</ul></div>',
     width: 640,
     confirmButtonText:'Entendi',
-    confirmButtonColor:'#a80f1e',
+    confirmButtonColor:'#1571B0',
     didOpen:(popup)=>{ const c = popup && popup.parentElement; if(c && c.classList.contains('swal2-container')) c.style.zIndex='100050'; }
   }, swalTema()));
 }
@@ -11301,7 +11301,7 @@ async function exportarItn03Individual(idArg){
       setStatus('err', res.erro||'Falha ao gerar a carga ITN 03.');
       if(typeof Swal!=='undefined'){
         Swal.fire(Object.assign({icon:'info', title:'Ainda não dá para exportar', text:res.erro||'Falha ao gerar a carga ITN 03.',
-          confirmButtonText:'Entendi', confirmButtonColor:'#a80f1e',
+          confirmButtonText:'Entendi', confirmButtonColor:'#1571B0',
           didOpen:(p)=>{ const c=p&&p.parentElement; if(c&&c.classList.contains('swal2-container')) c.style.zIndex='100050'; }
         }, swalTema()));
       }
@@ -11327,7 +11327,7 @@ async function exportarItn03Lote(escopo){
       setStatus('err', res.erro||'Falha ao gerar a carga ITN 03.');
       if(typeof Swal!=='undefined'){
         Swal.fire(Object.assign({icon:'info', title:'Nada para exportar', text:res.erro||'Falha ao gerar a carga ITN 03.',
-          confirmButtonText:'Entendi', confirmButtonColor:'#a80f1e',
+          confirmButtonText:'Entendi', confirmButtonColor:'#1571B0',
           didOpen:(p)=>{ const c=p&&p.parentElement; if(c&&c.classList.contains('swal2-container')) c.style.zIndex='100050'; }
         }, swalTema()));
       }
@@ -11450,7 +11450,7 @@ async function swalOnrNaoConfig(){
     title:'Configure a API do Mapa ONR',
     html:'Para enviar imóveis ao <b>Mapa do Registro de Imóveis (ONR)</b> é preciso cadastrar o <b>token de acesso</b> da API.<br><br>Deseja configurar agora?',
     showCancelButton:true, confirmButtonText:'⚙ Configurar agora', cancelButtonText:'Agora não',
-    confirmButtonColor:'#a80f1e', cancelButtonColor:'#6b7785', reverseButtons:true
+    confirmButtonColor:'#1571B0', cancelButtonColor:'#6b7785', reverseButtons:true
   }, swalTema()));
   if(r.isConfirmed && typeof abrirConfigOnr==='function') abrirConfigOnr();
 }
@@ -11550,7 +11550,7 @@ async function enviarTodosOnr(){
         title: r.enviados ? `Enviados ${r.enviados} de ${r.total}` : `Nenhum imóvel enviado`,
         html: `<div style="text-align:left"><b>${falhas.length}</b> falha(s):</div>` + listaHtml,
         showCancelButton:true, confirmButtonText: temConfig ? '⚙ Configurar API ONR' : 'Entendi',
-        cancelButtonText:'Fechar', confirmButtonColor:'#a80f1e', cancelButtonColor:'#6b7785', reverseButtons:true
+        cancelButtonText:'Fechar', confirmButtonColor:'#1571B0', cancelButtonColor:'#6b7785', reverseButtons:true
       }, swalTema()));
       if(temConfig && res.isConfirmed && typeof abrirConfigOnr==='function') abrirConfigOnr();
     }
