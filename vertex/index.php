@@ -1132,6 +1132,159 @@ function laudoSeDiscrepante($memorial) {
     return null;
 }
 
+/* ====================================================================
+ *  ANÁLISE DE MEMORIAL NARRATIVO (vértices rotulados P-1..P-n + lados
+ *  "azimute e distância Az=..°..'..\" e DIST metros até o vértice P-x").
+ *  Detecta: (a) coordenada fora da faixa UTM (erro de digitação — ex.: northing
+ *  com 8 dígitos) e a conserta pelo lado de chegada; (b) vértice deslocado da
+ *  posição prevista pelo azimute/distância do próprio memorial (marco incoerente).
+ *  Alimenta tanto as INCONSISTÊNCIAS do cadastro (matrículas e projetos) quanto o
+ *  PAINEL de foco no imóvel.
+ * ==================================================================== */
+
+/** Rótulo genérico de vértice ("P-1","P-15","M-07"), preservando a letra-prefixo. */
+function vxLabel($raw) {
+    $raw = strtoupper(trim((string)$raw));
+    $raw = strtr($raw, ['I' => '1', 'L' => '1']); // OCR comum no número
+    if (preg_match('/([A-Z]{1,3})[-\s]?0*(\d{1,4})/', $raw, $m)) return $m[1] . '-' . (int)$m[2];
+    if (preg_match('/0*(\d{1,4})/', $raw, $m)) return 'V-' . (int)$m[1];
+    return 'V-?';
+}
+/** Faixas plausíveis UTM (Brasil, hemisfério sul). */
+function vxBandaN($v) { return $v >= 1000000 && $v <= 10000000; }
+function vxBandaE($v) { return $v >= 100000  && $v <= 999999; }
+/** Candidatos ao conserto de um número fora de faixa removendo 1 dígito. */
+function vxDigitDrop($val, $lo, $hi) {
+    $intp = (string)(int)floor(abs($val)); $frac = abs($val) - floor(abs($val)); $out = [];
+    for ($k = 0; $k < strlen($intp); $k++) {
+        $c = (int)(substr($intp, 0, $k) . substr($intp, $k + 1));
+        if ($c >= $lo && $c <= $hi) $out[] = (float)$c + $frac;
+    }
+    return array_values(array_unique($out));
+}
+
+function analisarMemorialVertex($memorial, $zone = 23, $south = true) {
+    $t = normalizeGeoText($memorial);
+    $num = '\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?';
+
+    // ---- vértices rotulados em prosa: "vértice P-1, de coordenadas N=.. e E=.." ----
+    $reV = '/(?:v[ée]rtice|ponto|marco|estaca)\s+([A-Z]{1,3}[-\s]?[0-9lLI]{1,4})\b[^NE]{0,90}?\bN\s*=?\s*(' . $num . ')\s*(?:m\b)?[^NE]{0,25}?\bE\s*=?\s*(' . $num . ')/su';
+    preg_match_all($reV, $t, $mV, PREG_SET_ORDER);
+    $vx = [];
+    foreach ($mV as $x) {
+        $vx[] = ['rot' => vxLabel($x[1]), 'N' => brNumero($x[2]), 'E' => brNumero($x[3]), 'typo' => null, 'suspeito' => false, 'desvio_m' => null];
+    }
+    if (count($vx) < 3) return ['ok' => false, 'erro' => 'Memorial sem vértices rotulados em prosa (mínimo 3) — este analisador é específico para memoriais narrativos com "vértice P-n, de coordenadas N=.. e E=..".'];
+
+    // remove vértice de fechamento repetido (último ~ primeiro)
+    $k = count($vx);
+    if ($k > 3 && abs($vx[0]['N'] - $vx[$k-1]['N']) < 0.2 && abs($vx[0]['E'] - $vx[$k-1]['E']) < 0.2) array_pop($vx);
+    $nv = count($vx);
+
+    // ---- lados azimute+distância com destino: "..e DIST metros até o vértice P-x" ----
+    $reL = '/azimute\s*e\s*dist[âa]ncia\s*Az\s*=?\s*(\d{1,3})\s*°\s*(?:(\d{1,2})\s*\'\s*(?:([\d.,]+)\s*"?)?)?\s*e\s*(' . $num . ')\s*metros?[\s,]*at[ée]\s+(?:o\s+)?(?:v[ée]rtice\s+)?([A-Za-z]{1,3}[-\s]?\d{1,4}|chegarmos|ponto)/su';
+    preg_match_all($reL, $t, $mL, PREG_SET_ORDER);
+    $legs = [];
+    foreach ($mL as $x) {
+        $dest = $x[5] ?? ''; $paraRot = null;
+        if (preg_match('/^(chegarmos|ponto)/i', $dest)) $paraRot = $vx[0]['rot']; // fecha no ponto inicial
+        elseif ($dest !== '') $paraRot = vxLabel($dest);
+        $legs[] = ['az' => dmsToDecimal($x[1], $x[2] ?? '', $x[3] ?? ''), 'dist' => brNumero($x[4]), 'para' => $paraRot];
+    }
+    $legPara = []; foreach ($legs as $lg) { if ($lg['para'] !== null) $legPara[$lg['para']] = $lg; }
+
+    // ---- (a) conserta N/E fora de faixa pelo lado de chegada (ou mediana, sem lado) ----
+    $typos = [];
+    for ($i = 0; $i < $nv; $i++) {
+        $badN = !vxBandaN($vx[$i]['N']); $badE = !vxBandaE($vx[$i]['E']);
+        if (!$badN && !$badE) continue;
+        $prev = $i > 0 ? $vx[$i-1] : null;
+        $lg = $legPara[$vx[$i]['rot']] ?? null;
+        $fixN = $vx[$i]['N']; $fixE = $vx[$i]['E']; $via = '';
+        if ($prev && $lg && vxBandaN($prev['N']) && vxBandaE($prev['E'])) {
+            $az = deg2rad($lg['az']); $d = (float)$lg['dist'];
+            $tN = $prev['N'] + $d * cos($az); $tE = $prev['E'] + $d * sin($az);
+            if ($badN) { $best = null; foreach (vxDigitDrop($vx[$i]['N'], 1000000, 10000000) as $c) if ($best === null || abs($c - $tN) < abs($best - $tN)) $best = $c; if ($best !== null) { $fixN = $best; $via = 'pelo azimute/distância de ' . $prev['rot'] . '→' . $vx[$i]['rot']; } }
+            if ($badE) { $best = null; foreach (vxDigitDrop($vx[$i]['E'],  100000,   999999) as $c) if ($best === null || abs($c - $tE) < abs($best - $tE)) $best = $c; if ($best !== null) $fixE = $best; }
+        } else {
+            $valN = []; $valE = []; foreach ($vx as $w) { if (vxBandaN($w['N'])) $valN[] = $w['N']; if (vxBandaE($w['E'])) $valE[] = $w['E']; }
+            if ($badN) { $mN = medianaFloat($valN); $best = null; foreach (vxDigitDrop($vx[$i]['N'], 1000000, 10000000) as $c) if ($best === null || abs($c - $mN) < abs($best - $mN)) $best = $c; if ($best !== null) $fixN = $best; }
+            if ($badE) { $mE = medianaFloat($valE); $best = null; foreach (vxDigitDrop($vx[$i]['E'],  100000,   999999) as $c) if ($best === null || abs($c - $mE) < abs($best - $mE)) $best = $c; if ($best !== null) $fixE = $best; }
+        }
+        $msg = [];
+        if ($badN) $msg[] = 'N=' . (int)$vx[$i]['N'] . ' (' . strlen((string)(int)$vx[$i]['N']) . ' díg.) → ' . (int)$fixN;
+        if ($badE) $msg[] = 'E=' . (int)$vx[$i]['E'] . ' → ' . (int)$fixE;
+        $vx[$i]['typo'] = implode('; ', $msg) . ($via ? ' (' . $via . ')' : '');
+        $vx[$i]['suspeito'] = true; $typos[$vx[$i]['rot']] = $vx[$i]['typo'];
+        $vx[$i]['N'] = $fixN; $vx[$i]['E'] = $fixE;
+    }
+
+    // ---- lat/lng + área/perímetro (plano UTM, como o memorial) ----
+    $utm = [];
+    for ($i = 0; $i < $nv; $i++) { $g = utmToGeo($vx[$i]['E'], $vx[$i]['N'], $zone, $south); $vx[$i]['lat'] = $g[0]; $vx[$i]['lng'] = $g[1]; $utm[] = [$vx[$i]['N'], $vx[$i]['E']]; }
+    $areaM2 = 0.0; for ($i = 0; $i < $nv; $i++) { $j = ($i+1) % $nv; $areaM2 += $utm[$i][1]*$utm[$j][0] - $utm[$j][1]*$utm[$i][0]; } $areaM2 = abs($areaM2) / 2.0;
+    $per = 0.0; for ($i = 0; $i < $nv; $i++) { $j = ($i+1) % $nv; $per += hypot($utm[$j][1]-$utm[$i][1], $utm[$j][0]-$utm[$i][0]); }
+
+    // ---- tabela de divergência por lado (coords x azimute/distância declarados) ----
+    $lados = [];
+    for ($i = 0; $i < $nv; $i++) {
+        $j = ($i+1) % $nv; $dN = $utm[$j][0]-$utm[$i][0]; $dE = $utm[$j][1]-$utm[$i][1];
+        $distC = hypot($dN, $dE); $azC = fmod(rad2deg(atan2($dE, $dN)) + 360.0, 360.0);
+        $lg = $legPara[$vx[$j]['rot']] ?? null;
+        $row = ['de' => $vx[$i]['rot'], 'para' => $vx[$j]['rot'], 'dist_calc' => round($distC, 2), 'az_calc' => round($azC, 4), 'dist_decl' => null, 'az_decl' => null, 'suspeito' => false];
+        if ($lg) { $ad = abs($azC - $lg['az']); if ($ad > 180) $ad = 360 - $ad;
+            $row['dist_decl'] = round($lg['dist'], 2); $row['az_decl'] = round($lg['az'], 4);
+            $row['suspeito'] = (abs($distC - $lg['dist']) > 3.0) || ($ad > 0.5); }
+        $lados[] = $row;
+    }
+    // ---- (b) vértice CULPADO: reconstrói cada vértice pelo lado de chegada (a partir do anterior);
+    //          desvio > 5 m da posição prevista = marco incoerente. Pula o vértice inicial (fechamento). ----
+    $suspeitos = $typos;
+    for ($j = 1; $j < $nv; $j++) {
+        if (!empty($vx[$j]['typo'])) continue;
+        $lg = $legPara[$vx[$j]['rot']] ?? null; if (!$lg) continue;
+        $i = $j - 1; $az = deg2rad($lg['az']); $d = (float)$lg['dist'];
+        $rN = $utm[$i][0] + $d * cos($az); $rE = $utm[$i][1] + $d * sin($az);
+        $off = hypot($utm[$j][1] - $rE, $utm[$j][0] - $rN);
+        if ($off > 5.0) { $suspeitos[$vx[$j]['rot']] = true; $vx[$j]['suspeito'] = true; $vx[$j]['desvio_m'] = round($off, 2); }
+    }
+
+    // ---- confrontantes (heurística por lado) ----
+    $conf = [];
+    if (preg_match('/margem da (Estrada[^,.;]+)/su', $t, $mc)) $conf[] = trim($mc[1]);
+    if (preg_match_all('/limitar com (?:as\s+)?terras do (?:Sr\.?|Sra\.?)?\s*([^,.;]+)/su', $t, $mc2)) foreach ($mc2[1] as $nome) $conf[] = trim($nome);
+
+    // ---- área/perímetro declarados ----
+    $areaDecl = null; if (preg_match('/[áa]rea[^0-9]{0,30}?([\d.]*\d,\d{2,})\s*ha/iu', $t, $ma)) $areaDecl = brNumero($ma[1]);
+    $perDecl = null;  if (preg_match('/per[íi]metro[^0-9]{0,20}?([\d.]*\d,\d{2})\s*m/iu', $t, $mpp)) $perDecl = brNumero($mpp[1]);
+
+    return ['ok' => true, 'zona' => $zone, 'hemisferio' => $south ? 'sul' : 'norte',
+        'datum' => (preg_match('/SAD[-\s]?69/i', $t) ? 'SAD-69' : (preg_match('/SIRGAS/i', $t) ? 'SIRGAS2000' : '')),
+        'mc' => (preg_match('/(\d{2})\s*W\s*Gr/i', $t, $mm) ? $mm[1] . 'W' : ''),
+        'num_vertices' => $nv, 'vertices' => $vx, 'legs' => $legs, 'lados' => $lados,
+        'area_m2' => round($areaM2, 2), 'area_ha' => round($areaM2 / 10000, 4), 'perimetro_m' => round($per, 2),
+        'area_declarada_ha' => $areaDecl, 'perimetro_declarado_m' => $perDecl,
+        'typos' => $typos, 'suspeitos' => array_keys($suspeitos), 'confrontantes' => $conf];
+}
+
+/** Converte o laudo de memorial narrativo em INCONSISTÊNCIAS {sev,msg} (cadastro de matrículas e projetos). */
+function detectarInconsistenciasCoord($memorial) {
+    $inc = []; $m = (string)$memorial; if (trim($m) === '') return $inc;
+    $r = analisarMemorialVertex($m); if (empty($r['ok'])) return $inc;
+    foreach ($r['vertices'] as $v) {
+        if (!empty($v['typo'])) {
+            $inc[] = ['sev' => 'erro', 'msg' => 'Vértice ' . $v['rot'] . ': coordenada fora da faixa UTM (provável erro de digitação) — ' . $v['typo'] . '.'];
+        } elseif (!empty($v['suspeito'])) {
+            $inc[] = ['sev' => 'alerta', 'msg' => 'Vértice ' . $v['rot'] . ' está a ~' . number_format((float)($v['desvio_m'] ?? 0), 1, ',', '.') . ' m da posição prevista pelo azimute/distância do memorial — confira a coordenada do marco.'];
+        }
+    }
+    if ($r['area_declarada_ha'] !== null && abs($r['area_ha'] - $r['area_declarada_ha']) > max(0.05, 0.03 * $r['area_declarada_ha'])) {
+        $inc[] = ['sev' => 'alerta', 'msg' => 'Área calculada (' . number_format($r['area_ha'], 4, ',', '.') . ' ha) diverge da declarada no memorial (' . number_format($r['area_declarada_ha'], 4, ',', '.') . ' ha).'];
+    }
+    return $inc;
+}
+
+
 /** Reconstrói o pacote a partir da string "lat,lng lat,lng ..." gravada no banco. */
 function buildGeoDataFromWgs84($str) {
     $pts = [];
@@ -1530,7 +1683,7 @@ function inconsFmtDist($m) {
 }
 /* Checagens geométricas detalhadas (KML e PDF): lados desproporcionais, vértices
    duplicados, área atípica, coordenadas fora do Brasil e autointerseção. */
-function detectarInconsistenciasGeo($geo, $origem = '') {
+function detectarInconsistenciasGeo($geo, $origem = '', $memorial = '') {
     $inc = [];
     $nv = (int)($geo['num_vertices'] ?? 0);
     if ($nv > 0 && $nv < 4) $inc[] = ['sev' => 'erro', 'msg' => 'Polígono com poucos vértices (' . $nv . ') — o mínimo para uma poligonal fechada é 4.'];
@@ -1577,6 +1730,8 @@ function detectarInconsistenciasGeo($geo, $origem = '') {
         // Autointerseção
         if (inconsAutoIntersecta($pts)) $inc[] = ['sev' => 'alerta', 'msg' => 'A poligonal parece se autointersectar (lados se cruzam) — confira a ordem dos vértices.'];
     }
+    // Validação de coordenadas do memorial narrativo (marcos fora de faixa / vértices incoerentes)
+    if (trim((string)$memorial) !== '') $inc = array_merge($inc, detectarInconsistenciasCoord($memorial));
     return $inc;
 }
 /* Inconsistências específicas de uma matrícula lida por IA (PDF). */
@@ -4279,6 +4434,12 @@ if (isset($_POST['acao'])) {
             exit;
         }
 
+        if ($acao === 'analisar_vertex') {
+            $memorial = isset($_POST['memorial']) ? (string)$_POST['memorial'] : '';
+            echo json_encode(analisarMemorialVertex($memorial), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($acao === 'processar_kml') {
             $kml = isset($_POST['kml']) ? (string)$_POST['kml'] : '';
             $pm = parseKml($kml);
@@ -4375,7 +4536,7 @@ if (isset($_POST['acao'])) {
                         $mp = mapearImovelComGeo($conn, $idExistente, $origem, $fonte);
                         if (!empty($mp['ok'])) {
                             $geoMp = $mp['geo'];
-                            inconsGravar($conn, $idExistente, array_merge($incDup, detectarInconsistenciasGeo($geoMp, $origem)));
+                            inconsGravar($conn, $idExistente, array_merge($incDup, detectarInconsistenciasGeo($geoMp, $origem, ($origem === 'memorial' ? $fonte : ''))));
                             $mapeadoDup = ['num_vertices' => $geoMp['num_vertices'], 'area_ha' => $geoMp['area_ha']];
                         }
                     }
@@ -4419,7 +4580,7 @@ if (isset($_POST['acao'])) {
             }
 
             // inconsistências: geometria + (se KML) nome do placemark interno
-            $incList = detectarInconsistenciasGeo($data, $origem);
+            $incList = detectarInconsistenciasGeo($data, $origem, ($origem === 'memorial' ? $fonte : ''));
             if ($origem === 'kml') {
                 foreach (parseKml($fonte) as $p0) { list(, $incNome) = inconsNomeKml($p0['nome'] ?? ''); $incList = array_merge($incList, $incNome); }
             }
@@ -5152,7 +5313,7 @@ if (isset($_POST['acao'])) {
             $res = mapearImovelComGeo($conn, $mid, $origem, $conteudo);
             if (empty($res['ok'])) { echo json_encode(['ok' => false, 'erro' => $res['erro'] ?? 'Não foi possível extrair coordenadas do texto.']); exit; }
             $geo = $res['geo'];
-            inconsGravar($conn, $mid, detectarInconsistenciasGeo($geo, $origem));
+            inconsGravar($conn, $mid, detectarInconsistenciasGeo($geo, $origem, ($origem === 'memorial' ? $conteudo : '')));
             if ($ehKml && trim($conteudo) !== '') {
                 anexoSalvarBytes($conn, $mid, $conteudo, ('imovel_' . $mid . '.kml'), 'kml', 'application/vnd.google-earth.kml+xml');
             }
@@ -5362,7 +5523,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-22a-aba-relatorios (nova aba RELATÓRIOS: 3 painéis de completude com gráfico donut SVG e % — 1) matrículas faltantes da 1 até a maior, com intervalos comprimidos (ex.: 5–7, 23) e contagem de imóveis sem nº; 2) envio ao Mapa ONR: enviadas × faltantes, chips verdes p/ prontas e vermelhos p/ dados incompletos; 3) carga ITN 03: aptas × pendentes com O QUE FALTA em cada matrícula; botão Copiar lista por relatório, Recalcular, atalho de teclado 7, bottom nav mobile com 7 colunas; listar agora devolve itn03_ok/itn03_faltam (régua completa p/ mapeadas, mínima p/ exclusivas); tudo client-side sobre o próprio listar — sem migração de banco) | anterior: 2026-07-21f-3d-sem-links-externos (removidos os links "Google Earth" e "Google Maps (satélite)" do rodapé do modal de visão 3D — os imóveis só carregam dentro do sistema; mensagens de fallback do 3D atualizadas para não citar os links) | anterior: 2026-07-21e-vertodos-desmarcado (no foco de confronto o botão "Ver todos" fica desmarcado; clicá-lo nesse estado limpa o filtro ";*", oculta o badge do município e reexibe todos os imóveis — sem sair da visão geral) | anterior: 2026-07-21d-fix-termo-mat (fix: termo da consulta ";*" usava o rótulo "Mat. N", que não casa com o filtro exato de matrícula e o imóvel não era exibido — agora usa o NÚMERO puro (sem zeros à esquerda) e, sem matrícula, a identificação; corrigido também no verNoMapaConfronto da importação) | anterior: 2026-07-21c-foco-confronto-selecao (selecionar imóvel na lista agora foca em modo CONFRONTO: visão geral + consulta "matrícula;*" no painel — sobreposições e desmembradas — mantendo pontos dos vértices e badge de pertencimento ao município como no modo single; nova focarImovelConfronto; carregarImovel segue preenchendo Cadastrar/ONR/cor; dropzone de Importar só lista os tipos aceitos) | anterior: 2026-07-21b-shell-2-niveis-icones (REORGANIZAÇÃO ESTRUTURAL: barra de comando em 2 níveis — contexto/marca/base/ações em cima, faixa de abas com indicador embaixo; sprite SVG com 20 ícones estilo Lucide substituindo todos os emojis do shell, controles 3D, toolbars, cartões ONR e painel Visão geral; NAVEGAÇÃO INFERIOR FIXA no mobile (≤880px, estilo app nativo, safe-area, palco encolhe via bottom do shell); cabeçalhos de página por aba (ícone+título+descrição); form-grid em 3 colunas ≥1100px; "Como funciona" como stepper numerado; toggleRotulos atualiza só o <span> preservando o ícone) | anterior: 2026-07-21a-design-system-2 (DESIGN SYSTEM 2.0 "Instrumento cartográfico": camada visual 100% reconstruída — tokens de cor/raio/sombra/tipografia, Space Grotesk p/ títulos+abas, Inter p/ UI, IBM Plex Mono p/ dados; barra de comando com fio de lacre e abas segmentadas com indicador; graticule cartográfico sutil no palco; formulários com anel de foco, hover e select custom; botões com gradiente e elevação; cartões, badges, chips, acordeões, dropzones, painéis de mapa, modais e SweetAlert2 retematizados nos dois temas; dark mode revisto (azul-grafite); 100% responsivo (1100/880/520/420) com abas roláveis no mobile, alvos de toque maiores e prefers-reduced-motion; nenhum seletor/estado do JS alterado — apenas aparência) | anterior: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-22d-foco-encaixe-3d (removida a linha de controles "Inclinar/girar" sobre o mapa — sobra só o botão "Ver em 3D" no canto; o painel de dados do imóvel foi compactado (paddings/fontes menores, altura limitada a 360px com rolagem interna) e passa a abrir logo ABAIXO do botão "Ver em 3D" (top 104px, esquerda), encaixando na antiga posição do "Inclinar"; segue arrastável) | anterior: 2026-07-22c-foco-arrastavel (painel de dados do imóvel em foco: sobe para z-index 9 — deixa de ficar por baixo do painel Visão geral — e passa a abrir por padrão no canto SUPERIOR ESQUERDO do mapa (Visão geral fica à direita), sem sobreposição; agora é ARRASTÁVEL pela alça do cabeçalho via tornarArrastavel, com o botão "Dados do imóvel" também móvel (tornarArrastavelBtn) — mesmo comportamento do painel Visão geral; fechar/reabrir preservados) | anterior: 2026-07-22b-valida-memorial-narrativo-e-painel-foco (VALIDAÇÃO DE MEMORIAL NARRATIVO: novo analisador de memoriais em prosa — "vértice P-n, de coordenadas N=.. e E=.." com lados "azimute e distância Az=..°..'..\" e DIST metros até o vértice P-x". Detecta coordenada fora da faixa UTM (erro de digitação, ex.: northing com 8 dígitos) e a conserta pelo lado de chegada, e aponta o VÉRTICE culpado quando a coordenada diverge do azimute/distância do memorial (reconstrói a partir do vértice anterior; desvio > 5 m). Essas inconsistências passam a ser gravadas automaticamente no cadastro de MATRÍCULAS e de PROJETOS (fluxo salvar e mapear_texto) — antes o vértice ruim era descartado em silêncio. Novas funções analisarMemorialVertex/detectarInconsistenciasCoord e ação analisar_vertex; detectarInconsistenciasGeo ganhou 3º parâmetro opcional $memorial (retrocompatível). PAINEL DE FOCO: ao focar um único imóvel (carregarImovel), aparece à direita do mapa um painel com matrícula/identificação, datum·zona·MC, área (ha/m²/alqueire), perímetro, tabela de vértices E/N, confrontações e as inconsistências — reproduzindo o laudo do memorial no tema do app; preenche na hora pela geometria (WGS84→UTM em JS) e enriquece via analisar_vertex; botão fechar/reabrir; some ao voltar à visão geral) | anterior: 2026-07-22a-aba-relatorios (nova aba RELATÓRIOS: 3 painéis de completude com gráfico donut SVG e % — 1) matrículas faltantes da 1 até a maior, com intervalos comprimidos (ex.: 5–7, 23) e contagem de imóveis sem nº; 2) envio ao Mapa ONR: enviadas × faltantes, chips verdes p/ prontas e vermelhos p/ dados incompletos; 3) carga ITN 03: aptas × pendentes com O QUE FALTA em cada matrícula; botão Copiar lista por relatório, Recalcular, atalho de teclado 7, bottom nav mobile com 7 colunas; listar agora devolve itn03_ok/itn03_faltam (régua completa p/ mapeadas, mínima p/ exclusivas); tudo client-side sobre o próprio listar — sem migração de banco) | anterior: 2026-07-21f-3d-sem-links-externos (removidos os links "Google Earth" e "Google Maps (satélite)" do rodapé do modal de visão 3D — os imóveis só carregam dentro do sistema; mensagens de fallback do 3D atualizadas para não citar os links) | anterior: 2026-07-21e-vertodos-desmarcado (no foco de confronto o botão "Ver todos" fica desmarcado; clicá-lo nesse estado limpa o filtro ";*", oculta o badge do município e reexibe todos os imóveis — sem sair da visão geral) | anterior: 2026-07-21d-fix-termo-mat (fix: termo da consulta ";*" usava o rótulo "Mat. N", que não casa com o filtro exato de matrícula e o imóvel não era exibido — agora usa o NÚMERO puro (sem zeros à esquerda) e, sem matrícula, a identificação; corrigido também no verNoMapaConfronto da importação) | anterior: 2026-07-21c-foco-confronto-selecao (selecionar imóvel na lista agora foca em modo CONFRONTO: visão geral + consulta "matrícula;*" no painel — sobreposições e desmembradas — mantendo pontos dos vértices e badge de pertencimento ao município como no modo single; nova focarImovelConfronto; carregarImovel segue preenchendo Cadastrar/ONR/cor; dropzone de Importar só lista os tipos aceitos) | anterior: 2026-07-21b-shell-2-niveis-icones (REORGANIZAÇÃO ESTRUTURAL: barra de comando em 2 níveis — contexto/marca/base/ações em cima, faixa de abas com indicador embaixo; sprite SVG com 20 ícones estilo Lucide substituindo todos os emojis do shell, controles 3D, toolbars, cartões ONR e painel Visão geral; NAVEGAÇÃO INFERIOR FIXA no mobile (≤880px, estilo app nativo, safe-area, palco encolhe via bottom do shell); cabeçalhos de página por aba (ícone+título+descrição); form-grid em 3 colunas ≥1100px; "Como funciona" como stepper numerado; toggleRotulos atualiza só o <span> preservando o ícone) | anterior: 2026-07-21a-design-system-2 (DESIGN SYSTEM 2.0 "Instrumento cartográfico": camada visual 100% reconstruída — tokens de cor/raio/sombra/tipografia, Space Grotesk p/ títulos+abas, Inter p/ UI, IBM Plex Mono p/ dados; barra de comando com fio de lacre e abas segmentadas com indicador; graticule cartográfico sutil no palco; formulários com anel de foco, hover e select custom; botões com gradiente e elevação; cartões, badges, chips, acordeões, dropzones, painéis de mapa, modais e SweetAlert2 retematizados nos dois temas; dark mode revisto (azul-grafite); 100% responsivo (1100/880/520/420) com abas roláveis no mobile, alvos de toque maiores e prefers-reduced-motion; nenhum seletor/estado do JS alterado — apenas aparência) | anterior: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5985,6 +6146,51 @@ header('Expires: 0');
     font-family:var(--mono);font-size:11px;color:#C6D2DE;box-shadow:0 8px 26px rgba(0,0,0,.45)}
   .readout b{color:#fff;font-weight:600}
   .readout .dot{color:var(--red-bright)}
+
+  /* Painel de foco no imóvel — dados do memorial (instrumento cartográfico) */
+  .foco-panel{position:absolute;top:104px;left:14px;right:auto;z-index:9;display:none;width:314px;max-width:calc(100vw - 28px);
+    max-height:min(360px, calc(100% - 118px));overflow:auto;background:var(--ov-bg);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--sh-2);color:var(--ink);
+    font-family:var(--disp);font-size:12px;line-height:1.4}
+  .foco-panel.show{display:block}
+  .foco-close{position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;border-radius:8px;cursor:pointer;
+    background:transparent;color:var(--faint);font-size:18px;line-height:1}
+  .foco-close:hover{background:var(--panel-2);color:var(--ink)}
+  .foco-head{padding:11px 14px 7px;cursor:grab;-webkit-user-select:none;user-select:none;touch-action:none}
+  .foco-head:active{cursor:grabbing}
+  .foco-panel.dragging{cursor:grabbing;box-shadow:var(--sh-3)}
+  .foco-kick{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--red-text);text-transform:uppercase}
+  .foco-title{font-family:var(--titles);font-weight:600;font-size:15.5px;margin-top:2px;color:var(--ink)}
+  .foco-sub{color:var(--muted);font-size:11.5px;margin-top:2px}
+  .foco-metrics{display:flex;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .foco-metrics>div{flex:1;padding:8px 14px}
+  .foco-metrics>div+div{border-left:1px solid var(--line)}
+  .foco-metrics b{font-family:var(--titles);font-size:17px;font-weight:600;display:block;color:var(--ink)}
+  .foco-metrics span{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--faint);text-transform:uppercase}
+  .foco-area2{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:6px 14px;border-bottom:1px solid var(--line)}
+  .foco-sec{padding:8px 14px;border-bottom:1px solid var(--line)}
+  .foco-sec-t{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--faint);text-transform:uppercase;margin-bottom:5px}
+  table.foco-vtx{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+  table.foco-vtx th{text-align:left;color:var(--faint);font-weight:500;font-size:9.5px;letter-spacing:.06em;padding:0 0 4px}
+  table.foco-vtx td{padding:2px 0;color:var(--ink)}
+  table.foco-vtx td:first-child{color:var(--red-text);font-weight:600}
+  table.foco-vtx tr.susp td{color:var(--amber-text)}
+  table.foco-vtx tr.susp td:first-child::after{content:" \26A0"}
+  .foco-conf-item{display:flex;gap:7px;padding:3px 0;color:var(--ink)}
+  .foco-conf-item i{color:var(--red-bright);font-style:normal}
+  .foco-inc-item{padding:5px 8px;border-radius:8px;margin-bottom:5px;font-size:11.5px;background:var(--panel-2)}
+  .foco-inc-item.erro{border-left:3px solid var(--red-bright)}
+  .foco-inc-item.alerta{border-left:3px solid var(--amber)}
+  .foco-note{padding:8px 14px;color:var(--muted);font-size:10.5px}
+  .foco-note b{color:var(--ink)}
+  .foco-reopen{position:absolute;top:104px;left:14px;right:auto;z-index:9;display:none;border:1px solid var(--line);
+    background:var(--ov-bg);color:var(--ink);border-radius:10px;padding:7px 11px;font-size:12px;cursor:pointer;
+    font-family:var(--disp);box-shadow:var(--sh-1)}
+  .foco-reopen.show{display:inline-flex;align-items:center;gap:6px}
+  @media(max-width:880px){
+    .foco-panel{top:auto;left:8px;right:8px;bottom:calc(var(--vx-bottombar) + 8px);width:auto;max-height:52%}
+    .foco-reopen{top:auto;left:12px;right:auto;bottom:calc(var(--vx-bottombar) + 12px)}
+  }
 
   /* Selo de pertencimento (pílula topo-centro) */
   .muni-badge{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:8;display:none;
@@ -6741,11 +6947,6 @@ header('Expires: 0');
     <div id="map"></div>
     <div id="ctrl-3d" class="ctrl-3d">
       <button id="btn-3d" class="c3d-btn" title="Ver o imóvel em 3D fotorrealista (relevo do terreno)"><svg class="ic"><use href="#i-cube"/></svg><span>Ver em 3D</span></button>
-      <div class="c3d-row">
-        <button id="btn-3d-tilt" class="c3d-mini" title="Inclinar/desinclinar o mapa (visão oblíqua)"><svg class="ic"><use href="#i-tilt"/></svg><span>Inclinar</span></button>
-        <button id="btn-3d-left" class="c3d-mini" title="Girar à esquerda" style="display:none">⟲</button>
-        <button id="btn-3d-right" class="c3d-mini" title="Girar à direita" style="display:none">⟳</button>
-      </div>
     </div>
     <button id="btn-toggle-panel" class="toggle-panel" title="Mostrar/ocultar painel" aria-label="Mostrar ou ocultar painel">
       <svg class="ic-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -6753,6 +6954,35 @@ header('Expires: 0');
     </button>
     <div class="overlay" id="overlay">Clique em <span style="color:var(--red-bright);margin:0 4px">Mapear</span> para visualizar o imóvel</div>
     <div class="readout" id="readout"><span class="dot">◆</span> <b id="ro-name">Imóvel</b> &nbsp;·&nbsp; <span id="ro-area"></span> ha</div>
+
+    <!-- Painel de foco no imóvel: coordenadas, área e inconsistências (como no laudo do memorial) -->
+    <div class="foco-panel" id="foco-panel" aria-live="polite">
+      <button class="foco-close" id="foco-close" title="Ocultar painel" aria-label="Ocultar painel">&times;</button>
+      <div class="foco-head">
+        <div class="foco-kick" id="foco-kick">IMÓVEL</div>
+        <div class="foco-title" id="foco-title">Imóvel</div>
+        <div class="foco-sub" id="foco-sub"></div>
+      </div>
+      <div class="foco-metrics">
+        <div><b id="foco-area">—</b><span>Área (plano UTM)</span></div>
+        <div><b id="foco-perim">—</b><span>Perímetro</span></div>
+      </div>
+      <div class="foco-area2" id="foco-area2"></div>
+      <div class="foco-sec" id="foco-vtx-sec">
+        <div class="foco-sec-t">Vértices (E / N)</div>
+        <table class="foco-vtx"><thead><tr><th>Vért.</th><th>E</th><th>N</th></tr></thead><tbody id="foco-vtx-body"></tbody></table>
+      </div>
+      <div class="foco-sec" id="foco-conf-sec" style="display:none">
+        <div class="foco-sec-t">Confrontações</div>
+        <div id="foco-conf"></div>
+      </div>
+      <div class="foco-sec" id="foco-inc-sec" style="display:none">
+        <div class="foco-sec-t">Inconsistências</div>
+        <div id="foco-inc"></div>
+      </div>
+      <div class="foco-note" id="foco-note"></div>
+    </div>
+    <button class="foco-reopen" id="foco-reopen" title="Mostrar dados do imóvel">◧ Dados do imóvel</button>
     <div class="muni-badge" id="muni-badge"></div>
 
     <div class="overview-panel" id="overview-panel">
@@ -8235,7 +8465,98 @@ function setStatus(type,msg){
   else if(type==='ok') swalToast('success', stripTags(msg));
 }
 
+/* ============ PAINEL DE FOCO NO IMÓVEL (dados do memorial) ============ */
+function wgs84ToUTM(lat, lon){
+  const a=6378137.0, f=1/298.257223563;
+  const e2=f*(2-f), ep2=e2/(1-e2), k0=0.9996;
+  const zone=Math.floor((lon+180)/6)+1;
+  const lon0=(zone*6-183)*Math.PI/180;
+  const phi=lat*Math.PI/180, lam=lon*Math.PI/180;
+  const N=a/Math.sqrt(1-e2*Math.sin(phi)**2);
+  const T=Math.tan(phi)**2, C=ep2*Math.cos(phi)**2, A=Math.cos(phi)*(lam-lon0);
+  const M=a*((1-e2/4-3*e2*e2/64-5*e2**3/256)*phi
+    -(3*e2/8+3*e2*e2/32+45*e2**3/1024)*Math.sin(2*phi)
+    +(15*e2*e2/256+45*e2**3/1024)*Math.sin(4*phi)
+    -(35*e2**3/3072)*Math.sin(6*phi));
+  const E=k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T*T+72*C-58*ep2)*A**5/120)+500000;
+  let No=k0*(M+N*Math.tan(phi)*(A*A/2+(5-T+9*C+4*C*C)*A**4/24+(61-58*T+T*T+600*C-330*ep2)*A**6/720));
+  if(lat<0) No+=10000000;
+  return {E:E, N:No, zone:zone};
+}
+function focoFmtBR(n,d){ return Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function focoIncParse(raw){ try{ if(Array.isArray(raw)) return raw; if(typeof raw==='string'&&raw.trim()) return JSON.parse(raw); }catch(_){} return []; }
+function esconderPainelFoco(){
+  const p=document.getElementById('foco-panel'); if(p) p.classList.remove('show');
+  const r=document.getElementById('foco-reopen'); if(r) r.classList.remove('show');
+}
+function focoRenderInc(list){
+  const sec=document.getElementById('foco-inc-sec'), box=document.getElementById('foco-inc');
+  if(!sec||!box) return;
+  if(!list||!list.length){ sec.style.display='none'; box.innerHTML=''; return; }
+  box.innerHTML=list.map(it=>{ const sev=(it&&it.sev==='erro')?'erro':'alerta';
+    return '<div class="foco-inc-item '+sev+'">'+escapeHtml((it&&it.msg)||'')+'</div>'; }).join('');
+  sec.style.display='';
+}
+function mostrarPainelFoco(reg, geo){
+  const p=document.getElementById('foco-panel'); if(!p||!geo) return;
+  reg=reg||{};
+  const num=(reg.numero_matricula||'').toString().trim();
+  document.getElementById('foco-kick').textContent = num ? ('MATRÍCULA '+num) : 'IMÓVEL';
+  document.getElementById('foco-title').textContent = reg.identificador || (num?('Matrícula '+num):'Imóvel');
+  document.getElementById('foco-sub').textContent = [reg.municipio,reg.uf].filter(Boolean).join(' · ');
+  const areaHa=Number(geo.area_ha)||0, perim=Number(geo.perimetro_m)||0;
+  document.getElementById('foco-area').textContent = focoFmtBR(areaHa,2)+' ha';
+  document.getElementById('foco-perim').textContent = focoFmtBR(perim,2)+' m';
+  const m2=areaHa*10000;
+  document.getElementById('foco-area2').textContent = focoFmtBR(m2,2)+' m²  ·  '+focoFmtBR(m2/48400,2)+' alq. (48.400 m²)';
+  const body=document.getElementById('foco-vtx-body'); body.innerHTML='';
+  (geo.pts||[]).forEach((pt,i)=>{ const u=wgs84ToUTM(pt[0],pt[1]); const tr=document.createElement('tr');
+    tr.innerHTML='<td>V-'+(i+1)+'</td><td>'+Math.round(u.E).toLocaleString('pt-BR')+'</td><td>'+Math.round(u.N).toLocaleString('pt-BR')+'</td>';
+    body.appendChild(tr); });
+  document.getElementById('foco-vtx-sec').style.display=(geo.pts&&geo.pts.length)?'':'none';
+  document.getElementById('foco-conf-sec').style.display='none';
+  focoRenderInc(focoIncParse(reg.inconsistencias));
+  document.getElementById('foco-note').innerHTML='';
+  p.classList.add('show');
+  const rb=document.getElementById('foco-reopen'); if(rb) rb.classList.remove('show');
+  const memo=(reg.memorial_descritivo||'').trim();
+  if(memo && (reg.origem||'memorial')!=='kml'){
+    post({acao:'analisar_vertex', memorial:memo}).then(d=>focoEnriquecer(d)).catch(()=>{});
+  }
+}
+function focoEnriquecer(d){
+  if(!d||!d.ok) return;
+  const sub=document.getElementById('foco-sub');
+  const extra=[d.datum,('UTM '+d.zona+'S'),(d.mc?('MC '+d.mc):'')].filter(Boolean).join(' · ');
+  if(extra) sub.textContent=[sub.textContent, extra].filter(Boolean).join('   ·   ');
+  document.getElementById('foco-area').textContent=focoFmtBR(d.area_ha,2)+' ha';
+  document.getElementById('foco-perim').textContent=focoFmtBR(d.perimetro_m,2)+' m';
+  document.getElementById('foco-area2').textContent=focoFmtBR(d.area_m2,2)+' m²  ·  '+focoFmtBR(d.area_m2/48400,2)+' alq. (48.400 m²)';
+  const body=document.getElementById('foco-vtx-body'); body.innerHTML='';
+  (d.vertices||[]).forEach(v=>{ const tr=document.createElement('tr'); if(v.suspeito) tr.className='susp';
+    tr.innerHTML='<td>'+escapeHtml(v.rot)+'</td><td>'+Math.round(v.E).toLocaleString('pt-BR')+'</td><td>'+Math.round(v.N).toLocaleString('pt-BR')+'</td>';
+    body.appendChild(tr); });
+  document.getElementById('foco-vtx-sec').style.display='';
+  const confSec=document.getElementById('foco-conf-sec'), conf=document.getElementById('foco-conf');
+  if(d.confrontantes&&d.confrontantes.length){
+    conf.innerHTML=d.confrontantes.map(c=>'<div class="foco-conf-item"><i>—</i><span>'+escapeHtml(c)+'</span></div>').join('');
+    confSec.style.display='';
+  } else confSec.style.display='none';
+  const notas=[];
+  (d.vertices||[]).forEach(v=>{ if(v.typo) notas.push(v.rot+' corrigido de '+v.typo+'.'); });
+  const suspNoTypo=(d.suspeitos||[]).filter(r=>{const vv=(d.vertices||[]).find(x=>x.rot===r); return vv&&!vv.typo;});
+  if(suspNoTypo.length) notas.push('Vértice(s) '+suspNoTypo.join(', ')+' divergem do azimute/distância do memorial — confira a coordenada.');
+  const note=document.getElementById('foco-note');
+  note.innerHTML = notas.length ? ('<b>Ajustes:</b> '+notas.map(escapeHtml).join(' ')) : '';
+}
+function reabrirFoco(){ const p=document.getElementById('foco-panel'); if(p)p.classList.add('show'); const r=document.getElementById('foco-reopen'); if(r)r.classList.remove('show'); }
+(function(){
+  const c=document.getElementById('foco-close');
+  if(c) c.onclick=function(){ const p=document.getElementById('foco-panel'); if(p)p.classList.remove('show'); const r=document.getElementById('foco-reopen'); if(r)r.classList.add('show'); };
+})();
+
 function limparSingle(){
+  esconderPainelFoco();
   if(polygon){ polygon.setMap(null); polygon=null; }
   vertexMarkers.forEach(m=>m.setMap(null)); vertexMarkers=[];
   limparLabels();
@@ -10115,6 +10436,7 @@ async function carregarImovel(id){
   resetKmlZone();
   lastGeo = res.geo;
   await focarImovelConfronto(reg, res.geo);   // visão geral + "matrícula;*" + vértices + município
+  mostrarPainelFoco(reg, res.geo);           // painel lateral com coordenadas/área/inconsistências
   abrirCorPainel(id, reg.cor, reg.cor_opacidade, reg.cor_linha);
   preencherOnr(reg); onrPreencherGeometria(res.geo); onrSetAtivo(id, reg.identificador);
   mostrarEncInfo(reg);
@@ -11976,6 +12298,10 @@ function tornarArrastavel(painel, handle){
   if(kp){ tornarArrastavel(kp, kp.querySelector('.ovh')); }
   const rp = document.getElementById('ov-reopen');
   if(rp){ tornarArrastavelBtn(rp, reabrirOverview); }
+  const fp = document.getElementById('foco-panel');
+  if(fp){ tornarArrastavel(fp, fp.querySelector('.foco-head')); }
+  const frp = document.getElementById('foco-reopen');
+  if(frp){ tornarArrastavelBtn(frp, reabrirFoco); }
 })();
 
 /* Arrasto para um BOTÃO: move se o ponteiro andar (>4px); clique puro executa a ação. */
