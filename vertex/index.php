@@ -5358,703 +5358,1255 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-21f-3d-sem-links-externos (removidos os links "Google Earth" e "Google Maps (satélite)" do rodapé do modal de visão 3D — os imóveis só carregam dentro do sistema; mensagens de fallback do 3D atualizadas para não citar os links) | anterior: 2026-07-21e-vertodos-desmarcado (no foco de confronto o botão "Ver todos" fica desmarcado; clicá-lo nesse estado limpa o filtro ";*", oculta o badge do município e reexibe todos os imóveis — sem sair da visão geral) | anterior: 2026-07-21d-fix-termo-mat (fix: termo da consulta ";*" usava o rótulo "Mat. N", que não casa com o filtro exato de matrícula e o imóvel não era exibido — agora usa o NÚMERO puro (sem zeros à esquerda) e, sem matrícula, a identificação; corrigido também no verNoMapaConfronto da importação) | anterior: 2026-07-21c-foco-confronto-selecao (selecionar imóvel na lista agora foca em modo CONFRONTO: visão geral + consulta "matrícula;*" no painel — sobreposições e desmembradas — mantendo pontos dos vértices e badge de pertencimento ao município como no modo single; nova focarImovelConfronto; carregarImovel segue preenchendo Cadastrar/ONR/cor; dropzone de Importar só lista os tipos aceitos) | anterior: 2026-07-21b-shell-2-niveis-icones (REORGANIZAÇÃO ESTRUTURAL: barra de comando em 2 níveis — contexto/marca/base/ações em cima, faixa de abas com indicador embaixo; sprite SVG com 20 ícones estilo Lucide substituindo todos os emojis do shell, controles 3D, toolbars, cartões ONR e painel Visão geral; NAVEGAÇÃO INFERIOR FIXA no mobile (≤880px, estilo app nativo, safe-area, palco encolhe via bottom do shell); cabeçalhos de página por aba (ícone+título+descrição); form-grid em 3 colunas ≥1100px; "Como funciona" como stepper numerado; toggleRotulos atualiza só o <span> preservando o ícone) | anterior: 2026-07-21a-design-system-2 (DESIGN SYSTEM 2.0 "Instrumento cartográfico": camada visual 100% reconstruída — tokens de cor/raio/sombra/tipografia, Space Grotesk p/ títulos+abas, Inter p/ UI, IBM Plex Mono p/ dados; barra de comando com fio de lacre e abas segmentadas com indicador; graticule cartográfico sutil no palco; formulários com anel de foco, hover e select custom; botões com gradiente e elevação; cartões, badges, chips, acordeões, dropzones, painéis de mapa, modais e SweetAlert2 retematizados nos dois temas; dark mode revisto (azul-grafite); 100% responsivo (1100/880/520/420) com abas roláveis no mobile, alvos de toque maiores e prefers-reduced-motion; nenhum seletor/estado do JS alterado — apenas aparência) | anterior: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* ══════════════════════════════════════════════════════════════════
+     ATLAS VERTEX · DESIGN SYSTEM 2.0 — "Instrumento cartográfico"
+     Reconstrução completa da camada visual: tokens, tipografia, formas,
+     botões, cartões, painéis de mapa, modais e responsividade.
+     Todos os seletores/estados do JS foram preservados (.show, .active,
+     .sel, .drag, body.dark-mode…) — apenas a aparência foi refeita.
+     ══════════════════════════════════════════════════════════════════ */
+
+  /* ─── 1. TOKENS ─────────────────────────────────────────────────── */
   :root{
-    --bg:#f4f6f9; --panel:#ffffff; --panel-2:#f4f6f9; --line:#e3e8ee;
-    --ink:#1f2733; --muted:#475569; --faint:#64748b;
-    --red:#a80f1e; --red-bright:#cf1626; --red-soft:rgba(168,15,30,.10);
-    --green:#1f9d57; --amber:#c8881f;
-    --red-text:#a80f1e; --green-text:#14743f; --amber-text:#8a5d00;
-    --ov-bg:rgba(255,255,255,.97); --ov-shadow:0 12px 34px rgba(16,24,40,.16);
+    /* Superfícies */
+    --bg:#EDF1F7; --panel:#FFFFFF; --panel-2:#F4F6FA; --card:var(--panel);
+    --line:#E3E8F0; --line-2:#CFD8E4;
+    /* Tinta */
+    --ink:#152030; --muted:#48586C; --faint:#7C8BA0;
+    /* Marca — lacre cartorial */
+    --red:#B01224; --red-bright:#D5182C; --red-deep:#8C0E1D;
+    --red-soft:color-mix(in srgb, var(--red-bright) 9%, transparent);
+    --red-text:#A81222;
+    /* Acentos funcionais */
+    --teal:#0E8F80; --blue:#2563EB; --violet:#7C3AED;
+    --green:#178A4F; --green-text:#0F6B3B;
+    --amber:#B87B12; --amber-text:#8A5C07;
+    /* Vidro / sombras */
+    --ov-bg:color-mix(in srgb, var(--panel) 92%, transparent);
+    --sh-1:0 1px 2px rgba(21,32,48,.05), 0 2px 10px -4px rgba(21,32,48,.08);
+    --sh-2:0 2px 6px rgba(21,32,48,.05), 0 14px 34px -16px rgba(21,32,48,.22);
+    --sh-3:0 28px 70px -28px rgba(21,32,48,.42);
+    --ov-shadow:var(--sh-2);
+    --vx-shadow:var(--sh-1);
+    /* Geometria */
+    --r-s:9px; --r:12px; --r-l:16px; --r-xl:20px; --vx-r:var(--r);
+    /* Tipografia */
+    --disp:'Inter',system-ui,-apple-system,sans-serif;
+    --titles:'Space Grotesk','Inter',system-ui,sans-serif;
     --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
-    --disp:'Inter','Space Grotesk',system-ui,sans-serif;
+    /* Foco */
+    --ring:0 0 0 3px color-mix(in srgb, var(--red-bright) 18%, transparent);
+    --ring-teal:0 0 0 3px color-mix(in srgb, var(--teal) 20%, transparent);
     --atlas-header:60px;
+    --vx-bottombar:84px;
   }
-  /* Tema escuro do Atlas (body.dark-mode) — sobrescreve as variáveis do mapeador */
+  /* Tema escuro do Atlas (body.dark-mode) */
   body.dark-mode{
-    --bg:#0e1217; --panel:#161c24; --panel-2:#1c242e; --line:#283038;
-    --ink:#e7edf3; --muted:#8b97a4; --faint:#5d6975;
-    --red:#a80f1e; --red-bright:#e2342f; --red-soft:rgba(168,15,30,.16);
-    --green:#2faa6a; --amber:#d99a2b;
-    --red-text:#f0a3a3; --green-text:#7fd9a8; --amber-text:#e9c07a;
-    --ov-bg:rgba(16,20,26,.94); --ov-shadow:0 12px 34px rgba(0,0,0,.46);
+    --bg:#0A0F16; --panel:#111823; --panel-2:#18212E; --card:var(--panel);
+    --line:#243040; --line-2:#33455C;
+    --ink:#E8EEF6; --muted:#97A6B8; --faint:#64748B;
+    --red:#C21A2C; --red-bright:#EF4051; --red-deep:#8C0E1D;
+    --red-soft:color-mix(in srgb, var(--red-bright) 14%, transparent);
+    --red-text:#F39AA2;
+    --teal:#22B3A2; --blue:#5B8DEF; --violet:#A78BFA;
+    --green:#2FB871; --green-text:#7FE0AD;
+    --amber:#E0A63A; --amber-text:#EFC77E;
+    --ov-bg:color-mix(in srgb, var(--panel) 90%, transparent);
+    --sh-1:0 1px 2px rgba(0,0,0,.3), 0 4px 14px -6px rgba(0,0,0,.4);
+    --sh-2:0 2px 8px rgba(0,0,0,.35), 0 18px 44px -18px rgba(0,0,0,.6);
+    --sh-3:0 32px 80px -30px rgba(0,0,0,.75);
+    --ov-shadow:var(--sh-2);
+    --vx-shadow:var(--sh-1);
   }
+
+  /* ─── 2. BASE ───────────────────────────────────────────────────── */
   *{box-sizing:border-box}
   html,body{margin:0}
-  /* App do mapeador ocupa a área abaixo do header fixo do Atlas */
+  ::selection{background:color-mix(in srgb, var(--red-bright) 22%, transparent)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:99px;border:2px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-thumb:hover{background:var(--faint);border:2px solid transparent;background-clip:padding-box}
+  :is(button,a,input,select,textarea,summary):focus-visible{outline:none;box-shadow:var(--ring)}
+
+  /* ─── 3. SHELL ──────────────────────────────────────────────────── */
   .mapeador-shell{position:fixed;top:var(--header-height,60px);left:0;right:0;bottom:0;
+    display:flex;flex-direction:column;overflow:hidden;z-index:1;
     font-family:var(--disp);background:var(--bg);color:var(--ink);
-    display:grid;grid-template-columns:420px 1fr;overflow:hidden;z-index:1}
-  .panel{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
-  .head{padding:18px 22px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .back-atlas{flex:none;font-size:11px;font-weight:600;font-family:var(--mono);color:var(--muted);
-    text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;white-space:nowrap;transition:all .15s}
-  .back-atlas:hover{color:var(--ink);border-color:var(--red-bright)}
-  .brand{display:flex;align-items:center;gap:11px}
-  .mark{width:30px;height:30px;border-radius:7px;flex:none;
-    background:linear-gradient(135deg,#0d9488 0%,#1d4ed8 100%);display:grid;place-items:center;
-    box-shadow:0 2px 10px rgba(13,148,136,.4)}
-  .mark svg{width:17px;height:17px}
-  .brand h1{font-size:15px;font-weight:600;margin:0;line-height:1.1}
-  .brand p{margin:2px 0 0;font-size:11px;color:var(--muted);font-family:var(--mono)}
-  .body{padding:0 22px 18px;overflow-y:auto;flex:1;min-height:0}
-  .label{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;
-    color:var(--faint);margin:0 0 8px}
-  textarea,input,select{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);
-    border-radius:9px;padding:10px 12px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .15s}
-  textarea{height:140px;resize:vertical;line-height:1.5;font-size:11.5px}
-  textarea:focus,input:focus,select:focus{border-color:var(--red-bright)}
-  .row{display:grid;grid-template-columns:1fr 130px;gap:9px;margin-top:14px}
-  .field-label{font-size:11px;color:var(--muted);margin:0 0 5px;font-family:var(--mono)}
-  .actions{display:flex;gap:9px;margin-top:13px}
-  button{font-family:var(--disp);cursor:pointer;border:none;border-radius:8px;font-size:13px;font-weight:500;
-    transition:filter .15s,background .15s,border-color .15s,color .15s}
-  .btn-primary{flex:1;background:var(--red);color:#fff;padding:11px;box-shadow:0 2px 12px var(--red-soft)}
-  .btn-primary:hover{filter:brightness(1.12)}
-  .btn-primary:disabled{opacity:.5;cursor:default;filter:none}
-  .btn-save{flex:1;background:var(--green);color:#06140c;padding:11px;font-weight:600}
-  .btn-save:hover{filter:brightness(1.08)}
-  .btn-save:disabled{opacity:.4;cursor:default;filter:none}
-  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line);padding:11px 14px}
-  .btn-ghost:hover{border-color:var(--red-bright);color:var(--ink)}
-  .status{margin-top:13px;font-family:var(--mono);font-size:11.5px;padding:9px 12px;border-radius:8px;line-height:1.45;display:none}
+    font-feature-settings:'cv05','cv11';-webkit-font-smoothing:antialiased}
+
+  /* Palco com graticule cartográfico sutil (assinatura visual) */
+  .vx-stage{flex:1 1 auto;position:relative;min-height:0;width:100%;overflow:hidden;background:var(--bg)}
+  .vx-stage::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--ink) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--ink) 4%, transparent) 1px, transparent 1px);
+    background-size:32px 32px;
+    mask-image:radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 100%);
+    -webkit-mask-image:radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 100%)}
+  body.dark-mode .vx-stage::before{opacity:.35}
+
+  /* ─── 4. BARRA DE COMANDO ───────────────────────────────────────── */
+  .panel{flex:none;width:100%;position:relative;z-index:20;display:block;
+    background:color-mix(in srgb, var(--panel) 88%, transparent);
+    -webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);
+    border-bottom:1px solid var(--line)}
+  /* Fio de lacre: filete vermelho que assina a barra */
+  .panel::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;pointer-events:none;
+    background:linear-gradient(90deg, var(--red-bright), color-mix(in srgb, var(--red-bright) 40%, transparent) 34%, transparent 62%)}
+  /* Ícones vetoriais da interface (sprite <symbol>) */
+  .ic{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:2;
+    stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-2px}
+
+  /* Barra de comando em dois níveis: contexto em cima, navegação embaixo */
+  .vx-bar{display:flex;flex-direction:column}
+  .vx-top{display:flex;align-items:center;gap:16px;padding:10px 20px 9px;flex-wrap:wrap}
+  .vx-top-r{display:flex;align-items:center;gap:8px;margin-left:auto}
+
+  /* Marca */
+  .brand{display:flex;align-items:center;gap:11px;margin-right:2px}
+  .mark{width:36px;height:36px;border-radius:11px;flex:none;display:grid;place-items:center;
+    background:linear-gradient(140deg, var(--red-bright) 0%, var(--red-deep) 100%);
+    box-shadow:0 4px 12px -4px color-mix(in srgb, var(--red-bright) 60%, transparent),
+      inset 0 1px 0 rgba(255,255,255,.25)}
+  .mark svg{width:19px;height:19px}
+  .brand h1{margin:0;font-family:var(--titles);font-size:16.5px;font-weight:700;
+    letter-spacing:.01em;line-height:1.05;color:var(--ink)}
+  .brand p{margin:2px 0 0;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--faint)}
+
+  /* Voltar ao Atlas */
+  .back-atlas{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;
+    font-family:var(--disp);font-size:12px;font-weight:600;color:var(--muted);text-decoration:none;
+    border:1px solid var(--line);border-radius:999px;padding:7px 13px;background:var(--panel);
+    transition:border-color .15s,color .15s,box-shadow .15s}
+  .back-atlas:hover{color:var(--ink);border-color:var(--line-2);box-shadow:var(--sh-1)}
+  .back-atlas .ic{width:13px;height:13px}
+
+  /* Alternador de base (Matrículas / Projetos) */
+  .base-toggle{display:flex;gap:3px;margin:0;padding:4px;border-radius:12px;
+    background:var(--panel-2);border:1px solid var(--line)}
+  .base-toggle .bt-btn{flex:1;display:inline-flex;align-items:center;gap:7px;border:none;background:transparent;
+    cursor:pointer;white-space:nowrap;font-family:var(--disp);font-size:12px;font-weight:650;color:var(--muted);
+    padding:7px 13px;border-radius:9px;transition:background .16s,color .16s,box-shadow .16s}
+  .base-toggle .bt-btn .ic{width:14px;height:14px;opacity:.8}
+  .base-toggle .bt-btn:hover{color:var(--ink)}
+  .base-toggle .bt-btn.active{background:var(--panel);color:var(--teal);box-shadow:var(--sh-1)}
+  .base-toggle .bt-btn.active .ic{opacity:1}
+  .base-toggle.projetos .bt-btn.active{color:var(--violet)}
+  body.dark-mode .base-toggle .bt-btn.active{background:#202B3A}
+
+  /* Faixa de navegação — abas com indicador deslizante */
+  .vx-tabs{display:flex;gap:2px;padding:0 12px;
+    border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent)}
+  .vx-tab{position:relative;display:inline-flex;align-items:center;gap:8px;border:none;background:transparent;
+    color:var(--muted);font-family:var(--titles);font-size:13px;font-weight:600;letter-spacing:.01em;
+    padding:11px 15px 13px;cursor:pointer;white-space:nowrap;border-radius:10px 10px 0 0;
+    transition:color .16s,background .16s}
+  .vx-tab .ic{width:16px;height:16px;stroke-width:1.9;opacity:.75;transition:opacity .16s,color .16s}
+  .vx-tab:hover{color:var(--ink);background:color-mix(in srgb, var(--ink) 4%, transparent)}
+  .vx-tab:hover .ic{opacity:1}
+  .vx-tab.active{color:var(--ink)}
+  .vx-tab.active .ic{opacity:1;color:var(--red-bright)}
+  .vx-tab.active::after{content:'';position:absolute;left:12px;right:12px;bottom:-1px;height:2.5px;
+    border-radius:3px 3px 0 0;background:var(--red-bright)}
+
+  /* Ações rápidas da barra */
+  .quick-actions{display:flex;gap:6px}
+  .quick-actions .mini-btn{flex:none;justify-content:center}
+
+  /* Cabeçalho de página das abas */
+  .vx-pane-head{display:flex;gap:14px;align-items:flex-start;margin:2px 0 20px}
+  .vx-ph-ic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+    color:var(--red-bright);background:var(--red-soft);
+    border:1px solid color-mix(in srgb, var(--red-bright) 22%, transparent)}
+  .vx-ph-ic .ic{width:19px;height:19px;stroke-width:1.8}
+  .vx-ph-tx h2{margin:0;font-family:var(--titles);font-size:17px;font-weight:700;color:var(--ink);letter-spacing:.005em}
+  .vx-ph-tx p{margin:4px 0 0;font-size:12px;line-height:1.6;color:var(--muted);max-width:72ch}
+
+  /* Ícone dos cartões de ação (aba ONR) */
+  .vx-act-h{display:flex;align-items:center}
+  .vx-act-ic{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:9px;margin-right:9px;
+    color:var(--teal);background:color-mix(in srgb, var(--teal) 12%, transparent)}
+  .vx-act-ic.itn{color:var(--red-bright);background:var(--red-soft)}
+  .vx-act-ic .ic{width:15px;height:15px}
+
+  /* Faixa de status global (colada à barra) */
+  .panel>.status{margin:0;border-radius:0;border-left:none;border-right:none;border-top:none}
+
+  /* ─── 5. PANES ──────────────────────────────────────────────────── */
+  .vx-pane{position:absolute;inset:0;display:none;overflow-y:auto;
+    padding:24px max(20px, (100% - 1060px)/2) calc(24px + var(--vx-bottombar,0px));
+    animation:vxFade .22s ease}
+  .vx-pane.active{display:block}
+  @keyframes vxFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .vx-pane[data-pane="mapa"]{padding:0;overflow:hidden}
+  .vx-pane[data-pane="mapa"] .map-wrap{position:absolute;inset:0;width:100%;height:100%;min-width:0}
+  .vx-pane[data-pane="mapa"] #map{position:absolute;inset:0}
+
+  .vx-pane[data-pane="imoveis"]{padding:0;overflow:hidden}
+  .vx-pane[data-pane="imoveis"].active{display:flex;flex-direction:column}
+  .vx-pane[data-pane="imoveis"] .saved{flex:1;min-height:0;display:flex;flex-direction:column;margin:0}
+  .vx-pane[data-pane="imoveis"] .saved-head{flex:none;margin:0;padding:18px max(20px, (100% - 1060px)/2) 8px}
+  .imoveis-sticky{position:static;flex:none;margin:0;padding:2px max(20px, (100% - 1060px)/2) 14px;
+    background:var(--panel);border-bottom:1px solid var(--line)}
+  .imoveis-sticky .vista-toggle{margin:0}
+  .imoveis-sticky .search-wrap{margin:10px 0 0}
+  .imoveis-sticky .itn03-actions{margin:10px 0 0}
+  .vx-pane[data-pane="imoveis"] #saved-list{flex:1;min-height:0;overflow-y:auto;
+    padding:14px max(20px, (100% - 1060px)/2) calc(18px + var(--vx-bottombar,0px))}
+
+  /* Zera heranças do layout antigo */
+  .vx-pane .muni-box,.vx-pane .onr-box{margin-top:0}
+  .vx-pane .muni-box{border-top:none;padding-top:0}
+  .vx-pane .manual-accordion{margin-top:0}
+  .toggle-panel,.fab-panel{display:none !important}
+  .panel-backdrop{display:none;position:fixed;inset:0;z-index:899;background:rgba(8,12,18,.5)}
+  body.panel-open .panel-backdrop{display:block}
+
+  /* ─── 6. TIPOGRAFIA DE APOIO ────────────────────────────────────── */
+  .label{margin:0 0 8px;font-family:var(--titles);font-size:11px;font-weight:700;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+  .field-label,.fld .field-label{margin:0 0 6px;font-family:var(--disp);font-size:11.5px;
+    font-weight:600;color:var(--muted);letter-spacing:0;text-transform:none}
+  .field-hint{font-size:11px;color:var(--faint);line-height:1.5}
+  .saved h3{margin:0 0 10px;font-family:var(--titles);font-size:11px;font-weight:700;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+  .saved{margin-top:24px}
+  .saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .saved-head h3{margin:0}
+  .vx-sub-title{margin:26px 0 12px;padding-top:18px;border-top:1px dashed var(--line);
+    font-family:var(--titles);font-weight:700;font-size:13px;color:var(--ink)}
+  .vx-pane-hint{margin:0 0 16px;padding:11px 14px;border-radius:var(--r);
+    background:var(--panel-2);border:1px solid var(--line);
+    font-size:11.5px;color:var(--faint);line-height:1.55}
+  .vx-pane-hint b{color:var(--muted);font-weight:650}
+  .vx-flow{margin:18px 0 0;padding:14px 16px;border-radius:var(--r-l);
+    background:var(--panel-2);border:1px solid var(--line);
+    font-size:12px;color:var(--muted);line-height:1.6}
+  .vx-flow>b{color:var(--ink)}
+  .vx-flow ol{margin:8px 0 0;padding-left:18px}
+  .vx-flow li{margin:4px 0}
+
+  /* ─── 7. FORMULÁRIOS ────────────────────────────────────────────── */
+  textarea,input,select{width:100%;color:var(--ink);outline:none}
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+  select,.search-wrap input,.ov-search input{
+    font-family:var(--disp);font-size:13px;padding:11px 13px;border-radius:11px;
+    background:var(--panel);border:1px solid var(--line);
+    transition:border-color .15s, box-shadow .15s, background .15s}
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover:not(:focus):not([readonly]),
+  select:hover:not(:focus),textarea:hover:not(:focus){border-color:var(--line-2)}
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"])::placeholder,
+  textarea::placeholder{color:var(--faint)}
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+  select:focus,textarea:focus,.search-wrap input:focus,.ov-search input:focus{
+    border-color:var(--red-bright);box-shadow:var(--ring);outline:none}
+  select{appearance:none;-webkit-appearance:none;padding-right:36px;cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237C8BA0' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat:no-repeat;background-position:right 13px center}
+  textarea{height:140px;resize:vertical;line-height:1.55;font-size:11.5px;
+    font-family:var(--mono);border-radius:12px;padding:12px 13px;
+    background:var(--panel);border:1px solid var(--line);
+    transition:border-color .15s, box-shadow .15s}
+  input[readonly],.onr-sub input[readonly]{background:var(--panel-2);opacity:.72;cursor:not-allowed}
+  input[type="checkbox"],input[type="radio"]{accent-color:var(--red-bright)}
+  .row{display:grid;grid-template-columns:1fr 130px;gap:10px;margin-top:14px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 13px;margin-top:6px}
+  .fld{display:flex;flex-direction:column;min-width:0}
+  .fld .field-label{margin:0 0 5px}
+  .grid-2{grid-column:1 / -1}
+
+  /* ─── 8. BOTÕES ─────────────────────────────────────────────────── */
+  button{font-family:var(--disp);cursor:pointer;border:none;border-radius:10px;
+    font-size:13px;font-weight:550;color:var(--ink);
+    transition:filter .15s,background .15s,border-color .15s,color .15s,transform .15s,box-shadow .15s}
+  .actions{display:flex;gap:10px;margin-top:14px}
+  .btn-primary{flex:1;padding:12px 14px;border-radius:11px;font-weight:650;color:#fff;
+    background:linear-gradient(160deg, var(--red-bright), var(--red));
+    box-shadow:0 8px 20px -10px color-mix(in srgb, var(--red-bright) 65%, transparent),
+      inset 0 1px 0 rgba(255,255,255,.18)}
+  .btn-primary:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.05);
+    box-shadow:0 12px 26px -12px color-mix(in srgb, var(--red-bright) 75%, transparent)}
+  .btn-primary:active:not(:disabled){transform:none}
+  .btn-primary:disabled{opacity:.45;cursor:default}
+  .btn-save{flex:1;padding:12px 14px;border-radius:11px;font-weight:650;color:#fff;
+    background:linear-gradient(160deg, color-mix(in srgb, var(--green) 88%, #fff), var(--green));
+    box-shadow:0 8px 20px -10px color-mix(in srgb, var(--green) 60%, transparent),
+      inset 0 1px 0 rgba(255,255,255,.2)}
+  .btn-save:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.05)}
+  .btn-save:disabled{opacity:.4;cursor:default}
+  .btn-ghost{padding:11px 15px;border-radius:11px;background:var(--panel);
+    color:var(--muted);border:1px solid var(--line)}
+  .btn-ghost:hover{color:var(--ink);border-color:var(--line-2);background:var(--panel-2)}
+  .btn-ghost-sm{background:var(--panel);border:1px solid var(--line);color:var(--ink);
+    border-radius:9px;padding:0 12px;font-size:11px;white-space:nowrap}
+  .btn-ghost-sm:hover{border-color:var(--teal);color:var(--teal)}
+  .mini-btn{display:inline-flex;align-items:center;gap:6px;
+    font-family:var(--disp);font-size:11.5px;font-weight:600;letter-spacing:0;
+    padding:7px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel);color:var(--muted)}
+  .mini-btn:not(.onr):not(.at):hover{color:var(--ink);border-color:var(--line-2);
+    background:var(--panel-2);box-shadow:var(--sh-1)}
+  .mini-btn.active{background:var(--red-soft);
+    border-color:color-mix(in srgb, var(--red-bright) 45%, var(--line));color:var(--red-text)}
+  .mini-btn.onr{background:linear-gradient(135deg, var(--teal), var(--blue));color:#fff;border-color:transparent;
+    box-shadow:0 6px 16px -8px color-mix(in srgb, var(--teal) 60%, transparent)}
+  .mini-btn.onr:hover{filter:brightness(1.07)}
+  .mini-btn.proj{border-color:color-mix(in srgb, var(--violet) 45%, transparent);color:var(--violet)}
+  .btn-mini,.btn-mini-prim{border-radius:9px;padding:8px 14px;font-size:12px;font-weight:600;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+  .btn-mini:hover{border-color:var(--line-2);background:var(--panel-2)}
+  .btn-mini-prim{background:var(--red);color:#fff;border-color:var(--red)}
+  .btn-mini-prim:hover{filter:brightness(1.08)}
+  .btn-excluir{background:transparent;border:1px solid color-mix(in srgb, var(--red-bright) 40%, transparent);
+    color:var(--red-text);border-radius:9px;padding:8px 14px;font-size:12px;font-weight:600}
+  .btn-excluir:hover{background:var(--red-soft)}
+  .cfg-link{display:flex;align-items:center;gap:5px;width:fit-content;margin:12px 0 0 auto;
+    background:none;border:none;color:var(--faint);font-size:11px;
+    padding:5px 9px;border-radius:9px}
+  .cfg-link:hover{color:var(--muted);background:var(--panel-2)}
+  .link-config{display:block;width:100%;margin-top:6px;background:none;border:none;color:var(--faint);
+    font-family:var(--mono);font-size:10px;cursor:pointer;text-align:left;padding:3px 1px;border-radius:6px}
+  .link-config:hover{color:var(--violet)}
+
+  /* ─── 9. STATUS ─────────────────────────────────────────────────── */
+  .status{margin-top:13px;font-family:var(--disp);font-size:12px;font-weight:500;
+    padding:10px 14px;border-radius:10px;line-height:1.5;display:none}
+  .status.ok{display:block;background:color-mix(in srgb, var(--green) 9%, transparent);
+    color:var(--green-text);border:1px solid color-mix(in srgb, var(--green) 32%, transparent)}
+  .status.err{display:block;background:var(--red-soft);color:var(--red-text);
+    border:1px solid color-mix(in srgb, var(--red-bright) 32%, transparent)}
+  .status.warn{display:block;background:color-mix(in srgb, var(--amber) 11%, transparent);
+    color:var(--amber-text);border:1px solid color-mix(in srgb, var(--amber) 36%, transparent)}
+
+  /* ─── 10. MÉTRICAS ──────────────────────────────────────────────── */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    padding:13px 14px;box-shadow:var(--sh-1)}
+  .stat .v{font-family:var(--titles);font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+  .stat .u{font-size:12px;color:var(--faint);font-weight:400}
+  .stat .k{margin-top:4px;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--faint)}
+  .ed-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:0 0 16px}
+  .ed-stat{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+  .ed-stat .v{font-family:var(--titles);font-size:17px;font-weight:700;letter-spacing:-.01em}
+  .ed-stat .u{font-size:11px;color:var(--faint);font-weight:400}
+  .ed-stat .k{margin-top:3px;font-family:var(--mono);font-size:9px;text-transform:uppercase;
+    letter-spacing:.07em;color:var(--faint)}
+
+  /* ─── 11. BUSCA E FILTROS ───────────────────────────────────────── */
+  .search-wrap{position:relative;margin:4px 0 10px}
+  .search-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
+  #busca{width:100%;padding:10px 32px 10px 34px;border-radius:11px}
+  .search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;
+    color:var(--faint);font-size:18px;line-height:1;padding:2px 6px;border-radius:7px}
+  .search-clear:hover{color:var(--red-bright);background:var(--red-soft)}
+  .vista-toggle{display:flex;flex-wrap:wrap;gap:5px;background:transparent;border:none;padding:0;margin-bottom:8px}
+  .vista-toggle .vt-btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+    border:1px solid transparent;background:var(--panel-2);color:var(--muted);
+    font-family:var(--disp);font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:999px;
+    transition:background .15s,color .15s,border-color .15s,box-shadow .15s}
+  .vista-toggle .vt-btn:hover{color:var(--ink);border-color:var(--line);background:var(--panel)}
+  .vista-toggle .vt-btn.active{background:var(--red-bright);color:#fff;border-color:var(--red-bright);
+    box-shadow:0 5px 14px -7px color-mix(in srgb, var(--red-bright) 70%, transparent)}
+  .vista-toggle .vt-btn.vt-onr.active{background:var(--blue);border-color:var(--blue);
+    box-shadow:0 5px 14px -7px color-mix(in srgb, var(--blue) 70%, transparent)}
+  .vista-toggle .vt-btn .vt-count{display:inline-block;min-width:17px;text-align:center;
+    background:color-mix(in srgb, var(--ink) 8%, transparent);color:inherit;
+    border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;line-height:15px}
+  .vista-toggle .vt-btn.active .vt-count{background:rgba(255,255,255,.25)}
+  .itn03-actions{display:flex;gap:6px;margin-bottom:8px}
+  .itn03-actions .mini-btn{flex:1}
+
+  /* ─── 12. LISTA DE IMÓVEIS ──────────────────────────────────────── */
+  .item{display:flex;align-items:center;gap:11px;padding:11px 13px;margin-bottom:8px;cursor:pointer;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    transition:border-color .15s,background .15s,transform .15s,box-shadow .15s}
+  #saved-list .item{border:1px solid var(--line);border-radius:var(--vx-r)}
+  .item:hover,#saved-list .item:hover{border-color:color-mix(in srgb, var(--red-bright) 40%, var(--line));
+    background:color-mix(in srgb, var(--red-bright) 4%, var(--panel));
+    transform:translateX(2px);box-shadow:var(--sh-1)}
+  .item.sel{border-color:#F59E0B;background:color-mix(in srgb, #F59E0B 10%, var(--panel))}
+  .item.sel .ic{background:#F59E0B}
+  .item.destaque{border-color:var(--teal);background:color-mix(in srgb, var(--teal) 9%, var(--panel));
+    box-shadow:0 0 0 1px color-mix(in srgb, var(--teal) 35%, transparent) inset}
+  .item .ic{width:8px;height:8px;border-radius:3px;background:var(--red-bright);flex:none}
+  .item .info{flex:1;min-width:0}
+  .item .nm{font-size:13px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .mt{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+  .item .tag{font-family:var(--disp);font-weight:700;font-size:9.5px;letter-spacing:.03em;
+    text-transform:uppercase;border-radius:6px;padding:3px 7px;
+    background:color-mix(in srgb, var(--faint) 14%, transparent);color:var(--muted)}
+  .item .tag.mat{background:var(--red-soft);color:var(--red-text)}
+  .tag.urb{background:color-mix(in srgb, var(--blue) 12%, transparent);color:var(--blue);
+    border:1px solid color-mix(in srgb, var(--blue) 30%, transparent)}
+  .tag.rural{background:color-mix(in srgb, var(--green) 12%, transparent);color:var(--green);
+    border:1px solid color-mix(in srgb, var(--green) 30%, transparent)}
+  .item .del{background:transparent;border:none;color:var(--faint);font-size:15px;padding:3px 7px;border-radius:7px}
+  .item .del:hover{color:var(--red-bright);background:var(--red-soft)}
+  .item .it-edit{background:transparent;border:none;color:var(--faint);font-size:14px;
+    padding:3px 6px;border-radius:7px;flex:none}
+  .item .it-edit:hover{color:var(--red-bright);background:var(--red-soft)}
+  .item .it-onr{background:transparent;border:none;color:var(--teal);font-size:13px;
+    padding:3px 6px;border-radius:7px;flex:none}
+  .item .it-onr:hover:not(:disabled){background:color-mix(in srgb, var(--teal) 13%, transparent)}
+  .item .it-onr:disabled{color:var(--line-2);cursor:not-allowed}
+  .item .it-onr.enviado{color:var(--blue)}
+  .item .it-proj{background:transparent;border:none;color:var(--violet);font-size:13px;
+    padding:3px 6px;border-radius:7px;flex:none;cursor:pointer}
+  .item .it-proj:hover{background:color-mix(in srgb, var(--violet) 13%, transparent)}
+  .item-dot{width:11px;height:11px;border-radius:50%;flex:none;
+    box-shadow:0 0 0 2px var(--panel), inset 0 0 0 1px rgba(0,0,0,.14)}
+  .item-dot.vazio{background:var(--line)}
+  .empty-list{font-size:11.5px;color:var(--faint);padding:8px 2px}
+  .saved-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+  /* Selos e badges de estado */
+  .onr-badge,.morto-badge,.desmembra-badge,.fora-badge,.parcial-badge,.enc-meta{
+    display:inline-block;font-family:var(--mono);font-size:9px;font-weight:600;
+    padding:1px 6px;border-radius:6px;margin-left:4px;vertical-align:middle;text-decoration:none}
+  .onr-badge{background:var(--panel-2);color:var(--faint);border:1px solid var(--line)}
+  .onr-badge.env{background:color-mix(in srgb, var(--blue) 14%, transparent);color:var(--blue);border-color:transparent}
+  .morto-badge{background:color-mix(in srgb, var(--faint) 16%, transparent);color:var(--faint)}
+  .desmembra-badge{background:color-mix(in srgb, var(--teal) 14%, transparent);color:var(--teal)}
+  .fora-badge{font-weight:700;background:var(--red-soft);color:var(--red-text);
+    border:1px solid color-mix(in srgb, var(--red-bright) 40%, transparent)}
+  .enc-meta{font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-left:6px;
+    background:var(--red-soft);color:var(--red-text);
+    border:1px solid color-mix(in srgb, var(--red-bright) 40%, transparent)}
+  .parcial-badge{font-weight:700;background:color-mix(in srgb, var(--amber) 14%, transparent);
+    color:var(--amber-text);border:1px solid color-mix(in srgb, var(--amber) 42%, transparent)}
+  .parcial-line{font-family:var(--mono);font-size:9.5px;color:var(--amber-text);margin-top:4px;line-height:1.4;
+    background:color-mix(in srgb, var(--amber) 8%, transparent);
+    border-left:2px solid color-mix(in srgb, var(--amber) 50%, transparent);
+    padding:3px 7px;border-radius:0 5px 5px 0}
+  .item.parcial-mun{box-shadow:inset 3px 0 0 color-mix(in srgb, var(--amber) 60%, transparent)}
+  .item.fora-mun{box-shadow:inset 3px 0 0 var(--red-bright)}
+  .item.morto{opacity:.55}
+  .item.morto .nm{text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:var(--faint)}
+  .item .proj-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:6px;
+    background:color-mix(in srgb, var(--violet) 14%, transparent);color:var(--violet);margin-left:4px}
+  .item .itn03-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:6px;
+    background:color-mix(in srgb, var(--violet) 12%, transparent);color:var(--violet);margin-left:4px}
+  .item .itn03-apto{font-size:10px;font-weight:600;margin-left:4px}
+  .item .itn03-apto.ok{color:var(--green-text)}
+  .item .itn03-apto.no{color:var(--red-text)}
+  .inc-badge{display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:700;letter-spacing:.02em;
+    padding:1px 7px;border-radius:99px;cursor:pointer;vertical-align:middle;
+    background:color-mix(in srgb, var(--amber) 14%, transparent);color:var(--amber-text);
+    border:1px solid color-mix(in srgb, var(--amber) 40%, transparent)}
+  .inc-badge:hover{background:color-mix(in srgb, var(--amber) 24%, transparent)}
+  .situacao-edit{margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+
+  /* Aviso de matrícula encerrada no cadastro */
+  .enc-info{margin-bottom:12px;padding:11px 13px;border-radius:var(--r);
+    background:color-mix(in srgb, var(--faint) 8%, transparent);
+    border:1px solid color-mix(in srgb, var(--faint) 30%, transparent);
+    border-left:3px solid var(--faint)}
+  .enc-info-h{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:650;color:var(--ink)}
+  .enc-ico{color:var(--faint);font-size:13px}
+  .enc-info-b{margin-top:5px;font-size:11.5px;line-height:1.55;color:var(--ink)}
+  .enc-mut{color:var(--faint);font-family:var(--mono);font-size:9.5px}
+  .enc-info.desmembra{border-color:color-mix(in srgb, var(--teal) 38%, transparent);
+    border-left-color:var(--teal);background:color-mix(in srgb, var(--teal) 7%, transparent)}
+  .enc-info.desmembra .enc-ico{color:var(--teal)}
+
+  /* ─── 13. CHIPS E PROPRIETÁRIOS ─────────────────────────────────── */
+  .chips{display:flex;flex-wrap:wrap;gap:5px;min-height:24px;margin-bottom:6px}
+  .chips-vazio{font-family:var(--mono);font-size:10px;color:var(--faint);font-style:italic}
+  .chip{display:inline-flex;align-items:center;gap:5px;
+    background:color-mix(in srgb, var(--teal) 11%, transparent);color:var(--teal);
+    font-family:var(--mono);font-size:11px;font-weight:500;padding:3px 5px 3px 9px;border-radius:999px;
+    border:1px solid color-mix(in srgb, var(--teal) 30%, transparent)}
+  .chip-x{background:none;border:none;color:var(--teal);font-size:14px;line-height:1;padding:0 3px;border-radius:99px}
+  .chip-x:hover{background:color-mix(in srgb, var(--teal) 20%, transparent)}
+  .chips-add{display:flex;gap:6px}
+  .chips-add input{flex:1}
+  .gem-models{display:flex;flex-wrap:wrap;gap:5px;min-height:22px}
+  .prop-list{display:flex;flex-direction:column;gap:8px}
+  .prop-row{display:flex;gap:7px;align-items:center}
+  .prop-row .prop-nome{flex:1.3}
+  .prop-doc-wrap{flex:1;position:relative;display:flex;align-items:center}
+  .prop-doc-wrap .prop-doc{width:100%;padding-right:64px}
+  .prop-doc-badge{position:absolute;right:10px;font-family:var(--mono);font-size:8.5px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.04em;color:var(--faint);pointer-events:none}
+  .prop-doc-badge.ok{color:var(--green)}
+  .prop-doc-badge.bad{color:var(--red-bright)}
+  .prop-doc.doc-ok{border-color:color-mix(in srgb, var(--green) 55%, transparent)}
+  .prop-doc.doc-bad{border-color:color-mix(in srgb, var(--red-bright) 55%, transparent)}
+  .prop-del{flex:none;width:34px;height:38px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;color:var(--faint);font-size:16px;line-height:1}
+  .prop-del:hover{border-color:var(--red-bright);color:var(--red-bright);background:var(--red-soft)}
+
+  /* ─── 14. SELETOR DE COR ────────────────────────────────────────── */
+  .cor-box{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
+  .cor-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:4px}
+  .cor-sub-lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--muted);margin-top:8px}
+  .cor-sw{width:100%;aspect-ratio:1/1;min-height:26px;border-radius:9px;border:2px solid transparent;
+    cursor:pointer;padding:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);
+    transition:transform .12s,box-shadow .12s}
+  .cor-sw:hover{transform:scale(1.1)}
+  .cor-sw.sel{border-color:var(--panel);
+    box-shadow:0 0 0 2px var(--ink), inset 0 0 0 1px rgba(0,0,0,.1);transform:scale(1.05)}
+  .cor-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.5;margin-top:10px}
+
+  /* ─── 15. SLIDER DE INTENSIDADE ─────────────────────────────────── */
+  .op-wrap{display:flex;align-items:center;gap:11px;margin-top:12px}
+  .op-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--faint);flex:none}
+  .op-range{-webkit-appearance:none;appearance:none;flex:1;height:5px;border-radius:99px;
+    background:linear-gradient(90deg,var(--line),var(--line-2));outline:none;cursor:pointer}
+  .op-range::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+    background:var(--red-bright);border:3px solid var(--panel);
+    box-shadow:0 1px 5px rgba(0,0,0,.28);cursor:pointer;transition:transform .12s}
+  .op-range::-webkit-slider-thumb:hover{transform:scale(1.12)}
+  .op-range::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--red-bright);
+    border:3px solid var(--panel);cursor:pointer}
+  .cor-pop .op-range{width:100%;margin:2px 0}
+
+  /* ─── 16. ACORDEÕES ONR ─────────────────────────────────────────── */
+  .onr-box{margin-top:14px}
+  .onr-accordion{border:1px solid var(--line);border-radius:var(--r-l);background:var(--panel);
+    overflow:hidden;box-shadow:var(--sh-1)}
+  .onr-accordion>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;
+    padding:14px 16px;font-family:var(--disp);font-size:13.5px;font-weight:650;color:var(--ink);
+    transition:background .15s}
+  .onr-accordion>summary:hover{background:var(--panel-2)}
+  .onr-accordion>summary::-webkit-details-marker{display:none}
+  .onr-accordion>summary::after{content:'';margin-left:auto;width:9px;height:9px;flex:none;
+    border-right:2px solid var(--faint);border-bottom:2px solid var(--faint);
+    transform:rotate(45deg) translateY(-2px);transition:transform .2s}
+  .onr-accordion[open]>summary::after{transform:rotate(225deg) translateY(-2px)}
+  .onr-hint-active{font-family:var(--mono);font-size:10px;font-weight:400;color:var(--faint)}
+  .onr-body{padding:6px 16px 16px;border-top:1px solid var(--line)}
+  .onr-sub{margin-top:11px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .onr-sub>summary{list-style:none;cursor:pointer;padding:10px 13px;
+    font-family:var(--disp);font-size:11.5px;font-weight:700;letter-spacing:.02em;
+    color:var(--muted);background:var(--panel-2);transition:color .15s}
+  .onr-sub>summary:hover{color:var(--ink)}
+  .onr-sub>summary::-webkit-details-marker{display:none}
+  .onr-sub>summary::after{content:'+';float:right;color:var(--faint);font-weight:700;font-size:13px}
+  .onr-sub[open]>summary::after{content:'–'}
+  .onr-sub .form-grid{padding:11px 12px 12px}
+  .qual-list{padding:9px 11px;display:flex;flex-direction:column;gap:8px}
+  .qual-card{border:1px solid var(--line);border-radius:var(--r-s);padding:9px 11px;background:var(--panel)}
+  .qual-head{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:12.5px}
+  .qual-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+    padding:2px 7px;border-radius:99px}
+  .qual-tag.adq{background:color-mix(in srgb, var(--green) 13%, transparent);color:var(--green-text)}
+  .qual-tag.alien{background:var(--red-soft);color:var(--red-text)}
+  .qual-row{display:flex;gap:8px;font-size:11.5px;line-height:1.5}
+  .qual-k{flex:0 0 116px;color:var(--faint);font-family:var(--mono);font-size:10px;
+    text-transform:uppercase;letter-spacing:.04em;padding-top:1px}
+  .qual-v{flex:1;color:var(--ink)}
+
+  /* ─── 17. CAIXA DO MUNICÍPIO ────────────────────────────────────── */
   .muni-box{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
   .muni-label{display:flex;align-items:center;gap:7px;color:var(--faint)}
   .muni-row{display:flex;gap:9px;margin-top:2px}
   #muni-status{margin-top:10px}
-  /* Selo de pertencimento sobre o mapa */
-  .muni-badge{position:absolute;left:14px;bottom:120px;z-index:5;display:none;max-width:340px;
-    font-family:var(--mono);font-size:11.5px;font-weight:600;line-height:1.35;padding:8px 12px;border-radius:9px;
-    backdrop-filter:blur(10px);box-shadow:0 6px 22px rgba(0,0,0,.45);background:rgba(14,18,23,.88);color:#fff;border:1px solid rgba(255,255,255,.18)}
-  .muni-badge.dentro{background:rgba(12,38,25,.88);border-color:rgba(31,157,87,.6);color:#7fe0ad}
-  .muni-badge.parcial{background:rgba(46,36,12,.88);border-color:rgba(200,136,31,.65);color:#f4cd6f}
-  .muni-badge.fora{background:rgba(48,16,18,.9);border-color:rgba(226,52,47,.65);color:#ff9a9a}
-  .muni-badge b{color:#fff}
-  /* Estilo do limite municipal desenhado (legenda) */
-  .legend .sw.muni{background:rgba(37,99,235,.25);border:1px solid #2563eb}
-  /* Seletor de cor de destaque (painel) */
-  .cor-box{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
-  .cor-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:4px}
-  .cor-sub-lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-top:6px}
-  .cor-sw{width:100%;aspect-ratio:1/1;min-height:24px;border-radius:7px;border:2px solid transparent;cursor:pointer;
-    box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);transition:transform .1s;padding:0}
-  .cor-sw:hover{transform:scale(1.08)}
-  .cor-sw.sel{border-color:var(--ink);box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
-  .cor-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.45;margin-top:9px}
-  /* Accordion de dados ONR */
-  .onr-box{margin-top:14px}
-  .onr-accordion{border:1px solid var(--line);border-radius:11px;background:var(--bg);overflow:hidden}
-  .onr-accordion>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:11px 13px;font-family:var(--disp);font-size:13px;font-weight:600;color:var(--ink)}
-  .onr-accordion>summary::-webkit-details-marker{display:none}
-  .onr-accordion>summary::after{content:'▾';margin-left:auto;color:var(--faint);transition:transform .2s}
-  .onr-accordion[open]>summary::after{transform:rotate(180deg)}
-  .onr-hint-active{font-family:var(--mono);font-size:10px;font-weight:400;color:var(--faint)}
-  .onr-body{padding:4px 13px 14px;border-top:1px solid var(--line)}
-  .onr-sub{margin-top:10px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
-  .onr-sub>summary{list-style:none;cursor:pointer;padding:8px 11px;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);background:var(--panel)}
-  .onr-sub>summary::-webkit-details-marker{display:none}
-  .onr-sub>summary::after{content:'+';float:right;color:var(--faint);font-weight:700}
-  .onr-sub[open]>summary::after{content:'–'}
-  .qual-list{padding:8px 10px;display:flex;flex-direction:column;gap:8px}
-  .qual-card{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel)}
-  .qual-head{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12.5px}
-  .qual-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 6px;border-radius:6px}
-  .qual-tag.adq{background:rgba(19,105,63,.14);color:#13693f}
-  .qual-tag.alien{background:rgba(168,15,30,.14);color:#a80f1e}
-  .qual-row{display:flex;gap:8px;font-size:11.5px;line-height:1.45}
-  .qual-k{flex:0 0 116px;color:var(--faint);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px}
-  .qual-v{flex:1;color:var(--ink)}
-  .onr-sub .form-grid{padding:10px 11px 11px}
-  .onr-sub input[readonly]{opacity:.65;background:var(--panel);cursor:not-allowed}
-  /* Popup de cor sobre o mapa (InfoWindow — bolha branca) */
-  .cor-pop{font-family:var(--disp);min-width:200px;color:#1f2733}
-  .cor-pop-t{font-size:13px;font-weight:700;line-height:1.2}
-  .cor-pop-sub{font-size:11px;color:#6b7785;margin:1px 0 9px}
-  /* Bloco de informações do imóvel no popup do mapa */
-  .ip-box{margin:2px 0 11px;padding:9px 10px;background:#f4f6f9;border:1px solid #e3e8ee;border-radius:8px;display:flex;flex-direction:column;gap:4px}
-  .ip-row{display:flex;gap:8px;font-size:11.5px;line-height:1.35}
-  .ip-k{flex:none;width:78px;color:#64748b;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;padding-top:1px}
-  .ip-v{flex:1;color:#1f2733;font-weight:600;word-break:break-word}
-  /* Acordeão das opções de cor no popup */
-  .cor-pop-acc{margin-top:2px}
-  .cor-pop-acc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;margin-bottom:0;padding:3px 0;user-select:none}
-  .cor-pop-acc>summary::-webkit-details-marker{display:none}
-  .cor-pop-acc>summary::after{content:'▾';margin-left:auto;font-size:11px;transition:transform .2s}
-  .cor-pop-acc[open]>summary::after{transform:rotate(180deg)}
-  .cor-pop-acc>summary:hover{color:#0d9488}
-  /* Dialog do mapa (InfoWindow) no modo escuro */
-  body.dark-mode .gm-style .gm-style-iw-c,
-  body.dark-mode .gm-style .gm-style-iw-d{background:#161c24 !important}
-  body.dark-mode .gm-style .gm-style-iw-d{overflow:auto !important}
-  body.dark-mode .gm-style .gm-style-iw-t::after{background:linear-gradient(45deg,#161c24 50%,rgba(0,0,0,0) 51%) !important}
-  body.dark-mode .gm-style .gm-style-iw-tc::after{background:#161c24 !important}
-  body.dark-mode .gm-style .gm-style-iw-c button img,
-  body.dark-mode .gm-style .gm-ui-hover-effect img{filter:invert(1) brightness(1.6) !important}
-  body.dark-mode .cor-pop{color:#e7edf3}
-  body.dark-mode .cor-pop-sub{color:#8b97a4}
-  body.dark-mode .cor-pop-lbl{color:#8b97a4}
-  body.dark-mode .ip-box{background:#1c242e;border-color:#283038}
-  body.dark-mode .ip-k{color:#8b97a4}
-  body.dark-mode .ip-v{color:#e7edf3}
-  body.dark-mode .ip-inc{border-top-color:rgba(255,255,255,.16)}
-  body.dark-mode .ip-inc-h{color:#f0c14b}
-  body.dark-mode .ip-inc-row .inc-msg{color:#cdd6e0}
-  body.dark-mode .ip-inc-row .inc-msg b{color:#fff}
-  body.dark-mode .cor-pop-clear{background:#1c242e;border-color:#283038;color:#e2342f}
-  body.dark-mode .cor-pop-clear:hover{background:#2a1a1c;border-color:#a80f1e}
-  .cor-pop-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#9aa6b2;margin-bottom:6px}
-  .cor-pop-grid{display:grid;grid-template-columns:repeat(6,22px);gap:6px}
-  .cor-pop .cor-sw{width:22px;height:22px;aspect-ratio:auto;min-height:0}
-  .cor-pop-clear{margin-top:11px;width:100%;font-family:var(--disp);font-size:11px;font-weight:600;color:#a80f1e;
-    background:#fff;border:1px solid #e3e8ee;border-radius:7px;padding:6px;cursor:pointer}
-  .cor-pop-clear:hover{background:#faf0f1;border-color:#a80f1e}
-  .status.ok{display:block;background:rgba(31,157,87,.10);color:var(--green-text);border:1px solid rgba(31,157,87,.30)}
-  .status.err{display:block;background:var(--red-soft);color:var(--red-text);border:1px solid rgba(168,15,30,.30)}
-  .status.warn{display:block;background:rgba(200,136,31,.12);color:var(--amber-text);border:1px solid rgba(200,136,31,.35)}
-  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
-  .stat{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 13px}
-  .stat .v{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.5px}
-  .stat .u{font-size:12px;color:var(--faint);font-weight:400}
-  .stat .k{font-size:10px;color:var(--muted);margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px}
-  .ed-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:0 0 16px}
-  .ed-stat{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 11px}
-  .ed-stat .v{font-family:var(--mono);font-size:17px;font-weight:600;letter-spacing:-.5px}
-  .ed-stat .u{font-size:11px;color:var(--faint);font-weight:400}
-  .ed-stat .k{font-size:9.5px;color:var(--muted);margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.7px}
-  @media (max-width:760px){ .ed-stats{grid-template-columns:1fr 1fr} }
-  .saved{margin-top:24px}
-  .saved h3{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);margin:0 0 10px}
-  .item{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
-  .item:hover{border-color:var(--red-bright);background:rgba(168,15,30,.06)}
-  .item.sel{border-color:#f59e0b;background:rgba(245,158,11,.12)}
-  .item.sel .ic{background:#f59e0b}
-  .item.destaque{border-color:#0d9488;background:rgba(13,148,136,.12);box-shadow:0 0 0 1px rgba(13,148,136,.35) inset}
-  /* Popup do mapa sempre acima dos rótulos/elementos */
-  .gm-style .gm-style-iw-c,.gm-style .gm-style-iw-t,.gm-style .gm-style-iw{z-index:99999 !important}
-  .map-chip{z-index:1}
-  .item .ic{width:7px;height:7px;border-radius:2px;background:var(--red-bright);flex:none}
-  .item .info{flex:1;min-width:0}
-  .item .nm{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .item .mt{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
-  .item .tag{font-family:var(--mono);font-size:9px;letter-spacing:.5px;padding:2px 6px;border-radius:4px;
-    background:rgba(139,151,164,.14);color:var(--muted);text-transform:uppercase}
-  .item .tag.mat{background:var(--red-soft);color:#f0a3a3}
-  .item .del{background:transparent;border:none;color:var(--faint);font-size:15px;padding:2px 6px;border-radius:5px}
-  .item .del:hover{color:var(--red-bright);background:rgba(226,52,47,.1)}
-  .empty-list{font-family:var(--mono);font-size:11px;color:var(--faint);padding:6px 2px}
-  .map-wrap{position:relative;min-width:0}
-  #map{position:absolute;inset:0;background:#0a0d11}
-  /* ---- Controles 3D ---- */
-  .ctrl-3d{position:absolute;top:60px;left:14px;z-index:7;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
-  .c3d-btn{background:#fff;color:#1f2937;border:none;border-radius:8px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.35);display:flex;align-items:center;gap:6px}
-  .c3d-btn:hover{background:#f1f5f9}
-  .c3d-row{display:flex;gap:6px;background:#fff;border-radius:8px;padding:5px;box-shadow:0 1px 5px rgba(0,0,0,.35)}
-  .c3d-mini{background:#f1f5f9;border:none;border-radius:6px;padding:6px 9px;font-size:13px;cursor:pointer;color:#1f2937;line-height:1}
-  .c3d-mini:hover{background:#e2e8f0}
-  .c3d-mini.on{background:#0e1217;color:#fff;outline:2px solid #10b981}
-  .c3d-mini.wide{font-weight:600}
-  body.dark-mode .c3d-btn,body.dark-mode .c3d-row{background:#1c242e;color:#e7edf3}
-  body.dark-mode .c3d-btn:hover{background:#243040}
-  body.dark-mode .c3d-mini{background:#283445;color:#e7edf3}
-  body.dark-mode .c3d-mini:hover{background:#31445a}
-  .modal-3d-card{position:fixed;inset:3vh 3vw;background:#0a0d11;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-  .modal-3d-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#11161d;color:#e7edf3;border-bottom:1px solid #222c38;font-weight:600;font-size:14px}
-  .modal-3d-host{flex:1;min-height:0;position:relative;background:#0a0d11}
-  .modal-3d-host gmp-map-3d,.modal-3d-host .gmp-map-3d{width:100%;height:100%;display:block}
-  .modal-3d-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:#cbd5e1;font-size:14px;line-height:1.6}
-  .modal-3d-foot{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;padding:8px 12px;background:#11161d;color:#9aa6b2;border-top:1px solid #222c38;font-size:12px}
-  .modal-3d-foot.alert{color:#fbbf24}
-  .m3d-link{display:inline-flex;align-items:center;gap:5px;background:#283445;color:#e7edf3;text-decoration:none;border-radius:7px;padding:6px 11px;font-weight:600;font-size:12px}
-  .m3d-link:hover{background:#31445a}
-  .m3d-legend{position:absolute;top:56px;left:12px;z-index:4;background:rgba(9,12,16,.84);border:1px solid #222c38;border-radius:10px;padding:9px 11px;max-width:240px;max-height:62%;overflow:auto;font-size:12px;color:#e7edf3;box-shadow:0 4px 14px rgba(0,0,0,.45)}
-  .m3d-legend h4{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa6b2}
-  .m3d-legend .row{display:flex;align-items:center;gap:7px;margin:3px 0;line-height:1.2}
-  .m3d-legend .sw{width:13px;height:13px;border-radius:3px;flex:none;border:1px solid rgba(255,255,255,.28)}
-  .ov-legend-2d{margin:10px;background:rgba(9,12,16,.86);border:1px solid #222c38;border-radius:10px;padding:9px 11px;max-width:230px;max-height:52vh;overflow:auto;font-size:12px;color:#e7edf3;box-shadow:0 4px 14px rgba(0,0,0,.45)}
-  .ov-legend-2d h4{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa6b2}
-  .ov-legend-2d .row{display:flex;align-items:center;gap:7px;margin:3px 0;line-height:1.2}
-  .ov-legend-2d .sw{width:13px;height:13px;border-radius:3px;flex:none;border:1px solid rgba(255,255,255,.28)}
-  .readout{position:absolute;left:14px;bottom:80px;z-index:5;background:rgba(14,18,23,.88);
-    backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:9px 13px;
-    font-family:var(--mono);font-size:11px;color:#cbd5e1;display:none;box-shadow:0 6px 22px rgba(0,0,0,.45)}
-  .readout b{color:#fff;font-weight:500}
-  .readout .dot{color:#ff6b6b}
 
-  /* KML import */
-  .kml-zone{margin-top:11px;display:flex;align-items:center;gap:9px;padding:11px 13px;border:1px dashed var(--line);
-    border-radius:9px;color:var(--muted);cursor:pointer;font-size:12.5px;transition:border-color .15s,color .15s,background .15s}
-  .kml-zone:hover,.kml-zone.drag{border-color:var(--red-bright);color:var(--ink);background:rgba(168,15,30,.05)}
-  .kml-zone b{color:var(--ink);font-weight:600}
-  .kml-zone.loaded{border-style:solid;border-color:rgba(47,170,106,.4);color:#7fd9a8}
+  /* ─── 18. ZONAS KML / IA ────────────────────────────────────────── */
+  .kml-zone{margin-top:11px;display:flex;align-items:center;gap:10px;padding:12px 14px;
+    border:1.5px dashed var(--line-2);border-radius:var(--r);color:var(--muted);cursor:pointer;
+    font-size:12.5px;background:var(--panel);
+    transition:border-color .15s,color .15s,background .15s}
+  .kml-zone:hover,.kml-zone.drag{border-color:var(--red-bright);color:var(--ink);
+    background:color-mix(in srgb, var(--red-bright) 4%, var(--panel))}
+  .kml-zone b{color:var(--ink);font-weight:650}
+  .kml-zone.loaded{border-style:solid;border-color:color-mix(in srgb, var(--green) 45%, transparent);
+    color:var(--green-text)}
   .kml-zone.lote{margin-top:8px}
-  .kml-zone.lote:hover,.kml-zone.lote.drag{border-color:#0d9488;color:var(--ink);background:rgba(13,148,136,.06)}
+  .kml-zone.lote:hover,.kml-zone.lote.drag{border-color:var(--teal);color:var(--ink);
+    background:color-mix(in srgb, var(--teal) 5%, var(--panel))}
   .kml-zone.ia{margin-top:8px}
-  .zone-multi{font-family:var(--mono);font-size:9.5px;color:var(--faint);opacity:.85}
-  .kml-zone.ia:hover,.kml-zone.ia.drag{border-color:#7c3aed;color:var(--ink);background:rgba(124,58,237,.07)}
-  .link-config{display:block;width:100%;margin-top:6px;background:none;border:none;color:var(--faint);
-    font-family:var(--mono);font-size:10px;cursor:pointer;text-align:left;padding:3px 1px}
-  .link-config:hover{color:#7c3aed}
-  .gem-models{display:flex;flex-wrap:wrap;gap:5px;min-height:22px}
+  .kml-zone.ia:hover,.kml-zone.ia.drag{border-color:var(--violet);color:var(--ink);
+    background:color-mix(in srgb, var(--violet) 6%, var(--panel))}
+  .zone-multi{font-family:var(--mono);font-size:9.5px;color:var(--faint);opacity:.9}
 
-  /* Cabeçalho da lista + botão ver todos */
-  .saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-  .vista-toggle{display:flex;flex-wrap:wrap;gap:4px;background:var(--panel2,rgba(128,128,128,.08));border:1px solid var(--line);border-radius:9px;padding:3px;margin-bottom:8px}
-  .panel-top{position:sticky;top:0;z-index:30;background:var(--panel);margin:0 -22px 14px;padding:16px 22px 12px;border-bottom:1px solid var(--line);box-shadow:0 6px 12px -9px rgba(0,0,0,.35)}
-  .panel-top .base-toggle{margin-bottom:7px}
-  .quick-actions{display:flex;gap:6px}
-  .quick-actions .mini-btn{flex:1;justify-content:center}
-  .base-toggle{display:flex;gap:4px;background:var(--panel2,rgba(128,128,128,.08));border:1px solid var(--line);border-radius:9px;padding:3px;margin-bottom:9px}
-  .base-toggle .bt-btn{flex:1;border:none;background:transparent;color:var(--ink,#555);font-size:12px;font-weight:700;padding:7px 9px;border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap}
-  .base-toggle .bt-btn.active{background:var(--card,#fff);color:var(--brand,#0d9488);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-  .base-toggle.projetos .bt-btn.active{color:#7c3aed;background:var(--card,#fff)}
-  .item .proj-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:rgba(124,58,237,.16);color:#7c3aed;margin-left:4px}
-  .mini-btn.proj{border-color:rgba(124,58,237,.45);color:#7c3aed}
-  .vista-toggle .vt-btn{flex:0 1 auto;border:none;background:transparent;color:var(--ink,#555);font-size:11px;font-weight:600;padding:6px 9px;border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap}
-  .vista-toggle .vt-btn.vt-onr.active{background:rgba(31,95,165,.16);color:#1f5fa5}
-  .vista-toggle .vt-btn.active{background:var(--card,#fff);color:var(--brand,#0d9488);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-  .vt-count{display:inline-block;min-width:16px;padding:0 5px;margin-left:2px;border-radius:9px;background:rgba(13,148,136,.18);color:#0d9488;font-size:10px;line-height:15px}
-  .itn03-actions{display:flex;gap:6px;margin-bottom:8px}
-  .itn03-actions .mini-btn{flex:1}
-  .item .itn03-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:rgba(99,102,241,.16);color:#4f46e5;margin-left:4px}
-  .item .itn03-apto{font-size:10px;font-weight:600;margin-left:4px}
-  .item .itn03-apto.ok{color:#13693f}
-  .item .itn03-apto.no{color:#a80f1e}
-  .saved-head h3{margin:0}
-  .mini-btn{font-family:var(--mono);font-size:10px;letter-spacing:.5px;padding:6px 10px;background:transparent;
-    border:1px solid var(--line);color:var(--muted);border-radius:6px}
-  .mini-btn:hover{border-color:var(--red-bright);color:var(--ink)}
-  .mini-btn.active{background:var(--red-soft);border-color:var(--red-bright);color:#f0a3a3}
+  /* ─── 19. CARTÕES DE AÇÃO (ONR / Carga) ─────────────────────────── */
+  .vx-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+  .vx-act-card{position:relative;border:1px solid var(--line);border-radius:var(--r-l);
+    background:var(--panel);padding:20px;box-shadow:var(--sh-1);overflow:hidden;
+    transition:border-color .18s,transform .18s,box-shadow .18s}
+  .vx-act-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg, var(--red-bright), transparent 70%);
+    opacity:0;transition:opacity .18s}
+  .vx-act-card:hover{border-color:color-mix(in srgb, var(--red-bright) 28%, var(--line));
+    transform:translateY(-2px);box-shadow:var(--sh-2)}
+  .vx-act-card:hover::before{opacity:1}
+  .vx-act-h{font-family:var(--titles);font-weight:700;font-size:14.5px;color:var(--ink);margin-bottom:6px}
+  .vx-act-d{font-size:11.5px;color:var(--muted);line-height:1.55;margin:0 0 15px}
+  .vx-act-btn{width:100%;margin-bottom:8px}
+  .vx-act-btn2{width:100%;margin-bottom:7px;font-size:12px}
+  .vx-act-card .vx-act-btn2:last-child{margin-bottom:0}
 
-  /* Painel de visão geral / sobreposições */
-  .overview-panel{position:absolute;top:60px;right:14px;z-index:6;width:280px;max-height:calc(100% - 74px);
-    display:none;flex-direction:column;background:var(--ov-bg);color:var(--ink);backdrop-filter:blur(10px);
-    border:1px solid var(--line);border-radius:11px;overflow:hidden;box-shadow:var(--ov-shadow)}
+  /* ─── 20. DROPZONE (Importar) ───────────────────────────────────── */
+  .dropzone{border:2px dashed var(--line-2);border-radius:var(--r-xl);background:var(--panel);
+    padding:44px 24px;text-align:center;cursor:pointer;transition:.18s;
+    display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:var(--sh-1)}
+  .dropzone:hover,.dropzone:focus-visible{border-color:var(--red-bright);
+    background:color-mix(in srgb, var(--red-bright) 4%, var(--panel));outline:none}
+  .dropzone.drag{border-color:var(--red-bright);
+    background:color-mix(in srgb, var(--red-bright) 8%, var(--panel));
+    transform:translateY(-2px);box-shadow:0 18px 38px -20px color-mix(in srgb, var(--red-bright) 70%, transparent)}
+  .dz-ic{width:60px;height:60px;border-radius:50%;display:grid;place-items:center;
+    background:var(--panel-2);border:1px solid var(--line);color:var(--red-bright);transition:.18s}
+  .dropzone.drag .dz-ic{background:var(--red-bright);color:#fff;border-color:var(--red-bright);transform:scale(1.06)}
+  .dz-main{font-family:var(--titles);font-weight:650;font-size:15px;color:var(--ink)}
+  .dz-link{color:var(--red-bright);text-decoration:underline;text-underline-offset:3px}
+  .dz-sub{font-size:11.5px;color:var(--muted);max-width:460px;line-height:1.55}
+  .dz-badges{display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;justify-content:center}
+  .dz-badge{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.04em;color:var(--muted);
+    background:var(--panel-2);border:1px solid var(--line);border-radius:99px;padding:4px 11px}
+
+  /* ─── 21. MAPA · SOBREPOSIÇÕES E PAINÉIS ────────────────────────── */
+  .map-wrap{position:relative;min-width:0}
+  #map{position:absolute;inset:0;background:#0A0D11}
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;z-index:4;color:var(--faint);
+    font-family:var(--mono);font-size:12px;text-align:center;pointer-events:none}
+
+  /* Leitura do imóvel focado */
+  .readout{position:absolute;left:14px;bottom:80px;z-index:5;display:none;
+    background:rgba(10,14,19,.86);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.14);border-radius:var(--r);padding:9px 14px;
+    font-family:var(--mono);font-size:11px;color:#C6D2DE;box-shadow:0 8px 26px rgba(0,0,0,.45)}
+  .readout b{color:#fff;font-weight:600}
+  .readout .dot{color:var(--red-bright)}
+
+  /* Selo de pertencimento (pílula topo-centro) */
+  .muni-badge{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:8;display:none;
+    max-width:min(90%,420px);text-align:center;
+    font-family:var(--disp);font-weight:600;font-size:12px;line-height:1.4;
+    padding:8px 18px;border-radius:999px;
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.5);
+    background:rgba(12,16,22,.88);color:#fff;border:1px solid rgba(255,255,255,.16)}
+  .muni-badge.dentro{background:rgba(10,38,24,.88);border-color:color-mix(in srgb, var(--green) 55%, transparent);color:#8CE7B6}
+  .muni-badge.parcial{background:rgba(44,34,10,.88);border-color:color-mix(in srgb, var(--amber) 60%, transparent);color:#F5CF74}
+  .muni-badge.fora{background:rgba(46,14,16,.9);border-color:color-mix(in srgb, var(--red-bright) 60%, transparent);color:#FF9E9E}
+  .muni-badge b{color:#fff}
+
+  /* Painel flutuante (Visão geral / KML) */
+  .overview-panel{position:absolute;top:60px;right:14px;z-index:6;width:288px;max-height:calc(100% - 74px);
+    display:none;flex-direction:column;overflow:hidden;color:var(--ink);
+    background:var(--ov-bg);-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);
+    border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--sh-2)}
   .overview-panel.show{display:flex}
   .overview-panel.dragging{transition:none;cursor:grabbing}
-  .ovh{display:flex;align-items:flex-start;justify-content:space-between;padding:13px 15px;border-bottom:1px solid var(--line);
-    cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
+  .ovh{display:flex;align-items:flex-start;justify-content:space-between;padding:14px 16px;
+    border-bottom:1px solid var(--line);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
   .ovh:active{cursor:grabbing}
-  .ovh-title{font-size:13px;font-weight:600}
-  .ovh-sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px}
-  .ov-close{background:transparent;border:none;color:var(--faint);font-size:18px;line-height:1;padding:0 2px;border-radius:5px}
-  .ov-close:hover{color:var(--red-bright)}
-  .legend{display:flex;gap:16px;padding:10px 15px;border-bottom:1px solid var(--line);font-family:var(--mono);
-    font-size:10.5px;color:var(--muted)}
+  .ovh-title{font-family:var(--titles);font-size:13.5px;font-weight:700}
+  .ovh-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px}
+  .ov-close{background:transparent;border:none;color:var(--faint);font-size:18px;line-height:1;
+    padding:2px 6px;border-radius:7px}
+  .ov-close:hover{color:var(--red-bright);background:var(--red-soft)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);
+    font-family:var(--mono);font-size:10px;color:var(--muted)}
   .legend span{display:flex;align-items:center;gap:6px}
-  .legend .sw{width:13px;height:9px;border-radius:2px;display:inline-block}
-  .legend .sw.normal{background:rgba(22,163,74,.35);border:1px solid #16a34a}
-  .legend .sw.over{background:rgba(226,52,47,.5);border:1px solid var(--red-bright)}
-  .legend .sw.sel{background:rgba(245,158,11,.45);border:1px solid #f59e0b}
-  .ov-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.4;padding:8px 15px 0}
-  .ov-search{display:flex;gap:6px;padding:8px 10px 2px}
-  .ov-itn03{padding:6px 10px 2px}
-  .btn-itn03{width:100%;padding:8px 10px;border:1px solid #1f7a4d;background:#e8f7ee;color:#13693f;border-radius:8px;font-weight:600;font-size:12px;cursor:pointer;transition:.15s}
-  .btn-itn03:hover{background:#d6f0e0}
-  .btn-itn03:disabled{opacity:.6;cursor:default}
-  .ov-search input{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;color:var(--ink);
-    font-size:12px;padding:7px 9px;font-family:var(--disp);outline:none}
-  .ov-search input:focus{border-color:#0d9488}
+  .legend .sw{width:14px;height:10px;border-radius:3px;display:inline-block}
+  .legend .sw.normal{background:color-mix(in srgb, var(--green) 35%, transparent);border:1px solid var(--green)}
+  .legend .sw.over{background:color-mix(in srgb, var(--red-bright) 45%, transparent);border:1px solid var(--red-bright)}
+  .legend .sw.sel{background:rgba(245,158,11,.45);border:1px solid #F59E0B}
+  .legend .sw.muni{background:color-mix(in srgb, var(--blue) 25%, transparent);border:1px solid var(--blue)}
+  .ov-hint{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.45;padding:9px 16px 0}
+  .ov-search{display:flex;gap:6px;padding:9px 12px 2px}
+  .ov-search input{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;
+    color:var(--ink);font-size:12px;padding:8px 10px;outline:none}
+  .ov-search input:focus{border-color:var(--teal);box-shadow:var(--ring-teal)}
   .ov-search input::placeholder{color:var(--faint)}
-  .ov-search button{flex:none;width:30px;height:34px;background:var(--panel-2);border:1px solid var(--line);
-    border-radius:8px;color:var(--faint);font-size:16px;line-height:1;cursor:pointer}
+  .ov-search button{flex:none;width:32px;height:36px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:9px;color:var(--faint);font-size:16px;line-height:1}
   .ov-search button:hover{border-color:var(--red-bright);color:var(--red-bright)}
-  .ov-overlaps{overflow-y:auto;padding:8px 10px}
-  .ov-overlaps .ttl{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
-    color:var(--faint);padding:4px 5px 8px}
-  .ov-row{padding:9px 11px;border:1px solid rgba(226,52,47,.25);background:rgba(226,52,47,.06);border-radius:8px;
-    margin-bottom:7px;cursor:pointer;transition:background .15s}
-  .ov-row:hover{background:rgba(226,52,47,.13)}
-  .ov-row .pair{font-size:12px;font-weight:500;line-height:1.35}
+  .ov-itn03{padding:7px 12px 2px}
+  .btn-itn03{width:100%;padding:9px 11px;border-radius:9px;font-weight:650;font-size:12px;
+    border:1px solid color-mix(in srgb, var(--green) 45%, transparent);
+    background:color-mix(in srgb, var(--green) 10%, transparent);color:var(--green-text)}
+  .btn-itn03:hover{background:color-mix(in srgb, var(--green) 17%, transparent)}
+  .btn-itn03:disabled{opacity:.55;cursor:default}
+  .ov-overlaps{overflow-y:auto;padding:9px 12px}
+  .ov-overlaps .ttl{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--faint);padding:4px 4px 8px}
+  .ov-row{position:relative;padding:10px 12px;margin-bottom:7px;cursor:pointer;border-radius:var(--r-s);
+    border:1px solid color-mix(in srgb, var(--red-bright) 24%, transparent);
+    background:color-mix(in srgb, var(--red-bright) 5%, transparent);transition:background .15s}
+  .ov-row:hover{background:color-mix(in srgb, var(--red-bright) 11%, transparent)}
+  .ov-row .pair{font-size:12px;font-weight:550;line-height:1.4}
   .ov-row .amt{font-family:var(--mono);font-size:10.5px;color:var(--red-text);margin-top:3px}
-  .ov-tag{display:inline-block;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.3px;
-    text-transform:uppercase;padding:1px 6px;border-radius:7px;vertical-align:middle;margin-left:4px;white-space:nowrap}
-  .ov-tag.material{background:rgba(226,52,47,.18);color:var(--red-text);border:1px solid rgba(226,52,47,.5)}
-  .ov-tag.formal{background:rgba(245,158,11,.16);color:#b45309;border:1px solid rgba(180,83,9,.45)}
+  .ov-row .row-rep{position:absolute;top:8px;right:8px;background:var(--red);border:none;color:#fff;
+    font-family:var(--mono);font-size:9px;letter-spacing:.04em;padding:4px 8px;border-radius:6px;
+    opacity:0;transition:opacity .12s}
+  .ov-row:hover .row-rep{opacity:1}
+  .ov-row .row-rep:hover{background:var(--red-bright)}
+  .ov-tag{display:inline-block;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.03em;
+    text-transform:uppercase;padding:1px 7px;border-radius:99px;vertical-align:middle;margin-left:4px;white-space:nowrap}
+  .ov-tag.material{background:color-mix(in srgb, var(--red-bright) 15%, transparent);color:var(--red-text);
+    border:1px solid color-mix(in srgb, var(--red-bright) 45%, transparent)}
+  .ov-tag.formal{background:rgba(245,158,11,.15);color:var(--amber-text);
+    border:1px solid color-mix(in srgb, var(--amber) 45%, transparent)}
   .ov-none{font-family:var(--mono);font-size:11px;color:var(--green-text);padding:10px 6px}
-  .ov-foot{padding:11px;border-top:1px solid var(--line)}
-
-  /* Botão flutuante para reexibir o painel */
+  .ov-foot{padding:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
+  .btn-report{width:100%;padding:11px;border-radius:10px;font-size:12.5px;font-weight:600;color:#fff;
+    background:linear-gradient(160deg, var(--red-bright), var(--red));
+    box-shadow:0 6px 16px -8px color-mix(in srgb, var(--red-bright) 60%, transparent)}
+  .btn-report:hover{filter:brightness(1.06)}
   .ov-reopen{position:absolute;top:60px;right:14px;z-index:6;display:none;align-items:center;gap:8px;
-    background:var(--ov-bg);backdrop-filter:blur(10px);border:1px solid var(--line);color:var(--ink);
-    border-radius:9px;padding:9px 13px;font-size:12px;font-weight:500;box-shadow:var(--ov-shadow)}
+    background:var(--ov-bg);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border:1px solid var(--line);color:var(--ink);
+    border-radius:var(--r);padding:9px 14px;font-size:12px;font-weight:600;box-shadow:var(--sh-2)}
   .ov-reopen:hover{border-color:var(--red-bright)}
   .ov-reopen.show{display:flex}
 
-  /* Barra de seleção (Ctrl+clique) */
-  .sel-bar{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:7;display:none;
-    align-items:center;gap:12px;background:rgba(14,18,23,.94);backdrop-filter:blur(10px);
-    border:1px solid #f59e0b;border-radius:11px;padding:9px 12px 9px 16px;box-shadow:0 6px 24px rgba(0,0,0,.4)}
-  .sel-bar.show{display:flex}
-  .sel-count{font-family:var(--mono);font-size:12px;color:var(--muted)}
-  .sel-count b{color:#f59e0b;font-size:14px}
-  .sel-rep{background:var(--red);color:#fff;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:500}
-  .sel-rep:hover{filter:brightness(1.12)}
-  .sel-clear{background:transparent;border:1px solid var(--line);color:var(--muted);padding:8px 12px;border-radius:8px;font-size:12px}
-  .sel-clear:hover{border-color:#f59e0b;color:var(--ink)}
-
-  /* Botão de relatório por sobreposição na linha */
-  .ov-row{position:relative}
-  .ov-row .row-rep{position:absolute;top:8px;right:8px;background:rgba(168,15,30,.85);border:none;color:#fff;
-    font-family:var(--mono);font-size:9px;letter-spacing:.4px;padding:4px 7px;border-radius:5px;opacity:0;transition:opacity .12s}
-  .ov-row:hover .row-rep{opacity:1}
-  .ov-row .row-rep:hover{background:var(--red-bright)}
-  .btn-report{width:100%;background:var(--red);color:#fff;padding:10px;border-radius:8px;font-size:12.5px;
-    font-weight:500;box-shadow:0 2px 12px var(--red-soft)}
-  .btn-report:hover{filter:brightness(1.12)}
-
-  /* Painel de importação KML (nomear cada imóvel) */
-  .kml-panel{width:320px}
-  .kml-rows{overflow-y:auto;padding:9px 11px;flex:1}
-  .kml-row{padding:9px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--panel-2)}
+  /* Painel de importação KML */
+  .kml-panel{width:328px}
+  .kml-rows{overflow-y:auto;padding:10px 12px;flex:1}
+  .kml-row{padding:10px;border:1px solid var(--line);border-radius:var(--r-s);margin-bottom:8px;background:var(--panel-2)}
   .kml-row.sel{border-color:var(--red-bright)}
   .kml-row .top{display:flex;align-items:center;gap:7px;margin-bottom:7px}
-  .kml-row .idx{font-family:var(--mono);font-size:10px;color:var(--red-bright);font-weight:600;flex:none}
+  .kml-row .idx{font-family:var(--mono);font-size:10px;color:var(--red-bright);font-weight:700;flex:none}
   .kml-row .meta{font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-left:auto}
   .kml-row .inp{display:grid;grid-template-columns:1fr 96px;gap:7px}
-  .kml-row input,.kml-row select{padding:7px 9px;font-size:11.5px;border-radius:7px}
-  .kml-foot{padding:11px;border-top:1px solid var(--line)}
+  .kml-row input,.kml-row select{padding:7px 9px;font-size:11.5px;border-radius:8px}
+  .kml-foot{padding:12px;border-top:1px solid var(--line)}
 
-  /* Rótulo (nome/matrícula) sobre o polígono no mapa */
-  .map-chip{position:absolute;transform:translate(-50%,-50%);background:rgba(14,18,23,.82);color:#fff;
-    font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;
-    border:1px solid rgba(226,52,47,.65);white-space:nowrap;pointer-events:none;
-    text-shadow:0 1px 2px rgba(0,0,0,.85);letter-spacing:.2px}
+  /* Barra de seleção (Ctrl+clique) */
+  .sel-bar{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:7;display:none;
+    align-items:center;gap:12px;padding:9px 12px 9px 17px;border-radius:999px;
+    background:rgba(12,16,22,.92);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border:1px solid rgba(245,158,11,.75);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .sel-bar.show{display:flex}
+  .sel-count{font-family:var(--mono);font-size:12px;color:#A9B6C4;white-space:nowrap}
+  .sel-count b{color:#F59E0B;font-size:14px}
+  .sel-rep{background:var(--red-bright);color:#fff;padding:8px 15px;border-radius:999px;font-size:12.5px;font-weight:600}
+  .sel-rep:hover{filter:brightness(1.1)}
+  .sel-clear{background:transparent;border:1px solid rgba(255,255,255,.22);color:#C6D2DE;
+    padding:8px 13px;border-radius:999px;font-size:12px}
+  .sel-clear:hover{border-color:#F59E0B;color:#fff}
+
+  /* Rótulos sobre os polígonos */
+  .map-chip{position:absolute;transform:translate(-50%,-50%);z-index:1;white-space:nowrap;pointer-events:none;
+    background:rgba(12,16,22,.84);color:#fff;
+    font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.02em;
+    padding:3px 9px;border-radius:7px;border:1px solid color-mix(in srgb, var(--red-bright) 65%, transparent);
+    text-shadow:0 1px 2px rgba(0,0,0,.85)}
   .map-chip.clic{pointer-events:auto;cursor:pointer;transition:transform .1s ease,background .12s ease,border-color .12s ease}
-  .map-chip.clic:hover{background:rgba(13,148,136,.96);border-color:rgba(255,255,255,.55);
-    transform:translate(-50%,-50%) scale(1.08);box-shadow:0 3px 12px rgba(0,0,0,.45);z-index:5}
-  .map-chip.hover{transform:translate(-50%,calc(-50% - 20px));background:rgba(13,148,136,.96);
-    border-color:rgba(255,255,255,.35);font-family:var(--disp);font-weight:600;letter-spacing:.1px;
+  .map-chip.clic:hover{background:var(--teal);border-color:rgba(255,255,255,.55);
+    transform:translate(-50%,-50%) scale(1.08);box-shadow:0 4px 14px rgba(0,0,0,.45);z-index:5}
+  .map-chip.hover{transform:translate(-50%,calc(-50% - 20px));background:var(--teal);
+    border-color:rgba(255,255,255,.35);font-family:var(--disp);font-weight:600;
     box-shadow:0 4px 14px rgba(0,0,0,.4);animation:chipFade .14s ease-out}
   .map-chip.vizinho{background:rgba(180,83,9,.94);border-color:rgba(251,191,36,.7);color:#fff;
     font-family:var(--disp);font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.45)}
-  .map-chip.morto{background:rgba(86,94,104,.42);color:rgba(255,255,255,.72);border:1px dashed rgba(255,255,255,.32);
+  .map-chip.morto{background:rgba(86,94,104,.42);color:rgba(255,255,255,.72);
+    border:1px dashed rgba(255,255,255,.32);
     text-decoration:line-through;font-style:italic;font-weight:500;text-shadow:0 1px 2px rgba(0,0,0,.7)}
   .map-chip.morto.clic:hover{background:rgba(86,94,104,.85);border-color:rgba(255,255,255,.5);color:#fff}
   @keyframes chipFade{from{opacity:0;transform:translate(-50%,calc(-50% - 12px))}to{opacity:1;transform:translate(-50%,calc(-50% - 20px))}}
-  .overlay{position:absolute;inset:0;display:grid;place-items:center;z-index:4;color:var(--faint);
-    font-family:var(--mono);font-size:12px;text-align:center;pointer-events:none}
-  ::-webkit-scrollbar{width:9px;height:9px}
-  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}
-  ::-webkit-scrollbar-thumb:hover{background:#3a444f}
-  /* ===== Largura do painel (mais enxuta) ===== */
-  .mapeador-shell{grid-template-columns:360px 1fr}
-  .panel{transition:width .3s ease, opacity .25s ease}
-  /* ===== Formulário de cadastro ===== */
-  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px 12px;margin-top:6px}
-  .fld{display:flex;flex-direction:column;min-width:0}
-  .fld .field-label{margin:0 0 5px}
-  .grid-2{grid-column:1 / -1}
-  /* ===== Busca ===== */
-  .search-wrap{position:relative;margin:4px 0 10px}
-  .search-ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
-  #busca{width:100%;padding:9px 30px 9px 32px;background:var(--bg);border:1px solid var(--line);border-radius:9px;
-    color:var(--ink);font-family:var(--disp);font-size:13px;outline:none}
-  #busca:focus{border-color:var(--red-bright)}
-  .search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;
-    color:var(--faint);font-size:18px;cursor:pointer;line-height:1;padding:0 4px}
-  .search-clear:hover{color:var(--red-bright)}
-  /* ===== Itens da lista ===== */
-  .item-dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
-  .item-dot.vazio{background:var(--line)}
-  .item .it-edit{background:transparent;border:none;color:var(--faint);font-size:14px;cursor:pointer;padding:2px 5px;border-radius:6px;flex:none}
-  .item .it-edit:hover{color:var(--red-bright);background:var(--red-soft)}
-  .tag.urb{background:rgba(37,99,235,.14);color:#2563eb;border:1px solid rgba(37,99,235,.3)}
-  .tag.rural{background:rgba(22,163,74,.14);color:#16a34a;border:1px solid rgba(22,163,74,.3)}
-  /* Envio ONR na lista */
-  .saved-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-  .mini-btn.onr{background:linear-gradient(135deg,#0d9488,#1d4ed8);color:#fff;border-color:transparent}
-  .mini-btn.onr:hover{filter:brightness(1.08)}
-  .item .it-onr{background:transparent;border:none;color:#0d9488;font-size:13px;cursor:pointer;padding:2px 5px;border-radius:6px;flex:none}
-  .item .it-onr:hover:not(:disabled){background:rgba(13,148,136,.14)}
-  .item .it-onr:disabled{color:var(--line);cursor:not-allowed}
-  .item .it-onr.enviado{color:#1d4ed8}
-  .onr-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:var(--line);color:var(--faint);margin-left:4px;vertical-align:middle}
-  .onr-badge.env{background:rgba(29,78,216,.16);color:#1d4ed8}
-  /* Matrícula encerrada ("morta") */
-  .item.morto{opacity:.6}
-  .item.morto .nm{text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:var(--faint)}
-  .morto-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(120,130,145,.18);color:#8893a3;margin-left:4px;vertical-align:middle;text-decoration:none}
-  .desmembra-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(13,148,136,.16);color:#0d9488;margin-left:4px;vertical-align:middle;text-decoration:none}
-  .fora-badge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:rgba(226,52,47,.16);color:#e2342f;border:1px solid rgba(226,52,47,.4);margin-left:4px;vertical-align:middle;text-decoration:none}
-  .enc-meta{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:5px;background:rgba(226,52,47,.14);color:#e2342f;border:1px solid rgba(226,52,47,.4);margin-left:6px;vertical-align:middle;text-decoration:none;text-transform:uppercase}
-  .parcial-badge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:rgba(200,136,31,.16);color:var(--amber-text);border:1px solid rgba(200,136,31,.45);margin-left:4px;vertical-align:middle;text-decoration:none}
-  .parcial-line{font-family:var(--mono);font-size:9.5px;color:var(--amber-text);margin-top:3px;line-height:1.35;background:rgba(200,136,31,.08);border-left:2px solid rgba(200,136,31,.5);padding:2px 6px;border-radius:0 4px 4px 0}
-  .item.parcial-mun{box-shadow:inset 3px 0 0 rgba(200,136,31,.55)}
-  .item.fora-mun{box-shadow:inset 3px 0 0 #e2342f}
-  .situacao-edit{margin-top:6px;padding-top:11px;border-top:1px solid var(--line)}
-  /* Multi-entrada de matrículas (chips) */
-  .chips{display:flex;flex-wrap:wrap;gap:5px;min-height:24px;margin-bottom:6px}
-  .chips-vazio{font-family:var(--mono);font-size:10px;color:var(--faint);font-style:italic}
-  .chip{display:inline-flex;align-items:center;gap:5px;background:rgba(13,148,136,.14);color:#0d9488;
-    font-family:var(--mono);font-size:11px;padding:2px 4px 2px 8px;border-radius:6px;border:1px solid rgba(13,148,136,.3)}
-  .chip-x{background:none;border:none;color:#0d9488;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;border-radius:4px}
-  .chip-x:hover{background:rgba(13,148,136,.2)}
-  .chips-add{display:flex;gap:6px}
-  .chips-add input{flex:1}
-  .btn-ghost-sm{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:8px;
-    padding:0 12px;font-size:11px;cursor:pointer;white-space:nowrap}
-  .btn-ghost-sm:hover{border-color:#0d9488;color:#0d9488}
-  /* Lista de proprietários (vários, PF/PJ) */
-  .prop-list{display:flex;flex-direction:column;gap:7px}
-  .prop-row{display:flex;gap:6px;align-items:center}
-  .prop-row .prop-nome{flex:1.3}
-  .prop-doc-wrap{flex:1;position:relative;display:flex;align-items:center}
-  .prop-doc-wrap .prop-doc{width:100%;padding-right:64px}
-  .prop-doc-badge{position:absolute;right:8px;font-family:var(--mono);font-size:8.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);pointer-events:none}
-  .prop-doc-badge.ok{color:#1f9d57}
-  .prop-doc-badge.bad{color:#cf1626}
-  .prop-doc.doc-ok{border-color:rgba(31,157,87,.55)}
-  .prop-doc.doc-bad{border-color:rgba(207,22,38,.6)}
-  .prop-del{flex:none;width:32px;height:34px;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--faint);font-size:16px;line-height:1;cursor:pointer}
-  .prop-del:hover{border-color:#cf1626;color:#cf1626}
-  /* Aviso de matrícula encerrada no cadastro */
-  .enc-info{margin-bottom:11px;padding:10px 12px;border:1px solid rgba(120,130,145,.35);border-left:3px solid #8893a3;border-radius:9px;background:rgba(120,130,145,.10)}
-  .enc-info-h{display:flex;align-items:center;gap:6px;font-family:var(--disp);font-size:12.5px;font-weight:600;color:var(--ink)}
-  .enc-ico{color:#8893a3;font-size:13px}
-  .enc-info-b{margin-top:5px;font-size:11.5px;line-height:1.55;color:var(--ink)}
-  .enc-mut{color:var(--faint);font-family:var(--mono);font-size:9.5px}
-  .enc-info.desmembra{border-color:rgba(13,148,136,.4);border-left-color:#0d9488;background:rgba(13,148,136,.08)}
-  .enc-info.desmembra .enc-ico{color:#0d9488}
-  /* ===== Slider de intensidade ===== */
-  .op-wrap{display:flex;align-items:center;gap:10px;margin-top:11px}
-  .op-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);flex:none}
-  .op-range{-webkit-appearance:none;appearance:none;flex:1;height:5px;border-radius:3px;
-    background:linear-gradient(90deg,var(--line),var(--muted));outline:none;cursor:pointer}
-  .op-range::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--red);
-    border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);cursor:pointer}
-  .op-range::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--red);border:2px solid #fff;cursor:pointer}
-  .cor-pop .op-range{width:100%;margin:2px 0}
-  /* ===== Botão recolher painel ===== */
-  .toggle-panel{position:absolute;top:50%;left:12px;transform:translateY(-50%);z-index:7;width:30px;height:46px;display:flex;align-items:center;justify-content:center;
-    background:var(--ov-bg);border:1px solid var(--line);border-radius:9px;color:var(--ink);cursor:pointer;box-shadow:var(--ov-shadow);backdrop-filter:blur(10px)}
-  .toggle-panel:hover{border-color:var(--red-bright)}
-  .toggle-panel .ic-expand{display:none}
-  body.panel-collapsed .panel{width:0;min-width:0;border-right:none;overflow:hidden;opacity:0;pointer-events:none}
-  body.panel-collapsed .mapeador-shell{grid-template-columns:0 1fr}
-  body.panel-collapsed .toggle-panel .ic-collapse{display:none}
-  body.panel-collapsed .toggle-panel .ic-expand{display:block}
-  /* ===== Modal de edição ===== */
-  .modal-ov{position:fixed;inset:0;z-index:1200;background:rgba(8,12,18,.55);backdrop-filter:blur(3px);
-    display:none;align-items:center;justify-content:center;padding:18px}
-  .swal2-container{z-index:100050 !important}
+
+  /* Popup do mapa acima de tudo */
+  .gm-style .gm-style-iw-c,.gm-style .gm-style-iw-t,.gm-style .gm-style-iw{z-index:99999 !important}
+
+  /* ─── 22. CONTROLES 3D ──────────────────────────────────────────── */
+  .ctrl-3d{position:absolute;top:60px;left:14px;z-index:7;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+  .c3d-btn{display:flex;align-items:center;gap:7px;background:var(--panel);color:var(--ink);
+    border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-weight:700;font-size:13px;
+    box-shadow:var(--sh-1)}
+  .c3d-btn:hover{background:var(--panel-2);border-color:var(--line-2)}
+  .c3d-row{display:flex;gap:5px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:4px;box-shadow:var(--sh-1)}
+  .c3d-mini{background:var(--panel-2);border:none;border-radius:7px;padding:6px 10px;font-size:13px;
+    color:var(--ink);line-height:1}
+  .c3d-mini:hover{background:var(--line)}
+  .c3d-mini.on{background:var(--ink);color:var(--panel);outline:2px solid var(--teal)}
+  .c3d-mini.wide{font-weight:600}
+
+  /* Modal 3D fotorrealista */
+  .modal-3d-card{position:fixed;inset:3vh 3vw;background:#0A0D11;border-radius:var(--r-l);overflow:hidden;
+    display:flex;flex-direction:column;box-shadow:var(--sh-3)}
+  .modal-3d-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#10151C;color:#E8EEF6;
+    border-bottom:1px solid #232E3C;font-family:var(--titles);font-weight:700;font-size:14px}
+  .modal-3d-host{flex:1;min-height:0;position:relative;background:#0A0D11}
+  .modal-3d-host gmp-map-3d,.modal-3d-host .gmp-map-3d{width:100%;height:100%;display:block}
+  .modal-3d-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    text-align:center;padding:24px;color:#C6D2DE;font-size:14px;line-height:1.6}
+  .modal-3d-foot{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;
+    padding:9px 12px;background:#10151C;color:#94A3B8;border-top:1px solid #232E3C;font-size:12px}
+  .modal-3d-foot.alert{color:#FBBF24}
+  .m3d-link{display:inline-flex;align-items:center;gap:5px;background:#243040;color:#E8EEF6;
+    text-decoration:none;border-radius:8px;padding:6px 12px;font-weight:600;font-size:12px}
+  .m3d-link:hover{background:#31445A}
+  .m3d-legend{position:absolute;top:56px;left:12px;z-index:4;background:rgba(9,12,16,.86);
+    border:1px solid #232E3C;border-radius:var(--r);padding:10px 12px;max-width:240px;max-height:62%;
+    overflow:auto;font-size:12px;color:#E8EEF6;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+  .m3d-legend h4{margin:0 0 6px;font-family:var(--titles);font-size:10.5px;font-weight:700;
+    letter-spacing:.07em;text-transform:uppercase;color:#94A3B8}
+  .m3d-legend .row{display:flex;align-items:center;gap:7px;margin:3px 0;line-height:1.2}
+  .m3d-legend .sw{width:13px;height:13px;border-radius:4px;flex:none;border:1px solid rgba(255,255,255,.28)}
+
+  /* Legenda 2D das matrículas */
+  .ov-legend-2d{margin:10px;background:rgba(9,12,16,.88);border:1px solid rgba(255,255,255,.08);
+    border-radius:var(--r);padding:11px 13px;max-width:230px;max-height:52vh;overflow:auto;
+    font-size:12px;color:#E8EEF6;box-shadow:0 12px 30px -14px rgba(0,0,0,.6)}
+  .ov-legend-2d h4{margin:0 0 6px;font-family:var(--titles);font-size:10.5px;font-weight:700;
+    letter-spacing:.07em;text-transform:uppercase;color:#94A3B8}
+  .ov-legend-2d .row{display:flex;align-items:center;gap:7px;margin:3px 0;line-height:1.2}
+  .ov-legend-2d .sw{width:13px;height:13px;border-radius:4px;flex:none;border:1px solid rgba(255,255,255,.28)}
+
+  /* ─── 23. POPUP (InfoWindow) ────────────────────────────────────── */
+  .cor-pop{font-family:var(--disp);min-width:200px;color:#152030}
+  .cor-pop-t{font-size:13px;font-weight:700;line-height:1.25}
+  .cor-pop-sub{font-size:11px;color:#64748B;margin:1px 0 9px}
+  .cor-pop-lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#7C8BA0;margin-bottom:6px}
+  .cor-pop-grid{display:grid;grid-template-columns:repeat(6,22px);gap:6px}
+  .cor-pop .cor-sw{width:22px;height:22px;aspect-ratio:auto;min-height:0}
+  .cor-pop-clear{margin-top:11px;width:100%;font-size:11px;font-weight:600;color:#A81222;
+    background:#fff;border:1px solid #E3E8F0;border-radius:8px;padding:6px}
+  .cor-pop-clear:hover{background:#FBF0F1;border-color:#B01224}
+  .cor-pop-acc{margin-top:2px}
+  .cor-pop-acc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;
+    margin-bottom:0;padding:4px 0;user-select:none}
+  .cor-pop-acc>summary::-webkit-details-marker{display:none}
+  .cor-pop-acc>summary::after{content:'▾';margin-left:auto;font-size:11px;transition:transform .2s}
+  .cor-pop-acc[open]>summary::after{transform:rotate(180deg)}
+  .cor-pop-acc>summary:hover{color:#0E8F80}
+  .ip-box{margin:2px 0 11px;padding:10px 11px;background:#F4F6FA;border:1px solid #E3E8F0;
+    border-radius:9px;display:flex;flex-direction:column;gap:4px}
+  .ip-row{display:flex;gap:8px;font-size:11.5px;line-height:1.4}
+  .ip-k{flex:none;width:78px;color:#7C8BA0;font-family:var(--mono);font-size:9.5px;
+    text-transform:uppercase;letter-spacing:.04em;padding-top:1px}
+  .ip-v{flex:1;color:#152030;font-weight:600;word-break:break-word}
+  .ip-inc{margin-top:9px;padding-top:9px;border-top:1px dashed rgba(0,0,0,.16)}
+  .ip-inc-h{font-size:11.5px;font-weight:700;color:#8A5C07;margin-bottom:6px}
+  .ip-inc-row{display:flex;gap:6px;align-items:flex-start;font-size:11px;line-height:1.4;margin-bottom:4px}
+  .ip-inc-row .inc-msg{color:#1A2330}
+  .ip-inc-btn{margin-top:5px;font-size:11px;font-weight:600;color:#fff;background:var(--red);
+    border:none;border-radius:8px;padding:6px 11px}
+  .ip-inc-btn:hover{background:var(--red-bright)}
+  /* InfoWindow no modo escuro */
+  body.dark-mode .gm-style .gm-style-iw-c,
+  body.dark-mode .gm-style .gm-style-iw-d{background:#111823 !important}
+  body.dark-mode .gm-style .gm-style-iw-d{overflow:auto !important}
+  body.dark-mode .gm-style .gm-style-iw-t::after{background:linear-gradient(45deg,#111823 50%,rgba(0,0,0,0) 51%) !important}
+  body.dark-mode .gm-style .gm-style-iw-tc::after{background:#111823 !important}
+  body.dark-mode .gm-style .gm-style-iw-c button img,
+  body.dark-mode .gm-style .gm-ui-hover-effect img{filter:invert(1) brightness(1.6) !important}
+  body.dark-mode .cor-pop{color:#E8EEF6}
+  body.dark-mode .cor-pop-sub{color:#97A6B8}
+  body.dark-mode .cor-pop-lbl{color:#97A6B8}
+  body.dark-mode .ip-box{background:#18212E;border-color:#243040}
+  body.dark-mode .ip-k{color:#97A6B8}
+  body.dark-mode .ip-v{color:#E8EEF6}
+  body.dark-mode .ip-inc{border-top-color:rgba(255,255,255,.16)}
+  body.dark-mode .ip-inc-h{color:#F0C14B}
+  body.dark-mode .ip-inc-row .inc-msg{color:#CDD6E0}
+  body.dark-mode .ip-inc-row .inc-msg b{color:#fff}
+  body.dark-mode .cor-pop-clear{background:#18212E;border-color:#243040;color:#EF4051}
+  body.dark-mode .cor-pop-clear:hover{background:#2A1A1C;border-color:#B01224}
+
+  /* ─── 24. MODAIS ────────────────────────────────────────────────── */
+  .modal-ov{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;
+    padding:18px;background:color-mix(in srgb, #070B12 58%, transparent);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
   .modal-ov.show{display:flex}
-  .modal-card{width:100%;max-width:440px;background:var(--panel);color:var(--ink);border:1px solid var(--line);
-    border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;animation:modalIn .18s ease;
-    display:flex;flex-direction:column;max-height:calc(100vh - 36px)}
-  @keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
-  .modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line)}
-  .modal-h h3{margin:0;font-size:15px;font-weight:600}
-  .modal-x{background:none;border:none;color:var(--faint);font-size:22px;line-height:1;cursor:pointer}
-  .modal-x:hover{color:var(--red-bright)}
-  .modal-b{padding:18px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+  .swal2-container{z-index:100050 !important}
+  .modal-card{width:100%;max-width:440px;display:flex;flex-direction:column;max-height:calc(100vh - 36px);
+    background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    border-radius:var(--r-xl);overflow:hidden;animation:modalIn .2s cubic-bezier(.2,.9,.3,1.2);
+    box-shadow:var(--sh-3), inset 0 1px 0 rgba(255,255,255,.05)}
+  @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+  .modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .modal-h h3{margin:0;font-family:var(--titles);font-size:15.5px;font-weight:700}
+  .modal-x{background:none;border:none;color:var(--faint);font-size:22px;line-height:1;
+    padding:2px 8px;border-radius:8px}
+  .modal-x:hover{color:var(--red-bright);background:var(--red-soft)}
+  .modal-b{padding:20px;display:flex;flex-direction:column;gap:13px;overflow-y:auto}
   .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .modal-f{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);justify-content:flex-end}
-  .modal-f .btn-primary,.modal-f .btn-ghost{width:auto;padding:9px 16px}
-  /* ===== Modal de edição — largo, responsivo e organizado ===== */
-  #modal-edit .modal-card{max-width:1020px}#modal-edit .modal-b{padding:16px 18px;gap:14px}
-  /* ===== Autotutela registral ===== */
-  .mini-btn.at,.btn-report.at{background:rgba(122,13,22,.10);border:1px solid rgba(122,13,22,.45);color:#7a0d16}
-  body.dark-mode .mini-btn.at,body.dark-mode .btn-report.at{background:rgba(226,52,47,.14);border-color:rgba(226,52,47,.5);color:#ffb4b4}
-  .at-card{max-width:980px}
-  .at-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-  .at-hint{font-size:10.5px;color:var(--muted);font-family:var(--mono)}
-  .at-lista{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto}
-  .at-item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;background:var(--card)}
-  .at-item:hover{border-color:var(--red)}
-  .at-item .at-num{font-family:var(--mono);font-weight:700;font-size:12px;color:var(--ink)}
-  .at-item .at-meta{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
-  .at-fase{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);margin-left:auto;white-space:nowrap}
-  .at-fase.f-aberto,.at-fase.f-relatorio,.at-fase.f-notificacao,.at-fase.f-manifestacao{background:rgba(200,136,31,.16);color:var(--amber-text);border-color:rgba(200,136,31,.4)}
-  .at-fase.f-transacao,.at-fase.f-replica,.at-fase.f-decisao,.at-fase.f-saneamento{background:rgba(31,95,165,.14);color:#2f6fb0;border-color:rgba(31,95,165,.4)}
-  .at-fase.f-encerrado{background:rgba(31,157,87,.16);color:var(--green-text);border-color:rgba(31,157,87,.4)}
-  .at-fase.f-remetido,.at-fase.f-arquivado{background:var(--red-soft);color:var(--red-text);border-color:rgba(168,15,30,.4)}
-  .at-voltar{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0;margin-bottom:10px}
-  .at-steps{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px}
-  .at-steps .st{font-size:9.5px;font-family:var(--mono);padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
-  .at-steps .st.on{background:var(--red);color:#fff;border-color:var(--red)}
-  .at-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
-  .at-f{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;min-width:0}
-  .at-f label{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-  .at-f input,.at-f select,.at-f textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;background:var(--card);color:var(--ink);font-family:inherit}
-  .at-f textarea{resize:vertical;font-family:var(--mono);font-size:11.5px;line-height:1.5}
-  .at-sec{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#7a0d16;font-weight:700;margin:8px 0 8px;border-top:1px dashed var(--line);padding-top:12px}
-  body.dark-mode .at-sec{color:#ffb4b4}
-  .at-partes-box{margin-top:4px}
-  .at-parte{border:1px solid var(--line);border-radius:9px;padding:9px;margin-bottom:8px;background:var(--bg-soft,rgba(127,127,127,.04))}
-  .at-parte-row{display:grid;grid-template-columns:1.4fr 1fr .8fr .8fr;gap:8px;margin-bottom:7px}
-  .at-parte-row2{display:grid;grid-template-columns:auto auto 1.2fr auto;gap:10px;align-items:center}
-  .at-parte input,.at-parte select{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:11.5px;background:var(--card);color:var(--ink)}
-  .at-parte .chk{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);white-space:nowrap}
-  .at-parte .rm{background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;line-height:1}
-  .at-docs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0;padding:10px;border:1px dashed var(--line);border-radius:9px}
-  .at-docs-l{font-size:11px;color:var(--muted);font-family:var(--mono)}
-  .btn-doc{background:rgba(31,95,165,.10);border:1px solid rgba(31,95,165,.4);color:#2f6fb0;border-radius:7px;padding:6px 10px;font-size:11.5px;cursor:pointer}
-  body.dark-mode .btn-doc{background:rgba(90,150,220,.16);color:#9cc4ee;border-color:rgba(90,150,220,.45)}
-  .at-form-foot{display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:12px;border-top:1px solid var(--line)}
-  .at-save-status{font-size:11.5px;color:var(--muted)}.at-save-status.ok{color:#0d9488}.at-save-status.err{color:#e2342f}
-  .btn-mini,.btn-mini-prim{border-radius:8px;padding:8px 13px;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink)}
-  .btn-mini-prim{background:var(--red);color:#fff;border-color:var(--red)}
-  .btn-excluir{background:none;border:1px solid rgba(168,15,30,.4);color:var(--red);border-radius:8px;padding:8px 13px;font-size:12px;cursor:pointer}
-  @media(max-width:760px){.at-grid{grid-template-columns:1fr}.at-parte-row{grid-template-columns:1fr 1fr}.at-parte-row2{grid-template-columns:1fr 1fr}}
-  .at-ia{font-size:10px;border:1px solid rgba(31,95,165,.45);background:rgba(31,95,165,.10);color:#2f6fb0;border-radius:6px;padding:2px 8px;cursor:pointer;margin-left:8px;text-transform:none;letter-spacing:0}
-  .at-ia:disabled{opacity:.55;cursor:default}
-  body.dark-mode .at-ia{background:rgba(90,150,220,.16);color:#9cc4ee;border-color:rgba(90,150,220,.45)}
-  .at-anexos-lista{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
-  .at-parte-anexos{display:flex;flex-direction:column;gap:5px;margin-top:7px}
-  .at-parte-anexos:empty{display:none}
-  .at-anx{display:flex;align-items:center;gap:8px;font-size:11.5px;background:rgba(127,127,127,.07);border:1px solid var(--line);border-radius:7px;padding:5px 9px}
-  .at-anx a{color:var(--ink);text-decoration:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .at-anx-t{font-size:9.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
-  .at-anx-dl{color:#2f6fb0!important;flex:0 0 auto!important}
-  .at-anx-x{background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;line-height:1}
-  .at-up-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-  .at-up-tipo{border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:11px;background:var(--card);color:var(--ink)}
-  /* Dark mode: força fundo escuro e texto claro em TODOS os controles do modal (inclusive as opções das listas suspensas) */
-  body.dark-mode #modal-autotutela select,
-  body.dark-mode #modal-autotutela input,
-  body.dark-mode #modal-autotutela textarea,
-  body.dark-mode #modal-autotutela .at-up-tipo{background:#1c242e !important;color:#e7edf3 !important;border-color:#2c3743 !important}
-  body.dark-mode #modal-autotutela select option{background:#1c242e !important;color:#e7edf3 !important}
-  body.dark-mode #modal-autotutela input::placeholder,
-  body.dark-mode #modal-autotutela textarea::placeholder{color:#7f8b97}
+  .modal-f{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--line);justify-content:flex-end}
+  .modal-f .btn-primary,.modal-f .btn-ghost{width:auto;flex:none;padding:10px 18px}
+  #modal-edit .modal-card{max-width:1020px}
+  #modal-edit .modal-b{padding:16px 20px;gap:14px}
+  #modal-edit .onr-box{margin:0}
+  #modal-edit .onr-accordion{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:none}
+
+  /* Edição em duas colunas */
   .ed-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
   .ed-col{display:flex;flex-direction:column;gap:14px;min-width:0}
-  .ed-section{border:1px solid var(--line);border-radius:12px;background:var(--bg);overflow:hidden}
-  .ed-section>.ed-sec-head{display:flex;align-items:center;gap:8px;padding:10px 13px;background:var(--panel);border-bottom:1px solid var(--line)}
-  .ed-section>.ed-sec-head .ed-sec-ic{display:flex;color:var(--red)}
-  .ed-section>.ed-sec-head h4{margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink)}
+  .ed-section{border:1px solid var(--line);border-radius:var(--r);background:var(--bg);overflow:hidden}
+  .ed-section>.ed-sec-head{display:flex;align-items:center;gap:8px;padding:11px 14px;
+    background:var(--panel);border-bottom:1px solid var(--line)}
+  .ed-section>.ed-sec-head .ed-sec-ic{display:flex;color:var(--red-bright)}
+  .ed-section>.ed-sec-head h4{margin:0;font-family:var(--titles);font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.07em;color:var(--ink)}
   .ed-section>.ed-sec-head .ed-sec-sub{margin-left:auto;font-size:10.5px;color:var(--faint)}
-  .ed-section>.ed-sec-body{padding:13px;display:flex;flex-direction:column;gap:11px}
-  #modal-edit .onr-box{margin:0}
-  #modal-edit .onr-accordion{border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  /* Dropzone de anexos */
-  .ed-drop{border:1.6px dashed var(--line);border-radius:11px;padding:16px 12px;text-align:center;cursor:pointer;
-    transition:.15s;background:var(--panel);color:var(--faint)}
-  .ed-drop:hover,.ed-drop.drag{border-color:var(--red);background:rgba(168,15,30,.05);color:var(--ink)}
-  .ed-drop .ed-drop-ic{display:flex;justify-content:center;margin-bottom:6px;color:var(--red)}
+  .ed-section>.ed-sec-body{padding:14px;display:flex;flex-direction:column;gap:11px}
+  .ed-mapear-hint{margin-bottom:9px;padding:10px 12px;border-radius:var(--r-s);font-size:11.5px;line-height:1.5;
+    background:color-mix(in srgb, var(--blue) 9%, transparent);
+    border:1px solid color-mix(in srgb, var(--blue) 32%, transparent);color:var(--blue)}
+  .ed-geo-box{margin-top:11px;border:1px solid var(--line);border-radius:var(--r);padding:11px}
+  .ed-geo-h{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--faint);margin-bottom:7px}
+  .ed-geo-text{width:100%;min-height:120px;resize:vertical;font-family:var(--mono);font-size:11.5px;
+    line-height:1.5;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+    border-radius:9px;padding:10px 11px;box-sizing:border-box}
+  .ed-geo-acts{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap}
+  .ed-geo-status{font-size:11px;color:var(--faint)}
+  .ed-geo-status.ok{color:var(--teal)}
+  .ed-geo-status.err{color:var(--red-bright)}
+
+  /* Dropzone de anexos + lista */
+  .ed-drop{border:1.6px dashed var(--line-2);border-radius:var(--r);padding:18px 12px;text-align:center;
+    cursor:pointer;transition:.15s;background:var(--panel);color:var(--faint)}
+  .ed-drop:hover,.ed-drop.drag{border-color:var(--red-bright);
+    background:color-mix(in srgb, var(--red-bright) 4%, var(--panel));color:var(--ink)}
+  .ed-drop .ed-drop-ic{display:flex;justify-content:center;margin-bottom:6px;color:var(--red-bright)}
   .ed-drop b{color:var(--ink)}
   .ed-drop small{display:block;margin-top:3px;font-size:10.5px}
-  .ed-drop-opts{display:flex;align-items:center;gap:7px;justify-content:center;margin-top:9px;font-size:11.5px;color:var(--ink)}
-  .ed-drop-opts input{accent-color:var(--red)}
-  /* Lista de anexos */
+  .ed-drop-opts{display:flex;align-items:center;gap:7px;justify-content:center;margin-top:10px;
+    font-size:11.5px;color:var(--ink)}
+  .ed-drop-opts input{accent-color:var(--red-bright)}
+  .ed-drop.busy{opacity:.6;border-style:solid;cursor:not-allowed}
   .anx-list{display:flex;flex-direction:column;gap:8px}
   .anx-empty{font-size:11.5px;color:var(--faint);padding:4px 2px}
-  .anx-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--panel)}
-  .anx-ic{flex:0 0 30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
-  .anx-ic.pdf_matricula{background:#a80f1e}.anx-ic.pdf_sigef{background:#1f7a4d}.anx-ic.kml{background:#2563eb}.anx-ic.outro{background:#6b7280}
+  .anx-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);
+    border-radius:var(--r-s);padding:9px 11px;background:var(--panel)}
+  .anx-ic{flex:0 0 32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-size:9.5px;font-weight:800;color:#fff;letter-spacing:.02em}
+  .anx-ic.pdf_matricula{background:linear-gradient(150deg,var(--red-bright),var(--red-deep))}
+  .anx-ic.pdf_sigef{background:linear-gradient(150deg,#1F9D57,#136B3C)}
+  .anx-ic.kml{background:linear-gradient(150deg,#3B82F6,#1D4ED8)}
+  .anx-ic.outro{background:linear-gradient(150deg,#8A94A5,#5B6675)}
   .anx-meta{flex:1;min-width:0}
   .anx-nome{font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .anx-sub{font-size:10px;color:var(--faint);margin-top:1px}
   .anx-acts{display:flex;gap:4px;flex:0 0 auto}
-  .anx-btn{width:30px;height:30px;border:1px solid var(--line);background:var(--bg);color:var(--faint);border-radius:8px;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;transition:.15s}
-  .anx-btn:hover{color:var(--ink);border-color:var(--red)}
-  .anx-btn.danger:hover{color:#fff;background:var(--red);border-color:var(--red)}
+  .anx-btn{width:31px;height:31px;border:1px solid var(--line);background:var(--panel-2);color:var(--faint);
+    border-radius:8px;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .anx-btn:hover{color:var(--ink);border-color:var(--line-2);background:var(--panel)}
+  .anx-btn.danger:hover{color:#fff;background:var(--red-bright);border-color:var(--red-bright)}
   .anx-btn[disabled]{opacity:.45;cursor:default}
-  /* feedback de processamento DENTRO do modal (antes ficava só na barra atrás do modal) */
-  .ed-drop.busy{opacity:.6;border-style:solid;cursor:not-allowed}
-  .ed-mapear-hint{background:rgba(31,95,165,.10);border:1px solid rgba(31,95,165,.35);color:#1f5fa5;border-radius:9px;padding:9px 11px;font-size:11.5px;line-height:1.45;margin-bottom:9px}
-  .ed-geo-box{margin-top:11px;border:1px solid var(--line);border-radius:10px;padding:10px}
-  .ed-geo-h{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:#9aa6b2;margin-bottom:7px}
-  .ed-geo-text{width:100%;min-height:120px;resize:vertical;font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--ink);background:var(--card,#fff);border:1px solid var(--line);border-radius:8px;padding:9px 10px;box-sizing:border-box}
-  .ed-geo-acts{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
-  .ed-geo-status{font-size:11px;color:#9aa6b2}
-  .ed-geo-status.ok{color:#0d9488}.ed-geo-status.err{color:#e2342f}
-  body.dark-mode .ed-geo-text{background:#1c242e;border-color:#283038;color:#e7edf3}
-  .anx-busy{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;font-size:12px;
+  .anx-busy{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:var(--r-s);font-size:12px;
     border:1px solid var(--line);background:var(--panel);color:var(--ink)}
-  .anx-busy.work{border-color:rgba(168,15,30,.4);background:rgba(168,15,30,.06)}
-  .anx-busy.warn{border-color:#caa700;background:rgba(202,167,0,.10)}
-  .anx-busy.ok{border-color:rgba(19,105,63,.45);background:rgba(19,105,63,.08)}
-  .anx-spin{flex:0 0 16px;width:16px;height:16px;border-radius:50%;border:2.5px solid rgba(168,15,30,.25);
-    border-top-color:var(--red);animation:anxspin .7s linear infinite}
+  .anx-busy.work{border-color:color-mix(in srgb, var(--red-bright) 38%, transparent);
+    background:color-mix(in srgb, var(--red-bright) 5%, transparent)}
+  .anx-busy.warn{border-color:color-mix(in srgb, var(--amber) 55%, transparent);
+    background:color-mix(in srgb, var(--amber) 9%, transparent)}
+  .anx-busy.ok{border-color:color-mix(in srgb, var(--green) 45%, transparent);
+    background:color-mix(in srgb, var(--green) 7%, transparent)}
+  .anx-spin{flex:0 0 16px;width:16px;height:16px;border-radius:50%;
+    border:2.5px solid color-mix(in srgb, var(--red-bright) 25%, transparent);
+    border-top-color:var(--red-bright);animation:anxspin .7s linear infinite}
   @keyframes anxspin{to{transform:rotate(360deg)}}
   .anx-busy.shake{animation:anxshake .4s ease}
   @keyframes anxshake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
-  @media (max-width:820px){ .ed-grid{grid-template-columns:1fr} }
-  /* ===== Overlay de progresso da importação ===== */
+
+  /* ─── 25. OVERLAY DE IMPORTAÇÃO ─────────────────────────────────── */
   .import-ov{position:fixed;inset:0;z-index:100040;display:none;align-items:center;justify-content:center;
-    background:rgba(8,12,18,.62);backdrop-filter:blur(3px)}
+    background:color-mix(in srgb, #070B12 62%, transparent);
+    -webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
   .import-ov.show{display:flex}
-  .import-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px 30px;text-align:center;
-    box-shadow:0 24px 70px rgba(0,0,0,.5);min-width:260px}
-  .import-ttl{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:16px;letter-spacing:.2px}
+  .import-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-xl);
+    padding:28px 34px;text-align:center;box-shadow:var(--sh-3);min-width:270px}
+  .import-ttl{font-family:var(--titles);font-size:13.5px;font-weight:700;color:var(--ink);
+    margin-bottom:18px;letter-spacing:.01em}
   .import-ring{position:relative;width:120px;height:120px;margin:0 auto}
   .import-ring svg{transform:rotate(-90deg)}
   .import-ring .ring-bg{fill:none;stroke:var(--line);stroke-width:9}
-  .import-ring .ring-fg{fill:none;stroke:var(--red);stroke-width:9;stroke-linecap:round;
+  .import-ring .ring-fg{fill:none;stroke:var(--red-bright);stroke-width:9;stroke-linecap:round;
     stroke-dasharray:326.7;stroke-dashoffset:326.7;transition:stroke-dashoffset .3s ease}
-  .import-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:var(--ink)}
-  .import-meta{margin-top:14px;font-size:12px;color:var(--faint)}
-  .import-file{margin-top:4px;font-size:11.5px;color:var(--ink);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)}
+  .import-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:var(--titles);font-size:24px;font-weight:700;color:var(--ink)}
+  .import-meta{margin-top:15px;font-size:12px;color:var(--faint)}
+  .import-file{margin-top:4px;font-size:11.5px;color:var(--ink);max-width:300px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)}
   @keyframes import-spin{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
   .import-ov.indet .import-ring svg{animation:import-spin .9s linear infinite}
   .import-ov.indet .import-ring .ring-fg{transition:none}
   .import-ov.indet .import-pct{font-size:0}
-  /* ===== Modal de resultados da importação ===== */
+
+  /* Resultados da importação */
   .impres-resumo{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-  .impres-chip{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid var(--line)}
-  .impres-chip.ok{color:#13693f;background:rgba(19,105,63,.10);border-color:rgba(19,105,63,.3)}
-  .impres-chip.dup{color:#1f5fa5;background:rgba(31,95,165,.10);border-color:rgba(31,95,165,.3)}
-  .impres-chip.err{color:#a80f1e;background:rgba(168,15,30,.10);border-color:rgba(168,15,30,.3)}
-  .impres-chip.warn{color:#8a6d00;background:rgba(202,167,0,.12);border-color:rgba(202,167,0,.35)}
+  .impres-chip{font-size:11.5px;font-weight:650;padding:5px 12px;border-radius:99px;border:1px solid var(--line)}
+  .impres-chip.ok{color:var(--green-text);background:color-mix(in srgb, var(--green) 9%, transparent);
+    border-color:color-mix(in srgb, var(--green) 30%, transparent)}
+  .impres-chip.dup{color:var(--blue);background:color-mix(in srgb, var(--blue) 9%, transparent);
+    border-color:color-mix(in srgb, var(--blue) 30%, transparent)}
+  .impres-chip.err{color:var(--red-text);background:var(--red-soft);
+    border-color:color-mix(in srgb, var(--red-bright) 30%, transparent)}
+  .impres-chip.warn{color:var(--amber-text);background:color-mix(in srgb, var(--amber) 11%, transparent);
+    border-color:color-mix(in srgb, var(--amber) 35%, transparent)}
   .impres-list{display:flex;flex-direction:column;gap:8px}
-  .impres-item{border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:var(--panel)}
+  .impres-item{border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;background:var(--panel)}
   .impres-row1{display:flex;align-items:center;gap:9px}
-  .impres-ic{flex:0 0 22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff}
-  .impres-ic.criado{background:#13693f}.impres-ic.duplicado{background:#1f5fa5}.impres-ic.erro{background:#a80f1e}
-  .impres-nome{font-size:12.5px;font-weight:600;color:var(--ink)}
-  .impres-st{margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--faint)}
-  .impres-dest{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid var(--line);white-space:nowrap}
-  .impres-dest.mapa{color:#13693f;background:rgba(19,105,63,.10);border-color:rgba(19,105,63,.30)}
-  .impres-dest.itn{color:#4636a8;background:rgba(70,54,168,.10);border-color:rgba(70,54,168,.30)}
-  .impres-msg{font-size:11px;color:var(--faint);margin-top:3px;margin-left:31px}
-  .impres-inc{margin:7px 0 0 31px;display:flex;flex-direction:column;gap:4px}
-  .impres-inc .inc-line{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.4}
-  .inc-tag{flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:.4px;padding:1px 6px;border-radius:5px;margin-top:1px}
-  .inc-tag.erro{background:rgba(168,15,30,.14);color:#a80f1e}
-  .inc-tag.alerta{background:rgba(202,167,0,.16);color:#8a6d00}
-  .inc-tag.info{background:rgba(31,95,165,.14);color:#1f5fa5}
+  .impres-ic{flex:0 0 23px;height:23px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:800;color:#fff}
+  .impres-ic.criado{background:var(--green)}
+  .impres-ic.duplicado{background:var(--blue)}
+  .impres-ic.erro{background:var(--red)}
+  .impres-nome{font-size:12.5px;font-weight:650;color:var(--ink)}
+  .impres-st{margin-left:auto;font-size:9.5px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--faint)}
+  .impres-dest{font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:99px;
+    border:1px solid var(--line);white-space:nowrap}
+  .impres-dest.mapa{color:var(--green-text);background:color-mix(in srgb, var(--green) 9%, transparent);
+    border-color:color-mix(in srgb, var(--green) 30%, transparent)}
+  .impres-dest.itn{color:var(--violet);background:color-mix(in srgb, var(--violet) 9%, transparent);
+    border-color:color-mix(in srgb, var(--violet) 30%, transparent)}
+  .impres-msg{font-size:11px;color:var(--faint);margin-top:3px;margin-left:32px}
+  .impres-inc{margin:7px 0 0 32px;display:flex;flex-direction:column;gap:4px}
+  .impres-inc .inc-line{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.45}
+  .inc-tag{flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:.04em;padding:1px 7px;
+    border-radius:99px;margin-top:1px}
+  .inc-tag.erro{background:var(--red-soft);color:var(--red-text)}
+  .inc-tag.alerta{background:color-mix(in srgb, var(--amber) 14%, transparent);color:var(--amber-text)}
+  .inc-tag.info{background:color-mix(in srgb, var(--blue) 12%, transparent);color:var(--blue)}
   .impres-inc .inc-msg{color:var(--ink)}
-  .impres-relrow{display:flex;flex-wrap:wrap;gap:7px;margin:9px 0 0 31px}
-  .impres-relrow .mini-rel{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink,#374151);background:var(--card,#fff);border:1px solid var(--line,#d8dee6);border-radius:7px;padding:5px 10px;cursor:pointer;text-decoration:none;line-height:1;transition:.15s}
-  .impres-relrow .mini-rel:hover{border-color:var(--brand,#0d9488);color:var(--brand,#0d9488);background:rgba(13,148,136,.07)}
-  .impres-relrow .mini-rel.vermapa{background:var(--brand,#0d9488);border-color:var(--brand,#0d9488);color:#fff}
-  .impres-relrow .mini-rel.vermapa:hover{background:var(--brand,#0d9488);color:#fff;filter:brightness(1.07)}
-  /* badge de inconsistência na lista */
-  .inc-badge{display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:800;letter-spacing:.3px;
-    padding:1px 6px;border-radius:10px;background:rgba(202,167,0,.16);color:#8a6d00;border:1px solid rgba(202,167,0,.4);cursor:pointer;vertical-align:middle}
-  .inc-badge:hover{background:rgba(202,167,0,.28)}
-  /* bloco de inconsistências no InfoWindow do mapa */
-  .ip-inc{margin-top:9px;padding-top:9px;border-top:1px dashed rgba(0,0,0,.18)}
-  .ip-inc-h{font-size:11.5px;font-weight:700;color:#8a6d00;margin-bottom:6px}
-  .ip-inc-row{display:flex;gap:6px;align-items:flex-start;font-size:11px;line-height:1.4;margin-bottom:4px}
-  .ip-inc-row .inc-msg{color:#1a2330}
-  .ip-inc-btn{margin-top:5px;font-size:11px;font-weight:600;color:#fff;background:var(--red);border:none;border-radius:7px;padding:5px 10px;cursor:pointer}
-  .ip-inc-btn:hover{background:var(--red-bright)}
-  /* ===== FAB + backdrop (mobile) ===== */
-  .fab-panel{display:none;position:fixed;right:16px;bottom:92px;z-index:1100;width:52px;height:52px;border-radius:50%;
-    background:var(--red);color:#fff;border:none;box-shadow:0 6px 20px rgba(168,15,30,.45);cursor:pointer;align-items:center;justify-content:center}
-  .panel-backdrop{display:none;position:fixed;inset:0;z-index:899;background:rgba(8,12,18,.5)}
-  body.panel-open .panel-backdrop{display:block}
-  /* ===== Responsivo ===== */
+  .impres-relrow{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0 0 32px}
+  .impres-relrow .mini-rel{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+    color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:6px 11px;cursor:pointer;text-decoration:none;line-height:1;transition:.15s}
+  .impres-relrow .mini-rel:hover{border-color:var(--teal);color:var(--teal);
+    background:color-mix(in srgb, var(--teal) 6%, transparent)}
+  .impres-relrow .mini-rel.vermapa{background:var(--teal);border-color:var(--teal);color:#fff}
+  .impres-relrow .mini-rel.vermapa:hover{filter:brightness(1.07);color:#fff}
+
+  /* ─── 26. AUTOTUTELA REGISTRAL ──────────────────────────────────── */
+  .mini-btn.at,.btn-report.at{background:color-mix(in srgb, var(--red-deep) 9%, transparent);
+    border:1px solid color-mix(in srgb, var(--red-deep) 42%, transparent);
+    color:var(--red-text);box-shadow:none}
+  .mini-btn.at:hover,.btn-report.at:hover{background:color-mix(in srgb, var(--red-deep) 16%, transparent);filter:none}
+  .at-card{max-width:980px}
+  .at-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .at-hint{font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+  .at-lista{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto}
+  .at-item{border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;cursor:pointer;
+    display:flex;gap:10px;align-items:flex-start;background:var(--panel);
+    transition:border-color .15s,box-shadow .15s}
+  .at-item:hover{border-color:color-mix(in srgb, var(--red-bright) 45%, var(--line));box-shadow:var(--sh-1)}
+  .at-item .at-num{font-family:var(--mono);font-weight:700;font-size:12px;color:var(--ink)}
+  .at-item .at-meta{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.45}
+  .at-fase{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.04em;padding:3px 9px;border-radius:99px;border:1px solid var(--line);
+    margin-left:auto;white-space:nowrap}
+  .at-fase.f-aberto,.at-fase.f-relatorio,.at-fase.f-notificacao,.at-fase.f-manifestacao{
+    background:color-mix(in srgb, var(--amber) 13%, transparent);color:var(--amber-text);
+    border-color:color-mix(in srgb, var(--amber) 40%, transparent)}
+  .at-fase.f-transacao,.at-fase.f-replica,.at-fase.f-decisao,.at-fase.f-saneamento{
+    background:color-mix(in srgb, var(--blue) 11%, transparent);color:var(--blue);
+    border-color:color-mix(in srgb, var(--blue) 40%, transparent)}
+  .at-fase.f-encerrado{background:color-mix(in srgb, var(--green) 13%, transparent);
+    color:var(--green-text);border-color:color-mix(in srgb, var(--green) 40%, transparent)}
+  .at-fase.f-remetido,.at-fase.f-arquivado{background:var(--red-soft);color:var(--red-text);
+    border-color:color-mix(in srgb, var(--red-bright) 40%, transparent)}
+  .at-voltar{background:none;border:none;color:var(--red-bright);cursor:pointer;font-size:12px;
+    font-weight:600;padding:0;margin-bottom:10px}
+  .at-steps{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px}
+  .at-steps .st{font-size:9.5px;font-family:var(--mono);padding:4px 10px;border-radius:99px;
+    border:1px solid var(--line);color:var(--muted)}
+  .at-steps .st.on{background:var(--red-bright);color:#fff;border-color:var(--red-bright)}
+  .at-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+  .at-f{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;min-width:0}
+  .at-f label{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .at-f input,.at-f select,.at-f textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);
+    border-radius:9px;padding:9px 11px;font-size:12.5px;background:var(--panel);color:var(--ink);font-family:inherit}
+  .at-f textarea{resize:vertical;font-family:var(--mono);font-size:11.5px;line-height:1.5}
+  .at-sec{font-family:var(--titles);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--red-text);font-weight:700;margin:8px 0;border-top:1px dashed var(--line);padding-top:12px}
+  .at-partes-box{margin-top:4px}
+  .at-parte{border:1px solid var(--line);border-radius:var(--r-s);padding:10px;margin-bottom:8px;
+    background:var(--panel-2)}
+  .at-parte-row{display:grid;grid-template-columns:1.4fr 1fr .8fr .8fr;gap:8px;margin-bottom:7px}
+  .at-parte-row2{display:grid;grid-template-columns:auto auto 1.2fr auto;gap:10px;align-items:center}
+  .at-parte input,.at-parte select{width:100%;box-sizing:border-box;border:1px solid var(--line);
+    border-radius:8px;padding:7px 9px;font-size:11.5px;background:var(--panel);color:var(--ink)}
+  .at-parte .chk{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);white-space:nowrap}
+  .at-parte .rm{background:none;border:none;color:var(--red-bright);cursor:pointer;font-size:16px;line-height:1;
+    padding:2px 6px;border-radius:7px}
+  .at-parte .rm:hover{background:var(--red-soft)}
+  .at-docs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0;padding:11px;
+    border:1px dashed var(--line-2);border-radius:var(--r-s)}
+  .at-docs-l{font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .btn-doc{background:color-mix(in srgb, var(--blue) 9%, transparent);
+    border:1px solid color-mix(in srgb, var(--blue) 38%, transparent);color:var(--blue);
+    border-radius:8px;padding:6px 11px;font-size:11.5px;font-weight:600}
+  .btn-doc:hover{background:color-mix(in srgb, var(--blue) 15%, transparent)}
+  .at-form-foot{display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:12px;border-top:1px solid var(--line)}
+  .at-save-status{font-size:11.5px;color:var(--muted)}
+  .at-save-status.ok{color:var(--teal)}
+  .at-save-status.err{color:var(--red-bright)}
+  .at-ia{font-size:10px;border:1px solid color-mix(in srgb, var(--blue) 42%, transparent);
+    background:color-mix(in srgb, var(--blue) 9%, transparent);color:var(--blue);
+    border-radius:7px;padding:3px 9px;font-weight:600;margin-left:8px;text-transform:none;letter-spacing:0}
+  .at-ia:disabled{opacity:.55;cursor:default}
+  .at-anexos-lista{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+  .at-parte-anexos{display:flex;flex-direction:column;gap:5px;margin-top:7px}
+  .at-parte-anexos:empty{display:none}
+  .at-anx{display:flex;align-items:center;gap:8px;font-size:11.5px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+  .at-anx a{color:var(--ink);text-decoration:none;flex:1;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .at-anx-t{font-size:9.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+  .at-anx-dl{color:var(--blue)!important;flex:0 0 auto!important}
+  .at-anx-x{background:none;border:none;color:var(--red-bright);cursor:pointer;font-size:13px;line-height:1;
+    padding:2px 5px;border-radius:6px}
+  .at-anx-x:hover{background:var(--red-soft)}
+  .at-up-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .at-up-tipo{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:11px;
+    background:var(--panel);color:var(--ink)}
+  body.dark-mode #modal-autotutela select,
+  body.dark-mode #modal-autotutela input,
+  body.dark-mode #modal-autotutela textarea,
+  body.dark-mode #modal-autotutela .at-up-tipo{background:#18212E !important;color:#E8EEF6 !important;border-color:#2C3947 !important}
+  body.dark-mode #modal-autotutela select option{background:#18212E !important;color:#E8EEF6 !important}
+  body.dark-mode #modal-autotutela input::placeholder,
+  body.dark-mode #modal-autotutela textarea::placeholder{color:#7F8B97}
+
+  /* ─── 27. SWEETALERT2 (tema Vertex) ─────────────────────────────── */
+  .swal2-popup{border-radius:var(--r-xl) !important;font-family:var(--disp) !important;
+    box-shadow:var(--sh-3) !important}
+  .swal2-title{font-family:var(--titles) !important;font-weight:700 !important;font-size:19px !important}
+  .swal2-styled.swal2-confirm{border-radius:10px !important;font-weight:650 !important;
+    background:linear-gradient(160deg, var(--red-bright), var(--red)) !important;
+    box-shadow:0 8px 20px -10px color-mix(in srgb, var(--red-bright) 65%, transparent) !important}
+  .swal2-styled.swal2-cancel,.swal2-styled.swal2-deny{border-radius:10px !important;font-weight:600 !important}
+  .swal2-input,.swal2-select,.swal2-textarea{border-radius:10px !important;font-size:13px !important}
+  .swal2-input:focus,.swal2-select:focus,.swal2-textarea:focus{
+    border-color:var(--red-bright) !important;box-shadow:var(--ring) !important}
+  body.dark-mode .swal2-popup{background:#111823 !important;color:#E8EEF6 !important;
+    border:1px solid #243040}
+  body.dark-mode .swal2-title,body.dark-mode .swal2-html-container{color:#E8EEF6 !important}
+  body.dark-mode .swal2-input,body.dark-mode .swal2-select,body.dark-mode .swal2-textarea{
+    background:#18212E !important;color:#E8EEF6 !important;border-color:#2C3947 !important}
+  body.dark-mode .swal2-select option{background:#18212E;color:#E8EEF6}
+
+  /* ─── 27b. INTEGRAÇÃO DOS ÍCONES NOS COMPONENTES ───────────────── */
+  .mini-btn .ic{width:13.5px;height:13.5px}
+  .c3d-btn,.c3d-mini{display:inline-flex;align-items:center;gap:7px}
+  .c3d-btn .ic{width:15px;height:15px}
+  .c3d-mini .ic{width:13px;height:13px}
+  .ov-close{display:grid;place-items:center}
+  .ov-close .ic{width:14px;height:14px}
+  .btn-itn03 .ic{width:14px;height:14px;margin-right:6px}
+  .btn-report .ic{width:13px;height:13px;margin-right:6px}
+  .btn-report{display:inline-flex;align-items:center;justify-content:center}
+  .btn-itn03{display:inline-flex;align-items:center;justify-content:center}
+  .cfg-link .ic{width:13px;height:13px}
+  .btn-save .ic,.btn-ghost .ic,.btn-primary .ic{width:14px;height:14px;margin-right:7px}
+  .vx-act-btn,.vx-act-btn2{display:inline-flex;align-items:center;justify-content:center}
+  .vx-sub-title .ic{width:15px;height:15px;vertical-align:-3px;margin-right:8px;color:var(--teal)}
+  .saved-actions .mini-btn{display:inline-flex;align-items:center}
+
+  /* Distribuição da grade de formulário em telas largas */
+  @media (min-width:1100px){
+    .form-grid{grid-template-columns:repeat(3,1fr)}
+    .form-grid .fld.grid-2{grid-column:span 2}
+  }
+
+  /* "Como funciona" como passo a passo numerado */
+  .vx-flow ol{list-style:none;counter-reset:vxs;padding-left:0;margin:10px 0 0}
+  .vx-flow li{counter-increment:vxs;position:relative;padding:3px 0 3px 34px;margin:9px 0}
+  .vx-flow li::before{content:counter(vxs);position:absolute;left:0;top:1px;width:22px;height:22px;
+    border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:700;
+    color:var(--red-bright);background:var(--red-soft);
+    border:1px solid color-mix(in srgb, var(--red-bright) 25%, transparent)}
+
+  /* ─── 28. RESPONSIVO ────────────────────────────────────────────── */
+  @media (max-width:1100px){
+    .vx-top{gap:12px;padding:9px 14px 8px}
+    .vx-tabs{padding:0 8px}
+    .vx-tab{padding:10px 12px 12px;font-size:12.5px}
+  }
   @media (max-width:880px){
-    .mapeador-shell{grid-template-columns:1fr}
-    .panel{position:fixed;top:var(--header-height,60px);bottom:0;left:0;width:88%;max-width:380px;z-index:900;
-      transform:translateX(-102%);transition:transform .28s ease;border-right:1px solid var(--line);box-shadow:6px 0 30px rgba(0,0,0,.3)}
+    /* O palco encolhe para dar lugar à navegação inferior fixa */
+    .mapeador-shell{grid-template-columns:none;
+      bottom:calc(60px + env(safe-area-inset-bottom,0px))}
+    .panel{position:relative;top:auto;bottom:auto;left:auto;width:100%;max-width:none;transform:none;z-index:20}
     body.panel-open .panel{transform:none}
-    body.panel-collapsed .mapeador-shell{grid-template-columns:1fr}
-    .fab-panel{display:flex}
-    .toggle-panel{display:none}
+
+    .vx-top{gap:10px;padding:8px 12px}
+    .brand p{display:none}
+    .brand h1{font-size:15px}
+    .mark{width:32px;height:32px;border-radius:10px}
+    .mark svg{width:17px;height:17px}
+    .quick-actions .mini-btn span{display:none}
+    .quick-actions .mini-btn{width:38px;height:38px;padding:0;border-radius:11px}
+    .quick-actions .mini-btn .ic{width:16px;height:16px}
+    .back-atlas span{display:none}
+    .back-atlas{width:38px;height:38px;padding:0;border-radius:11px}
+    .back-atlas .ic{width:15px;height:15px}
+
+    /* Navegação inferior fixa (estilo app nativo) */
+    .vx-tabs{position:fixed;left:0;right:0;bottom:0;z-index:890;margin:0;border-top:1px solid var(--line);
+      height:calc(60px + env(safe-area-inset-bottom,0px));
+      padding:5px 6px calc(5px + env(safe-area-inset-bottom,0px));
+      display:grid;grid-template-columns:repeat(6,1fr);gap:2px;
+      background:color-mix(in srgb, var(--panel) 93%, transparent);
+      -webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);
+      box-shadow:0 -8px 22px -14px rgba(10,16,24,.4)}
+    .vx-tab{flex-direction:column;gap:3px;justify-content:center;align-items:center;
+      padding:4px 2px;border-radius:10px;font-size:9.5px;font-weight:600;min-width:0}
+    .vx-tab span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+    .vx-tab .ic{width:19px;height:19px}
+    .vx-tab:hover{background:transparent}
+    .vx-tab.active{background:var(--red-soft);color:var(--red-deep)}
+    .vx-tab.active .ic{color:currentColor}
+    .vx-tab.active::after{display:none}
+    body.dark-mode .vx-tab.active{background:color-mix(in srgb, var(--red-bright) 16%, transparent);
+      color:var(--red-bright)}
+
+    .vx-pane{padding:16px 14px calc(16px + var(--vx-bottombar,0px))}
+    .vx-pane[data-pane="imoveis"] .saved-head,.imoveis-sticky,
+    .vx-pane[data-pane="imoveis"] #saved-list{padding-left:14px;padding-right:14px}
+    .vx-pane-head{gap:11px;margin-bottom:16px}
+    .vx-ph-ic{width:34px;height:34px;border-radius:10px}
+    .vx-ph-ic .ic{width:16px;height:16px}
+    .vx-ph-tx h2{font-size:15.5px}
+    .vx-actions{grid-template-columns:1fr}
+    .ed-grid{grid-template-columns:1fr}
+    .at-grid{grid-template-columns:1fr}
+    .at-parte-row{grid-template-columns:1fr 1fr}
+    .at-parte-row2{grid-template-columns:1fr 1fr}
+    .overview-panel{width:min(300px, calc(100vw - 28px))}
+    .kml-panel{width:min(328px, calc(100vw - 28px))}
+    .ed-stats{grid-template-columns:1fr 1fr}
+    /* Alvos de toque maiores */
+    .mini-btn{padding:9px 13px}
+    .item{padding:12px 13px}
+  }
+  @media (max-width:520px){
+    .base-toggle .bt-btn span{display:none}
+    .base-toggle .bt-btn{padding:8px 12px}
+    .base-toggle .bt-btn .ic{width:15px;height:15px}
+    .dropzone{padding:32px 16px}
+    .form-grid{grid-template-columns:1fr}
+    .row{grid-template-columns:1fr}
+    .modal-row{grid-template-columns:1fr}
+    .stats{grid-template-columns:1fr 1fr}
+    .sel-bar{bottom:70px;gap:8px;padding:8px 10px 8px 14px;max-width:calc(100vw - 20px)}
+    .sel-rep{padding:8px 11px;font-size:11.5px}
+    .muni-badge{max-width:calc(100vw - 28px);font-size:11px}
+    .modal-f{flex-wrap:wrap}
+    .modal-f .btn-primary,.modal-f .btn-ghost{flex:1}
   }
   @media (max-width:420px){
-    .fab-panel{bottom:84px;right:14px}
-    .modal-row{grid-template-columns:1fr}
+    .vx-tab span{display:none}
+    .vx-tab .ic{width:21px;height:21px}
+    .modal-ov{padding:10px}
+    .import-card{padding:22px 20px;min-width:0;width:calc(100vw - 40px)}
+    .kml-row .inp{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.001s !important;transition-duration:.001s !important}
+    .vx-pane{animation:none}
+    #saved-list .item:hover,.item:hover,.vx-act-card:hover,.dropzone.drag{transform:none}
   }
 </style>
 </head>
@@ -6070,36 +6622,184 @@ header('Expires: 0');
   })();
 </script>
 <div class="mapeador-shell">
+  <!-- Sprite de ícones da interface (stroke 2, estilo Lucide) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-map" viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></symbol>
+    <symbol id="i-arch" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></symbol>
+    <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M2 12l10-10 10 10-10 10z"/><path d="M7 12l2.5 2.5"/><path d="M12 7l2.5 2.5"/><path d="M9.5 9.5l2 2"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></symbol>
+    <symbol id="i-tilt" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M5 7l7-4 7 4"/><path d="M5 7l-3 7a3.5 3.5 0 0 0 6 0z"/><path d="M19 7l-3 7a3.5 3.5 0 0 0 6 0z"/><path d="M8 21h8"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  </svg>
   <div class="panel">
-    <div class="head">
-      <div class="brand">
-        <div class="mark">
-          <svg viewBox="0 0 24 24" fill="#fff" stroke="none">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>
-          </svg>
+    <!-- ===== Barra de comando (2 níveis: contexto em cima, navegação embaixo) ===== -->
+    <div class="vx-bar">
+      <div class="vx-top">
+        <div class="brand">
+          <div class="mark">
+            <svg viewBox="0 0 24 24" fill="#fff" stroke="none">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+            </svg>
+          </div>
+          <div>
+            <h1>Vertex</h1>
+            <p>GMS · Google Maps · Atlas</p>
+          </div>
         </div>
-        <div>
-          <h1>Vertex</h1>
-          <p>GMS · Google Maps · Atlas</p>
+        <div class="base-toggle" id="base-toggle" title="Alterna entre a base de matrículas e a base de projetos (projetos = imóveis ainda sem matrícula)">
+          <button type="button" class="bt-btn active" data-base="matriculas"><svg class="ic"><use href="#i-arch"/></svg><span>Matrículas</span></button>
+          <button type="button" class="bt-btn" data-base="projetos"><svg class="ic"><use href="#i-ruler"/></svg><span>Projetos</span></button>
+        </div>
+        <div class="vx-top-r">
+          <div class="quick-actions">
+            <button class="mini-btn" id="btn-todos" title="Ver todos os imóveis no mapa"><svg class="ic"><use href="#i-eye"/></svg><span>Ver todos</span></button>
+            <button class="mini-btn active" id="btn-rotulos" title="Rótulos ocultos — passe o mouse sobre o imóvel para ver a matrícula"><svg class="ic"><use href="#i-tag"/></svg><span>Mostrar rótulos</span></button>
+          </div>
+          <a href="../index.php" class="back-atlas" title="Voltar ao Atlas"><svg class="ic"><use href="#i-back"/></svg><span>Atlas</span></a>
         </div>
       </div>
-      <a href="../index.php" class="back-atlas" title="Voltar ao Atlas">← Atlas</a>
+      <nav class="vx-tabs" id="vx-tabs" role="tablist">
+        <button type="button" class="vx-tab active" data-tab="mapa"      title="Mapa em tela cheia"><svg class="ic"><use href="#i-map"/></svg><span>Mapa</span></button>
+        <button type="button" class="vx-tab"        data-tab="imoveis"   title="Imóveis gravados, filtros e envios"><svg class="ic"><use href="#i-list"/></svg><span>Imóveis</span></button>
+        <button type="button" class="vx-tab"        data-tab="cadastrar" title="Cadastro por memorial, cor e dados ONR"><svg class="ic"><use href="#i-edit"/></svg><span>Cadastrar</span></button>
+        <button type="button" class="vx-tab"        data-tab="importar"  title="Importar KML ou PDF/SIGEF por IA"><svg class="ic"><use href="#i-upload"/></svg><span>Importar</span></button>
+        <button type="button" class="vx-tab"        data-tab="onr"       title="Enviar ao Mapa da ONR e exportar carga ITN 03"><svg class="ic"><use href="#i-globe"/></svg><span>ONR / Carga</span></button>
+        <button type="button" class="vx-tab"        data-tab="limites"   title="Limite do município (IBGE / KML)"><svg class="ic"><use href="#i-compass"/></svg><span>Limites</span></button>
+      </nav>
+    </div>
+    <!-- Faixa de status (global, visível em qualquer aba) -->
+      <div class="status" id="status"></div>
+  </div><!-- /.panel -->
+
+  <div class="vx-stage" id="vx-stage">
+    <!-- ===== MAPA — seção dedicada em tela cheia ===== -->
+    <section class="vx-pane active" data-pane="mapa">
+      <div class="map-wrap">
+    <div id="map"></div>
+    <div id="ctrl-3d" class="ctrl-3d">
+      <button id="btn-3d" class="c3d-btn" title="Ver o imóvel em 3D fotorrealista (relevo do terreno)"><svg class="ic"><use href="#i-cube"/></svg><span>Ver em 3D</span></button>
+      <div class="c3d-row">
+        <button id="btn-3d-tilt" class="c3d-mini" title="Inclinar/desinclinar o mapa (visão oblíqua)"><svg class="ic"><use href="#i-tilt"/></svg><span>Inclinar</span></button>
+        <button id="btn-3d-left" class="c3d-mini" title="Girar à esquerda" style="display:none">⟲</button>
+        <button id="btn-3d-right" class="c3d-mini" title="Girar à direita" style="display:none">⟳</button>
+      </div>
+    </div>
+    <button id="btn-toggle-panel" class="toggle-panel" title="Mostrar/ocultar painel" aria-label="Mostrar ou ocultar painel">
+      <svg class="ic-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      <svg class="ic-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
+    <div class="overlay" id="overlay">Clique em <span style="color:var(--red-bright);margin:0 4px">Mapear</span> para visualizar o imóvel</div>
+    <div class="readout" id="readout"><span class="dot">◆</span> <b id="ro-name">Imóvel</b> &nbsp;·&nbsp; <span id="ro-area"></span> ha</div>
+    <div class="muni-badge" id="muni-badge"></div>
+
+    <div class="overview-panel" id="overview-panel">
+      <div class="ovh">
+        <div>
+          <div class="ovh-title">Visão geral</div>
+          <div class="ovh-sub" id="ov-sub">—</div>
+        </div>
+        <button class="ov-close" id="ov-hide" title="Ocultar painel"><svg class="ic"><use href="#i-minus"/></svg></button>
+      </div>
+      <div class="legend">
+        <span><i class="sw normal"></i>Imóvel</span>
+        <span><i class="sw sel"></i>Selecionado</span>
+        <span><i class="sw over"></i>Sobreposição</span>
+      </div>
+      <div class="ov-hint" id="ov-hint">Ctrl+clique (ou clique direito) nos imóveis para selecionar · clique numa sobreposição para o relatório dela</div>
+      <div class="ov-search">
+        <input type="text" id="ov-busca" placeholder="Filtrar... 744;822 (só essas) · 506;* (506 + sobrepostas/desmembradas)">
+        <button id="ov-busca-clear" title="Limpar filtro">×</button>
+      </div>
+      <div class="ov-itn03">
+        <button id="ov-itn03" class="btn-itn03" title="Gerar a carga ITN 03 (ONR) dos imóveis prontos para o Mapa ONR — todos, ou apenas os do filtro ;"><svg class="ic"><use href="#i-down"/></svg><span>Exportar carga ITN 03 (lote)</span></button>
+      </div>
+      <div class="ov-overlaps" id="ov-overlaps"></div>
+      <div class="ov-foot">
+        <button class="btn-report" id="btn-relatorio">Gerar relatório de sobreposição (PDF)</button>
+        <button class="btn-report at" id="btn-instaurar-at" title="Abrir um procedimento de autotutela registral a partir das sobreposições exibidas"><svg class="ic"><use href="#i-scale"/></svg><span>Instaurar autotutela desta sobreposição</span></button>
+      </div>
     </div>
 
-    <div class="body">
+    <button class="ov-reopen" id="ov-reopen" title="Mostrar painel de imóveis e sobreposições">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+      <span>Imóveis e sobreposições</span>
+    </button>
 
-      <div class="panel-top">
-        <div class="base-toggle" id="base-toggle" title="Alterna entre a base de matrículas e a base de projetos (projetos = imóveis ainda sem matrícula)">
-          <button type="button" class="bt-btn active" data-base="matriculas">📁 Matrículas</button>
-          <button type="button" class="bt-btn" data-base="projetos">📐 Projetos</button>
+    <div class="sel-bar" id="sel-bar">
+      <span class="sel-count"><b id="sel-n">0</b> selecionado(s)</span>
+      <button class="sel-rep" id="sel-relatorio">Relatório dos selecionados</button>
+      <button class="sel-clear" id="sel-limpar">Limpar</button>
+    </div>
+
+    <div class="overview-panel kml-panel" id="kml-panel">
+      <div class="ovh">
+        <div>
+          <div class="ovh-title">Importar do KML</div>
+          <div class="ovh-sub" id="kml-sub">—</div>
         </div>
-        <div class="quick-actions">
-          <button class="mini-btn" id="btn-todos">🗺 Ver todos no mapa</button>
-          <button class="mini-btn active" id="btn-rotulos" title="Rótulos ocultos — passe o mouse sobre o imóvel para ver a matrícula">🏷 Mostrar rótulos</button>
-        </div>
+        <button class="ov-close" id="kml-close" title="Cancelar"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
+      <div class="kml-rows" id="kml-rows"></div>
+      <div class="kml-foot">
+        <button class="btn-save" id="btn-import-lote" style="width:100%">Gravar imóveis</button>
+      </div>
+    </div>
+  </div>
+    </section>
 
-      <details class="onr-accordion manual-accordion">
+    <section class="vx-pane" data-pane="imoveis">
+      <div class="saved">
+        <div class="saved-head">
+          <h3>Imóveis gravados</h3>
+          <div class="saved-actions">
+            <button class="mini-btn onr" id="btn-onr-lote" title="Enviar todos os imóveis prontos ao Mapa ONR"><svg class="ic"><use href="#i-send"/></svg><span>Enviar prontos</span></button>
+            <button class="mini-btn" id="btn-onr-config" title="Configurar a API do Mapa ONR"><svg class="ic"><use href="#i-gear"/></svg></button>
+            <button class="mini-btn at" id="btn-autotutela" title="Processo de autotutela registral (Prov. CNJ 195/2025, art. 440-BG; LRP)"><svg class="ic"><use href="#i-scale"/></svg><span>Autotutela registral</span></button>
+          </div>
+        </div>
+        <div class="imoveis-sticky">
+        <div class="vista-toggle" id="vista-toggle">
+          <button type="button" class="vt-btn" data-vista="todas" title="Todas as matrículas, inclusive as exclusivas da carga ITN 03">Todas <span id="vt-count-todas" class="vt-count"></span></button>
+          <button type="button" class="vt-btn active" data-vista="mapa" title="Matrículas com mapa (polígono)">Mapeadas <span id="vt-count-mapa" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="dentro" title="Matrículas dentro do perímetro do município">Dentro do município <span id="vt-count-dentro" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="fora" title="Matrículas fora do perímetro do município">Fora do município <span id="vt-count-fora" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="ultrapassa" title="Matrículas que ultrapassam o limite (parte em município vizinho)">Ultrapassam <span id="vt-count-ultrapassa" class="vt-count"></span></button>
+          <button type="button" class="vt-btn" data-vista="itn03" title="Matrículas exclusivas da carga ITN 03 (sem mapa)">Exclusivas ITN 03 <span id="vt-count-itn03" class="vt-count"></span></button>
+          <button type="button" class="vt-btn vt-onr" data-vista="prontas" title="Mapeadas prontas para enviar ao Mapa da ONR (com todos os dados e não enviadas)">Prontas p/ ONR <span id="vt-count-prontas" class="vt-count"></span></button>
+          <button type="button" class="vt-btn vt-onr" data-vista="enviadas" title="Matrículas já enviadas ao Mapa da ONR">Enviadas <span id="vt-count-enviadas" class="vt-count"></span></button>
+          <button type="button" class="vt-btn vt-onr" data-vista="faltando" title="Mapeadas que ainda faltam enviar ao Mapa da ONR (não enviadas, exceto fora do município/encerradas)">Faltando enviar <span id="vt-count-faltando" class="vt-count"></span></button>
+        </div>
+        <div class="itn03-actions" id="itn03-actions" style="display:none">
+          <button class="mini-btn" id="btn-itn03-nova" title="Cadastrar uma matrícula só para a carga ITN 03 (sem coordenadas/mapa)"><svg class="ic"><use href="#i-plus"/></svg><span>Nova matrícula</span></button>
+          <button class="mini-btn onr" id="btn-itn03-export-excl" title="Exportar a carga ITN 03 das matrículas exclusivas aptas"><svg class="ic"><use href="#i-down"/></svg><span>Exportar carga</span></button>
+        </div>
+        <div class="search-wrap">
+          <svg class="search-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="busca" type="text" placeholder="Buscar… matrícula, proprietário, ou 744-760 (intervalo) e 744;822 (específicas)">
+          <button id="busca-clear" class="search-clear" title="Limpar" style="display:none">×</button>
+        </div>
+        </div><!-- /.imoveis-sticky -->
+        <div id="saved-list"><div class="empty-list">Carregando…</div></div>
+      </div>
+      </section>
+
+    <section class="vx-pane" data-pane="cadastrar">
+        <header class="vx-pane-head"><div class="vx-ph-ic"><svg class="ic"><use href="#i-edit"/></svg></div><div class="vx-ph-tx"><h2>Cadastrar imóvel</h2><p>Cole um memorial descritivo (GMS/UTM) para gerar o polígono, confira e grave. O destaque de cor aparece após mapear.</p></div></header>
+      <details class="onr-accordion manual-accordion" open>
         <summary class="onr-summary">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>
           Cadastro manual
@@ -6155,9 +6855,32 @@ header('Expires: 0');
       </div>
         </div>
       </details>
-
+      <div class="stats" id="stats" style="display:none">
+        <div class="stat"><div class="v" id="s-vtx">—</div><div class="k">Vértices</div></div>
+        <div class="stat"><div class="v" id="s-area">—<span class="u"> ha</span></div><div class="k">Área (UTM 23S)</div></div>
+        <div class="stat"><div class="v" id="s-per">—<span class="u"> km</span></div><div class="k">Perímetro</div></div>
+        <div class="stat"><div class="v" id="s-cen" style="font-size:12px">—</div><div class="k">Centro lat,lng</div></div>
+      </div>
+      <div class="cor-box" id="cor-box" style="display:none">
+        <p class="label muni-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path></svg>
+          Cor de destaque do imóvel
+        </p>
+        <div class="cor-sub-lbl">Preenchimento (fundo)</div>
+        <div class="cor-grid" id="cor-grid"></div>
+        <div class="cor-sub-lbl" style="margin-top:9px">Linha (contorno)</div>
+        <div class="cor-grid" id="cor-grid-linha"></div>
+        <div class="op-wrap">
+          <span class="op-lbl">Intensidade</span>
+          <input type="range" id="cor-op" class="op-range" min="0.08" max="0.55" step="0.01" value="0.18">
+        </div>
+        <button type="button" class="btn-ghost" id="cor-clear" style="margin-top:8px;width:100%">Remover destaque</button>
+        <p class="cor-hint">Dica: defina cores diferentes para o <b>fundo</b> e a <b>linha</b> quando houver imóveis vizinhos ou desmembramentos. Clique sobre um imóvel no mapa (em "Ver todos") para destacá-lo. O vermelho é reservado a sobreposições.</p>
+      </div>
+      
+      <div class="vx-sub-title"><svg class="ic"><use href="#i-globe"/></svg>Dados para o Mapa ONR</div>
       <div class="onr-box">
-        <details class="onr-accordion">
+        <details class="onr-accordion" open>
           <summary class="onr-summary">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
             Dados para o Mapa ONR
@@ -6232,8 +6955,52 @@ header('Expires: 0');
           </div>
         </details>
       </div>
+      </section>
 
-      <div class="muni-box" style="display:none">
+    <section class="vx-pane" data-pane="importar">
+        <header class="vx-pane-head"><div class="vx-ph-ic"><svg class="ic"><use href="#i-upload"/></svg></div><div class="vx-ph-tx"><h2>Importar arquivos</h2><p>Arraste ou selecione arquivos <b>KML</b> ou <b>PDF</b> (matrícula/SIGEF). O tipo é detectado automaticamente: KML vira polígono na hora; PDF é lido por IA. Aceita vários de uma vez.</p></div></header>
+      <div class="dropzone" id="vx-drop" tabindex="0" role="button" aria-label="Importar arquivos KML ou PDF">
+        <input type="file" id="vx-drop-file" accept=".kml,.pdf,application/pdf,application/vnd.google-earth.kml+xml" multiple hidden>
+        <div class="dz-ic">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        </div>
+        <div class="dz-main">Arraste os arquivos aqui ou <span class="dz-link">clique para selecionar</span></div>
+        <div class="dz-sub">KML · PDF de matrícula/SIGEF</div>
+        <div class="dz-badges"><span class="dz-badge">.kml</span><span class="dz-badge">.pdf</span></div>
+      </div>
+      <button type="button" class="cfg-link" id="btn-gemini-config" title="Configurar os modelos e a chave da IA (Gemini)"><svg class="ic"><use href="#i-gear"/></svg><span>Configurar IA (Gemini)</span></button>
+      </section>
+
+      <section class="vx-pane" data-pane="onr">
+        <header class="vx-pane-head"><div class="vx-ph-ic"><svg class="ic"><use href="#i-globe"/></svg></div><div class="vx-ph-tx"><h2>ONR e carga ITN 03</h2><p>Envie os imóveis prontos ao Mapa da ONR e exporte a carga ITN 03. O preenchimento dos <b>Dados ONR</b> de cada imóvel fica na aba <b>Cadastrar</b>.</p></div></header>
+        <div class="vx-actions">
+          <div class="vx-act-card">
+            <div class="vx-act-h"><span class="vx-act-ic"><svg class="ic"><use href="#i-globe"/></svg></span>Mapa do Registro de Imóveis (ONR)</div>
+            <p class="vx-act-d">Transmite ao Mapa da ONR todos os imóveis marcados como <b>Prontos p/ ONR</b>.</p>
+            <button type="button" class="btn-save vx-act-btn" id="vx-onr-enviar"><svg class="ic"><use href="#i-send"/></svg><span>Enviar prontos ao Mapa da ONR</span></button>
+            <button type="button" class="btn-ghost vx-act-btn2" id="vx-onr-config"><svg class="ic"><use href="#i-gear"/></svg><span>Configurar API do Mapa ONR</span></button>
+          </div>
+          <div class="vx-act-card">
+            <div class="vx-act-h"><span class="vx-act-ic itn"><svg class="ic"><use href="#i-down"/></svg></span>Carga ITN 03</div>
+            <p class="vx-act-d">Gera o JSON validável da carga ITN 03 (ONR, schema v1.2.0), separado por urbano/rural.</p>
+            <button type="button" class="btn-itn03 vx-act-btn" id="vx-itn-lote"><svg class="ic"><use href="#i-down"/></svg><span>Exportar carga ITN 03 (prontos)</span></button>
+            <button type="button" class="btn-ghost vx-act-btn2" id="vx-itn-excl"><svg class="ic"><use href="#i-down"/></svg><span>Exportar só exclusivas da ITN 03</span></button>
+            <button type="button" class="btn-ghost vx-act-btn2" id="vx-itn-nova"><svg class="ic"><use href="#i-plus"/></svg><span>Nova matrícula só ITN 03</span></button>
+          </div>
+        </div>
+        <div class="vx-flow">
+          <b>Como funciona</b>
+          <ol>
+            <li><b>Enviar prontos</b> → publica no Mapa da ONR os imóveis aptos.</li>
+            <li><b>Exportar carga ITN 03</b> → baixa o arquivo para envio da ITN 03.</li>
+            <li>Faltando dados? Abra o imóvel e preencha os <b>Dados ONR</b> na aba <b>Cadastrar</b>.</li>
+          </ol>
+        </div>
+      </section>
+
+    <section class="vx-pane" data-pane="limites">
+        <header class="vx-pane-head"><div class="vx-ph-ic"><svg class="ic"><use href="#i-compass"/></svg></div><div class="vx-ph-tx"><h2>Limites do município</h2><p>Carregue o limite do município para conferir quais imóveis estão dentro, fora ou ultrapassam o perímetro.</p></div></header>
+      <div class="muni-box">
         <p class="label muni-label">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
           Limite do município (IBGE)
@@ -6268,151 +7035,9 @@ header('Expires: 0');
         </div>
         <div class="status" id="muni-status"></div>
       </div>
+      </section>
 
-      <div class="kml-zone lote" id="kml-lote-zone">
-        <input type="file" id="kml-lote-file" accept=".kml,application/vnd.google-earth.kml+xml" multiple hidden>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1"></rect><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
-        <span id="kml-lote-label">Importar <b>KML</b> <span class="zone-multi">(1 ou vários)</span></span>
-      </div>
-
-      <div class="kml-zone ia" id="pdf-mat-zone">
-        <input type="file" id="pdf-mat-file" accept="application/pdf,.pdf" multiple hidden>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M9 15h6M9 18h4"></path></svg>
-        <span id="pdf-mat-label">Matrícula ou <b>SIGEF</b> em PDF — mapear via IA <span class="zone-multi">(1 ou vários)</span></span>
-      </div>
-      <button type="button" class="link-config" id="btn-gemini-config">⚙ Configurar IA (Gemini)</button>
-
-      <div class="status" id="status"></div>
-
-      <div class="stats" id="stats" style="display:none">
-        <div class="stat"><div class="v" id="s-vtx">—</div><div class="k">Vértices</div></div>
-        <div class="stat"><div class="v" id="s-area">—<span class="u"> ha</span></div><div class="k">Área (UTM 23S)</div></div>
-        <div class="stat"><div class="v" id="s-per">—<span class="u"> km</span></div><div class="k">Perímetro</div></div>
-        <div class="stat"><div class="v" id="s-cen" style="font-size:12px">—</div><div class="k">Centro lat,lng</div></div>
-      </div>
-
-      <div class="cor-box" id="cor-box" style="display:none">
-        <p class="label muni-label">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path></svg>
-          Cor de destaque do imóvel
-        </p>
-        <div class="cor-sub-lbl">Preenchimento (fundo)</div>
-        <div class="cor-grid" id="cor-grid"></div>
-        <div class="cor-sub-lbl" style="margin-top:9px">Linha (contorno)</div>
-        <div class="cor-grid" id="cor-grid-linha"></div>
-        <div class="op-wrap">
-          <span class="op-lbl">Intensidade</span>
-          <input type="range" id="cor-op" class="op-range" min="0.08" max="0.55" step="0.01" value="0.18">
-        </div>
-        <button type="button" class="btn-ghost" id="cor-clear" style="margin-top:8px;width:100%">Remover destaque</button>
-        <p class="cor-hint">Dica: defina cores diferentes para o <b>fundo</b> e a <b>linha</b> quando houver imóveis vizinhos ou desmembramentos. Clique sobre um imóvel no mapa (em "Ver todos") para destacá-lo. O vermelho é reservado a sobreposições.</p>
-      </div>
-
-      <div class="saved">
-        <div class="saved-head">
-          <h3>Imóveis gravados</h3>
-          <div class="saved-actions">
-            <button class="mini-btn onr" id="btn-onr-lote" title="Enviar todos os imóveis prontos ao Mapa ONR">➤ Enviar prontos</button>
-            <button class="mini-btn" id="btn-onr-config" title="Configurar a API do Mapa ONR">⚙</button>
-            <button class="mini-btn at" id="btn-autotutela" title="Processo de autotutela registral (Prov. CNJ 195/2025, art. 440-BG; LRP)">⚖ Autotutela registral</button>
-          </div>
-        </div>
-        <div class="vista-toggle" id="vista-toggle">
-          <button type="button" class="vt-btn" data-vista="todas" title="Todas as matrículas, inclusive as exclusivas da carga ITN 03">Todas <span id="vt-count-todas" class="vt-count"></span></button>
-          <button type="button" class="vt-btn active" data-vista="mapa" title="Matrículas com mapa (polígono)">Mapeadas <span id="vt-count-mapa" class="vt-count"></span></button>
-          <button type="button" class="vt-btn" data-vista="dentro" title="Matrículas dentro do perímetro do município">Dentro do município <span id="vt-count-dentro" class="vt-count"></span></button>
-          <button type="button" class="vt-btn" data-vista="fora" title="Matrículas fora do perímetro do município">Fora do município <span id="vt-count-fora" class="vt-count"></span></button>
-          <button type="button" class="vt-btn" data-vista="ultrapassa" title="Matrículas que ultrapassam o limite (parte em município vizinho)">Ultrapassam <span id="vt-count-ultrapassa" class="vt-count"></span></button>
-          <button type="button" class="vt-btn" data-vista="itn03" title="Matrículas exclusivas da carga ITN 03 (sem mapa)">Exclusivas ITN 03 <span id="vt-count-itn03" class="vt-count"></span></button>
-          <button type="button" class="vt-btn vt-onr" data-vista="prontas" title="Mapeadas prontas para enviar ao Mapa da ONR (com todos os dados e não enviadas)">Prontas p/ ONR <span id="vt-count-prontas" class="vt-count"></span></button>
-          <button type="button" class="vt-btn vt-onr" data-vista="enviadas" title="Matrículas já enviadas ao Mapa da ONR">Enviadas <span id="vt-count-enviadas" class="vt-count"></span></button>
-          <button type="button" class="vt-btn vt-onr" data-vista="faltando" title="Mapeadas que ainda faltam enviar ao Mapa da ONR (não enviadas, exceto fora do município/encerradas)">Faltando enviar <span id="vt-count-faltando" class="vt-count"></span></button>
-        </div>
-        <div class="itn03-actions" id="itn03-actions" style="display:none">
-          <button class="mini-btn" id="btn-itn03-nova" title="Cadastrar uma matrícula só para a carga ITN 03 (sem coordenadas/mapa)">➕ Nova matrícula</button>
-          <button class="mini-btn onr" id="btn-itn03-export-excl" title="Exportar a carga ITN 03 das matrículas exclusivas aptas">⤓ Exportar carga</button>
-        </div>
-        <div class="search-wrap">
-          <svg class="search-ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <input id="busca" type="text" placeholder="Buscar… matrícula, proprietário, ou 744-760 (intervalo) e 744;822 (específicas)">
-          <button id="busca-clear" class="search-clear" title="Limpar" style="display:none">×</button>
-        </div>
-        <div id="saved-list"><div class="empty-list">Carregando…</div></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="map-wrap">
-    <div id="map"></div>
-    <div id="ctrl-3d" class="ctrl-3d">
-      <button id="btn-3d" class="c3d-btn" title="Ver o imóvel em 3D fotorrealista (relevo do terreno)">🧊 Ver em 3D</button>
-      <div class="c3d-row">
-        <button id="btn-3d-tilt" class="c3d-mini" title="Inclinar/desinclinar o mapa (visão oblíqua)">⤢ Inclinar</button>
-        <button id="btn-3d-left" class="c3d-mini" title="Girar à esquerda" style="display:none">⟲</button>
-        <button id="btn-3d-right" class="c3d-mini" title="Girar à direita" style="display:none">⟳</button>
-      </div>
-    </div>
-    <button id="btn-toggle-panel" class="toggle-panel" title="Mostrar/ocultar painel" aria-label="Mostrar ou ocultar painel">
-      <svg class="ic-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-      <svg class="ic-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-    </button>
-    <div class="overlay" id="overlay">Clique em <span style="color:var(--red-bright);margin:0 4px">Mapear</span> para visualizar o imóvel</div>
-    <div class="readout" id="readout"><span class="dot">◆</span> <b id="ro-name">Imóvel</b> &nbsp;·&nbsp; <span id="ro-area"></span> ha</div>
-    <div class="muni-badge" id="muni-badge"></div>
-
-    <div class="overview-panel" id="overview-panel">
-      <div class="ovh">
-        <div>
-          <div class="ovh-title">Visão geral</div>
-          <div class="ovh-sub" id="ov-sub">—</div>
-        </div>
-        <button class="ov-close" id="ov-hide" title="Ocultar painel">–</button>
-      </div>
-      <div class="legend">
-        <span><i class="sw normal"></i>Imóvel</span>
-        <span><i class="sw sel"></i>Selecionado</span>
-        <span><i class="sw over"></i>Sobreposição</span>
-      </div>
-      <div class="ov-hint" id="ov-hint">Ctrl+clique (ou clique direito) nos imóveis para selecionar · clique numa sobreposição para o relatório dela</div>
-      <div class="ov-search">
-        <input type="text" id="ov-busca" placeholder="Filtrar... 744;822 (só essas) · 506;* (506 + sobrepostas/desmembradas)">
-        <button id="ov-busca-clear" title="Limpar filtro">×</button>
-      </div>
-      <div class="ov-itn03">
-        <button id="ov-itn03" class="btn-itn03" title="Gerar a carga ITN 03 (ONR) dos imóveis prontos para o Mapa ONR — todos, ou apenas os do filtro ;">⤓ Exportar carga ITN 03 (lote)</button>
-      </div>
-      <div class="ov-overlaps" id="ov-overlaps"></div>
-      <div class="ov-foot">
-        <button class="btn-report" id="btn-relatorio">Gerar relatório de sobreposição (PDF)</button>
-        <button class="btn-report at" id="btn-instaurar-at" title="Abrir um procedimento de autotutela registral a partir das sobreposições exibidas">⚖ Instaurar autotutela desta sobreposição</button>
-      </div>
-    </div>
-
-    <button class="ov-reopen" id="ov-reopen" title="Mostrar painel de imóveis e sobreposições">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-      <span>Imóveis e sobreposições</span>
-    </button>
-
-    <div class="sel-bar" id="sel-bar">
-      <span class="sel-count"><b id="sel-n">0</b> selecionado(s)</span>
-      <button class="sel-rep" id="sel-relatorio">Relatório dos selecionados</button>
-      <button class="sel-clear" id="sel-limpar">Limpar</button>
-    </div>
-
-    <div class="overview-panel kml-panel" id="kml-panel">
-      <div class="ovh">
-        <div>
-          <div class="ovh-title">Importar do KML</div>
-          <div class="ovh-sub" id="kml-sub">—</div>
-        </div>
-        <button class="ov-close" id="kml-close" title="Cancelar">×</button>
-      </div>
-      <div class="kml-rows" id="kml-rows"></div>
-      <div class="kml-foot">
-        <button class="btn-save" id="btn-import-lote" style="width:100%">Gravar imóveis</button>
-      </div>
-    </div>
-  </div>
+  </div><!-- /.vx-stage -->
 </div><!-- /.mapeador-shell -->
 
 <!-- Botão flutuante p/ abrir o painel no mobile -->
@@ -6562,9 +7187,7 @@ header('Expires: 0');
     <div id="m3d-legend" class="m3d-legend" style="display:none"></div>
     <div id="m3d-msg" class="modal-3d-msg" style="display:none"></div>
     <div class="modal-3d-foot" id="m3d-foot">
-      <span id="m3d-foot-txt">Arraste para girar · role o mouse para aproximar. Abrir também em:</span>
-      <a id="m3d-earth" class="m3d-link" target="_blank" rel="noopener" href="#">🌐 Google Earth</a>
-      <a id="m3d-maps" class="m3d-link" target="_blank" rel="noopener" href="#">🗺 Google Maps (satélite)</a>
+      <span id="m3d-foot-txt">Arraste para girar · role o mouse para aproximar.</span>
     </div>
   </div>
 </div>
@@ -6752,7 +7375,7 @@ header('Expires: 0');
     <div class="modal-f">
       <button class="btn-ghost" id="ed-cancelar2" onclick="fecharEdicao()">Cancelar</button>
       <button class="btn-ghost" id="ed-itn03" title="Gerar a carga ITN 03 desta matrícula (precisa estar pronta para o Mapa ONR)">⤓ Carga ITN 03</button>
-      <button class="btn-ghost" id="ed-onr-correcao" style="display:none;border-color:#0d9488;color:#0d9488" title="Reenviar este imóvel ao Mapa ONR como RETIFICAÇÃO (correção dos dados já enviados)">↻ Enviar correção à ONR</button>
+      <button class="btn-ghost" id="ed-onr-correcao" style="display:none;border-color:var(--teal);color:var(--teal)" title="Reenviar este imóvel ao Mapa ONR como RETIFICAÇÃO (correção dos dados já enviados)">↻ Enviar correção à ONR</button>
       <button class="btn-primary" id="ed-salvar">Salvar alterações</button>
     </div>
   </div>
@@ -7103,7 +7726,7 @@ async function render3D(){
     setStatus('ok', nOver ? ('Visão 3D — '+nOver+' sobreposição(ões) em vermelho.') : 'Visão 3D carregada.');
   }catch(e){
     host.style.display='none'; msg.style.display='flex';
-    msg.innerHTML='Não foi possível montar o 3D embutido. Use os links do rodapé (Google Earth / Maps).';
+    msg.innerHTML='Não foi possível montar o 3D embutido. Tente novamente ou use "Inclinar" no próprio mapa.';
   }
 }
 let _ctl3D=null;
@@ -7168,7 +7791,7 @@ function mostrarFallback3D(txt){
   const host=document.getElementById('m3d-host'), msg=document.getElementById('m3d-msg');
   if(host){ host.style.display='none'; host.innerHTML=''; }
   if(msg){ msg.style.display='flex';
-    msg.innerHTML=txt+'<br><br>Abra no <b>Google Earth</b> (rodapé) ou use o <a href="#" id="m3d-alt" style="color:#8ab4ff;text-decoration:underline">visualizador com relevo (alternativo)</a>.';
+    msg.innerHTML=txt+'<br><br>Use o <a href="#" id="m3d-alt" style="color:#8ab4ff;text-decoration:underline">visualizador com relevo (alternativo)</a>.';
     const alt=document.getElementById('m3d-alt'); if(alt) alt.onclick=(e)=>{ e.preventDefault(); render3D(); };
   }
 }
@@ -7484,7 +8107,7 @@ function toggleRotulos(){
   aplicarRotulosVisibilidade();
   ocultarHoverTip();
   const b=document.getElementById('btn-rotulos');
-  if(b){ b.textContent = rotulosOcultos ? '🏷 Mostrar rótulos' : '🏷 Ocultar rótulos'; b.classList.toggle('active', rotulosOcultos); b.title = rotulosOcultos ? 'Rótulos ocultos — passe o mouse sobre o imóvel para ver a matrícula' : 'Ocultar os números das matrículas no mapa'; }
+  if(b){ const sp=b.querySelector('span'); const tx = rotulosOcultos ? 'Mostrar rótulos' : 'Ocultar rótulos'; if(sp) sp.textContent = tx; else b.textContent = tx; b.classList.toggle('active', rotulosOcultos); b.title = rotulosOcultos ? 'Rótulos ocultos — passe o mouse sobre o imóvel para ver a matrícula' : 'Ocultar os números das matrículas no mapa'; }
 }
 
 function fmt(n,d){ return Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
@@ -7603,7 +8226,15 @@ function desenhar(geo, nome){
     }));
   });
   const b = new google.maps.LatLngBounds();
-  path.forEach(pt=>b.extend(pt)); map.fitBounds(b, 40);
+  path.forEach(pt=>b.extend(pt));
+  // Vai para a seção do MAPA e só enquadra quando o mapa tiver tamanho real —
+  // sem isso, vindo de outra aba, o fitBounds calcula sobre 0×0 e o imóvel "não aparece" até dar F5.
+  if(typeof vxEnsureMapVisibleThen==='function'){
+    vxEnsureMapVisibleThen(()=>{ if(!b.isEmpty()) map.fitBounds(b, 40); });
+  } else {
+    try{ google.maps.event.trigger(map,'resize'); }catch(_){}
+    map.fitBounds(b, 40);
+  }
 
   // rótulo com nome/matrícula no centro do imóvel
   addLabel({lat:geo.centro_lat, lng:geo.centro_lng}, nome);
@@ -7826,14 +8457,25 @@ document.getElementById('btn-save').onclick = async ()=>{
 
 /* ===================== IMPORTAÇÃO KML ===================== */
 /* ---- Importação de KML: 1 ou vários arquivos (1 imóvel por arquivo) ---- */
-const kmlLoteZone = document.getElementById('kml-lote-zone');
-const kmlLoteFile = document.getElementById('kml-lote-file');
-if(kmlLoteZone && kmlLoteFile){
-  kmlLoteZone.onclick = ()=> kmlLoteFile.click();
-  kmlLoteFile.onchange = e=>{ if(e.target.files && e.target.files.length) lerLoteKml(e.target.files); e.target.value=''; };
-  ['dragover','dragenter'].forEach(ev=>kmlLoteZone.addEventListener(ev,e=>{e.preventDefault();kmlLoteZone.classList.add('drag');}));
-  ['dragleave','drop'].forEach(ev=>kmlLoteZone.addEventListener(ev,e=>{e.preventDefault();kmlLoteZone.classList.remove('drag');}));
-  kmlLoteZone.addEventListener('drop', e=>{ const fs=e.dataTransfer.files; if(fs && fs.length) lerLoteKml(fs); });
+/* ===== Importação unificada: um único dropzone detecta KML x PDF pelo tipo ===== */
+function vxImportarArquivos(files){
+  const arr = Array.from(files||[]);
+  if(!arr.length) return;
+  const kmls = arr.filter(f=>/\.kml$/i.test(f.name));
+  const pdfs = arr.filter(f=>/\.pdf$/i.test(f.name) || f.type==='application/pdf');
+  if(!kmls.length && !pdfs.length){ setStatus('err','Formato não suportado — envie arquivos .kml ou .pdf.'); return; }
+  if(kmls.length) lerLoteKml(kmls);
+  if(pdfs.length){ pdfs.length>1 ? enviarLotePdfMatricula(pdfs) : enviarPdfMatricula(pdfs[0]); }
+}
+const vxDrop = document.getElementById('vx-drop');
+const vxDropFile = document.getElementById('vx-drop-file');
+if(vxDrop && vxDropFile){
+  vxDrop.onclick = ()=> vxDropFile.click();
+  vxDrop.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); vxDropFile.click(); } });
+  vxDropFile.onchange = e=>{ if(e.target.files && e.target.files.length) vxImportarArquivos(e.target.files); e.target.value=''; };
+  ['dragover','dragenter'].forEach(ev=>vxDrop.addEventListener(ev,e=>{e.preventDefault();vxDrop.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev=>vxDrop.addEventListener(ev,e=>{e.preventDefault();vxDrop.classList.remove('drag');}));
+  vxDrop.addEventListener('drop', e=>{ const fs=e.dataTransfer.files; if(fs && fs.length) vxImportarArquivos(fs); });
 }
 function resetKmlZone(){ /* zona de KML único removida — no-op por compatibilidade */ }
 // Define se o nome do arquivo é "número de matrícula" (só dígitos e separadores . - / espaço)
@@ -7959,6 +8601,9 @@ function gerarRelatorioInconsistencias(ids){
 // Abre a visão geral e confronta as sobreposições do imóvel importado (consulta "identificação;*").
 async function verNoMapaConfronto(id, isProjeto){
   const m=document.getElementById('modal-import-res'); if(m) m.classList.remove('show');
+  // Vai para a seção do MAPA e ESPERA o mapa ficar visível e com tamanho real ANTES de desenhar —
+  // desenhar a visão geral num mapa 0×0 fazia o polígono não renderizar até dar F5.
+  await vxWaitMapReady();
   // Projeto: garante a base de PROJETOS (carrega matrículas + projeto para o confronto)
   if(isProjeto && escopoBase!=='projetos'){
     escopoBase='projetos';
@@ -7966,18 +8611,31 @@ async function verNoMapaConfronto(id, isProjeto){
     if(bt){ bt.classList.add('projetos'); bt.querySelectorAll('.bt-btn').forEach(x=>x.classList.toggle('active', x.getAttribute('data-base')==='projetos')); }
   }
   await carregarLista();
+  // Garante que a categoria em exibição inclua o imóvel-alvo (senão ele fica de fora da visão geral)
+  vistaLista='todas'; if(typeof sincronizarVistaToggle==='function') sincronizarVistaToggle();
   await verTodos();
   document.getElementById('overview-panel').classList.add('show');
   // Monta o termo pela identificação do imóvel (matrícula se houver, senão identificador)
   const it = (itensOverview||[]).find(x=>String(x.id)===String(id))
           || (imoveisCache||[]).find(x=>String(x.id)===String(id)) || {};
   let termo = (it.numero_matricula && String(it.numero_matricula).trim())
-      ? rotuloMat(it.numero_matricula) : (it.identificador||'');
+      ? String(it.numero_matricula).trim().replace(/^0+(?=\d)/,'') : (it.identificador||'');
   termo = String(termo||'').replace(/;/g,' ').trim();
   if(!termo){ setStatus('warn','Imóvel sem identificação para confrontar no mapa.'); return; }
   const busca=document.getElementById('ov-busca');
   if(busca) busca.value = termo + ';*';
   if(typeof filtrarOverlaps==='function') filtrarOverlaps(); // aplica "termo;*" → foca o imóvel + sobreposições
+  // Reforço final: reenquadra no imóvel-alvo e FORÇA o re-render do polígono (setMap null→map),
+  // resolvendo em definitivo o caso em que a camada não aparecia sem F5.
+  vxEnsureMapVisibleThen(()=>{
+    const alvo=(itensOverview||[]).find(x=>String(x.id)===String(id));
+    if(alvo && alvo._poly && alvo._poly.getPath){
+      try{ alvo._poly.setMap(null); alvo._poly.setMap(map); }catch(_){}
+      const bb=new google.maps.LatLngBounds();
+      alvo._poly.getPath().forEach(p=>bb.extend(p));
+      if(!bb.isEmpty()) map.fitBounds(bb,60);
+    } else if(alvo && alvo.centro){ map.panTo(alvo.centro); }
+  });
   setStatus('ok', 'Confrontando "' + termo + '" com as matrículas — sobreposições em vermelho.');
 }
 (function(){
@@ -8091,7 +8749,16 @@ function turfToPaths(geom){
 }
 
 document.getElementById('btn-todos').onclick = ()=>{
-  if(modo==='overview') sairOverview(); else verTodos();
+  const b=document.getElementById('btn-todos');
+  if(modo==='overview' && b && !b.classList.contains('active')){
+    // Estava no foco de confronto (filtro "matrícula;*"): limpa o filtro e volta a ver TODOS
+    const busca=document.getElementById('ov-busca'); if(busca) busca.value='';
+    const mb=document.getElementById('muni-badge'); if(mb) mb.style.display='none';
+    if(typeof vxRevealMap==='function') vxRevealMap();
+    verTodos();
+    return;
+  }
+  if(modo==='overview') sairOverview(); else { if(typeof vxRevealMap==='function') vxRevealMap(); verTodos(); }
 };
 (function(){
   const bt=document.getElementById('base-toggle'); if(!bt) return;
@@ -9313,6 +9980,57 @@ function renderLista(){
   });
   sincronizarListaSelecao();
 }
+/* ===== FOCO DE CONFRONTO ao selecionar um imóvel gravado =====
+   Exibe o imóvel na VISÃO GERAL com a consulta "matrícula;*" (detecta sobreposições
+   e desmembradas), mantendo os recursos do modo single: pontos dos vértices e
+   badge de pertencimento ao município (dentro/parcial/fora). */
+async function focarImovelConfronto(reg, geo){
+  if(typeof vxWaitMapReady==='function') await vxWaitMapReady();
+  // Garante a visão geral com TODAS as categorias (senão o alvo pode ficar fora da base)
+  if(modo!=='overview' || !itensOverview || !itensOverview.length){
+    vistaLista='todas'; if(typeof sincronizarVistaToggle==='function') sincronizarVistaToggle();
+    await verTodos();
+  }
+  document.getElementById('overview-panel').classList.add('show');
+  const rp=document.getElementById('ov-reopen'); if(rp) rp.classList.remove('show');
+  // Termo da consulta: NÚMERO da matrícula puro (sem o rótulo "Mat.", que quebra o
+  // casamento exato do filtro); sem matrícula, usa a identificação do imóvel
+  let termo = (reg.numero_matricula && String(reg.numero_matricula).trim())
+      ? String(reg.numero_matricula).trim().replace(/^0+(?=\d)/,'') : (reg.identificador||'');
+  termo = String(termo||'').replace(/;/g,' ').trim();
+  const busca=document.getElementById('ov-busca');
+  if(termo && busca){ busca.value = termo + ';*'; if(typeof filtrarOverlaps==='function') filtrarOverlaps(); }
+  // Pontos dos vértices do imóvel selecionado (como no clique sobre o imóvel)
+  vertexMarkers.forEach(m=>m.setMap(null)); vertexMarkers=[];
+  if(geo && geo.pts && geo.pts.length){
+    geo.pts.forEach((p,i)=>{
+      vertexMarkers.push(new google.maps.Marker({
+        position:{lat:p[0],lng:p[1]}, map:map,
+        icon:{path:google.maps.SymbolPath.CIRCLE, scale:4, fillColor:'#0e1217',
+              fillOpacity:1, strokeColor:'#e2342f', strokeWeight:2},
+        title:'V'+(i+1)
+      }));
+    });
+  }
+  // Leitura rápida (nome + área) sobre o mapa
+  const ro=document.getElementById('readout');
+  if(ro && geo){ ro.style.display='block';
+    document.getElementById('ro-name').textContent = reg.identificador || 'Imóvel';
+    document.getElementById('ro-area').textContent = fmt(geo.area_ha,2); }
+  // Pertencimento ao município (badge dentro/parcial/fora, se o limite estiver carregado)
+  if(typeof verificarPertencimento==='function') verificarPertencimento(geo);
+  // "Ver todos" fica DESMARCADO durante o foco de confronto — um clique nele
+  // limpa o filtro e volta a exibir todos os imóveis
+  const btTodos=document.getElementById('btn-todos'); if(btTodos) btTodos.classList.remove('active');
+  // Enquadra no imóvel selecionado (o filtro já enquadrou o conjunto; reforça o alvo)
+  vxEnsureMapVisibleThen(()=>{
+    if(geo && geo.pts && geo.pts.length){
+      const b=new google.maps.LatLngBounds();
+      geo.pts.forEach(p=>b.extend({lat:p[0],lng:p[1]}));
+      if(!b.isEmpty()) map.fitBounds(b,60);
+    }
+  });
+}
 async function carregarImovel(id){
   const res = await post({acao:'carregar', id});
   if(!res.ok || !res.geo.ok){ setStatus('err','Não foi possível carregar este registro.'); return; }
@@ -9329,7 +10047,7 @@ async function carregarImovel(id){
   document.getElementById('tipo_identificador').value = reg.tipo_identificador||'nome';
   resetKmlZone();
   lastGeo = res.geo;
-  desenhar(res.geo, reg.identificador);
+  await focarImovelConfronto(reg, res.geo);   // visão geral + "matrícula;*" + vértices + município
   abrirCorPainel(id, reg.cor, reg.cor_opacidade, reg.cor_linha);
   preencherOnr(reg); onrPreencherGeometria(res.geo); onrSetAtivo(id, reg.identificador);
   mostrarEncInfo(reg);
@@ -10331,18 +11049,43 @@ async function salvarOnr(){
 }
 
 /* ---- Envio à ONR ---- */
+/* Detecta a falha "API do Mapa ONR não configurada" (token ausente) em qualquer mensagem. */
+function ehErroOnrSemConfig(txt){
+  return /n[ãa]o configurad|configure? a (chave|api|token)|token da api onr|#511/i.test(String(txt||''));
+}
+/* Alerta claro (SweetAlert2) com atalho para configurar a API do Mapa ONR. */
+async function swalOnrNaoConfig(){
+  if(typeof Swal==='undefined'){ setStatus('err','Configure a API do Mapa ONR antes de enviar.'); return; }
+  const r = await Swal.fire(Object.assign({
+    icon:'warning',
+    title:'Configure a API do Mapa ONR',
+    html:'Para enviar imóveis ao <b>Mapa do Registro de Imóveis (ONR)</b> é preciso cadastrar o <b>token de acesso</b> da API.<br><br>Deseja configurar agora?',
+    showCancelButton:true, confirmButtonText:'⚙ Configurar agora', cancelButtonText:'Agora não',
+    confirmButtonColor:'#a80f1e', cancelButtonColor:'#6b7785', reverseButtons:true
+  }, swalTema()));
+  if(r.isConfirmed && typeof abrirConfigOnr==='function') abrirConfigOnr();
+}
 async function enviarOnr(id){
   if(!(await swalConfirm('Enviar à ONR?','Enviar este imóvel ao Mapa do Registro de Imóveis (ONR)?','Enviar'))) return;
   setStatus('warn','Enviando à ONR… (gerando shapefile e transmitindo)');
   const r = await post({acao:'enviar_onr', id});
-  if(!r.ok){ setStatus('err', r.mensagem||'Falha no envio.'); carregarLista(); return; }
+  if(!r.ok){
+    if(ehErroOnrSemConfig(r.mensagem)){ setStatus('warn','Envio pausado — configure a API do Mapa ONR.'); await swalOnrNaoConfig(); carregarLista(); return; }
+    setStatus('err', r.mensagem||'Falha no envio.');
+    if(typeof Swal!=='undefined') Swal.fire(Object.assign({icon:'error', title:'Falha no envio à ONR',
+      text: r.mensagem || 'Não foi possível enviar este imóvel ao Mapa da ONR.'}, swalTema()));
+    carregarLista(); return;
+  }
   setStatus('ok', r.mensagem + (r.importation_id?(' · ID: '+r.importation_id):''));
   carregarLista();
 }
 async function consultarStatusOnr(id){
   setStatus('warn','Consultando status na ONR…');
   const r = await post({acao:'status_onr', id});
-  if(!r.ok){ setStatus('err', r.mensagem||'Falha ao consultar status.'); return; }
+  if(!r.ok){
+    if(ehErroOnrSemConfig(r.mensagem)){ setStatus('warn','Configure a API do Mapa ONR.'); await swalOnrNaoConfig(); return; }
+    setStatus('err', r.mensagem||'Falha ao consultar status.'); return;
+  }
   setStatus('ok','Status ONR: '+r.status);
   carregarLista();
 }
@@ -10371,7 +11114,13 @@ async function enviarCorrecaoOnr(){
     // 2) reenvia à ONR — nova importação (retificação)
     const r = await post({acao:'enviar_onr', id});
     importProgressHide();
-    if(!r.ok){ setStatus('err','Falha ao enviar a correção: '+(r.mensagem||'')); return; }
+    if(!r.ok){
+      if(ehErroOnrSemConfig(r.mensagem)){ setStatus('warn','Configure a API do Mapa ONR.'); await swalOnrNaoConfig(); return; }
+      setStatus('err','Falha ao enviar a correção: '+(r.mensagem||''));
+      if(typeof Swal!=='undefined') Swal.fire(Object.assign({icon:'error', title:'Falha ao enviar a correção',
+        text:(r.mensagem||'Não foi possível reenviar ao Mapa da ONR.')}, swalTema()));
+      return;
+    }
     setStatus('ok','Correção enviada à ONR (retificação).'+(r.importation_id?(' · ID: '+r.importation_id):''));
     await carregarLista();
     fecharEdicao();
@@ -10379,14 +11128,46 @@ async function enviarCorrecaoOnr(){
 }
 async function enviarTodosOnr(){
   const prontos = (imoveisCache||[]).filter(it=> String(it.onr_pronto)==='1' && String(it.onr_enviado)!=='1').length;
-  if(prontos===0){ setStatus('warn','Nenhum imóvel pronto para envio (faltam dados ONR ou já enviados).'); return; }
-  if(!(await swalConfirm('Enviar em lote?','Enviar '+prontos+' imóvel(is) pronto(s) à ONR?','Enviar todos'))) return;
+  if(prontos===0){
+    setStatus('warn','Nenhum imóvel pronto para envio (faltam dados ONR ou já enviados).');
+    if(typeof Swal!=='undefined') Swal.fire(Object.assign({icon:'info', title:'Nada para enviar',
+      html:'Não há imóveis <b>prontos para o Mapa da ONR</b>. Complete os <b>Dados ONR</b> de cada imóvel (aba Cadastrar) — eles passam a contar em <b>Prontas p/ ONR</b>.'}, swalTema()));
+    return;
+  }
+  if(!(await swalConfirm('Enviar em lote?','Enviar '+prontos+' imóvel(is) pronto(s) ao Mapa da ONR?','Enviar todos'))) return;
   setStatus('warn','Enviando '+prontos+' imóvel(is) à ONR…');
   const r = await post({acao:'enviar_onr_lote'});
-  if(!r.ok){ setStatus('err','Falha no envio em lote.'); return; }
-  let msg = `Enviados ${r.enviados} de ${r.total}.`;
-  if(r.falhas && r.falhas.length) msg += ' Falhas: '+r.falhas.join(' | ');
-  setStatus((r.falhas && r.falhas.length) ? 'warn':'ok', msg);
+  if(!r.ok){
+    if(ehErroOnrSemConfig(r.mensagem||r.erro)){ setStatus('warn','Envio pausado — configure a API do Mapa ONR.'); await swalOnrNaoConfig(); return; }
+    setStatus('err','Falha no envio em lote.');
+    if(typeof Swal!=='undefined') Swal.fire(Object.assign({icon:'error', title:'Falha no envio em lote',
+      text:(r.mensagem||r.erro||'Não foi possível enviar os imóveis ao Mapa da ONR.')}, swalTema()));
+    return;
+  }
+  const falhas = Array.isArray(r.falhas) ? r.falhas : [];
+  // Todas as falhas por API não configurada → alerta único com atalho de configuração
+  if(r.enviados===0 && falhas.length && falhas.every(f=>ehErroOnrSemConfig(f))){
+    setStatus('warn','Envio pausado — configure a API do Mapa ONR.');
+    await swalOnrNaoConfig(); carregarLista(); return;
+  }
+  if(falhas.length){
+    setStatus('warn', `Enviados ${r.enviados} de ${r.total}.`);
+    if(typeof Swal!=='undefined'){
+      const listaHtml = '<ul style="text-align:left;margin:10px 0 0;padding-left:18px;max-height:200px;overflow:auto;font-size:13px">'
+        + falhas.map(f=>'<li style="margin:3px 0">'+escapeHtml(String(f))+'</li>').join('') + '</ul>';
+      const temConfig = falhas.some(f=>ehErroOnrSemConfig(f));
+      const res = await Swal.fire(Object.assign({
+        icon: r.enviados ? 'warning' : 'error',
+        title: r.enviados ? `Enviados ${r.enviados} de ${r.total}` : `Nenhum imóvel enviado`,
+        html: `<div style="text-align:left"><b>${falhas.length}</b> falha(s):</div>` + listaHtml,
+        showCancelButton:true, confirmButtonText: temConfig ? '⚙ Configurar API ONR' : 'Entendi',
+        cancelButtonText:'Fechar', confirmButtonColor:'#a80f1e', cancelButtonColor:'#6b7785', reverseButtons:true
+      }, swalTema()));
+      if(temConfig && res.isConfirmed && typeof abrirConfigOnr==='function') abrirConfigOnr();
+    }
+  } else {
+    setStatus('ok', `Enviados ${r.enviados} de ${r.total}.`);
+  }
   carregarLista();
 }
 /* ---- Configuração da API ONR ---- */
@@ -11044,15 +11825,7 @@ function verificarPertencimento(geo){
   const bcor=document.getElementById('ed-onr-correcao'); if(bcor) bcor.addEventListener('click', enviarCorrecaoOnr);
   const bcfg=document.getElementById('btn-onr-config'); if(bcfg) bcfg.addEventListener('click', abrirConfigOnr);
   const cfgov=document.getElementById('modal-onr-config'); if(cfgov) cfgov.addEventListener('click', e=>{ if(e.target===cfgov) fecharConfigOnr(); });
-  // IA (Gemini): zona de PDF de matrícula + configuração
-  const pz=document.getElementById('pdf-mat-zone'); const pf=document.getElementById('pdf-mat-file');
-  if(pz && pf){
-    pz.onclick=()=>pf.click();
-    pf.onchange=e=>{ const fs=e.target.files; if(fs && fs.length){ fs.length>1 ? enviarLotePdfMatricula(fs) : enviarPdfMatricula(fs[0]); } e.target.value=''; };
-    ['dragover','dragenter'].forEach(ev=>pz.addEventListener(ev,e=>{e.preventDefault();pz.classList.add('drag');}));
-    ['dragleave','drop'].forEach(ev=>pz.addEventListener(ev,e=>{e.preventDefault();pz.classList.remove('drag');}));
-    pz.addEventListener('drop', e=>{ const fs=e.dataTransfer.files; if(fs && fs.length){ fs.length>1 ? enviarLotePdfMatricula(fs) : enviarPdfMatricula(fs[0]); } });
-  }
+  // IA (Gemini): dropzone unificado é ligado acima (vx-drop); aqui só a configuração
   const bgem=document.getElementById('btn-gemini-config'); if(bgem) bgem.addEventListener('click', abrirConfigGemini);
   const gadd=document.getElementById('gem-model-add'); if(gadd) gadd.addEventListener('click', gemAddModel);
   const ginp=document.getElementById('gem-model-input'); if(ginp) ginp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); gemAddModel(); } });
@@ -11175,6 +11948,89 @@ function tornarArrastavelBtn(el, onClick){
   el.addEventListener('mousedown', inicio);
   el.addEventListener('touchstart', inicio, {passive:false});
 }
+
+/* =====================================================================
+   Vertex — navegação por abas da barra de comando + sessão do mapa
+   (organiza os recursos que antes ficavam escondidos no painel lateral)
+   ===================================================================== */
+function vxMapResize(delay){
+  setTimeout(()=>{ try{ if(window.google && map) google.maps.event.trigger(map,'resize'); }catch(_){} }, delay||60);
+}
+/* O espaço do menu inferior do Atlas é reservado por CSS (--vx-bottombar); aqui só reenquadramos o mapa. */
+function vxAjustarRodape(){ vxMapResize(90); }
+/* Garante que a aba do MAPA esteja ativa e que o #map já tenha tamanho real (>0)
+   antes de executar cb (normalmente um fitBounds). Resolve o caso em que o
+   enquadramento acontecia com o mapa oculto (0×0) e o imóvel só aparecia após F5. */
+function vxEnsureMapVisibleThen(cb){
+  if(typeof window.__vxAtivar==='function') window.__vxAtivar('mapa');
+  let tries=0;
+  (function wait(){
+    const d=document.getElementById('map');
+    if(window.google && map && d && d.clientWidth>4 && d.clientHeight>4){
+      try{ google.maps.event.trigger(map,'resize'); }catch(_){}
+      requestAnimationFrame(()=>{ try{ cb&&cb(); }catch(_){} });
+    } else if(tries++ < 60){ requestAnimationFrame(wait); }
+    else { try{ cb&&cb(); }catch(_){} }
+  })();
+}
+/* Versão em Promise: garante a aba do MAPA ativa e o #map com tamanho real,
+   e SÓ resolve depois de um resize + 2 frames — para desenhar polígonos num mapa já assentado. */
+function vxWaitMapReady(){
+  return new Promise(res=>{
+    if(typeof window.__vxAtivar==='function') window.__vxAtivar('mapa');
+    let n=0;
+    (function w(){
+      const d=document.getElementById('map');
+      if(window.google && map && d && d.clientWidth>4 && d.clientHeight>4){
+        try{ google.maps.event.trigger(map,'resize'); }catch(_){}
+        requestAnimationFrame(()=>requestAnimationFrame(res));
+      } else if(n++<60){ requestAnimationFrame(w); }
+      else res();
+    })();
+  });
+}
+/* Ativa a aba do MAPA (seção em tela cheia) e reenquadra o mapa */
+function vxRevealMap(){
+  if(typeof window.__vxAtivar==='function') window.__vxAtivar('mapa');
+  vxMapResize(80);
+}
+(function(){
+  const tabs = Array.from(document.querySelectorAll('#vx-tabs .vx-tab'));
+  const panes = Array.from(document.querySelectorAll('#vx-stage .vx-pane'));
+  if(!tabs.length) return;
+
+  function ativar(nome){
+    tabs.forEach(t=> t.classList.toggle('active', t.dataset.tab===nome));
+    panes.forEach(p=> p.classList.toggle('active', p.dataset.pane===nome));
+    if(nome==='mapa') vxMapResize(60);   // o mapa estava oculto: precisa recalcular o tamanho
+  }
+  window.__vxAtivar = ativar;   // exposto para vxRevealMap() e outras partes do sistema
+
+  tabs.forEach(t=> t.addEventListener('click', ()=> ativar(t.dataset.tab)));
+
+  // Atalhos 1..6 trocam de aba (fora de campos de texto)
+  const mapaAbas={'1':'mapa','2':'imoveis','3':'cadastrar','4':'importar','5':'onr','6':'limites'};
+  document.addEventListener('keydown', (e)=>{
+    const alvo=e.target, tag=(alvo&&alvo.tagName||'').toUpperCase();
+    if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(alvo&&alvo.isContentEditable)) return;
+    if(mapaAbas[e.key]){ ativar(mapaAbas[e.key]); }
+  });
+
+  /* ===== Ações da aba ONR / Carga (sem formulário) ===== */
+  const acao=(id,fn)=>{ const b=document.getElementById(id); if(b) b.addEventListener('click', fn); };
+  acao('vx-onr-enviar', ()=>{ if(typeof enviarTodosOnr==='function') enviarTodosOnr(); });
+  acao('vx-onr-config', ()=>{ if(typeof abrirConfigOnr==='function') abrirConfigOnr(); });
+  acao('vx-itn-lote',   ()=>{ if(typeof exportarItn03Lote==='function') exportarItn03Lote('mapa'); });
+  acao('vx-itn-excl',   ()=>{ if(typeof exportarItn03Lote==='function') exportarItn03Lote('exclusivas'); });
+  acao('vx-itn-nova',   ()=>{ if(typeof novaMatriculaItn03==='function') novaMatriculaItn03(); });
+
+  window.addEventListener('resize', ()=> vxMapResize(120));
+  let _vxR; window.addEventListener('resize', ()=>{ clearTimeout(_vxR); _vxR=setTimeout(vxAjustarRodape,180); });
+  window.addEventListener('load', ()=> setTimeout(vxAjustarRodape,120));
+  vxAjustarRodape();
+  setTimeout(vxAjustarRodape, 600);
+  vxMapResize(400);   // primeiro enquadramento após o layout assentar
+})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 <script async src="https://maps.googleapis.com/maps/api/js?key=<?= GMAPS_KEY ?>&v=alpha&callback=initMap&loading=async"></script>
