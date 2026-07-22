@@ -4990,6 +4990,10 @@ if (isset($_POST['acao'])) {
                 $row['itn03_exclusivo'] = (int)($row['itn03_exclusivo'] ?? 0);
                 $row['is_projeto'] = (int)($row['is_projeto'] ?? 0);
                 $row['itn03_apto'] = itn03ExclusivoApto($row) ? 1 : 0; // aptidão p/ carga exclusiva ITN 03
+                // Aptidão REAL para a carga ITN 03 (mapeadas usam a régua completa; exclusivas, a mínima)
+                $falItn = ((int)($row['itn03_exclusivo'] ?? 0) === 1) ? itn03ExclusivoFaltam($row) : itn03Faltam($row);
+                $row['itn03_ok']     = count($falItn) === 0 ? 1 : 0;
+                $row['itn03_faltam'] = $falItn;
                 $rows[] = $row;
             }
             echo json_encode(['ok' => true, 'itens' => $rows], JSON_UNESCAPED_UNICODE);
@@ -5358,7 +5362,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-21f-3d-sem-links-externos (removidos os links "Google Earth" e "Google Maps (satélite)" do rodapé do modal de visão 3D — os imóveis só carregam dentro do sistema; mensagens de fallback do 3D atualizadas para não citar os links) | anterior: 2026-07-21e-vertodos-desmarcado (no foco de confronto o botão "Ver todos" fica desmarcado; clicá-lo nesse estado limpa o filtro ";*", oculta o badge do município e reexibe todos os imóveis — sem sair da visão geral) | anterior: 2026-07-21d-fix-termo-mat (fix: termo da consulta ";*" usava o rótulo "Mat. N", que não casa com o filtro exato de matrícula e o imóvel não era exibido — agora usa o NÚMERO puro (sem zeros à esquerda) e, sem matrícula, a identificação; corrigido também no verNoMapaConfronto da importação) | anterior: 2026-07-21c-foco-confronto-selecao (selecionar imóvel na lista agora foca em modo CONFRONTO: visão geral + consulta "matrícula;*" no painel — sobreposições e desmembradas — mantendo pontos dos vértices e badge de pertencimento ao município como no modo single; nova focarImovelConfronto; carregarImovel segue preenchendo Cadastrar/ONR/cor; dropzone de Importar só lista os tipos aceitos) | anterior: 2026-07-21b-shell-2-niveis-icones (REORGANIZAÇÃO ESTRUTURAL: barra de comando em 2 níveis — contexto/marca/base/ações em cima, faixa de abas com indicador embaixo; sprite SVG com 20 ícones estilo Lucide substituindo todos os emojis do shell, controles 3D, toolbars, cartões ONR e painel Visão geral; NAVEGAÇÃO INFERIOR FIXA no mobile (≤880px, estilo app nativo, safe-area, palco encolhe via bottom do shell); cabeçalhos de página por aba (ícone+título+descrição); form-grid em 3 colunas ≥1100px; "Como funciona" como stepper numerado; toggleRotulos atualiza só o <span> preservando o ícone) | anterior: 2026-07-21a-design-system-2 (DESIGN SYSTEM 2.0 "Instrumento cartográfico": camada visual 100% reconstruída — tokens de cor/raio/sombra/tipografia, Space Grotesk p/ títulos+abas, Inter p/ UI, IBM Plex Mono p/ dados; barra de comando com fio de lacre e abas segmentadas com indicador; graticule cartográfico sutil no palco; formulários com anel de foco, hover e select custom; botões com gradiente e elevação; cartões, badges, chips, acordeões, dropzones, painéis de mapa, modais e SweetAlert2 retematizados nos dois temas; dark mode revisto (azul-grafite); 100% responsivo (1100/880/520/420) com abas roláveis no mobile, alvos de toque maiores e prefers-reduced-motion; nenhum seletor/estado do JS alterado — apenas aparência) | anterior: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-22a-aba-relatorios (nova aba RELATÓRIOS: 3 painéis de completude com gráfico donut SVG e % — 1) matrículas faltantes da 1 até a maior, com intervalos comprimidos (ex.: 5–7, 23) e contagem de imóveis sem nº; 2) envio ao Mapa ONR: enviadas × faltantes, chips verdes p/ prontas e vermelhos p/ dados incompletos; 3) carga ITN 03: aptas × pendentes com O QUE FALTA em cada matrícula; botão Copiar lista por relatório, Recalcular, atalho de teclado 7, bottom nav mobile com 7 colunas; listar agora devolve itn03_ok/itn03_faltam (régua completa p/ mapeadas, mínima p/ exclusivas); tudo client-side sobre o próprio listar — sem migração de banco) | anterior: 2026-07-21f-3d-sem-links-externos (removidos os links "Google Earth" e "Google Maps (satélite)" do rodapé do modal de visão 3D — os imóveis só carregam dentro do sistema; mensagens de fallback do 3D atualizadas para não citar os links) | anterior: 2026-07-21e-vertodos-desmarcado (no foco de confronto o botão "Ver todos" fica desmarcado; clicá-lo nesse estado limpa o filtro ";*", oculta o badge do município e reexibe todos os imóveis — sem sair da visão geral) | anterior: 2026-07-21d-fix-termo-mat (fix: termo da consulta ";*" usava o rótulo "Mat. N", que não casa com o filtro exato de matrícula e o imóvel não era exibido — agora usa o NÚMERO puro (sem zeros à esquerda) e, sem matrícula, a identificação; corrigido também no verNoMapaConfronto da importação) | anterior: 2026-07-21c-foco-confronto-selecao (selecionar imóvel na lista agora foca em modo CONFRONTO: visão geral + consulta "matrícula;*" no painel — sobreposições e desmembradas — mantendo pontos dos vértices e badge de pertencimento ao município como no modo single; nova focarImovelConfronto; carregarImovel segue preenchendo Cadastrar/ONR/cor; dropzone de Importar só lista os tipos aceitos) | anterior: 2026-07-21b-shell-2-niveis-icones (REORGANIZAÇÃO ESTRUTURAL: barra de comando em 2 níveis — contexto/marca/base/ações em cima, faixa de abas com indicador embaixo; sprite SVG com 20 ícones estilo Lucide substituindo todos os emojis do shell, controles 3D, toolbars, cartões ONR e painel Visão geral; NAVEGAÇÃO INFERIOR FIXA no mobile (≤880px, estilo app nativo, safe-area, palco encolhe via bottom do shell); cabeçalhos de página por aba (ícone+título+descrição); form-grid em 3 colunas ≥1100px; "Como funciona" como stepper numerado; toggleRotulos atualiza só o <span> preservando o ícone) | anterior: 2026-07-21a-design-system-2 (DESIGN SYSTEM 2.0 "Instrumento cartográfico": camada visual 100% reconstruída — tokens de cor/raio/sombra/tipografia, Space Grotesk p/ títulos+abas, Inter p/ UI, IBM Plex Mono p/ dados; barra de comando com fio de lacre e abas segmentadas com indicador; graticule cartográfico sutil no palco; formulários com anel de foco, hover e select custom; botões com gradiente e elevação; cartões, badges, chips, acordeões, dropzones, painéis de mapa, modais e SweetAlert2 retematizados nos dois temas; dark mode revisto (azul-grafite); 100% responsivo (1100/880/520/420) com abas roláveis no mobile, alvos de toque maiores e prefers-reduced-motion; nenhum seletor/estado do JS alterado — apenas aparência) | anterior: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -6518,6 +6522,47 @@ header('Expires: 0');
     color:var(--red-bright);background:var(--red-soft);
     border:1px solid color-mix(in srgb, var(--red-bright) 25%, transparent)}
 
+  /* ─── 27c. ABA RELATÓRIOS ──────────────────────────────────────── */
+  .rel-toolbar{display:flex;align-items:center;gap:12px;margin:0 0 14px}
+  .rel-quando{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .rel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start}
+  .rel-loading{grid-column:1/-1;padding:26px;text-align:center;color:var(--muted);font-size:12.5px;
+    border:1.5px dashed var(--line-2);border-radius:var(--r-l);background:var(--panel)}
+  .rel-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-l);
+    box-shadow:var(--sh-1);padding:18px 18px 16px;display:flex;flex-direction:column;gap:13px;min-width:0}
+  .rel-h{display:flex;align-items:center;gap:10px}
+  .rel-h .vx-act-ic{margin-right:0}
+  .rel-h h3{margin:0;font-family:var(--titles);font-size:14px;font-weight:700;color:var(--ink)}
+  .rel-h p{margin:2px 0 0;font-size:11px;color:var(--muted)}
+  .rel-top{display:flex;align-items:center;gap:16px}
+  .rel-donut{flex:none;width:104px;height:104px;position:relative}
+  .rel-donut svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .rel-donut .rel-pct{position:absolute;inset:0;display:grid;place-items:center;
+    font-family:var(--titles);font-weight:700;font-size:20px;color:var(--ink)}
+  .rel-donut .rel-pct small{display:block;font-family:var(--mono);font-weight:400;font-size:9px;
+    color:var(--faint);letter-spacing:.06em;text-transform:uppercase;text-align:center;margin-top:2px}
+  .rel-nums{display:flex;flex-direction:column;gap:7px;min-width:0}
+  .rel-n{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--muted)}
+  .rel-n b{font-family:var(--mono);font-size:14px;color:var(--ink);font-weight:600}
+  .rel-n .dot{width:8px;height:8px;border-radius:3px;flex:none;align-self:center}
+  .rel-miss-h{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-top:2px}
+  .rel-miss-h span{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+  .rel-copy{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);
+    color:var(--muted);font-family:var(--disp);font-size:11px;font-weight:600;border-radius:999px;
+    padding:5px 11px;cursor:pointer;transition:color .15s,border-color .15s,box-shadow .15s}
+  .rel-copy:hover{color:var(--ink);border-color:var(--line-2);box-shadow:var(--sh-1)}
+  .rel-copy .ic{width:12px;height:12px}
+  .rel-miss{display:flex;flex-wrap:wrap;gap:6px;max-height:172px;overflow:auto;padding:2px}
+  .rel-chip{font-family:var(--mono);font-size:11px;color:var(--ink);background:var(--panel-2);
+    border:1px solid var(--line);border-radius:8px;padding:4px 8px;white-space:nowrap}
+  .rel-chip.warn{background:color-mix(in srgb, var(--red-bright) 8%, transparent);
+    border-color:color-mix(in srgb, var(--red-bright) 28%, transparent)}
+  .rel-chip.ok2{background:color-mix(in srgb, var(--teal) 10%, transparent);
+    border-color:color-mix(in srgb, var(--teal) 30%, transparent)}
+  .rel-chip small{display:block;font-family:var(--ui);font-size:9.5px;color:var(--muted);white-space:normal;max-width:220px}
+  .rel-vazio{font-size:12px;color:var(--teal);font-weight:600}
+  .rel-nota{font-size:10.5px;color:var(--faint);line-height:1.55;margin:0}
+
   /* ─── 28. RESPONSIVO ────────────────────────────────────────────── */
   @media (max-width:1100px){
     .vx-top{gap:12px;padding:9px 14px 8px}
@@ -6547,7 +6592,7 @@ header('Expires: 0');
     .vx-tabs{position:fixed;left:0;right:0;bottom:0;z-index:890;margin:0;border-top:1px solid var(--line);
       height:calc(60px + env(safe-area-inset-bottom,0px));
       padding:5px 6px calc(5px + env(safe-area-inset-bottom,0px));
-      display:grid;grid-template-columns:repeat(6,1fr);gap:2px;
+      display:grid;grid-template-columns:repeat(7,1fr);gap:2px;
       background:color-mix(in srgb, var(--panel) 93%, transparent);
       -webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);
       box-shadow:0 -8px 22px -14px rgba(10,16,24,.4)}
@@ -6644,6 +6689,9 @@ header('Expires: 0');
     <symbol id="i-down" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
     <symbol id="i-minus" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></symbol>
   </svg>
   <div class="panel">
     <!-- ===== Barra de comando (2 níveis: contexto em cima, navegação embaixo) ===== -->
@@ -6679,6 +6727,7 @@ header('Expires: 0');
         <button type="button" class="vx-tab"        data-tab="importar"  title="Importar KML ou PDF/SIGEF por IA"><svg class="ic"><use href="#i-upload"/></svg><span>Importar</span></button>
         <button type="button" class="vx-tab"        data-tab="onr"       title="Enviar ao Mapa da ONR e exportar carga ITN 03"><svg class="ic"><use href="#i-globe"/></svg><span>ONR / Carga</span></button>
         <button type="button" class="vx-tab"        data-tab="limites"   title="Limite do município (IBGE / KML)"><svg class="ic"><use href="#i-compass"/></svg><span>Limites</span></button>
+        <button type="button" class="vx-tab"        data-tab="relatorios" title="Relatórios de completude: matrículas faltantes, envio ONR e carga ITN 03"><svg class="ic"><use href="#i-chart"/></svg><span>Relatórios</span></button>
       </nav>
     </div>
     <!-- Faixa de status (global, visível em qualquer aba) -->
@@ -7036,6 +7085,24 @@ header('Expires: 0');
         <div class="status" id="muni-status"></div>
       </div>
       </section>
+
+    <!-- ===== ABA: RELATÓRIOS ===== -->
+    <section class="vx-pane" data-pane="relatorios">
+      <header class="vx-pane-head">
+        <div class="vx-ph-ic"><svg class="ic"><use href="#i-chart"/></svg></div>
+        <div class="vx-ph-tx">
+          <h2>Relatórios de completude</h2>
+          <p>Panorama do acervo: matrículas faltantes na numeração (1 até a maior), envio ao Mapa da ONR e aptidão para a carga ITN 03 — com percentuais e a lista exata do que falta.</p>
+        </div>
+      </header>
+      <div class="rel-toolbar">
+        <button class="mini-btn" id="rel-atualizar"><svg class="ic"><use href="#i-refresh"/></svg><span>Recalcular</span></button>
+        <span class="rel-quando" id="rel-quando"></span>
+      </div>
+      <div class="rel-grid" id="rel-wrap">
+        <div class="rel-loading">Abra esta aba para calcular os relatórios.</div>
+      </div>
+    </section>
 
   </div><!-- /.vx-stage -->
 </div><!-- /.mapeador-shell -->
@@ -11994,6 +12061,114 @@ function vxRevealMap(){
   if(typeof window.__vxAtivar==='function') window.__vxAtivar('mapa');
   vxMapResize(80);
 }
+/* ===================== ABA RELATÓRIOS =====================
+   Três painéis de completude calculados sobre a base de matrículas (projetos fora):
+   1) Matrículas faltantes na numeração (1 até a maior cadastrada);
+   2) Envio ao Mapa da ONR (enviadas × faltantes, destacando as já prontas);
+   3) Aptidão para a carga ITN 03 (aptas × pendentes, com o que falta em cada uma). */
+function relEsc(t){ return String(t==null?'':t).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function relRotulo(i){ const k=matKey(i.numero_matricula); return /^\d+$/.test(k) ? ('Mat. '+k) : (i.identificador||('#'+i.id)); }
+function relFaixas(nums){ // [1,2,3,7,9,10] -> ["1–3","7","9–10"]
+  const out=[]; let a=null,b=null;
+  nums.forEach(n=>{ if(a===null){a=b=n;} else if(n===b+1){b=n;} else {out.push(a===b?String(a):a+'–'+b); a=b=n;} });
+  if(a!==null) out.push(a===b?String(a):a+'–'+b);
+  return out;
+}
+function relDonut(pct, cor){
+  const r=44, C=2*Math.PI*r, done=Math.max(0,Math.min(100,pct))/100*C;
+  return `<div class="rel-donut"><svg viewBox="0 0 104 104">
+    <circle cx="52" cy="52" r="${r}" fill="none" stroke="var(--line)" stroke-width="11"/>
+    <circle cx="52" cy="52" r="${r}" fill="none" stroke="${cor}" stroke-width="11" stroke-linecap="round"
+      stroke-dasharray="${done.toFixed(2)} ${(C-done).toFixed(2)}"/>
+  </svg><div class="rel-pct">${pct.toFixed(pct>=100?0:1).replace('.',',')}%<small>completo</small></div></div>`;
+}
+function relCard(ic, icCls, titulo, sub, pct, cor, linhas, missHtml, copyId, copyTxt, nota){
+  return `<div class="rel-card">
+    <div class="rel-h"><span class="vx-act-ic ${icCls}"><svg class="ic"><use href="#${ic}"/></svg></span>
+      <div><h3>${titulo}</h3><p>${sub}</p></div></div>
+    <div class="rel-top">${relDonut(pct,cor)}<div class="rel-nums">${linhas}</div></div>
+    ${missHtml}
+    ${nota?`<p class="rel-nota">${nota}</p>`:''}
+    <textarea id="${copyId}-txt" style="position:absolute;left:-9999px;top:-9999px">${relEsc(copyTxt)}</textarea>
+  </div>`;
+}
+function relLinha(cor, valor, rotulo){ return `<div class="rel-n"><span class="dot" style="background:${cor}"></span><b>${valor}</b> ${rotulo}</div>`; }
+function relMissBloco(titulo, copyId, chipsHtml, vazioMsg){
+  return `<div><div class="rel-miss-h"><span>${titulo}</span>
+    ${chipsHtml?`<button class="rel-copy" data-copy="${copyId}"><svg class="ic"><use href="#i-copy"/></svg>Copiar lista</button>`:''}</div>
+    ${chipsHtml?`<div class="rel-miss">${chipsHtml}</div>`:`<div class="rel-vazio">${vazioMsg}</div>`}</div>`;
+}
+async function renderRelatorios(forcar){
+  const wrap=document.getElementById('rel-wrap'); if(!wrap) return;
+  wrap.innerHTML='<div class="rel-loading">Calculando relatórios…</div>';
+  try{ const res=await post({acao:'listar'}); if(res && res.ok && res.itens) imoveisCache=res.itens; }catch(_){}
+  const its=(imoveisCache||[]).filter(i=> !(+i.is_projeto));
+  const enc=i=> String(i.situacao||'')==='encerrada';
+  const verdeOk='var(--teal)';
+
+  /* ---- 1) Matrículas faltantes na numeração ---- */
+  const nums=new Set(); let semNum=0;
+  its.forEach(i=>{ const k=matKey(i.numero_matricula); if(/^\d+$/.test(k)&&+k>0) nums.add(+k); else semNum++; });
+  const maxM=nums.size?Math.max(...Array.from(nums)):0;
+  const faltamN=[]; for(let n=1;n<=maxM;n++) if(!nums.has(n)) faltamN.push(n);
+  const pct1=maxM? (nums.size/maxM*100) : 0;
+  const faixas=relFaixas(faltamN);
+  const chips1=faixas.map(f=>`<span class="rel-chip warn">${f}</span>`).join('');
+  const card1=relCard('i-arch','itn','Matrículas faltantes','Numeração de 1 até a maior cadastrada',
+    pct1, verdeOk,
+    relLinha(verdeOk, nums.size.toLocaleString('pt-BR'), 'matrículas cadastradas')+
+    relLinha('var(--red-bright)', faltamN.length.toLocaleString('pt-BR'), 'faltantes até a Mat. '+maxM.toLocaleString('pt-BR'))+
+    (semNum?relLinha('var(--faint)', semNum, 'sem nº de matrícula (fora do cálculo)'):''),
+    relMissBloco('Faltantes (intervalos)','rel1',chips1,'Nenhuma matrícula faltante — numeração completa.'),
+    'rel1', 'Matrículas faltantes (1 até '+maxM+'): '+(faixas.join(', ')||'nenhuma'),
+    'Considera toda matrícula numérica cadastrada no sistema (mapeadas, exclusivas ITN 03 e encerradas).');
+
+  /* ---- 2) Envio ao Mapa da ONR ---- */
+  const baseOnr=its.filter(i=> !(+i.itn03_exclusivo) && !enc(i));
+  const envs=baseOnr.filter(i=> +i.onr_enviado);
+  const falO=baseOnr.filter(i=> !(+i.onr_enviado));
+  falO.sort((a,b)=>{ const ka=matKey(a.numero_matricula), kb=matKey(b.numero_matricula);
+    const na=/^\d+$/.test(ka)?+ka:1e15, nb=/^\d+$/.test(kb)?+kb:1e15; return na-nb; });
+  const prontasO=falO.filter(i=> +i.onr_pronto).length;
+  const pct2=baseOnr.length? (envs.length/baseOnr.length*100) : 0;
+  const chips2=falO.map(i=>`<span class="rel-chip ${(+i.onr_pronto)?'ok2':'warn'}" title="${(+i.onr_pronto)?'Pronta para envio':'Dados ONR incompletos'}">${relEsc(relRotulo(i))}</span>`).join('');
+  const card2=relCard('i-globe','','Envio ao Mapa da ONR','Imóveis mapeados ativos (encerradas fora)',
+    pct2, verdeOk,
+    relLinha(verdeOk, envs.length.toLocaleString('pt-BR'), 'enviadas de '+baseOnr.length.toLocaleString('pt-BR'))+
+    relLinha('var(--red-bright)', falO.length.toLocaleString('pt-BR'), 'faltando enviar')+
+    (prontasO?relLinha('var(--teal)', prontasO, 'destas já estão prontas p/ envio'):''),
+    relMissBloco('Faltando enviar','rel2',chips2,'Todos os imóveis elegíveis já foram enviados.'),
+    'rel2', 'Faltando enviar ao Mapa ONR: '+(falO.map(relRotulo).join(', ')||'nenhuma'),
+    'Verde = pronta para envio (dados ONR completos) · Vermelho = dados ONR incompletos.');
+
+  /* ---- 3) Carga ITN 03 ---- */
+  const baseItn=its.filter(i=> !enc(i));
+  const oks=baseItn.filter(i=> +i.itn03_ok);
+  const falI=baseItn.filter(i=> !(+i.itn03_ok));
+  falI.sort((a,b)=>{ const ka=matKey(a.numero_matricula), kb=matKey(b.numero_matricula);
+    const na=/^\d+$/.test(ka)?+ka:1e15, nb=/^\d+$/.test(kb)?+kb:1e15; return na-nb; });
+  const pct3=baseItn.length? (oks.length/baseItn.length*100) : 0;
+  const chips3=falI.map(i=>{ const f=(i.itn03_faltam||[]).join(', ');
+    return `<span class="rel-chip warn" title="${relEsc('Falta: '+(f||'—'))}">${relEsc(relRotulo(i))}<small>${relEsc(f)}</small></span>`; }).join('');
+  const card3=relCard('i-down','itn','Carga ITN 03','Mapeadas + exclusivas ativas (encerradas fora)',
+    pct3, verdeOk,
+    relLinha(verdeOk, oks.length.toLocaleString('pt-BR'), 'aptas de '+baseItn.length.toLocaleString('pt-BR'))+
+    relLinha('var(--red-bright)', falI.length.toLocaleString('pt-BR'), 'pendentes'),
+    relMissBloco('Pendentes (com o que falta)','rel3',chips3,'Todas as matrículas ativas estão aptas para a carga.'),
+    'rel3', 'Pendentes da carga ITN 03: '+(falI.map(i=> relRotulo(i)+' (falta: '+((i.itn03_faltam||[]).join(', ')||'—')+')').join('; ')||'nenhuma'),
+    'A pendência de cada matrícula aparece dentro do próprio cartão; preencha na aba Cadastrar → Dados ONR.');
+
+  wrap.innerHTML = card1 + card2 + card3;
+  const q=document.getElementById('rel-quando');
+  if(q) q.textContent='calculado às '+new Date().toLocaleTimeString('pt-BR');
+  wrap.querySelectorAll('.rel-copy').forEach(b=>{
+    b.onclick=()=>{ const ta=document.getElementById(b.dataset.copy+'-txt'); if(!ta) return;
+      ta.select(); try{ document.execCommand('copy'); }catch(_){}
+      if(navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(()=>{});
+      const sp=b.lastChild; const old=sp.textContent; sp.textContent='Copiado!'; setTimeout(()=>{ sp.textContent=old; },1200);
+    };
+  });
+}
 (function(){
   const tabs = Array.from(document.querySelectorAll('#vx-tabs .vx-tab'));
   const panes = Array.from(document.querySelectorAll('#vx-stage .vx-pane'));
@@ -12003,13 +12178,14 @@ function vxRevealMap(){
     tabs.forEach(t=> t.classList.toggle('active', t.dataset.tab===nome));
     panes.forEach(p=> p.classList.toggle('active', p.dataset.pane===nome));
     if(nome==='mapa') vxMapResize(60);   // o mapa estava oculto: precisa recalcular o tamanho
+    if(nome==='relatorios' && typeof renderRelatorios==='function') renderRelatorios();
   }
   window.__vxAtivar = ativar;   // exposto para vxRevealMap() e outras partes do sistema
 
   tabs.forEach(t=> t.addEventListener('click', ()=> ativar(t.dataset.tab)));
 
-  // Atalhos 1..6 trocam de aba (fora de campos de texto)
-  const mapaAbas={'1':'mapa','2':'imoveis','3':'cadastrar','4':'importar','5':'onr','6':'limites'};
+  // Atalhos 1..7 trocam de aba (fora de campos de texto)
+  const mapaAbas={'1':'mapa','2':'imoveis','3':'cadastrar','4':'importar','5':'onr','6':'limites','7':'relatorios'};
   document.addEventListener('keydown', (e)=>{
     const alvo=e.target, tag=(alvo&&alvo.tagName||'').toUpperCase();
     if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(alvo&&alvo.isContentEditable)) return;
@@ -12023,6 +12199,7 @@ function vxRevealMap(){
   acao('vx-itn-lote',   ()=>{ if(typeof exportarItn03Lote==='function') exportarItn03Lote('mapa'); });
   acao('vx-itn-excl',   ()=>{ if(typeof exportarItn03Lote==='function') exportarItn03Lote('exclusivas'); });
   acao('vx-itn-nova',   ()=>{ if(typeof novaMatriculaItn03==='function') novaMatriculaItn03(); });
+  acao('rel-atualizar', ()=>{ if(typeof renderRelatorios==='function') renderRelatorios(true); });
 
   window.addEventListener('resize', ()=> vxMapResize(120));
   let _vxR; window.addEventListener('resize', ()=>{ clearTimeout(_vxR); _vxR=setTimeout(vxAjustarRodape,180); });
