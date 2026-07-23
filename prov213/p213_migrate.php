@@ -6,7 +6,7 @@
  */
 
 // Suba este número sempre que o schema mudar; força uma nova verificação.
-if (!defined('P213_SCHEMA_VERSION')) define('P213_SCHEMA_VERSION', 4);
+if (!defined('P213_SCHEMA_VERSION')) define('P213_SCHEMA_VERSION', 5);
 
 /**
  * Cria/atualiza todas as tabelas e colunas. Idempotente e barato:
@@ -31,13 +31,20 @@ CREATE TABLE IF NOT EXISTS p213_config (
   encarregado_dpo   VARCHAR(180)  NOT NULL DEFAULT '',
   dpo_contato       VARCHAR(180)  NOT NULL DEFAULT '',
   corregedoria      VARCHAR(180)  NOT NULL DEFAULT 'Corregedoria Geral da Justiça',
-  receita_semestral DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-  fator_ipca        DECIMAL(6,4)  NOT NULL DEFAULT 1.0000,
+  receita_semestral   DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  fator_atualizacao   DECIMAL(6,4)  NOT NULL DEFAULT 1.0000,
+  -- memória de cálculo da receita bruta semestral (art. 2º, XXIV, red. Prov. 243/2026)
+  rec_emolumentos     DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  rec_outras          DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  rec_atos_gratuitos  DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  rec_renda_minima    DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  ded_terceiros       DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  ded_repasses        DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   classe_manual     TINYINT       NULL,
   subclasse_manual  VARCHAR(2)    NULL,
   modelo_solucao    VARCHAR(30)   NOT NULL DEFAULT 'propria',
   gemini_api_key    VARCHAR(160)  NOT NULL DEFAULT '',
-  gemini_modelo     VARCHAR(60)   NOT NULL DEFAULT 'gemini-3.5-flash',
+  gemini_modelo     VARCHAR(60)   NOT NULL DEFAULT 'gemini-3.1-flash-lite',
   atualizado_em     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
@@ -164,7 +171,14 @@ CREATE TABLE IF NOT EXISTS p213_meta (
     $colunas = [
         'p213_config' => [
             'gemini_api_key' => "ALTER TABLE p213_config ADD COLUMN gemini_api_key VARCHAR(160) NOT NULL DEFAULT ''",
-            'gemini_modelo'  => "ALTER TABLE p213_config ADD COLUMN gemini_modelo VARCHAR(60) NOT NULL DEFAULT 'gemini-3.5-flash'",
+            'gemini_modelo'  => "ALTER TABLE p213_config ADD COLUMN gemini_modelo VARCHAR(60) NOT NULL DEFAULT 'gemini-3.1-flash-lite'",
+            // memória de cálculo da receita bruta (Prov. 243/2026)
+            'rec_emolumentos'    => "ALTER TABLE p213_config ADD COLUMN rec_emolumentos DECIMAL(14,2) NOT NULL DEFAULT 0.00",
+            'rec_outras'         => "ALTER TABLE p213_config ADD COLUMN rec_outras DECIMAL(14,2) NOT NULL DEFAULT 0.00",
+            'rec_atos_gratuitos' => "ALTER TABLE p213_config ADD COLUMN rec_atos_gratuitos DECIMAL(14,2) NOT NULL DEFAULT 0.00",
+            'rec_renda_minima'   => "ALTER TABLE p213_config ADD COLUMN rec_renda_minima DECIMAL(14,2) NOT NULL DEFAULT 0.00",
+            'ded_terceiros'      => "ALTER TABLE p213_config ADD COLUMN ded_terceiros DECIMAL(14,2) NOT NULL DEFAULT 0.00",
+            'ded_repasses'       => "ALTER TABLE p213_config ADD COLUMN ded_repasses DECIMAL(14,2) NOT NULL DEFAULT 0.00",
         ],
     ];
     foreach ($colunas as $tab => $cols) {
@@ -176,13 +190,29 @@ CREATE TABLE IF NOT EXISTS p213_meta (
         }
     }
 
+    // Prov. 243/2026: o art. 16, §2º deixou de indexar os limites ao IPCA — quem divulga
+    // os valores atualizados passou a ser a Corregedoria Nacional. Renomeia preservando o valor.
+    try {
+        $novo  = $conn->query("SHOW COLUMNS FROM p213_config LIKE 'fator_atualizacao'");
+        $velho = $conn->query("SHOW COLUMNS FROM p213_config LIKE 'fator_ipca'");
+        if ($velho && $velho->num_rows > 0 && $novo && $novo->num_rows === 0) {
+            $conn->query("ALTER TABLE p213_config
+                          CHANGE fator_ipca fator_atualizacao DECIMAL(6,4) NOT NULL DEFAULT 1.0000");
+            $rel['colunas']++;
+        } elseif ($novo && $novo->num_rows === 0) {
+            $conn->query("ALTER TABLE p213_config
+                          ADD COLUMN fator_atualizacao DECIMAL(6,4) NOT NULL DEFAULT 1.0000");
+            $rel['colunas']++;
+        }
+    } catch (Throwable $e) { $rel['erros'][] = 'fator_atualizacao: ' . $e->getMessage(); }
+
     // linha padrão de configuração
     try { $conn->query("INSERT IGNORE INTO p213_config (id) VALUES (1)"); } catch (Throwable $e) {}
 
     // migração de dados: modelos Gemini já desligados pelo Google -> modelo ativo
     try {
         $conn->query("UPDATE p213_config
-                      SET gemini_modelo = 'gemini-3.5-flash'
+                      SET gemini_modelo = 'gemini-3.1-flash-lite'
                       WHERE gemini_modelo IN
                         ('gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-pro','gemini-1.5-flash','')");
         if ($conn->affected_rows > 0) $rel['colunas'] += 0; // apenas normalização de dados

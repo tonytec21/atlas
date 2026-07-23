@@ -20,7 +20,8 @@ function cls_etapa($d) {
 
 p213_head('Conformidade — Provimento 213');
 p213_hero('Conformidade — Provimento CN-CNJ n. 213/2026',
-    'Padrões mínimos de TIC dos serviços notariais e de registro &middot; vigência desde 23/02/2026');
+    'Padrões mínimos de TIC dos serviços notariais e de registro &middot; ' .
+    'prazos e classes na redação do Provimento 243, de 21/07/2026');
 p213_nav('index.php');
 ?>
 
@@ -77,7 +78,7 @@ p213_nav('index.php');
 
   <!-- ───────────────────────────── coluna direita -->
   <div>
-    <div class="p213-grid g2" style="margin-bottom:18px">
+    <div class="p213-grid g3" style="margin-bottom:18px">
       <div class="p213-deadline <?= cls_prazo($prz['inicial_dias']) ?>">
         <div class="lbl">Etapas 1 e 2 — implementação inicial obrigatória (art. 20)</div>
         <div class="num"><?= $prz['inicial_dias'] >= 0 ? $prz['inicial_dias'] . ' dias' : 'Vencido' ?></div>
@@ -90,16 +91,24 @@ p213_nav('index.php');
         <div class="lbl">Vence em <?= $prz['global']->format('d/m/Y') ?>
           &middot; <?= $prz['meses_norma'] ?> meses da vigência</div>
       </div>
+      <div class="p213-deadline <?= cls_prazo($prz['avaliacao_dias']) ?>">
+        <div class="lbl">Primeira avaliação técnica (art. 22, §1º, III)</div>
+        <div class="num"><?= $prz['avaliacao_dias'] >= 0 ? $prz['avaliacao_dias'] . ' dias' : 'Vencido' ?></div>
+        <div class="lbl">Vence em <?= $prz['avaliacao']->format('d/m/Y') ?>
+          &middot; 12 meses da vigência</div>
+      </div>
     </div>
 
     <?php if ($prz['inicial_dias'] < 60): ?>
       <div class="p213-alert info">
         <i class="fa fa-info-circle"></i>
-        <div><strong>Prorrogação excepcional (art. 21).</strong> A Corregedoria pode prorrogar
-          <em>uma única vez</em> o prazo do art. 20 por até 90 dias (limite:
-          <?= $prz['prorrogado']->format('d/m/Y') ?>), mediante plano formal de adequação com cronograma e
-          responsáveis, e adoção imediata de medidas compensatórias. O requerimento deve ser apresentado
-          <strong>antes</strong> do vencimento.</div>
+        <div><strong>Prorrogação excepcional (art. 21, red. Prov. 243/2026).</strong> A Corregedoria pode
+          prorrogar o prazo do art. 20 <em>em uma ou mais oportunidades</em>, desde que o somatório não
+          ultrapasse <strong>180 dias</strong> (limite: <?= $prz['prorrogado']->format('d/m/Y') ?>).
+          Exige plano formal de adequação com cronograma, responsáveis e a descrição das causas do atraso,
+          além de medidas compensatórias imediatas. Classe 1 pode ter parte da documentação dispensada (§1º);
+          Classes 2 e 3 instruem com documentação técnica e orçamentos (§2º). O deferimento sujeita a serventia
+          a regime especial de acompanhamento (§4º).</div>
       </div>
     <?php endif; ?>
 

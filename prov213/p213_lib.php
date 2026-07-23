@@ -62,15 +62,19 @@ function p213_usuario() {
 // 3. Enquadramento por classe (art. 16)
 // ---------------------------------------------------------------------------
 /**
- * Classe 1: até R$ 100.000,00 (subclasses A, B, C — terços do teto)
- * Classe 2: acima de C1 até R$ 500.000,00 (subclasses D, E, F — terços do teto)
- * Classe 3: acima de R$ 500.000,00 (G até 3x; H até 6x; I até 12x; J acima de 12x)
- * Base: arrecadação bruta SEMESTRAL. §2º: tetos atualizados anualmente pelo IPCA.
+ * Enquadramento por RECEITA BRUTA SEMESTRAL (art. 16, redação do Prov. 243/2026).
+ *
+ * Classe 1: até R$ 300.000,00 (subclasses A, B, C — terços do teto)
+ * Classe 2: acima do teto da C1 até R$ 1.500.000,00 (subclasses D, E, F — terços do teto)
+ * Classe 3: acima do teto da C2 (G até 3x; H até 6x; I até 12x; J acima de 12x)
+ *
+ * §2º: os limites são atualizados automaticamente a cada ano de vigência, cabendo à
+ * Corregedoria Nacional divulgar os valores — não há mais indexador predefinido.
  */
-function p213_enquadrar($receitaSemestral, $fatorIpca = 1.0) {
+function p213_enquadrar($receitaSemestral, $fatorAtualizacao = 1.0) {
     $r  = (float)$receitaSemestral;
-    $t1 = 100000.00 * $fatorIpca;
-    $t2 = 500000.00 * $fatorIpca;
+    $t1 =  300000.00 * $fatorAtualizacao;
+    $t2 = 1500000.00 * $fatorAtualizacao;
 
     if ($r <= $t1) {
         $sub = ($r <= $t1 / 3) ? 'A' : (($r <= 2 * $t1 / 3) ? 'B' : 'C');
@@ -111,25 +115,60 @@ function p213_parametros($classe) {
 // ---------------------------------------------------------------------------
 // 5. Prazos (arts. 20, 21 e 23)
 // ---------------------------------------------------------------------------
-function p213_prazos($classe, $vigencia = P213_VIGENCIA) {
-    $dias  = [3 => 90, 2 => 150, 1 => 210];             // art. 20 — Etapas 1 e 2
-    $meses = [3 => 24, 2 => 30,  1 => 36];              // art. 23 — Etapas 1 a 5
+function p213_prazos($classe, $vigencia = P213_VIGENCIA_243) {
+    // art. 20 (Etapas 1 e 2) — prazos ampliados pelo Prov. 243/2026
+    $dias  = [3 => 180, 2 => 240, 1 => 300];
+    // art. 23 (Etapas 1 a 5) — implementação cumulativa e integral
+    $meses = [3 => 24,  2 => 30,  1 => 36];
     $d = new DateTime($vigencia);
 
     $inicial = (clone $d)->modify('+' . $dias[$classe] . ' days');
     $global  = (clone $d)->modify('+' . $meses[$classe] . ' months');
-    $prorrog = (clone $inicial)->modify('+90 days');    // art. 21 — prorrogação excepcional
+    // art. 21, §3º — o SOMATÓRIO das prorrogações não pode ultrapassar 180 dias
+    // (podem ser deferidas em uma ou mais oportunidades).
+    $prorrog = (clone $inicial)->modify('+180 days');
+    // art. 22, §1º, III — primeira avaliação técnica em até 12 meses da vigência
+    $avaliacao = (clone $d)->modify('+12 months');
 
     $hoje = new DateTime('today');
     return [
         'inicial'          => $inicial,
         'inicial_dias'     => (int)$hoje->diff($inicial)->format('%r%a'),
         'prorrogado'       => $prorrog,
+        'prorrog_dias_max' => 180,
+        'avaliacao'        => $avaliacao,
+        'avaliacao_dias'   => (int)$hoje->diff($avaliacao)->format('%r%a'),
         'global'           => $global,
         'global_dias'      => (int)$hoje->diff($global)->format('%r%a'),
         'dias_norma'       => $dias[$classe],
         'meses_norma'      => $meses[$classe],
+        'vigencia'         => $d,
     ];
+}
+
+/**
+ * Requisitos NÃO suscetíveis da ressalva técnica do art. 20-A (§4º): padrão mínimo
+ * indispensável de proteção do acervo e dos dados pessoais — cópias de segurança,
+ * integridade e autenticidade dos atos, controle de acesso, registro de auditoria
+ * e obrigações decorrentes de lei.
+ */
+function p213_nao_ressalvavel($cod) {
+    static $set = null;
+    if ($set === null) {
+        $set = array_flip([
+            // cópias de segurança e sua custódia
+            '3.2.a','3.2.b','3.2.c','3.2.d','3.2.e','3.3','4.5',
+            // integridade e autenticidade dos atos
+            '3.1.a','3.1.b','3.1.c','3.1.d',
+            // controle de acesso
+            '1.3.a','1.3.b','1.3.c','1.3.d',
+            // registro de auditoria
+            '3.8.a','3.8.b','3.8.c','3.8.d','3.8.e','4.1',
+            // obrigações decorrentes de lei (LGPD)
+            '1.1.II','1.4','1.5',
+        ]);
+    }
+    return isset($set[$cod]);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,8 +240,12 @@ function p213_catalogo() {
  'Software livre/código aberto é admitido, desde que compatível com as normas de segurança. Guarde notas fiscais e termos de licença.'],
 
 ['1.8.b', 1, 3, $C, 'Nenhum sistema operacional, SGBD, aplicação crítica ou componente está fora do ciclo de suporte oficial (EOL)?',
- 'Art. 4º, §3º',
- 'Componente em EOL não é aceito para fins de conformidade. Mantenha evidência documental da vigência do suporte técnico e das atualizações de segurança.'],
+ 'Art. 4º, §3º (redação do Prov. 243/2026)',
+ 'Componente em EOL não é aceito para fins de conformidade. O Prov. 243 ressalvou o regime de transição do art. 20-A: havendo indisponibilidade de mercado ou custo desproporcional, cabe requerer autorização à Corregedoria — que não é automática e só produz efeitos após deferimento. Mantenha evidência documental da vigência do suporte.'],
+
+['1.8.d', 1, 2, $C, 'Existe processo formal de seleção, contratação e supervisão de fornecedores, plataformas e assessorias de TIC, com medidas objetivas, proporcionais e eficazes?',
+ 'Art. 14, §2º (redação do Prov. 243/2026)',
+ 'A adoção de solução própria, contratada, compartilhada ou coletiva não afasta a responsabilidade do delegatário. Documente os critérios de seleção, a avaliação prévia de segurança e a rotina de supervisão contratual. A centralização material de controles não transfere responsabilidade funcional nem exonera o dever de governança local (art. 14, §1º).'],
 
 ['1.8.c', 1, 3, $C, 'Os contratos com terceiros que tratam, armazenam ou processam dados foram revisados e contêm cláusulas de confidencialidade, reversibilidade, portabilidade em formato não proprietário, documentação técnica de migração, cooperação na transição, gestão de incidentes e conformidade com a LGPD?',
  'Anexo IV, item 1.8; art. 13, §6º',
@@ -301,6 +344,10 @@ function p213_catalogo() {
 ['3.2.e', 3, 2, [1, 2], 'Se usa nuvem comercial de amplo mercado, os arquivos são cifrados na origem (AES-256+) com a chave sob custódia exclusiva da serventia, e não do provedor?',
  'Anexo IV, item 3.2.1.1',
  'É a hipótese simplificada de redundância para Classes 1 e 2. A custódia exclusiva da chave é o elemento decisivo.'],
+
+['3.2.f', 3, 1, [3], 'A serventia avaliou a meta técnica de excelência de recuperação de dados com defasagem inferior a 30 minutos para os ambientes de maior criticidade?',
+ 'Art. 12, §12 (incluído pelo Prov. 243/2026)',
+ 'É meta de excelência, não requisito peremptório: exigível quando tecnicamente viável e economicamente proporcional, aferida em função da classe e subclasse, da criticidade dos dados e do custo da solução de mercado. Registre a avaliação de viabilidade no dossiê, ainda que a conclusão seja pela não adoção.'],
 
 ['3.3', 3, 3, $C, 'As rotinas de backup são monitoradas quanto à execução e integridade, com alerta técnico automático ao responsável e abertura formal de chamado em caso de falha?',
  'Art. 12, §10; Anexo IV, item 3.3', 'Backup sem monitoramento não conta. Configure alerta ativo (e-mail/telegram) e trilha do chamado.'],
@@ -565,7 +612,7 @@ function p213_config() {
         $cfg = $res->fetch_assoc();
     }
     if (empty($cfg['classe_manual'])) {
-        $enq = p213_enquadrar($cfg['receita_semestral'], (float)$cfg['fator_ipca']);
+        $enq = p213_enquadrar($cfg['receita_semestral'], (float)$cfg['fator_atualizacao']);
         $cfg['classe']    = $enq['classe'];
         $cfg['subclasse'] = $enq['subclasse'];
     } else {

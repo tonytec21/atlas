@@ -641,6 +641,73 @@ objetivamente verificada em inspeções ou correições, sujeita o responsável 
 (art. 17, §2º).</p>
 ' . $RODAPE],
 
+'ressalva_20a' => [
+ 'titulo' => 'Requerimento de Ressalva Técnica (art. 20-A)',
+ 'base'   => 'Art. 20-A, §§1º a 6º (incluído pelo Prov. 243/2026)',
+ 'etapa'  => 0,
+ 'resumo' => 'Pede à Corregedoria o cumprimento de exigência em nível técnico diverso, por indisponibilidade de mercado ou desproporção econômica.',
+ 'html'   => $CABEC . '
+<h2 style="text-align:center">REQUERIMENTO DE RESSALVA TÉCNICA</h2>
+<p style="text-align:center">Art. 20-A do Provimento CN-CNJ n. 213/2026, incluído pelo Provimento n. 243/2026</p>
+
+<p><strong>{{TITULAR}}</strong>, {{TITULAR_QUALIF}} da {{SERVENTIA}}, inscrita no CNS {{CNS}}, enquadrada na
+<strong>Classe {{CLASSE}}, Subclasse {{SUBCLASSE}}</strong>, vem requerer à {{CORREGEDORIA}}, com fundamento no
+art. 20-A do Provimento CN-CNJ n. 213/2026, autorização para cumprir em <strong>nível técnico diverso</strong> a
+exigência adiante especificada, pelos fundamentos que passa a expor.</p>
+
+<h3>1. Exigência objeto do requerimento</h3>
+<p>Item do Anexo IV / dispositivo: ______________________________<br>
+Nível de serviço exigido para a classe: ______________________________<br>
+Nível de serviço tecnicamente possível no caso concreto: ______________________________</p>
+
+<h3>2. Fundamento (art. 20-A, §1º)</h3>
+<p>( ) <strong>I — indisponibilidade de mercado:</strong> a solução exigida não se encontra disponível no
+mercado em condições de implantação tempestiva.<br>
+( ) <strong>II — desproporção econômica:</strong> o custo de implantação e manutenção é manifestamente
+desproporcional à receita bruta semestral da serventia, apurada na forma do art. 2º, XXIV.</p>
+<p>Demonstração objetiva: ______________________________________________________________</p>
+
+<h3>3. Documentação instrutória obrigatória</h3>
+<p>( ) Orçamentos de, no mínimo, <strong>três fornecedores</strong> distintos (§1º);<br>
+( ) <strong>Laudo técnico</strong> subscrito por profissional habilitado (§1º);<br>
+( ) Demonstrativo da receita bruta semestral apurada na forma do art. 2º, XXIV;<br>
+( ) Outros: ______________________________</p>
+
+<h3>4. Medidas compensatórias de segurança e continuidade (§3º, II)</h3>
+<p>1. ______________________________________________________________<br>
+2. ______________________________________________________________<br>
+3. ______________________________________________________________</p>
+
+<h3>5. Plano de convergência ao padrão do Provimento (§3º, III)</h3>
+<table border="1" cellpadding="4">
+<tr><th width="46%">Etapa do plano</th><th width="24%">Prazo</th><th width="30%">Previsão orçamentária</th></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+</table>
+
+<h3>6. Ciência das condições legais</h3>
+<p>O requerente declara ciência de que:</p>
+<ol>
+<li>a ressalva <strong>não é automática</strong>, não decorre de simples alegação e <strong>não produz efeitos
+antes da decisão</strong> da Corregedoria, permanecendo a serventia integralmente obrigada ao cumprimento da
+exigência até o deferimento (§2º);</li>
+<li>o eventual deferimento observará prazo certo, <strong>não superior a um ciclo anual</strong>, renovável
+mediante nova e atualizada demonstração (§3º, I);</li>
+<li>a decisão será registrada perante a Corregedoria Nacional de Justiça para monitoramento (§3º, IV);</li>
+<li><strong>não são suscetíveis de ressalva</strong> as exigências que constituam padrão mínimo indispensável de
+proteção do acervo e dos dados pessoais, notadamente as relativas à realização e à custódia de cópias de
+segurança, à integridade e à autenticidade dos atos praticados, ao controle de acesso e ao registro de
+auditoria, bem como as obrigações decorrentes de lei (§4º);</li>
+<li>a prestação de informação falsa ou a omissão de dado relevante acarreta a <strong>revogação imediata</strong>
+da autorização, com restabelecimento integral da exigência e do prazo originários, sem prejuízo da
+responsabilidade disciplinar (§5º);</li>
+<li>a Corregedoria poderá, a qualquer tempo, determinar inspeção ou perícia para aferir a subsistência dos
+fundamentos, revogando a autorização quando cessados (§6º).</li>
+</ol>
+
+<p>Nestes termos, pede deferimento.</p>
+' . $RODAPE],
+
 'declaracao_etapa' => [
  'titulo' => 'Declaração de Conclusão de Etapa (Justiça Aberta)',
  'base'   => 'Anexo IV, itens 1.9, 2.9, 3.9, 4.9 e 5.7; art. 17',

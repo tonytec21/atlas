@@ -25,6 +25,16 @@ p213_hero('Diagnóstico de conformidade',
 p213_nav('diagnostico.php');
 ?>
 
+<div class="p213-alert info">
+  <i class="fa fa-gavel"></i>
+  <div><strong>Regime de transição do art. 20-A (Prov. 243/2026).</strong> Havendo indisponibilidade de mercado
+    ou custo manifestamente desproporcional, a Corregedoria pode autorizar o cumprimento em nível técnico
+    diverso — mediante requerimento com laudo de profissional habilitado e três orçamentos. A ressalva
+    <em>não é automática</em> e só produz efeitos após o deferimento. Os itens marcados
+    <span class="p213-tag c3"><i class="fa fa-lock"></i> sem ressalva</span> constituem padrão mínimo
+    indispensável e não a admitem (§4º).</div>
+</div>
+
 <div class="p213-progressbar" id="pbar">
   <div class="p213-progressbar__row">
     <div class="p213-progressbar__meter">
@@ -78,6 +88,10 @@ p213_nav('diagnostico.php');
           <span class="p213-tag c<?= $it['peso'] ?>"><?= p213_criticidade($it['peso']) ?></span>
           <?php if (count($it['classes']) < 3): ?>
             <span class="p213-tag info">Classe <?= implode('/', $it['classes']) ?></span>
+          <?php endif; ?>
+          <?php if (p213_nao_ressalvavel($it['cod'])): ?>
+            <span class="p213-tag c3" title="Art. 20-A, §4º — padrão mínimo indispensável: não admite ressalva técnica">
+              <i class="fa fa-lock"></i> sem ressalva</span>
           <?php endif; ?>
           <?php $ne = isset($nEvid[$it['cod']]) ? $nEvid[$it['cod']] : 0; ?>
           <a class="p213-tag <?= $ne ? 'c1' : 'c3' ?>" style="margin-left:auto;text-decoration:none"

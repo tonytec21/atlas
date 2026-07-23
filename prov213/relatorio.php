@@ -82,7 +82,7 @@ function rel_conformidade($cfg, $classe, $score, $resp, $par, $prz, $etapas) {
         . '<tr><td width="30%"><b>Serventia</b></td><td>' . p213_esc($cfg['serventia'] ?: '—') . '</td></tr>'
         . '<tr><td><b>CNS</b></td><td>' . p213_esc($cfg['cns'] ?: '—') . '</td></tr>'
         . '<tr><td><b>Enquadramento</b></td><td>Classe ' . $classe . ', Subclasse ' . p213_esc($cfg['subclasse'])
-        . ' (arrecadação bruta semestral, art. 16)</td></tr>'
+        . ' (receita bruta semestral, art. 16 c/c art. 2º, XXIV, red. Prov. 243/2026)</td></tr>'
         . '<tr><td><b>Titular</b></td><td>' . p213_esc($cfg['titular'] ?: '—') . ' — ' . p213_esc($cfg['titular_qualif']) . '</td></tr>'
         . '<tr><td><b>Responsável técnico</b></td><td>' . p213_esc($cfg['responsavel_tec'] ?: '—') . '</td></tr>'
         . '<tr><td><b>Data de emissão</b></td><td>' . date('d/m/Y H:i') . '</td></tr>'
@@ -105,11 +105,16 @@ function rel_conformidade($cfg, $classe, $score, $resp, $par, $prz, $etapas) {
         . '<tr><td>Forma de comprovação</td><td>' . $par['comprovacao'] . '</td></tr>'
         . '</table>';
 
-    $h .= '<h3>3. Prazos</h3><table border="1" cellpadding="4">'
+    $h .= '<h3>3. Prazos</h3>'
+        . '<p style="font-size:8pt">Contados da entrada em vigor do Provimento n. 243, de 21 de julho de 2026, '
+        . 'que alterou os arts. 20, 22 e 23 do Provimento n. 213/2026.</p>'
+        . '<table border="1" cellpadding="4">'
         . '<tr><td width="55%">Etapas 1 e 2 — implementação inicial obrigatória (art. 20)</td><td>'
         . $prz['inicial']->format('d/m/Y') . ' (' . $prz['dias_norma'] . ' dias da vigência)</td></tr>'
-        . '<tr><td>Prorrogação excepcional, uma única vez (art. 21)</td><td>até '
+        . '<tr><td>Prorrogação excepcional, somatório de até 180 dias (art. 21)</td><td>até '
         . $prz['prorrogado']->format('d/m/Y') . '</td></tr>'
+        . '<tr><td>Primeira avaliação técnica (art. 22, §1º, III)</td><td>'
+        . $prz['avaliacao']->format('d/m/Y') . ' (12 meses da vigência)</td></tr>'
         . '<tr><td>Etapas 1 a 5 — implementação integral (art. 23)</td><td>'
         . $prz['global']->format('d/m/Y') . ' (' . $prz['meses_norma'] . ' meses da vigência)</td></tr>'
         . '</table>';
@@ -197,8 +202,12 @@ function rel_plano($cfg, $classe, $plano, $prz, $etapas) {
         . '<li>Evoluir para as Etapas 3 a 5 em regime progressivo de maturidade (art. 22), respeitando a ordem '
         . 'sequencial e o prazo global do art. 23.</li>'
         . '<li>Se houver inviabilidade técnica ou financeira temporária, requerer <b>antes do vencimento</b> a '
-        . 'prorrogação única de até 90 dias (art. 21), com plano formal de adequação, cronograma, responsáveis e '
-        . 'medidas compensatórias imediatas de redução de risco.</li>'
+        . 'prorrogação do art. 21 (uma ou mais oportunidades, somatório de até 180 dias), com plano formal de '
+        . 'adequação, cronograma, responsáveis, descrição das causas do atraso e medidas compensatórias imediatas.</li>'
+        . '<li>Se a exigência for tecnicamente indisponível no mercado ou economicamente desproporcional, avaliar o '
+        . 'requerimento de ressalva técnica do <b>art. 20-A</b>, instruído com laudo de profissional habilitado e, no '
+        . 'mínimo, três orçamentos. A ressalva não é automática, não retroage e não alcança backup, integridade e '
+        . 'autenticidade dos atos, controle de acesso e trilhas de auditoria (§4º).</li>'
         . '</ol>';
     return $h;
 }

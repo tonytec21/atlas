@@ -72,13 +72,19 @@ try {
         foreach ($campos as $c) {
             if (isset($_POST[$c])) { $sets[] = "$c=?"; $vals[] = trim($_POST[$c]); $tipos .= 's'; }
         }
-        if (isset($_POST['receita_semestral'])) {
-            $sets[] = 'receita_semestral=?';
-            $vals[] = (float)str_replace([',', ' '], ['.', ''], $_POST['receita_semestral']);
+        $monetarios = ['receita_semestral','rec_emolumentos','rec_outras','rec_atos_gratuitos',
+                       'rec_renda_minima','ded_terceiros','ded_repasses'];
+        foreach ($monetarios as $mc) {
+            if (!isset($_POST[$mc])) continue;
+            // aceita "1.234.567,89" (pt-BR) e "1234567.89"
+            $v = str_replace(['.', ' '], '', (string)$_POST[$mc]);
+            $v = str_replace(',', '.', $v);
+            $sets[] = $mc . '=?';
+            $vals[] = (float)$v;
             $tipos .= 'd';
         }
-        if (isset($_POST['fator_ipca'])) {
-            $sets[] = 'fator_ipca=?'; $vals[] = (float)$_POST['fator_ipca']; $tipos .= 'd';
+        if (isset($_POST['fator_atualizacao'])) {
+            $sets[] = 'fator_atualizacao=?'; $vals[] = (float)$_POST['fator_atualizacao']; $tipos .= 'd';
         }
         if (array_key_exists('classe_manual', $_POST)) {
             $cm = $_POST['classe_manual'] === '' ? null : (int)$_POST['classe_manual'];
@@ -102,7 +108,7 @@ try {
     // -----------------------------------------------------------------
     case 'simular_classe':
         $r = (float)str_replace([',', ' '], ['.', ''], isset($_POST['receita']) ? $_POST['receita'] : '0');
-        $f = isset($_POST['fator_ipca']) ? (float)$_POST['fator_ipca'] : 1.0;
+        $f = isset($_POST['fator_atualizacao']) ? (float)$_POST['fator_atualizacao'] : 1.0;
         $e = p213_enquadrar($r, $f);
         out(true, ['enquadramento' => $e, 'parametros' => p213_parametros($e['classe']),
                    'prazos' => array_map(function ($v) {

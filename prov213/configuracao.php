@@ -72,19 +72,52 @@ p213_nav('configuracao.php');
       <div class="p213-card__head"><h2 class="p213-card__title"><i class="fa fa-balance-scale"></i> Enquadramento</h2>
         <span class="p213-hint">art. 16</span></div>
       <div class="p213-card__body">
-        <div class="p213-fields" style="grid-template-columns:minmax(0,1fr)">
-          <div class="p213-field"><label class="p213-label">Arrecadação bruta semestral (R$)</label>
+        <div class="p213-alert info" style="margin-bottom:16px">
+          <i class="fa fa-gavel"></i>
+          <div>O <strong>Provimento 243/2026</strong> definiu a base de cálculo no art. 2º, XXIV:
+            somam-se emolumentos e demais receitas do serviço delegado, <em>inclusive</em> ressarcimento por
+            atos gratuitos e complementação de renda mínima; deduzem-se <em>exclusivamente</em> valores de
+            terceiros e repasses legais obrigatórios. <strong>Não</strong> se deduzem despesas de custeio,
+            pessoal, investimento nem tributos do delegatário.</div>
+        </div>
+
+        <div class="p213-calc">
+          <div class="p213-calc__t">Memória de cálculo — receita bruta semestral</div>
+          <div class="p213-calc__row"><label>Emolumentos</label>
+            <input id="rec_emolumentos" class="p213-in calc" value="<?= number_format((float)$cfg['rec_emolumentos'], 2, ',', '.') ?>"></div>
+          <div class="p213-calc__row"><label>Outras receitas do serviço delegado</label>
+            <input id="rec_outras" class="p213-in calc" value="<?= number_format((float)$cfg['rec_outras'], 2, ',', '.') ?>"></div>
+          <div class="p213-calc__row"><label>Ressarcimento por atos gratuitos</label>
+            <input id="rec_atos_gratuitos" class="p213-in calc" value="<?= number_format((float)$cfg['rec_atos_gratuitos'], 2, ',', '.') ?>"></div>
+          <div class="p213-calc__row"><label>Complementação de renda mínima</label>
+            <input id="rec_renda_minima" class="p213-in calc" value="<?= number_format((float)$cfg['rec_renda_minima'], 2, ',', '.') ?>"></div>
+          <div class="p213-calc__row neg"><label>(&minus;) Arrecadado por conta de terceiros <small>art. 2º, XXV</small></label>
+            <input id="ded_terceiros" class="p213-in calc" value="<?= number_format((float)$cfg['ded_terceiros'], 2, ',', '.') ?>"></div>
+          <div class="p213-calc__row neg"><label>(&minus;) Repasses legais obrigatórios <small>art. 2º, XXVI</small></label>
+            <input id="ded_repasses" class="p213-in calc" value="<?= number_format((float)$cfg['ded_repasses'], 2, ',', '.') ?>"></div>
+          <div class="p213-calc__total">
+            <span>Receita bruta semestral</span>
+            <strong id="calcTotal">R$ 0,00</strong>
+          </div>
+          <button type="button" class="p213-btn p213-btn--ghost p213-btn--sm p213-btn--block"
+                  style="margin-top:10px" onclick="aplicarCalculo()">
+            <i class="fa fa-arrow-down"></i> Usar este total no enquadramento</button>
+        </div>
+
+        <div class="p213-fields" style="grid-template-columns:minmax(0,1fr);margin-top:16px">
+          <div class="p213-field"><label class="p213-label">Receita bruta semestral considerada (R$)</label>
             <input id="receita_semestral" class="p213-in"
                    value="<?= number_format((float)$cfg['receita_semestral'], 2, ',', '.') ?>"></div>
-          <div class="p213-field"><label class="p213-label">Fator de atualização IPCA (§2º)</label>
-            <input id="fator_ipca" class="p213-in" value="<?= p213_esc($cfg['fator_ipca']) ?>"></div>
+          <div class="p213-field"><label class="p213-label">Fator de atualização dos limites (art. 16, §2º)</label>
+            <input id="fator_atualizacao" class="p213-in" value="<?= p213_esc($cfg['fator_atualizacao']) ?>">
+            <span class="p213-hint">Os limites são atualizados a cada ano de vigência; os valores são
+              divulgados pela Corregedoria Nacional. Use 1,0000 enquanto não houver divulgação.</span></div>
         </div>
 
         <div class="p213-alert neutral" style="margin:16px 0">
-          <i class="fa fa-exclamation-circle"></i>
-          <div>O art. 16 fala em <em>arrecadação bruta</em>. O total exibido no Justiça Aberta inclui fundos
-            públicos e repasses obrigatórios, o que pode elevar a classe. Havendo divergência, registre a
-            memória de cálculo no dossiê e, se necessário, fixe a classe manualmente.</div>
+          <i class="fa fa-info-circle"></i>
+          <div>O §1º passou a mandar reavaliar com base na <strong>média das receitas brutas semestrais do
+            exercício imediatamente anterior</strong> — não mais no último semestre isolado.</div>
         </div>
 
         <div class="p213-fields">
@@ -126,10 +159,10 @@ p213_nav('configuracao.php');
                    value="<?= p213_esc(isset($cfg['gemini_api_key']) ? $cfg['gemini_api_key'] : '') ?>"></div>
           <div class="p213-field"><label class="p213-label">Modelo</label>
             <select id="gemini_modelo" class="p213-in">
-              <?php foreach (['gemini-3.5-flash' => 'Gemini 3.5 Flash (recomendado)',
-                             'gemini-3.1-pro' => 'Gemini 3.1 Pro (reasoning avançado)',
-                             'gemini-3.1-flash-lite' => 'Gemini 3.1 Flash-Lite (mais econômico)'] as $mv => $ml): ?>
-                <option value="<?= $mv ?>" <?= (isset($cfg['gemini_modelo']) ? $cfg['gemini_modelo'] : 'gemini-3.5-flash') === $mv ? 'selected' : '' ?>><?= $ml ?></option>
+              <?php foreach (['gemini-3.1-flash-lite' => 'Gemini 3.1 Flash-Lite (padrão, mais econômico)',
+                             'gemini-3.5-flash' => 'Gemini 3.5 Flash (mais capaz)',
+                             'gemini-3.1-pro' => 'Gemini 3.1 Pro (reasoning avançado)'] as $mv => $ml): ?>
+                <option value="<?= $mv ?>" <?= (isset($cfg['gemini_modelo']) ? $cfg['gemini_modelo'] : 'gemini-3.1-flash-lite') === $mv ? 'selected' : '' ?>><?= $ml ?></option>
               <?php endforeach; ?>
             </select></div>
         </div>
@@ -146,14 +179,15 @@ p213_nav('configuracao.php');
       <div class="p213-card__head"><h2 class="p213-card__title"><i class="fa fa-list"></i> Faixas do art. 16</h2></div>
       <div class="p213-card__body">
         <dl style="margin:0">
-          <div class="p213-kv"><dt>Classe 1</dt><dd class="sm">até R$ 100.000,00 &middot; A, B, C</dd></div>
-          <div class="p213-kv"><dt>Classe 2</dt><dd class="sm">até R$ 500.000,00 &middot; D, E, F</dd></div>
+          <div class="p213-kv"><dt>Classe 1</dt><dd class="sm">até R$ 300.000,00 &middot; A, B, C</dd></div>
+          <div class="p213-kv"><dt>Classe 2</dt><dd class="sm">até R$ 1.500.000,00 &middot; D, E, F</dd></div>
           <div class="p213-kv"><dt>Classe 3</dt><dd class="sm">G até 3× &middot; H até 6× &middot; I até 12× &middot; J acima</dd></div>
         </dl>
         <p class="p213-hint" style="margin-top:14px">
-          Reavaliação anual com base no semestre imediatamente anterior (§1º). A migração de classe não produz
-          efeito imediato quando a variação não ultrapassa 10% do limite superior da faixa anterior, exigindo
-          consolidação por dois ciclos consecutivos (§3º).
+          Limites elevados pelo Provimento 243/2026. Reavaliação anual pela média dos semestres do exercício
+          anterior (§1º). A migração não produz efeito imediato quando a variação não ultrapassa 10% do limite
+          superior da faixa anterior, exigindo consolidação por dois ciclos consecutivos — regra que agora vale
+          tanto para a migração ascendente quanto para a descendente (§3º).
         </p>
       </div>
     </div>
@@ -164,7 +198,9 @@ p213_nav('configuracao.php');
 $js = <<<'JS'
 var IDS = ['serventia','cns','cnpj','endereco','municipio_uf','titular','titular_qualif',
            'responsavel_tec','encarregado_dpo','dpo_contato','corregedoria','modelo_solucao',
-           'receita_semestral','fator_ipca','classe_manual','subclasse_manual',
+           'receita_semestral','fator_atualizacao','classe_manual','subclasse_manual',
+           'rec_emolumentos','rec_outras','rec_atos_gratuitos','rec_renda_minima',
+           'ded_terceiros','ded_repasses',
            'gemini_api_key','gemini_modelo'];
 
 document.getElementById('btnSalvar').addEventListener('click', function(){
@@ -180,12 +216,34 @@ document.getElementById('btnSalvar').addEventListener('click', function(){
   });
 });
 
-['receita_semestral','fator_ipca'].forEach(function(id){
+function num(id){
+  var v = (document.getElementById(id).value || '0').replace(/\./g,'').replace(',','.');
+  var n = parseFloat(v); return isNaN(n) ? 0 : n;
+}
+function brl(n){ return 'R$ ' + n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function calcular(){
+  var t = num('rec_emolumentos') + num('rec_outras') + num('rec_atos_gratuitos') + num('rec_renda_minima')
+        - num('ded_terceiros') - num('ded_repasses');
+  if (t < 0) t = 0;
+  document.getElementById('calcTotal').textContent = brl(t);
+  return t;
+}
+function aplicarCalculo(){
+  var t = calcular();
+  document.getElementById('receita_semestral').value =
+    t.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('receita_semestral').dispatchEvent(new Event('input'));
+}
+document.querySelectorAll('.calc').forEach(function(el){ el.addEventListener('input', calcular); });
+calcular();
+
+['receita_semestral','fator_atualizacao'].forEach(function(id){
   document.getElementById(id).addEventListener('input', function(){
     var fd = new FormData();
     fd.append('acao','simular_classe');
     fd.append('receita', document.getElementById('receita_semestral').value);
-    fd.append('fator_ipca', document.getElementById('fator_ipca').value || '1');
+    fd.append('fator_atualizacao', document.getElementById('fator_atualizacao').value || '1');
     fetch('api.php',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
       if(!j.success) return;
       var e = j.data.enquadramento, p = j.data.parametros, z = j.data.prazos;

@@ -2,6 +2,12 @@
 
 Build: `ATLAS-PROV213-BUILD: 2026-07-09-conformidade-cnj-213`
 
+> **Atualizado para o Provimento CN-CNJ n. 243, de 21/07/2026**, que alterou o Prov. 213/2026:
+> novos limites de enquadramento (Classe 1 até R$ 300 mil; Classe 2 até R$ 1,5 milhão), nova
+> definição de receita bruta semestral (art. 2º, XXIV a XXVI), prazos ampliados (180/240/300
+> dias), prorrogação de até 180 dias em uma ou mais oportunidades e o regime de ressalva
+> técnica do art. 20-A.
+
 ## Instalação
 
 1. Copie a pasta `prov213/` para dentro de `atlas/` (fica irmã de `os/`, `caixa/`, etc.).
@@ -26,7 +32,7 @@ schema após um deploy, mas é opcional. A cada mudança de estrutura, basta sub
 | Arquivo | Função |
 |---|---|
 | `config.php` | Credenciais, caminhos e data de vigência |
-| `p213_lib.php` | Catálogo normativo (76 requisitos), motor de score, prazos, layout |
+| `p213_lib.php` | Catálogo normativo (78 requisitos), motor de score, prazos, layout |
 | `p213_docs.php` | Modelos dos 14 termos/documentos exigidos |
 | `install.php` | Schema idempotente (6 tabelas) |
 | `index.php` | Painel: gauge, etapas, prazos, próximas ações |
@@ -44,7 +50,7 @@ Tabelas: `p213_config`, `p213_respostas`, `p213_ativos`, `p213_incidentes`,
 
 ## Cofre de evidências
 
-- Catálogo de **137 evidências esperadas**, mapeadas um a um para os 76 requisitos.
+- Catálogo de evidências esperadas, mapeadas uma a uma para os 78 requisitos.
 - Upload até 30 MB, extensões restritas, gravado em `evidencias/etapaN/` com nome aleatório.
   A pasta recebe um `.htaccess` que desliga o engine PHP e nega `.php/.phtml/.phar`.
 - **SHA-256 calculado no servidor** a cada upload; download só via `evidencias.php?baixar=ID`
@@ -79,13 +85,17 @@ saem entre colchetes. Sem a chave configurada, os botões de IA simplesmente nã
 
 ## Enquadramento e prazos (validados)
 
-| Classe | Receita semestral | Etapas 1–2 (art. 20) | Prorrogação (art. 21) | Integral (art. 23) |
+| Classe | Receita bruta semestral | Etapas 1–2 (art. 20) | Prorrogação (art. 21) | Integral (art. 23) |
 |---|---|---|---|---|
-| 3 | acima de R$ 500.000 | 24/05/2026 (90 d) | 22/08/2026 | 23/02/2028 (24 m) |
-| 2 | até R$ 500.000 | 23/07/2026 (150 d) | 21/10/2026 | 23/08/2028 (30 m) |
-| 1 | até R$ 100.000 | 21/09/2026 (210 d) | 20/12/2026 | 23/02/2029 (36 m) |
+| 3 | acima de R$ 1.500.000 | 19/02/2027 (180 d) | +180 d (somatório) | 23/08/2028 (24 m) |
+| 2 | até R$ 1.500.000 | 20/04/2027 (240 d) | +180 d (somatório) | 23/02/2029 (30 m) |
+| 1 | até R$ 300.000 | 19/06/2027 (300 d) | +180 d (somatório) | 23/08/2029 (36 m) |
 
-Base: vigência em 23/02/2026 (DJe/CNJ n. 40/2026). Alterável em `P213_VIGENCIA` (`config.php`).
+Primeira avaliação técnica (art. 22, §1º, III): 23/08/2027.
+
+Base: vigência do **Provimento 243, de 21/07/2026**, em 23/08/2026 — ajustável em
+`P213_VIGENCIA_243` (`config.php`). Todos os prazos são recalculados a partir dela.
+
 
 Parâmetros por classe (Anexos I e II): RPO 4 h / 12 h / 24 h · RTO 8 h / 24 h / 24 h ·
 backup completo 24 h / 48 h / 72 h · link 50 / 10 / 2 Mbps · teste de restauração semestral (C3) ou

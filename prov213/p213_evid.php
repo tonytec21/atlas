@@ -26,6 +26,7 @@ function p213_evid_esperadas() {
 '1.8.a'   => ['Notas fiscais e termos de licença', 'Relação de softwares livres com a respectiva licença'],
 '1.8.b'   => ['Relatório de versões confrontado com o ciclo de suporte do fabricante', 'Evidência oficial de suporte vigente'],
 '1.8.c'   => ['Contratos revisados contendo as sete cláusulas', 'Aditivos contratuais firmados'],
+'1.8.d'   => ['Critérios documentados de seleção e contratação de fornecedores de TIC', 'Avaliação prévia de segurança do fornecedor', 'Registro da rotina de supervisão contratual'],
 '1.9'     => ['Declaração de conclusão da Etapa 1 assinada', 'Comprovante ou protocolo do Sistema Justiça Aberta'],
 
 // ───────────────────────────────────────────────── ETAPA 2
@@ -57,6 +58,7 @@ function p213_evid_esperadas() {
 '3.2.c'   => ['Comprovação dos dois ambientes tecnicamente independentes (contratos ou capturas)'],
 '3.2.d'   => ['Captura do recurso de imutabilidade (WORM, retention lock ou versionamento bloqueado)'],
 '3.2.e'   => ['Evidência da cifra na origem em AES-256', 'Declaração de custódia exclusiva da chave pela serventia'],
+'3.2.f'   => ['Estudo de viabilidade técnica e econômica da meta de 30 minutos', 'Orçamento das soluções de mercado avaliadas', 'Decisão fundamentada de adoção ou de não adoção'],
 '3.3'     => ['Captura do alerta automático configurado', 'Registro de chamado aberto em caso de falha'],
 '3.4.a'   => ['Configuração do firewall com IPS/IDS', 'Amostra de log de eventos de segurança'],
 '3.4.b'   => ['Mapa de VLANs ou configuração de segmentação lógica'],
@@ -189,7 +191,7 @@ function p213_gemini_config() {
     $cfg = p213_config();
     return [
         'key'    => isset($cfg['gemini_api_key']) ? trim($cfg['gemini_api_key']) : '',
-        'modelo' => !empty($cfg['gemini_modelo']) ? $cfg['gemini_modelo'] : 'gemini-3.5-flash',
+        'modelo' => !empty($cfg['gemini_modelo']) ? $cfg['gemini_modelo'] : 'gemini-3.1-flash-lite',
     ];
 }
 
