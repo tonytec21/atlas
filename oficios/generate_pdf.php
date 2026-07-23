@@ -80,7 +80,16 @@ $pdf->Ln(10);
 $pdf->MultiCell(0, 10, $oficio['corpo']);
 
 $pdf->Ln(20);
-$pdf->Cell(0, 10, 'Atenciosamente,', 0, 1);
+
+// Verificar se a expressao "Atenciosamente," deve constar no impresso (padrao: sim)
+// Arquivo separado do configuracao.json para evitar conflitos de merge em servidores de clientes
+$atenciosamenteFile = __DIR__ . '/atenciosamente.json';
+$atenciosamenteData = file_exists($atenciosamenteFile) ? json_decode(file_get_contents($atenciosamenteFile), true) : array();
+$exibirAtenciosamente = !(isset($atenciosamenteData['atenciosamente']['habilitar']) && $atenciosamenteData['atenciosamente']['habilitar'] === 'N');
+
+if ($exibirAtenciosamente) {
+    $pdf->Cell(0, 10, 'Atenciosamente,', 0, 1);
+}
 $pdf->Cell(0, 10, $oficio['assinante'], 0, 1);
 
 $pdfOutputPath = $oficiosDir . "/oficio_$numero.pdf";

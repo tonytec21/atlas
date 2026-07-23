@@ -160,6 +160,12 @@ if (file_exists($configFile)) {
     $complemento = '';
 }
 
+// Verificar se a expressão "Atenciosamente," deve constar no impresso (padrão: sim)
+// Arquivo separado do configuracao.json para evitar conflitos de merge em servidores de clientes
+$atenciosamenteFile = __DIR__ . '/atenciosamente.json';
+$atenciosamenteData = file_exists($atenciosamenteFile) ? json_decode(file_get_contents($atenciosamenteFile), true) : array();
+$exibirAtenciosamente = !(isset($atenciosamenteData['atenciosamente']['habilitar']) && $atenciosamenteData['atenciosamente']['habilitar'] === 'N');
+
 // Número do ofício
 $pdf->SetFont('helvetica', 'B', 12);
 
@@ -206,7 +212,9 @@ renderCorpoOficioPdf($pdf, $oficioData['corpo'], 160);
 
 // Assinatura
 $pdf->SetFont('helvetica', '', 12);
-$pdf->writeHTML('<p style="text-indent: 20mm; text-align: justify;">Atenciosamente,</p>', true, false, true, false);
+if ($exibirAtenciosamente) {
+    $pdf->writeHTML('<p style="text-indent: 20mm; text-align: justify;">Atenciosamente,</p>', true, false, true, false);
+}
 $pdf->Ln(15);
 
 // Adicionar imagem da assinatura, se disponível
