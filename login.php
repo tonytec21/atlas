@@ -233,7 +233,7 @@ body{
 
   <!-- logomarca -->
   <div class="brand text-center mb-4">
-    <img src="<?= 'http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/atlas_logo_nova_login.png'?>" alt="Atlas">
+    <img src="<?= 'http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/atlas_2026.png'?>" alt="Atlas">
   </div>
 
   <!-- mensagem git pull (opcional) -->

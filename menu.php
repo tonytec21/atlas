@@ -1065,7 +1065,7 @@ $mode_query->close();
     <!-- Header Superior -->
     <div id="system-name">  
         <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/index.php'?>">  
-            <img id="logo-img" src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/' . ($mode === 'dark-mode' ? 'atlas_logo_2025_2.png' : 'atlas_logo_2025_1.png')?>" alt="Atlas">  
+            <img id="logo-img" src="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/' . ($mode === 'dark-mode' ? 'atlas_2026.png' : 'atlas_2026.png')?>" alt="Atlas">  
         </a>  
     </div>
 
@@ -1356,7 +1356,7 @@ $mode_query->close();
             modeIcon.className = `fas ${newMode === 'dark-mode' ? 'fa-moon' : 'fa-sun'}`;  
             
             const baseUrl = '<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/style/img/'?>';  
-            logoImg.src = baseUrl + (newMode === 'dark-mode' ? 'atlas_logo_2025_2.png' : 'atlas_logo_2025_1.png');  
+            logoImg.src = baseUrl + (newMode === 'dark-mode' ? 'atlas_2026.png' : 'atlas_2026.png');  
             
             $.ajax({  
                 url: '<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/save_mode.php'?>',  
@@ -1437,7 +1437,7 @@ $mode_query->close();
                     body.classList.remove('light-mode', 'dark-mode');  
                     body.classList.add(mode);  
                     modeIcon.className = `fas ${mode === 'dark-mode' ? 'fa-moon' : 'fa-sun'}`;  
-                    logoImg.src = baseUrl + (mode === 'dark-mode' ? 'atlas_logo_2025_2.png' : 'atlas_logo_2025_1.png');  
+                    logoImg.src = baseUrl + (mode === 'dark-mode' ? 'atlas_2026.png' : 'atlas_2026.png');  
                 }  
             });
 
