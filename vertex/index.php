@@ -130,6 +130,72 @@ if (isset($_GET['anexo'])) {
     exit;
 }
 
+/* ---------- Download de KML gerado a partir das coordenadas gravadas: vertex/index.php?kml=<id> ----------
+ * Vale para MATRÍCULAS e PROJETOS: qualquer imóvel com geometria mapeada (memorial descritivo,
+ * PDF da matrícula, PDF do SIGEF ou KML importado) pode exportar as coordenadas como KML. */
+if (isset($_GET['kml'])) {
+    $kid = (int)$_GET['kml'];
+    $stmt = $conn->prepare("SELECT * FROM memoriais_mapeados WHERE id = ?");
+    $stmt->bind_param('i', $kid);
+    $stmt->execute();
+    $r = $stmt->get_result();
+    $row = $r ? $r->fetch_assoc() : null;
+    if (!$row) { http_response_code(404); header('Content-Type: text/plain; charset=UTF-8'); echo 'Imóvel não encontrado.'; exit; }
+    $pts = [];
+    foreach (preg_split('/\s+/', trim((string)($row['coordenadas_wgs84'] ?? ''))) as $par) {
+        if ($par === '') continue;
+        $xy = explode(',', $par);
+        if (count($xy) >= 2 && is_numeric($xy[0]) && is_numeric($xy[1])) $pts[] = [(float)$xy[0], (float)$xy[1]];
+    }
+    if (count($pts) < 3) {
+        http_response_code(422); header('Content-Type: text/plain; charset=UTF-8');
+        echo 'Este imóvel ainda não possui coordenadas mapeadas — importe o memorial descritivo, o PDF da matrícula/SIGEF ou um KML antes de gerar o arquivo.';
+        exit;
+    }
+    // KML exige anel fechado (primeiro vértice = último)
+    $ult = $pts[count($pts) - 1];
+    if ($pts[0][0] !== $ult[0] || $pts[0][1] !== $ult[1]) $pts[] = $pts[0];
+    $ehProj = (int)($row['is_projeto'] ?? 0) === 1;
+    $numMat = trim((string)($row['numero_matricula'] ?? ''));
+    $ident  = trim((string)($row['identificador'] ?? ''));
+    if ($ehProj) $nome = 'Projeto' . ($ident !== '' ? ' — ' . $ident : ($numMat !== '' ? ' ' . $numMat : ' #' . $kid));
+    else         $nome = $numMat !== '' ? 'Matrícula ' . $numMat : ($ident !== '' ? $ident : 'Imóvel #' . $kid);
+    $descL = [];
+    if ($ident !== '' && $numMat !== '') $descL[] = $ident;
+    $mun = trim((string)($row['municipio'] ?? '')); $uf = trim((string)($row['uf'] ?? ''));
+    if ($mun !== '') $descL[] = $mun . ($uf !== '' ? '/' . $uf : '');
+    $areaHa = (float)($row['area_ha'] ?? 0);
+    if ($areaHa > 0) $descL[] = 'Área: ' . number_format($areaHa, 4, ',', '.') . ' ha';
+    if (trim((string)($row['origem'] ?? '')) !== '') $descL[] = 'Origem: ' . trim((string)$row['origem']);
+    $descL[] = 'SIRGAS2000 (lat/lng) · gerado pelo Atlas Vertex em ' . date('d/m/Y H:i');
+    $coordStr = '';
+    foreach ($pts as $p) $coordStr .= number_format($p[1], 8, '.', '') . ',' . number_format($p[0], 8, '.', '') . ',0 ';
+    $escX = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_XML1, 'UTF-8'); };
+    $kml = '<' . '?xml version="1.0" encoding="UTF-8"?' . '>' . "\n"
+         . '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
+         . '<name>' . $escX($nome) . '</name>'
+         . '<Style id="vertex"><LineStyle><color>ffd84e1d</color><width>2</width></LineStyle>'
+         . '<PolyStyle><color>4dd84e1d</color></PolyStyle></Style>'
+         . '<Placemark><name>' . $escX($nome) . '</name>'
+         . '<description>' . $escX(implode(' · ', $descL)) . '</description>'
+         . '<styleUrl>#vertex</styleUrl>'
+         . '<Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>'
+         . trim($coordStr)
+         . '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>';
+    if ($ehProj)      $slug = 'projeto-' . ($ident !== '' ? $ident : ($numMat !== '' ? $numMat : $kid));
+    elseif ($numMat !== '') $slug = 'matricula-' . $numMat;
+    else              $slug = $ident !== '' ? $ident : 'imovel-' . $kid;
+    $slug = trim(preg_replace('/[^A-Za-z0-9._-]+/', '_', $slug), '_');
+    if ($slug === '') $slug = 'imovel-' . $kid;
+    if (!headers_sent()) {
+        header('Content-Type: application/vnd.google-earth.kml+xml; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $slug . '.kml"');
+        header('Cache-Control: private, max-age=0, must-revalidate');
+    }
+    echo $kml;
+    exit;
+}
+
 /* ---------- Download/visualização de anexo da AUTOTUTELA: index.php?at_anexo=<id>[&dl=1] ---------- */
 if (isset($_GET['at_anexo'])) {
     if (function_exists('ensureAutotutela')) { try { ensureAutotutela($conn); } catch (Throwable $e) {} }
@@ -5523,7 +5589,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-22d-foco-encaixe-3d (removida a linha de controles "Inclinar/girar" sobre o mapa — sobra só o botão "Ver em 3D" no canto; o painel de dados do imóvel foi compactado (paddings/fontes menores, altura limitada a 360px com rolagem interna) e passa a abrir logo ABAIXO do botão "Ver em 3D" (top 104px, esquerda), encaixando na antiga posição do "Inclinar"; segue arrastável) | anterior: 2026-07-22c-foco-arrastavel (painel de dados do imóvel em foco: sobe para z-index 9 — deixa de ficar por baixo do painel Visão geral — e passa a abrir por padrão no canto SUPERIOR ESQUERDO do mapa (Visão geral fica à direita), sem sobreposição; agora é ARRASTÁVEL pela alça do cabeçalho via tornarArrastavel, com o botão "Dados do imóvel" também móvel (tornarArrastavelBtn) — mesmo comportamento do painel Visão geral; fechar/reabrir preservados) | anterior: 2026-07-22b-valida-memorial-narrativo-e-painel-foco (VALIDAÇÃO DE MEMORIAL NARRATIVO: novo analisador de memoriais em prosa — "vértice P-n, de coordenadas N=.. e E=.." com lados "azimute e distância Az=..°..'..\" e DIST metros até o vértice P-x". Detecta coordenada fora da faixa UTM (erro de digitação, ex.: northing com 8 dígitos) e a conserta pelo lado de chegada, e aponta o VÉRTICE culpado quando a coordenada diverge do azimute/distância do memorial (reconstrói a partir do vértice anterior; desvio > 5 m). Essas inconsistências passam a ser gravadas automaticamente no cadastro de MATRÍCULAS e de PROJETOS (fluxo salvar e mapear_texto) — antes o vértice ruim era descartado em silêncio. Novas funções analisarMemorialVertex/detectarInconsistenciasCoord e ação analisar_vertex; detectarInconsistenciasGeo ganhou 3º parâmetro opcional $memorial (retrocompatível). PAINEL DE FOCO: ao focar um único imóvel (carregarImovel), aparece à direita do mapa um painel com matrícula/identificação, datum·zona·MC, área (ha/m²/alqueire), perímetro, tabela de vértices E/N, confrontações e as inconsistências — reproduzindo o laudo do memorial no tema do app; preenche na hora pela geometria (WGS84→UTM em JS) e enriquece via analisar_vertex; botão fechar/reabrir; some ao voltar à visão geral) | anterior: 2026-07-22a-aba-relatorios (nova aba RELATÓRIOS: 3 painéis de completude com gráfico donut SVG e % — 1) matrículas faltantes da 1 até a maior, com intervalos comprimidos (ex.: 5–7, 23) e contagem de imóveis sem nº; 2) envio ao Mapa ONR: enviadas × faltantes, chips verdes p/ prontas e vermelhos p/ dados incompletos; 3) carga ITN 03: aptas × pendentes com O QUE FALTA em cada matrícula; botão Copiar lista por relatório, Recalcular, atalho de teclado 7, bottom nav mobile com 7 colunas; listar agora devolve itn03_ok/itn03_faltam (régua completa p/ mapeadas, mínima p/ exclusivas); tudo client-side sobre o próprio listar — sem migração de banco) | anterior: 2026-07-21f-3d-sem-links-externos (removidos os links "Google Earth" e "Google Maps (satélite)" do rodapé do modal de visão 3D — os imóveis só carregam dentro do sistema; mensagens de fallback do 3D atualizadas para não citar os links) | anterior: 2026-07-21e-vertodos-desmarcado (no foco de confronto o botão "Ver todos" fica desmarcado; clicá-lo nesse estado limpa o filtro ";*", oculta o badge do município e reexibe todos os imóveis — sem sair da visão geral) | anterior: 2026-07-21d-fix-termo-mat (fix: termo da consulta ";*" usava o rótulo "Mat. N", que não casa com o filtro exato de matrícula e o imóvel não era exibido — agora usa o NÚMERO puro (sem zeros à esquerda) e, sem matrícula, a identificação; corrigido também no verNoMapaConfronto da importação) | anterior: 2026-07-21c-foco-confronto-selecao (selecionar imóvel na lista agora foca em modo CONFRONTO: visão geral + consulta "matrícula;*" no painel — sobreposições e desmembradas — mantendo pontos dos vértices e badge de pertencimento ao município como no modo single; nova focarImovelConfronto; carregarImovel segue preenchendo Cadastrar/ONR/cor; dropzone de Importar só lista os tipos aceitos) | anterior: 2026-07-21b-shell-2-niveis-icones (REORGANIZAÇÃO ESTRUTURAL: barra de comando em 2 níveis — contexto/marca/base/ações em cima, faixa de abas com indicador embaixo; sprite SVG com 20 ícones estilo Lucide substituindo todos os emojis do shell, controles 3D, toolbars, cartões ONR e painel Visão geral; NAVEGAÇÃO INFERIOR FIXA no mobile (≤880px, estilo app nativo, safe-area, palco encolhe via bottom do shell); cabeçalhos de página por aba (ícone+título+descrição); form-grid em 3 colunas ≥1100px; "Como funciona" como stepper numerado; toggleRotulos atualiza só o <span> preservando o ícone) | anterior: 2026-07-21a-design-system-2 (DESIGN SYSTEM 2.0 "Instrumento cartográfico": camada visual 100% reconstruída — tokens de cor/raio/sombra/tipografia, Space Grotesk p/ títulos+abas, Inter p/ UI, IBM Plex Mono p/ dados; barra de comando com fio de lacre e abas segmentadas com indicador; graticule cartográfico sutil no palco; formulários com anel de foco, hover e select custom; botões com gradiente e elevação; cartões, badges, chips, acordeões, dropzones, painéis de mapa, modais e SweetAlert2 retematizados nos dois temas; dark mode revisto (azul-grafite); 100% responsivo (1100/880/520/420) com abas roláveis no mobile, alvos de toque maiores e prefers-reduced-motion; nenhum seletor/estado do JS alterado — apenas aparência) | anterior: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-23a-tema-teal-azul-e-baixar-kml (RETEMATIZAÇÃO: cor da marca muda de vermelho-lacre para o gradiente do card do módulo — linear-gradient(135deg,#0d9488 0%,#1d4ed8 100%) — via tokens --red/--red-bright/--red-deep/--red-text nos dois temas; novos tokens SEMÂNTICOS --err/--err-bright/--err-soft/--err-text (vermelhos originais) para alertas, pendências, sobreposições, exclusões e para as linhas/chips "faltantes"/"faltando enviar"/"pendentes" da aba Relatórios; verdeOk e chips "pronta p/ envio" passam de teal para var(--green) (teal agora é marca); cor padrão do polígono do imóvel vira azul #1D4ED8 (vértices teal), sobreposição segue vermelha; SweetAlert de tema em #1571B0. BAIXAR KML: novo endpoint GET ?kml=<id> que gera KML (SIRGAS2000, anel fechado, lng,lat,0, estilo azul da marca, nome Matrícula/Projeto + descrição com área/município/origem) a partir de coordenadas_wgs84 — vale para matrículas E projetos, qualquer origem (memorial, PDF matrícula, PDF SIGEF, KML); novo botão "⤓ Baixar KML" no rodapé do modal Editar dados do imóvel, exibido só quando o registro tem geometria) | anterior: 2026-07-22d-foco-encaixe-3d (removida a linha de controles "Inclinar/girar" sobre o mapa — sobra só o botão "Ver em 3D" no canto; o painel de dados do imóvel foi compactado (paddings/fontes menores, altura limitada a 360px com rolagem interna) e passa a abrir logo ABAIXO do botão "Ver em 3D" (top 104px, esquerda), encaixando na antiga posição do "Inclinar"; segue arrastável) | anterior: 2026-07-22c-foco-arrastavel (painel de dados do imóvel em foco: sobe para z-index 9 — deixa de ficar por baixo do painel Visão geral — e passa a abrir por padrão no canto SUPERIOR ESQUERDO do mapa (Visão geral fica à direita), sem sobreposição; agora é ARRASTÁVEL pela alça do cabeçalho via tornarArrastavel, com o botão "Dados do imóvel" também móvel (tornarArrastavelBtn) — mesmo comportamento do painel Visão geral; fechar/reabrir preservados) | anterior: 2026-07-22b-valida-memorial-narrativo-e-painel-foco (VALIDAÇÃO DE MEMORIAL NARRATIVO: novo analisador de memoriais em prosa — "vértice P-n, de coordenadas N=.. e E=.." com lados "azimute e distância Az=..°..'..\" e DIST metros até o vértice P-x". Detecta coordenada fora da faixa UTM (erro de digitação, ex.: northing com 8 dígitos) e a conserta pelo lado de chegada, e aponta o VÉRTICE culpado quando a coordenada diverge do azimute/distância do memorial (reconstrói a partir do vértice anterior; desvio > 5 m). Essas inconsistências passam a ser gravadas automaticamente no cadastro de MATRÍCULAS e de PROJETOS (fluxo salvar e mapear_texto) — antes o vértice ruim era descartado em silêncio. Novas funções analisarMemorialVertex/detectarInconsistenciasCoord e ação analisar_vertex; detectarInconsistenciasGeo ganhou 3º parâmetro opcional $memorial (retrocompatível). PAINEL DE FOCO: ao focar um único imóvel (carregarImovel), aparece à direita do mapa um painel com matrícula/identificação, datum·zona·MC, área (ha/m²/alqueire), perímetro, tabela de vértices E/N, confrontações e as inconsistências — reproduzindo o laudo do memorial no tema do app; preenche na hora pela geometria (WGS84→UTM em JS) e enriquece via analisar_vertex; botão fechar/reabrir; some ao voltar à visão geral) | anterior: 2026-07-22a-aba-relatorios (nova aba RELATÓRIOS: 3 painéis de completude com gráfico donut SVG e % — 1) matrículas faltantes da 1 até a maior, com intervalos comprimidos (ex.: 5–7, 23) e contagem de imóveis sem nº; 2) envio ao Mapa ONR: enviadas × faltantes, chips verdes p/ prontas e vermelhos p/ dados incompletos; 3) carga ITN 03: aptas × pendentes com O QUE FALTA em cada matrícula; botão Copiar lista por relatório, Recalcular, atalho de teclado 7, bottom nav mobile com 7 colunas; listar agora devolve itn03_ok/itn03_faltam (régua completa p/ mapeadas, mínima p/ exclusivas); tudo client-side sobre o próprio listar — sem migração de banco) | anterior: 2026-07-21f-3d-sem-links-externos (removidos os links "Google Earth" e "Google Maps (satélite)" do rodapé do modal de visão 3D — os imóveis só carregam dentro do sistema; mensagens de fallback do 3D atualizadas para não citar os links) | anterior: 2026-07-21e-vertodos-desmarcado (no foco de confronto o botão "Ver todos" fica desmarcado; clicá-lo nesse estado limpa o filtro ";*", oculta o badge do município e reexibe todos os imóveis — sem sair da visão geral) | anterior: 2026-07-21d-fix-termo-mat (fix: termo da consulta ";*" usava o rótulo "Mat. N", que não casa com o filtro exato de matrícula e o imóvel não era exibido — agora usa o NÚMERO puro (sem zeros à esquerda) e, sem matrícula, a identificação; corrigido também no verNoMapaConfronto da importação) | anterior: 2026-07-21c-foco-confronto-selecao (selecionar imóvel na lista agora foca em modo CONFRONTO: visão geral + consulta "matrícula;*" no painel — sobreposições e desmembradas — mantendo pontos dos vértices e badge de pertencimento ao município como no modo single; nova focarImovelConfronto; carregarImovel segue preenchendo Cadastrar/ONR/cor; dropzone de Importar só lista os tipos aceitos) | anterior: 2026-07-21b-shell-2-niveis-icones (REORGANIZAÇÃO ESTRUTURAL: barra de comando em 2 níveis — contexto/marca/base/ações em cima, faixa de abas com indicador embaixo; sprite SVG com 20 ícones estilo Lucide substituindo todos os emojis do shell, controles 3D, toolbars, cartões ONR e painel Visão geral; NAVEGAÇÃO INFERIOR FIXA no mobile (≤880px, estilo app nativo, safe-area, palco encolhe via bottom do shell); cabeçalhos de página por aba (ícone+título+descrição); form-grid em 3 colunas ≥1100px; "Como funciona" como stepper numerado; toggleRotulos atualiza só o <span> preservando o ícone) | anterior: 2026-07-21a-design-system-2 (DESIGN SYSTEM 2.0 "Instrumento cartográfico": camada visual 100% reconstruída — tokens de cor/raio/sombra/tipografia, Space Grotesk p/ títulos+abas, Inter p/ UI, IBM Plex Mono p/ dados; barra de comando com fio de lacre e abas segmentadas com indicador; graticule cartográfico sutil no palco; formulários com anel de foco, hover e select custom; botões com gradiente e elevação; cartões, badges, chips, acordeões, dropzones, painéis de mapa, modais e SweetAlert2 retematizados nos dois temas; dark mode revisto (azul-grafite); 100% responsivo (1100/880/520/420) com abas roláveis no mobile, alvos de toque maiores e prefers-reduced-motion; nenhum seletor/estado do JS alterado — apenas aparência) | anterior: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -7678,6 +7744,7 @@ header('Expires: 0');
     </div>
     <div class="modal-f">
       <button class="btn-ghost" id="ed-cancelar2" onclick="fecharEdicao()">Cancelar</button>
+      <button class="btn-ghost" id="ed-baixar-kml" style="display:none" title="Baixar o arquivo KML gerado a partir das coordenadas extraídas (memorial descritivo, PDF da matrícula ou do SIGEF)">⤓ Baixar KML</button>
       <button class="btn-ghost" id="ed-itn03" title="Gerar a carga ITN 03 desta matrícula (precisa estar pronta para o Mapa ONR)">⤓ Carga ITN 03</button>
       <button class="btn-ghost" id="ed-onr-correcao" style="display:none;border-color:var(--teal);color:var(--teal)" title="Reenviar este imóvel ao Mapa ONR como RETIFICAÇÃO (correção dos dados já enviados)">↻ Enviar correção à ONR</button>
       <button class="btn-primary" id="ed-salvar">Salvar alterações</button>
@@ -10626,6 +10693,7 @@ async function abrirEdicao(id){
   edPreencherOnr(null);            // limpa enquanto busca o registro completo
   edAnxId = it.id;
   edAnxBusy=false; if(typeof edAnxBusyUI==='function') edAnxBusyUI('off'); edRenderAnexos(null);
+  (function(){ const b=document.getElementById('ed-baixar-kml'); if(b) b.style.display='none'; })(); // reexibido abaixo se houver geometria
   document.getElementById('modal-edit').classList.add('show');
   edAtualizarDrop();
   // os dados ONR completos não vêm na listagem enxuta: busca o registro inteiro
@@ -10650,6 +10718,13 @@ async function abrirEdicao(id){
       }
     }
     if(res && res.ok) edRenderAnexos(res.anexos||[]);
+    // Baixar KML: disponível para qualquer imóvel (matrícula ou projeto) com coordenadas mapeadas
+    (function(){
+      const b=document.getElementById('ed-baixar-kml'); if(!b) return;
+      const temGeo = !!(res && res.ok && res.registro && String(res.registro.coordenadas_wgs84||'').trim()!=='');
+      b.style.display = temGeo ? '' : 'none';
+      b.onclick = ()=>{ window.location.href = window.location.pathname + '?kml=' + encodeURIComponent(it.id); };
+    })();
   } catch(e){ edRenderAnexos([]); }
 }
 const EONR_PADRAO = {onr_nivel_publicidade:'3', onr_classificacao:'1'};
