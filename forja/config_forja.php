@@ -341,36 +341,122 @@ function forja_comprimir_pdf($src, $nivel = 'recomendado')
     return $out;
 }
 
+/**
+ * Aspas seguras para argumentos de linha de comando.
+ *
+ * IMPORTANTE: no Windows o escapeshellarg() do PHP substitui '%' por espaço
+ * (proteção contra expansão de variáveis do cmd.exe). Isso destrói padrões como
+ * "pagina-%03d.png", que viram "pagina- 03d.png" — e o Ghostscript, sem o %d,
+ * grava apenas a 1ª página e aborta nas demais. Por isso, para caminhos gerados
+ * internamente (que nunca contêm aspas), montamos as aspas manualmente.
+ */
+function forja_arg($s)
+{
+    if (!forja_is_win()) return escapeshellarg($s);
+    return '"' . str_replace('"', '', $s) . '"';
+}
+
+/** Lista apenas as imagens com nome válido (pagina-001.png, pagina-002.png, ...). */
+function forja_imgs_validas($dir, $formato)
+{
+    $out = [];
+    foreach ((array)glob($dir . '/pagina-*.' . $formato) as $f) {
+        if (preg_match('~^pagina-\d+\.' . preg_quote($formato, '~') . '$~i', basename($f))) $out[] = $f;
+    }
+    natsort($out);
+    return array_values($out);
+}
+
+/** Remove tudo que estiver na pasta de imagens (usado antes do fallback). */
+function forja_limpar_imgs($dir, $formato)
+{
+    foreach ((array)glob($dir . '/pagina-*.' . $formato) as $f) @unlink($f);
+}
+
+/** Quantidade de páginas do PDF. Retorna 0 se não for possível determinar. */
+function forja_pdf_num_paginas($src)
+{
+    /* 1) FPDI — rápido, sem processo externo. */
+    try {
+        forja_load_libs();
+        $cls = 'setasign\\Fpdi\\Tcpdf\\Fpdi';
+        $t = new $cls();
+        $n = (int)$t->setSourceFile($src);
+        if ($n > 0) return $n;
+    } catch (Throwable $e) { /* PDF 1.5+ com object streams: tenta o Ghostscript */ }
+
+    /* 2) Ghostscript. */
+    if ($gs = forja_gs_bin()) {
+        $ps  = str_replace('\\', '/', $src);
+        $cmd = forja_arg($gs) . ' -q -dNODISPLAY -dNOSAFER -dBATCH -c '
+             . forja_arg('(' . $ps . ') (r) file runpdfbegin pdfpagecount = quit');
+        $r = forja_exec($cmd);
+        if (preg_match('~(\d+)~', $r['out'], $m) && (int)$m[1] > 0) return (int)$m[1];
+    }
+
+    /* 3) Heurística no conteúdo bruto (não funciona com object streams). */
+    $raw = @file_get_contents($src);
+    if ($raw !== false && preg_match_all('~/Type\s*/Page\b~', $raw, $m2)) return count($m2[0]);
+
+    return 0;
+}
+
 function forja_pdf_para_imagens($src, $formato = 'png', $dpi = 150)
 {
-    $dpi = max(72, min(400, (int)$dpi));
+    $dpi     = max(72, min(400, (int)$dpi));
     $formato = $formato === 'jpg' ? 'jpg' : 'png';
-    $dir = forja_dir_out() . '/imgs_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4);
+    $dir     = forja_dir_out() . '/imgs_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4);
     @mkdir($dir, 0775, true);
     $pattern = $dir . '/pagina-%03d.' . $formato;
 
+    $total = forja_pdf_num_paginas($src);   /* 0 = desconhecido */
+    $erro  = '';
+
     $gs = forja_gs_bin();
-    $ok = false;
     if ($gs) {
         $device = $formato === 'jpg' ? 'jpeg' : 'png16m';
         $extra  = $formato === 'jpg' ? ' -dJPEGQ=90' : '';
-        $cmd = escapeshellarg($gs) . ' -sDEVICE=' . $device . ' -r' . $dpi . $extra
-             . ' -dNOPAUSE -dQUIET -dBATCH -dTextAlphaBits=4 -dGraphicsAlphaBits=4'
-             . ' -sOutputFile=' . escapeshellarg($pattern) . ' ' . escapeshellarg($src);
+        $comuns = ' -dNOPAUSE -dQUIET -dBATCH -dTextAlphaBits=4 -dGraphicsAlphaBits=4';
+
+        /* Tentativa 1: uma única chamada com o padrão %03d. */
+        $cmd = forja_arg($gs) . ' -sDEVICE=' . $device . ' -r' . $dpi . $extra . $comuns
+             . ' -sOutputFile=' . forja_arg($pattern) . ' ' . forja_arg($src);
         $r = forja_exec($cmd);
-        $ok = ($r['rc'] === 0);
+        $erro = $r['out'];
+
+        $feitas = count(forja_imgs_validas($dir, $formato));
+        $faltou = $total > 0 ? ($feitas < $total) : ($feitas === 0);
+
+        /* Tentativa 2: renderiza página a página. Sempre confiável, pois não
+           depende do padrão %d sobreviver ao shell. */
+        if ($faltou) {
+            forja_limpar_imgs($dir, $formato);
+            $limite = $total > 0 ? $total : 2000;
+            for ($p = 1; $p <= $limite; $p++) {
+                $alvo = $dir . '/pagina-' . sprintf('%03d', $p) . '.' . $formato;
+                $cmd  = forja_arg($gs) . ' -sDEVICE=' . $device . ' -r' . $dpi . $extra . $comuns
+                      . ' -dFirstPage=' . $p . ' -dLastPage=' . $p
+                      . ' -sOutputFile=' . forja_arg($alvo) . ' ' . forja_arg($src);
+                $r = forja_exec($cmd);
+                if ($r['rc'] !== 0 || !is_file($alvo) || filesize($alvo) < 100) { @unlink($alvo); break; }
+            }
+        }
     }
-    if (!$ok && ($mk = forja_magick_bin())) {
-        $cmd = escapeshellarg($mk) . ' -density ' . $dpi . ' ' . escapeshellarg($src)
-             . ($formato === 'jpg' ? ' -quality 90' : '') . ' ' . escapeshellarg($pattern);
+
+    /* Fallback: ImageMagick (também com aspas seguras + numeração a partir de 1). */
+    if (!forja_imgs_validas($dir, $formato) && ($mk = forja_magick_bin())) {
+        forja_limpar_imgs($dir, $formato);
+        $cmd = forja_arg($mk) . ' -density ' . $dpi . ' ' . forja_arg($src)
+             . ($formato === 'jpg' ? ' -quality 90' : '') . ' -scene 1 ' . forja_arg($pattern);
         $r = forja_exec($cmd);
+        if (!$erro) $erro = $r['out'];
     }
-    $files = glob($dir . '/pagina-*.' . $formato);
-    natsort($files); $files = array_values($files);
-    if (!$files) throw new RuntimeException('Nenhuma imagem gerada. Verifique se o Ghostscript/ImageMagick está configurado.');
+
+    $files = forja_imgs_validas($dir, $formato);
+    if (!$files) throw new RuntimeException('Nenhuma imagem gerada. Verifique se o Ghostscript/ImageMagick está configurado. ' . mb_substr($erro, 0, 300));
 
     $zip = forja_dir_out() . '/imagens_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.zip';
-    $za = new ZipArchive();
+    $za  = new ZipArchive();
     if ($za->open($zip, ZipArchive::CREATE) !== true) throw new RuntimeException('Não foi possível criar o ZIP.');
     foreach ($files as $f) $za->addFile($f, basename($f));
     $za->close();
