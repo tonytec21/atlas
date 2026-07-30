@@ -1469,6 +1469,339 @@
     ];
 
     /* ==================================================================
+     * 5i) FLUXO DE CAIXA — caixa/index.php
+     *     Quase tudo acontece em janelas (modais); cada uma tem o seu guia,
+     *     e o botão “?” acompanha a janela aberta.
+     * ================================================================ */
+    var passosCaixa = [
+        {
+            alvo: '#pesquisarForm',
+            titulo: 'Fluxo de Caixa',
+            texto: 'Esta tela reúne o movimento financeiro do cartório por <b>funcionário</b> e por '
+                 + '<b>dia</b>: o que foi recebido nos atos, as saídas, os depósitos e o saldo que passa '
+                 + 'de um dia para o outro. Comece pelos filtros.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#funcionario',
+            titulo: 'Funcionário',
+            texto: 'Escolha de quem é o caixa. A opção <b>Todos</b> consolida os funcionários no mesmo '
+                 + 'card — é o chamado <b>caixa unificado</b>, usado no fechamento geral do dia.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#periodo',
+            titulo: 'Período',
+            texto: 'Atalhos para hoje, ontem, a semana ou o mês. Para um intervalo específico, use as '
+                 + 'datas ao lado.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#data_inicial',
+            titulo: 'Datas',
+            texto: 'Data inicial e final do intervalo pesquisado. Cada dia vira um card no resultado.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#modo_visualizacao',
+            subir: '.form-check',
+            titulo: 'Modo de visualização',
+            texto: 'Marcando esta opção, todos os dias do período são consolidados em <b>um único caixa</b> '
+                 + '(com o funcionário “Todos”, também consolida as pessoas), abrindo o card, a janela de '
+                 + 'detalhes e o relatório unificados.<br><b>É apenas consulta:</b> nesse modo não há '
+                 + 'cadastro de depósitos, saídas nem fechamento.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#pesquisarForm button[type="submit"]',
+            titulo: 'Pesquisar',
+            texto: 'Aplica os filtros e monta os cards do resultado.',
+            posicao: 'topo'
+        },
+        {
+            alvo: '#cardsResultados',
+            titulo: 'Os cards do resultado',
+            texto: 'Cada card é um caixa (funcionário + dia) com o resumo dos valores e a cor indicando a '
+                 + 'situação — aberto ou fechado. <b>Clique no corpo do card</b> para abrir a janela de '
+                 + 'detalhes, com todo o movimento daquele caixa.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: '#cardsResultados .btn-icon',
+            titulo: 'Ações de cada caixa',
+            texto: 'Os botõezinhos no rodapé do card abrem as ações sem entrar nos detalhes:<ul>'
+                 + '<li><b>Saídas e Despesas</b> — lança o que saiu do caixa;</li>'
+                 + '<li><b>Depósito do Caixa</b> — registra depósitos e fecha o caixa com transporte do saldo;</li>'
+                 + '<li><b>Imprimir Fechamento</b> — abre o relatório do caixa em outra aba;</li>'
+                 + '<li><b>Ver Depósitos do Caixa</b> — no caixa unificado, lista os depósitos de todos;</li>'
+                 + '<li><b>Fechar caixa</b> (cadeado) — encerra o caixa do dia.</li></ul>'
+                 + 'Cada janela dessas tem o seu próprio guia: abra a janela e clique no <b>“?”</b>.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: 'button[onclick*="analiticos"]',
+            titulo: 'Analíticos',
+            texto: 'Leva aos relatórios analíticos, com os números consolidados por período — útil para '
+                 + 'conferência e prestação de contas.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosCaixaDetalhes = [
+        {
+            alvo: '#modalStatusPill',
+            titulo: 'Situação do caixa',
+            texto: 'Indica se este caixa está <b>aberto</b> ou <b>fechado</b>. Depois de fechado, o '
+                 + 'movimento fica apenas para consulta.',
+            posicao: 'baixo',
+            aguardar: 2500,
+            opcional: true
+        },
+        {
+            alvo: '#cardSaldoInicial',
+            titulo: 'Saldo inicial',
+            texto: 'O dinheiro que já estava em caixa quando o dia começou — normalmente o saldo '
+                 + 'transportado do fechamento anterior.',
+            posicao: 'baixo',
+            aguardar: 2500,
+            opcional: true
+        },
+        {
+            alvo: '#cardTotalRecebido',
+            titulo: 'O que entrou',
+            texto: 'Os cards do topo separam a origem do dinheiro: <b>atos liquidados</b>, <b>atos '
+                 + 'manuais</b>, <b>atos isentos</b> (que não geram valor) e o recebido <b>em conta</b> '
+                 + 'e <b>em espécie</b>. O “Total Recebido” é a soma das entradas do dia.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#cardSaidasDespesas',
+            titulo: 'O que saiu',
+            texto: '<b>Saídas/Despesas</b> são os pagamentos feitos com o dinheiro do caixa; '
+                 + '<b>Devoluções</b> são valores devolvidos a apresentantes; e <b>Depósito do Caixa</b> '
+                 + 'é o que foi recolhido para o banco.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#cardTotalSelos',
+            titulo: 'Selos e repasses',
+            texto: '<b>Selos (à vista)</b> e <b>Selos diferidos</b> mostram a parcela dos emolumentos '
+                 + 'destinada ao selo digital; <b>Repasse a credores</b> reúne valores de terceiros que '
+                 + 'passaram pelo caixa.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#cardTotalEmCaixa',
+            titulo: 'Total em caixa',
+            texto: 'O resultado de tudo: saldo inicial + entradas − saídas − devoluções − depósitos. '
+                 + 'É este valor que deve bater com o dinheiro conferido na gaveta no fim do dia.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#filtrosAtosLiquidados',
+            titulo: 'Filtrar os atos',
+            texto: 'Nas listas detalhadas dá para filtrar por funcionário, ato, apresentante ou número da '
+                 + 'O.S. — útil para localizar um lançamento específico na conferência. O botão '
+                 + '<b>Limpar</b> volta à lista completa.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: '#tabelaAtos',
+            titulo: 'As listas detalhadas',
+            texto: 'Abaixo dos cards vêm as listas que compõem cada número: atos liquidados, atos '
+                 + 'manuais, isentos, selos, pagamentos por tipo, devoluções, saídas, depósitos e saldo '
+                 + 'transportado — cada uma com o seu total ao final.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        }
+    ];
+
+    var passosCaixaSaida = [
+        {
+            alvo: '#titulo',
+            titulo: 'Título da saída',
+            texto: 'Descreva o gasto de forma reconhecível — <i>combustível</i>, <i>material de '
+                 + 'escritório</i>, <i>correio</i>. É o que aparece no fechamento.',
+            posicao: 'baixo',
+            aguardar: 2500
+        },
+        {
+            alvo: '#valor_saida',
+            titulo: 'Valor',
+            texto: 'Quanto saiu do caixa. O valor é descontado do total em caixa assim que a saída é salva.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#forma_de_saida',
+            titulo: 'Forma de saída',
+            texto: 'Como o pagamento foi feito (espécie, cartão, transferência…). Ajuda na conferência '
+                 + 'entre o dinheiro em gaveta e o extrato bancário.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#anexo',
+            subir: '.custom-file',
+            titulo: 'Anexo',
+            texto: 'Anexe o cupom, a nota ou o comprovante do gasto. Fica guardado junto do lançamento e '
+                 + 'pode ser consultado depois pelo ícone do olho.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#formCadastroSaida button[type="submit"]',
+            titulo: 'Cadastrar a saída',
+            texto: 'Grava o lançamento e atualiza o caixa na hora.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#tabelaSaidasCadastradas',
+            titulo: 'Saídas já cadastradas',
+            texto: 'A lista traz o que já foi lançado neste caixa, com o botão de <b>visualizar</b> o '
+                 + 'anexo e o de <b>remover</b> — a remoção só é possível enquanto o caixa estiver aberto.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        }
+    ];
+
+    var passosCaixaDeposito = [
+        {
+            alvo: '#total_em_caixa',
+            titulo: 'Quanto há para depositar',
+            texto: 'O topo da janela mostra o <b>total em caixa</b>, o que já foi depositado e o saldo '
+                 + 'transportado — os números que orientam o valor do depósito.',
+            posicao: 'baixo',
+            aguardar: 2500,
+            opcional: true
+        },
+        {
+            alvo: '#valor_deposito',
+            titulo: 'Valor do depósito',
+            texto: 'O quanto está sendo recolhido do caixa para o banco.',
+            posicao: 'baixo',
+            aguardar: 2500
+        },
+        {
+            alvo: '#tipo_deposito',
+            titulo: 'Tipo',
+            texto: 'Depósito bancário, espécie ou transferência — conforme a forma como o dinheiro saiu '
+                 + 'do caixa.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#comprovante_deposito',
+            subir: '.custom-file',
+            titulo: 'Comprovante',
+            texto: 'Anexe o comprovante do depósito. Não havendo comprovante no momento, marque '
+                 + '<b>Sem comprovante</b> — mas registre-o depois, pelo clipe na lista de depósitos.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#btnAdicionarDeposito',
+            titulo: 'Adicionar depósito',
+            texto: 'Grava o depósito e abate o valor do total em caixa. Pode lançar vários depósitos no '
+                 + 'mesmo dia.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#tabelaDepositosRegistrados',
+            titulo: 'Depósitos registrados',
+            texto: 'Lista os depósitos deste caixa, com <b>visualizar</b>, <b>anexar comprovante</b> '
+                 + '(clipe) e <b>remover</b>.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: '#btnTransportarSaldo',
+            titulo: 'Transportar saldo e fechar o caixa',
+            texto: 'Encerra o caixa do dia e leva o <b>total em caixa</b> restante para o caixa seguinte, '
+                 + 'como saldo inicial. O sistema pede confirmação mostrando o valor que será '
+                 + 'transportado — confira o dinheiro em gaveta antes, porque depois de fechado o caixa '
+                 + 'não aceita novos lançamentos.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosCaixaAnexar = [
+        {
+            alvo: '#arquivo_comprovante',
+            subir: '.custom-file',
+            titulo: 'Escolher o comprovante',
+            texto: 'Selecione o arquivo do comprovante daquele depósito — imagem ou PDF.',
+            posicao: 'baixo',
+            aguardar: 2500
+        },
+        {
+            alvo: '#formAnexarComprovante button[type="submit"]',
+            titulo: 'Enviar',
+            texto: 'Vincula o comprovante ao depósito. Depois disso, o ícone do olho passa a exibi-lo na '
+                 + 'lista — é assim que se regulariza um depósito lançado como “sem comprovante”.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosCaixaDepositosUnificado = [
+        {
+            alvo: '#tabelaDepositosCaixaUnificado',
+            titulo: 'Depósitos do caixa unificado',
+            texto: 'Reúne os depósitos de <b>todos os funcionários</b> naquela data, com funcionário, '
+                 + 'valor, tipo e comprovante. É a visão usada na conferência do fechamento geral do dia.',
+            posicao: 'topo',
+            aguardar: 3000
+        }
+    ];
+
+    var passosCaixaAbrir = [
+        {
+            alvo: '#saldo_inicial',
+            titulo: 'Saldo inicial do dia',
+            texto: 'Ao entrar sem um caixa aberto, o sistema pede a abertura. Informe o dinheiro que já '
+                 + 'está na gaveta — normalmente o saldo transportado do dia anterior, que costuma vir '
+                 + 'preenchido. Confira antes de confirmar: é a base de todo o fechamento.',
+            posicao: 'baixo',
+            aguardar: 2500
+        },
+        {
+            alvo: '#formAbrirCaixa button[type="submit"]',
+            titulo: 'Abrir caixa',
+            texto: 'Abre o caixa do dia e libera os lançamentos.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: 'button[onclick*="pularAberturaCaixa"]',
+            titulo: 'Pular por enquanto',
+            texto: 'Fecha o aviso e deixa a abertura para depois — útil quando você entrou só para '
+                 + 'consultar. Sem o caixa aberto, porém, não é possível lançar saídas nem depósitos.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    /* ==================================================================
      * 6) TABELA DE EMOLUMENTOS — tabela_de_emolumentos.php
      * ================================================================ */
     var passosEmolumentos = [
@@ -1710,8 +2043,34 @@
     var caminho = (window.location.pathname || '').toLowerCase();
     var emSignum = caminho.indexOf('/signum/') >= 0;
     var emForja = caminho.indexOf('/forja/') >= 0;
+    var emCaixa = caminho.indexOf('/caixa/') >= 0;
 
-    if (emForja && /^configurar/.test(pagina)) {
+    if (emCaixa) {
+        var ROTULO_CAIXA = 'Guia do Fluxo de Caixa';
+        window.GuiaOS.registrar('caixa', passosCaixa, {
+            rotuloAjuda: ROTULO_CAIXA,
+            mensagemFinal: 'Cada janela do módulo tem o seu guia: abra a janela e clique no “?”.'
+        });
+        var JANELAS_CAIXA = [
+            ['#detalhesModal', 'caixa-detalhes', 'Como ler os detalhes do caixa', passosCaixaDetalhes],
+            ['#cadastroSaidaModal', 'caixa-saida', 'Como lançar uma saída', passosCaixaSaida],
+            ['#cadastroDepositoModal', 'caixa-deposito', 'Como depositar e fechar o caixa', passosCaixaDeposito],
+            ['#anexarComprovanteModal', 'caixa-anexar', 'Como anexar o comprovante', passosCaixaAnexar],
+            ['#verDepositosCaixaModal', 'caixa-depositos', 'Como conferir os depósitos', passosCaixaDepositosUnificado],
+            ['#abrirCaixaModal', 'caixa-abrir', 'Como abrir o caixa do dia', passosCaixaAbrir]
+        ];
+        for (var iC = 0; iC < JANELAS_CAIXA.length; iC++) {
+            (function (j) {
+                window.GuiaOS.registrar(j[1], j[3], {
+                    botaoAjuda: false,          // o botão existente é reaproveitado
+                    rotuloAjuda: j[2],
+                    mensagemFinal: 'Feche a janela para voltar ao fluxo de caixa.'
+                });
+                ligarModalGuia(j[0], j[1], j[2], 'caixa', ROTULO_CAIXA);
+            })(JANELAS_CAIXA[iC]);
+        }
+        window.GuiaOS.autoIniciar('caixa');
+    } else if (emForja && /^configurar/.test(pagina)) {
         window.GuiaOS.registrar('forja-config', passosForjaConfig, {
             rotuloAjuda: 'Guia das configurações',
             mensagemFinal: 'Configurado! Volte à Forja e use as ferramentas.'

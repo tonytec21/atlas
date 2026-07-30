@@ -39,8 +39,9 @@ esperando o usuário clicar de verdade em “Buscar Ato” e “Adicionar à OS�
    <?php include(__DIR__ . '/os/guia/guia.php'); ?>
    ```
 
-   Nos módulos **Atlas Signum** (`atlas/signum/index.php` e `configurar.php`) e
-   **Atlas Forja** (`atlas/forja/index.php` e `configurar.php`):
+   Nos módulos **Atlas Signum** (`atlas/signum/index.php` e `configurar.php`),
+   **Atlas Forja** (`atlas/forja/index.php` e `configurar.php`) e
+   **Fluxo de Caixa** (`atlas/caixa/index.php`):
 
    ```php
    <?php include(__DIR__ . '/../os/guia/guia.php'); ?>
@@ -70,6 +71,7 @@ Abra `guia/demo/demo-criar-os.html` direto no navegador: é uma cópia simplific
 | No meio do guia | `→` / `Enter` avança, `←` volta, `Esc` sai |
 | Passos “Buscar Ato” e “Adicionar à OS” | O botão *Próximo* fica apagado: o guia só avança quando o usuário clica de verdade no botão do sistema |
 | Passo final da tela de pesquisa | Ao clicar em *Criar Ordem de Serviço*, o guia **continua sozinho** na tela seguinte |
+| Abrir qualquer janela do **Fluxo de Caixa** | O guia troca para o daquela janela (detalhes, saída, depósito, comprovante, depósitos unificados, abertura) e volta ao guia do módulo ao fechar |
 | Trocar de aba na **Forja** | O botão “?” passa a oferecer o guia daquela ferramenta (“Como comprimir PDF”, “Como dividir um PDF”…). Se o usuário já estiver dentro de um guia da Forja, ele **troca junto** |
 | Abrir as janelas **Pagamentos** ou **Anexos** na tela da O.S. | O guia **troca** para o daquela janela e o botão “?” passa a exibir **“Como adicionar pagamento”** / **“Como adicionar anexo”**; ao fechar, o guia anterior é retomado no mesmo passo e o botão volta a **“O que fazer com esta O.S.”** |
 | Ao sair pelo *Sair do guia* | Não abre mais automaticamente, mas continua disponível no botão “?” |
@@ -96,6 +98,8 @@ Guias registrados:
 | `forja` | `forja/index.php` | visão geral do módulo e das oito ferramentas |
 | `forja-comprimir` | aba Comprimir PDF | quatro níveis (300/200/150/120 dpi), seletor de cores, dica contextual, selos do resultado e prévia comparativa |
 | `forja-pdf2img`, `forja-img2pdf`, `forja-juntar`, `forja-multiplo`, `forja-dividir`, `forja-word2pdf`, `forja-pdf2word` | abas da Forja | um guia por ferramenta |
+| `caixa` | `caixa/index.php` | filtros, modo de visualização, cards e ações de cada caixa |
+| `caixa-detalhes`, `caixa-saida`, `caixa-deposito`, `caixa-anexar`, `caixa-depositos`, `caixa-abrir` | janelas do fluxo de caixa | um guia por modal: detalhes, saídas, depósito/fechamento, comprovante, depósitos unificados e abertura |
 | `forja-config` | `forja/configurar.php` | caminhos do Ghostscript/ImageMagick/LibreOffice, ativação e instalação portátil |
 | `tabela-emolumentos` | `tabela_de_emolumentos.php` | filtros, leitura dos valores, exportação e impressão |
 | `liberar-os` | `liberar_os.php` | desfazer as liquidações do dia, com a regra de bloqueio e o log |
@@ -317,4 +321,5 @@ node teste_guia10.js  # guia de assinatura nos dois estados (a assinar / já ass
 node teste_guia11.js  # janela de autorização: iframe, reconexão automática e troca de guia
 node teste_guia12.js  # módulo Signum: guia da tela, configurações e autorização do Assinador
 node teste_guia13.js  # módulo Forja: guia geral, um guia por ferramenta e troca ao mudar de aba
+node teste_guia14.js  # Fluxo de Caixa: guia da tela e a troca em cada uma das seis janelas
 ```
