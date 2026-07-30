@@ -24,6 +24,7 @@ $cpfCarimboFmt = asg_cpf_fmt($cpfCarimbo);
 $prontoA1 = ($metodo === 'a1') ? (bool)$certInfo : true;
 function eh($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 ?>
+<?php include(__DIR__ . '/../os/guia/guia.php'); ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>

@@ -7,6 +7,7 @@ $isAdmin = forja_is_admin();
 $temEngine = forja_tem_pdf_engine();
 function eh($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 ?>
+<?php include(__DIR__ . '/../os/guia/guia.php'); ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -60,6 +61,24 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
 .result b{ color:var(--fj-text); } .result small{ color:var(--fj-muted); display:block; }
 .spin{ display:none; text-align:center; padding:24px; } .spin .s{ width:42px;height:42px;border:4px solid var(--fj-border);border-top-color:var(--fj-primary);border-radius:50%;animation:fjspin 1s linear infinite;margin:0 auto 10px; }
 @keyframes fjspin{ to{ transform:rotate(360deg); } }
+.hint{ font-size:.82rem; color:var(--fj-muted); background:var(--fj-bg); border:1px dashed var(--fj-border); border-radius:10px; padding:9px 12px; margin:-4px 0 6px; }
+.hint b{ color:var(--fj-text); }
+.badges{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.bdg{ font-size:.74rem; font-weight:700; padding:3px 9px; border-radius:999px; background:var(--fj-bg); color:var(--fj-muted); border:1px solid var(--fj-border); }
+.bdg.ok{ background:rgba(34,197,94,.14); color:#15803d; border-color:transparent; }
+.prev{ margin-top:14px; border-top:1px dashed var(--fj-border); padding-top:12px; }
+.prev-bar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+.prev-bar .fj-pill{ font-size:.8rem; padding:6px 12px; }
+.prev-bar .fj-pill.sel{ background:linear-gradient(135deg,var(--fj-primary),var(--fj-primary2)); color:#fff; border-color:transparent; }
+.pdfv{ display:grid; gap:10px; }
+.pdfv.dois{ grid-template-columns:1fr 1fr; }
+.pdfv .pane{ border:1px solid var(--fj-border); border-radius:12px; overflow:hidden; background:var(--fj-card); }
+.pdfv .pane h6{ margin:0; padding:8px 12px; font-size:.76rem; font-weight:800; color:var(--fj-muted); background:var(--fj-bg); border-bottom:1px solid var(--fj-border); display:flex; align-items:center; justify-content:space-between; gap:10px; text-transform:uppercase; letter-spacing:.03em; }
+.pdfv .pane h6 span{ font-weight:700; text-transform:none; letter-spacing:0; }
+.pdfv iframe{ width:100%; height:560px; border:0; display:block; background:#fff; }
+.pdfv img{ width:100%; display:block; }
+.prev-nota{ font-size:.78rem; color:var(--fj-muted); margin-top:8px; }
+@media (max-width:900px){ .pdfv.dois{ grid-template-columns:1fr; } .pdfv iframe{ height:420px; } }
 </style>
 </head>
 <body class="light-mode">
@@ -109,12 +128,20 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
         <div class="opts">
           <label>Nível:</label>
           <select class="inp" id="nivelComp">
-            <option value="tela">Máxima compressão (menor arquivo)</option>
-            <option value="recomendado" selected>Recomendada (bom equilíbrio)</option>
-            <option value="alta">Alta qualidade (menos compressão)</option>
+            <option value="alta">Alta qualidade &mdash; 300 dpi</option>
+            <option value="recomendado" selected>Recomendada &mdash; equilíbrio (200 dpi)</option>
+            <option value="forte">Máxima compressão legível &mdash; 150 dpi</option>
+            <option value="extrema">Compressão extrema &mdash; 120 dpi</option>
+          </select>
+          <label>Cores:</label>
+          <select class="inp" id="cinzaComp">
+            <option value="auto" selected>Automático</option>
+            <option value="sim">Converter em tons de cinza</option>
+            <option value="nao">Preservar as cores</option>
           </select>
           <button class="fj-pill fj-pri" id="btnComprimir" disabled style="margin-left:auto"><i class="fa fa-bolt"></i> Comprimir</button>
         </div>
+        <div class="hint" id="hintComp"></div>
         <div class="spin" data-spin="comprimir"><div class="s"></div><div style="font-weight:700;color:var(--fj-text)">Comprimindo…</div></div>
         <div class="result" data-result="comprimir"></div>
       </div>
@@ -322,11 +349,110 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
       +'<a class="fj-pill fj-pri" href="baixar.php?token='+encodeURIComponent(token)+'"><i class="fa fa-download"></i> Baixar</a></div>';
   }
 
+  var DICAS={
+    alta:'Reamostra imagens para <b>300 dpi</b> com JPEG de alta qualidade. Indicado para documentos que ainda serão impressos ou reconhecidos por OCR.',
+    recomendado:'Reamostra para <b>200 dpi</b>. Mantém o texto nítido na tela e na impressão comum — é a melhor escolha para digitalizações de cartório.',
+    forte:'Reamostra para <b>150 dpi</b> com reamostragem bicúbica. Costuma reduzir de <b>85% a 90%</b> e o texto continua perfeitamente legível.',
+    extrema:'Reamostra para <b>120 dpi</b>. Reduz cerca de <b>90% a 95%</b> — use para anexar em e-mail/protocolo. Ainda legível, mas não recomendado para reimpressão.'
+  };
+  function atualizarDica(){
+    var n=$('#nivelComp').value, c=$('#cinzaComp').value, t=DICAS[n]||'';
+    if(c==='sim') t+=' <b>Tons de cinza</b> ativado: reduz mais 30&ndash;60% em digitalizações coloridas.';
+    else if(c==='auto') t+=' No modo <b>automático</b>, páginas sem cor real são convertidas para cinza.';
+    $('#hintComp').innerHTML=t;
+  }
+  $('#nivelComp').addEventListener('change',atualizarDica);
+  $('#cinzaComp').addEventListener('change',atualizarDica);
+  atualizarDica();
+
+  function paneHtml(id,titulo,tam){
+    return '<div class="pane"><h6>'+esc(titulo)+'<span>'+(tam?humano(tam):'')+'</span></h6>'
+         + '<iframe id="'+id+'" title="'+esc(titulo)+'" referrerpolicy="no-referrer"></iframe></div>';
+  }
+  function previaHtml(j){
+    if(!j.token) return '';
+    var h='<div class="prev"><div class="prev-bar">'
+      + '<b style="font-size:.84rem;color:var(--fj-text)">Prévia da qualidade:</b>'
+      + '<button class="fj-pill fj-soft sel" data-pv="novo"><i class="fa fa-compress"></i> Comprimido</button>';
+    if(j.token_orig) h+='<button class="fj-pill fj-soft" data-pv="orig"><i class="fa fa-file-pdf-o"></i> Original</button>'
+                      +'<button class="fj-pill fj-soft" data-pv="dois"><i class="fa fa-columns"></i> Lado a lado</button>';
+    if((j.paginas||0)>1) h+='<span style="font-size:.8rem;color:var(--fj-muted)">pág. <input class="inp" id="pvPag" type="number" min="1" max="'+j.paginas+'" value="1" style="width:74px;padding:5px 8px"></span>';
+    h+='<a class="fj-pill fj-soft" id="pvAba" target="_blank" rel="noopener" href="#"><i class="fa fa-external-link"></i> Abrir em nova aba</a>'
+      +'</div><div class="pdfv" id="pvBox"></div>'
+      +'<div class="prev-nota">O documento é exibido pelo visualizador de PDF do próprio navegador &mdash; use o zoom dele para conferir o texto no tamanho real. '
+      +'<a href="#" id="pvImg" style="color:var(--fj-primary);font-weight:700">Não carregou? Ver como imagem</a></div></div>';
+    return h;
+  }
+
+  function montarPrevia(j){
+    var box=document.getElementById('pvBox'); if(!box) return;
+    var modo='novo', comoImagem=false;
+
+    function pagina(){ var e=document.getElementById('pvPag'); return Math.max(1, parseInt(e&&e.value||'1',10)||1); }
+    function urlPdf(tk){ return 'ver.php?token='+encodeURIComponent(tk)+'#page='+pagina()+'&view=FitH&zoom=page-width'; }
+    function urlImg(tk){ return 'previa.php?token='+encodeURIComponent(tk)+'&pg='+pagina()+'&dpi=150&t='+Date.now(); }
+
+    function desenhar(){
+      var dois = (modo==='dois' && j.token_orig);
+      box.className = 'pdfv'+(dois?' dois':'');
+      var rotNovo='Comprimido'+(j.dpi?(' · '+j.dpi+' dpi'):''), rotOrig='Original';
+      if(comoImagem){
+        var im=function(tk,rot,tam){
+          return '<div class="pane"><h6>'+esc(rot)+'<span>'+(tam?humano(tam):'')+'</span></h6>'
+               + '<img src="'+urlImg(tk)+'" alt="'+esc(rot)+'"></div>';
+        };
+        box.innerHTML = dois ? (im(j.token_orig,rotOrig,j.orig)+im(j.token,rotNovo,j.novo))
+                     : (modo==='orig' ? im(j.token_orig,rotOrig,j.orig) : im(j.token,rotNovo,j.novo));
+        return;
+      }
+      if(dois){
+        box.innerHTML = paneHtml('pvA',rotOrig,j.orig)+paneHtml('pvB',rotNovo,j.novo);
+        document.getElementById('pvA').src=urlPdf(j.token_orig);
+        document.getElementById('pvB').src=urlPdf(j.token);
+      } else if(modo==='orig'){
+        box.innerHTML = paneHtml('pvA',rotOrig,j.orig);
+        document.getElementById('pvA').src=urlPdf(j.token_orig);
+      } else {
+        box.innerHTML = paneHtml('pvB',rotNovo,j.novo);
+        document.getElementById('pvB').src=urlPdf(j.token);
+      }
+      var aba=document.getElementById('pvAba');
+      if(aba) aba.href = urlPdf(modo==='orig'&&j.token_orig ? j.token_orig : j.token);
+    }
+
+    document.querySelectorAll('[data-pv]').forEach(function(b){
+      b.addEventListener('click',function(){
+        document.querySelectorAll('[data-pv]').forEach(function(x){x.classList.remove('sel');});
+        b.classList.add('sel'); modo=b.dataset.pv; desenhar();
+      });
+    });
+    var inp=document.getElementById('pvPag'); if(inp) inp.addEventListener('change',desenhar);
+    var lnk=document.getElementById('pvImg');
+    if(lnk) lnk.addEventListener('click',function(ev){
+      ev.preventDefault(); comoImagem=!comoImagem;
+      lnk.textContent = comoImagem ? 'Voltar para o PDF' : 'Não carregou? Ver como imagem';
+      desenhar();
+    });
+    desenhar();
+  }
+
   $('#btnComprimir').addEventListener('click',async function(){
-    try{ var j=await processar('comprimir','comprimir.php',{nivel:$('#nivelComp').value},this);
-      var pct=j.orig>0?Math.round((1-j.novo/j.orig)*100):0;
-      showResult('comprimir', baixarHtml(j.token,'PDF comprimido',
-        humano(j.orig)+' → '+humano(j.novo)+(pct>0?(' · '+pct+'% menor'):' · já estava otimizado')));
+    try{
+      var j=await processar('comprimir','comprimir.php',{nivel:$('#nivelComp').value,cinza:$('#cinzaComp').value},this);
+      var pct=(typeof j.reducao==='number')?j.reducao:(j.orig>0?Math.round((1-j.novo/j.orig)*100):0);
+      var resumo=humano(j.orig)+' → '+humano(j.novo)+(pct>0?(' · '+pct+'% menor'):' · nada a ganhar sem perder qualidade');
+      var badges='<div class="badges">'
+        + (pct>0?'<span class="bdg ok">'+pct+'% menor</span>':'')
+        + (j.rotulo?'<span class="bdg">'+esc(j.rotulo)+'</span>':'')
+        + (j.dpi?'<span class="bdg">'+j.dpi+' dpi</span>':'')
+        + (j.cinza?'<span class="bdg">tons de cinza'+(j.cinza_auto?' (auto)':'')+'</span>':'')
+        + (j.paginas?'<span class="bdg">'+j.paginas+' pág.</span>':'')
+        + '</div>';
+      var extra='';
+      if(j.ja_otimizado) extra='<div class="hint" style="margin:10px 0 0">Este PDF já está otimizado para o nível escolhido — devolvemos o arquivo original em vez de um maior. Para reduzir mais, escolha <b>Máxima compressão legível</b> ou <b>Compressão extrema</b>.</div>';
+      else if((j.avisos||[]).length) extra='<div class="hint" style="margin:10px 0 0">'+esc(j.avisos.join(' '))+'</div>';
+      showResult('comprimir', baixarHtml(j.token,'PDF comprimido',resumo)+badges+extra+previaHtml(j));
+      montarPrevia(j);
     }catch(e){ Swal.fire('Erro',e.message,'error'); }
   });
   $('#btnPdf2Img').addEventListener('click',async function(){

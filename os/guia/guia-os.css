@@ -1,0 +1,507 @@
+/* ==========================================================================
+   GuiaOS — estilos do guia interativo (Atlas / módulo O.S.)
+   Segue as variáveis do sistema (style/style.php) e o tema escuro
+   aplicado por body.dark-mode.
+   ========================================================================== */
+
+.guia-os {
+    --guia-primaria: #667eea;
+    --guia-primaria-2: #764ba2;
+    --guia-destaque: #e11d48;
+    --guia-fundo: #ffffff;
+    --guia-texto: #1f2937;
+    --guia-texto-2: #6b7280;
+    --guia-borda: #e5e7eb;
+
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    display: none;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+
+    /* IMPORTANTE: o guia é apenas visual — a página continua utilizável.
+       Só o balão recebe cliques (ver .guia-os__balao). */
+    pointer-events: none;
+}
+
+body.dark-mode .guia-os {
+    --guia-fundo: #242832;
+    --guia-texto: #e9ecef;
+    --guia-texto-2: #adb5bd;
+    --guia-borda: #2d3238;
+}
+
+.guia-os.guia-os--ativo { display: block; }
+
+/* Enquanto o guia está aberto, evita rolagem horizontal causada pelo realce */
+body.guia-os-aberto { overflow-x: hidden; }
+
+/* ------------------------------------------------ máscara (4 painéis) */
+.guia-os__mascara {
+    position: fixed;
+    background: rgba(15, 23, 42, .62);
+    transition: all .18s ease;
+    pointer-events: none;
+}
+
+/* Modo opcional: escurecido "sólido", que impede cliques fora do destaque
+   (ativado por bloquearFundo: true nas opções do guia). */
+.guia-os--bloqueado .guia-os__mascara { pointer-events: auto; }
+
+/* ------------------------------------------------ realce do elemento */
+.guia-os__anel {
+    position: fixed;
+    border: 3px solid var(--guia-destaque);
+    border-radius: 10px;
+    box-shadow: 0 0 0 4px rgba(225, 29, 72, .18);
+    pointer-events: none;
+    transition: all .18s ease;
+}
+
+.guia-os__anel::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 10px;
+    border: 3px solid var(--guia-destaque);
+    animation: guia-os-pulso 1.8s ease-out infinite;
+}
+
+@keyframes guia-os-pulso {
+    0%   { transform: scale(1);    opacity: .55; }
+    70%  { transform: scale(1.06); opacity: 0; }
+    100% { transform: scale(1.06); opacity: 0; }
+}
+
+/* ------------------------------------------------ balão de conteúdo */
+.guia-os__balao {
+    position: fixed;
+    width: 380px;
+    max-width: calc(100vw - 24px);
+    background: var(--guia-fundo);
+    color: var(--guia-texto);
+    border-radius: 16px;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, .28);
+    padding: 18px 20px 16px;
+    pointer-events: auto;
+}
+
+.guia-os__balao--entrando { animation: guia-os-entrada .22s ease-out; }
+
+@keyframes guia-os-entrada {
+    from { opacity: 0; transform: translateY(6px) scale(.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+.guia-os__seta {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: var(--guia-fundo);
+    transform: rotate(45deg);
+}
+.guia-os__seta--baixo { top: -7px;    margin-left: -7px; }
+.guia-os__seta--topo  { bottom: -7px; margin-left: -7px; }
+.guia-os__seta--dir   { left: -7px;   margin-top: -7px; }
+.guia-os__seta--esq   { right: -7px;  margin-top: -7px; }
+
+.guia-os__topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.guia-os__contador {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--guia-primaria);
+}
+
+.guia-os__fechar {
+    background: none;
+    border: 0;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--guia-texto-2);
+    cursor: pointer;
+    padding: 0 2px;
+    border-radius: 6px;
+}
+.guia-os__fechar:hover { color: var(--guia-destaque); }
+
+.guia-os__titulo {
+    margin: 0 0 6px;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--guia-texto);
+}
+
+.guia-os__texto {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--guia-texto-2);
+}
+.guia-os__texto b, .guia-os__texto strong { color: var(--guia-texto); }
+.guia-os__texto ul { margin: 8px 0 0; padding-left: 18px; }
+.guia-os__texto li { margin-bottom: 4px; }
+.guia-os__texto code {
+    background: rgba(102, 126, 234, .12);
+    color: var(--guia-primaria);
+    padding: 1px 5px;
+    border-radius: 5px;
+    font-size: 12.5px;
+}
+
+.guia-os__barra {
+    height: 4px;
+    background: var(--guia-borda);
+    border-radius: 4px;
+    margin: 14px 0 12px;
+    overflow: hidden;
+}
+
+.guia-os__progresso {
+    height: 100%;
+    width: 0;
+    border-radius: 4px;
+    background: linear-gradient(135deg, var(--guia-primaria), var(--guia-primaria-2));
+    transition: width .25s ease;
+}
+
+.guia-os__rodape {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.guia-os__acoes { display: flex; gap: 8px; }
+
+.guia-os__btn {
+    border: 0;
+    border-radius: 10px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .18s ease;
+    font-family: inherit;
+}
+
+.guia-os__btn--principal {
+    background: linear-gradient(135deg, var(--guia-primaria), var(--guia-primaria-2));
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(102, 126, 234, .32);
+}
+.guia-os__btn--principal:hover { filter: brightness(1.06); transform: translateY(-1px); }
+
+.guia-os__btn--claro {
+    background: var(--guia-borda);
+    color: var(--guia-texto);
+}
+.guia-os__btn--claro:hover { filter: brightness(.97); }
+
+.guia-os__btn--texto {
+    background: none;
+    color: var(--guia-texto-2);
+    padding-left: 0;
+}
+.guia-os__btn--texto:hover { color: var(--guia-destaque); }
+
+/* botão "Próximo" apagado quando o passo espera uma ação do usuário */
+.guia-os__btn--fantasma { opacity: .45; }
+
+.guia-os__dica {
+    display: none;
+    margin-top: 12px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border-left: 3px solid var(--guia-destaque);
+    background: rgba(225, 29, 72, .08);
+    color: var(--guia-destaque);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+/* ------------------------------------------------ modo folha (celular) */
+.guia-os__balao--folha {
+    width: auto !important;
+    border-radius: 18px;
+    box-shadow: 0 -8px 30px rgba(15, 23, 42, .3);
+}
+
+@media (max-width: 760px) {
+    .guia-os__titulo { font-size: 16px; }
+    .guia-os__texto { font-size: 13px; }
+    .guia-os__btn { padding: 10px 14px; }
+}
+
+/* ------------------------------------------------ botão flutuante "?" */
+.guia-os-ajuda {
+    position: fixed;
+    right: 18px;
+    bottom: 90px;
+    z-index: 15000;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 48px;
+    padding: 0 16px 0 14px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(102, 126, 234, .38);
+    transition: all .2s ease;
+}
+.guia-os-ajuda:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(102, 126, 234, .46); }
+
+.guia-os-ajuda__icone {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .22);
+    font-weight: 800;
+}
+
+/* Realce discreto quando o botão troca de função (ex.: ao abrir o pagamento) */
+.guia-os-ajuda--trocando { animation: guia-os-troca .45s ease-out; }
+
+@keyframes guia-os-troca {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.07); box-shadow: 0 10px 26px rgba(102, 126, 234, .55); }
+    100% { transform: scale(1); }
+}
+
+@media (max-width: 760px) {
+    .guia-os-ajuda { padding: 0; width: 48px; justify-content: center; }
+    .guia-os-ajuda__rotulo { display: none; }
+}
+
+/* Diálogos do SweetAlert2 abertos com o guia ativo ficam acima dele */
+body.guia-os-aberto .swal2-container { z-index: 30000 !important; }
+
+@media print {
+    .guia-os, .guia-os-ajuda { display: none !important; }
+}
+
+
+/* ==========================================================================
+   AutorizarAssinador — janela de liberação do Assinador SERPRO
+   (usada em assinar-os.php, junto com assinador-autorizar.js)
+   ========================================================================== */
+
+.aa-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 19000;
+    display: none;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+}
+.aa-modal.show { display: block; }
+body.aa-travado { overflow: hidden; }
+
+.aa-fundo {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, .58);
+    backdrop-filter: blur(2px);
+}
+
+.aa-caixa {
+    position: relative;
+    width: 560px;
+    max-width: calc(100vw - 24px);
+    margin: 6vh auto 0;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .35);
+    overflow: hidden;
+    animation: aa-entrada .22s ease-out;
+}
+
+@keyframes aa-entrada {
+    from { opacity: 0; transform: translateY(10px) scale(.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+.aa-cabecalho {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+}
+.aa-icone { font-size: 18px; }
+.aa-titulo { margin: 0; font-size: 16.5px; font-weight: 700; flex: 1; }
+.aa-fechar {
+    background: rgba(255, 255, 255, .18);
+    border: 0;
+    color: #fff;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    font-size: 19px;
+    line-height: 1;
+    cursor: pointer;
+}
+.aa-fechar:hover { background: rgba(255, 255, 255, .3); }
+
+.aa-instrucao {
+    margin: 0;
+    padding: 14px 18px 12px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #475569;
+}
+.aa-instrucao b { color: #1f2937; }
+
+/* "Janelinha": mostra só o pedaço útil da página do Assinador */
+.aa-janela {
+    position: relative;
+    margin: 0 18px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f8fafc;
+}
+
+.aa-frame {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 560px;
+    border: 0;
+    transform-origin: top center;
+}
+
+/* Bordas suavizadas para esconder o recorte */
+.aa-cortina {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 18px;
+    pointer-events: none;
+}
+.aa-cortina--topo { top: 0;    background: linear-gradient(to bottom, #fff, rgba(255,255,255,0)); }
+.aa-cortina--base { bottom: 0; background: linear-gradient(to top,    #fff, rgba(255,255,255,0)); }
+
+/* Etapa 1 — painel de liberação do certificado (substitui o iframe) */
+.aa-cert {
+    display: none;
+    position: absolute;
+    inset: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 20px;
+    text-align: center;
+    background: #fff;
+    z-index: 2;
+}
+.aa-janela--certificado .aa-cert { display: flex; }
+.aa-janela--certificado .aa-frame,
+.aa-janela--certificado .aa-cortina { display: none; }
+
+.aa-cert__selo { font-size: 26px; }
+.aa-cert__titulo { font-size: 14.5px; font-weight: 700; color: #1f2937; }
+.aa-cert__texto { font-size: 12.8px; line-height: 1.55; color: #475569; max-width: 430px; }
+.aa-cert__texto b { color: #1f2937; }
+.aa-cert__btn { margin-top: 4px; }
+.aa-cert__url {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11.5px;
+    color: #94a3b8;
+}
+
+.aa-status {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 14px 18px 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #eef2ff;
+    color: #3730a3;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.aa-spin {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 2.4px solid #c7d2fe;
+    border-top-color: #4f46e5;
+    animation: aa-girar .8s linear infinite;
+    flex: 0 0 auto;
+}
+.aa-spin--ok {
+    border-color: #16a34a;
+    border-top-color: #16a34a;
+    background: #16a34a;
+    animation: none;
+}
+.aa-spin--erro {
+    border-color: #ef4444;
+    border-top-color: #ef4444;
+    background: #ef4444;
+    animation: none;
+}
+.aa-status:has(.aa-spin--ok) { background: #dcfce7; color: #166534; }
+.aa-status:has(.aa-spin--erro) { background: #fee2e2; color: #991b1b; }
+
+@keyframes aa-girar { to { transform: rotate(360deg); } }
+
+.aa-acoes {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 18px 18px;
+}
+
+.aa-btn {
+    border: 0;
+    border-radius: 10px;
+    padding: 9px 15px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .18s ease;
+}
+.aa-btn--principal {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(102, 126, 234, .32);
+}
+.aa-btn--principal:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.aa-btn--claro { background: #eef0f4; color: #334155; }
+.aa-btn--claro:hover { filter: brightness(.97); }
+
+/* Chama a atenção quando a autorização está pendente */
+.aa-abrir--piscando { animation: aa-pisca 1.6s ease-in-out 3; }
+
+@keyframes aa-pisca {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+    50%      { box-shadow: 0 0 0 6px rgba(37, 99, 235, .22); }
+}
+
+@media (max-width: 600px) {
+    .aa-caixa { margin-top: 2vh; }
+    .aa-acoes .aa-btn { flex: 1 1 100%; }
+}

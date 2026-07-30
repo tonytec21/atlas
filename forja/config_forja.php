@@ -324,20 +324,364 @@ function forja_exec($cmd)
     return ['rc' => $rc, 'out' => implode("\n", $out)];
 }
 
-function forja_comprimir_pdf($src, $nivel = 'recomendado')
+/* =====================================================================
+ * COMPRESSÃO DE PDF — motor v2
+ * ---------------------------------------------------------------------
+ * Por que o motor antigo falhava:
+ *   1) usava apenas os presets do Ghostscript (-dPDFSETTINGS). O preset
+ *      /ebook só reamostra imagens acima de 1,5x o alvo (>225 dpi) e, por
+ *      padrão, o pdfwrite REPASSA os JPEGs originais sem recomprimir
+ *      (-dPassThroughJPEGImages=true). Resultado: digitalização de 200 dpi
+ *      saía do mesmo tamanho -> "já estava otimizado".
+ *   2) o preset /screen reamostra para 72 dpi usando /Average. Em documento
+ *      digitalizado isso destrói o texto -> ilegível.
+ *
+ * O que o motor novo faz:
+ *   - controla explicitamente dpi, filtro de reamostragem (/Bicubic),
+ *     limiar (=1.0, sempre reamostra) e qualidade JPEG (QFactor);
+ *   - desliga o repasse de JPEG/JPX, forçando a recompressão;
+ *   - usa CCITT G4 (sem perda) em imagens 1 bit;
+ *   - deduplica imagens, faz subset de fontes e grava em PDF 1.7
+ *     (object streams = estrutura bem menor);
+ *   - escada progressiva: se a 1ª tentativa não reduzir o suficiente, tenta
+ *     a próxima do MESMO nível (nunca abaixo do piso de legibilidade);
+ *   - opção "tons de cinza" (detecção automática de páginas neutras);
+ *   - nunca devolve arquivo maior que o original.
+ * ===================================================================== */
+
+/** Versão do Ghostscript (float). 0.0 se não identificada. */
+function forja_gs_versao()
+{
+    static $v = null;
+    if ($v !== null) return $v;
+    $gs = forja_gs_bin();
+    if (!$gs) return $v = 0.0;
+    $r = forja_exec(forja_arg($gs) . ' --version');
+    $v = (float)trim(strtok($r['out'], "\n"));
+    return $v;
+}
+
+/** Escreve o arquivo .ps com os dicionários de qualidade JPEG (setdistillerparams). */
+function forja_gs_qualidade_ps($qfactor, $subamostrar = false)
+{
+    $q  = number_format((float)$qfactor, 2, '.', '');
+    $sc = $subamostrar ? '[2 1 1 2]' : '[1 1 1 1]';   // croma (só faz sentido em cor)
+    $dc = '<< /QFactor ' . $q . ' /Blend 1 /HSamples ' . $sc . ' /VSamples ' . $sc . ' >>';
+    $dg = '<< /QFactor ' . $q . ' /Blend 1 /HSamples [1 1 1 1] /VSamples [1 1 1 1] >>';
+    $ps = "<<\n"
+        . "  /ColorACSImageDict " . $dc . "\n"
+        . "  /ColorImageDict    " . $dc . "\n"
+        . "  /GrayACSImageDict  " . $dg . "\n"
+        . "  /GrayImageDict     " . $dg . "\n"
+        . ">> setdistillerparams\n";
+    $f = forja_dir_tmp() . '/gsq_' . bin2hex(random_bytes(4)) . '.ps';
+    file_put_contents($f, $ps);
+    return $f;
+}
+
+/** Heurística: o PDF é predominantemente digitalizado (imagens) ou vetorial/texto? */
+function forja_pdf_tem_imagens($src)
+{
+    $achou = false;
+    if ($fp = @fopen($src, 'rb')) {
+        $cauda = '';
+        while (!feof($fp)) {
+            $buf = $cauda . (string)fread($fp, 1048576);
+            if (strpos($buf, '/DCTDecode') !== false || strpos($buf, '/JPXDecode') !== false
+             || strpos($buf, '/Subtype/Image') !== false || strpos($buf, '/Subtype /Image') !== false) { $achou = true; break; }
+            $cauda = substr($buf, -32);
+        }
+        fclose($fp);
+    }
+    if ($achou) return true;
+    // PDFs 1.5+ escondem os dicionários em object streams: usa o peso por página.
+    $pg = forja_pdf_num_paginas($src);
+    return $pg > 0 && (filesize($src) / $pg) > 120 * 1024;
+}
+
+/**
+ * Detecta se as páginas são cromaticamente neutras (C≈M≈Y) — nesse caso a
+ * conversão para tons de cinza é segura e reduz bastante o tamanho.
+ */
+function forja_pdf_neutro($src, $maxPaginas = 4, $tolerancia = 0.02)
 {
     $gs = forja_gs_bin();
-    if (!$gs) throw new RuntimeException('Ghostscript não encontrado. Configure o caminho em "Configurar".');
-    $mapa = ['tela' => '/screen', 'recomendado' => '/ebook', 'alta' => '/printer', 'maxima' => '/prepress'];
-    $set = $mapa[$nivel] ?? '/ebook';
-    $out = forja_dir_out() . '/comprimido_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.pdf';
-    $cmd = escapeshellarg($gs)
-         . ' -sDEVICE=pdfwrite -dCompatibilityLevel=1.5 -dPDFSETTINGS=' . $set
-         . ' -dNOPAUSE -dQUIET -dBATCH -dDetectDuplicateImages=true -dCompressFonts=true'
-         . ' -sOutputFile=' . escapeshellarg($out) . ' ' . escapeshellarg($src);
+    if (!$gs) return false;
+    $cmd = forja_arg($gs) . ' -q -o - -sDEVICE=inkcov -dNOPAUSE -dBATCH'
+         . ' -dFirstPage=1 -dLastPage=' . (int)$maxPaginas . ' ' . forja_arg($src);
     $r = forja_exec($cmd);
-    if ($r['rc'] !== 0 || !is_file($out) || filesize($out) < 100)
-        throw new RuntimeException('Falha ao comprimir o PDF. ' . mb_substr($r['out'], 0, 300));
+    if ($r['rc'] !== 0) return false;
+    $n = 0;
+    foreach (explode("\n", $r['out']) as $ln) {
+        if (!preg_match('~([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+CMYK~', $ln, $m)) continue;
+        $c = (float)$m[1]; $mg = (float)$m[2]; $y = (float)$m[3];
+        if (max(abs($c - $mg), abs($mg - $y), abs($c - $y)) > $tolerancia) return false;
+        $n++;
+    }
+    return $n > 0;
+}
+
+/** Uma tentativa de compressão com parâmetros explícitos. Devolve o caminho ou null. */
+function forja_gs_tentativa($src, $dpi, $qfactor, $subamostrar, $cinza, $monoDpi = 300)
+{
+    $gs = forja_gs_bin();
+    if (!$gs) return null;
+    $ps  = forja_gs_qualidade_ps($qfactor, $subamostrar);
+    $out = forja_dir_tmp() . '/cmp_' . bin2hex(random_bytes(5)) . '.pdf';
+    $dpi = max(50, (int)$dpi);
+
+    $o = [
+        '-sDEVICE=pdfwrite',
+        '-dCompatibilityLevel=1.7',
+        '-dNOPAUSE', '-dBATCH', '-dQUIET', '-dSAFER',
+        '-dAutoRotatePages=/None',
+        '-dDetectDuplicateImages=true',
+        '-dCompressFonts=true', '-dSubsetFonts=true', '-dCompressStreams=true',
+        // >>> a chave do problema: sem isso o Ghostscript não recomprime JPEG algum
+        '-dPassThroughJPEGImages=false',
+        '-dPassThroughJPXImages=false',
+        // imagens coloridas
+        '-dDownsampleColorImages=true', '-dColorImageDownsampleType=/Bicubic',
+        '-dColorImageResolution=' . $dpi, '-dColorImageDownsampleThreshold=1.0',
+        '-dEncodeColorImages=true', '-dAutoFilterColorImages=false', '-dColorImageFilter=/DCTEncode',
+        // imagens em tons de cinza
+        '-dDownsampleGrayImages=true', '-dGrayImageDownsampleType=/Bicubic',
+        '-dGrayImageResolution=' . $dpi, '-dGrayImageDownsampleThreshold=1.0',
+        '-dEncodeGrayImages=true', '-dAutoFilterGrayImages=false', '-dGrayImageFilter=/DCTEncode',
+        // imagens 1 bit: CCITT G4 é SEM PERDA e comprime muito; não reamostra à toa
+        '-dDownsampleMonoImages=true', '-dMonoImageDownsampleType=/Subsample',
+        '-dMonoImageResolution=' . (int)$monoDpi, '-dMonoImageDownsampleThreshold=1.5',
+        '-dEncodeMonoImages=true', '-dMonoImageFilter=/CCITTFaxEncode',
+    ];
+    if ($cinza) {
+        $o[] = '-sColorConversionStrategy=Gray';
+        $o[] = '-dProcessColorModel=/DeviceGray';
+    } else {
+        $o[] = '-dConvertCMYKImagesToRGB=true';
+    }
+
+    $cmd = forja_arg($gs) . ' ' . implode(' ', $o)
+         . ' -sOutputFile=' . forja_arg($out) . ' ' . forja_arg($ps) . ' ' . forja_arg($src);
+    $r = forja_exec($cmd);
+    @unlink($ps);
+
+    if ($r['rc'] !== 0 || !is_file($out) || filesize($out) < 1024) { @unlink($out); return null; }
+    return $out;
+}
+
+/** Passe apenas estrutural (sem mexer em imagem) — bom para PDF de texto/vetor. */
+function forja_gs_estrutural($src)
+{
+    $gs = forja_gs_bin();
+    if (!$gs) return null;
+    $out = forja_dir_tmp() . '/cmp_' . bin2hex(random_bytes(5)) . '.pdf';
+    $cmd = forja_arg($gs) . ' -sDEVICE=pdfwrite -dCompatibilityLevel=1.7 -dNOPAUSE -dBATCH -dQUIET -dSAFER'
+         . ' -dAutoRotatePages=/None -dDetectDuplicateImages=true -dCompressFonts=true -dSubsetFonts=true'
+         . ' -dCompressStreams=true -dEncodeColorImages=true -dEncodeGrayImages=true'
+         . ' -sOutputFile=' . forja_arg($out) . ' ' . forja_arg($src);
+    $r = forja_exec($cmd);
+    if ($r['rc'] !== 0 || !is_file($out) || filesize($out) < 1024) { @unlink($out); return null; }
+    return $out;
+}
+
+/** Perfis de compressão. Cada passo = [dpi, QFactor, subamostrar croma]. */
+function forja_perfis_compressao()
+{
+    return [
+        'alta' => [
+            'rotulo' => 'Alta qualidade',
+            'meta'   => 0.10,
+            'passos' => [[300, 0.25, false], [300, 0.45, false], [250, 0.55, false]],
+        ],
+        'recomendado' => [
+            'rotulo' => 'Recomendada (equilíbrio)',
+            'meta'   => 0.35,
+            'passos' => [[200, 0.45, false], [180, 0.65, false], [150, 0.80, true]],
+        ],
+        'forte' => [
+            'rotulo' => 'Máxima compressão legível',
+            'meta'   => 0.65,
+            'passos' => [[150, 0.80, true], [132, 1.00, true], [120, 1.20, true]],
+        ],
+        'extrema' => [
+            'rotulo' => 'Compressão extrema',
+            'meta'   => 0.85,
+            'passos' => [[120, 1.10, true], [110, 1.40, true], [100, 1.70, true]],
+        ],
+    ];
+}
+
+/** Compatibilidade com os nomes antigos usados pela tela. */
+function forja_normaliza_nivel($n)
+{
+    $n = strtolower(trim((string)$n));
+    $mapa = [
+        'tela' => 'forte', 'screen' => 'forte', 'maxima' => 'extrema', 'máxima' => 'extrema',
+        'ebook' => 'recomendado', 'equilibrio' => 'recomendado', 'equilíbrio' => 'recomendado',
+        'printer' => 'alta', 'prepress' => 'alta', 'qualidade' => 'alta',
+    ];
+    if (isset($mapa[$n])) $n = $mapa[$n];
+    return isset(forja_perfis_compressao()[$n]) ? $n : 'recomendado';
+}
+
+/** Limpeza dos temporários/saídas antigos (evita o módulo crescer sem limite). */
+function forja_gc($horas = 6)
+{
+    $lim = time() - max(1, (int)$horas) * 3600;
+    foreach ([forja_dir_tmp(), forja_dir_out()] as $d) {
+        foreach ((array)glob($d . '/*') as $f) {
+            if (!is_file($f)) continue;
+            if (basename($f) === '.htaccess') continue;
+            if (@filemtime($f) < $lim) @unlink($f);
+        }
+    }
+}
+
+/** Extrai uma amostra de páginas (usada para calibrar a compressão de arquivos grandes). */
+function forja_pdf_amostra($src, $paginas = 4)
+{
+    $gs = forja_gs_bin();
+    if (!$gs) return null;
+    $out = forja_dir_tmp() . '/amo_' . bin2hex(random_bytes(5)) . '.pdf';
+    $cmd = forja_arg($gs) . ' -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dQUIET -dSAFER'
+         . ' -dFirstPage=1 -dLastPage=' . max(1, (int)$paginas)
+         . ' -dPassThroughJPEGImages=true -dAutoRotatePages=/None'
+         . ' -sOutputFile=' . forja_arg($out) . ' ' . forja_arg($src);
+    $r = forja_exec($cmd);
+    if ($r['rc'] !== 0 || !is_file($out) || filesize($out) < 1024) { @unlink($out); return null; }
+    return $out;
+}
+
+/**
+ * Comprime um PDF.
+ *
+ * @param string $src    caminho do PDF de origem
+ * @param string $nivel  alta | recomendado | forte | extrema (aceita os nomes antigos)
+ * @param array  $opc    ['cinza' => 'auto'|'sim'|'nao']
+ * @param array  $info   (por referência) detalhes do que foi feito
+ * @return string caminho do PDF resultante (em forja/saida)
+ */
+function forja_comprimir_pdf($src, $nivel = 'recomendado', $opc = [], &$info = null)
+{
+    if (!forja_gs_bin()) throw new RuntimeException('Ghostscript não encontrado. Configure o caminho em "Configurar".');
+
+    $nivel   = forja_normaliza_nivel($nivel);
+    $perfis  = forja_perfis_compressao();
+    $perfil  = $perfis[$nivel];
+    $orig    = (int)filesize($src);
+    $paginas = forja_pdf_num_paginas($src);
+
+    $info = [
+        'nivel' => $nivel, 'rotulo' => $perfil['rotulo'], 'orig' => $orig, 'paginas' => $paginas,
+        'cinza' => false, 'cinza_auto' => false, 'tentativas' => 0, 'dpi' => null, 'qualidade' => null,
+        'estrategia' => '', 'calibrado' => false, 'ja_otimizado' => false, 'avisos' => [],
+    ];
+
+    /* ---- PDF vetorial/texto: reamostrar não adianta, só otimização estrutural ---- */
+    if (!forja_pdf_tem_imagens($src)) {
+        $info['estrategia'] = 'estrutural';
+        $info['tentativas'] = 1;
+        $o = forja_gs_estrutural($src);
+        return forja_finalizar_compressao($src, $o, $orig, $info);
+    }
+    $info['estrategia'] = 'imagem';
+
+    /* ---- Arquivos grandes: calibra a escada numa amostra e só depois processa tudo ---- */
+    $amostra = null;
+    if ($paginas > 6 && ($orig > 25 * 1024 * 1024 || $paginas > 40)) $amostra = forja_pdf_amostra($src, 4);
+    $ref     = $amostra ?: $src;
+    $refTam  = (int)filesize($ref);
+    $info['calibrado'] = (bool)$amostra;
+
+    /* ---- Tons de cinza: automático (páginas neutras), forçado ou desligado ---- */
+    $modoCinza = strtolower((string)($opc['cinza'] ?? 'auto'));
+    $cinza = false; $cinzaAuto = false;
+    if ($modoCinza === 'sim') $cinza = true;
+    elseif ($modoCinza !== 'nao') { $cinza = $cinzaAuto = forja_pdf_neutro($ref); }
+
+    /* ---- Escada progressiva sobre a referência ---- */
+    $melhor = null; $melhorTam = $refTam; $passoOk = null;
+    foreach ($perfil['passos'] as $i => $p) {
+        $o = forja_gs_tentativa($ref, $p[0], $p[1], $p[2], $cinza);
+        $info['tentativas'] = $i + 1;
+        if (!$o) continue;
+        $tam = filesize($o);
+        if ($tam < $melhorTam) {
+            if ($melhor) @unlink($melhor);
+            $melhor = $o; $melhorTam = $tam; $passoOk = $p;
+        } else { @unlink($o); }
+        if ($melhorTam <= $refTam * (1 - $perfil['meta'])) break;
+    }
+
+    /* ---- Último recurso: tons de cinza (só no modo automático) ---- */
+    if (!$cinza && $modoCinza === 'auto' && $melhorTam > $refTam * 0.90) {
+        $p = end($perfil['passos']);
+        $o = forja_gs_tentativa($ref, $p[0], $p[1], $p[2], true);
+        if ($o) {
+            if (filesize($o) < $melhorTam * 0.92) {
+                if ($melhor) @unlink($melhor);
+                $melhor = $o; $melhorTam = filesize($o); $passoOk = $p;
+                $cinza = $cinzaAuto = true;
+                $info['avisos'][] = 'Convertido para tons de cinza: era a única forma de reduzir o arquivo sem perder nitidez.';
+            } else { @unlink($o); }
+        }
+    }
+
+    /* ---- Nada funcionou na escada: tenta o ganho estrutural ---- */
+    if (!$passoOk) {
+        if ($melhor) { @unlink($melhor); $melhor = null; }
+        $o = forja_gs_estrutural($ref);
+        if ($o) { if (filesize($o) < $refTam) { $melhor = $o; $info['estrategia'] = 'estrutural'; } else @unlink($o); }
+    }
+
+    $info['cinza'] = $cinza && $info['estrategia'] === 'imagem';
+    $info['cinza_auto'] = $cinzaAuto && $info['cinza'];
+    if ($passoOk) { $info['dpi'] = $passoOk[0]; $info['qualidade'] = $passoOk[1]; }
+
+    /* ---- Se trabalhamos numa amostra, aplica agora o passo escolhido no arquivo inteiro ---- */
+    if ($amostra) {
+        if ($melhor) @unlink($melhor);
+        @unlink($amostra);
+        $melhor = $passoOk
+            ? forja_gs_tentativa($src, $passoOk[0], $passoOk[1], $passoOk[2], $info['cinza'])
+            : forja_gs_estrutural($src);
+    }
+
+    return forja_finalizar_compressao($src, $melhor, $orig, $info);
+}
+
+/** Move o melhor resultado para forja/saida — e nunca devolve arquivo maior que o original. */
+function forja_finalizar_compressao($src, $candidato, $orig, &$info)
+{
+    if (!$candidato || !is_file($candidato) || filesize($candidato) >= $orig) {
+        if ($candidato) @unlink($candidato);
+        $info['ja_otimizado'] = true;
+        $info['dpi'] = null; $info['qualidade'] = null; $info['cinza'] = false;
+        $candidato = forja_dir_tmp() . '/cmp_' . bin2hex(random_bytes(5)) . '.pdf';
+        if (!@copy($src, $candidato)) throw new RuntimeException('Falha ao preparar o arquivo de saída.');
+    }
+    $final = forja_dir_out() . '/comprimido_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.pdf';
+    if (!@rename($candidato, $final)) { @copy($candidato, $final); @unlink($candidato); }
+    if (!is_file($final) || filesize($final) < 100) throw new RuntimeException('Falha ao comprimir o PDF.');
+
+    $info['novo']    = filesize($final);
+    $info['reducao'] = $orig > 0 ? round((1 - $info['novo'] / $orig) * 100, 1) : 0;
+    return $final;
+}
+
+/** Renderiza uma página como JPEG (usado na prévia de qualidade). */
+function forja_pdf_previa_jpeg($pdf, $pagina = 1, $dpi = 110)
+{
+    $gs = forja_gs_bin();
+    if (!$gs) throw new RuntimeException('Ghostscript não configurado.');
+    $pagina = max(1, (int)$pagina);
+    $out = forja_dir_tmp() . '/prev_' . bin2hex(random_bytes(5)) . '.jpg';
+    $cmd = forja_arg($gs) . ' -sDEVICE=jpeg -dJPEGQ=92 -dNOPAUSE -dBATCH -dQUIET -dSAFER'
+         . ' -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -r' . (int)$dpi
+         . ' -dFirstPage=' . $pagina . ' -dLastPage=' . $pagina
+         . ' -sOutputFile=' . forja_arg($out) . ' ' . forja_arg($pdf);
+    $r = forja_exec($cmd);
+    if ($r['rc'] !== 0 || !is_file($out) || filesize($out) < 100) { @unlink($out); throw new RuntimeException('Não foi possível gerar a prévia.'); }
     return $out;
 }
 

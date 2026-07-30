@@ -261,6 +261,7 @@ try {
     if ($connAtlasList && $connAtlasList->ping()) $connAtlasList->close();
 } catch (\Throwable $e) { }
 ?>
+<?php include(__DIR__ . '/os/guia/guia.php'); ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>

@@ -19,7 +19,7 @@ define('SYNC_UA', 'Mozilla/5.0 (compatible; AtlasProvimentos/1.0)');
 // Incrementar SEMPRE que mudar tabela ou coluna. E o que dispara a migracao
 // em base ja instalada -- conferir "tabela existe" nao basta, foi assim que
 // 'prioridade' e depois 'pagina' ficaram faltando.
-define('SYNC_SCHEMA_VERSAO', 13);
+define('SYNC_SCHEMA_VERSAO', 14);
 
 define('SYNC_TIMEOUT', 90);   // tjma.jus.br chega a passar de 45s
 // O acervo guarda os PDFs em anexo/{ORIGEM}/{TIPO}/{ANO}/{NUMERO}.pdf
@@ -59,6 +59,55 @@ CREATE TABLE kb_fontes (
   UNIQUE KEY uq_adaptador (adaptador)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ", 'tabela kb_fontes');
+
+    // Leis federais: lista curada, nao ha listagem para varrer.
+    $ddl("
+CREATE TABLE kb_leis (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  url           VARCHAR(500) NOT NULL,
+  apelido       VARCHAR(160) NULL,
+  numero        VARCHAR(20) NULL,
+  ano           SMALLINT NULL,
+  data_lei      DATE NULL,
+  ementa        TEXT NULL,
+  provimento_id INT NULL,
+  chars         INT NULL,
+  ativo         TINYINT(1) NOT NULL DEFAULT 1,
+  ultimo_erro   VARCHAR(500) NULL,
+  atualizado_em DATETIME NULL,
+  criado_em     DATETIME NOT NULL,
+  UNIQUE KEY uq_url (url(255))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+", 'tabela kb_leis');
+
+    // A coluna 'tipo' do acervo so aceitava Provimento e Resolucao. Sem abrir
+    // espaco para 'Lei', o MySQL rejeita ou trunca em silencio.
+    try {
+        $st = $conn->query("SHOW COLUMNS FROM provimentos LIKE 'tipo'");
+        $col = $st->fetch(PDO::FETCH_ASSOC);
+        if ($col && stripos($col['Type'], "'Lei'") === false) {
+            $conn->exec("ALTER TABLE provimentos
+                         MODIFY tipo ENUM('Provimento','Resolu\xc3\xa7\xc3\xa3o','Lei') NOT NULL");
+            $log[] = '[OK]   coluna provimentos.tipo agora aceita Lei';
+        } else {
+            $log[] = '[SKIP] coluna provimentos.tipo ja aceita Lei';
+        }
+    } catch (PDOException $e) {
+        $log[] = '[ERRO] ampliar provimentos.tipo: ' . $e->getMessage();
+    }
+
+    // Leis de interesse do foro extrajudicial.
+    try {
+        $conn->exec("INSERT IGNORE INTO kb_leis (url, apelido, ativo, criado_em) VALUES
+            ('https://www.planalto.gov.br/ccivil_03/leis/l6015compilada.htm',
+             'Lei de Registros Publicos', 1, NOW()),
+            ('https://www.planalto.gov.br/ccivil_03/leis/l9492.htm',
+             'Lei do Protesto de Titulos', 1, NOW()),
+            ('https://www.planalto.gov.br/ccivil_03/_ato2019-2022/2022/lei/l14382.htm',
+             'SERP - Sistema Eletronico dos Registros Publicos', 1, NOW()),
+            ('https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm',
+             'LGPD - Protecao de Dados Pessoais', 1, NOW())");
+    } catch (PDOException $e) { /* tabela pode nao existir ainda */ }
 
     $ddl("
 CREATE TABLE kb_sync_itens (
@@ -252,7 +301,36 @@ function syncGet($url, &$http = null)
     if ($body === false) {
         throw new RuntimeException('Falha de rede: ' . $erro);
     }
-    return $body;
+    return syncParaUtf8($body);
+}
+
+/**
+ * Converte a resposta para UTF-8 quando o site declara outra codificacao.
+ * O Planalto ainda serve as leis em ISO-8859-1; sem converter, todo acento
+ * vira lixo no acervo.
+ */
+function syncParaUtf8($html)
+{
+    if (strncmp($html, '%PDF', 4) === 0) {
+        return $html;   // binario: nao mexe
+    }
+
+    $cs = null;
+    if (preg_match('#charset\s*=\s*["\']?([\w-]+)#i', substr($html, 0, 3000), $m)) {
+        $cs = strtoupper($m[1]);
+    }
+    if ($cs === null) {
+        $cs = mb_check_encoding($html, 'UTF-8') ? 'UTF-8' : 'ISO-8859-1';
+    }
+    if (in_array($cs, array('UTF-8', 'UTF8'), true)) {
+        return $html;
+    }
+
+    $conv = @iconv($cs, 'UTF-8//TRANSLIT', $html);
+    if ($conv !== false && $conv !== '') {
+        return $conv;
+    }
+    return mb_convert_encoding($html, 'UTF-8', $cs);
 }
 
 /** HTML -> texto limpo, no formato que o modulo ja usa (linha unica). */
@@ -865,6 +943,145 @@ function syncCgjmaLinksDownload($html, $titulo)
         if ($u) { $out['pdf'] = $u; }
     }
     return $out;
+}
+
+// ===========================================================================
+// LEIS FEDERAIS (planalto.gov.br)
+// ===========================================================================
+
+/**
+ * Le uma pagina de lei do Planalto.
+ *
+ * As paginas sao antigas e servidas em ISO-8859-1 -- syncGet() ja converte.
+ * A estrutura e estavel ha decadas: titulo, ementa, "O PRESIDENTE DA
+ * REPUBLICA", corpo, e o rodape do D.O.U.
+ */
+function syncLeiFicha($html)
+{
+    $texto = syncHtmlParaTexto($html);
+
+    if (!preg_match('/\bLEI\s+(?:COMPLEMENTAR\s+)?N[\x{00BA}\x{00B0}o\.\s]*\s*([\d\.]+)\s*,?\s*'
+        . 'DE\s*(\d{1,2})\s*DE\s*([A-Z\x{00C0}-\x{00DC}a-z\x{00E0}-\x{00FC}]+)\s*DE\s*(\d{4})/iu',
+        $texto, $m)) {
+        return null;
+    }
+
+    $meses = array('janeiro'=>'01','fevereiro'=>'02','marco'=>'03','abril'=>'04','maio'=>'05',
+        'junho'=>'06','julho'=>'07','agosto'=>'08','setembro'=>'09','outubro'=>'10',
+        'novembro'=>'11','dezembro'=>'12');
+    $mes = strtr(mb_strtolower($m[3], 'UTF-8'), array("\xc3\xa7" => 'c', "\xc3\xa3" => 'a'));
+    if (!isset($meses[$mes])) {
+        return null;
+    }
+
+    $meta = array(
+        'tipo'   => 'Lei',
+        'numero' => syncNormalizarNumero($m[1]),
+        'ano'    => (int) $m[4],
+        'data'   => $m[4] . '-' . $meses[$mes] . '-' . str_pad($m[2], 2, '0', STR_PAD_LEFT),
+        'titulo' => trim($m[0]),
+    );
+    if ($meta['numero'] === '') {
+        return null;
+    }
+
+    // Ementa: entre o titulo e o preambulo presidencial.
+    $depoisTitulo = mb_substr($texto, mb_strpos($texto, $m[0]) + mb_strlen($m[0]));
+    if (preg_match('/^(.{20,900}?)\s*O\s+PRESIDENTE\s+DA\s+REP/su', $depoisTitulo, $me)) {
+        $meta['ementa'] = trim($me[1], " .-\t\n");
+    }
+
+    // Corpo: do preambulo ate o rodape do D.O.U.
+    $corpo = $depoisTitulo;
+    if (preg_match('/O\s+PRESIDENTE\s+DA\s+REP/u', $corpo, $mp, PREG_OFFSET_CAPTURE)) {
+        $corpo = substr($corpo, $mp[0][1]);
+    }
+    $corte = preg_split('/Este\s+texto\s+n\x{00E3}o\s+substitui/u', $corpo);
+    $meta['texto'] = trim($corte[0]);
+
+    return $meta;
+}
+
+/**
+ * Baixa a lei e grava no acervo como tipo 'Lei', origem 'Federal'.
+ * Reaproveita a mesma tabela dos provimentos, entao a indexacao, a busca e a
+ * citacao continuam funcionando sem nenhuma adaptacao.
+ */
+function syncLeiImportar(PDO $conn, $leiId, $funcionario = null)
+{
+    $st = $conn->prepare("SELECT * FROM kb_leis WHERE id = :id");
+    $st->execute(array(':id' => (int) $leiId));
+    $lei = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$lei) {
+        return array('ok' => false, 'mensagem' => 'Lei não cadastrada.');
+    }
+
+    try {
+        $html = syncGet($lei['url'], $http);
+        if ($http !== 200) {
+            throw new RuntimeException('A página retornou HTTP ' . $http);
+        }
+        $meta = syncLeiFicha($html);
+        if (!$meta) {
+            throw new RuntimeException('Não reconheci o número e a data da lei nessa página.');
+        }
+        if (mb_strlen($meta['texto']) < 1000) {
+            throw new RuntimeException('Texto muito curto ('
+                . mb_strlen($meta['texto']) . ' caracteres).');
+        }
+
+        $texto = trim(preg_replace('/\s+/u', ' ', $meta['texto']));
+
+        // Ja existe no acervo?
+        $bus = $conn->prepare(
+            "SELECT id FROM provimentos
+              WHERE tipo = 'Lei' AND numero_provimento = :n AND YEAR(data_provimento) = :a
+              LIMIT 1");
+        $bus->execute(array(':n' => $meta['numero'], ':a' => $meta['ano']));
+        $provId = $bus->fetchColumn();
+
+        $descricao = isset($meta['ementa']) ? mb_substr($meta['ementa'], 0, 900)
+                   : ($lei['apelido'] ?: 'Lei federal');
+
+        if ($provId) {
+            $conn->prepare(
+                "UPDATE provimentos SET conteudo_anexo = :c, descricao = :d,
+                        caminho_anexo = :a WHERE id = :id")
+                 ->execute(array(':c' => $texto, ':d' => $descricao,
+                                 ':a' => $lei['url'], ':id' => $provId));
+        } else {
+            $conn->prepare(
+                "INSERT INTO provimentos
+                    (numero_provimento, origem, descricao, data_provimento, caminho_anexo,
+                     tipo, funcionario, data_cadastro, status, conteudo_anexo)
+                 VALUES (:n,'Federal',:d,:dt,:a,'Lei',:f,NOW(),'Ativo',:c)")
+                 ->execute(array(':n' => $meta['numero'], ':d' => $descricao,
+                                 ':dt' => $meta['data'], ':a' => $lei['url'],
+                                 ':f' => $funcionario, ':c' => $texto));
+            $provId = (int) $conn->lastInsertId();
+        }
+
+        $conn->prepare(
+            "UPDATE kb_leis SET numero = :n, ano = :a, data_lei = :dt, ementa = :e,
+                    provimento_id = :p, chars = :c, ultimo_erro = NULL, atualizado_em = NOW()
+              WHERE id = :id")
+             ->execute(array(':n' => $meta['numero'], ':a' => $meta['ano'], ':dt' => $meta['data'],
+                             ':e' => $descricao, ':p' => $provId,
+                             ':c' => mb_strlen($texto), ':id' => $lei['id']));
+
+        return array(
+            'ok' => true,
+            'ato' => 'Lei ' . $meta['numero'] . '/' . $meta['ano'],
+            'provimento_id' => (int) $provId,
+            'mensagem' => 'Importada (' . number_format(mb_strlen($texto), 0, ',', '.')
+                        . ' caracteres).',
+        );
+
+    } catch (Throwable $e) {
+        $conn->prepare("UPDATE kb_leis SET ultimo_erro = :e, atualizado_em = NOW() WHERE id = :id")
+             ->execute(array(':e' => mb_substr($e->getMessage(), 0, 480), ':id' => (int) $leiId));
+        return array('ok' => false, 'mensagem' => $e->getMessage());
+    }
 }
 
 // ===========================================================================

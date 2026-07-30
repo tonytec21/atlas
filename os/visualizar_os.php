@@ -413,6 +413,7 @@ $todos_itens_liquidados = !$temItensNaoLiquidados && count($ordem_servico_itens)
 $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
 
 ?>
+<?php include(__DIR__ . '/guia/guia.php'); ?>
 <!DOCTYPE html>  
 <html lang="pt-br">  
 <head>  
@@ -2857,7 +2858,8 @@ $(document).ready(function() {
     function imprimirReciboA4() {
         if (<?php echo (float)$total_pagamentos; ?> <= 0) return; 
         window.open('recibo_a4.php?id=<?php echo $os_id; ?>', '_blank');
-    }
+    }
+
     function assinarDocOS() {
         window.open('assinar-os.php?tipo=os&id=<?php echo $os_id; ?>', '_blank');
     }

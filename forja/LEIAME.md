@@ -5,7 +5,9 @@ Instale como a pasta `forja/` no mesmo nível de `oficios/` (usa `../menu.php`, 
 `../script/`, `../style/` e as libs TCPDF/FPDI de `../oficios`).
 
 ## Operações
-- **Comprimir PDF** — reduz o tamanho (Ghostscript). Níveis: máxima / recomendada / alta qualidade.
+- **Comprimir PDF** — reduz o tamanho (Ghostscript, motor v2). Níveis: alta qualidade (300 dpi) /
+  recomendada (200 dpi) / máxima compressão legível (150 dpi) / extrema (120 dpi), com opção de
+  conversão em tons de cinza e prévia da qualidade página a página. Veja `COMPRESSAO.md`.
 - **PDF → Imagens** — uma imagem por página (PNG ou JPG, 100/150/300 DPI), entregue em um ZIP.
 - **Imagens → PDF** — junta várias imagens (PNG/JPG) em um PDF (tamanho da imagem ou ajustado em A4).
 - **Dividir PDF** — divide um PDF em N partes (ou N páginas por parte), entregue em um ZIP.

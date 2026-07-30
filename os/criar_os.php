@@ -27,6 +27,7 @@ $atosSemValor = json_decode(
     true  
 );  
 ?>  
+<?php include(__DIR__ . '/guia/guia.php'); ?>
 <!DOCTYPE html>  
 <html lang="pt-br">  
 <head>  

@@ -114,6 +114,34 @@ $itens = $conn->query("
       </div>
     </div>
 
+    <div class="cx">
+      <h5 class="mb-1">Leis federais</h5>
+      <p class="meta">Textos do Planalto. Entram no acervo como tipo <b>Lei</b>, origem
+         <b>Federal</b>, e passam a fundamentar as respostas junto com os provimentos.</p>
+      <div id="listaLeis"><span class="meta">Carregando...</span></div>
+      <hr>
+      <div class="form-row align-items-end">
+        <div class="form-group col-md-7">
+          <label class="meta">Endere&ccedil;o no planalto.gov.br</label>
+          <input type="text" class="form-control form-control-sm" id="leiUrl"
+                 placeholder="https://www.planalto.gov.br/ccivil_03/leis/l8935.htm">
+        </div>
+        <div class="form-group col-md-3">
+          <label class="meta">Apelido (opcional)</label>
+          <input type="text" class="form-control form-control-sm" id="leiApelido"
+                 placeholder="Lei dos Notários">
+        </div>
+        <div class="form-group col-md-2">
+          <button class="btn btn-sm btn-secondary btn-block" id="btnLeiAdd">
+            <i class="fa fa-plus"></i> Adicionar
+          </button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnLeisTodas" style="color:#fff!important">
+        <i class="fa fa-download"></i> Atualizar todas as leis
+      </button>
+    </div>
+
     <ul class="nav nav-tabs mb-3">
       <?php foreach (array('pendentes'=>'Pendentes','importados'=>'Importados',
                            'erros'=>'Com erro','ignorados'=>'Ignorados') as $k=>$v): ?>
@@ -633,6 +661,97 @@ $('#btnDiag').on('click', function () {
    .always(function () { b.prop('disabled', false).html('<i class="fa fa-stethoscope"></i> Diagnóstico'); });
 });
 
+// ===================== Leis federais =====================
+function carregarLeis(){
+  $.post('sync_worker.php', {acao:'leis_listar'}, null, 'json').done(function(r){
+    if (!r.leis || !r.leis.length){ $('#listaLeis').html('<div class="meta">Nenhuma lei cadastrada.</div>'); return; }
+    var h = '';
+    r.leis.forEach(function(l){
+      var titulo = l.numero ? ('Lei ' + l.numero + '/' + l.ano) : 'ainda não importada';
+      h += '<div class="fonte"><div style="flex:1;min-width:260px">'
+         + '<strong>' + esc(l.apelido || titulo) + '</strong>'
+         + (l.ativo == 1 ? '' : ' <span class="meta">(desativada)</span>')
+         + '<div class="meta">' + esc(titulo)
+         + (l.chars ? ' · ' + Number(l.chars).toLocaleString('pt-BR') + ' caracteres' : '')
+         + (l.atualizado_em ? ' · ' + l.atualizado_em : ' · nunca importada')
+         + '<br><a href="' + esc(l.url) + '" target="_blank">' + esc(l.url) + '</a>'
+         + (l.ultimo_erro ? '<br><span style="color:var(--kb-alerta)">' + esc(l.ultimo_erro) + '</span>' : '')
+         + '</div></div><div>'
+         + '<button class="btn btn-sm btn-outline-success" onclick="leiImportar(' + l.id + ', this)">'
+         + '<i class="fa fa-download"></i> ' + (l.provimento_id ? 'Atualizar' : 'Importar') + '</button> '
+         + '<button class="btn btn-sm btn-outline-secondary" onclick="leiToggle(' + l.id + ')">'
+         + (l.ativo == 1 ? 'Desativar' : 'Ativar') + '</button> '
+         + '<button class="btn btn-sm btn-outline-danger" onclick="leiRemover(' + l.id + ')" '
+         + 'title="Remover da lista"><i class="fa fa-trash"></i></button>'
+         + '</div></div>';
+    });
+    $('#listaLeis').html(h);
+  });
+}
+
+function leiImportar(id, btn){
+  var b = $(btn).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+  $.post('sync_worker.php', {acao:'lei_importar', lei_id:id}, null, 'json')
+   .done(function(r){
+     Swal.fire({icon: r.ok?'success':'error', title: r.ok?'Importada':'Não deu certo',
+       html: (r.ato ? '<b>' + esc(r.ato) + '</b><br>' : '') + esc(r.mensagem||''),
+       confirmButtonColor:'#0f6f77'}).then(function(){ carregarLeis(); });
+   })
+   .fail(function(xhr){ Swal.fire({icon:'error', title:'Erro',
+     html:'<div style="text-align:left;font-size:.8rem">' + esc(mensagemDoErro(xhr)) + '</div>'}); })
+   .always(function(){ b.prop('disabled', false).html('<i class="fa fa-download"></i>'); });
+}
+
+function leiToggle(id){ $.post('sync_worker.php', {acao:'lei_toggle', lei_id:id}, null, 'json')
+  .done(carregarLeis); }
+
+function leiRemover(id){
+  Swal.fire({title:'Remover da lista?', text:'O texto já importado permanece no acervo.',
+    icon:'warning', showCancelButton:true, confirmButtonText:'Remover',
+    cancelButtonText:'Cancelar', confirmButtonColor:'#dc3545'})
+   .then(function(r){ if(r.isConfirmed)
+     $.post('sync_worker.php', {acao:'lei_remover', lei_id:id}, null, 'json').done(carregarLeis); });
+}
+
+$('#btnLeiAdd').on('click', function(){
+  var url = $('#leiUrl').val().trim();
+  if (!url){ Swal.fire('Informe o endereço', 'Cole a URL da lei no planalto.gov.br.', 'info'); return; }
+  var b = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+  $.post('sync_worker.php', {acao:'lei_add', url:url, apelido:$('#leiApelido').val()}, null, 'json')
+   .done(function(r){
+     Swal.fire({icon: r.ok?'success':'error', title: r.ok?'Lei adicionada':'Não deu certo',
+       html: (r.ato ? '<b>' + esc(r.ato) + '</b><br>' : '') + esc(r.mensagem||''),
+       confirmButtonColor:'#0f6f77'})
+      .then(function(){ if(r.ok){ $('#leiUrl,#leiApelido').val(''); } carregarLeis(); });
+   })
+   .fail(function(xhr){ Swal.fire('Erro', esc(mensagemDoErro(xhr)), 'error'); })
+   .always(function(){ b.prop('disabled', false).html('<i class="fa fa-plus"></i> Adicionar'); });
+});
+
+$('#btnLeisTodas').on('click', function(){
+  var b = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Atualizando...');
+  var feitas = 0, erros = [];
+  (function lote(){
+    $.post('sync_worker.php', {acao:'leis_importar_todas'}, null, 'json')
+     .done(function(r){
+       if (r.resultados) r.resultados.forEach(function(x){
+         if (x.ok) feitas++; else erros.push(x.mensagem); });
+       $('#detalhe').text(feitas + ' lei(s) atualizada(s) · ' + r.restam + ' restante(s)');
+       $('#progresso').show();
+       if (!r.concluido && r.feitas > 0){ lote(); return; }
+       Swal.fire({icon: erros.length ? 'warning' : 'success',
+         title: feitas + ' lei(s) atualizada(s)',
+         html: erros.length ? '<div style="text-align:left;font-size:.85rem">'
+             + esc(erros.join(' | ')) + '</div>' : 'Agora indexe a base na tela da Aria.'})
+        .then(function(){ carregarLeis(); });
+       b.prop('disabled', false).html('<i class="fa fa-download"></i> Atualizar todas as leis');
+     })
+     .fail(function(xhr){ Swal.fire('Erro', esc(mensagemDoErro(xhr)), 'error');
+       b.prop('disabled', false).html('<i class="fa fa-download"></i> Atualizar todas as leis'); });
+  })();
+});
+
+carregarLeis();
 carregar();
 </script>
 <?php include(__DIR__ . '/../rodape.php'); ?>

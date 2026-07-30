@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demonstração — Guia interativo da tela Criar O.S.</title>
+<link rel="stylesheet" href="../guia-os.css">
+<style>
+    :root { --primaria:#667eea; --primaria2:#764ba2; --borda:#e5e7eb; --texto:#2c3e50; --texto2:#6c757d; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f8f9fa; color:var(--texto); font-family:'Inter','Segoe UI',Arial,sans-serif; padding-bottom:90px; }
+    .topo { height:56px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.06); display:flex;
+            align-items:center; justify-content:space-between; padding:0 24px; position:sticky; top:0; z-index:900; }
+    .topo strong { font-size:19px; letter-spacing:2px; color:var(--primaria); }
+    .usuario { display:flex; align-items:center; gap:10px; font-size:13px; }
+    .avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--primaria),var(--primaria2));
+              color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; }
+    .container { max-width:1180px; margin:0 auto; padding:22px 20px 40px; }
+    .hero { background:linear-gradient(135deg,var(--primaria),var(--primaria2)); color:#fff; border-radius:18px;
+            padding:22px 26px; font-size:24px; font-weight:700; margin-bottom:18px; }
+    .header-actions { display:flex; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    label { display:block; font-size:13px; font-weight:600; color:var(--texto2); margin:0 0 6px; }
+    .form-row { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:16px; }
+    .form-group { flex:1 1 160px; }
+    .col-5 { flex:5 1 260px; } .col-3 { flex:3 1 180px; } .col-2 { flex:2 1 130px; } .col-12 { flex:1 1 100%; }
+    input, select, textarea { width:100%; padding:9px 12px; border:2px solid var(--borda); border-radius:10px;
+                              font-size:14px; font-family:inherit; background:#fff; color:var(--texto); }
+    input[readonly] { background:#f3f4f6; }
+    .btn { border:0; border-radius:10px; padding:10px 18px; font-size:13.5px; font-weight:600; color:#fff;
+           cursor:pointer; font-family:inherit; }
+    .btn-primary { background:linear-gradient(135deg,var(--primaria),var(--primaria2)); }
+    .btn-secondary { background:linear-gradient(135deg,#6b7280,#4b5563); }
+    .btn-success { background:linear-gradient(135deg,#10b981,#059669); width:100%; }
+    .btn-warning { background:linear-gradient(135deg,#f59e0b,#d97706); padding:5px 10px; font-size:11px; }
+    .btn-danger  { background:linear-gradient(135deg,#ef4444,#dc2626); padding:5px 10px; font-size:11px; }
+    .btn:disabled { opacity:.45; cursor:not-allowed; }
+    table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--borda); border-radius:12px; overflow:hidden; }
+    th { background:#f3f4f6; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--texto2);
+         padding:10px 8px; text-align:left; }
+    td { padding:10px 8px; font-size:12.5px; border-top:1px solid var(--borda); }
+    hr { border:0; border-top:1px solid var(--borda); margin:22px 0; }
+    .bottom-nav { position:fixed; left:0; right:0; bottom:0; height:65px; background:#fff; display:flex;
+                  align-items:center; justify-content:center; gap:46px; box-shadow:0 -2px 12px rgba(0,0,0,.06); z-index:800; }
+    .bottom-nav span { font-size:11px; font-weight:600; color:#64748b; }
+    .aviso { background:#e0f2fe; border-left:3px solid #0284c7; color:#0c4a6e; padding:10px 14px;
+             border-radius:10px; font-size:13px; margin-bottom:18px; }
+</style>
+</head>
+<body>
+
+<div class="topo">
+    <strong>ATLAS</strong>
+    <div class="usuario"><div class="avatar">T</div><div><b>TONY</b><br><span style="color:#64748b">Escrevente</span></div></div>
+</div>
+
+<div id="main" class="main-content">
+<div class="container">
+
+    <div class="aviso">
+        Página de <b>demonstração</b> do guia interativo — reproduz os campos da tela <code>criar_os.php</code>.
+        O guia abre sozinho na primeira visita; depois use o botão <b>“?”</b> no canto inferior direito.
+    </div>
+
+    <div class="hero">Criar Ordem de Serviço</div>
+
+    <div class="header-actions">
+        <button type="button" class="btn btn-secondary" onclick="window.open('tabela_de_emolumentos.php')">Tabela de Emolumentos</button>
+        <button type="button" class="btn btn-secondary" onclick="window.location.href='index.php'">Ordens de Serviço</button>
+    </div>
+
+    <div style="max-width:560px;margin:0 auto 18px;text-align:center">
+        <label for="modelo_orcamento">Carregar Modelo de O.S:</label>
+        <select id="modelo_orcamento"><option>Selecione um modelo...</option><option>Certidão de inteiro teor</option></select>
+    </div>
+
+    <hr>
+
+    <form id="osForm" onsubmit="event.preventDefault(); adicionarItem();">
+        <div class="form-row">
+            <div class="form-group col-5"><label for="cliente">Apresentante:</label><input id="cliente" oninput="verificarSalvar()"></div>
+            <div class="form-group col-3"><label for="cpf_cliente">CPF/CNPJ do Apresentante:</label><input id="cpf_cliente"></div>
+            <div class="form-group col-2"><label for="base_calculo">Base de Cálculo:</label><input id="base_calculo" value="0,00"></div>
+            <div class="form-group col-2"><label for="total_os">Valor Total da OS:</label><input id="total_os" value="0,00" readonly></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-12"><label for="descricao_os">Título da OS:</label><input id="descricao_os"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-3"><label for="ato">Código do Ato:</label><input id="ato" value="16.2"></div>
+            <div class="form-group col-2"><label for="quantidade">Quantidade:</label><input id="quantidade" value="1"></div>
+            <div class="form-group col-2"><label for="desconto_legal">Desconto Legal (%):</label><input id="desconto_legal" value="0"></div>
+            <div class="form-group col-2" style="align-self:flex-end">
+                <button type="button" class="btn btn-primary" style="width:100%" onclick="buscarAto()">Buscar Ato</button>
+            </div>
+            <div class="form-group col-3" style="align-self:flex-end">
+                <button type="button" class="btn btn-secondary" style="width:100%" onclick="adicionarAtoManual()">Adicionar Ato Manualmente</button>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-12"><label for="descricao">Descrição:</label><input id="descricao"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label for="emolumentos">Emolumentos:</label><input id="emolumentos" value="0,00" readonly></div>
+            <div class="form-group"><label for="ferc">FERC:</label><input id="ferc" value="0,00" readonly></div>
+            <div class="form-group"><label for="fadep">FADEP:</label><input id="fadep" value="0,00" readonly></div>
+            <div class="form-group"><label for="femp">FEMP:</label><input id="femp" value="0,00" readonly></div>
+            <div class="form-group"><label for="ferrfis">FERRFIS:</label><input id="ferrfis" value="0,00" readonly></div>
+            <div class="form-group"><label for="total">Total:</label><input id="total" value="0,00" readonly></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-12"><button type="submit" class="btn btn-success">+ Adicionar à OS</button></div>
+        </div>
+    </form>
+
+    <div id="osItens" style="margin-top:22px">
+        <h4 style="margin:0 0 10px;font-size:16px">Itens da Ordem de Serviço</h4>
+        <table>
+            <thead><tr><th>#</th><th>Ato</th><th>Quantidade</th><th>Desconto Legal (%)</th><th>Descrição</th>
+            <th>Emolumentos</th><th>FERC</th><th>FADEP</th><th>FEMP</th><th>FERRFIS</th><th>Total</th><th>Ações</th></tr></thead>
+            <tbody id="itensTable"></tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <div class="form-row">
+        <div class="form-group col-12"><label for="observacoes">Observações:</label><textarea id="observacoes" rows="3"></textarea></div>
+    </div>
+
+    <button type="button" id="btnSalvarOS" class="btn btn-primary" style="width:100%;padding:14px" disabled
+            onclick="alert('Demonstração: aqui a O.S. seria gravada.')">SALVAR OS</button>
+</div>
+</div>
+
+<div class="bottom-nav">
+    <span>O.S</span><span>Caixa</span><span>Início</span><span>Tarefas</span><span>Menu</span>
+</div>
+
+<script>
+/* Simulações mínimas apenas para a demonstração funcionar. */
+var itens = [];
+function buscarAto() {
+    document.getElementById('descricao').value = 'CERTIDÃO DE INTEIRO TEOR';
+    var q = parseFloat(document.getElementById('quantidade').value || 1);
+    var v = [96.40, 19.28, 5.78, 4.82, 2.12].map(function (n) { return n * q; });
+    var ids = ['emolumentos', 'ferc', 'fadep', 'femp', 'ferrfis'];
+    ids.forEach(function (id, i) { document.getElementById(id).value = v[i].toFixed(2).replace('.', ','); });
+    document.getElementById('total').value = v.reduce(function (a, b) { return a + b; }, 0).toFixed(2).replace('.', ',');
+}
+function adicionarAtoManual() {
+    document.getElementById('ato').value = '0';
+    ['emolumentos', 'ferc', 'fadep', 'femp', 'ferrfis', 'total'].forEach(function (id) {
+        document.getElementById(id).readOnly = false;
+    });
+    document.getElementById('descricao').focus();
+}
+function adicionarItem() {
+    var v = function (id) { return document.getElementById(id).value; };
+    if (!parseFloat(v('total').replace(',', '.'))) { alert('Busque o ato antes de adicionar.'); return; }
+    itens.push({ ato: v('ato'), qtd: v('quantidade'), desc: v('desconto_legal'), descricao: v('descricao'),
+                 e: v('emolumentos'), fe: v('ferc'), fa: v('fadep'), fm: v('femp'), fr: v('ferrfis'), t: v('total') });
+    desenhar();
+    ['descricao', 'emolumentos', 'ferc', 'fadep', 'femp', 'ferrfis', 'total'].forEach(function (id) {
+        document.getElementById(id).value = id === 'descricao' ? '' : '0,00';
+    });
+}
+function desenhar() {
+    var html = '', soma = 0;
+    itens.forEach(function (i, n) {
+        soma += parseFloat(i.t.replace(/\./g, '').replace(',', '.')) || 0;
+        html += '<tr><td>' + (n + 1) + '</td><td>' + i.ato + '</td><td>' + i.qtd + '</td><td>' + i.desc + '%</td><td>' +
+            i.descricao + '</td><td>' + i.e + '</td><td>' + i.fe + '</td><td>' + i.fa + '</td><td>' + i.fm +
+            '</td><td>' + i.fr + '</td><td>' + i.t + '</td>' +
+            '<td><button type="button" class="btn btn-warning">Ato Isento</button> ' +
+            '<button type="button" class="btn btn-danger" onclick="remover(' + n + ')">Remover</button></td></tr>';
+    });
+    document.getElementById('itensTable').innerHTML = html;
+    document.getElementById('total_os').value = soma.toFixed(2).replace('.', ',');
+    verificarSalvar();
+}
+function remover(n) { itens.splice(n, 1); desenhar(); }
+function verificarSalvar() {
+    document.getElementById('btnSalvarOS').disabled =
+        !(document.getElementById('cliente').value.trim() && itens.length);
+}
+</script>
+
+<script src="../guia-os.js"></script>
+<script src="../guia-os-passos.js"></script>
+</body>
+</html>

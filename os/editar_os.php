@@ -91,6 +91,7 @@ try {
     die('Erro ao buscar dados da OS: ' . $e->getMessage());
 }
 ?>
+<?php include(__DIR__ . '/guia/guia.php'); ?>
 <!DOCTYPE html>  
 <html lang="pt-br">  
 <head>  

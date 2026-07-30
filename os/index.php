@@ -4,6 +4,7 @@ checkSession();
 include(__DIR__ . '/db_connection.php');  
 date_default_timezone_set('America/Sao_Paulo');  
 ?>  
+<?php include(__DIR__ . '/guia/guia.php'); ?>
 <!DOCTYPE html>  
 <html lang="pt-br">  
 
@@ -1215,7 +1216,6 @@ body.dark-mode footer .footer-content a:hover {
 }
     </style>  
 </head>  
-
 <body>  
     <?php include(__DIR__ . '/../menu.php'); ?>  
 

@@ -145,6 +145,62 @@ try {
             responder($r);
             break;
 
+        case 'leis_listar':
+            $leis = $conn->query("SELECT * FROM kb_leis ORDER BY ativo DESC, ano DESC, numero")
+                         ->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($leis as $i => $l) {
+                $leis[$i]['atualizado_em'] = $l['atualizado_em']
+                    ? date('d/m/Y H:i', strtotime($l['atualizado_em'])) : null;
+            }
+            responder(array('leis' => $leis));
+            break;
+
+        case 'lei_importar':
+            responder(syncLeiImportar($conn, (int) $_POST['lei_id'], $quem));
+            break;
+
+        case 'leis_importar_todas':
+            $ids = $conn->query("SELECT id FROM kb_leis WHERE ativo = 1
+                                  AND (atualizado_em IS NULL
+                                       OR atualizado_em < DATE_SUB(NOW(), INTERVAL 1 HOUR))
+                                  ORDER BY id LIMIT 2")->fetchAll(PDO::FETCH_COLUMN);
+            $res = array();
+            foreach ($ids as $id) { $res[] = syncLeiImportar($conn, (int) $id, $quem); }
+            $restam = (int) $conn->query("SELECT COUNT(*) FROM kb_leis WHERE ativo = 1
+                          AND (atualizado_em IS NULL
+                               OR atualizado_em < DATE_SUB(NOW(), INTERVAL 1 HOUR))")->fetchColumn();
+            responder(array('feitas' => count($res), 'restam' => $restam,
+                            'resultados' => $res, 'concluido' => count($ids) === 0));
+            break;
+
+        case 'lei_add':
+            $url = trim($_POST['url']);
+            if (!preg_match('#^https?://(www\.)?planalto\.gov\.br/#i', $url)) {
+                responder(array('ok' => false,
+                    'mensagem' => 'Informe um endereço do planalto.gov.br.'));
+            }
+            $st = $conn->prepare(
+                "INSERT IGNORE INTO kb_leis (url, apelido, ativo, criado_em)
+                 VALUES (:u, :a, 1, NOW())");
+            $st->execute(array(':u' => $url,
+                ':a' => trim(isset($_POST['apelido']) ? $_POST['apelido'] : '') ?: null));
+            $st = $conn->prepare("SELECT id FROM kb_leis WHERE url = :u");
+            $st->execute(array(':u' => $url));
+            responder(syncLeiImportar($conn, (int) $st->fetchColumn(), $quem));
+            break;
+
+        case 'lei_toggle':
+            $conn->prepare("UPDATE kb_leis SET ativo = 1 - ativo WHERE id = :id")
+                 ->execute(array(':id' => (int) $_POST['lei_id']));
+            responder(array());
+            break;
+
+        case 'lei_remover':
+            $conn->prepare("DELETE FROM kb_leis WHERE id = :id")
+                 ->execute(array(':id' => (int) $_POST['lei_id']));
+            responder(array());
+            break;
+
         case 'lacunas':
             responder(array('lacunas' => syncLacunas($conn,
                 isset($_POST['ano']) ? (int) $_POST['ano'] : null)));

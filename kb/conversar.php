@@ -199,7 +199,11 @@ function formatarFontes(array $trechos)
             'referencia' => $t['referencia'],
             'data'       => date('d/m/Y', strtotime($t['data_provimento'])),
             'situacao'   => isset($t['situacao']) ? $t['situacao'] : 'vigente',
-            'anexo'      => '../provimentos/' . $t['caminho_anexo'],
+            // Lei federal guarda a URL do Planalto; provimento guarda caminho
+            // relativo. Concatenar sempre quebraria o link das leis.
+            'anexo'      => (strpos((string) $t['caminho_anexo'], 'http') === 0)
+                            ? $t['caminho_anexo']
+                            : '../provimentos/' . $t['caminho_anexo'],
             'trecho'     => mb_substr($t['conteudo'], 0, 700)
                           . (mb_strlen($t['conteudo']) > 700 ? '...' : ''),
         );

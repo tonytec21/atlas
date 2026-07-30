@@ -18,6 +18,7 @@ $CSRF = os_csrf_token();
 $assinadoUrl = 'view_signed_os.php?tipo=' . rawurlencode($tipo) . '&os_id=' . $osId;
 function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 ?>
+<?php include(__DIR__ . '/guia/guia.php'); ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
