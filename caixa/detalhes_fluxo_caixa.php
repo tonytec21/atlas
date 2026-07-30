@@ -15,6 +15,14 @@ try {
     $tipo = $_GET['tipo'];
 
     $conn = getDatabaseConnection();
+
+    // Estrutura e migrações do módulo analítico (uma única vez; ver atlas_migracoes)
+    $__mig = __DIR__ . '/../analitico/migracoes_analitico.php';
+    if (is_file($__mig)) {
+        require_once $__mig;
+        atlas_migrar_analitico_seguro($conn);
+    }
+
     /* Collation compatível com MySQL 5.7/8.0 e MariaDB */
     $conn->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
     $conn->exec("SET collation_connection = 'utf8mb4_unicode_ci'");
@@ -107,20 +115,56 @@ try {
                 r.ferc           AS ferc,
                 r.femp           AS femp,
                 r.ferrfis        AS ferrfis,  
-                r.total          AS total
+                r.total          AS total,
+                r.diferido       AS diferido,
+                r.indeferido     AS indeferido,
+                r.desconto       AS desconto
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
                     ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
                      = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
-              AND r.cancelado = 0
-              AND r.isento    = 0
-              AND r.diferido  = 0
+              AND r.cancelado  = 0
+              AND r.diferido   = 0
+              AND (r.isento = 0 OR r.indeferido = 1)
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
         $stmt->execute();
         $selos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // SELOS DIFERIDOS (Unificado): atos selados com emolumentos diferidos.
+        // Entram no Total em Selos, mas em lista e card próprios.
+        $sql = "
+            SELECT 
+                f.usuario        AS funcionario,
+                r.numero_selo    AS numero_selo,
+                r.ato            AS ato,
+                r.tipo           AS tipo,
+                r.selagem        AS selagem,
+                r.emolumentos    AS emolumentos,
+                r.ferj           AS ferj,
+                r.fadep          AS fadep,
+                r.ferc           AS ferc,
+                r.femp           AS femp,
+                r.ferrfis        AS ferrfis,  
+                r.total          AS total,
+                r.diferido       AS diferido,
+                r.indeferido     AS indeferido,
+                r.desconto       AS desconto
+            FROM relatorios_analiticos r
+            INNER JOIN funcionarios f 
+                    ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+                     = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+            WHERE DATE(r.selagem) = :data
+              AND r.cancelado  = 0
+              AND r.diferido   = 1
+              AND (r.isento = 0 OR r.indeferido = 1)
+        ";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+        $stmt->execute();
+        $selos_diferidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // ATOS ISENTOS (Unificado)
         $sql = "
@@ -136,15 +180,18 @@ try {
                 r.ferc           AS ferc,
                 r.femp           AS femp,
                 r.ferrfis        AS ferrfis,  
-                r.total          AS total
+                r.total          AS total,
+                r.diferido       AS diferido,
+                r.indeferido     AS indeferido,
+                r.desconto       AS desconto
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
                     ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
                      = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
-              AND r.cancelado = 0
-              AND r.isento    = 1
-              AND r.diferido  = 0
+              AND r.cancelado  = 0
+              AND r.isento     = 1
+              AND r.indeferido = 0
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
@@ -248,22 +295,59 @@ try {
                 r.ferc           AS ferc,
                 r.femp           AS femp, 
                 r.ferrfis        AS ferrfis,                                
-                r.total          AS total
+                r.total          AS total,
+                r.diferido       AS diferido,
+                r.indeferido     AS indeferido,
+                r.desconto       AS desconto
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
                     ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
                      = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
               AND f.usuario = :funcionario
-              AND r.cancelado = 0
-              AND r.isento    = 0
-              AND r.diferido  = 0
+              AND r.cancelado  = 0
+              AND r.diferido   = 0
+              AND (r.isento = 0 OR r.indeferido = 1)
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
         $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->execute();
         $selos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // SELOS DIFERIDOS (Individual)
+        $sql = "
+            SELECT 
+                f.usuario        AS funcionario,
+                r.numero_selo    AS numero_selo,
+                r.ato            AS ato,
+                r.tipo           AS tipo,
+                r.selagem        AS selagem,
+                r.emolumentos    AS emolumentos,
+                r.ferj           AS ferj,
+                r.fadep          AS fadep,
+                r.ferc           AS ferc,
+                r.femp           AS femp, 
+                r.ferrfis        AS ferrfis,                                
+                r.total          AS total,
+                r.diferido       AS diferido,
+                r.indeferido     AS indeferido,
+                r.desconto       AS desconto
+            FROM relatorios_analiticos r
+            INNER JOIN funcionarios f 
+                    ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+                     = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+            WHERE DATE(r.selagem) = :data
+              AND f.usuario = :funcionario
+              AND r.cancelado  = 0
+              AND r.diferido   = 1
+              AND (r.isento = 0 OR r.indeferido = 1)
+        ";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':data', $data);
+        $stmt->bindParam(':funcionario', $funcionarios);
+        $stmt->execute();
+        $selos_diferidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // ATOS ISENTOS (Individual)
         $sql = "
@@ -279,16 +363,19 @@ try {
                 r.ferc           AS ferc,
                 r.femp           AS femp,
                 r.ferrfis        AS ferrfis,                                
-                r.total          AS total
+                r.total          AS total,
+                r.diferido       AS diferido,
+                r.indeferido     AS indeferido,
+                r.desconto       AS desconto
             FROM relatorios_analiticos r
             INNER JOIN funcionarios f 
                     ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
                      = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
               AND f.usuario = :funcionario
-              AND r.cancelado = 0
-              AND r.isento    = 1
-              AND r.diferido  = 0
+              AND r.cancelado  = 0
+              AND r.isento     = 1
+              AND r.indeferido = 0
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
@@ -368,10 +455,18 @@ try {
         return $carry + floatval($item['valor_transportado']);
     }, 0.0);
 
-    // Total em Selos
-    $totalSelos = array_reduce(isset($selos) ? $selos : [], function($carry, $item) {
+    // Total em Selos à vista
+    $totalSelosAVista = array_reduce(isset($selos) ? $selos : [], function($carry, $item) {
         return $carry + floatval($item['total']);
     }, 0.0);
+
+    // NOVO: Total em Selos Diferidos (lista e card próprios)
+    $totalSelosDiferidos = array_reduce(isset($selos_diferidos) ? $selos_diferidos : [], function($carry, $item) {
+        return $carry + floatval($item['total']);
+    }, 0.0);
+
+    // Total em Selos = à vista + diferidos
+    $totalSelos = $totalSelosAVista + $totalSelosDiferidos;
 
     // NOVO: Total em Atos Isentos (somente amostragem — não entra em total recebido)
     $totalAtosIsentos = array_reduce(isset($atos_isentos) ? $atos_isentos : [], function($carry, $item) {
@@ -400,6 +495,7 @@ try {
     error_log("Total Depósito do Caixa: " . $totalDepositoCaixa);
     error_log("Total Saldo Transportado: " . $totalSaldoTransportado);
     error_log("Total em Selos: " . $totalSelos);
+    error_log("Total em Selos Diferidos: " . $totalSelosDiferidos);
     error_log("Total Atos Isentos: " . $totalAtosIsentos);
 
     $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $totalSaidasDespesas - $totalDepositoCaixa - $totalSaldoTransportado;
@@ -413,6 +509,9 @@ try {
         'depositos' => $depositos,
         'saldoTransportado' => $saldoTransportado,
         'selos' => isset($selos) ? $selos : [],
+
+        // NOVO: selos com emolumentos diferidos (lista e card próprios)
+        'selosDiferidos' => isset($selos_diferidos) ? $selos_diferidos : [],
 
         // NOVO: retornar também a lista dos Atos Isentos (opcional para uso futuro no front)
         'atosIsentos' => isset($atos_isentos) ? $atos_isentos : [],
@@ -428,6 +527,8 @@ try {
         'saldoInicial' => $saldoInicial,
         'totalSaldoTransportado' => $totalSaldoTransportado,
         'totalSelos' => $totalSelos,
+        'totalSelosAVista' => $totalSelosAVista,
+        'totalSelosDiferidos' => $totalSelosDiferidos,
 
         // NOVO: total dos Atos Isentos (usado no card do front)
         'totalAtosIsentos' => isset($totalAtosIsentos) ? $totalAtosIsentos : 0.0,

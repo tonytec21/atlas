@@ -9,36 +9,10 @@ date_default_timezone_set('America/Sao_Paulo');
 try {
     $conn = getDatabaseConnection();
 
-    // Cria/atualiza tabela relatorios_analiticos
-    $conn->exec("
-        CREATE TABLE IF NOT EXISTS relatorios_analiticos (
-            id               INT AUTO_INCREMENT PRIMARY KEY,
-            seq_linha        INT NULL,
-            cartorio         VARCHAR(255) NULL,
-            numero_selo      VARCHAR(80) NOT NULL,
-            ato              VARCHAR(255) NULL,
-            usuario          VARCHAR(255) NULL,
-            isento           TINYINT(1) NOT NULL DEFAULT 0,
-            cancelado        TINYINT(1) NOT NULL DEFAULT 0,
-            diferido         TINYINT(1) NOT NULL DEFAULT 0,
-            selagem          DATE NULL,                  -- era VARCHAR(100), agora DATE (apenas data)
-            operacao         DATETIME NULL,              -- era VARCHAR(100), agora DATETIME (data e hora)
-            tipo             VARCHAR(120) NULL,
-            emolumentos      DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-            ferj             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-            fadep            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-            ferc             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-            femp             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-            ferrfis          DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-            selo_valor       DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-            total            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-            arquivo_origem   VARCHAR(255) NULL,
-            uploaded_by      VARCHAR(120) NULL,
-            created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at       DATETIME NULL,
-            UNIQUE KEY uq_numero_selo (numero_selo)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    ");
+    // Estrutura e migrações do módulo analítico. Rodam automaticamente ao abrir
+    // a página e apenas uma vez cada (controle na tabela atlas_migracoes).
+    require_once __DIR__ . '/migracoes_analitico.php';
+    atlas_migrar_analitico_seguro($conn);
 } catch (Exception $e) {
     // Silencioso
 }
@@ -80,6 +54,124 @@ function normText($v): string {
 function readCell($sheet, int $colIndex, int $rowIndex) {
     $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex);
     return $sheet->getCell($colLetter . $rowIndex)->getValue();
+}
+
+/**
+ * Igual ao readCell, porem resolve celulas de formula.
+ * O bloco de resumo do Portal do Selo usa SUMIF; getValue() devolveria o texto
+ * da formula. Preferimos o valor ja calculado e gravado no proprio arquivo
+ * (getOldCalculatedValue) e, se ele nao existir, mandamos o PhpSpreadsheet calcular.
+ */
+function readCellValue($sheet, int $colIndex, int $rowIndex) {
+    $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex);
+    $cell = $sheet->getCell($colLetter . $rowIndex);
+    $v = $cell->getValue();
+    if (is_string($v) && isset($v[0]) && $v[0] === '=') {
+        $cached = $cell->getOldCalculatedValue();
+        if ($cached !== null && $cached !== '') return $cached;
+        try { return $cell->getCalculatedValue(); } catch (Throwable $e) { return null; }
+    }
+    return $v;
+}
+
+/**
+ * Normaliza um titulo de coluna para comparacao: minusculas, sem acentos,
+ * sem espacos e sem pontuacao. Ex.: 'Nº do Selo' => 'ndoselo'.
+ */
+function slugHeader($v): string {
+    $s = mb_strtolower(normText($v), 'UTF-8');
+    $de   = ['á','à','â','ã','ä','é','è','ê','ë','í','ì','î','ï','ó','ò','ô','õ','ö','ú','ù','û','ü','ç','º','°','ª'];
+    $para = ['a','a','a','a','a','e','e','e','e','i','i','i','i','o','o','o','o','o','u','u','u','u','c','','',''];
+    $s = str_replace($de, $para, $s);
+    return preg_replace('/[^a-z0-9#]/', '', $s);
+}
+
+/**
+ * Localiza a linha de cabecalho da grade e devolve o mapa slug => indice da coluna.
+ * Evita depender de posicoes fixas: se o Portal do Selo inserir novas colunas no
+ * meio da planilha, a leitura continua correta.
+ *
+ * @return array [int $linhaCabecalho, array $mapa]
+ */
+function localizarCabecalho($sheet, int $maxLinhas, int $maxCols): array {
+    for ($r = 1; $r <= $maxLinhas; $r++) {
+        $mapa = [];
+        for ($c = 1; $c <= $maxCols; $c++) {
+            $slug = slugHeader(readCell($sheet, $c, $r));
+            if ($slug !== '' && !isset($mapa[$slug])) {
+                $mapa[$slug] = $c;
+            }
+        }
+        if (isset($mapa['#'], $mapa['cartorio'], $mapa['ndoselo'], $mapa['emolumentos'], $mapa['total'])) {
+            return [$r, $mapa];
+        }
+    }
+    return [0, []];
+}
+
+/**
+ * Le o bloco de resumo do topo da planilha (rubrica x Valor/Desconto/Indeferido/Total).
+ * Se a planilha for do formato antigo (sem esse bloco), devolve array vazio.
+ */
+function lerResumo($sheet, int $linhaCabecalho): array {
+    $out = [];
+    $linhaTitulos = 0; $colRotulo = 0; $colValor = 0; $colDesc = 0; $colIndef = 0; $colTotal = 0;
+
+    for ($r = 1; $r < $linhaCabecalho && $linhaTitulos === 0; $r++) {
+        for ($c = 1; $c <= 10; $c++) {
+            if (slugHeader(readCell($sheet, $c, $r)) === 'valor'
+                && slugHeader(readCell($sheet, $c + 1, $r)) === 'desconto') {
+                $linhaTitulos = $r;
+                $colValor  = $c;
+                $colDesc   = $c + 1;
+                $colIndef  = $c + 2;
+                $colTotal  = $c + 3;
+                $colRotulo = max(1, $c - 1);
+                break;
+            }
+        }
+    }
+    if ($linhaTitulos === 0) return $out;
+
+    for ($r = $linhaTitulos + 1; $r < $linhaCabecalho; $r++) {
+        $rot = normText(readCell($sheet, $colRotulo, $r));
+        $rot = rtrim($rot, ": \t");
+        if ($rot === '') continue;
+        // A observacao legal (art. 28-A) ocupa uma celula longa logo abaixo do bloco
+        if (mb_strlen($rot, 'UTF-8') > 40) break;
+        $out[] = [
+            'rubrica'    => $rot,
+            'valor'      => toMoney(readCellValue($sheet, $colValor,  $r)),
+            'desconto'   => toMoney(readCellValue($sheet, $colDesc,   $r)),
+            'indeferido' => toMoney(readCellValue($sheet, $colIndef,  $r)),
+            'total'      => toMoney(readCellValue($sheet, $colTotal,  $r)),
+        ];
+    }
+    return $out;
+}
+
+/**
+ * Extrai o periodo do nome do arquivo gerado pelo Portal do Selo.
+ * Ex.: relatorio_analitico_27_07_2026_a_02_08_2026.xlsx
+ * @return array [?string $inicio, ?string $fim] em 'Y-m-d'
+ */
+function periodoDoNome(string $nome): array {
+    if (preg_match('/(\d{2})_(\d{2})_(\d{4})_a_(\d{2})_(\d{2})_(\d{4})/', $nome, $m)) {
+        return ["{$m[3]}-{$m[2]}-{$m[1]}", "{$m[6]}-{$m[5]}-{$m[4]}"];
+    }
+    return [null, null];
+}
+
+/** Localiza a celula "Gerado em:" e devolve a data/hora ao lado dela. */
+function lerGeradoEm($sheet, int $linhaCabecalho, int $maxCols): ?string {
+    for ($r = 1; $r < $linhaCabecalho; $r++) {
+        for ($c = 1; $c <= $maxCols; $c++) {
+            if (slugHeader(readCell($sheet, $c, $r)) === 'geradoem') {
+                return parseExcelDate(readCellValue($sheet, $c + 1, $r), true);
+            }
+        }
+    }
+    return null;
 }
 
 /**
@@ -261,20 +353,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $uploader = isset($_SESSION['username']) ? $_SESSION['username'] : 'desconhecido';
     $totalFiles = count($_FILES['relatorios']['name']);
     $summary = [
-        'files'    => $totalFiles,
-        'inserted' => 0,
-        'updated'  => 0,
-        'skipped'  => 0,
-        'errors'   => []
+        'files'      => $totalFiles,
+        'inserted'   => 0,
+        'updated'    => 0,
+        'skipped'    => 0,
+        'estornos'   => 0,   // linhas com valores negativos (cancelamento/retificacao na mesma remessa)
+        'indeferidos'=> 0,   // atos com isencao indeferida (voltam a ser cobraveis)
+        'errors'     => []
     ];
 
     $sql = "
         INSERT INTO relatorios_analiticos
-        (seq_linha, cartorio, numero_selo, ato, usuario, isento, cancelado, diferido, selagem, operacao, tipo,
-         emolumentos, ferj, fadep, ferc, femp, ferrfis, selo_valor, total, arquivo_origem, uploaded_by, created_at, updated_at)
+        (seq_linha, cartorio, numero_selo, ato, usuario, isento, cancelado, diferido, indeferido, pendente_recurso,
+         linha_sinal, selagem, operacao, tipo,
+         emolumentos, ferj, fadep, ferc, femp, ferrfis, selo_valor, total, desconto, arquivo_origem, uploaded_by, created_at, updated_at)
         VALUES
-        (:seq_linha, :cartorio, :numero_selo, :ato, :usuario, :isento, :cancelado, :diferido, :selagem, :operacao, :tipo,
-         :emolumentos, :ferj, :fadep, :ferc, :femp, :ferrfis, :selo_valor, :total, :arquivo_origem, :uploaded_by, NOW(), NULL)
+        (:seq_linha, :cartorio, :numero_selo, :ato, :usuario, :isento, :cancelado, :diferido, :indeferido, :pendente_recurso,
+         :linha_sinal, :selagem, :operacao, :tipo,
+         :emolumentos, :ferj, :fadep, :ferc, :femp, :ferrfis, :selo_valor, :total, :desconto, :arquivo_origem, :uploaded_by, NOW(), NULL)
         ON DUPLICATE KEY UPDATE
             cartorio = VALUES(cartorio),
             ato = VALUES(ato),
@@ -282,6 +378,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             isento = VALUES(isento),
             cancelado = VALUES(cancelado),
             diferido = VALUES(diferido),
+            indeferido = VALUES(indeferido),
+            pendente_recurso = VALUES(pendente_recurso),
             selagem = VALUES(selagem),
             operacao = VALUES(operacao),
             tipo = VALUES(tipo),
@@ -293,14 +391,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             ferrfis = VALUES(ferrfis),
             selo_valor = VALUES(selo_valor),
             total = VALUES(total),
+            desconto = VALUES(desconto),
             arquivo_origem = VALUES(arquivo_origem),
             uploaded_by = VALUES(uploaded_by),
             updated_at = NOW()
     ";
     $stmt = $conn->prepare($sql);
 
-    $ROW_HEADERS = 17;
-    $ROW_DATA    = 18;
+    $sqlResumo = "
+        INSERT INTO relatorios_analiticos_resumo
+        (arquivo_origem, rubrica, valor, desconto, indeferido, total,
+         periodo_inicio, periodo_fim, gerado_em, uploaded_by, created_at, updated_at)
+        VALUES
+        (:arquivo_origem, :rubrica, :valor, :desconto, :indeferido, :total,
+         :periodo_inicio, :periodo_fim, :gerado_em, :uploaded_by, NOW(), NULL)
+        ON DUPLICATE KEY UPDATE
+            valor = VALUES(valor),
+            desconto = VALUES(desconto),
+            indeferido = VALUES(indeferido),
+            total = VALUES(total),
+            periodo_inicio = VALUES(periodo_inicio),
+            periodo_fim = VALUES(periodo_fim),
+            gerado_em = VALUES(gerado_em),
+            uploaded_by = VALUES(uploaded_by),
+            updated_at = NOW()
+    ";
+    $stmtResumo = $conn->prepare($sqlResumo);
+
+    // Ate 40 linhas de preambulo antes da grade (cabecalho, resumo e observacao legal)
+    $MAX_LINHAS_PREAMBULO = 40;
 
     for ($i = 0; $i < $totalFiles; $i++) {
         $name = $_FILES['relatorios']['name'][$i];
@@ -319,58 +438,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $highestCol = $sheet->getHighestColumn();
             $highestColIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestCol);
 
-            $expectedHeaders = [
-                '#','Cartório','Nº do Selo','Ato','Usuário','Isento','Cancelado','Diferido','Selagem','Operação','Tipo',
-                'Emolumentos','FERJ','FADEP','FERC','FEMP','FERRFIS','Selo','Total'
+            // ====== LOCALIZA O CABEÇALHO E MAPEIA AS COLUNAS PELO TÍTULO ======
+            // A grade não é lida por posição fixa: colunas novas inseridas pelo
+            // Portal do Selo (como "Diferido") deixam de deslocar os valores.
+            list($ROW_HEADERS, $mapaCols) = localizarCabecalho($sheet, min($highestRow, $MAX_LINHAS_PREAMBULO), $highestColIndex);
+            if ($ROW_HEADERS === 0) {
+                $summary['errors'][] = "Não foi possível localizar a linha de cabeçalho em '{$name}'. O arquivo é o Relatório Analítico do Portal do Selo?";
+                continue;
+            }
+            $ROW_DATA = $ROW_HEADERS + 1;
+
+            $obrigatorias = [
+                '#'           => '#',
+                'cartorio'    => 'Cartório',
+                'ndoselo'     => 'Nº do Selo',
+                'ato'         => 'Ato',
+                'usuario'     => 'Usuário',
+                'isento'      => 'Isento',
+                'cancelado'   => 'Cancelado',
+                'diferido'    => 'Diferido',
+                'selagem'     => 'Selagem',
+                'operacao'    => 'Operação',
+                'tipo'        => 'Tipo',
+                'emolumentos' => 'Emolumentos',
+                'ferj'        => 'FERJ',
+                'fadep'       => 'FADEP',
+                'ferc'        => 'FERC',
+                'femp'        => 'FEMP',
+                'ferrfis'     => 'FERRFIS',
+                'selo'        => 'Selo',
+                'total'       => 'Total',
             ];
-            $headersOk = true;
-            $headersRead = [];
-            for ($c = 1; $c <= min($highestColIndex, count($expectedHeaders)); $c++) {
-                $headersRead[] = normText(readCell($sheet, $c, $ROW_HEADERS));
+            $faltando = [];
+            foreach ($obrigatorias as $slug => $rotulo) {
+                if (!isset($mapaCols[$slug])) $faltando[] = $rotulo;
             }
-            for ($h = 0; $h < count($expectedHeaders); $h++) {
-                if (!isset($headersRead[$h]) || mb_strtolower($headersRead[$h], 'UTF-8') !== mb_strtolower($expectedHeaders[$h], 'UTF-8')) {
-                    $headersOk = false;
-                    break;
-                }
-            }
-            if (!$headersOk) {
-                $summary['errors'][] = "Cabeçalho inesperado em '{$name}'. Verifique se os títulos estão na linha 17.";
+            if (!empty($faltando)) {
+                $summary['errors'][] = "Colunas não encontradas em '{$name}' (linha {$ROW_HEADERS}): " . implode(', ', $faltando) . '.';
                 continue;
             }
 
+            // Atalho para ler pelo nome da coluna
+            $col = function(string $slug) use ($mapaCols) { return $mapaCols[$slug]; };
+
+            // ====== BLOCO DE RESUMO (Valor / Desconto / Indeferido / Total) ======
+            list($periodoIni, $periodoFim) = periodoDoNome($name);
+            $geradoEm = lerGeradoEm($sheet, $ROW_HEADERS, $highestColIndex);
+            foreach (lerResumo($sheet, $ROW_HEADERS) as $lin) {
+                try {
+                    $stmtResumo->bindValue(':arquivo_origem', $name);
+                    $stmtResumo->bindValue(':rubrica',        $lin['rubrica']);
+                    $stmtResumo->bindValue(':valor',          $lin['valor']);
+                    $stmtResumo->bindValue(':desconto',       $lin['desconto']);
+                    $stmtResumo->bindValue(':indeferido',     $lin['indeferido']);
+                    $stmtResumo->bindValue(':total',          $lin['total']);
+                    $stmtResumo->bindValue(':periodo_inicio', $periodoIni, $periodoIni === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+                    $stmtResumo->bindValue(':periodo_fim',    $periodoFim, $periodoFim === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+                    $stmtResumo->bindValue(':gerado_em',      $geradoEm,   $geradoEm   === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+                    $stmtResumo->bindValue(':uploaded_by',    $uploader);
+                    $stmtResumo->execute();
+                } catch (Exception $re) {
+                    $summary['errors'][] = "Resumo de '{$name}': " . $re->getMessage();
+                }
+            }
+
             for ($row = $ROW_DATA; $row <= $highestRow; $row++) {
-                $numeroSelo = normText(readCell($sheet, 3, $row));
+                $numeroSelo = normText(readCell($sheet, $col('ndoselo'), $row));
                 if ($numeroSelo === '') {
                     continue;
                 }
 
-                $seqLinha   = normText(readCell($sheet, 1, $row));
-                $cartorio   = normText(readCell($sheet, 2, $row));
-                $ato        = normText(readCell($sheet, 4, $row));
-                $usuario    = normText(readCell($sheet, 5, $row));
-                $isento     = toBoolFlag(readCell($sheet, 6, $row));
-                $cancelado  = toBoolFlag(readCell($sheet, 7, $row));
-                $diferido   = toBoolFlag(readCell($sheet, 8, $row));
+                $seqLinha   = normText(readCell($sheet, $col('#'), $row));
+                $cartorio   = normText(readCell($sheet, $col('cartorio'), $row));
+                $ato        = normText(readCell($sheet, $col('ato'), $row));
+                $usuario    = normText(readCell($sheet, $col('usuario'), $row));
+                $isento     = toBoolFlag(readCell($sheet, $col('isento'), $row));
+                $cancelado  = toBoolFlag(readCell($sheet, $col('cancelado'), $row));
+                $diferido   = toBoolFlag(readCell($sheet, $col('diferido'), $row));
 
                 // ====== CONVERTE DATAS ======
                 // Selagem: apenas data (DATE)
-                $rawSelagem = readCell($sheet, 9, $row);
+                $rawSelagem = readCell($sheet, $col('selagem'), $row);
                 $selagemDb  = parseExcelDate($rawSelagem, false); // 'Y-m-d' ou null
 
                 // Operação: data e hora (DATETIME)
-                $rawOperacao = readCell($sheet, 10, $row);
+                $rawOperacao = readCell($sheet, $col('operacao'), $row);
                 $operacaoDb  = parseExcelDate($rawOperacao, true); // 'Y-m-d H:i:s' ou null
 
-                $tipo       = normText(readCell($sheet, 11, $row));
-                $emol       = toMoney(readCell($sheet, 12, $row));
-                $ferj       = toMoney(readCell($sheet, 13, $row));
-                $fadep      = toMoney(readCell($sheet, 14, $row));
-                $ferc       = toMoney(readCell($sheet, 15, $row));
-                $femp       = toMoney(readCell($sheet, 16, $row));
-                $ferrfis    = toMoney(readCell($sheet, 17, $row));
-                $seloValor  = toMoney(readCell($sheet, 18, $row));
-                $total      = toMoney(readCell($sheet, 19, $row));
+                $tipo       = normText(readCell($sheet, $col('tipo'), $row));
+                $emol       = toMoney(readCell($sheet, $col('emolumentos'), $row));
+                $ferj       = toMoney(readCell($sheet, $col('ferj'), $row));
+                $fadep      = toMoney(readCell($sheet, $col('fadep'), $row));
+                $ferc       = toMoney(readCell($sheet, $col('ferc'), $row));
+                $femp       = toMoney(readCell($sheet, $col('femp'), $row));
+                $ferrfis    = toMoney(readCell($sheet, $col('ferrfis'), $row));
+                $seloValor  = toMoney(readCell($sheet, $col('selo'), $row));
+                $total      = toMoney(readCell($sheet, $col('total'), $row));
+
+                // ====== CLASSIFICAÇÃO PELO CAMPO "Tipo" ======
+                // "Normal" | "Isenção indeferida" | "Pendente de recurso (com/sem anexo)"
+                $tipoSlug        = slugHeader($tipo);
+                $indeferido      = (strpos($tipoSlug, 'isencaoindeferida') !== false) ? 1 : 0;
+                $pendenteRecurso = (strpos($tipoSlug, 'pendentederecurso') !== false) ? 1 : 0;
+
+                // Estorno: linha negativa gerada por cancelamento/retificação dentro
+                // da mesma remessa (é o que alimenta a coluna "Desconto" do resumo).
+                $linhaSinal = ($total < 0 || $emol < 0) ? -1 : 1;
+                $desconto   = ($linhaSinal === -1) ? abs($total) : 0.0;
+
+                if ($linhaSinal === -1) $summary['estornos']++;
+                if ($indeferido === 1)  $summary['indeferidos']++;
 
                 if ($seqLinha === '') {
                     $stmt->bindValue(':seq_linha', null, PDO::PARAM_NULL);
@@ -384,6 +561,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt->bindValue(':isento',         $isento, PDO::PARAM_INT);
                 $stmt->bindValue(':cancelado',      $cancelado, PDO::PARAM_INT);
                 $stmt->bindValue(':diferido',       $diferido, PDO::PARAM_INT);
+                $stmt->bindValue(':indeferido',       $indeferido, PDO::PARAM_INT);
+                $stmt->bindValue(':pendente_recurso', $pendenteRecurso, PDO::PARAM_INT);
+                $stmt->bindValue(':linha_sinal',      $linhaSinal, PDO::PARAM_INT);
 
                 if ($selagemDb === null) {
                     $stmt->bindValue(':selagem', null, PDO::PARAM_NULL);
@@ -406,6 +586,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt->bindValue(':ferrfis',        $ferrfis);
                 $stmt->bindValue(':selo_valor',     $seloValor);
                 $stmt->bindValue(':total',          $total);
+                $stmt->bindValue(':desconto',       $desconto);
                 $stmt->bindValue(':arquivo_origem', $name);
                 $stmt->bindValue(':uploaded_by',    $uploader);
 
@@ -2268,10 +2449,17 @@ function openDetailModal(item) {
     ? new Date(String(item.operacao).replace(' ', 'T')).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' }) 
     : '—';
   
-  let statusBadges = '';  
-  if(cancelado) statusBadges += '<span class="badge badge-danger"><i class="fas fa-times-circle"></i> Cancelado</span> ';  
-  if(isento) statusBadges += '<span class="badge badge-warning"><i class="fas fa-check-circle"></i> Isento</span> ';  
-  if(diferido) statusBadges += '<span class="badge badge-warning"><i class="fas fa-clock"></i> Diferido</span>';  
+  const indeferido      = item.indeferido == 1;
+  const pendenteRecurso = item.pendente_recurso == 1;
+  const estorno         = parseFloat(item.total || 0) < 0;
+
+  let statusBadges = '';
+  if(cancelado) statusBadges += '<span class="badge badge-danger"><i class="fas fa-times-circle"></i> Cancelado</span> ';
+  if(estorno) statusBadges += '<span class="badge badge-danger"><i class="fas fa-undo"></i> Estorno</span> ';
+  if(indeferido) statusBadges += '<span class="badge badge-info"><i class="fas fa-gavel"></i> Isenção indeferida</span> ';
+  if(isento && !indeferido) statusBadges += '<span class="badge badge-warning"><i class="fas fa-check-circle"></i> Isento</span> ';
+  if(pendenteRecurso) statusBadges += '<span class="badge badge-secondary"><i class="fas fa-hourglass-half"></i> Pendente de recurso</span> ';
+  if(diferido) statusBadges += '<span class="badge badge-warning"><i class="fas fa-clock"></i> Diferido</span>';
    
   const modalContent = `  
     <div class="detail-section">  
@@ -2641,9 +2829,16 @@ function performSearch() {
         const cancelado = item.cancelado == 1;
         const diferido = item.diferido == 1;
         
+        const indeferido      = item.indeferido == 1;
+        const pendenteRecurso = item.pendente_recurso == 1;
+        const estorno         = parseFloat(item.total || 0) < 0;
+
         let statusBadges = '';
         if(cancelado) statusBadges += '<span class="badge badge-danger"><i class="fas fa-times-circle"></i> Cancelado</span> ';
-        if(isento) statusBadges += '<span class="badge badge-warning"><i class="fas fa-check-circle"></i> Isento</span> ';
+        if(estorno) statusBadges += '<span class="badge badge-danger"><i class="fas fa-undo"></i> Estorno</span> ';
+        if(indeferido) statusBadges += '<span class="badge badge-info"><i class="fas fa-gavel"></i> Isenção indeferida</span> ';
+        if(isento && !indeferido) statusBadges += '<span class="badge badge-warning"><i class="fas fa-check-circle"></i> Isento</span> ';
+        if(pendenteRecurso) statusBadges += '<span class="badge badge-secondary"><i class="fas fa-hourglass-half"></i> Pendente de recurso</span> ';
         if(diferido) statusBadges += '<span class="badge badge-warning"><i class="fas fa-clock"></i> Diferido</span>';
         
         const itemJson = JSON.stringify(item).replace(/'/g, '&#39;');
@@ -2678,9 +2873,16 @@ function performSearch() {
         const cancelado = item.cancelado == 1;
         const diferido = item.diferido == 1;
         
+        const indeferido      = item.indeferido == 1;
+        const pendenteRecurso = item.pendente_recurso == 1;
+        const estorno         = parseFloat(item.total || 0) < 0;
+
         let statusBadges = '';
         if(cancelado) statusBadges += '<span class="badge badge-danger"><i class="fas fa-times-circle"></i> Cancelado</span> ';
-        if(isento) statusBadges += '<span class="badge badge-warning"><i class="fas fa-check-circle"></i> Isento</span> ';
+        if(estorno) statusBadges += '<span class="badge badge-danger"><i class="fas fa-undo"></i> Estorno</span> ';
+        if(indeferido) statusBadges += '<span class="badge badge-info"><i class="fas fa-gavel"></i> Isenção indeferida</span> ';
+        if(isento && !indeferido) statusBadges += '<span class="badge badge-warning"><i class="fas fa-check-circle"></i> Isento</span> ';
+        if(pendenteRecurso) statusBadges += '<span class="badge badge-secondary"><i class="fas fa-hourglass-half"></i> Pendente de recurso</span> ';
         if(diferido) statusBadges += '<span class="badge badge-warning"><i class="fas fa-clock"></i> Diferido</span>';
         
         const itemJson = JSON.stringify(item).replace(/'/g, '&#39;');

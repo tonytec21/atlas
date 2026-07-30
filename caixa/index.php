@@ -28,36 +28,13 @@ date_default_timezone_set('America/Sao_Paulo');
     try {
         $conn = getDatabaseConnection();
 
-        // Cria/atualiza tabela relatorios_analiticos
-        $conn->exec("
-            CREATE TABLE IF NOT EXISTS relatorios_analiticos (
-                id               INT AUTO_INCREMENT PRIMARY KEY,
-                seq_linha        INT NULL,
-                cartorio         VARCHAR(255) NULL,
-                numero_selo      VARCHAR(80) NOT NULL,
-                ato              VARCHAR(255) NULL,
-                usuario          VARCHAR(255) NULL,
-                isento           TINYINT(1) NOT NULL DEFAULT 0,
-                cancelado        TINYINT(1) NOT NULL DEFAULT 0,
-                diferido         TINYINT(1) NOT NULL DEFAULT 0,
-                selagem          DATE NULL,                  -- era VARCHAR(100), agora DATE (apenas data)
-                operacao         DATETIME NULL,              -- era VARCHAR(100), agora DATETIME (data e hora)
-                tipo             VARCHAR(120) NULL,
-                emolumentos      DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-                ferj             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-                fadep            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-                ferc             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-                femp             DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-                ferrfis          DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-                selo_valor       DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-                total            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-                arquivo_origem   VARCHAR(255) NULL,
-                uploaded_by      VARCHAR(120) NULL,
-                created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at       DATETIME NULL,
-                UNIQUE KEY uq_numero_selo (numero_selo)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        ");
+        // Estrutura e migrações do módulo analítico. Rodam automaticamente ao abrir
+        // a página e apenas uma vez cada (controle na tabela atlas_migracoes).
+        $__mig = __DIR__ . '/../analitico/migracoes_analitico.php';
+        if (is_file($__mig)) {
+            require_once $__mig;
+            atlas_migrar_analitico_seguro($conn);
+        }
     } catch (Exception $e) {
         // Silencioso
     }
@@ -663,11 +640,19 @@ date_default_timezone_set('America/Sao_Paulo');
                             </div>
                         </div>
 
-                        <!-- NOVO: Total em Selos -->
+                        <!-- NOVO: Total em Selos (à vista + diferidos) -->
                         <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-primary mb-3">
                                 <div class="card-header">Total em Selos</div>
                                 <div class="card-body"><h5 class="card-title" id="cardTotalSelos">R$ 0,00</h5></div>
+                            </div>
+                        </div>
+
+                        <!-- NOVO: Selos Diferidos (já somados no Total em Selos) -->
+                        <div class="col-6 col-sm-6 col-md-3 col-lg-3">
+                            <div class="card text-white mb-3" style="background-color:#7c3aed;">
+                                <div class="card-header">Selos Diferidos</div>
+                                <div class="card-body"><h5 class="card-title" id="cardSelosDiferidos">R$ 0,00</h5></div>
                             </div>
                         </div>
 
@@ -802,7 +787,36 @@ date_default_timezone_set('America/Sao_Paulo');
                                     <tbody id="detalhesSelos"></tbody>
                                 </table>
                             </div>
-                            <h6 class="total-label">Total em Selos: <span id="totalSelos">R$ 0,00</span></h6>
+                            <h6 class="total-label">Total em Selos (à vista): <span id="totalSelos">R$ 0,00</span></h6>
+                        </div>
+                    </div>
+
+                    <!-- NOVO: SELOS DIFERIDOS — só aparece quando houver -->
+                    <div class="card mb-3" id="listaSelosDiferidosWrap" style="display:none;">
+                        <div class="card-header table-title text-center"><b>SELOS DIFERIDOS</b></div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="tabelaSelosDiferidos" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Funcionário</th>
+                                            <th>Nº Selo</th>
+                                            <th>Ato</th>
+                                            <th>Tipo</th>
+                                            <th>Selagem</th>
+                                            <th>Emolumentos</th>
+                                            <th>FERJ</th>
+                                            <th>FADEP</th>
+                                            <th>FERC</th>
+                                            <th>FEMP</th>
+                                            <th>FERRFIS</th>
+                                            <th>TOTAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detalhesSelosDiferidos"></tbody>
+                                </table>
+                            </div>
+                            <h6 class="total-label">Total em Selos Diferidos: <span id="totalSelosDiferidos">R$ 0,00</span></h6>
                         </div>
                     </div>
 
@@ -1573,8 +1587,11 @@ date_default_timezone_set('America/Sao_Paulo');
                     toggleCard('#cardSaidasDespesas', detalhes.totalSaidasDespesas);
                     toggleCard('#cardDepositoCaixa', detalhes.totalDepositoCaixa);
 
-                    // NOVO: Card Total em Selos
+                    // NOVO: Card Total em Selos (à vista + diferidos)
                     toggleCard('#cardTotalSelos', detalhes.totalSelos);
+
+                    // NOVO: Card Selos Diferidos (só aparece quando houver)
+                    toggleCard('#cardSelosDiferidos', detalhes.totalSelosDiferidos);
 
                     // NOVO: Card Repasse a Credores (só aparece quando houver)
                     toggleCard('#cardRepasseCredor', detalhes.totalRepasseCredor);
@@ -1787,8 +1804,36 @@ date_default_timezone_set('America/Sao_Paulo');
                         `);
                     });
                     $('#totalSelos').text(formatCurrency(totalSelos));
-                    // mantém o card em sincronia (caso tabela seja paginada/filtrada no futuro)
-                    $('#cardTotalSelos').text(formatCurrency(totalSelos));
+
+                    /* NOVO: SELOS DIFERIDOS — lista própria, mas somada ao Total em Selos */
+                    var totalSelosDiferidos = 0;
+                    $('#detalhesSelosDiferidos').empty();
+                    var selosDiferidos = detalhes.selosDiferidos || [];
+                    selosDiferidos.forEach(function(s) {
+                        totalSelosDiferidos += parseFloat(s.total || 0);
+                        $('#detalhesSelosDiferidos').append(`
+                            <tr>
+                                <td>${s.funcionario}</td>
+                                <td>${s.numero_selo}</td>
+                                <td>${s.ato || ''}</td>
+                                <td>${s.tipo || ''}</td>
+                                <td>${s.selagem ? formatDateForDisplay(s.selagem) : ''}</td>
+                                <td>${formatCurrency(s.emolumentos)}</td>
+                                <td>${formatCurrency(s.ferj)}</td>
+                                <td>${formatCurrency(s.fadep)}</td>
+                                <td>${formatCurrency(s.ferc)}</td>
+                                <td>${formatCurrency(s.femp)}</td>
+                                <td>${formatCurrency(s.ferrfis)}</td>
+                                <td>${formatCurrency(s.total)}</td>
+                            </tr>
+                        `);
+                    });
+                    $('#totalSelosDiferidos').text(formatCurrency(totalSelosDiferidos));
+                    $('#listaSelosDiferidosWrap').toggle(selosDiferidos.length > 0);
+
+                    // mantém os cards em sincronia (caso a tabela seja paginada/filtrada no futuro)
+                    $('#cardTotalSelos').text(formatCurrency(totalSelos + totalSelosDiferidos));
+                    $('#cardSelosDiferidos').text(formatCurrency(totalSelosDiferidos));
 
                     // NOVO: Repasse a Credores (Protesto) — lista só aparece quando houver
                     var totalRepasseCredor = 0;
@@ -1875,6 +1920,9 @@ date_default_timezone_set('America/Sao_Paulo');
 
                     // NOVO: tabela de Selos
                     $('#tabelaSelos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+
+                    // NOVO: tabela de Selos Diferidos
+                    $('#tabelaSelosDiferidos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
 
                     // NOVO: tabela de Repasse a Credores
                     $('#tabelaRepasseCredor').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });

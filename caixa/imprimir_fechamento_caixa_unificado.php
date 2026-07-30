@@ -12,6 +12,13 @@ if (!isset($_GET['data'])) {
 
 $data = $_GET['data'];
 $conn = getDatabaseConnection();
+
+// Estrutura e migrações do módulo analítico (uma única vez; ver atlas_migracoes)
+$__mig = __DIR__ . '/../analitico/migracoes_analitico.php';
+if (is_file($__mig)) {
+    require_once $__mig;
+    atlas_migrar_analitico_seguro($conn);
+}
 /* Collation compatível (mesmo tratamento do detalhes_fluxo_caixa) para o JOIN dos selos */
 $conn->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 $conn->exec("SET collation_connection = 'utf8mb4_unicode_ci'");
@@ -121,15 +128,48 @@ $selos = fetchData(
         r.ferc           AS ferc,
         r.femp           AS femp,
         r.ferrfis        AS ferrfis,
-        r.total          AS total
+        r.total          AS total,
+        r.indeferido     AS indeferido,
+        r.desconto       AS desconto
      FROM relatorios_analiticos r
      INNER JOIN funcionarios f
              ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
               = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
      WHERE DATE(r.selagem) = :data
-       AND r.cancelado = 0
-       AND r.isento    = 0
-       AND r.diferido  = 0
+       AND r.cancelado  = 0
+       AND r.diferido   = 0
+       AND (r.isento = 0 OR r.indeferido = 1)
+     ORDER BY f.usuario, r.numero_selo",
+    $params
+);
+
+// ================= Selos Diferidos (emolumentos diferidos) =================
+// Mesma origem dos selos, separados em lista e card próprios.
+// Entram no Total em Selos, mas continuam informativos (não afetam o Total em Caixa).
+$selosDiferidos = fetchData(
+    "SELECT
+        f.usuario        AS funcionario,
+        r.numero_selo    AS numero_selo,
+        r.ato            AS ato,
+        r.tipo           AS tipo,
+        r.selagem        AS selagem,
+        r.emolumentos    AS emolumentos,
+        r.ferj           AS ferj,
+        r.fadep          AS fadep,
+        r.ferc           AS ferc,
+        r.femp           AS femp,
+        r.ferrfis        AS ferrfis,
+        r.total          AS total,
+        r.indeferido     AS indeferido,
+        r.desconto       AS desconto
+     FROM relatorios_analiticos r
+     INNER JOIN funcionarios f
+             ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+              = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+     WHERE DATE(r.selagem) = :data
+       AND r.cancelado  = 0
+       AND r.diferido   = 1
+       AND (r.isento = 0 OR r.indeferido = 1)
      ORDER BY f.usuario, r.numero_selo",
     $params
 );
@@ -164,7 +204,9 @@ $totalDepositos = array_sum(array_column($depositos, 'valor_do_deposito'));
 $totalSaldoTransportado = array_sum(array_column($saldoTransportado, 'valor_transportado'));
 $totalSaldoInicial = array_sum(array_column($saldoInicial, 'saldo_inicial'));
 $totalRepasseCredor = array_sum(array_column($repasseCredor, 'total_repasse'));
-$totalSelos = array_sum(array_column($selos, 'total'));
+$totalSelosAVista    = array_sum(array_column($selos, 'total'));
+$totalSelosDiferidos = array_sum(array_column($selosDiferidos, 'total'));
+$totalSelos          = $totalSelosAVista + $totalSelosDiferidos;
 
 $totalRecebidoEmEspecie = $totalPorForma['Espécie'] ?? 0;
 
@@ -220,6 +262,7 @@ $cards = [
     'Depósito do Caixa' => $totalDepositos,
     'Saldo Transportado' => $totalSaldoTransportado,
     'Total em Selos' => $totalSelos,
+    'Selos Diferidos' => $totalSelosDiferidos,
     'Repasse a Credores' => $totalRepasseCredor,
     'Total em Caixa' => $totalEmCaixa
 ];
@@ -236,6 +279,7 @@ $cardColors = [
     'Depósito do Caixa' => '#17a2b8',
     'Saldo Transportado' => '#34495e',
     'Total em Selos' => '#0b5394',
+    'Selos Diferidos' => '#7c3aed',
     'Repasse a Credores' => '#64748b',
     'Total em Caixa' => '#343a40'
 ];
@@ -431,6 +475,25 @@ renderTable($pdf, 'Selos',
         number_format($s['ferrfis'], 2, ',', '.'),
         number_format($s['total'], 2, ',', '.')
     ], $selos),
+    ['FUNCIONÁRIO'=>'13%', 'Nº SELO'=>'10%', 'ATO'=>'16%', 'TIPO'=>'8%', 'SELAGEM'=>'8%', 'EMOLUMENTOS'=>'8%', 'FERJ'=>'6%', 'FADEP'=>'6%', 'FERC'=>'6%', 'FEMP'=>'6%', 'FERRFIS'=>'6%', 'TOTAL (R$)'=>'7%']
+);
+
+renderTable($pdf, 'Selos Diferidos',
+    ['FUNCIONÁRIO', 'Nº SELO', 'ATO', 'TIPO', 'SELAGEM', 'EMOLUMENTOS', 'FERJ', 'FADEP', 'FERC', 'FEMP', 'FERRFIS', 'TOTAL (R$)'],
+    array_map(fn($s) => [
+        $s['funcionario'],
+        $s['numero_selo'],
+        mb_strimwidth($s['ato'], 0, 34, '...', 'UTF-8'),
+        $s['tipo'],
+        $s['selagem'] ? date('d/m/Y', strtotime($s['selagem'])) : '',
+        number_format($s['emolumentos'], 2, ',', '.'),
+        number_format($s['ferj'], 2, ',', '.'),
+        number_format($s['fadep'], 2, ',', '.'),
+        number_format($s['ferc'], 2, ',', '.'),
+        number_format($s['femp'], 2, ',', '.'),
+        number_format($s['ferrfis'], 2, ',', '.'),
+        number_format($s['total'], 2, ',', '.')
+    ], $selosDiferidos),
     ['FUNCIONÁRIO'=>'13%', 'Nº SELO'=>'10%', 'ATO'=>'16%', 'TIPO'=>'8%', 'SELAGEM'=>'8%', 'EMOLUMENTOS'=>'8%', 'FERJ'=>'6%', 'FADEP'=>'6%', 'FERC'=>'6%', 'FEMP'=>'6%', 'FERRFIS'=>'6%', 'TOTAL (R$)'=>'7%']
 );
 
