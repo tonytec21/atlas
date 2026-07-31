@@ -1,9 +1,10 @@
 <?php
-if (isset($_POST['category'])) {
-    $category = $_POST['category'];
-    $categoriesFile = 'categorias/categorias.json';
-    $categories = file_exists($categoriesFile) ? json_decode(file_get_contents($categoriesFile), true) : [];
-    $categories[] = $category; // Add the new category
-    file_put_contents($categoriesFile, json_encode($categories, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-}
-?>
+require_once __DIR__ . '/_compat.php';
+arq_exige_login();
+arq_compat_exige_post();
+arq_compat_avisar('save_category.php');
+$_POST['acao'] = 'criar';
+$_POST['nome'] = isset($_POST['category']) ? $_POST['category'] : (isset($_POST['nome']) ? $_POST['nome'] : '');
+$_POST['_csrf'] = arq_csrf_token();
+$_REQUEST['acao'] = 'criar';
+require __DIR__ . '/api/categorias.php';

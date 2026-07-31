@@ -1,211 +1,379 @@
 <?php
-include(__DIR__ . '/session_check.php');
-checkSession();
-require_once('../oficios/tcpdf/tcpdf.php');
+/**
+ * Atlas · Arquivamento Digital
+ * Capa de arquivamento.
+ *
+ * Reescrito para desenhar a página diretamente com Cell/MultiCell/Rect, sem
+ * usar Header() nem o parser de HTML do TCPDF. Motivo: o writeHTML depende do
+ * estado de margens, quebra de página e tags aninhadas, e quando algo ali
+ * falha o resultado é uma página em branco sem mensagem de erro. Desenhando
+ * na mão, cada elemento tem posição e tamanho explícitos.
+ *
+ * Layout mantido igual ao original:
+ *   ARQUIVAMENTO
+ *   ATRIBUIÇÃO: ...
+ *   tabela rótulo/valor com borda
+ *   SELOS DE ARQUIVAMENTO:
+ *     - uma moldura de 100 mm por selo (QR + texto + funcionário)
+ *     - ou uma moldura vazia de 100 x 50 mm quando não há selo
+ */
 
-// Configurar a classe PDF
-class PDF extends TCPDF
+require_once __DIR__ . '/bootstrap.php';
+arq_exige_login();
+
+/* ------------------------------------------------------------------ *
+ * Entrada
+ * ------------------------------------------------------------------ */
+$id = isset($_GET['id']) ? preg_replace('/\D/', '', (string) $_GET['id']) : '';
+if ($id === '') {
+    http_response_code(400);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Identificador não informado.');
+}
+
+$json = __DIR__ . '/meta-dados/' . $id . '.json';
+if (!is_file($json)) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Arquivamento não encontrado.');
+}
+
+$ato = json_decode((string) file_get_contents($json), true);
+if (!is_array($ato)) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Arquivo de metadados ilegível.');
+}
+
+/* ------------------------------------------------------------------ *
+ * Dados
+ * ------------------------------------------------------------------ */
+function capa_txt($arr, $chave)
 {
-    // Cabeçalho do PDF
-    public function Header()
-    {
-        $image_file = '../style/img/timbrado.png'; // Verifique se o caminho está correto
-        
-        // Definir largura e altura que você deseja forçar
-        $imageWidth = 210;  // Largura total da página A4 (em mm)
-        $imageHeight = 297; // Altura total da página A4 (em mm)
-
-        // Desativar as margens e o AutoPageBreak temporariamente
-        $this->SetAutoPageBreak(false, 0); // Desativar temporariamente a quebra automática de página
-        $this->SetMargins(0, 0, 0); // Remover margens para a imagem
-        
-        // Redimensionar a imagem para ocupar toda a página, ignorando proporções
-        $this->Image($image_file, 0, 0, $imageWidth, $imageHeight, 'PNG', '', '', false, 300, '', false, false, 0, false, false, false);
-
-        // Restaurar as margens e o AutoPageBreak para o conteúdo subsequente
-        $this->SetAutoPageBreak(true, 25); // Restaurar o AutoPageBreak com a margem inferior de 2.5cm
-        $this->SetMargins(25, 45, 25);  // Restaurar as margens para o conteúdo
-        $this->SetY(35); // Ajuste para garantir que o conteúdo não sobreponha a imagem
-    }
-
-    // Rodapé do PDF
-    public function Footer()
-    {
-        $this->SetY(-15);
-        $this->SetFont('helvetica', 'I', 8);
-    }
-
-    // Adicionar parágrafo com recuo na primeira linha
-    public function AddParagraph($text, $lineHeight)
-    {
-        $this->SetX(25); // Recuo da margem esquerda
-        $paragraphs = explode("\n", $text);
-        foreach ($paragraphs as $paragraph) {
-            $this->SetX(25);
-            $paragraph = ltrim($paragraph, "\t"); // Remove o tab no início do parágrafo
-            $this->WriteHTML('<p style="text-align:justify; text-indent:2cm;">' . htmlspecialchars_decode($paragraph) . '</p>');
-        }
-    }
+    return isset($arr[$chave]) ? trim((string) $arr[$chave]) : '';
 }
 
 /**
- * Retorna TODOS os selos vinculados ao arquivo (arquivamento)
+ * Cor da atribuição — exatamente as mesmas da lombada colorida dos cards no
+ * acervo (assets/css/arquivamento.css). Devolve [R, G, B].
  */
-function getSelos($arquivo_id) {
-    include 'db_connection.php';
-    $stmt = $conn->prepare("SELECT selos.* 
-                              FROM selos_arquivamentos 
-                              INNER JOIN selos ON selos_arquivamentos.selo_id = selos.id 
-                             WHERE selos_arquivamentos.arquivo_id = ?
-                          ORDER BY selos.id ASC");
-    $stmt->bind_param("i", $arquivo_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $selos = [];
-    while ($row = $result->fetch_assoc()) {
-        $selos[] = $row;
+function capa_cor_atribuicao($atribuicao)
+{
+    $cores = [
+        'Registro Civil'                        => [0xB0, 0x32, 0x2F],
+        'Registro de Imóveis'                   => [0x0E, 0x7C, 0x86],
+        'Registro de Títulos e Documentos'      => [0x4C, 0x5F, 0xBF],
+        'Registro Civil das Pessoas Jurídicas'  => [0x16, 0x7D, 0x53],
+        'Notas'                                 => [0xB4, 0x66, 0x1A],
+        'Protesto'                              => [0x7A, 0x4B, 0xA8],
+        'Contratos Marítimos'                   => [0x1F, 0x6F, 0xB2],
+    ];
+    return isset($cores[$atribuicao]) ? $cores[$atribuicao] : [0x5F, 0x71, 0x78];
+}
+
+$partes = [];
+if (isset($ato['partes_envolvidas']) && is_array($ato['partes_envolvidas'])) {
+    foreach ($ato['partes_envolvidas'] as $p) {
+        if (is_array($p) && !empty($p['nome'])) { $partes[] = trim((string) $p['nome']); }
     }
-    $stmt->close();
-    return $selos;
 }
 
-/** Helpers seguros */
-function val(array $arr, string $key): string {
-    return isset($arr[$key]) ? trim((string)$arr[$key]) : '';
-}
-function has($v): bool {
-    return isset($v) && trim((string)$v) !== '';
-}
-function esc($v): string {
-    return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+$dataFmt = '';
+$dataRaw = capa_txt($ato, 'data_ato');
+if ($dataRaw !== '' && $dataRaw !== '0000-00-00') {
+    $dt = DateTime::createFromFormat('Y-m-d', $dataRaw);
+    if ($dt instanceof DateTime) { $dataFmt = $dt->format('d/m/Y'); }
 }
 
-if (isset($_GET['id'])) {
-    $id = $_GET['id'];
-    $filePath = "meta-dados/$id.json";
+// Só entram na tabela as linhas que têm valor — igual ao original.
+$linhas = [];
+foreach ([
+    ['ATO / TERMO Nº:',       capa_txt($ato, 'termo')],
+    ['PROTOCOLO Nº:',         capa_txt($ato, 'protocolo')],
+    ['MATRICULA Nº:',         capa_txt($ato, 'matricula')],
+    ['NATUREZA DO ATO:',      capa_txt($ato, 'categoria')],
+    ['DATA DO ATO:',          $dataFmt],
+    ['LIVRO Nº:',             capa_txt($ato, 'livro')],
+    ['FOLHA Nº:',             capa_txt($ato, 'folha')],
+    ['PARTES ENVOLVIDAS:',    implode('; ', $partes)],
+    ['DESCRIÇÃO E DETALHES:', capa_txt($ato, 'descricao')],
+] as $l) {
+    if ($l[1] !== '') { $linhas[] = $l; }
+}
 
-    if (file_exists($filePath)) {
-        $ato = json_decode(file_get_contents($filePath), true);
+/* Selos — via PDO, que já degrada sozinho se o banco estiver fora. */
+$selos = [];
+$pdo = arq_db();
+if ($pdo) {
+    try {
+        $st = $pdo->prepare(
+            'SELECT s.numero_selo, s.texto_selo, s.qr_code, s.escrevente, s.quantidade
+               FROM selos_arquivamentos sa
+         INNER JOIN selos s ON s.id = sa.selo_id
+              WHERE sa.arquivo_id = :id
+           ORDER BY s.id ASC'
+        );
+        $st->execute([':id' => $id]);
+        $selos = $st->fetchAll();
+    } catch (PDOException $e) {
+        error_log('[arquivamento] capa: falha ao ler selos — ' . $e->getMessage());
+    }
+}
 
-        // Busca TODOS os selos
-        $selos = getSelos($id);
+$quantidadeTotal = 0;
+foreach ($selos as $s) { $quantidadeTotal += (int) (isset($s['quantidade']) ? $s['quantidade'] : 0); }
 
-        // Soma das quantidades
-        $quantidade_total = 0;
-        foreach ($selos as $s) {
-            $quantidade_total += (int)($s['quantidade'] ?? 0);
-        }
+/* ------------------------------------------------------------------ *
+ * TCPDF
+ * ------------------------------------------------------------------ */
+$tcpdf = __DIR__ . '/../oficios/tcpdf/tcpdf.php';
+if (!is_file($tcpdf)) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Biblioteca TCPDF não encontrada em ' . $tcpdf);
+}
+require_once $tcpdf;
 
-        // Monta string de partes
-        $partesNomes = [];
-        if (isset($ato['partes_envolvidas']) && is_array($ato['partes_envolvidas'])) {
-            foreach ($ato['partes_envolvidas'] as $parte) {
-                if (!empty($parte['nome'])) {
-                    $partesNomes[] = $parte['nome'];
-                }
-            }
-        }
-        $partesStr = implode('; ', $partesNomes);
+$timbradoLigado = false;
+$cfg = @file_get_contents(__DIR__ . '/../style/configuracao.json');
+if ($cfg !== false) {
+    $cfg = json_decode($cfg, true);
+    $timbradoLigado = is_array($cfg) && isset($cfg['timbrado']) && $cfg['timbrado'] === 'S';
+}
+$timbrado = __DIR__ . '/../style/img/timbrado.png';
+$usarTimbrado = $timbradoLigado && is_file($timbrado);
 
-        // Campos do ato (já saneados)
-        $atribuicao = val($ato, 'atribuicao');
-        $termo      = val($ato, 'termo');
-        $protocolo  = val($ato, 'protocolo');
-        $matricula  = val($ato, 'matricula');
-        $categoria  = val($ato, 'categoria');
-        $dataAtoRaw = val($ato, 'data_ato');
-        $livro      = val($ato, 'livro');
-        $folha      = val($ato, 'folha');
-        $descricao  = val($ato, 'descricao');
+$ESQ    = 25;   // margem esquerda
+$DIR    = 25;   // margem direita
+$LARG   = 210 - $ESQ - $DIR;         // largura útil: 160 mm
+$TOPO   = $usarTimbrado ? 40 : 22;   // onde o conteúdo começa
+$RODAPE = $usarTimbrado ? 30 : 18;   // espaço reservado no pé
 
-        // Formata data se válida (Y-m-d)
-        $dataAtoFmt = '';
-        if ($dataAtoRaw !== '' && $dataAtoRaw !== '0000-00-00') {
-            $dt = DateTime::createFromFormat('Y-m-d', $dataAtoRaw);
-            if ($dt instanceof DateTime) {
-                $dataAtoFmt = $dt->format('d/m/Y');
-            }
-        }
+$pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+$pdf->SetCreator('Atlas');
+$pdf->SetAuthor(arq_usuario_nome());
+$pdf->SetTitle('Capa de arquivamento ' . $id);
 
-        // Monta as linhas da tabela condicionalmente
-        $rows = '';
-        if (has($termo))     { $rows .= '  <tr><td>ATO / TERMO Nº:</td><td>' . esc($termo) . '</td></tr>'; }
-        if (has($protocolo)) { $rows .= '  <tr><td>PROTOCOLO Nº:</td><td>' . esc($protocolo) . '</td></tr>'; }
-        if (has($matricula)) { $rows .= '  <tr><td>MATRICULA Nº:</td><td>' . esc($matricula) . '</td></tr>'; }
-        if (has($categoria)) { $rows .= '  <tr><td>NATUREZA DO ATO:</td><td>' . esc($categoria) . '</td></tr>'; }
-        if (has($dataAtoFmt)){ $rows .= '  <tr><td>DATA DO ATO:</td><td>' . esc($dataAtoFmt) . '</td></tr>'; }
-        if (has($livro))     { $rows .= '  <tr><td>LIVRO Nº:</td><td>' . esc($livro) . '</td></tr>'; }
-        if (has($folha))     { $rows .= '  <tr><td>FOLHA Nº:</td><td>' . esc($folha) . '</td></tr>'; }
-        if (has($partesStr)) { $rows .= '  <tr><td>PARTES ENVOLVIDAS:</td><td>' . esc($partesStr) . '</td></tr>'; }
-        if (has($descricao)) { $rows .= '  <tr><td>DESCRIÇÃO E DETALHES:</td><td>' . esc($descricao) . '</td></tr>'; }
+// Sem cabeçalho e rodapé automáticos: o timbrado é desenhado à mão em cada
+// página, o que evita depender do ciclo de vida do Header().
+$pdf->setPrintHeader(false);
+$pdf->setPrintFooter(false);
+$pdf->SetMargins($ESQ, $TOPO, $DIR);
+$pdf->SetAutoPageBreak(true, $RODAPE);
 
-        $pdf = new PDF();
-        $pdf->SetMargins(25, 50, 25); // Definir as margens: esquerda, superior (ajustada), direita
-        $pdf->AddPage();
+/** Abre uma página nova já com o timbrado desenhado por baixo. */
+function capa_nova_pagina($pdf, $usarTimbrado, $timbrado, $ESQ, $TOPO, $RODAPE)
+{
+    $pdf->AddPage();
+
+    if ($usarTimbrado) {
+        // A quebra automática precisa estar DESLIGADA aqui. Com ela ligada, o
+        // TCPDF vê uma imagem de 297 mm começando em y=0, conclui que não cabe
+        // na área útil e reduz/reposiciona a imagem — era por isso que o
+        // timbrado não cobria a folha inteira.
+        $pdf->SetAutoPageBreak(false, 0);
+        $pdf->Image(
+            $timbrado, 0, 0, 210, 297, 'PNG', '', '', false, 300, '',
+            false, false, 0, false, false, false
+        );
+        $pdf->SetAutoPageBreak(true, $RODAPE);
+
+        // Marca este ponto como início do conteúdo: tudo que vier depois é
+        // escrito por cima da imagem, nunca por baixo.
+        $pdf->setPageMark();
+    }
+
+    $pdf->SetXY($ESQ, $TOPO);
+}
+
+/** Garante espaço; se não houver, abre página nova com timbrado. */
+function capa_espaco($pdf, $altura, $usarTimbrado, $timbrado, $ESQ, $TOPO, $RODAPE)
+{
+    if ($pdf->GetY() + $altura > 297 - $RODAPE) {
+        capa_nova_pagina($pdf, $usarTimbrado, $timbrado, $ESQ, $TOPO, $RODAPE);
+    }
+}
+
+capa_nova_pagina($pdf, $usarTimbrado, $timbrado, $ESQ, $TOPO, $RODAPE);
+
+$atribuicao = capa_txt($ato, 'atribuicao');
+$cor        = capa_cor_atribuicao($atribuicao);
+
+/* ---- Título ---- */
+$pdf->SetFont('helvetica', 'B', 17);
+$pdf->SetTextColor(0, 0, 0);
+$pdf->Cell($LARG, 8, 'ARQUIVAMENTO', 0, 1, 'C');
+
+// Número do arquivamento, discreto, só para identificação.
+$pdf->SetFont('helvetica', '', 9.5);
+$pdf->SetTextColor(0x5F, 0x71, 0x78);
+$pdf->Cell($LARG, 4.5, 'Nº ' . $id, 0, 1, 'C');
+$pdf->SetTextColor(0, 0, 0);
+
+// Filete na cor da atribuição — o mesmo código de cor da lombada dos cards.
+$yFilete = $pdf->GetY() + 1.5;
+$pdf->SetFillColor($cor[0], $cor[1], $cor[2]);
+$pdf->Rect(($ESQ + $LARG / 2) - 18, $yFilete, 36, 1.1, 'F');
+$pdf->SetXY($ESQ, $yFilete + 1.1);
+$pdf->Ln(7);
+
+/* ---- Atribuição ---- */
+if ($atribuicao !== '') {
+    $y = $pdf->GetY();
+    // Barra vertical à esquerda, como a lombada da ficha no acervo.
+    $pdf->SetFillColor($cor[0], $cor[1], $cor[2]);
+    $pdf->Rect($ESQ, $y, 2.6, 6.5, 'F');
+
+    $pdf->SetFont('helvetica', 'B', 12);
+    $pdf->SetXY($ESQ + 5, $y);
+    $pdf->Cell($LARG - 5, 6.5, 'ATRIBUIÇÃO: ' . mb_strtoupper($atribuicao, 'UTF-8'), 0, 1, 'L');
+    $pdf->SetXY($ESQ, $y + 6.5);
+    $pdf->Ln(4);
+}
+
+/* ---- Tabela do ato ----
+   Desenhada linha a linha: a altura de cada uma vem do número de linhas que
+   o valor ocupa, então nada estoura nem sobrepõe. */
+if ($linhas) {
+    $colRotulo = 55;
+    $colValor  = $LARG - $colRotulo;
+
+    foreach ($linhas as $l) {
         $pdf->SetFont('helvetica', '', 10);
 
-        $html  = '';
-        $html .= '<h1 style="text-align: center;">ARQUIVAMENTO</h1>';
-        $html .= '<br>';
+        $nLinhas = max(
+            $pdf->getNumLines($l[0], $colRotulo),
+            $pdf->getNumLines($l[1], $colValor)
+        );
+        $altura = max(6.8, $nLinhas * 5.0 + 1.8);
 
-        // ATRIBUIÇÃO só aparece se houver valor
-        if (has($atribuicao)) {
-            $html .= '<h3>ATRIBUIÇÃO: ' . esc(mb_strtoupper($atribuicao)) . '</h3>';
-        }
+        capa_espaco($pdf, $altura, $usarTimbrado, $timbrado, $ESQ, $TOPO, $RODAPE);
 
-        // Tabela só aparece se houver ao menos uma linha
-        if ($rows !== '') {
-            $html .= '<table border="1" cellpadding="4">';
-            $html .= $rows;
-            $html .= '</table>';
-        }
+        $y = $pdf->GetY();
 
-        $html .= '<br><br>';
-        $html .= '<h3>SELOS DE ARQUIVAMENTO:</h3>';
+        // As bordas saem de Rect, e não do parâmetro border do MultiCell: o
+        // MultiCell desenha a moldura na posição interna dele, que com
+        // alinhamento vertical e altura fixa não coincide com a da célula.
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetLineWidth(0.2);
+        $pdf->Rect($ESQ, $y, $colRotulo, $altura);
+        $pdf->Rect($ESQ + $colRotulo, $y, $colValor, $altura);
 
-        if (!empty($selos)) {
-            // Exibe a QUANTIDADE TOTAL (soma de todas as quantidades)
-            $html .= '<p><strong>Quantidade total:</strong> ' . $quantidade_total . '</p>';
+        $pdf->MultiCell($colRotulo, $altura, $l[0], 0, 'L', false, 0,
+                        $ESQ + 1.5, $y, true, 0, false, true, $altura, 'M');
+        $pdf->MultiCell($colValor, $altura, $l[1], 0, 'L', false, 0,
+                        $ESQ + $colRotulo + 1.5, $y, true, 0, false, true, $altura, 'M');
 
-            // Renderiza cada selo, um abaixo do outro
-            foreach ($selos as $selo) {
-                $qr   = $selo['qr_code'];
-                $num  = $selo['numero_selo'];
-                $txt  = $selo['texto_selo'];
-                $func = $selo['escrevente'];
+        $pdf->SetXY($ESQ, $y + $altura);
+    }
+}
 
-                $html .= '<div style="border: 1px solid black; width: 100mm; margin-bottom: 6mm;">';
-                $html .= '  <table>';
-                $html .= '    <tr>';
-                $html .= '      <td style="width: 19%; vertical-align: middle;"><p></p><img style="width: 90px;" src="data:image/png;base64,' . $qr . '" alt="QR Code"></td>';
-                $html .= '      <td style="width: 77%; padding-left: 10px;">';
-                $html .= '        <p style="text-align: justify;font-size: 9px;"><strong style="text-align: center!important;font-size: 10px;">Poder Judiciário – TJMA<br>Selo: ' . esc($num) . '</strong><br>' . $txt . '</p>';
-                $html .= '      </td>';
-                $html .= '    </tr>';
-                $html .= '  </table>';
-                $html .= '  <table>';
-                $html .= '    <tr>';
-                $html .= '      <td>';
-                $html .= '        <strong style="font-size: 10px;">Funcionário: ' . utf8_decode($func) . '</strong>';
-                $html .= '      </td>';
-                $html .= '    </tr>';
-                $html .= '  </table>';
-                $html .= '</div>';
+$pdf->Ln(7);
+
+/* ---- Selos ---- */
+capa_espaco($pdf, 20, $usarTimbrado, $timbrado, $ESQ, $TOPO, $RODAPE);
+$pdf->SetFont('helvetica', 'B', 12);
+$pdf->Cell($LARG, 6.5, 'SELOS DE ARQUIVAMENTO:', 0, 1, 'L');
+$pdf->Ln(2.5);
+
+$LARG_SELO = $LARG;   // mesma largura da tabela do ato (160 mm)
+
+if ($selos) {
+    if ($quantidadeTotal > 0) {
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->Cell($LARG, 5.5, 'Quantidade total: ' . $quantidadeTotal, 0, 1, 'L');
+        $pdf->Ln(2.5);
+    }
+
+    foreach ($selos as $selo) {
+        $numero = trim((string) (isset($selo['numero_selo']) ? $selo['numero_selo'] : ''));
+        $texto  = trim((string) (isset($selo['texto_selo']) ? $selo['texto_selo'] : ''));
+        $func   = trim((string) (isset($selo['escrevente']) ? $selo['escrevente'] : ''));
+
+        // O QR só é usado se for base64 de um PNG de verdade. Com a string
+        // vazia ou corrompida, o TCPDF abortava o documento inteiro.
+        $qrBin = '';
+        if (!empty($selo['qr_code'])) {
+            $bin = base64_decode((string) $selo['qr_code'], true);
+            if ($bin !== false && strlen($bin) > 32
+                && (strncmp($bin, "\x89PNG", 4) === 0 || strncmp($bin, "\xFF\xD8\xFF", 3) === 0)) {
+                $qrBin = $bin;
             }
-        } else {
-            // Sem selos: reserva um espaço
-            $html .= '<div style="border: 1px solid black; width: 100mm; height: 50mm;"><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p><p></p></div>';
         }
 
-        $pdf->writeHTML($html, true, false, true, false, '');
+        /* --- Medidas da moldura ---
+           O QR fica encostado à esquerda e o texto começa logo depois dele,
+           sem o vão que sobrava antes. A altura sai do conteúdo real, então
+           não fica espaço morto no meio da caixa. */
+        $PAD      = 4;      // respiro interno da moldura
+        $ladoQr   = $qrBin !== '' ? 28 : 0;
+        $recuoTxt = $qrBin !== '' ? $PAD + $ladoQr + 4 : $PAD;
+        $largTxt  = $LARG_SELO - $recuoTxt - $PAD;
 
-        ob_start();
-        $pdf->Output('capa_de_arquivamento.pdf', 'I');
-        ob_end_flush();
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Ato não encontrado']);
+        $ALT_CAB  = 4.4;    // altura de linha do cabeçalho do selo
+        $ALT_TXT  = 4.0;    // altura de linha do corpo
+
+        $pdf->SetFont('helvetica', 'B', 9);
+        $alturaCabecalho = $pdf->getNumLines("Poder Judiciário – TJMA\nSelo: " . $numero, $largTxt) * $ALT_CAB;
+
+        $pdf->SetFont('helvetica', '', 8.5);
+        $alturaTexto = $pdf->getNumLines($texto, $largTxt) * $ALT_TXT;
+
+        $alturaCorpo = max($ladoQr, $alturaCabecalho + $alturaTexto + 1);
+        $alturaFunc  = $func !== '' ? 6 : 0;
+        $alturaTotal = $PAD + $alturaCorpo + $alturaFunc + $PAD;
+
+        capa_espaco($pdf, $alturaTotal + 4, $usarTimbrado, $timbrado, $ESQ, $TOPO, $RODAPE);
+
+        $x = $ESQ;
+        $y = $pdf->GetY();
+
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetLineWidth(0.2);
+        $pdf->Rect($x, $y, $LARG_SELO, $alturaTotal);
+
+        if ($qrBin !== '') {
+            // Centralizado na altura do corpo, para não ficar preso ao topo.
+            $yQr = $y + $PAD + max(0, ($alturaCorpo - $ladoQr) / 2);
+            try {
+                $pdf->Image('@' . $qrBin, $x + $PAD, $yQr, $ladoQr, $ladoQr, '', '', '', false, 300);
+            } catch (Exception $e) {
+                error_log('[arquivamento] capa: QR do selo ' . $numero . ' não pôde ser desenhado.');
+            }
+        }
+
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->SetXY($x + $recuoTxt, $y + $PAD);
+        $pdf->MultiCell($largTxt, $ALT_CAB, "Poder Judiciário – TJMA\nSelo: " . $numero, 0, 'C', false, 1);
+
+        // Alinhado à esquerda, e não justificado: a justificação espalhava a
+        // última linha de ponta a ponta, deixando vãos enormes entre palavras.
+        $pdf->SetFont('helvetica', '', 8.5);
+        $pdf->SetX($x + $recuoTxt);
+        $pdf->MultiCell($largTxt, $ALT_TXT, $texto, 0, 'L', false, 1);
+
+        if ($func !== '') {
+            $pdf->SetFont('helvetica', 'B', 8.5);
+            $pdf->SetXY($x + $PAD, $y + $alturaTotal - $PAD - 4.5);
+            $pdf->Cell($LARG_SELO - 2 * $PAD, 4.5, 'Funcionário: ' . $func, 0, 0, 'L');
+        }
+
+        $pdf->SetXY($ESQ, $y + $alturaTotal + 4.5);
     }
 } else {
-    echo json_encode(['status' => 'error', 'message' => 'ID não fornecido']);
+    // Sem selo: moldura em branco de 100 x 50 mm, para ser preenchida depois.
+    capa_espaco($pdf, 54, $usarTimbrado, $timbrado, $ESQ, $TOPO, $RODAPE);
+    $y = $pdf->GetY();
+    $pdf->SetDrawColor(0, 0, 0);
+    $pdf->SetLineWidth(0.2);
+    $pdf->Rect($ESQ, $y, $LARG_SELO, 50);
+    $pdf->SetXY($ESQ, $y + 54);
 }
-?>
+
+/* ------------------------------------------------------------------ *
+ * Saída
+ * ------------------------------------------------------------------ */
+arq_auditar('capa', $id);
+
+while (ob_get_level() > 0) { ob_end_clean(); }
+$pdf->Output('capa_de_arquivamento_' . $id . '.pdf', 'I');

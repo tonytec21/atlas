@@ -1,188 +1,92 @@
 <?php
-session_start();
-header('Content-Type: application/json; charset=utf-8');
+/**
+ * Legado: criação de arquivamento a partir de outros módulos (Tarefas).
+ * Mantém o contrato antigo: POST multipart com file-input[] e existing_files[],
+ * resposta {status:'success', redirect:'...'}.
+ */
+require_once __DIR__ . '/_compat.php';
+arq_exige_login();
+arq_compat_exige_post();
+arq_compat_avisar('save_ato.php');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['status' => 'error', 'message' => 'Método inválido.']);
+if (!arq_limite_taxa('save_legado', 60, 60)) {
+    echo json_encode(['status' => 'error', 'message' => 'Muitas gravações em sequência.']);
     exit;
 }
 
-$id = time();
-$filePath = "meta-dados/$id.json";
-$uploadDir = "arquivos/$id/";
+$id = (string) time();
+while (is_file(arq_dir_meta() . '/' . $id . '.json')) { $id = (string) ((int) $id + 1); }
 
-// Garante diretório de upload
-if (!is_dir($uploadDir)) {
-    @mkdir($uploadDir, 0777, true);
+function legado_txt($k, $max = 255) {
+    $v = isset($_POST[$k]) ? (string) $_POST[$k] : '';
+    $v = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', $v);
+    return mb_substr(trim($v), 0, $max);
 }
 
-$username = isset($_SESSION['username']) ? $_SESSION['username'] : 'sistema';
-$creationTime = date('Y-m-d H:i:s');
-
-// Helper simples para sanitização de texto
-function sanitize_text($v){ return is_string($v) ? trim($v) : ''; }
-
-// Partes envolvidas (aceita vazio)
 $partes = [];
-if (isset($_POST['partes_envolvidas'])) {
-    $tmp = json_decode($_POST['partes_envolvidas'], true);
-    if (is_array($tmp)) $partes = $tmp;
+$brutas = json_decode(isset($_POST['partes_envolvidas']) ? $_POST['partes_envolvidas'] : '[]', true);
+if (is_array($brutas)) {
+    foreach ($brutas as $p) {
+        if (!is_array($p)) { continue; }
+        $partes[] = [
+            'cpf'   => preg_replace('/\D/', '', isset($p['cpf']) ? $p['cpf'] : ''),
+            'nome'  => mb_substr(trim(isset($p['nome']) ? $p['nome'] : ''), 0, 150),
+            'papel' => '',
+        ];
+    }
 }
 
-$dados = [
-    'id' => $id,
-    'atribuicao' => sanitize_text($_POST['atribuicao'] ?? ''),
-    'categoria' => sanitize_text($_POST['categoria'] ?? ''),
-    'data_ato' => sanitize_text($_POST['data_ato'] ?? ''),
-    'livro' => sanitize_text($_POST['livro'] ?? ''),
-    'folha' => sanitize_text($_POST['folha'] ?? ''),
-    'termo' => sanitize_text($_POST['termo'] ?? ''),
-    'protocolo' => sanitize_text($_POST['protocolo'] ?? ''),
-    'matricula' => sanitize_text($_POST['matricula'] ?? ''),
-    'descricao' => sanitize_text($_POST['descricao'] ?? ''),
+$anexosTarefa = [];
+if (!empty($_POST['existing_files'])) {
+    $lista = is_array($_POST['existing_files']) ? $_POST['existing_files'] : [$_POST['existing_files']];
+    foreach ($lista as $ref) {
+        $ref = str_replace('\\', '/', (string) $ref);
+        $pos = strpos($ref, 'arquivos/');
+        if ($pos !== false) { $ref = substr($ref, $pos); }
+        if ($ref === '') { continue; }
+        $anexosTarefa[] = $ref;
+        arq_importar_referencia($ref, $id);
+    }
+    $anexosTarefa = array_values(array_unique($anexosTarefa));
+}
+
+$up = arq_processar_uploads('file-input', $id, count($anexosTarefa));
+
+$registro = [
+    'id'                => (int) $id,
+    'atribuicao'        => legado_txt('atribuicao', 80),
+    'categoria'         => legado_txt('categoria', 120),
+    'data_ato'          => legado_txt('data_ato', 10),
+    'livro'             => legado_txt('livro', 30),
+    'folha'             => legado_txt('folha', 30),
+    'termo'             => legado_txt('termo', 40),
+    'protocolo'         => legado_txt('protocolo', 40),
+    'matricula'         => legado_txt('matricula', 40),
+    'descricao'         => mb_substr((string) (isset($_POST['descricao']) ? $_POST['descricao'] : ''), 0, 4000),
     'partes_envolvidas' => $partes,
-    'cadastrado_por' => $username,
-    'data_cadastro' => $creationTime
+    'anexos'            => $up['anexos'],
+    'anexos_tarefa'     => $anexosTarefa,
+    'cadastrado_por'    => arq_usuario(),
+    'data_cadastro'     => date('Y-m-d H:i:s'),
+    'modificacoes'      => [[
+        'usuario'   => arq_usuario(),
+        'data_hora' => date('Y-m-d H:i:s'),
+        'acao'      => 'cadastro',
+        'ip'        => arq_ip(),
+    ]],
 ];
 
-$anexos = [];
-$anexos_tarefa = []; // <-- Somente referências de anexos vindos das tarefas
-
-/* -------- Normalização / Resolução de caminho -------- */
-function normalize_relpath($p) {
-    if (!is_string($p) || $p === '') return '';
-    $p = str_replace('\\','/',$p);
-    $pathOnly = parse_url($p, PHP_URL_PATH);
-    if ($pathOnly === null || $pathOnly === false) $pathOnly = $p;
-    $decoded  = urldecode($pathOnly);
-    $decoded = preg_replace('~/+~','/',$decoded);
-    $rel      = ltrim($decoded, "/\\");
-    return $rel;
+header('Content-Type: application/json; charset=utf-8');
+if (!arq_salvar_ato($id, $registro)) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Falha ao gravar os metadados.']);
+    exit;
 }
 
-// Retorna referência a partir de "arquivos/..." quando possível
-function ref_rel_arquivos($p) {
-    $rel = normalize_relpath($p);
-    $pos = strpos($rel, 'arquivos/');
-    if ($pos !== false) {
-        return substr($rel, $pos); // ex.: "arquivos/0dfb.../6694.pdf"
-    }
-    return $rel;
-}
-
-function resolve_source_path($raw) {
-    if (!is_string($raw) || $raw === '') return false;
-
-    $raw = str_replace('\\','/',$raw);
-    $pathOnly = parse_url($raw, PHP_URL_PATH);
-    if ($pathOnly === null || $pathOnly === false) $pathOnly = $raw;
-    $pathOnly = preg_replace('~/+~','/',$pathOnly);
-
-    // Se já é caminho absoluto de filesystem
-    if (preg_match('~^([a-zA-Z]:/|/)~', $pathOnly) && file_exists($pathOnly)) {
-        $rp = realpath($pathOnly);
-        if ($rp !== false) return $rp;
-    }
-
-    $rel = ltrim($pathOnly, '/');
-    $projectRoot = realpath(__DIR__ . '/..');
-    $docRoot     = !empty($_SERVER['DOCUMENT_ROOT']) ? realpath($_SERVER['DOCUMENT_ROOT']) : false;
-
-    $candidates = [];
-    if ($docRoot)     $candidates[] = $docRoot . '/' . $rel;
-    if ($projectRoot) $candidates[] = $projectRoot . '/' . $rel;
-    if ($projectRoot) $candidates[] = $projectRoot . '/' . ltrim($pathOnly,'/');
-
-    foreach ($candidates as $c) {
-        if (file_exists($c)) {
-            $rp = realpath($c);
-            if ($rp !== false) return $rp;
-        }
-    }
-
-    if (file_exists($rel)) {
-        $rp = realpath($rel);
-        if ($rp !== false) return $rp;
-    }
-
-    return false;
-}
-
-/* -------- 1) Copiar anexos já existentes (existing_files[]) -------- */
-$existingFiles = [];
-if (isset($_POST['existing_files'])) {
-    $existingFiles = $_POST['existing_files'];
-    if (!is_array($existingFiles)) $existingFiles = [$existingFiles];
-}
-
-if (!empty($existingFiles)) {
-    foreach ($existingFiles as $item) {
-        if (!is_string($item) || $item === '') continue;
-
-        // Sempre salva SOMENTE em "anexos_tarefa"
-        $refForJson = ref_rel_arquivos($item);
-        if ($refForJson !== '') {
-            $anexos_tarefa[] = $refForJson;
-        }
-
-        // Mantém o comportamento de copiar o arquivo para a pasta do ato,
-        // mas NÃO adiciona nada em $anexos (evita duplicidade no JSON).
-        $source = resolve_source_path($item);
-        if ($source === false || !is_file($source) || !is_readable($source)) {
-            // Apenas loga; nada é incluído em "anexos"
-            error_log("[arquivamento] Referência de tarefa não copiada (não resolvida): {$item}");
-            continue;
-        }
-
-        $baseName = basename($source);
-        $dest     = $uploadDir . $baseName;
-
-        if (file_exists($dest)) {
-            $pi   = pathinfo($baseName);
-            $name = $pi['filename'];
-            $ext  = isset($pi['extension']) ? '.' . $pi['extension'] : '';
-            $n = 1;
-            do { $dest = $uploadDir . $name . " ($n)" . $ext; $n++; } while (file_exists($dest));
-        }
-
-        if (!is_dir($uploadDir)) @mkdir($uploadDir, 0777, true);
-
-        if (!@copy($source, $dest)) {
-            error_log("[arquivamento] Falha ao copiar de {$source} para {$dest} (anexo de tarefa).");
-        }
-        // IMPORTANTE: não adicionar $dest em $anexos para não duplicar no JSON
-    }
-}
-
-/* -------- 2) Adicionar novos uploads -------- */
-if (!empty($_FILES['file-input']['name'][0])) {
-    $fileCount = count($_FILES['file-input']['name']);
-    for ($i = 0; $i < $fileCount; $i++) {
-        $fileName = basename($_FILES['file-input']['name'][$i]);
-        $targetFilePath = $uploadDir . $fileName;
-
-        if (file_exists($targetFilePath)) {
-            $pi   = pathinfo($fileName);
-            $name = $pi['filename'];
-            $ext  = isset($pi['extension']) ? '.' . $pi['extension'] : '';
-            $n = 1;
-            do { $targetFilePath = $uploadDir . $name . " ($n)" . $ext; $n++; } while (file_exists($targetFilePath));
-        }
-
-        if (move_uploaded_file($_FILES['file-input']['tmp_name'][$i], $targetFilePath)) {
-            $anexos[] = $targetFilePath; // uploads novos continuam em "anexos"
-        } else {
-            error_log("[arquivamento] Falha ao mover upload tmp para {$targetFilePath}");
-        }
-    }
-}
-
-$dados['anexos'] = $anexos;
-$dados['anexos_tarefa'] = $anexos_tarefa; // Somente anexos vindos das tarefas
-
-// Salva metadados
-@mkdir(dirname($filePath), 0777, true);
-file_put_contents($filePath, json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-
-// Resposta
-echo json_encode(['status' => 'success', 'redirect' => "edit_ato.php?id=$id"]);
+arq_auditar('criar', $id, ['origem' => 'legado', 'avisos' => $up['erros']]);
+echo json_encode([
+    'status'   => 'success',
+    'redirect' => 'cadastro.php?id=' . $id,
+    'id'       => $id,
+    'avisos'   => $up['erros'],
+]);

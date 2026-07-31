@@ -1,12 +1,13 @@
 <?php
-if (isset($_POST['id']) && isset($_POST['category'])) {
-    $id = $_POST['id'];
-    $category = $_POST['category'];
-    $categoriesFile = 'categorias/categorias.json';
-    $categories = file_exists($categoriesFile) ? json_decode(file_get_contents($categoriesFile), true) : [];
-    if (isset($categories[$id])) {
-        $categories[$id] = $category;
-        file_put_contents($categoriesFile, json_encode($categories, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    }
-}
-?>
+require_once __DIR__ . '/_compat.php';
+arq_exige_login();
+arq_compat_exige_post();
+arq_compat_avisar('update_category.php');
+$cats = arq_categorias();
+$i = isset($_POST['id']) ? (int) $_POST['id'] : -1;
+$_POST['antigo'] = isset($cats[$i]) ? $cats[$i] : '';
+$_POST['nome']   = isset($_POST['category']) ? $_POST['category'] : '';
+$_POST['acao']   = 'renomear';
+$_POST['_csrf']  = arq_csrf_token();
+$_REQUEST['acao'] = 'renomear';
+require __DIR__ . '/api/categorias.php';

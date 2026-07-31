@@ -1,15 +1,16 @@
 <?php
-if (isset($_GET['id'])) {
-    $id = $_GET['id'];
-    $filePath = "meta-dados/$id.json";
+/** Legado: detalhe de um arquivamento. */
+require_once __DIR__ . '/_compat.php';
+arq_exige_login();
+arq_compat_avisar('get_ato.php');
 
-    if (file_exists($filePath)) {
-        $ato = json_decode(file_get_contents($filePath), true);
-        echo json_encode($ato);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Ato não encontrado']);
-    }
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'ID não fornecido']);
+$id  = arq_id_valido(isset($_GET['id']) ? $_GET['id'] : '');
+$ato = $id !== '' ? arq_obter($id) : null;
+
+header('Content-Type: application/json; charset=utf-8');
+if (!$ato) { echo json_encode(['error' => 'Ato nao encontrado']); exit; }
+
+foreach ($ato['anexos'] as $i => $a) {
+    $ato['anexos'][$i] = 'arquivo.php?id=' . rawurlencode($id) . '&a=' . $i;
 }
-?>
+echo json_encode($ato, JSON_UNESCAPED_UNICODE);

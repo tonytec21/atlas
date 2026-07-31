@@ -125,7 +125,6 @@ try {
                      = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
               AND r.cancelado  = 0
-              AND r.diferido   = 0
               AND (r.isento = 0 OR r.indeferido = 1)
         ";
         $stmt = $conn->prepare($sql);
@@ -133,8 +132,8 @@ try {
         $stmt->execute();
         $selos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // SELOS DIFERIDOS (Unificado): atos selados com emolumentos diferidos.
-        // Entram no Total em Selos, mas em lista e card próprios.
+        // SELOS CANCELADOS (Unificado): lista e card próprios.
+        // O valor é DEDUZIDO do Total em Selos.
         $sql = "
             SELECT 
                 f.usuario        AS funcionario,
@@ -157,14 +156,12 @@ try {
                     ON (CONVERT(TRIM(LOWER(f.nome_completo)) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
                      = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
-              AND r.cancelado  = 0
-              AND r.diferido   = 1
-              AND (r.isento = 0 OR r.indeferido = 1)
+              AND r.cancelado  = 1
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
         $stmt->execute();
-        $selos_diferidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $selos_cancelados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // ATOS ISENTOS (Unificado)
         $sql = "
@@ -306,7 +303,6 @@ try {
             WHERE DATE(r.selagem) = :data
               AND f.usuario = :funcionario
               AND r.cancelado  = 0
-              AND r.diferido   = 0
               AND (r.isento = 0 OR r.indeferido = 1)
         ";
         $stmt = $conn->prepare($sql);
@@ -315,7 +311,7 @@ try {
         $stmt->execute();
         $selos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // SELOS DIFERIDOS (Individual)
+        // SELOS CANCELADOS (Individual)
         $sql = "
             SELECT 
                 f.usuario        AS funcionario,
@@ -339,15 +335,13 @@ try {
                      = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
             WHERE DATE(r.selagem) = :data
               AND f.usuario = :funcionario
-              AND r.cancelado  = 0
-              AND r.diferido   = 1
-              AND (r.isento = 0 OR r.indeferido = 1)
+              AND r.cancelado  = 1
         ";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':data', $data);
         $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->execute();
-        $selos_diferidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $selos_cancelados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // ATOS ISENTOS (Individual)
         $sql = "
@@ -455,18 +449,19 @@ try {
         return $carry + floatval($item['valor_transportado']);
     }, 0.0);
 
-    // Total em Selos à vista
-    $totalSelosAVista = array_reduce(isset($selos) ? $selos : [], function($carry, $item) {
+    // Selos válidos do dia (inclui os diferidos)
+    $totalSelosBrutos = array_reduce(isset($selos) ? $selos : [], function($carry, $item) {
         return $carry + floatval($item['total']);
     }, 0.0);
 
-    // NOVO: Total em Selos Diferidos (lista e card próprios)
-    $totalSelosDiferidos = array_reduce(isset($selos_diferidos) ? $selos_diferidos : [], function($carry, $item) {
-        return $carry + floatval($item['total']);
+    // NOVO: Selos cancelados — sempre em módulo, para deduzir com segurança
+    // independentemente de o Portal informar o valor positivo ou negativo.
+    $totalSelosCancelados = array_reduce(isset($selos_cancelados) ? $selos_cancelados : [], function($carry, $item) {
+        return $carry + abs(floatval($item['total']));
     }, 0.0);
 
-    // Total em Selos = à vista + diferidos
-    $totalSelos = $totalSelosAVista + $totalSelosDiferidos;
+    // Total em Selos = selos válidos - cancelados
+    $totalSelos = $totalSelosBrutos - $totalSelosCancelados;
 
     // NOVO: Total em Atos Isentos (somente amostragem — não entra em total recebido)
     $totalAtosIsentos = array_reduce(isset($atos_isentos) ? $atos_isentos : [], function($carry, $item) {
@@ -495,7 +490,7 @@ try {
     error_log("Total Depósito do Caixa: " . $totalDepositoCaixa);
     error_log("Total Saldo Transportado: " . $totalSaldoTransportado);
     error_log("Total em Selos: " . $totalSelos);
-    error_log("Total em Selos Diferidos: " . $totalSelosDiferidos);
+    error_log("Selos Cancelados (deduzidos): " . $totalSelosCancelados);
     error_log("Total Atos Isentos: " . $totalAtosIsentos);
 
     $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $totalSaidasDespesas - $totalDepositoCaixa - $totalSaldoTransportado;
@@ -510,8 +505,8 @@ try {
         'saldoTransportado' => $saldoTransportado,
         'selos' => isset($selos) ? $selos : [],
 
-        // NOVO: selos com emolumentos diferidos (lista e card próprios)
-        'selosDiferidos' => isset($selos_diferidos) ? $selos_diferidos : [],
+        // NOVO: selos cancelados (lista e card próprios; deduzidos do total)
+        'selosCancelados' => isset($selos_cancelados) ? $selos_cancelados : [],
 
         // NOVO: retornar também a lista dos Atos Isentos (opcional para uso futuro no front)
         'atosIsentos' => isset($atos_isentos) ? $atos_isentos : [],
@@ -527,8 +522,8 @@ try {
         'saldoInicial' => $saldoInicial,
         'totalSaldoTransportado' => $totalSaldoTransportado,
         'totalSelos' => $totalSelos,
-        'totalSelosAVista' => $totalSelosAVista,
-        'totalSelosDiferidos' => $totalSelosDiferidos,
+        'totalSelosBrutos' => $totalSelosBrutos,
+        'totalSelosCancelados' => $totalSelosCancelados,
 
         // NOVO: total dos Atos Isentos (usado no card do front)
         'totalAtosIsentos' => isset($totalAtosIsentos) ? $totalAtosIsentos : 0.0,

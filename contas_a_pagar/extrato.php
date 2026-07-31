@@ -84,6 +84,7 @@ if ($conta === 'banco' && cap_tem_pagamento_os()) {
 }
 usort($mov, function($a,$b){ return strcmp($a['data'],$b['data']); });
 ?>
+<?php include(__DIR__ . '/../os/guia/guia.php'); ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>

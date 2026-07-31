@@ -156,15 +156,14 @@ $selos = fetchData(
      WHERE DATE(r.selagem) = :data
        ' . ($tipo === 'unificado' ? '' : 'AND f.usuario = :funcionario ') . '
        AND r.cancelado  = 0
-       AND r.diferido   = 0
        AND (r.isento = 0 OR r.indeferido = 1)
      ORDER BY r.numero_selo',
     $params
 );
 
-// ================= Selos Diferidos (emolumentos diferidos) =================
-// Lista e card próprios, mas somados ao Total em Selos.
-$selosDiferidos = fetchData(
+// ================= Selos Cancelados =================
+// Lista e card próprios. O valor é DEDUZIDO do Total em Selos.
+$selosCancelados = fetchData(
     'SELECT
         f.usuario        AS funcionario,
         r.numero_selo    AS numero_selo,
@@ -186,16 +185,16 @@ $selosDiferidos = fetchData(
               = (CONVERT(TRIM(LOWER(r.usuario))       USING utf8mb4) COLLATE utf8mb4_unicode_ci)
      WHERE DATE(r.selagem) = :data
        ' . ($tipo === 'unificado' ? '' : 'AND f.usuario = :funcionario ') . '
-       AND r.cancelado  = 0
-       AND r.diferido   = 1
-       AND (r.isento = 0 OR r.indeferido = 1)
+       AND r.cancelado  = 1
      ORDER BY r.numero_selo',
     $params
 );
 
-$totalSelosAVista    = array_sum(array_column($selos, 'total'));
-$totalSelosDiferidos = array_sum(array_column($selosDiferidos, 'total'));
-$totalSelos          = $totalSelosAVista + $totalSelosDiferidos;
+$totalSelosBrutos     = array_sum(array_column($selos, 'total'));
+// Em módulo, para deduzir com segurança tanto se o Portal informar o
+// cancelamento com valor positivo quanto negativo.
+$totalSelosCancelados = array_sum(array_map('abs', array_column($selosCancelados, 'total')));
+$totalSelos           = $totalSelosBrutos - $totalSelosCancelados;
 
 $totalAtos = array_sum(array_column($atos, 'total'));
 $totalAtosManuais = array_sum(array_column($atosManuais, 'total'));
@@ -275,7 +274,7 @@ $cards = [
     'Depósito do Caixa' => $totalDepositos,
     'Saldo Transportado' => $totalSaldoTransportado,
     'Total em Selos' => $totalSelos,
-    'Selos Diferidos' => $totalSelosDiferidos,
+    'Selos Cancelados' => $totalSelosCancelados,
     'Repasse a Credores' => $totalRepasseCredor,
     'Total em Caixa' => $totalEmCaixa
 ];
@@ -292,7 +291,7 @@ $cardColors = [
     'Depósito do Caixa' => '#17a2b8',
     'Saldo Transportado' => '#34495e',
     'Total em Selos' => '#0b5394',
-    'Selos Diferidos' => '#7c3aed',
+    'Selos Cancelados' => '#c0392b',
     'Repasse a Credores' => '#64748b',
     'Total em Caixa' => '#343a40'
 ];
@@ -506,7 +505,7 @@ renderTable($pdf, 'Selos',
     ['Nº SELO'=>'12%', 'ATO'=>'20%', 'TIPO'=>'9%', 'SELAGEM'=>'9%', 'EMOLUMENTOS'=>'9%', 'FERJ'=>'7%', 'FADEP'=>'7%', 'FERC'=>'7%', 'FEMP'=>'7%', 'FERRFIS'=>'7%', 'TOTAL (R$)'=>'6%']
 );
 
-renderTable($pdf, 'Selos Diferidos',
+renderTable($pdf, 'Selos Cancelados',
     ['Nº SELO', 'ATO', 'TIPO', 'SELAGEM', 'EMOLUMENTOS', 'FERJ', 'FADEP', 'FERC', 'FEMP', 'FERRFIS', 'TOTAL (R$)'],
     array_map(fn($s) => [
         $s['numero_selo'],
@@ -520,7 +519,7 @@ renderTable($pdf, 'Selos Diferidos',
         number_format($s['femp'], 2, ',', '.'),
         number_format($s['ferrfis'], 2, ',', '.'),
         number_format($s['total'], 2, ',', '.')
-    ], $selosDiferidos),
+    ], $selosCancelados),
     ['Nº SELO'=>'12%', 'ATO'=>'20%', 'TIPO'=>'9%', 'SELAGEM'=>'9%', 'EMOLUMENTOS'=>'9%', 'FERJ'=>'7%', 'FADEP'=>'7%', 'FERC'=>'7%', 'FEMP'=>'7%', 'FERRFIS'=>'7%', 'TOTAL (R$)'=>'6%']
 );
 

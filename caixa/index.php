@@ -4,7 +4,6 @@ checkSession();
 include(__DIR__ . '/db_connection.php');
 date_default_timezone_set('America/Sao_Paulo');
 ?>
-<?php include(__DIR__ . '/../os/guia/guia.php'); ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 
@@ -649,11 +648,11 @@ date_default_timezone_set('America/Sao_Paulo');
                             </div>
                         </div>
 
-                        <!-- NOVO: Selos Diferidos (já somados no Total em Selos) -->
+                        <!-- NOVO: Selos Cancelados (deduzidos do Total em Selos) -->
                         <div class="col-6 col-sm-6 col-md-3 col-lg-3">
-                            <div class="card text-white mb-3" style="background-color:#7c3aed;">
-                                <div class="card-header">Selos Diferidos</div>
-                                <div class="card-body"><h5 class="card-title" id="cardSelosDiferidos">R$ 0,00</h5></div>
+                            <div class="card text-white mb-3" style="background-color:#c0392b;">
+                                <div class="card-header">Selos Cancelados</div>
+                                <div class="card-body"><h5 class="card-title" id="cardSelosCancelados">R$ 0,00</h5></div>
                             </div>
                         </div>
 
@@ -788,16 +787,16 @@ date_default_timezone_set('America/Sao_Paulo');
                                     <tbody id="detalhesSelos"></tbody>
                                 </table>
                             </div>
-                            <h6 class="total-label">Total em Selos (à vista): <span id="totalSelos">R$ 0,00</span></h6>
+                            <h6 class="total-label">Subtotal dos Selos: <span id="totalSelos">R$ 0,00</span></h6>
                         </div>
                     </div>
 
-                    <!-- NOVO: SELOS DIFERIDOS — só aparece quando houver -->
-                    <div class="card mb-3" id="listaSelosDiferidosWrap" style="display:none;">
-                        <div class="card-header table-title text-center"><b>SELOS DIFERIDOS</b></div>
+                    <!-- NOVO: SELOS CANCELADOS — só aparece quando houver -->
+                    <div class="card mb-3" id="listaSelosCanceladosWrap" style="display:none;">
+                        <div class="card-header table-title text-center"><b>SELOS CANCELADOS</b></div>
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table id="tabelaSelosDiferidos" class="table table-striped table-bordered">
+                                <table id="tabelaSelosCancelados" class="table table-striped table-bordered">
                                     <thead>
                                         <tr>
                                             <th>Funcionário</th>
@@ -814,10 +813,10 @@ date_default_timezone_set('America/Sao_Paulo');
                                             <th>TOTAL</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="detalhesSelosDiferidos"></tbody>
+                                    <tbody id="detalhesSelosCancelados"></tbody>
                                 </table>
                             </div>
-                            <h6 class="total-label">Total em Selos Diferidos: <span id="totalSelosDiferidos">R$ 0,00</span></h6>
+                            <h6 class="total-label">Total em Selos Cancelados: <span id="totalSelosCancelados">R$ 0,00</span></h6>
                         </div>
                     </div>
 
@@ -1591,8 +1590,8 @@ date_default_timezone_set('America/Sao_Paulo');
                     // NOVO: Card Total em Selos (à vista + diferidos)
                     toggleCard('#cardTotalSelos', detalhes.totalSelos);
 
-                    // NOVO: Card Selos Diferidos (só aparece quando houver)
-                    toggleCard('#cardSelosDiferidos', detalhes.totalSelosDiferidos);
+                    // NOVO: Card Selos Cancelados (só aparece quando houver)
+                    toggleCard('#cardSelosCancelados', detalhes.totalSelosCancelados);
 
                     // NOVO: Card Repasse a Credores (só aparece quando houver)
                     toggleCard('#cardRepasseCredor', detalhes.totalRepasseCredor);
@@ -1806,13 +1805,13 @@ date_default_timezone_set('America/Sao_Paulo');
                     });
                     $('#totalSelos').text(formatCurrency(totalSelos));
 
-                    /* NOVO: SELOS DIFERIDOS — lista própria, mas somada ao Total em Selos */
-                    var totalSelosDiferidos = 0;
-                    $('#detalhesSelosDiferidos').empty();
-                    var selosDiferidos = detalhes.selosDiferidos || [];
-                    selosDiferidos.forEach(function(s) {
-                        totalSelosDiferidos += parseFloat(s.total || 0);
-                        $('#detalhesSelosDiferidos').append(`
+                    /* NOVO: SELOS CANCELADOS — lista própria; o valor é DEDUZIDO do Total em Selos */
+                    var totalSelosCancelados = 0;
+                    $('#detalhesSelosCancelados').empty();
+                    var selosCancelados = detalhes.selosCancelados || [];
+                    selosCancelados.forEach(function(s) {
+                        totalSelosCancelados += Math.abs(parseFloat(s.total || 0));
+                        $('#detalhesSelosCancelados').append(`
                             <tr>
                                 <td>${s.funcionario}</td>
                                 <td>${s.numero_selo}</td>
@@ -1829,12 +1828,12 @@ date_default_timezone_set('America/Sao_Paulo');
                             </tr>
                         `);
                     });
-                    $('#totalSelosDiferidos').text(formatCurrency(totalSelosDiferidos));
-                    $('#listaSelosDiferidosWrap').toggle(selosDiferidos.length > 0);
+                    $('#totalSelosCancelados').text(formatCurrency(totalSelosCancelados));
+                    $('#listaSelosCanceladosWrap').toggle(selosCancelados.length > 0);
 
                     // mantém os cards em sincronia (caso a tabela seja paginada/filtrada no futuro)
-                    $('#cardTotalSelos').text(formatCurrency(totalSelos + totalSelosDiferidos));
-                    $('#cardSelosDiferidos').text(formatCurrency(totalSelosDiferidos));
+                    $('#cardTotalSelos').text(formatCurrency(totalSelos - totalSelosCancelados));
+                    $('#cardSelosCancelados').text(formatCurrency(totalSelosCancelados));
 
                     // NOVO: Repasse a Credores (Protesto) — lista só aparece quando houver
                     var totalRepasseCredor = 0;
@@ -1922,8 +1921,8 @@ date_default_timezone_set('America/Sao_Paulo');
                     // NOVO: tabela de Selos
                     $('#tabelaSelos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
 
-                    // NOVO: tabela de Selos Diferidos
-                    $('#tabelaSelosDiferidos').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
+                    // NOVO: tabela de Selos Cancelados
+                    $('#tabelaSelosCancelados').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });
 
                     // NOVO: tabela de Repasse a Credores
                     $('#tabelaRepasseCredor').DataTable({ "language": { "url": "../style/Portuguese-Brasil.json" }, "destroy": true, "pageLength": 10, "order": [] });

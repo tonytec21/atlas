@@ -1,0 +1,716 @@
+/* =====================================================================
+   Atlas · Arquivamento Digital
+   Sistema visual do módulo.
+
+   Direção: o acervo de um cartório é uma estante. Cada arquivamento é uma
+   lombada de livro — daí a faixa vertical colorida por atribuição com o
+   número do registro. A família é a Inter, a mesma que o Atlas carrega no
+   menu; o que separa título de texto é o peso, não a fonte. A monoespaçada
+   fica só nos códigos (livro, folha, termo, protocolo, matrícula), porque
+   identificador é código e deve alinhar em coluna.
+   ===================================================================== */
+
+/* Os tokens valem para o container do módulo e também para os elementos que
+   ficam fora dele no DOM — a barra de seleção é fixa e mora fora do
+   .container, e sem isso as variáveis não resolveriam (fundo transparente,
+   texto branco sobre página branca). */
+.arq,
+.arq-selecao {
+  /* Paleta ------------------------------------------------------------ */
+  --arq-tinta:      #0B1F26;
+  --arq-papel:      #F1F4F4;
+  --arq-superficie: #FFFFFF;
+  --arq-elevado:    #FAFBFB;
+  --arq-borda:      #D9E1E2;
+  --arq-suave:      #5F7178;
+
+  --arq-acento:     #0E7C86;
+  --arq-acento-esc: #0B5A62;
+  --arq-acento-luz: #E4F1F2;
+
+  --arq-selo:       #B4661A;
+  --arq-selo-luz:   #FBF0E3;
+  --arq-barra:      #0B1F26;   /* fundo da barra de seleção: sempre escuro */
+  --arq-barra-bd:   transparent;
+  --arq-ok:         #167D53;
+  --arq-alerta:     #B4661A;
+  --arq-perigo:     #B0322F;
+
+  /* Cores das atribuições (lombadas) --------------------------------- */
+  --arq-rc:    #B0322F;
+  --arq-ri:    #0E7C86;
+  --arq-rtd:   #4C5FBF;
+  --arq-rcpj:  #167D53;
+  --arq-not:   #B4661A;
+  --arq-prot:  #7A4BA8;
+  --arq-cmar:  #1F6FB2;
+  --arq-adm:   #5F7178;
+
+  /* Tipografia -------------------------------------------------------- */
+  /* O Atlas carrega a Inter no menu.php. O modulo usa a mesma familia em
+     toda a interface — o que diferencia titulo de texto e o peso, nao a
+     familia. A monoespacada fica so nos codigos (livro, folha, termo,
+     protocolo, matricula), porque identificador precisa alinhar em coluna. */
+  --arq-titulo: 'Inter', "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --arq-sans:   'Inter', "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --arq-mono:   "Cascadia Mono", Consolas, "Roboto Mono", "Courier New", monospace;
+
+  /* Métrica ----------------------------------------------------------- */
+  --arq-r:   10px;
+  --arq-r-g: 16px;
+  --arq-sombra:  0 1px 2px rgba(11,31,38,.06), 0 8px 24px rgba(11,31,38,.06);
+  --arq-sombra-f: 0 12px 40px rgba(11,31,38,.16);
+
+  color: var(--arq-tinta);
+  font-family: var(--arq-sans);
+}
+
+body.dark-mode .arq,
+body.dark-mode .arq-selecao,
+.arq.arq-escuro {
+  --arq-tinta:      #DDE7E9;
+  --arq-papel:      #0B1417;
+  --arq-superficie: #111E22;
+  --arq-elevado:    #16262B;
+  --arq-borda:      #23383E;
+  --arq-suave:      #8DA3AA;
+  --arq-acento:     #2AA0AA;
+  --arq-acento-esc: #1B7E88;
+  --arq-acento-luz: #10333A;
+  --arq-selo:       #D98A3C;
+  --arq-selo-luz:   #2C2015;
+  --arq-barra:      #16262B;
+  --arq-barra-bd:   #2C4249;
+  --arq-sombra:  0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  --arq-sombra-f: 0 12px 40px rgba(0,0,0,.55);
+}
+
+.arq *, .arq *::before, .arq *::after { box-sizing: border-box; }
+
+/* =====================================================================
+   Cabeçalho
+   ===================================================================== */
+.arq-topo {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
+  padding: 18px 0 16px;
+  margin-bottom: 16px;
+}
+.arq-topo h1 {
+  font-family: var(--arq-titulo);
+  font-size: 1.5rem;
+  font-weight: 800; letter-spacing: -.01em;
+  margin: 0; line-height: 1.2; color: var(--arq-tinta);
+}
+.arq-titulo-linha { display: flex; align-items: center; gap: 12px; }
+.arq-icone-titulo {
+  width: 44px; height: 44px; flex: none; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+  background: var(--arq-acento-luz); color: var(--arq-acento-esc);
+}
+.arq-sobretitulo {
+  font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--arq-acento); margin-bottom: 3px; font-weight: 700;
+}
+.arq-topo p { margin: 5px 0 0; color: var(--arq-suave); font-size: .88rem; max-width: 56ch; }
+
+/* Indicadores ---------------------------------------------------------- */
+.arq-kpis { display: flex; gap: 26px; flex-wrap: wrap; }
+.arq-kpi { min-width: 74px; }
+.arq-kpi b {
+  display: block; font-family: var(--arq-titulo);
+  font-size: 1.5rem; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--arq-tinta);
+}
+.arq-kpi span {
+  display: block; margin-top: 4px; font-size: .68rem;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--arq-suave);
+}
+
+/* =====================================================================
+   Barra de comando
+   ===================================================================== */
+.arq-comando {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  max-width: 100%;
+  background: var(--arq-superficie); border: 1px solid var(--arq-borda);
+  border-radius: var(--arq-r-g); padding: 12px; box-shadow: var(--arq-sombra);
+}
+.arq-busca { position: relative; flex: 1 1 300px; min-width: 220px; }
+.arq-busca > i {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--arq-suave); pointer-events: none;
+}
+/* A especificidade aqui precisa vencer a regra genérica de campos, mais
+   abaixo: sem isso o padding-left volta a 11px e o texto passa por baixo
+   da lupa. */
+.arq .arq-busca input[type=search],
+.arq .arq-busca input[type=text] {
+  width: 100%; height: 44px; padding: 0 40px 0 40px;
+  border: 1px solid var(--arq-borda); border-radius: var(--arq-r);
+  background: var(--arq-elevado); color: var(--arq-tinta); font-size: .95rem;
+  font-family: inherit; -webkit-appearance: none; appearance: none;
+}
+.arq .arq-busca input::placeholder { color: var(--arq-suave); }
+/* O Chrome desenha um "x" próprio no input[type=search]; sai porque já
+   existe o botão de limpar do módulo. */
+.arq .arq-busca input[type=search]::-webkit-search-cancel-button { display: none; }
+.arq-busca .arq-limpar {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  border: 0; background: transparent; color: var(--arq-suave);
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: none;
+}
+.arq-busca .arq-limpar:hover { background: var(--arq-acento-luz); color: var(--arq-acento); }
+
+/* Campos --------------------------------------------------------------- */
+.arq input[type=text], .arq input[type=date], .arq input[type=search],
+.arq input[type=number], .arq select, .arq textarea {
+  font-family: inherit; font-size: .92rem; color: var(--arq-tinta);
+  background: var(--arq-superficie); border: 1px solid var(--arq-borda);
+  border-radius: var(--arq-r); padding: 9px 11px; width: 100%;
+}
+.arq textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+.arq input:focus, .arq select:focus, .arq textarea:focus {
+  outline: none; border-color: var(--arq-acento);
+  box-shadow: 0 0 0 3px var(--arq-acento-luz);
+}
+.arq label.arq-rot {
+  display: block; font-size: .68rem; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--arq-suave); margin-bottom: 5px;
+}
+.arq .arq-mono { font-family: var(--arq-mono); font-variant-numeric: tabular-nums; }
+
+/* Botões --------------------------------------------------------------- */
+.arq-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; padding: 0 16px; border-radius: var(--arq-r);
+  border: 1px solid var(--arq-borda); background: var(--arq-superficie);
+  color: var(--arq-tinta); font: inherit; font-size: .89rem; font-weight: 600;
+  cursor: pointer; transition: background .14s, border-color .14s, transform .14s;
+  text-decoration: none; white-space: nowrap;
+}
+.arq-btn:hover { background: var(--arq-elevado); border-color: var(--arq-suave); color: var(--arq-tinta); text-decoration: none; }
+.arq-btn:active { transform: translateY(1px); }
+.arq-btn:disabled, .arq-btn[aria-disabled=true] { opacity: .5; cursor: not-allowed; }
+.arq-btn-p { background: var(--arq-acento); border-color: var(--arq-acento); color: #fff; }
+.arq-btn-p:hover { background: var(--arq-acento-esc); border-color: var(--arq-acento-esc); color: #fff; }
+.arq-btn-perigo { color: var(--arq-perigo); border-color: color-mix(in srgb, var(--arq-perigo) 35%, transparent); }
+.arq-btn-perigo:hover { background: color-mix(in srgb, var(--arq-perigo) 10%, transparent); color: var(--arq-perigo); }
+.arq-btn-sm { height: 32px; padding: 0 11px; font-size: .82rem; }
+.arq-btn-ic { width: 40px; padding: 0; }
+.arq-btn-ic.arq-btn-sm { width: 32px; }
+.arq-btn.ativo { background: var(--arq-acento-luz); border-color: var(--arq-acento); color: var(--arq-acento-esc); }
+
+.arq-seg { display: inline-flex; border: 1px solid var(--arq-borda); border-radius: var(--arq-r); overflow: hidden; }
+.arq-seg button {
+  border: 0; background: var(--arq-superficie); color: var(--arq-suave);
+  height: 40px; width: 42px; cursor: pointer; font-size: .95rem;
+}
+.arq-seg button + button { border-left: 1px solid var(--arq-borda); }
+.arq-seg button[aria-pressed=true] { background: var(--arq-acento-luz); color: var(--arq-acento-esc); }
+
+/* =====================================================================
+   Período e filtros
+   ===================================================================== */
+.arq-periodo { display: flex; gap: 6px; flex-wrap: wrap; }
+.arq-fatia {
+  border: 1px solid var(--arq-borda); background: var(--arq-superficie);
+  color: var(--arq-suave); border-radius: 999px; padding: 7px 14px;
+  font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.arq-fatia:hover { border-color: var(--arq-acento); color: var(--arq-acento); }
+.arq-fatia[aria-pressed=true] {
+  background: var(--arq-tinta); border-color: var(--arq-tinta); color: var(--arq-superficie);
+}
+
+.arq-filtros {
+  display: none; margin-top: 12px; padding-top: 14px;
+  border-top: 1px dashed var(--arq-borda);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;
+  /* Item flex dentro de .arq-comando: sem a base de 100% a grade herda a
+     largura do conteúdo e desce tudo numa coluna só. */
+  flex: 1 0 100%; width: 100%; min-width: 0;
+}
+.arq-filtros.aberto { display: grid; }
+.arq-filtros > div { min-width: 0; }
+.arq-filtros .arq-full { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; }
+
+.arq-ativos { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; }
+.arq-ativo {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--arq-acento-luz); color: var(--arq-acento-esc);
+  border: 1px solid color-mix(in srgb, var(--arq-acento) 30%, transparent);
+  border-radius: 999px; padding: 5px 6px 5px 12px; font-size: .8rem; font-weight: 600;
+}
+.arq-ativo button {
+  border: 0; background: transparent; color: inherit; cursor: pointer;
+  width: 20px; height: 20px; border-radius: 50%; line-height: 1; font-size: .9rem;
+}
+.arq-ativo button:hover { background: rgba(0,0,0,.08); }
+
+/* =====================================================================
+   Resultado
+   ===================================================================== */
+.arq-resumo {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin: 22px 0 12px;
+}
+.arq-resumo h2 {
+  font-family: var(--arq-titulo); font-size: 1.15rem; font-weight: 700; margin: 0;
+}
+.arq-resumo .arq-contagem { color: var(--arq-suave); font-size: .85rem; }
+.arq-resumo .arq-contagem b { color: var(--arq-tinta); font-variant-numeric: tabular-nums; }
+
+/* Grade de lombadas ---------------------------------------------------- */
+.arq-estante {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+.arq-ficha {
+  position: relative; display: flex;
+  background: var(--arq-superficie); border: 1px solid var(--arq-borda);
+  border-radius: var(--arq-r-g); overflow: hidden; box-shadow: var(--arq-sombra);
+  transition: transform .16s, box-shadow .16s, border-color .16s;
+}
+.arq-ficha:hover { transform: translateY(-2px); box-shadow: var(--arq-sombra-f); border-color: var(--arq-suave); }
+.arq-ficha.marcada { border-color: var(--arq-acento); box-shadow: 0 0 0 2px var(--arq-acento-luz), var(--arq-sombra); }
+
+/* A lombada: faixa vertical com o número do arquivamento */
+.arq-lombada {
+  flex: 0 0 34px; background: var(--arq-adm);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; position: relative;
+}
+.arq-lombada span {
+  font-family: var(--arq-mono); font-size: .64rem; letter-spacing: .12em;
+  color: rgba(255,255,255,.92); white-space: nowrap;
+  writing-mode: vertical-rl; transform: rotate(180deg);
+}
+.arq-ficha[data-atr="Registro Civil"] .arq-lombada { background: var(--arq-rc); }
+.arq-ficha[data-atr="Registro de Imóveis"] .arq-lombada { background: var(--arq-ri); }
+.arq-ficha[data-atr="Registro de Títulos e Documentos"] .arq-lombada { background: var(--arq-rtd); }
+.arq-ficha[data-atr="Registro Civil das Pessoas Jurídicas"] .arq-lombada { background: var(--arq-rcpj); }
+.arq-ficha[data-atr="Notas"] .arq-lombada { background: var(--arq-not); }
+.arq-ficha[data-atr="Protesto"] .arq-lombada { background: var(--arq-prot); }
+.arq-ficha[data-atr="Contratos Marítimos"] .arq-lombada { background: var(--arq-cmar); }
+
+.arq-ficha-corpo { flex: 1; padding: 14px 14px 12px; min-width: 0; display: flex; flex-direction: column; }
+.arq-ficha-topo { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.arq-ficha-topo label { margin: 2px 0 0; cursor: pointer; }
+.arq-ficha h3 {
+  font-family: var(--arq-titulo); font-size: 1.03rem; font-weight: 700;
+  margin: 0; line-height: 1.25; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.arq-etiqueta {
+  font-size: .66rem; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--arq-suave); font-weight: 700; margin-bottom: 2px;
+}
+.arq-partes {
+  font-size: .87rem; color: var(--arq-tinta); line-height: 1.45; margin: 0 0 10px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.arq-partes:empty::before { content: "Sem partes registradas"; color: var(--arq-suave); font-style: italic; }
+
+/* Códigos em coluna alinhada */
+.arq-codigos {
+  display: flex; gap: 14px; flex-wrap: wrap; margin: 0 0 10px;
+  padding: 8px 10px; background: var(--arq-elevado);
+  border: 1px solid var(--arq-borda); border-radius: 8px;
+}
+.arq-codigo { min-width: 0; }
+.arq-codigo em {
+  display: block; font-style: normal; font-size: .6rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--arq-suave); font-weight: 700;
+}
+.arq-codigo b {
+  font-family: var(--arq-mono); font-size: .85rem; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.arq-ficha-pe {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-top: auto; padding-top: 10px;
+  border-top: 1px solid var(--arq-borda);
+}
+.arq-marcas { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; flex: 1 1 auto; min-width: 0; }
+.arq-marca {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .74rem; font-weight: 600; color: var(--arq-suave);
+  border: 1px solid var(--arq-borda); border-radius: 999px; padding: 3px 9px;
+}
+.arq-marca.tem-anexo { color: var(--arq-acento-esc); border-color: color-mix(in srgb, var(--arq-acento) 32%, transparent); background: var(--arq-acento-luz); }
+.arq-marca.tem-selo  { color: var(--arq-selo); border-color: color-mix(in srgb, var(--arq-selo) 32%, transparent); background: var(--arq-selo-luz); }
+.arq-acoes { display: flex; gap: 4px; flex: none; margin-left: auto; }
+
+/* Tabela ---------------------------------------------------------------- */
+.arq-tabela-caixa {
+  background: var(--arq-superficie); border: 1px solid var(--arq-borda);
+  border-radius: var(--arq-r-g); overflow: auto; box-shadow: var(--arq-sombra);
+}
+table.arq-tabela { width: 100%; border-collapse: collapse; font-size: .86rem; }
+table.arq-tabela th {
+  text-align: left; padding: 11px 12px; white-space: nowrap;
+  font-size: .66rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--arq-suave); background: var(--arq-elevado);
+  border-bottom: 1px solid var(--arq-borda); position: sticky; top: 0; z-index: 1;
+}
+table.arq-tabela th[data-ord] { cursor: pointer; user-select: none; }
+table.arq-tabela th[data-ord]:hover { color: var(--arq-acento); }
+table.arq-tabela td { padding: 10px 12px; border-bottom: 1px solid var(--arq-borda); vertical-align: middle; }
+table.arq-tabela tbody tr:hover { background: var(--arq-elevado); }
+table.arq-tabela tbody tr.marcada { background: var(--arq-acento-luz); }
+table.arq-tabela .col-min { width: 1%; white-space: nowrap; }
+.arq-pilula-atr {
+  display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600;
+}
+.arq-ponto { width: 8px; height: 8px; border-radius: 2px; background: var(--arq-adm); flex: none; }
+
+/* Vazio / carregando ---------------------------------------------------- */
+.arq-vazio {
+  text-align: center; padding: 64px 24px; color: var(--arq-suave);
+  border: 1px dashed var(--arq-borda); border-radius: var(--arq-r-g);
+  background: var(--arq-superficie);
+}
+.arq-vazio i { font-size: 2.4rem; opacity: .45; display: block; margin-bottom: 14px; }
+.arq-vazio h3 { font-family: var(--arq-titulo); color: var(--arq-tinta); margin: 0 0 6px; font-size: 1.1rem; }
+.arq-vazio p { margin: 0 0 16px; font-size: .9rem; }
+
+.arq-esqueleto {
+  height: 170px; border-radius: var(--arq-r-g); border: 1px solid var(--arq-borda);
+  background: linear-gradient(100deg, var(--arq-superficie) 30%, var(--arq-elevado) 50%, var(--arq-superficie) 70%);
+  background-size: 220% 100%; animation: arq-brilho 1.2s infinite linear;
+}
+@keyframes arq-brilho { from { background-position: 220% 0; } to { background-position: -20% 0; } }
+
+/* Paginação ------------------------------------------------------------- */
+.arq-paginacao { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 22px 0 8px; flex-wrap: wrap; }
+.arq-paginacao .arq-pag-info { color: var(--arq-suave); font-size: .85rem; margin: 0 8px; font-variant-numeric: tabular-nums; }
+
+/* =====================================================================
+   Barra de seleção
+   ===================================================================== */
+.arq-selecao {
+  /* O menu do Atlas é fixo no rodapé (.bottom-nav). A barra sobe acima dele. */
+  position: fixed; left: 50%; bottom: 104px; transform: translate(-50%, 24px);
+  /* Acima do menu inferior do Atlas, que usa z-index 1000. */
+  z-index: 1200; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  /* Fundo próprio: --arq-tinta vira cor clara no modo escuro, o que deixava
+     a barra branca com texto branco. */
+  background: #0B1F26; background: var(--arq-barra, #0B1F26);
+  border: 1px solid var(--arq-barra-bd, transparent);
+  color: #fff; padding: 10px 12px 10px 18px;
+  border-radius: 999px; box-shadow: var(--arq-sombra-f);
+  max-width: calc(100vw - 32px);
+  /* Esconder só com transform deixava uma faixa da barra assomando na borda
+     inferior quando nada estava selecionado. */
+  visibility: hidden; opacity: 0; pointer-events: none;
+  transition: transform .22s cubic-bezier(.2,.8,.3,1), opacity .18s, visibility 0s linear .2s;
+}
+.arq-selecao.visivel {
+  transform: translate(-50%, 0);
+  visibility: visible; opacity: 1; pointer-events: auto;
+  transition: transform .22s cubic-bezier(.2,.8,.3,1), opacity .18s, visibility 0s;
+}
+.arq-selecao b { font-variant-numeric: tabular-nums; }
+.arq-selecao .arq-btn {
+  background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.24); color: #fff;
+}
+.arq-selecao .arq-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+.arq-selecao .arq-btn-p { background: var(--arq-acento); border-color: var(--arq-acento); }
+
+/* =====================================================================
+   Diálogos
+   ===================================================================== */
+.arq-fundo {
+  position: fixed; inset: 0; background: rgba(11,31,38,.55);
+  backdrop-filter: blur(2px); z-index: 1300;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  opacity: 0; pointer-events: none; transition: opacity .18s;
+}
+.arq-fundo.aberto { opacity: 1; pointer-events: auto; }
+.arq-dialogo {
+  background: var(--arq-superficie); border-radius: var(--arq-r-g);
+  box-shadow: var(--arq-sombra-f); width: min(1080px, 100%);
+  max-height: min(92vh, 900px); display: flex; flex-direction: column; overflow: hidden;
+  transform: translateY(10px) scale(.99); transition: transform .18s;
+  border: 1px solid var(--arq-borda);
+}
+.arq-fundo.aberto .arq-dialogo { transform: none; }
+.arq-dialogo.largo { width: min(1400px, 100%); max-height: 94vh; }
+.arq-dialogo.estreito { width: min(560px, 100%); }
+
+.arq-dlg-topo {
+  display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+  border-bottom: 1px solid var(--arq-borda); background: var(--arq-elevado); flex: none;
+}
+.arq-dlg-topo h2 {
+  font-family: var(--arq-titulo); font-size: 1.15rem; font-weight: 700;
+  margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.arq-dlg-topo .arq-num {
+  font-family: var(--arq-mono); font-size: .74rem; color: var(--arq-suave);
+  border: 1px solid var(--arq-borda); border-radius: 6px; padding: 3px 8px; background: var(--arq-superficie);
+}
+.arq-dlg-corpo { padding: 18px; overflow: auto; flex: 1; }
+.arq-dlg-pe {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  padding: 14px 18px; border-top: 1px solid var(--arq-borda);
+  background: var(--arq-elevado); flex: none; flex-wrap: wrap;
+}
+.arq-dlg-pe .arq-esq { margin-right: auto; color: var(--arq-suave); font-size: .82rem; }
+.arq-fechar {
+  border: 0; background: transparent; color: var(--arq-suave); cursor: pointer;
+  width: 34px; height: 34px; border-radius: 8px; font-size: 1.1rem; flex: none;
+}
+.arq-fechar:hover { background: var(--arq-borda); color: var(--arq-tinta); }
+
+/* Detalhe --------------------------------------------------------------- */
+.arq-detalhe { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 22px; }
+@media (max-width: 900px) { .arq-detalhe { grid-template-columns: 1fr; } }
+
+.arq-secao { margin-bottom: 22px; }
+.arq-secao > h3 {
+  font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--arq-suave); font-weight: 700; margin: 0 0 10px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--arq-borda);
+}
+.arq-dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+.arq-dado em { display: block; font-style: normal; font-size: .64rem; letter-spacing: .1em; text-transform: uppercase; color: var(--arq-suave); font-weight: 700; margin-bottom: 3px; }
+.arq-dado b { font-size: .93rem; font-weight: 600; word-break: break-word; }
+
+.arq-lista-partes { list-style: none; margin: 0; padding: 0; }
+.arq-lista-partes li {
+  display: flex; align-items: baseline; gap: 10px; padding: 8px 0;
+  border-bottom: 1px dashed var(--arq-borda); font-size: .9rem;
+}
+.arq-lista-partes li:last-child { border-bottom: 0; }
+.arq-lista-partes .arq-cpf { font-family: var(--arq-mono); font-size: .82rem; color: var(--arq-suave); white-space: nowrap; }
+
+.arq-selos { display: flex; flex-direction: column; gap: 10px; }
+.arq-selo {
+  display: flex; gap: 12px; padding: 10px; border-radius: var(--arq-r);
+  background: var(--arq-selo-luz); border: 1px solid color-mix(in srgb, var(--arq-selo) 26%, transparent);
+}
+.arq-selo img { width: 62px; height: 62px; flex: none; border-radius: 6px; background: #fff; }
+.arq-selo-num { font-family: var(--arq-mono); font-weight: 700; color: var(--arq-selo); font-size: .86rem; }
+.arq-selo-txt { font-size: .76rem; color: var(--arq-suave); line-height: 1.45; margin-top: 4px; }
+
+.arq-linha-tempo { list-style: none; margin: 0; padding: 0 0 0 18px; border-left: 2px solid var(--arq-borda); }
+.arq-linha-tempo li { position: relative; padding: 0 0 14px 14px; font-size: .84rem; }
+.arq-linha-tempo li::before {
+  content: ""; position: absolute; left: -25px; top: 5px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--arq-superficie); border: 2px solid var(--arq-acento);
+}
+.arq-linha-tempo b { display: block; font-size: .84rem; }
+.arq-linha-tempo span { color: var(--arq-suave); font-size: .78rem; font-variant-numeric: tabular-nums; }
+
+/* Anexos ---------------------------------------------------------------- */
+.arq-anexos { display: flex; flex-direction: column; gap: 8px; }
+.arq-anexo {
+  display: flex; align-items: center; gap: 12px; padding: 10px;
+  border: 1px solid var(--arq-borda); border-radius: var(--arq-r);
+  background: var(--arq-superficie); transition: border-color .14s, background .14s;
+}
+.arq-anexo:hover { border-color: var(--arq-acento); background: var(--arq-elevado); }
+.arq-anexo.indisponivel { opacity: .55; }
+.arq-anexo-ic {
+  width: 40px; height: 46px; flex: none; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center; font-size: 1.15rem;
+  background: var(--arq-elevado); border: 1px solid var(--arq-borda); color: var(--arq-suave);
+  position: relative; cursor: pointer; overflow: hidden;
+}
+.arq-anexo-ic img { width: 100%; height: 100%; object-fit: cover; }
+.arq-anexo[data-ext=pdf] .arq-anexo-ic { color: var(--arq-perigo); }
+.arq-anexo-info { flex: 1; min-width: 0; cursor: pointer; }
+.arq-anexo-nome { font-size: .88rem; font-weight: 600; word-break: break-word; line-height: 1.3; }
+.arq-anexo-meta { font-size: .74rem; color: var(--arq-suave); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.arq-anexo-meta .arq-hash { font-family: var(--arq-mono); font-size: .68rem; }
+.arq-anexo-acoes { display: flex; gap: 4px; flex: none; }
+
+/* Visualizador ---------------------------------------------------------- */
+.arq-visor { display: flex; flex-direction: column; height: min(92vh, 1000px); }
+.arq-visor-palco {
+  flex: 1; background: #22343A; display: flex; align-items: center; justify-content: center;
+  overflow: auto; padding: 12px;
+}
+.arq-visor-palco iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.arq-visor-palco img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; background: #fff; }
+
+/* =====================================================================
+   Bandeja de compilação — o coração do módulo
+   ===================================================================== */
+.arq-compilar-cab {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  padding: 12px 14px; border-radius: var(--arq-r); margin-bottom: 16px;
+  background: var(--arq-acento-luz); border: 1px solid color-mix(in srgb, var(--arq-acento) 28%, transparent);
+  color: var(--arq-acento-esc); font-size: .86rem;
+}
+.arq-compilar-cab i { font-size: 1.1rem; }
+
+.arq-pilha { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.arq-pilha li {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+  border: 1px solid var(--arq-borda); border-radius: var(--arq-r);
+  background: var(--arq-superficie); cursor: grab;
+}
+.arq-pilha li.arrastando { opacity: .4; }
+.arq-pilha li.alvo { border-color: var(--arq-acento); border-style: dashed; }
+.arq-pilha li.fora { opacity: .5; background: var(--arq-elevado); }
+.arq-pilha .arq-punho { color: var(--arq-suave); cursor: grab; flex: none; }
+.arq-pilha .arq-ordem {
+  font-family: var(--arq-mono); font-size: .76rem; font-weight: 700; color: var(--arq-suave);
+  min-width: 26px; text-align: right; flex: none; font-variant-numeric: tabular-nums;
+}
+.arq-pilha .arq-item-nome { flex: 1; min-width: 0; font-size: .86rem; word-break: break-word; }
+.arq-pilha .arq-item-sub { font-size: .73rem; color: var(--arq-suave); margin-top: 2px; }
+.arq-pilha .arq-item-fls {
+  font-family: var(--arq-mono); font-size: .74rem; color: var(--arq-suave); flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.arq-pilha .arq-grupo {
+  font-family: var(--arq-mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--arq-suave); padding: 10px 2px 2px; border: 0; background: transparent; cursor: default;
+}
+
+.arq-progresso { height: 6px; border-radius: 999px; background: var(--arq-borda); overflow: hidden; margin-top: 4px; }
+.arq-progresso > div { height: 100%; width: 0; background: var(--arq-acento); transition: width .2s; }
+.arq-etapa { font-size: .82rem; color: var(--arq-suave); margin-top: 8px; min-height: 1.2em; }
+
+/* =====================================================================
+   Formulário de cadastro
+   ===================================================================== */
+.arq-form { display: grid; gap: 18px; }
+.arq-cartao {
+  background: var(--arq-superficie); border: 1px solid var(--arq-borda);
+  border-radius: var(--arq-r-g); padding: 18px; box-shadow: var(--arq-sombra);
+}
+.arq-cartao > h2 {
+  font-family: var(--arq-titulo); font-size: 1.05rem; font-weight: 700; margin: 0 0 4px;
+  display: flex; align-items: center; gap: 10px;
+}
+.arq-cartao > h2 .arq-passo {
+  font-family: var(--arq-mono); font-size: .7rem; color: var(--arq-acento);
+  border: 1px solid color-mix(in srgb, var(--arq-acento) 34%, transparent);
+  background: var(--arq-acento-luz); border-radius: 6px; padding: 2px 7px; font-weight: 700;
+}
+.arq-cartao > p.arq-ajuda { color: var(--arq-suave); font-size: .84rem; margin: 0 0 16px; }
+.arq-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
+.arq-grade .arq-larg-2 { grid-column: span 2; }
+@media (max-width: 640px) { .arq-grade .arq-larg-2 { grid-column: span 1; } }
+.arq-campo-erro input, .arq-campo-erro select { border-color: var(--arq-perigo); }
+.arq-msg-erro { color: var(--arq-perigo); font-size: .78rem; margin-top: 4px; display: none; }
+.arq-campo-erro .arq-msg-erro { display: block; }
+
+.arq-solta {
+  border: 2px dashed var(--arq-borda); border-radius: var(--arq-r-g);
+  padding: 30px 20px; text-align: center; cursor: pointer;
+  background: var(--arq-elevado); transition: border-color .15s, background .15s;
+}
+.arq-solta:hover, .arq-solta.sobre { border-color: var(--arq-acento); background: var(--arq-acento-luz); }
+.arq-solta i { font-size: 1.8rem; color: var(--arq-acento); display: block; margin-bottom: 10px; }
+.arq-solta b { display: block; font-size: .95rem; margin-bottom: 4px; }
+.arq-solta span { font-size: .8rem; color: var(--arq-suave); }
+
+.arq-tabela-partes { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .88rem; }
+.arq-tabela-partes th {
+  text-align: left; font-size: .64rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--arq-suave); padding: 8px; border-bottom: 1px solid var(--arq-borda);
+}
+.arq-tabela-partes td { padding: 8px; border-bottom: 1px solid var(--arq-borda); }
+
+/* =====================================================================
+   Avisos, utilitários e acessibilidade
+   ===================================================================== */
+.arq-nota {
+  display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--arq-r);
+  font-size: .85rem; line-height: 1.5; border: 1px solid transparent;
+}
+.arq-nota i { flex: none; margin-top: 2px; }
+.arq-nota-info   { background: var(--arq-acento-luz); border-color: color-mix(in srgb, var(--arq-acento) 26%, transparent); color: var(--arq-acento-esc); }
+.arq-nota-alerta { background: var(--arq-selo-luz); border-color: color-mix(in srgb, var(--arq-selo) 30%, transparent); color: var(--arq-selo); }
+.arq-nota-perigo { background: color-mix(in srgb, var(--arq-perigo) 8%, transparent); border-color: color-mix(in srgb, var(--arq-perigo) 30%, transparent); color: var(--arq-perigo); }
+
+.arq-esconde { display: none !important; }
+.arq-so-leitor {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+.arq mark { background: #FFEDA3; color: inherit; padding: 0 2px; border-radius: 3px; }
+body.dark-mode .arq mark { background: #5A4A12; color: #FFEFC0; }
+
+.arq input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--arq-acento); cursor: pointer; }
+
+.arq :focus-visible { outline: 2px solid var(--arq-acento); outline-offset: 2px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .arq *, .arq *::before, .arq *::after {
+    animation-duration: .001ms !important; transition-duration: .001ms !important;
+  }
+}
+
+/* Telas médias: a barra de comando deixa de caber numa linha só. */
+@media (max-width: 900px) {
+  .arq-comando { gap: 8px; }
+  .arq-busca { flex: 1 1 100%; }
+  .arq-periodo {
+    flex: 1 1 100%;
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch; padding-bottom: 2px;
+  }
+  .arq-periodo::-webkit-scrollbar { display: none; }
+  .arq-fatia { flex: none; }
+}
+
+@media (max-width: 640px) {
+  .arq-estante { grid-template-columns: 1fr; }
+
+  .arq-topo { padding-top: 14px; gap: 14px; }
+  .arq-topo h1 { font-size: 1.3rem; }
+  .arq-icone-titulo { width: 38px; height: 38px; font-size: 17px; }
+  .arq-kpis { gap: 16px; width: 100%; }
+  .arq-kpi { flex: 1 1 auto; min-width: 64px; }
+  .arq-kpi b { font-size: 1.2rem; }
+
+  /* Cada controle ocupa a linha inteira; nada de botão espremido. */
+  .arq-comando > .arq-btn,
+  .arq-comando > a.arq-btn { flex: 1 1 auto; }
+  .arq-comando .arq-btn-p { flex: 1 1 100%; }
+  .arq-seg { flex: none; }
+
+  .arq-filtros { grid-template-columns: 1fr; }
+
+  .arq-resumo { gap: 6px; }
+  .arq-ficha-pe { flex-wrap: wrap; }
+  .arq-acoes { width: 100%; justify-content: flex-end; }
+
+  .arq-selecao {
+    left: 10px; right: 10px; bottom: 100px;
+    transform: translateY(16px); border-radius: var(--arq-r-g);
+    justify-content: center;
+  }
+  .arq-selecao.visivel { transform: none; }
+  .arq-selecao .arq-btn { flex: 1 1 auto; }
+
+  .arq-dialogo { max-height: 100vh; border-radius: 0; height: 100vh; width: 100vw; }
+  .arq-fundo { padding: 0; }
+  .arq-dlg-pe { flex-direction: column-reverse; align-items: stretch; }
+  .arq-dlg-pe .arq-btn { width: 100%; }
+  .arq-dlg-pe .arq-esq { margin: 0 0 4px; text-align: center; }
+
+  .arq-grade { grid-template-columns: 1fr; }
+  .arq-grade .arq-larg-2 { grid-column: span 1; }
+  .arq-dados { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Telas bem estreitas (360px e abaixo). */
+@media (max-width: 380px) {
+  .arq-lombada { flex-basis: 26px; }
+  .arq-codigos { gap: 10px; }
+  .arq-kpis { gap: 12px; }
+}
+
+@media print {
+  .arq-comando, .arq-selecao, .arq-acoes, .arq-paginacao, .arq-topo .arq-kpis { display: none !important; }
+  .arq-ficha { break-inside: avoid; box-shadow: none; }
+}

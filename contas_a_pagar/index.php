@@ -69,6 +69,7 @@ $SALDOS = cap_saldos();
 $temCaixa = cap_tem_deposito_caixa();
 $FORMAS = cap_formas_pagamento();
 ?>
+<?php include(__DIR__ . '/../os/guia/guia.php'); ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>

@@ -23,7 +23,7 @@ class PDF extends TCPDF
 }
 
 function getSeal($arquivo_id) {
-    include 'db_connection.php';
+    include __DIR__ . '/db_connection.php';
     $stmt = $conn->prepare("SELECT selos.* FROM selos_arquivamentos INNER JOIN selos ON selos_arquivamentos.selo_id = selos.id WHERE selos_arquivamentos.arquivo_id = ?");
     $stmt->bind_param("i", $arquivo_id);
     $stmt->execute();
@@ -34,10 +34,11 @@ function getSeal($arquivo_id) {
 }
 
 if (isset($_GET['id'])) {
-    $id = $_GET['id'];
-    $filePath = "meta-dados/$id.json";
+    // Só dígitos: sem isto, ?id=../algo sairia da pasta meta-dados.
+    $id = preg_match('/^\d{1,20}$/', (string) $_GET['id']) ? $_GET['id'] : '';
+    $filePath = __DIR__ . "/meta-dados/$id.json";
 
-    if (file_exists($filePath)) {
+    if ($id !== '' && file_exists($filePath)) {
         $ato = json_decode(file_get_contents($filePath), true);
 
         $selo = getSeal($id);

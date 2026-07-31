@@ -1,0 +1,158 @@
+/* ==========================================================================
+   Atlas · Arquivamento Digital — complemento
+   --------------------------------------------------------------------------
+   A aparência do módulo vem das folhas do próprio sistema:
+     ../style/style_cadastro_arquivamento.php
+     ../style/style_edit_arquivamento.php
+   Este arquivo cobre SOMENTE o que não existia antes — dropzone, visão em
+   tabela, barra de seleção e bandeja de compilação — usando os mesmos tokens
+   (--brand, --card, --border, --muted, --shadow) para não destoar.
+   ========================================================================== */
+
+/* ---------- Dropzone de anexos ---------- */
+.arq-dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  padding: 26px 18px;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+  background: transparent;
+  transition: border-color .15s, background .15s, transform .06s;
+}
+.arq-dropzone:hover { border-color: var(--brand); background: rgba(79, 70, 229, .04); }
+.arq-dropzone.ativo { border-color: var(--brand); background: rgba(79, 70, 229, .08); transform: translateY(-1px); }
+.arq-dropzone i { font-size: 30px; display: block; margin-bottom: 8px; color: var(--brand); }
+.arq-dropzone b { color: var(--text); }
+
+.anexo-item.removido { opacity: .5; text-decoration: line-through; }
+.anexo-item.removido .anexo-acoes { text-decoration: none; }
+
+/* ---------- Barra de seleção múltipla ---------- */
+.arq-barra-selecao {
+  position: sticky;
+  bottom: 12px;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.arq-barra-selecao.visivel { display: flex; }
+.arq-barra-selecao .contagem {
+  font-weight: 800;
+  color: var(--brand);
+  margin-right: auto;
+}
+
+/* ---------- Visão em tabela ---------- */
+.arq-tabela-acervo { width: 100%; }
+.arq-tabela-acervo th {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  font-weight: 800;
+  border-top: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.arq-tabela-acervo th .fa { opacity: .45; margin-left: 4px; }
+.arq-tabela-acervo th.ordenado .fa { opacity: 1; color: var(--brand); }
+.arq-tabela-acervo td { vertical-align: middle; }
+.arq-tabela-acervo tbody tr { cursor: pointer; }
+.arq-tabela-acervo tbody tr:hover { background: rgba(79, 70, 229, .05); }
+.arq-cod { font-variant-numeric: tabular-nums; }
+
+/* ---------- Bandeja de compilação ---------- */
+.arq-bandeja-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  margin-bottom: 8px;
+  cursor: grab;
+}
+.arq-bandeja-item.arrastando { opacity: .4; }
+.arq-bandeja-item .puxador { color: var(--muted); cursor: grab; }
+.arq-bandeja-item .nome { flex: 1; overflow-wrap: anywhere; }
+.arq-bandeja-item .tam { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+
+.arq-progresso {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.arq-progresso > div {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  transition: width .2s;
+}
+
+/* ---------- Chips de filtro ativo ---------- */
+.arq-chip-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #EEF2FF;
+  color: #3730A3;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: .3rem .65rem;
+  font-size: .8rem;
+  font-weight: 700;
+  margin: 0 6px 6px 0;
+}
+.arq-chip-filtro button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  line-height: 1;
+  cursor: pointer;
+  opacity: .7;
+}
+.arq-chip-filtro button:hover { opacity: 1; }
+body.dark-mode .arq-chip-filtro { background: #263041; color: #cbd5e1; border-color: #344154; }
+
+/* ---------- Estado vazio ---------- */
+.arq-vazio {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--muted);
+}
+.arq-vazio i { font-size: 42px; opacity: .35; display: block; margin-bottom: 12px; }
+.arq-vazio h3 { font-weight: 800; font-size: 1.05rem; color: var(--text); margin-bottom: 6px; }
+
+/* ---------- Esqueleto de carregamento ---------- */
+.arq-esqueleto {
+  border-radius: 14px;
+  background: linear-gradient(90deg, var(--border) 25%, transparent 37%, var(--border) 63%);
+  background-size: 400% 100%;
+  animation: arq-brilho 1.2s ease infinite;
+}
+@keyframes arq-brilho { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) {
+  .arq-esqueleto { animation: none; }
+  .arq-dropzone, .arq-progresso > div { transition: none; }
+}
+
+/* ---------- Impressão ---------- */
+@media print {
+  .page-hero .hero-actions,
+  .arq-barra-selecao,
+  .filter-card,
+  .bottom-nav { display: none !important; }
+}

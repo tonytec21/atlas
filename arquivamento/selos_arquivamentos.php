@@ -1,5 +1,8 @@
 <?php
-include 'db_connection.php';
+require_once __DIR__ . '/bootstrap.php';
+arq_exige_login();
+
+include __DIR__ . '/db_connection.php';
 
 // Função para obter as configurações da API do banco de dados
 function getApiConfig($conn) {

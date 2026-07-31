@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
+arq_exige_login();
+
 include(__DIR__ . '/session_check.php');
 checkSession();
 ?>
@@ -19,6 +22,7 @@ checkSession();
     <script src="../script/serpro-signer-promise.js" type="text/javascript"></script>
     <script src="../script/serpro-signer-client.js" type="text/javascript"></script>
     <script src="../script/jquery.autogrow-textarea.js" type="text/javascript"></script>
+    <script src="../script/sweetalert2.js"></script>
     <script>
         const commands = [
             {"command": "sign","type": "text", "inputData": "teste"},
@@ -230,7 +234,12 @@ include(__DIR__ . '/../menu.php');
                     if (base64.indexOf('data:application/pdf;base64,') == 0) {
                         base64 = base64.substring('data:application/pdf;base64,'.length, base64.length);
                     } else {
-                        alert('O cabeçalho PDF não foi encontrado. Esse é mesmo um arquivo PDF?');
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Isso não parece um PDF',
+                            text: 'O cabeçalho do arquivo não corresponde ao de um PDF. Confira o documento e tente de novo.',
+                            confirmButtonColor: '#0E7C86'
+                        });
                     }
                     document.getElementById("content-value").value = base64;
                     prettyCommandSign();
@@ -286,7 +295,12 @@ include(__DIR__ . '/../menu.php');
                     sendSignedPdfToServer(response, fileName);
                 })
                 .catch(function(error) {
-                    alert('Erro ao assinar o PDF.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Não foi possível assinar',
+                        text: (error && (error.error || error.message)) || 'O assinador não concluiu a operação.',
+                        confirmButtonColor: '#0E7C86'
+                    });
                 });
         });
 

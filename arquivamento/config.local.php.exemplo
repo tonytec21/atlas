@@ -1,0 +1,22 @@
+<?php
+/**
+ * Renomeie para "config.local.php" e ajuste com os dados reais do servidor.
+ * Este arquivo NAO deve ser versionado (ja esta no .gitignore).
+ */
+
+define('ARQ_DB_HOST', 'localhost');
+define('ARQ_DB_NAME', 'atlas');
+define('ARQ_DB_USER', 'atlas_app');
+define('ARQ_DB_PASS', 'troque-esta-senha');
+
+// Troque para 'dev' quando precisar ver os erros na tela.
+define('ARQ_AMBIENTE', 'producao');
+define('ARQ_SESSAO_TIMEOUT_MIN', 240);
+define('ARQ_COOKIE_SECURE', false);
+
+define('ARQ_UPLOAD_MAX_BYTES', 60 * 1024 * 1024);
+define('ARQ_UPLOAD_MAX_ARQUIVOS', 60);
+define('ARQ_LIXEIRA_DIAS', 90);
+
+// Aceitar qualquer formato de arquivo (padrao). false volta a lista branca.
+define('ARQ_UPLOAD_ACEITA_TUDO', true);

@@ -723,23 +723,35 @@
         var alvo = document.querySelector(seletor);
         if (!alvo) { return false; }
 
-        var jq = window.jQuery || window.$;
-        if (jq && jq.fn && jq.fn.on) {
-            jq(alvo).on('shown.bs.modal', function () { aoAbrir && aoAbrir(alvo); });
-            jq(alvo).on('hidden.bs.modal', function () { aoFechar && aoFechar(alvo); });
-            return true;
+        /* Classes usadas pelas janelas do Atlas:
+           - Bootstrap 4/5 → .show      - Bootstrap 3 → .in
+           - diálogos próprios (arquivamento) → .aberto */
+        var RE_ABERTO = /(^|\s)(show|in|aberto)(\s|$)/;
+        var aberto = RE_ABERTO.test(alvo.className);
+
+        function avaliar(novo) {
+            if (novo === aberto) { return; }
+            aberto = novo;
+            if (novo) { aoAbrir && aoAbrir(alvo); } else { aoFechar && aoFechar(alvo); }
         }
 
-        if (!window.MutationObserver) { return false; }
-        var aberto = /(^|\s)(show|in)(\s|$)/.test(alvo.className);
-        new window.MutationObserver(function () {
-            var agora = /(^|\s)(show|in)(\s|$)/.test(alvo.className);
-            if (agora === aberto) { return; }
-            aberto = agora;
-            window.setTimeout(function () {
-                if (aberto) { aoAbrir && aoAbrir(alvo); } else { aoFechar && aoFechar(alvo); }
-            }, 260);                       // espera a animação do modal
-        }).observe(alvo, { attributes: true, attributeFilter: ['class'] });
+        // Eventos do Bootstrap, quando houver jQuery (respeitam a animação).
+        var jq = window.jQuery || window.$;
+        if (jq && jq.fn && jq.fn.on) {
+            jq(alvo).on('shown.bs.modal', function () { avaliar(true); });
+            jq(alvo).on('hidden.bs.modal', function () { avaliar(false); });
+        }
+
+        // Observador da classe: cobre as janelas que não são do Bootstrap.
+        if (window.MutationObserver) {
+            new window.MutationObserver(function () {
+                var agora = RE_ABERTO.test(alvo.className);
+                if (agora === aberto) { return; }
+                window.setTimeout(function () {
+                    avaliar(RE_ABERTO.test(alvo.className));
+                }, 260);                       // espera a animação da janela
+            }).observe(alvo, { attributes: true, attributeFilter: ['class'] });
+        }
         return true;
     }
 

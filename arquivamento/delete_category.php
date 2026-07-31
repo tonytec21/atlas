@@ -1,11 +1,12 @@
 <?php
-if (isset($_POST['id'])) {
-    $id = $_POST['id'];
-    $categoriesFile = 'categorias/categorias.json';
-    $categories = file_exists($categoriesFile) ? json_decode(file_get_contents($categoriesFile), true) : [];
-    if (isset($categories[$id])) {
-        array_splice($categories, $id, 1);
-        file_put_contents($categoriesFile, json_encode($categories, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    }
-}
-?>
+require_once __DIR__ . '/_compat.php';
+arq_exige_login();
+arq_compat_exige_post();
+arq_compat_avisar('delete_category.php');
+$cats = arq_categorias();
+$i = isset($_POST['id']) ? (int) $_POST['id'] : -1;
+$_POST['nome']  = isset($cats[$i]) ? $cats[$i] : (isset($_POST['nome']) ? $_POST['nome'] : '');
+$_POST['acao']  = 'excluir';
+$_POST['_csrf'] = arq_csrf_token();
+$_REQUEST['acao'] = 'excluir';
+require __DIR__ . '/api/categorias.php';

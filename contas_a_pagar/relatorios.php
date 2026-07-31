@@ -79,6 +79,7 @@ $catLabels=array_keys($porCat); $catVals=array_values($porCat);
 $mesLabels=array_keys($porMes); $mesVals=array_values($porMes);
 $qs = http_build_query(['de'=>$de,'ate'=>$ate,'base'=>$baseSel,'categoria'=>$cat,'status'=>$stat]);
 ?>
+<?php include(__DIR__ . '/../os/guia/guia.php'); ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>

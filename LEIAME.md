@@ -41,7 +41,10 @@ esperando o usuário clicar de verdade em “Buscar Ato” e “Adicionar à OS�
 
    Nos módulos **Atlas Signum** (`atlas/signum/index.php` e `configurar.php`),
    **Atlas Forja** (`atlas/forja/index.php` e `configurar.php`) e
-   **Fluxo de Caixa** (`atlas/caixa/index.php`):
+   **Fluxo de Caixa** (`atlas/caixa/index.php`), **Contas a Pagar**
+   (`atlas/contas_a_pagar/index.php`, `extrato.php` e `relatorios.php`) e
+   **Arquivamento Digital** (`atlas/arquivamento/index.php`, `cadastro.php`,
+   `categorias.php` e `lixeira.php`):
 
    ```php
    <?php include(__DIR__ . '/../os/guia/guia.php'); ?>
@@ -71,6 +74,8 @@ Abra `guia/demo/demo-criar-os.html` direto no navegador: é uma cópia simplific
 | No meio do guia | `→` / `Enter` avança, `←` volta, `Esc` sai |
 | Passos “Buscar Ato” e “Adicionar à OS” | O botão *Próximo* fica apagado: o guia só avança quando o usuário clica de verdade no botão do sistema |
 | Passo final da tela de pesquisa | Ao clicar em *Criar Ordem de Serviço*, o guia **continua sozinho** na tela seguinte |
+| Abrir qualquer janela do **Arquivamento** | O guia troca para o daquela janela (detalhe, compilação, visualizador) e volta ao do acervo ao fechar |
+| Abrir qualquer janela do **Contas a Pagar** | O guia troca para o daquela janela (conta, pagamento, anexos, configurações, transferência) e volta ao do módulo ao fechar |
 | Abrir qualquer janela do **Fluxo de Caixa** | O guia troca para o daquela janela (detalhes, saída, depósito, comprovante, depósitos unificados, abertura) e volta ao guia do módulo ao fechar |
 | Trocar de aba na **Forja** | O botão “?” passa a oferecer o guia daquela ferramenta (“Como comprimir PDF”, “Como dividir um PDF”…). Se o usuário já estiver dentro de um guia da Forja, ele **troca junto** |
 | Abrir as janelas **Pagamentos** ou **Anexos** na tela da O.S. | O guia **troca** para o daquela janela e o botão “?” passa a exibir **“Como adicionar pagamento”** / **“Como adicionar anexo”**; ao fechar, o guia anterior é retomado no mesmo passo e o botão volta a **“O que fazer com esta O.S.”** |
@@ -98,6 +103,14 @@ Guias registrados:
 | `forja` | `forja/index.php` | visão geral do módulo e das oito ferramentas |
 | `forja-comprimir` | aba Comprimir PDF | quatro níveis (300/200/150/120 dpi), seletor de cores, dica contextual, selos do resultado e prévia comparativa |
 | `forja-pdf2img`, `forja-img2pdf`, `forja-juntar`, `forja-multiplo`, `forja-dividir`, `forja-word2pdf`, `forja-pdf2word` | abas da Forja | um guia por ferramenta |
+| `arq` | `arquivamento/index.php` | busca, filtros avançados, visões, seleção múltipla e ações em lote |
+| `arq-detalhe`, `arq-compilar`, `arq-visor` | janelas do acervo | detalhe do registro, compilação do dossiê e visualizador de documentos |
+| `arq-cadastro` | `arquivamento/cadastro.php` | os três passos: dados do ato, partes e documentos + selos |
+| `arq-categorias`, `arq-lixeira` | telas auxiliares | classificação do acervo e retenção/expurgo |
+| `cap` | `contas_a_pagar/index.php` | KPIs, contas virtuais, gráficos, filtros e lista de contas |
+| `cap-conta`, `cap-pagar`, `cap-anexos`, `cap-config` | janelas do Contas a Pagar | cadastro (com parcelamento), pagamento, anexos e alertas por e-mail |
+| `cap-extrato` + `cap-transferir` | `contas_a_pagar/extrato.php` | movimento das contas virtuais e transferência entre elas |
+| `cap-relatorios` | `contas_a_pagar/relatorios.php` | filtros por base da data, gráficos, tabela e exportação CSV |
 | `caixa` | `caixa/index.php` | filtros, modo de visualização, cards e ações de cada caixa |
 | `caixa-detalhes`, `caixa-saida`, `caixa-deposito`, `caixa-anexar`, `caixa-depositos`, `caixa-abrir` | janelas do fluxo de caixa | um guia por modal: detalhes, saídas, depósito/fechamento, comprovante, depósitos unificados e abertura |
 | `forja-config` | `forja/configurar.php` | caminhos do Ghostscript/ImageMagick/LibreOffice, ativação e instalação portátil |
@@ -148,8 +161,10 @@ GuiaOS.aoAbrirModal('#pagamentoModal',
     function () { GuiaOS.iniciar('pagamento-os', { reiniciar: true }); },
     function () { GuiaOS.parar(); });
 ```
-Usa os eventos `shown/hidden.bs.modal` do jQuery quando disponíveis e, na falta deles,
-um `MutationObserver` na classe do elemento (compatível com Bootstrap 4 `.show` e 3 `.in`).
+Combina os eventos `shown/hidden.bs.modal` do jQuery, quando existem, com um `MutationObserver`
+na classe do elemento — reconhecendo `.show` (Bootstrap 4/5), `.in` (Bootstrap 3) e `.aberto`
+(diálogos próprios, como os do Arquivamento). Os dois caminhos convivem sem disparar em
+duplicidade.
 Combine com `GuiaOS.emExecucao()` para guardar o guia atual e retomá-lo depois.
 
 ### Trocar o guia oferecido pelo botão “?”
@@ -322,4 +337,6 @@ node teste_guia11.js  # janela de autorização: iframe, reconexão automática 
 node teste_guia12.js  # módulo Signum: guia da tela, configurações e autorização do Assinador
 node teste_guia13.js  # módulo Forja: guia geral, um guia por ferramenta e troca ao mudar de aba
 node teste_guia14.js  # Fluxo de Caixa: guia da tela e a troca em cada uma das seis janelas
+node teste_guia15.js  # Contas a Pagar: painel, quatro janelas, extrato/transferência e relatórios
+node teste_guia16.js  # Arquivamento: acervo, janelas .aberto, cadastro, categorias e lixeira
 ```

@@ -1,12 +1,7 @@
 <?php
-$files = glob('meta-dados/*.json');
-$atos = [];
-
-foreach ($files as $file) {
-    $ato = json_decode(file_get_contents($file), true);
-    $ato['id'] = basename($file, '.json');
-    $atos[] = $ato;
-}
-
-echo json_encode($atos);
-?>
+/** Legado: todos os arquivamentos, sem filtro. */
+require_once __DIR__ . '/_compat.php';
+arq_exige_login();
+arq_compat_avisar('get_atos.php');
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode(arq_indice(), JSON_UNESCAPED_UNICODE);

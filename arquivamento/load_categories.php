@@ -1,9 +1,5 @@
 <?php
-$categoriesFile = 'categorias/categorias.json';
-if (file_exists($categoriesFile)) {
-    $categories = json_decode(file_get_contents($categoriesFile), true);
-    echo json_encode($categories);
-} else {
-    echo json_encode([]);
-}
-?>
+require_once __DIR__ . '/_compat.php';
+arq_exige_login();
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode(arq_categorias(), JSON_UNESCAPED_UNICODE);

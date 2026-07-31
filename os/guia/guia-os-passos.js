@@ -1802,6 +1802,1036 @@
     ];
 
     /* ==================================================================
+     * 5j) CONTAS A PAGAR — contas_a_pagar/
+     *     Painel, janelas (conta, pagamento, anexos, configurações),
+     *     extrato das contas virtuais e relatórios.
+     * ================================================================ */
+    var passosCap = [
+        {
+            alvo: '.kpi-grid',
+            titulo: 'Contas a Pagar',
+            texto: 'O módulo de despesas do cartório: cadastre contas avulsas ou recorrentes, acompanhe '
+                 + 'vencimentos, registre pagamentos e receba avisos por e-mail.<br>Os quatro cartões do '
+                 + 'topo resumem a situação: <b>Em aberto</b>, <b>Vencidas</b>, <b>A vencer</b> (dentro '
+                 + 'do prazo de aviso configurado) e <b>Pago no mês</b>.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '.vconta',
+            titulo: 'Contas virtuais',
+            texto: 'Duas “caixinhas” acompanham o dinheiro do cartório: <b>Banco</b> e <b>Espécie</b>. '
+                 + 'Cada pagamento sai de uma delas conforme a forma escolhida, e o saldo mostra entradas '
+                 + 'menos saídas — em vermelho quando fica negativo. O botão <b>Extrato</b> abre o '
+                 + 'movimento detalhado daquela conta.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#chartStatus',
+            subir: '.row',
+            titulo: 'Os gráficos',
+            texto: '<b>Situação (em aberto)</b>, <b>Em aberto por categoria</b> e <b>Pagamentos (6 meses)</b> — '
+                 + 'úteis para enxergar concentração de despesas e a evolução do que já foi pago.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#searchForm',
+            titulo: 'Filtros',
+            texto: 'Busque por texto e refine por <b>categoria</b>, <b>recorrência</b>, <b>mês de '
+                 + 'vencimento</b> e <b>situação</b> (em aberto, vencidas, pagas…). A lista e os '
+                 + 'gráficos acompanham o filtro.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#tabelaContas',
+            titulo: 'A lista de contas',
+            texto: 'Cada linha é uma conta, com vencimento, valor, categoria e situação. Os botões da '
+                 + 'coluna de ações abrem as janelas do módulo:<ul>'
+                 + '<li><b>✓ verde</b> — registrar o pagamento;</li>'
+                 + '<li><b>lápis</b> — editar a conta;</li>'
+                 + '<li><b>clipe</b> — anexos (boleto, nota, comprovante);</li>'
+                 + '<li><b>lixeira</b> — excluir.</li></ul>'
+                 + 'Cada janela dessas tem o seu guia: abra e clique no <b>“?”</b>.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: 'button[data-bs-target="#contaModal"]',
+            titulo: 'Nova conta',
+            texto: 'Cadastra uma despesa — avulsa, recorrente ou parcelada.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#btnSyncFundos',
+            titulo: 'Sincronizar fundos',
+            texto: 'Recalcula automaticamente as contas de <b>FERJ, FERC, FEMP, FADEP e FERRFIS</b> a '
+                 + 'partir dos selos lançados — assim os valores devidos a esses fundos entram no '
+                 + 'contas a pagar sem digitação manual.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: 'a[href="extrato.php"]',
+            titulo: 'Extrato e Relatórios',
+            texto: '<b>Extrato</b> mostra o movimento das contas virtuais e permite transferir valores '
+                 + 'entre elas. <b>Relatórios</b> consolida as contas por período, com exportação em CSV. '
+                 + 'As duas telas têm guia próprio.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: 'button[data-bs-target="#configModal"]',
+            titulo: 'Configurações',
+            texto: 'Define o e-mail que recebe os alertas de vencimento, com quantos dias de antecedência '
+                 + 'avisar e os dados do servidor de envio.',
+            posicao: 'baixo',
+            opcional: true
+        }
+    ];
+
+    var passosCapConta = [
+        {
+            alvo: '#c_titulo',
+            titulo: 'Título da conta',
+            texto: 'Como a despesa será reconhecida na lista — <i>Energia elétrica</i>, <i>Aluguel</i>, '
+                 + '<i>Internet</i>. Campo obrigatório.',
+            posicao: 'baixo',
+            aguardar: 2500
+        },
+        {
+            alvo: '#c_valor',
+            titulo: 'Valor e vencimento',
+            texto: 'O valor da conta e a data em que ela vence. São esses campos que alimentam os '
+                 + 'cartões de <b>vencidas</b> e <b>a vencer</b> e disparam os alertas por e-mail.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#c_categoria',
+            titulo: 'Categoria',
+            texto: 'Classifica a despesa para os gráficos e relatórios (por exemplo: tributos, aluguel, '
+                 + 'pessoal, material). Vale manter um padrão para os números fazerem sentido depois.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#c_recorrencia',
+            titulo: 'Recorrência',
+            texto: 'Para contas que se repetem (mensal, anual…), o sistema já prepara a próxima ocorrência '
+                 + '— evita recadastrar a mesma despesa todo mês.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#c_parc_on',
+            subir: '.form-check',
+            titulo: 'Parcelamento',
+            texto: 'Ligue esta chave para dividir a despesa em parcelas. Aparecem então o <b>número de '
+                 + 'parcelas</b> e a escolha entre <b>valor total</b> (o sistema divide) ou <b>valor de '
+                 + 'cada parcela</b> (o sistema multiplica) — a prévia mostra como ficará antes de salvar.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#c_fornecedor',
+            titulo: 'Fornecedor, nota e observações',
+            texto: 'Campos opcionais, mas que ajudam bastante na conferência e aparecem no relatório: '
+                 + 'quem prestou o serviço, o número da nota fiscal e o que mais for útil registrar.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#contaSalvarBtn',
+            titulo: 'Salvar',
+            texto: 'Grava a conta. Sendo parcelada, todas as parcelas são criadas de uma vez, com os '
+                 + 'vencimentos já distribuídos.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosCapPagar = [
+        {
+            alvo: '#pg_valor_fmt',
+            titulo: 'Registrar o pagamento',
+            texto: 'A janela já traz o <b>valor da conta</b>. Confira antes de confirmar — é este valor '
+                 + 'que sairá da conta virtual escolhida.',
+            posicao: 'baixo',
+            aguardar: 2500,
+            opcional: true
+        },
+        {
+            alvo: '#pg_forma',
+            titulo: 'Forma de pagamento',
+            texto: 'Além de registrar como a conta foi paga, a forma define <b>de qual conta virtual o '
+                 + 'valor sai</b>: apenas <b>Espécie</b> debita o dinheiro em espécie; PIX, '
+                 + 'transferência, boleto, débito automático e cartões debitam o <b>Banco</b>.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#pg_data',
+            titulo: 'Data do pagamento',
+            texto: 'A data em que o pagamento aconteceu de fato — é ela que posiciona o lançamento no '
+                 + 'extrato e no relatório.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#pg_saldo_box',
+            titulo: 'Saldo da conta escolhida',
+            texto: 'Mostra o saldo disponível na conta virtual que será debitada, para você perceber na '
+                 + 'hora se o pagamento vai deixá-la negativa.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#pgConfirmBtn',
+            titulo: 'Confirmar pagamento',
+            texto: 'Marca a conta como paga, lança a saída na conta virtual e atualiza os cartões do '
+                 + 'painel e o extrato.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosCapAnexos = [
+        {
+            alvo: '#axDz',
+            titulo: 'Anexar documentos',
+            texto: 'Arraste os arquivos para esta área ou clique para escolher — boleto, nota fiscal, '
+                 + 'comprovante de pagamento. Vários de uma vez, se precisar.',
+            posicao: 'baixo',
+            aguardar: 2500
+        },
+        {
+            alvo: '#axDesc',
+            titulo: 'Descrição',
+            texto: 'Um rótulo curto para identificar o anexo depois (“boleto”, “comprovante PIX”, “NF '
+                 + '1234”). Ajuda quando a conta acumula vários arquivos.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#axList',
+            titulo: 'Arquivos anexados',
+            texto: 'A lista traz tudo o que já está vinculado à conta, com os botões para <b>visualizar</b>, '
+                 + '<b>baixar</b> e <b>excluir</b>.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: '#axViewerBody',
+            titulo: 'Visualizador',
+            texto: 'Ao abrir um anexo, ele é exibido aqui mesmo. Use <b>Abrir em nova aba</b> ou '
+                 + '<b>Baixar</b> quando precisar do arquivo, e <b>Voltar</b> para a lista.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        }
+    ];
+
+    var passosCapConfig = [
+        {
+            alvo: '#cfg_email',
+            titulo: 'E-mail dos alertas',
+            texto: 'Endereço que recebe os avisos de contas a vencer e vencidas. Pode ser a conta '
+                 + 'administrativa do cartório.',
+            posicao: 'baixo',
+            aguardar: 2500
+        },
+        {
+            alvo: '#cfg_dias',
+            titulo: 'Antecedência do aviso',
+            texto: 'Quantos dias antes do vencimento o alerta é enviado. Esse mesmo número define o '
+                 + 'cartão <b>A vencer</b> no painel.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#cfg_ativo',
+            subir: '.form-check',
+            titulo: 'Ativar os alertas',
+            texto: 'Liga ou desliga o envio automático, sem perder as configurações.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#configForm',
+            titulo: 'Servidor de envio (SMTP)',
+            texto: 'Host, porta, tipo de segurança, usuário, senha e o remetente. São os dados da conta '
+                 + 'de e-mail que o sistema usa para enviar — normalmente fornecidos pelo provedor.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#cfgTestBtn',
+            titulo: 'Testar o envio',
+            texto: 'Dispara um e-mail de teste com os dados preenchidos. Faça isso antes de confiar nos '
+                 + 'alertas — é a forma de saber que a configuração está correta.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosCapExtrato = [
+        {
+            alvo: '.hero, #main h1',
+            titulo: 'Extrato da conta virtual',
+            texto: 'Mostra, lançamento a lançamento, o que entrou e o que saiu de cada “caixinha” do '
+                 + 'cartório — <b>Banco</b> e <b>Espécie</b>. Use os botões acima para alternar entre elas.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: 'input[name="de"]',
+            subir: '.filter-card',
+            titulo: 'Período',
+            texto: 'Delimite o intervalo do extrato e clique em filtrar. Os totais acompanham o período '
+                 + 'escolhido.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#tabelaContas',
+            titulo: 'Os movimentos',
+            texto: 'Data, descrição, observação e valor de cada lançamento — pagamentos de contas, '
+                 + 'transferências entre as contas virtuais e, no Banco, os recebimentos de O.S. que não '
+                 + 'foram em espécie.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: '#btnTransferir',
+            titulo: 'Transferir entre contas',
+            texto: 'Abre a janela de transferência — usada quando o dinheiro em espécie é depositado no '
+                 + 'banco, ou quando se faz um saque para o caixa. A janela tem o seu próprio guia.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '.js-estornar',
+            titulo: 'Estornar uma transferência',
+            texto: 'Transferências lançadas por engano podem ser estornadas pelo botão vermelho da linha, '
+                 + 'que desfaz o movimento nas duas contas.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        }
+    ];
+
+    var passosCapTransferir = [
+        {
+            alvo: '#tr_origem',
+            titulo: 'Origem e destino',
+            texto: 'De qual conta virtual o valor sai e para qual ele vai. O botão de <b>inverter</b>, '
+                 + 'entre os dois campos, troca a direção com um clique.',
+            posicao: 'baixo',
+            aguardar: 2500
+        },
+        {
+            alvo: '#tr_valor',
+            titulo: 'Valor',
+            texto: 'Quanto será transferido. O atalho <b>“Usar todo o saldo disponível”</b> preenche com '
+                 + 'o saldo inteiro da origem — prático ao depositar toda a espécie no banco.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#tr_data',
+            titulo: 'Data e observação',
+            texto: 'A data do movimento e um texto livre para identificá-lo no extrato (“depósito do dia”, '
+                 + '“saque para troco”).',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#tr_saldo_box',
+            titulo: 'Saldo da origem',
+            texto: 'Fica visível para você conferir se a transferência deixa a conta de origem negativa.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#trConfirmBtn',
+            titulo: 'Transferir',
+            texto: 'Lança a saída na origem e a entrada no destino, na mesma data. Se errar, dá para '
+                 + 'estornar depois pela própria linha do extrato.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosCapRelatorios = [
+        {
+            alvo: '.filter-card',
+            titulo: 'Relatórios de contas',
+            texto: 'Consolida as contas por período. Escolha o intervalo e a <b>base da data</b> — se o '
+                 + 'relatório considera o <b>vencimento</b> ou a <b>data de pagamento</b>; a diferença '
+                 + 'muda bastante o resultado no fechamento do mês.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: 'select[name="categoria"]',
+            titulo: 'Categoria e situação',
+            texto: 'Refina por categoria de despesa e por situação (pagas, em aberto, vencidas).',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#chartCat',
+            subir: '.row',
+            titulo: 'Os gráficos',
+            texto: 'Distribuição <b>por categoria</b> e evolução <b>por mês</b>, sempre conforme os '
+                 + 'filtros aplicados.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#tabelaContas',
+            titulo: 'A tabela detalhada',
+            texto: 'Vencimento, título, categoria, fornecedor, nota fiscal, valor, situação, data e forma '
+                 + 'de pagamento — e o botão de <b>anexos</b> para conferir os comprovantes sem sair daqui.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: 'a[href*="export=csv"]',
+            titulo: 'Exportar CSV',
+            texto: 'Baixa exatamente o que está filtrado, para abrir no Excel — útil para a contabilidade '
+                 + 'e para conferências fora do sistema.',
+            posicao: 'baixo',
+            opcional: true
+        }
+    ];
+
+    /* ==================================================================
+     * 5k) ARQUIVAMENTO DIGITAL — arquivamento/
+     * ================================================================ */
+    var passosArq = [
+        {
+            alvo: '#kpi-total',
+            subir: '.arq-kpis, .row, section',
+            titulo: 'Arquivamento Digital',
+            texto: 'O acervo digital da serventia: cada registro guarda os dados do ato, as partes '
+                 + 'envolvidas e os documentos digitalizados. Os indicadores do topo mostram o total de '
+                 + 'arquivamentos, os do mês, a quantidade de anexos e o espaço ocupado.',
+            posicao: 'baixo',
+            aguardar: 3000
+        },
+        {
+            alvo: '#arq-q',
+            titulo: 'Busca rápida',
+            texto: 'Procura em tudo de uma vez — nome de parte, CPF/CNPJ, livro, folha, termo, protocolo, '
+                 + 'matrícula e descrição. É o caminho mais curto quando você já sabe o que procura.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#arq-periodo',
+            titulo: 'Período',
+            texto: 'Fatias rápidas de tempo — hoje, 7 dias, 30 dias, o ano ou tudo. O acervo abre nos '
+                 + 'últimos 30 dias; para consultas antigas, escolha <b>Tudo</b>.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-alternar-filtros',
+            titulo: 'Filtros avançados',
+            texto: 'Abre a busca campo a campo: atribuição, categoria, nome, CPF/CNPJ, livro, folha, '
+                 + 'termo, protocolo, matrícula, descrição, intervalo de datas e presença de anexo. '
+                 + 'Use quando a busca rápida trouxer resultados demais.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-visao',
+            titulo: 'Fichas ou tabela',
+            texto: 'Alterna a apresentação dos resultados: <b>fichas</b> mostram mais contexto de cada '
+                 + 'registro; a <b>tabela</b> é melhor para conferir muitos de uma vez.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-ordenar',
+            titulo: 'Ordenação',
+            texto: 'Define a ordem da listagem — por data do ato ou de cadastro, do mais novo ao mais '
+                 + 'antigo e vice-versa.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-resultados',
+            titulo: 'Os resultados',
+            texto: 'Clique em um registro para abrir o <b>painel de detalhe</b>, com os dados completos, '
+                 + 'os anexos, a capa e o histórico. Cada registro tem uma caixinha de seleção — é por '
+                 + 'ela que se trabalha com vários ao mesmo tempo.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: '#arq-selecao',
+            titulo: 'Trabalhando com vários',
+            texto: 'Ao marcar registros, aparece esta barra flutuante:<ul>'
+                 + '<li><b>Compilar</b> — junta os anexos de todos em um PDF único, com capa e índice;</li>'
+                 + '<li><b>ZIP</b> — baixa os arquivos originais compactados;</li>'
+                 + '<li><b>CSV</b> — exporta os dados dos registros para planilha;</li>'
+                 + '<li><b>Selecionar todos</b> e <b>limpar seleção</b> completam a barra.</li></ul>',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: 'a[href="cadastro.php"]',
+            titulo: 'Novo arquivamento',
+            texto: 'Abre o cadastro em quatro passos: dados do ato, partes, anexos e selos.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: 'a[href="categorias.php"]',
+            titulo: 'Categorias e Lixeira',
+            texto: '<b>Categorias</b> organiza o acervo por tipo de ato — renomear uma categoria '
+                 + 'reclassifica sozinho todos os registros que a usavam. <b>Lixeira</b> guarda o que '
+                 + 'foi excluído, por um prazo, permitindo restaurar. As duas telas têm guia próprio.',
+            posicao: 'baixo',
+            opcional: true
+        }
+    ];
+
+    var passosArqDetalhe = [
+        {
+            alvo: '#arq-detalhe-corpo',
+            titulo: 'Detalhe do arquivamento',
+            texto: 'Reúne tudo do registro: dados do ato, partes qualificadas, anexos, selos emitidos e '
+                 + 'os últimos eventos de <b>auditoria</b> — quem cadastrou, editou ou excluiu, e quando.',
+            posicao: 'topo',
+            aguardar: 3000
+        },
+        {
+            alvo: '#arq-detalhe-capa',
+            titulo: 'Capa do arquivamento',
+            texto: 'Gera a capa para impressão, com uma moldura por selo emitido (com QR, texto e '
+                 + 'funcionário) — ou uma moldura em branco, para colar o selo depois, quando ainda '
+                 + 'não houver emissão.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-detalhe-compilar',
+            titulo: 'Compilar o dossiê',
+            texto: 'Junta os anexos deste registro em um PDF único, com capa e índice. A janela de '
+                 + 'compilação tem o seu próprio guia.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-detalhe-editar',
+            titulo: 'Editar',
+            texto: 'Abre o cadastro com os dados carregados — é também por aqui que se chega ao passo de '
+                 + '<b>solicitar selo</b>, que só existe para arquivamentos já gravados.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosArqVisor = [
+        {
+            alvo: '#arq-visor-palco',
+            titulo: 'Visualizador de documentos',
+            texto: 'PDFs, imagens e textos abrem aqui mesmo. Os demais formatos — planilhas, XML, DWG — '
+                 + 'são baixados, porque o navegador não os exibe.',
+            posicao: 'topo',
+            aguardar: 3000
+        },
+        {
+            alvo: '#arq-visor-aba',
+            titulo: 'Abrir em nova aba e baixar',
+            texto: 'Para ver em tela cheia ou guardar o arquivo original, use estes dois botões — o '
+                 + 'nome baixado é sempre o nome original do documento.',
+            posicao: 'baixo',
+            opcional: true
+        }
+    ];
+
+    var passosArqCompilar = [
+        {
+            alvo: '#arq-compilar-resumo',
+            titulo: 'Compilar dossiê',
+            texto: 'Junta imagens e PDFs em um documento único, com <b>capa</b> e <b>índice</b>. O resumo '
+                 + 'mostra o que entrará na compilação.',
+            posicao: 'baixo',
+            aguardar: 3000
+        },
+        {
+            alvo: '#arq-pilha',
+            titulo: 'A ordem dos documentos',
+            texto: 'A bandeja lista os anexos na ordem em que serão juntados — <b>arraste</b> para '
+                 + 'reordenar antes de gerar, e desmarque o que não deve entrar.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-carimbar',
+            subir: 'label, .arq-campo',
+            titulo: 'Carimbo de folhas',
+            texto: 'Ligado, cada página recebe o carimbo <b>fl. N/M</b> — a numeração contínua que se '
+                 + 'espera de um dossiê arquivado.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-compilar-zip',
+            subir: 'label, .arq-campo',
+            titulo: 'Baixar em ZIP',
+            texto: 'Em vez do PDF único, baixa os arquivos originais compactados — útil quando é preciso '
+                 + 'entregar os documentos exatamente como foram arquivados.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-compilar-gerar',
+            titulo: 'Gerar',
+            texto: 'A junção acontece <b>no próprio navegador</b>: os anexos são baixados, as páginas '
+                 + 'contadas e o PDF é montado aqui. Por isso a barra de progresso — em dossiês grandes '
+                 + 'leva alguns segundos, e a aba precisa ficar aberta até o fim.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosArqCadastro = [
+        {
+            alvo: '#atribuicao',
+            titulo: 'Passo 01 — dados do ato',
+            texto: '<b>Atribuição</b> e <b>categoria</b> classificam o arquivamento e são obrigatórias, '
+                 + 'junto com a <b>data do ato</b>. O botão ao lado da categoria cria uma nova sem sair '
+                 + 'da tela.',
+            posicao: 'baixo',
+            aguardar: 2500
+        },
+        {
+            alvo: '#livro',
+            titulo: 'Localização do ato',
+            texto: 'Livro, folha, termo/ordem, protocolo e matrícula — preencha o que se aplicar ao seu '
+                 + 'tipo de ato. São justamente esses campos que a busca do acervo pesquisa depois.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#p-cpf',
+            titulo: 'Passo 02 — partes',
+            texto: 'Informe CPF/CNPJ, nome e a <b>qualificação</b> (outorgante, outorgado, requerente…) '
+                 + 'e clique em <b>adicionar</b>. Repita para cada pessoa — são elas que tornam o '
+                 + 'registro localizável por nome ou documento.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#solta',
+            titulo: 'Passo 03 — anexos',
+            texto: 'Arraste os documentos digitalizados para esta área ou clique para escolher. O acervo '
+                 + 'aceita <b>qualquer formato</b> (PDF, imagens, planilhas, XML…); arquivos que o '
+                 + 'servidor poderia executar são neutralizados na gravação, mantendo o nome original '
+                 + 'para você.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#bloco-selos',
+            titulo: 'Passo 04 — selos',
+            texto: 'Este passo aparece quando o arquivamento <b>já está gravado</b>, porque o selo precisa '
+                 + 'do número do registro. Livro, folha, termo, escrevente e partes vão preenchidos do '
+                 + 'que já está na tela.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#ato',
+            titulo: 'Dados do selo',
+            texto: 'Escolha o <b>ato</b> e a <b>tabela de custas</b>, informe a quantidade de folhas e, '
+                 + 'sendo o caso, marque <b>isento</b> e descreva o motivo. Depois clique em '
+                 + '<b>solicitar selo</b>.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#salvar',
+            titulo: 'Salvar',
+            texto: 'Grava o arquivamento e o devolve ao acervo. Os anexos são enviados junto — em '
+                 + 'documentos grandes, aguarde a barra concluir antes de sair da tela.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosArqCategorias = [
+        {
+            alvo: '#nova',
+            titulo: 'Criar categoria',
+            texto: 'Digite o nome e clique em criar. As categorias organizam o acervo e alimentam os '
+                 + 'filtros da tela principal — vale combinar um padrão de nomes com a equipe.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#lista',
+            titulo: 'Renomear e excluir',
+            texto: '<b>Renomear</b> reclassifica sozinho todos os registros que usavam o nome antigo — '
+                 + 'nenhum arquivamento fica órfão.<br><b>Excluir</b> só é permitido quando a categoria '
+                 + 'não estiver em uso por nenhum registro.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        }
+    ];
+
+    var passosArqLixeira = [
+        {
+            alvo: '#busca',
+            titulo: 'Lixeira',
+            texto: 'Tudo o que é excluído no acervo vem para cá e fica disponível por um prazo, antes do '
+                 + 'descarte definitivo. Use a busca para localizar o registro.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#lista',
+            titulo: 'Restaurar ou expurgar',
+            texto: 'A lista mostra quem excluiu e o <b>prazo</b> restante.<ul>'
+                 + '<li><b>Restaurar</b> devolve o registro ao acervo, com os anexos;</li>'
+                 + '<li><b>Excluir definitivamente</b> (expurgo) é irreversível: exige perfil autorizado '
+                 + 'e a digitação do número do arquivamento como confirmação.</li></ul>',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        }
+    ];
+
+    /* ==================================================================
+     * 5k) ARQUIVAMENTO DIGITAL — arquivamento/
+     *     Acervo (busca, seleção, compilação), cadastro em 3 passos,
+     *     categorias e lixeira. As janelas têm guia próprio.
+     * ================================================================ */
+    var passosArq = [
+        {
+            alvo: '.arq-kpis, #kpi-total',
+            subir: '.arq-kpis',
+            titulo: 'Arquivamento Digital',
+            texto: 'O acervo digital da serventia: aqui ficam guardados, indexados e pesquisáveis os '
+                 + 'documentos arquivados. Os indicadores do topo mostram o total de arquivamentos, os '
+                 + 'do mês, a quantidade de documentos e o espaço ocupado.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#arq-q',
+            titulo: 'Busca rápida',
+            texto: 'Procura em todo o registro de uma vez — número, nome das partes, CPF/CNPJ, livro, '
+                 + 'folha, descrição. É por onde começa a maioria das consultas do balcão.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#arq-periodo',
+            titulo: 'Recorte de período',
+            texto: 'Atalhos por <b>hoje</b>, <b>7 dias</b>, <b>30 dias</b>, <b>ano</b> ou <b>tudo</b>. '
+                 + 'O padrão são 30 dias; para consultas antigas, lembre-se de trocar para “tudo”.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-alternar-filtros',
+            titulo: 'Filtros avançados',
+            texto: 'Abre a busca detalhada: atribuição, categoria, nome da parte, CPF/CNPJ, livro, folha, '
+                 + 'termo, protocolo, matrícula, descrição, data exata, intervalo e presença de '
+                 + 'documentos anexados. Use quando a busca rápida trouxer resultado demais.',
+            posicao: 'baixo',
+            aoEntrar: function (el) {
+                if (el && el.getAttribute('aria-expanded') === 'false') { el.click(); }
+            }
+        },
+        {
+            alvo: '#arq-f-atribuicao',
+            titulo: 'Combinando filtros',
+            texto: 'Os campos se somam: atribuição + categoria + período, por exemplo, isolam '
+                 + 'rapidamente um conjunto de atos. Os filtros ativos ficam listados logo abaixo, e '
+                 + 'podem ser removidos um a um.',
+            posicao: 'baixo',
+            aguardar: 2000,
+            opcional: true
+        },
+        {
+            alvo: '#arq-visao',
+            titulo: 'Fichas ou tabela',
+            texto: 'Alterne entre a visão em <b>fichas</b> (melhor para leitura) e em <b>tabela</b> '
+                 + '(melhor para conferir muitos registros de uma vez). A ordenação fica ao lado.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-resultados',
+            titulo: 'Os resultados',
+            texto: 'Clique em um registro para abrir o <b>detalhe</b>, com as partes, os documentos '
+                 + 'anexados, os selos vinculados e o histórico de quem consultou ou alterou aquele '
+                 + 'arquivamento.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: '#arq-selecao',
+            titulo: 'Seleção múltipla',
+            texto: 'Marcando vários registros aparece a barra flutuante com as ações em lote: '
+                 + '<b>Compilar</b> (dossiê único em PDF), <b>ZIP</b> (originais + manifesto), '
+                 + '<b>CSV</b> (planilha do resultado) e <b>limpar seleção</b>.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        },
+        {
+            alvo: 'a[href="cadastro.php"]',
+            titulo: 'Novo arquivamento',
+            texto: 'Abre o formulário de cadastro, em três passos: dados do ato, partes envolvidas e '
+                 + 'documentos. Aquela tela tem o seu próprio guia.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: 'a[href="categorias.php"]',
+            titulo: 'Categorias e Lixeira',
+            texto: '<b>Categorias</b> organiza a classificação do acervo — renomear uma categoria '
+                 + 'reclassifica sozinho todos os registros que a usavam. <b>Lixeira</b> guarda o que '
+                 + 'foi excluído, pelo prazo de retenção, antes do descarte definitivo.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosArqDetalhe = [
+        {
+            alvo: '#arq-detalhe-corpo',
+            titulo: 'Detalhe do arquivamento',
+            texto: 'Reúne tudo o que existe sobre o registro: dados do ato (livro, folha, termo, '
+                 + 'protocolo, matrícula), as <b>partes</b>, os <b>documentos anexados</b> e os '
+                 + '<b>selos digitais</b> vinculados. Clique em um documento para vê-lo sem sair da tela.',
+            posicao: 'topo',
+            aguardar: 3000
+        },
+        {
+            alvo: '#arq-detalhe-capa',
+            titulo: 'Capa de arquivamento',
+            texto: 'Gera a capa em PDF para a juntada física do processo — com os dados do ato e os '
+                 + 'selos vinculados.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-detalhe-compilar',
+            titulo: 'Compilar este dossiê',
+            texto: 'Junta os documentos deste arquivamento em um <b>PDF único</b>, com capa e índice.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-detalhe-editar',
+            titulo: 'Editar',
+            texto: 'Abre o registro no formulário de cadastro para corrigir dados, incluir partes ou '
+                 + 'anexar novos documentos. Toda alteração fica registrada na trilha de auditoria.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosArqCompilar = [
+        {
+            alvo: '#arq-compilar-resumo',
+            titulo: 'Compilar dossiê',
+            texto: 'Junta os documentos selecionados em um <b>PDF único</b>, com capa e índice — e o '
+                 + 'índice já sai com o intervalo de folhas de cada documento (1–3, 4, 5–12).<br>'
+                 + 'A junção acontece <b>no seu navegador</b>: não pesa no servidor e dá conta de '
+                 + 'dossiês grandes.',
+            posicao: 'baixo',
+            aguardar: 3000
+        },
+        {
+            alvo: '#arq-pilha',
+            titulo: 'A ordem dos documentos',
+            texto: 'A bandeja mostra a pilha na ordem em que os documentos entrarão no PDF. '
+                 + '<b>Arraste</b> para reordenar antes de gerar.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-carimbar',
+            subir: 'label',
+            titulo: 'Numeração das folhas',
+            texto: 'Com esta opção ligada, cada folha do corpo recebe o carimbo <b>fl. N/M</b> — '
+                 + 'inclusive nas páginas giradas, respeitando a orientação.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-compilar-gerar',
+            titulo: 'Gerar o PDF',
+            texto: 'Monta capa, índice e corpo e entrega o arquivo. Formatos que não entram no PDF '
+                 + '(DOCX, XLSX, TXT, P7S) são listados na capa como <b>não incorporados</b> — para '
+                 + 'esses, use o ZIP.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#arq-compilar-zip',
+            titulo: 'Baixar em ZIP',
+            texto: 'Alternativa que preserva os <b>originais</b>, acompanhados de um '
+                 + '<b>MANIFESTO.txt</b> com o SHA-256 de cada arquivo — serve para provar que o '
+                 + 'documento entregue é bit a bit o que está no acervo.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosArqVisor = [
+        {
+            alvo: '#arq-visor-palco',
+            titulo: 'Visualizador de documentos',
+            texto: 'Exibe o documento sem sair do acervo. A entrega passa sempre por rota autenticada — '
+                 + 'e cada consulta fica registrada na trilha de auditoria.',
+            posicao: 'topo',
+            aguardar: 3000
+        },
+        {
+            alvo: '#arq-visor-baixar',
+            titulo: 'Abrir em aba e baixar',
+            texto: 'Use <b>abrir em nova aba</b> para conferir em tela cheia ou <b>baixar</b> quando '
+                 + 'precisar do arquivo original.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosArqCadastro = [
+        {
+            alvo: '#atribuicao',
+            titulo: 'Passo 1 — dados do ato',
+            texto: 'Comece pela <b>atribuição</b> e pela <b>categoria</b> (o botão <b>+</b> ao lado cria '
+                 + 'uma categoria nova sem sair daqui) e pela <b>data do ato</b>. Os três são '
+                 + 'obrigatórios.',
+            posicao: 'baixo',
+            aguardar: 2000
+        },
+        {
+            alvo: '#livro',
+            titulo: 'Localização do ato',
+            texto: '<b>Livro</b>, <b>folha</b>, <b>termo/ordem</b>, <b>protocolo</b> e <b>matrícula</b>: '
+                 + 'preencha o que existir. São esses campos que permitem reencontrar o documento anos '
+                 + 'depois, e todos são pesquisáveis no acervo.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#descricao',
+            titulo: 'Descrição',
+            texto: 'Um resumo do que está sendo arquivado. Vale caprichar: é o texto que aparece na '
+                 + 'busca e ajuda quem for procurar depois sem saber o número.',
+            posicao: 'topo',
+            opcional: true
+        },
+        {
+            alvo: '#p-cpf',
+            titulo: 'Passo 2 — partes',
+            texto: 'Informe <b>CPF/CNPJ</b>, <b>nome completo</b> e a <b>qualificação</b> (outorgante, '
+                 + 'outorgado, requerente…) e clique em adicionar. Repita para cada pessoa envolvida — '
+                 + 'a busca por nome e por documento depende disso.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#partes',
+            titulo: 'Partes adicionadas',
+            texto: 'A lista mostra quem já foi incluído; dá para remover antes de salvar.',
+            posicao: 'topo',
+            aguardar: 2500,
+            opcional: true
+        },
+        {
+            alvo: '#solta',
+            titulo: 'Passo 3 — documentos',
+            texto: 'Arraste os arquivos para esta área ou clique para escolher. Qualquer formato é '
+                 + 'aceito — é um acervo de cartório —, mas arquivos executáveis no servidor são '
+                 + 'neutralizados na gravação, por segurança.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#fila',
+            titulo: 'Fila de envio',
+            texto: 'Acompanhe aqui o progresso de cada anexo. Ao editar um arquivamento, os documentos '
+                 + 'já existentes aparecem acima e podem ser removidos.',
+            posicao: 'topo',
+            aguardar: 2500,
+            opcional: true
+        },
+        {
+            alvo: '#btnAddSelo',
+            titulo: 'Selos digitais',
+            texto: 'Vincule o selo do ato: informe <b>ato</b>, <b>tabela de custas</b> e <b>quantidade '
+                 + 'de folhas</b>; havendo <b>isenção</b>, marque a opção e informe o motivo. Os selos '
+                 + 'vinculados saem na capa e no dossiê compilado.',
+            posicao: 'baixo',
+            opcional: true
+        },
+        {
+            alvo: '#salvar',
+            titulo: 'Salvar o arquivamento',
+            texto: 'Grava o registro com as partes, os anexos e os selos. Depois de salvo, ele já '
+                 + 'aparece no acervo e pode ser compilado, ter capa gerada ou ser editado.',
+            posicao: 'topo',
+            opcional: true
+        }
+    ];
+
+    var passosArqCategorias = [
+        {
+            alvo: '#nova',
+            titulo: 'Criar categoria',
+            texto: 'Digite o nome e clique em criar. As categorias organizam o acervo e alimentam os '
+                 + 'filtros da busca — vale combinar um padrão com a equipe antes de sair criando.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#lista',
+            titulo: 'Renomear e excluir',
+            texto: '<b>Renomear</b> reclassifica automaticamente todos os registros que usavam o nome '
+                 + 'antigo — nada fica órfão. Já a <b>exclusão</b> só é permitida quando a categoria '
+                 + 'não estiver em uso por nenhum arquivamento.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        }
+    ];
+
+    var passosArqLixeira = [
+        {
+            alvo: '#busca',
+            titulo: 'Lixeira',
+            texto: 'Arquivamentos excluídos não somem na hora: ficam aqui pelo prazo de retenção '
+                 + 'configurado, e podem ser localizados pela busca.',
+            posicao: 'baixo'
+        },
+        {
+            alvo: '#lista',
+            titulo: 'Restaurar ou expurgar',
+            texto: '<b>Restaurar</b> devolve o registro ao acervo com tudo o que ele tinha. '
+                 + 'O <b>expurgo</b> é definitivo e por isso é protegido: exige perfil autorizado e '
+                 + 'digitar o número do arquivamento para confirmar. Não há como desfazer.',
+            posicao: 'topo',
+            aguardar: 3000,
+            opcional: true
+        }
+    ];
+
+    /* ==================================================================
      * 6) TABELA DE EMOLUMENTOS — tabela_de_emolumentos.php
      * ================================================================ */
     var passosEmolumentos = [
@@ -2044,8 +3074,93 @@
     var emSignum = caminho.indexOf('/signum/') >= 0;
     var emForja = caminho.indexOf('/forja/') >= 0;
     var emCaixa = caminho.indexOf('/caixa/') >= 0;
+    var emCap = caminho.indexOf('/contas_a_pagar/') >= 0;
+    var emArq = caminho.indexOf('/arquivamento/') >= 0;
+    var emArq = caminho.indexOf('/arquivamento/') >= 0;
 
-    if (emCaixa) {
+    if (emArq) {
+        if (/^cadastro/.test(pagina)) {
+            window.GuiaOS.registrar('arq-cadastro', passosArqCadastro, {
+                rotuloAjuda: 'Como cadastrar um arquivamento',
+                mensagemFinal: 'Arquivamento pronto! Ele já aparece no acervo, pesquisável por parte, livro e protocolo.'
+            });
+            window.GuiaOS.autoIniciar('arq-cadastro');
+        } else if (/^categorias/.test(pagina)) {
+            window.GuiaOS.registrar('arq-categorias', passosArqCategorias, {
+                rotuloAjuda: 'Guia das categorias'
+            });
+        } else if (/^lixeira/.test(pagina)) {
+            window.GuiaOS.registrar('arq-lixeira', passosArqLixeira, {
+                rotuloAjuda: 'Guia da lixeira'
+            });
+        } else {
+            var ROTULO_ARQ = 'Guia do Arquivamento';
+            window.GuiaOS.registrar('arq', passosArq, {
+                rotuloAjuda: ROTULO_ARQ,
+                mensagemFinal: 'Cada painel do módulo tem o seu guia: abra o painel e clique no “?”.'
+            });
+            var JANELAS_ARQ = [
+                ['#arq-dlg-detalhe', 'arq-detalhe', 'Como ler o detalhe do registro', passosArqDetalhe],
+                ['#arq-dlg-visor', 'arq-visor', 'Como usar o visualizador', passosArqVisor],
+                ['#arq-dlg-compilar', 'arq-compilar', 'Como compilar o dossiê', passosArqCompilar]
+            ];
+            for (var iA = 0; iA < JANELAS_ARQ.length; iA++) {
+                (function (j) {
+                    window.GuiaOS.registrar(j[1], j[3], {
+                        botaoAjuda: false,
+                        rotuloAjuda: j[2],
+                        mensagemFinal: 'Feche o painel para voltar ao acervo.'
+                    });
+                    ligarModalGuia(j[0], j[1], j[2], 'arq', ROTULO_ARQ);
+                })(JANELAS_ARQ[iA]);
+            }
+            window.GuiaOS.autoIniciar('arq');
+        }
+    } else if (emCap) {
+        if (/^extrato/.test(pagina)) {
+            window.GuiaOS.registrar('cap-extrato', passosCapExtrato, {
+                rotuloAjuda: 'Guia do extrato',
+                mensagemFinal: 'Extrato conferido! Volte ao painel pelo botão “Contas a pagar”.'
+            });
+            window.GuiaOS.registrar('cap-transferir', passosCapTransferir, {
+                botaoAjuda: false,
+                rotuloAjuda: 'Como transferir entre contas',
+                mensagemFinal: 'Transferência registrada — confira no extrato das duas contas.'
+            });
+            ligarModalGuia('#transferirModal', 'cap-transferir', 'Como transferir entre contas',
+                           'cap-extrato', 'Guia do extrato');
+            window.GuiaOS.autoIniciar('cap-extrato');
+        } else if (/^relatorios/.test(pagina)) {
+            window.GuiaOS.registrar('cap-relatorios', passosCapRelatorios, {
+                rotuloAjuda: 'Guia dos relatórios',
+                mensagemFinal: 'Pronto! Use o CSV quando precisar dos números fora do sistema.'
+            });
+            window.GuiaOS.autoIniciar('cap-relatorios');
+        } else {
+            var ROTULO_CAP = 'Guia do Contas a Pagar';
+            window.GuiaOS.registrar('cap', passosCap, {
+                rotuloAjuda: ROTULO_CAP,
+                mensagemFinal: 'Cada janela do módulo tem o seu guia: abra a janela e clique no “?”.'
+            });
+            var JANELAS_CAP = [
+                ['#contaModal', 'cap-conta', 'Como cadastrar uma conta', passosCapConta],
+                ['#pagarModal', 'cap-pagar', 'Como registrar o pagamento', passosCapPagar],
+                ['#anexosModal', 'cap-anexos', 'Como anexar documentos', passosCapAnexos],
+                ['#configModal', 'cap-config', 'Como configurar os alertas', passosCapConfig]
+            ];
+            for (var iP = 0; iP < JANELAS_CAP.length; iP++) {
+                (function (j) {
+                    window.GuiaOS.registrar(j[1], j[3], {
+                        botaoAjuda: false,
+                        rotuloAjuda: j[2],
+                        mensagemFinal: 'Feche a janela para voltar ao painel de contas.'
+                    });
+                    ligarModalGuia(j[0], j[1], j[2], 'cap', ROTULO_CAP);
+                })(JANELAS_CAP[iP]);
+            }
+            window.GuiaOS.autoIniciar('cap');
+        }
+    } else if (emCaixa) {
         var ROTULO_CAIXA = 'Guia do Fluxo de Caixa';
         window.GuiaOS.registrar('caixa', passosCaixa, {
             rotuloAjuda: ROTULO_CAIXA,

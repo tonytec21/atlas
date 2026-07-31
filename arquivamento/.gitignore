@@ -1,0 +1,10 @@
+config.local.php
+meta-dados/*.json
+meta-dados/.indice.json
+arquivos/*/
+arquivos-assinados/*
+lixeira/*
+logs/*.jsonl
+logs/*.log
+!*/index.php
+!*/.htaccess

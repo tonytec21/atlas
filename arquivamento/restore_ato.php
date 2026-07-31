@@ -1,28 +1,10 @@
 <?php
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = $_POST['id'];
-
-    $jsonFile = "lixeira/$id.json";
-    $jsonDest = "meta-dados/$id.json";
-    $dirSource = "lixeira/$id/";
-    $dirDest = "arquivos/$id/";
-
-    if (file_exists($jsonFile)) {
-        rename($jsonFile, $jsonDest);
-    }
-
-    if (is_dir($dirSource)) {
-        if (!is_dir($dirDest)) {
-            mkdir($dirDest, 0777, true);
-        }
-        $files = glob($dirSource . '*');
-        foreach ($files as $file) {
-            $fileDest = $dirDest . basename($file);
-            rename($file, $fileDest);
-        }
-        rmdir($dirSource);
-    }
-
-    echo json_encode(['status' => 'success']);
-}
-?>
+/** Legado: restaura da lixeira. */
+require_once __DIR__ . '/_compat.php';
+arq_exige_login();
+arq_compat_exige_post();
+arq_compat_avisar('restore_ato.php');
+$_POST['acao'] = 'restaurar';
+$_POST['_csrf'] = arq_csrf_token();
+$_REQUEST['acao'] = 'restaurar';
+require __DIR__ . '/api/lixeira.php';
