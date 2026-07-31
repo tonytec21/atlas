@@ -1805,7 +1805,26 @@ function viewTask(taskToken) {
             token: taskToken
         },
         success: function(response) {
-            var task = JSON.parse(response);
+            var task;
+            try {
+                task = (typeof response === 'string') ? JSON.parse(response) : response;
+            } catch (e) {
+                // O endpoint devolveu HTML (aviso ou erro do PHP) em vez de JSON.
+                console.error('Resposta inválida de view_task.php:', response);
+                if (window.Swal) {
+                    Swal.fire({ icon: 'error', title: 'Não foi possível abrir a tarefa',
+                                text: 'O servidor devolveu uma resposta inesperada. Verifique o log do PHP.' });
+                }
+                return;
+            }
+
+            if (task && task.error) {
+                console.error('view_task.php:', task.detalhe || task.error);
+                if (window.Swal) {
+                    Swal.fire({ icon: 'error', title: 'Não foi possível abrir a tarefa', text: task.error });
+                }
+                return;
+            }
 
             // Carregar os dados da tarefa
             $('#viewTitle').val(task.titulo)

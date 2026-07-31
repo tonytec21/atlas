@@ -1,10 +1,23 @@
-# Bloqueio total de acesso direto + desligamento do motor PHP.
+# A lista de categorias e consumida por HTTP pelo modulo Tarefas
+# (../arquivamento/categorias/categorias.json), entao este arquivo especifico
+# precisa continuar acessivel. Nao ha dado pessoal nele — so os nomes das
+# categorias de arquivamento.
+#
+# Todo o resto da pasta segue bloqueado, e o motor PHP fica desligado.
+
 <IfModule mod_authz_core.c>
   Require all denied
+  <Files "categorias.json">
+    Require all granted
+  </Files>
 </IfModule>
+
 <IfModule !mod_authz_core.c>
   Order allow,deny
   Deny from all
+  <Files "categorias.json">
+    Allow from all
+  </Files>
 </IfModule>
 
 <IfModule mod_php.c>
