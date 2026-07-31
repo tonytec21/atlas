@@ -1448,13 +1448,13 @@ function imovelTemGeo($conn, $id) {
 
 /* Mapeia um imóvel SEM coordenadas (ex.: exclusivo da ITN 03) a partir de um KML ou memorial/SIGEF:
    extrai a geometria e atualiza a linha como MAPEADA (origem, coordenadas e itn03_exclusivo=0). */
-function mapearImovelComGeo($conn, $id, $origem, $conteudo) {
+function mapearImovelComGeo($conn, $id, $origem, $conteudo, $geoPronto = null) {
     $id = (int)$id;
     if ($id <= 0) return ['ok' => false, 'erro' => 'Imóvel inválido.'];
     $conteudo = (string)$conteudo;
     if (trim($conteudo) === '') return ['ok' => false, 'erro' => 'Conteúdo do KML/memorial vazio.'];
     $origem = ($origem === 'kml') ? 'kml' : 'memorial';
-    $geo = processarFonte($origem, $conteudo);
+    $geo = (is_array($geoPronto) && !empty($geoPronto['ok'])) ? $geoPronto : processarFonte($origem, $conteudo);
     if (empty($geo['ok'])) {
         return ['ok' => false, 'erro' => 'Não foi possível extrair coordenadas do ' . ($origem === 'kml' ? 'KML' : 'memorial/SIGEF') . ' (vértices encontrados: ' . (int)($geo['num_vertices'] ?? 0) . ').'];
     }
@@ -5531,6 +5531,59 @@ if (isset($_POST['acao'])) {
             ], JSON_UNESCAPED_UNICODE); exit;
         }
 
+        if ($acao === 'anexo_mapear') {
+            // (RE)MAPEIA o imóvel a partir de um anexo já arquivado: extrai as coordenadas do KML
+            // ou do PDF (matrícula/SIGEF, memorial via IA) e SUBSTITUI a geometria atual.
+            // Diferente do fluxo de anexar/analisar, aqui o remapeamento é EXPLÍCITO — vale
+            // inclusive para imóvel que já tem geometria (ex.: matrícula com memorial errado,
+            // corrigida depois pelo PDF do SIGEF).
+            $mid = (int)($_POST['id'] ?? 0);
+            $aid = (int)($_POST['aid'] ?? 0);
+            if ($mid <= 0 || $aid <= 0) { echo json_encode(['ok' => false, 'erro' => 'Imóvel ou anexo inválido.']); exit; }
+            $a = anexoObter($conn, $aid);
+            if (!$a || (int)($a['memorial_id'] ?? 0) !== $mid) { echo json_encode(['ok' => false, 'erro' => 'Anexo não encontrado neste imóvel.']); exit; }
+            $bytes = @file_get_contents(anexosDir() . '/' . $a['arquivo']);
+            if ($bytes === false || $bytes === '') { echo json_encode(['ok' => false, 'erro' => 'Falha ao ler o arquivo do anexo no servidor.']); exit; }
+            $nomeAx = (string)($a['nome_original'] ?? '');
+            $extAx  = strtolower(pathinfo($nomeAx, PATHINFO_EXTENSION));
+            $ehKml  = ($a['tipo'] ?? '') === 'kml' || $extAx === 'kml' || stripos((string)($a['mime'] ?? ''), 'kml') !== false;
+            $modelo = null; $laudo = null;
+            if ($ehKml) {
+                $mp = mapearImovelComGeo($conn, $mid, 'kml', $bytes);
+                if (empty($mp['ok'])) { echo json_encode(['ok' => false, 'erro' => (string)($mp['erro'] ?? 'Não foi possível extrair coordenadas do KML.')]); exit; }
+                $geo = $mp['geo'];
+                inconsGravar($conn, $mid, detectarInconsistenciasGeo($geo, 'kml'));
+            } else {
+                // PDF da matrícula ou do SIGEF: a IA extrai o memorial descritivo do documento
+                $cfg = geminiConfigLer();
+                if (trim($cfg['api_key']) === '') { echo json_encode(['ok' => false, 'erro' => 'Configure a chave da API do Gemini para mapear a partir de PDF.']); exit; }
+                if (stripos((string)($a['mime'] ?? ''), 'pdf') === false && $extAx !== 'pdf') { echo json_encode(['ok' => false, 'erro' => 'O mapeamento por anexo aceita KML ou PDF (matrícula/SIGEF).']); exit; }
+                $r = geminiExtrairMatricula($cfg, $bytes);
+                if (empty($r['ok'])) { echo json_encode($r, JSON_UNESCAPED_UNICODE); exit; }
+                $modelo = (string)($r['modelo'] ?? '');
+                $memorial = trim((string)($r['dados']['memorial'] ?? ''));
+                if ($memorial === '') { echo json_encode(['ok' => false, 'erro' => 'A IA não encontrou um memorial descritivo (vértices/coordenadas) neste PDF — não há o que mapear.']); exit; }
+                // mesma âncora regional do fluxo de importação (memoriais só com azimute/distância)
+                list($refLat, $refLng) = refRegiaoImoveis($conn);
+                $geoCalc = buildGeoData($memorial, $refLat, $refLng);
+                $mp = mapearImovelComGeo($conn, $mid, 'memorial', $memorial, $geoCalc);
+                if (empty($mp['ok'])) { echo json_encode(['ok' => false, 'erro' => (string)($mp['erro'] ?? 'Não foi possível extrair coordenadas do memorial deste PDF.')]); exit; }
+                $geo = $mp['geo'];
+                inconsGravar($conn, $mid, detectarInconsistenciasGeo($geo, 'memorial', $memorial));
+                $laudo = laudoSeDiscrepante($memorial);
+            }
+            $rsM = $conn->query("SELECT * FROM memoriais_mapeados WHERE id = " . (int)$mid . " LIMIT 1");
+            $registro = $rsM ? $rsM->fetch_assoc() : null;
+            echo json_encode([
+                'ok' => true, 'id' => $mid, 'anexo_id' => $aid, 'modelo' => $modelo, 'laudo' => $laudo,
+                'registro' => $registro, 'anexos' => anexosListar($conn, $mid),
+                'geo' => ['num_vertices' => $geo['num_vertices'], 'area_ha' => $geo['area_ha'], 'perimetro_m' => $geo['perimetro_m']],
+                'mensagem' => 'Imóvel remapeado a partir de "' . $nomeAx . '": ' . $geo['num_vertices'] . ' vértices ('
+                    . number_format((float)$geo['area_ha'], 4, ',', '.') . ' ha).'
+                    . (!empty($geo['aviso_geometria']) ? ' ' . $geo['aviso_geometria'] : '')
+            ], JSON_UNESCAPED_UNICODE); exit;
+        }
+
         if ($acao === 'carregar') {
             $id = (int)($_POST['id'] ?? 0);
             $stmt = $conn->prepare("SELECT * FROM memoriais_mapeados WHERE id = ?");
@@ -5589,7 +5642,7 @@ header('Expires: 0');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vertex — Atlas</title>
-<!-- ATLAS-VERTEX-BUILD: 2026-07-23a-tema-teal-azul-e-baixar-kml (RETEMATIZAÇÃO: cor da marca muda de vermelho-lacre para o gradiente do card do módulo — linear-gradient(135deg,#0d9488 0%,#1d4ed8 100%) — via tokens --red/--red-bright/--red-deep/--red-text nos dois temas; novos tokens SEMÂNTICOS --err/--err-bright/--err-soft/--err-text (vermelhos originais) para alertas, pendências, sobreposições, exclusões e para as linhas/chips "faltantes"/"faltando enviar"/"pendentes" da aba Relatórios; verdeOk e chips "pronta p/ envio" passam de teal para var(--green) (teal agora é marca); cor padrão do polígono do imóvel vira azul #1D4ED8 (vértices teal), sobreposição segue vermelha; SweetAlert de tema em #1571B0. BAIXAR KML: novo endpoint GET ?kml=<id> que gera KML (SIRGAS2000, anel fechado, lng,lat,0, estilo azul da marca, nome Matrícula/Projeto + descrição com área/município/origem) a partir de coordenadas_wgs84 — vale para matrículas E projetos, qualquer origem (memorial, PDF matrícula, PDF SIGEF, KML); novo botão "⤓ Baixar KML" no rodapé do modal Editar dados do imóvel, exibido só quando o registro tem geometria) | anterior: 2026-07-22d-foco-encaixe-3d (removida a linha de controles "Inclinar/girar" sobre o mapa — sobra só o botão "Ver em 3D" no canto; o painel de dados do imóvel foi compactado (paddings/fontes menores, altura limitada a 360px com rolagem interna) e passa a abrir logo ABAIXO do botão "Ver em 3D" (top 104px, esquerda), encaixando na antiga posição do "Inclinar"; segue arrastável) | anterior: 2026-07-22c-foco-arrastavel (painel de dados do imóvel em foco: sobe para z-index 9 — deixa de ficar por baixo do painel Visão geral — e passa a abrir por padrão no canto SUPERIOR ESQUERDO do mapa (Visão geral fica à direita), sem sobreposição; agora é ARRASTÁVEL pela alça do cabeçalho via tornarArrastavel, com o botão "Dados do imóvel" também móvel (tornarArrastavelBtn) — mesmo comportamento do painel Visão geral; fechar/reabrir preservados) | anterior: 2026-07-22b-valida-memorial-narrativo-e-painel-foco (VALIDAÇÃO DE MEMORIAL NARRATIVO: novo analisador de memoriais em prosa — "vértice P-n, de coordenadas N=.. e E=.." com lados "azimute e distância Az=..°..'..\" e DIST metros até o vértice P-x". Detecta coordenada fora da faixa UTM (erro de digitação, ex.: northing com 8 dígitos) e a conserta pelo lado de chegada, e aponta o VÉRTICE culpado quando a coordenada diverge do azimute/distância do memorial (reconstrói a partir do vértice anterior; desvio > 5 m). Essas inconsistências passam a ser gravadas automaticamente no cadastro de MATRÍCULAS e de PROJETOS (fluxo salvar e mapear_texto) — antes o vértice ruim era descartado em silêncio. Novas funções analisarMemorialVertex/detectarInconsistenciasCoord e ação analisar_vertex; detectarInconsistenciasGeo ganhou 3º parâmetro opcional $memorial (retrocompatível). PAINEL DE FOCO: ao focar um único imóvel (carregarImovel), aparece à direita do mapa um painel com matrícula/identificação, datum·zona·MC, área (ha/m²/alqueire), perímetro, tabela de vértices E/N, confrontações e as inconsistências — reproduzindo o laudo do memorial no tema do app; preenche na hora pela geometria (WGS84→UTM em JS) e enriquece via analisar_vertex; botão fechar/reabrir; some ao voltar à visão geral) | anterior: 2026-07-22a-aba-relatorios (nova aba RELATÓRIOS: 3 painéis de completude com gráfico donut SVG e % — 1) matrículas faltantes da 1 até a maior, com intervalos comprimidos (ex.: 5–7, 23) e contagem de imóveis sem nº; 2) envio ao Mapa ONR: enviadas × faltantes, chips verdes p/ prontas e vermelhos p/ dados incompletos; 3) carga ITN 03: aptas × pendentes com O QUE FALTA em cada matrícula; botão Copiar lista por relatório, Recalcular, atalho de teclado 7, bottom nav mobile com 7 colunas; listar agora devolve itn03_ok/itn03_faltam (régua completa p/ mapeadas, mínima p/ exclusivas); tudo client-side sobre o próprio listar — sem migração de banco) | anterior: 2026-07-21f-3d-sem-links-externos (removidos os links "Google Earth" e "Google Maps (satélite)" do rodapé do modal de visão 3D — os imóveis só carregam dentro do sistema; mensagens de fallback do 3D atualizadas para não citar os links) | anterior: 2026-07-21e-vertodos-desmarcado (no foco de confronto o botão "Ver todos" fica desmarcado; clicá-lo nesse estado limpa o filtro ";*", oculta o badge do município e reexibe todos os imóveis — sem sair da visão geral) | anterior: 2026-07-21d-fix-termo-mat (fix: termo da consulta ";*" usava o rótulo "Mat. N", que não casa com o filtro exato de matrícula e o imóvel não era exibido — agora usa o NÚMERO puro (sem zeros à esquerda) e, sem matrícula, a identificação; corrigido também no verNoMapaConfronto da importação) | anterior: 2026-07-21c-foco-confronto-selecao (selecionar imóvel na lista agora foca em modo CONFRONTO: visão geral + consulta "matrícula;*" no painel — sobreposições e desmembradas — mantendo pontos dos vértices e badge de pertencimento ao município como no modo single; nova focarImovelConfronto; carregarImovel segue preenchendo Cadastrar/ONR/cor; dropzone de Importar só lista os tipos aceitos) | anterior: 2026-07-21b-shell-2-niveis-icones (REORGANIZAÇÃO ESTRUTURAL: barra de comando em 2 níveis — contexto/marca/base/ações em cima, faixa de abas com indicador embaixo; sprite SVG com 20 ícones estilo Lucide substituindo todos os emojis do shell, controles 3D, toolbars, cartões ONR e painel Visão geral; NAVEGAÇÃO INFERIOR FIXA no mobile (≤880px, estilo app nativo, safe-area, palco encolhe via bottom do shell); cabeçalhos de página por aba (ícone+título+descrição); form-grid em 3 colunas ≥1100px; "Como funciona" como stepper numerado; toggleRotulos atualiza só o <span> preservando o ícone) | anterior: 2026-07-21a-design-system-2 (DESIGN SYSTEM 2.0 "Instrumento cartográfico": camada visual 100% reconstruída — tokens de cor/raio/sombra/tipografia, Space Grotesk p/ títulos+abas, Inter p/ UI, IBM Plex Mono p/ dados; barra de comando com fio de lacre e abas segmentadas com indicador; graticule cartográfico sutil no palco; formulários com anel de foco, hover e select custom; botões com gradiente e elevação; cartões, badges, chips, acordeões, dropzones, painéis de mapa, modais e SweetAlert2 retematizados nos dois temas; dark mode revisto (azul-grafite); 100% responsivo (1100/880/520/420) com abas roláveis no mobile, alvos de toque maiores e prefers-reduced-motion; nenhum seletor/estado do JS alterado — apenas aparência) | anterior: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
+<!-- ATLAS-VERTEX-BUILD: 2026-07-23b-remapear-por-anexo (REMAPEAR PELO ANEXO: nova ação anexo_mapear — (re)mapeia o imóvel a partir de um anexo já arquivado, SUBSTITUINDO a geometria atual: KML direto, ou PDF da matrícula/SIGEF com o memorial extraído pela IA (geminiExtrairMatricula) e geometria via buildGeoData com âncora regional (refRegiaoImoveis); grava memorial_descritivo/origem, inconsistências (detectarInconsistenciasGeo) e devolve laudo (laudoSeDiscrepante) que habilita o "Revisar traçado"; mapearImovelComGeo ganha 4º parâmetro opcional \$geoPronto (retrocompatível). UI: novo botão de PIN em cada anexo KML/PDF da lista do modal Editar dados do imóvel (matrículas E projetos) com confirmação "Remapear o imóvel?" quando já há geometria; edMapearAnexo atualiza stats, memorial no textarea, botão Baixar KML, lista e mapa (single/overview). Resolve o caso: matrícula mapeada com memorial errado -> anexar o PDF do SIGEF e remapear por ele) | anterior: 2026-07-23a-tema-teal-azul-e-baixar-kml (RETEMATIZAÇÃO: cor da marca muda de vermelho-lacre para o gradiente do card do módulo — linear-gradient(135deg,#0d9488 0%,#1d4ed8 100%) — via tokens --red/--red-bright/--red-deep/--red-text nos dois temas; novos tokens SEMÂNTICOS --err/--err-bright/--err-soft/--err-text (vermelhos originais) para alertas, pendências, sobreposições, exclusões e para as linhas/chips "faltantes"/"faltando enviar"/"pendentes" da aba Relatórios; verdeOk e chips "pronta p/ envio" passam de teal para var(--green) (teal agora é marca); cor padrão do polígono do imóvel vira azul #1D4ED8 (vértices teal), sobreposição segue vermelha; SweetAlert de tema em #1571B0. BAIXAR KML: novo endpoint GET ?kml=<id> que gera KML (SIRGAS2000, anel fechado, lng,lat,0, estilo azul da marca, nome Matrícula/Projeto + descrição com área/município/origem) a partir de coordenadas_wgs84 — vale para matrículas E projetos, qualquer origem (memorial, PDF matrícula, PDF SIGEF, KML); novo botão "⤓ Baixar KML" no rodapé do modal Editar dados do imóvel, exibido só quando o registro tem geometria) | anterior: 2026-07-22d-foco-encaixe-3d (removida a linha de controles "Inclinar/girar" sobre o mapa — sobra só o botão "Ver em 3D" no canto; o painel de dados do imóvel foi compactado (paddings/fontes menores, altura limitada a 360px com rolagem interna) e passa a abrir logo ABAIXO do botão "Ver em 3D" (top 104px, esquerda), encaixando na antiga posição do "Inclinar"; segue arrastável) | anterior: 2026-07-22c-foco-arrastavel (painel de dados do imóvel em foco: sobe para z-index 9 — deixa de ficar por baixo do painel Visão geral — e passa a abrir por padrão no canto SUPERIOR ESQUERDO do mapa (Visão geral fica à direita), sem sobreposição; agora é ARRASTÁVEL pela alça do cabeçalho via tornarArrastavel, com o botão "Dados do imóvel" também móvel (tornarArrastavelBtn) — mesmo comportamento do painel Visão geral; fechar/reabrir preservados) | anterior: 2026-07-22b-valida-memorial-narrativo-e-painel-foco (VALIDAÇÃO DE MEMORIAL NARRATIVO: novo analisador de memoriais em prosa — "vértice P-n, de coordenadas N=.. e E=.." com lados "azimute e distância Az=..°..'..\" e DIST metros até o vértice P-x". Detecta coordenada fora da faixa UTM (erro de digitação, ex.: northing com 8 dígitos) e a conserta pelo lado de chegada, e aponta o VÉRTICE culpado quando a coordenada diverge do azimute/distância do memorial (reconstrói a partir do vértice anterior; desvio > 5 m). Essas inconsistências passam a ser gravadas automaticamente no cadastro de MATRÍCULAS e de PROJETOS (fluxo salvar e mapear_texto) — antes o vértice ruim era descartado em silêncio. Novas funções analisarMemorialVertex/detectarInconsistenciasCoord e ação analisar_vertex; detectarInconsistenciasGeo ganhou 3º parâmetro opcional $memorial (retrocompatível). PAINEL DE FOCO: ao focar um único imóvel (carregarImovel), aparece à direita do mapa um painel com matrícula/identificação, datum·zona·MC, área (ha/m²/alqueire), perímetro, tabela de vértices E/N, confrontações e as inconsistências — reproduzindo o laudo do memorial no tema do app; preenche na hora pela geometria (WGS84→UTM em JS) e enriquece via analisar_vertex; botão fechar/reabrir; some ao voltar à visão geral) | anterior: 2026-07-22a-aba-relatorios (nova aba RELATÓRIOS: 3 painéis de completude com gráfico donut SVG e % — 1) matrículas faltantes da 1 até a maior, com intervalos comprimidos (ex.: 5–7, 23) e contagem de imóveis sem nº; 2) envio ao Mapa ONR: enviadas × faltantes, chips verdes p/ prontas e vermelhos p/ dados incompletos; 3) carga ITN 03: aptas × pendentes com O QUE FALTA em cada matrícula; botão Copiar lista por relatório, Recalcular, atalho de teclado 7, bottom nav mobile com 7 colunas; listar agora devolve itn03_ok/itn03_faltam (régua completa p/ mapeadas, mínima p/ exclusivas); tudo client-side sobre o próprio listar — sem migração de banco) | anterior: 2026-07-21f-3d-sem-links-externos (removidos os links "Google Earth" e "Google Maps (satélite)" do rodapé do modal de visão 3D — os imóveis só carregam dentro do sistema; mensagens de fallback do 3D atualizadas para não citar os links) | anterior: 2026-07-21e-vertodos-desmarcado (no foco de confronto o botão "Ver todos" fica desmarcado; clicá-lo nesse estado limpa o filtro ";*", oculta o badge do município e reexibe todos os imóveis — sem sair da visão geral) | anterior: 2026-07-21d-fix-termo-mat (fix: termo da consulta ";*" usava o rótulo "Mat. N", que não casa com o filtro exato de matrícula e o imóvel não era exibido — agora usa o NÚMERO puro (sem zeros à esquerda) e, sem matrícula, a identificação; corrigido também no verNoMapaConfronto da importação) | anterior: 2026-07-21c-foco-confronto-selecao (selecionar imóvel na lista agora foca em modo CONFRONTO: visão geral + consulta "matrícula;*" no painel — sobreposições e desmembradas — mantendo pontos dos vértices e badge de pertencimento ao município como no modo single; nova focarImovelConfronto; carregarImovel segue preenchendo Cadastrar/ONR/cor; dropzone de Importar só lista os tipos aceitos) | anterior: 2026-07-21b-shell-2-niveis-icones (REORGANIZAÇÃO ESTRUTURAL: barra de comando em 2 níveis — contexto/marca/base/ações em cima, faixa de abas com indicador embaixo; sprite SVG com 20 ícones estilo Lucide substituindo todos os emojis do shell, controles 3D, toolbars, cartões ONR e painel Visão geral; NAVEGAÇÃO INFERIOR FIXA no mobile (≤880px, estilo app nativo, safe-area, palco encolhe via bottom do shell); cabeçalhos de página por aba (ícone+título+descrição); form-grid em 3 colunas ≥1100px; "Como funciona" como stepper numerado; toggleRotulos atualiza só o <span> preservando o ícone) | anterior: 2026-07-21a-design-system-2 (DESIGN SYSTEM 2.0 "Instrumento cartográfico": camada visual 100% reconstruída — tokens de cor/raio/sombra/tipografia, Space Grotesk p/ títulos+abas, Inter p/ UI, IBM Plex Mono p/ dados; barra de comando com fio de lacre e abas segmentadas com indicador; graticule cartográfico sutil no palco; formulários com anel de foco, hover e select custom; botões com gradiente e elevação; cartões, badges, chips, acordeões, dropzones, painéis de mapa, modais e SweetAlert2 retematizados nos dois temas; dark mode revisto (azul-grafite); 100% responsivo (1100/880/520/420) com abas roláveis no mobile, alvos de toque maiores e prefers-reduced-motion; nenhum seletor/estado do JS alterado — apenas aparência) | anterior: 2026-07-03u-valida-doc-salvar (3D PRÓPRIO em Three.js: satélite+relevo servidos pelo backend, independe do Map Tiles API; links Earth/Maps confiáveis; controle 3D movido p/ esquerda sem sobrepor o painel; aba minimizada arrastável; 3D usa path (fim do warning de coordinates) + rodapé/timeout com atalho Google Earth; visão 3D: "Ver em 3D" fotorrealista via Map3DElement com contornos dos imóveis + fallback Google Earth; inclinar/girar o próprio mapa; cor de LINHA e de PREENCHIMENTO separadas no painel e no popup; imóvel-mãe/encerrado renderiza por baixo via zIndex; editar matrícula agora mostra o memorial extraído + botões Analisar/Revisar traçado com prévia e ação atualizar_geometria por id; laudo no fluxo de PDF com escolha correto x transcrito + prévia SVG comparando os dois traçados; PDF individual mostra modal de resultado; laudo transcrito x corrigido; escolha AUTOMÁTICA no cadastro quando há coords inconsistentes; botão "Revisar traçado" reaparece na edição só p/ imóveis nessa situação; parser UTM rotulado "<num>-E e <num>-N"; correção easting 7-díg + OCR; grava/atualiza inclusive registro existente) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -10874,6 +10927,8 @@ function edRenderAnexos(list){
     const url = window.location.pathname+'?anexo='+a.id;
     const analisarBtn = ehPdf(a.tipo)
       ? `<button class="anx-btn" title="Analisar com IA e preencher campos faltantes" data-anx-ia="${a.id}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.7-6.7l-1.4 1.4M7.7 16.3l-1.4 1.4m12.4 0l-1.4-1.4M7.7 7.7L6.3 6.3"/><circle cx="12" cy="12" r="3.2"/></svg></button>` : '';
+    const mapearBtn = (ehPdf(a.tipo) || a.tipo==='kml')
+      ? `<button class="anx-btn" title="Mapear o imóvel a partir deste anexo — extrai as coordenadas do ${a.tipo==='kml'?'KML':'PDF (memorial via IA)'} e SUBSTITUI a geometria atual" data-anx-map="${a.id}" data-anx-tipo="${a.tipo}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg></button>` : '';
     const sigla = a.tipo==='kml'?'KML':(ehPdf(a.tipo)?'PDF':'•');
     return `<div class="anx-item">
       <div class="anx-ic ${a.tipo}">${sigla}</div>
@@ -10881,11 +10936,13 @@ function edRenderAnexos(list){
       <div class="anx-acts">
         <a class="anx-btn" href="${url}" target="_blank" rel="noopener" title="Abrir / baixar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></a>
         ${analisarBtn}
+        ${mapearBtn}
         <button class="anx-btn danger" title="Excluir anexo" data-anx-del="${a.id}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
       </div>
     </div>`;
   }).join('');
   box.querySelectorAll('[data-anx-ia]').forEach(b=> b.onclick=()=> edAnalisarAnexo(+b.dataset.anxIa));
+  box.querySelectorAll('[data-anx-map]').forEach(b=> b.onclick=()=> edMapearAnexo(+b.dataset.anxMap, b.dataset.anxTipo||''));
   box.querySelectorAll('[data-anx-del]').forEach(b=> b.onclick=()=> edExcluirAnexo(+b.dataset.anxDel));
 }
 /* aplica um registro completo ao formulário (após análise IA) — proprietários, tipo, ONR, qualificação */
@@ -10998,6 +11055,56 @@ async function edAnalisarAnexo(aid){
     setStatus('ok', (r.mensagem||'Análise concluída.')+(r.modelo?(' ('+r.modelo+')'):''));
     setTimeout(()=>{ if(!edAnxBusy) edAnxBusyUI('off'); }, 3500);
   }catch(e){ edAnxBusyUI('err','Falha na requisição de análise.'); setStatus('err','Falha na requisição de análise.'); }
+  finally{ edAnxBusy=false; }
+}
+/* (Re)mapeia o imóvel a partir de um anexo (KML ou PDF matrícula/SIGEF): extrai as
+ * coordenadas e SUBSTITUI a geometria atual. Útil quando o memorial da matrícula veio
+ * com erro e a geometria correta está em outro documento (ex.: PDF do SIGEF). */
+async function edMapearAnexo(aid, tipo){
+  if(edAnxId<=0 || !aid) return;
+  if(edAnxBusy){ swalToast('info','Aguarde — já há um arquivo sendo processado.'); return; }
+  const temGeo = !!(edItemAtual && ((+edItemAtual.num_vertices||0) > 0 || String(edItemAtual.coordenadas_wgs84||'').trim()!==''));
+  const ehKml = tipo==='kml';
+  const ok = await Swal.fire({...swalTema(),
+    title: temGeo ? 'Remapear o imóvel?' : 'Mapear o imóvel?',
+    html: (temGeo
+        ? 'A geometria atual será <b>substituída</b> pelas coordenadas extraídas deste anexo'
+        : 'O imóvel será mapeado com as coordenadas extraídas deste anexo')
+      + (ehKml ? ' (KML).' : ' — o memorial descritivo do PDF será lido pela IA.')
+      + '<br><small>O memorial gravado no imóvel também passa a ser o deste documento.</small>',
+    icon: temGeo ? 'warning' : 'question',
+    showCancelButton:true, confirmButtonText: temGeo?'Remapear':'Mapear', cancelButtonText:'Cancelar'
+  }).then(x=>x.isConfirmed).catch(()=>false);
+  if(!ok) return;
+  edAnxBusy=true;
+  edAnxBusyUI('work', ehKml ? 'Extraindo coordenadas do KML e remapeando…' : 'Lendo o memorial do PDF com IA e remapeando… aguarde.');
+  setStatus('warn','Remapeando a partir do anexo…');
+  try{
+    const fd=new FormData(); fd.append('acao','anexo_mapear'); fd.append('id', edAnxId); fd.append('aid', aid);
+    const r = await fetch(window.location.pathname,{method:'POST',body:fd}).then(x=>x.json());
+    if(!r || !r.ok){ const er=(r&&r.erro)||'Falha ao mapear a partir do anexo.'; edAnxBusyUI('err', er); setStatus('err', er); return; }
+    if(r.anexos) edRenderAnexos(r.anexos);
+    if(r.registro){
+      edItemAtual = Object.assign(edItemAtual||{}, r.registro);
+      edRenderStats(r.registro);
+      const ta=document.getElementById('ed-geo-text'); if(ta) ta.value = r.registro.memorial_descritivo || '';
+    }
+    edEhExclusiva=false; if(typeof edAtualizarMapearHint==='function') edAtualizarMapearHint();
+    const bk=document.getElementById('ed-baixar-kml'); if(bk) bk.style.display='';
+    // laudo: memorial do PDF com coordenadas inconsistentes -> habilita "Revisar traçado"
+    edOcultarRevisar();
+    if(r.laudo && typeof laudoTemDiscrepancia==='function' && laudoTemDiscrepancia(r.laudo)){
+      edLaudoAtual=r.laudo;
+      const b=document.getElementById('ed-btn-revisar'); if(b) b.style.display='';
+      const stt=document.getElementById('ed-geo-status'); if(stt){ stt.className='ed-geo-status'; stt.textContent='⚠ Coordenadas do documento inconsistentes — use "Revisar traçado".'; }
+    }
+    if(typeof carregarLista==='function') carregarLista();
+    if(typeof carregarImovel==='function' && typeof modo!=='undefined' && modo==='single') carregarImovel(edAnxId);
+    else if(typeof modo!=='undefined' && modo==='overview' && typeof verTodos==='function') verTodos();
+    edAnxBusyUI('ok', r.mensagem||'Imóvel remapeado.');
+    setStatus('ok', (r.mensagem||'Imóvel remapeado.')+(r.modelo?(' ('+r.modelo+')'):''));
+    setTimeout(()=>{ if(!edAnxBusy) edAnxBusyUI('off'); }, 3500);
+  }catch(e){ edAnxBusyUI('err','Falha na requisição de remapeamento.'); setStatus('err','Falha na requisição de remapeamento.'); }
   finally{ edAnxBusy=false; }
 }
 async function edExcluirAnexo(aid){
