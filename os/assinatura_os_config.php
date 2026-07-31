@@ -7,7 +7,8 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 @ini_set('display_errors', 0);
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE & ~E_WARNING);
-date_default_timezone_set('America/Fortaleza');
+require_once __DIR__ . '/atlas_tempo.php';
+date_default_timezone_set(ATLAS_TZ);
 
 require_once __DIR__ . '/../oficios/assin_pades.php'; // AtlasDer, AtlasPadesInjector, atlas_openssl_conf, AtlasPadesSigner
 
@@ -28,6 +29,7 @@ function os_db()
     if ($conn instanceof mysqli && @$conn->ping()) return $conn;
     $conn = new mysqli('localhost', 'root', '', 'atlas');
     if ($conn->connect_error) throw new RuntimeException('Falha na conexão com o banco.');
+    atlas_alinhar_fuso($conn); // hora correta em NOW()/CURRENT_TIMESTAMP
     $conn->set_charset('utf8mb4');
     return $conn;
 }

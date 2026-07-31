@@ -6,6 +6,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 @ini_set('display_errors', 0);
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE & ~E_WARNING);
+require_once __DIR__ . '/atlas_tempo.php';
 
 function pa_db()
 {
@@ -14,6 +15,7 @@ function pa_db()
     $c = new mysqli('localhost', 'root', '', 'atlas');
     if ($c->connect_error) throw new RuntimeException('Falha na conexão com o banco.');
     $c->set_charset('utf8mb4');
+    atlas_alinhar_fuso($c); // hora correta em NOW()/CURRENT_TIMESTAMP
     return $c;
 }
 
