@@ -159,26 +159,334 @@ function processTableForPdf($tableHtml, $contentWidthMm = 160) {
 }
 
 /**
- * Processa todo o corpo do ofício para o PDF, separando tabelas e normalizando
- * 
- * @param TCPDF $pdf Instância do TCPDF
- * @param string $conteudoOficio O corpo HTML do ofício
- * @param float $contentWidthMm Largura da área de conteúdo em mm
+ * ============================================================================
+ * IMAGENS NO PDF - CONVERSAO DE UNIDADES
+ * ----------------------------------------------------------------------------
+ * O TCPDF interpreta os atributos width/height da tag <img> SEMPRE em PIXELS
+ * (ver tcpdf.php: getHTMLUnitToUnits($tag['width'], ..., 'px', false)).
+ * Antes, o helper gravava esses atributos em milimetros, entao uma imagem
+ * calculada para 128mm era desenhada como 128px = 128 / 2.8346 = 45mm,
+ * ou seja, apenas ~35% do tamanho pretendido (imagens "minusculas").
+ * As funcoes abaixo fazem a conversao correta mm (unidades do documento) -> px.
+ * ============================================================================
+ */
+
+/**
+ * Fator de conversao: 1 unidade do documento (mm) equivale a quantos "px" do TCPDF
+ * px_tcpdf = unidades * getScaleFactor() * getImageScale()
+ *
+ * @param TCPDF|null $pdf Instancia do TCPDF (opcional)
+ * @return float
+ */
+function atlasPdfUnitsToPx($pdf = null) {
+    $k = 72 / 25.4;   // fator padrao para documentos em milimetros
+    $scale = 1.0;
+    if (is_object($pdf)) {
+        if (method_exists($pdf, 'getScaleFactor')) {
+            $v = (float) $pdf->getScaleFactor();
+            if ($v > 0) $k = $v;
+        }
+        if (method_exists($pdf, 'getImageScale')) {
+            $v = (float) $pdf->getImageScale();
+            if ($v > 0) $scale = $v;
+        }
+    }
+    return $k * $scale;
+}
+
+/**
+ * Converte um valor CSS (px, %, mm, cm, pt, in, em) para unidades do documento (mm)
+ *
+ * @param string $value      Valor CSS bruto (ex.: "320px", "80%", "12cm")
+ * @param float  $refWidthMm Largura de referencia para valores percentuais
+ * @param float  $unitsToPx  Fator de conversao (ver atlasPdfUnitsToPx)
+ * @return float|null Valor em mm ou null se nao for possivel converter
+ */
+function atlasCssToMm($value, $refWidthMm, $unitsToPx) {
+    $value = trim((string) $value);
+    if ($value === '') return null;
+
+    if (!preg_match('/^(-?\d+(?:\.\d+)?)\s*(px|%|mm|cm|pt|in|em|rem)?$/i', $value, $m)) {
+        return null;
+    }
+
+    $num  = floatval($m[1]);
+    $unit = isset($m[2]) ? strtolower($m[2]) : 'px';
+    if ($unit === '') $unit = 'px';
+
+    // 1 px CSS = 0.75pt; converte para unidades do documento usando o proprio fator do TCPDF
+    $cssPxToMm = 0.75 / max(0.0001, ($unitsToPx));
+
+    switch ($unit) {
+        case '%':   return $refWidthMm * $num / 100;
+        case 'mm':  return $num;
+        case 'cm':  return $num * 10;
+        case 'in':  return $num * 25.4;
+        case 'pt':  return $num * 25.4 / 72;
+        case 'em':
+        case 'rem': return $num * 12 * 25.4 / 72; // aproximacao: 1em = 12pt (fonte do corpo)
+        case 'px':
+        default:    return $num * $cssPxToMm;
+    }
+}
+
+/**
+ * Normaliza tags <img> no HTML para compatibilidade com TCPDF
+ * - Converte caminhos relativos/URLs para caminhos absolutos no filesystem
+ * - Normaliza barras (funciona em Windows e Linux)
+ * - Calcula largura/altura reais em mm respeitando a proporcao original
+ * - Grava width/height em PIXELS (unica unidade que o TCPDF entende na tag <img>)
+ * - Limita a imagem a largura util e a altura util da pagina
+ * - Suporta imagens em base64 (data:image/...)
+ *
+ * @param string     $html
+ * @param float      $contentWidthMm Largura util do conteudo em mm
+ * @param TCPDF|null $pdf            Instancia do TCPDF (para conversao exata de unidades)
+ * @return string
+ */
+function normalizeImagesForPdf($html, $contentWidthMm = 160, $pdf = null) {
+    if (empty($html) || stripos($html, '<img') === false) {
+        return $html;
+    }
+
+    $unitsToPx = atlasPdfUnitsToPx($pdf);
+
+    // Altura util da pagina (para nao estourar a area de conteudo)
+    $maxHeightMm = 200;
+    if (is_object($pdf) && method_exists($pdf, 'getPageHeight')) {
+        $margins = method_exists($pdf, 'getMargins') ? $pdf->getMargins() : array('top' => 45, 'bottom' => 25);
+        $top     = isset($margins['top']) ? $margins['top'] : 45;
+        $bottom  = isset($margins['bottom']) ? $margins['bottom'] : 25;
+        $calc    = $pdf->getPageHeight() - $top - $bottom;
+        if ($calc > 20) $maxHeightMm = $calc;
+    }
+
+    // Diretorio do modulo oficios (onde fica a pasta imagens/)
+    $oficiosDir = str_replace('\\', '/', rtrim(__DIR__, '/\\'));
+
+    // Document root do servidor
+    $docRoot = isset($_SERVER['DOCUMENT_ROOT']) ? str_replace('\\', '/', rtrim($_SERVER['DOCUMENT_ROOT'], '/\\')) : '';
+
+    $html = preg_replace_callback(
+        '/<img[^>]*>/i',
+        function($match) use ($oficiosDir, $docRoot, $contentWidthMm, $maxHeightMm, $unitsToPx) {
+            $tag = $match[0];
+
+            // Extrair src
+            if (!preg_match('/src\s*=\s*["\']([^"\']+)["\']/i', $tag, $srcMatch)) {
+                return $tag;
+            }
+            $src = trim($srcMatch[1]);
+            if ($src === '') return $tag;
+
+            $absPath    = '';
+            $isDataUri  = (stripos($src, 'data:image') === 0);
+            $natWidthPx = 0;
+            $natHeightPx = 0;
+
+            if ($isDataUri) {
+                // Dimensoes reais da imagem embutida em base64
+                if (preg_match('/^data:image\/[^;]+;base64,(.*)$/is', $src, $dm)) {
+                    $bin = @base64_decode(preg_replace('/\s+/', '', $dm[1]));
+                    if ($bin !== false && function_exists('getimagesizefromstring')) {
+                        $info = @getimagesizefromstring($bin);
+                        if ($info && $info[0] > 0) {
+                            $natWidthPx  = $info[0];
+                            $natHeightPx = $info[1];
+                        }
+                    }
+                }
+            } else {
+                // ---- Resolver caminho absoluto da imagem ----
+
+                // Caminho relativo (ex: "imagens/25_2025/foto.jpg")
+                if (strpos($src, 'http') !== 0 && strpos($src, '/') !== 0) {
+                    $candidate = $oficiosDir . '/' . $src;
+                    if (file_exists($candidate)) {
+                        $absPath = realpath($candidate);
+                    }
+                }
+
+                // Caminho absoluto no servidor (ex: "/atlas/oficios/imagens/foto.jpg")
+                if (!$absPath && $docRoot !== '' && strpos($src, '/') === 0) {
+                    $candidate = $docRoot . $src;
+                    if (file_exists($candidate)) {
+                        $absPath = realpath($candidate);
+                    }
+                }
+
+                // URL completa - extrair path local
+                if (!$absPath && strpos($src, 'http') === 0) {
+                    $parsed = @parse_url($src);
+                    if (!empty($parsed['path'])) {
+                        if ($docRoot !== '' && file_exists($docRoot . $parsed['path'])) {
+                            $absPath = realpath($docRoot . $parsed['path']);
+                        } else {
+                            // tentar relativo ao modulo (ex: http://host/atlas/oficios/imagens/x.jpg)
+                            $rel = $parsed['path'];
+                            if (($pos = stripos($rel, '/imagens/')) !== false) {
+                                $candidate = $oficiosDir . substr($rel, $pos);
+                                if (file_exists($candidate)) {
+                                    $absPath = realpath($candidate);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Nao encontrou o arquivo - retorna a tag original
+                if (!$absPath) {
+                    return $tag;
+                }
+
+                // Normalizar barras para / (TCPDF aceita forward slashes no Windows)
+                $absPath = str_replace('\\', '/', $absPath);
+
+                $info = @getimagesize($absPath);
+                if ($info && $info[0] > 0) {
+                    $natWidthPx  = $info[0];
+                    $natHeightPx = $info[1];
+                }
+            }
+
+            // ---- Descobrir a largura desejada (em mm) ----
+            $style = '';
+            if (preg_match('/style\s*=\s*["\']([^"\']*)["\']/i', $tag, $sm)) {
+                $style = $sm[1];
+            }
+
+            $widthMm    = null;
+            $maxWidthMm = null;
+            $heightMm   = null;
+
+            // 1) style width (largura efetiva) e max-width (limite, como no navegador)
+            if (preg_match('/(?<!-)\bwidth\s*:\s*([0-9.]+\s*(?:px|%|mm|cm|pt|in|em|rem)?)/i', $style, $wm)) {
+                $widthMm = atlasCssToMm($wm[1], $contentWidthMm, $unitsToPx);
+            }
+            if (preg_match('/max-width\s*:\s*([0-9.]+\s*(?:px|%|mm|cm|pt|in|em|rem)?)/i', $style, $mwm)) {
+                $maxWidthMm = atlasCssToMm($mwm[1], $contentWidthMm, $unitsToPx);
+            }
+            // 2) style height (somente se explicita e diferente de auto)
+            if (preg_match('/(?<!-)\bheight\s*:\s*([0-9.]+\s*(?:px|%|mm|cm|pt|in|em|rem)?)/i', $style, $hm2)) {
+                $heightMm = atlasCssToMm($hm2[1], $maxHeightMm, $unitsToPx);
+            }
+            // 3) atributo width="..." (px)
+            if ($widthMm === null && preg_match('/\swidth\s*=\s*["\']?([0-9.]+%?)["\']?/i', $tag, $wm3)) {
+                $widthMm = atlasCssToMm($wm3[1], $contentWidthMm, $unitsToPx);
+            }
+            // 4) atributo height="..." (px)
+            if ($heightMm === null && preg_match('/\sheight\s*=\s*["\']?([0-9.]+%?)["\']?/i', $tag, $hm3)) {
+                $heightMm = atlasCssToMm($hm3[1], $maxHeightMm, $unitsToPx);
+            }
+
+            // 5) Sem largura definida: usar o tamanho natural da imagem (96 DPI, como no navegador)
+            if ($widthMm === null) {
+                if ($heightMm !== null && $natWidthPx > 0 && $natHeightPx > 0) {
+                    $widthMm = $heightMm * ($natWidthPx / $natHeightPx);
+                } elseif ($natWidthPx > 0) {
+                    $widthMm = $natWidthPx * 25.4 / 96;
+                } else {
+                    $widthMm = $contentWidthMm; // ultimo recurso: largura total do conteudo
+                }
+            }
+
+            // ---- Limites: max-width (se houver), area util e minimo de seguranca ----
+            if ($maxWidthMm !== null && $maxWidthMm > 0) {
+                $widthMm = min($widthMm, $maxWidthMm);
+            }
+            $widthMm = min($widthMm, $contentWidthMm);
+            $widthMm = max($widthMm, 10);
+
+            // ---- Altura proporcional ----
+            if ($natWidthPx > 0 && $natHeightPx > 0) {
+                $heightMm = $widthMm * ($natHeightPx / $natWidthPx);
+            }
+
+            // Se a altura estourar a area util da pagina, reduzir mantendo a proporcao
+            if ($heightMm !== null && $heightMm > $maxHeightMm) {
+                if ($natWidthPx > 0 && $natHeightPx > 0) {
+                    $widthMm = $maxHeightMm * ($natWidthPx / $natHeightPx);
+                }
+                $heightMm = $maxHeightMm;
+            }
+
+            // ---- Converter mm -> px (unidade lida pelo TCPDF na tag <img>) ----
+            $widthPx  = (int) round($widthMm * $unitsToPx);
+            $heightPx = ($heightMm !== null && $heightMm > 0) ? (int) round($heightMm * $unitsToPx) : 0;
+
+            $finalSrc = $isDataUri ? $src : $absPath;
+
+            // ---- Montar tag limpa para TCPDF ----
+            $newTag = '<img src="' . $finalSrc . '" width="' . $widthPx . '"';
+            if ($heightPx > 0) {
+                $newTag .= ' height="' . $heightPx . '"';
+            }
+            // Guardar a altura em mm para o controle de quebra de pagina
+            if ($heightMm > 0) {
+                $newTag .= ' data-atlas-h="' . round($heightMm, 2) . '"';
+            }
+            $newTag .= ' />';
+
+            return $newTag;
+        },
+        $html
+    );
+
+    return $html;
+}
+
+/**
+ * Escreve um bloco que contem imagem, garantindo espaco suficiente na pagina.
+ * Sem isso, o TCPDF (que usa fitonpage = true ao desenhar <img> no writeHTML)
+ * ENCOLHE a imagem para caber no espaco restante da pagina.
+ *
+ * @param TCPDF  $pdf
+ * @param string $innerHtml HTML ja normalizado (contendo <img>)
+ * @param string $align     center|left|right|justify
+ */
+function atlasWriteBlocoImagem($pdf, $innerHtml, $align = 'center') {
+    // Somar a altura (em mm) das imagens do bloco
+    $alturaMm = 0;
+    if (preg_match_all('/data-atlas-h\s*=\s*["\']([0-9.]+)["\']/i', $innerHtml, $hm)) {
+        foreach ($hm[1] as $h) {
+            $alturaMm += floatval($h);
+        }
+    }
+
+    if ($alturaMm > 0 && method_exists($pdf, 'getPageHeight') && method_exists($pdf, 'getBreakMargin')) {
+        $limiteY = $pdf->getPageHeight() - $pdf->getBreakMargin();
+        if (($pdf->GetY() + $alturaMm + 2) > $limiteY) {
+            $pdf->AddPage();
+        }
+    }
+
+    // data-atlas-h e apenas um marcador interno; remover antes de enviar ao TCPDF
+    $innerHtml = preg_replace('/\s*data-atlas-h\s*=\s*["\'][0-9.]+["\']/i', '', $innerHtml);
+
+    $pdf->writeHTML('<div style="text-align:' . $align . ';">' . $innerHtml . '</div>', true, false, true, false);
+}
+
+/**
+ * Processa todo o corpo do oficio para o PDF, separando tabelas e normalizando
+ *
+ * @param TCPDF $pdf Instancia do TCPDF
+ * @param string $conteudoOficio O corpo HTML do oficio
+ * @param float $contentWidthMm Largura da area de conteudo em mm
  */
 function renderCorpoOficioPdf($pdf, $conteudoOficio, $contentWidthMm = 160) {
     // Decodificar entidades HTML
     $conteudoOficio = html_entity_decode($conteudoOficio, ENT_QUOTES, 'UTF-8');
-    
-    // Normalizar imagens para caminhos absolutos (necessário para TCPDF)
-    $conteudoOficio = normalizeImagesForPdf($conteudoOficio, $contentWidthMm);
-    
-    // Dividir conteúdo em blockquote, table e o restante
+
+    // Normalizar imagens (caminhos absolutos + dimensoes corretas em px do TCPDF)
+    $conteudoOficio = normalizeImagesForPdf($conteudoOficio, $contentWidthMm, $pdf);
+
+    // Dividir conteudo em blockquote, table e o restante
     $partes = preg_split('/(<blockquote>.*?<\/blockquote>|<table.*?<\/table>)/is', $conteudoOficio, -1, PREG_SPLIT_DELIM_CAPTURE);
-    
+
     foreach ($partes as $parte) {
         $parte = trim($parte);
         if (empty($parte)) continue;
-        
+
         // Blockquote
         if (preg_match('/<blockquote>(.*?)<\/blockquote>/is', $parte, $matches)) {
             $pdf->Ln(-6);
@@ -191,32 +499,33 @@ function renderCorpoOficioPdf($pdf, $conteudoOficio, $contentWidthMm = 160) {
         // Tabela
         elseif (preg_match('/<table.*?<\/table>/is', $parte)) {
             $tabelaNormalizada = normalizeTableForPdf($parte, $contentWidthMm);
+            $tabelaNormalizada = preg_replace('/\s*data-atlas-h\s*=\s*["\'][0-9.]+["\']/i', '', $tabelaNormalizada);
             $pdf->SetFont('helvetica', '', 10);
             $pdf->writeHTML($tabelaNormalizada, true, false, true, false, '');
             $pdf->Ln(5);
         }
         else {
             $pdf->SetFont('helvetica', '', 12);
-            
+
             // Regex com suporte a <p> COM ou SEM atributos: <p>, <p style="...">, <p class="...">
             if (preg_match_all('/<p[^>]*>(.*?)<\/p>/is', $parte, $matchesParagrafo)) {
                 foreach ($matchesParagrafo[1] as $paragrafoTexto) {
                     if (preg_match('/<img\s/i', $paragrafoTexto)) {
-                        // Parágrafo com imagem: renderizar centralizado, sem text-indent
-                        $pdf->writeHTML('<div style="text-align:center;">' . $paragrafoTexto . '</div>', true, false, true, false);
+                        // Paragrafo com imagem: renderizar centralizado, sem text-indent
+                        atlasWriteBlocoImagem($pdf, $paragrafoTexto, 'center');
                     } else {
                         $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $paragrafoTexto . '</div>', true, false, true, false);
                     }
                     $pdf->Ln(5);
                 }
             } else {
-                // Conteúdo fora de <p> — pode ser imagem solta ou texto
+                // Conteudo fora de <p> - pode ser imagem solta ou texto
                 $temImagem = preg_match('/<img\s/i', $parte);
                 $temConteudo = $temImagem || !empty(trim(strip_tags($parte)));
-                
+
                 if ($temConteudo) {
                     if ($temImagem) {
-                        $pdf->writeHTML('<div style="text-align:center;">' . $parte . '</div>', true, false, true, false);
+                        atlasWriteBlocoImagem($pdf, $parte, 'center');
                     } else {
                         $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $parte . '</div>', true, false, true, false);
                     }
@@ -226,117 +535,4 @@ function renderCorpoOficioPdf($pdf, $conteudoOficio, $contentWidthMm = 160) {
         }
     }
 }
-
-/**
- * Normaliza tags <img> no HTML para compatibilidade com TCPDF
- * - Converte caminhos relativos para caminhos absolutos no filesystem
- * - Normaliza caminhos para barras normais (/) — funciona em Windows e Linux
- * - Converte largura CSS (%) para width/height em mm (unidade do TCPDF)
- * - Remove atributos CSS que TCPDF não entende (max-width, float, etc.)
- */
-function normalizeImagesForPdf($html, $contentWidthMm = 160) {
-    if (empty($html) || stripos($html, '<img') === false) {
-        return $html;
-    }
-    
-    // Diretório do módulo oficios (onde fica a pasta imagens/)
-    $oficiosDir = str_replace('\\', '/', rtrim(__DIR__, '/\\'));
-    
-    // Document root do servidor
-    $docRoot = str_replace('\\', '/', rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/\\'));
-    
-    $html = preg_replace_callback(
-        '/<img[^>]*>/i',
-        function($match) use ($oficiosDir, $docRoot, $contentWidthMm) {
-            $tag = $match[0];
-            
-            // Extrair src
-            if (!preg_match('/src\s*=\s*["\']([^"\']+)["\']/i', $tag, $srcMatch)) {
-                return $tag;
-            }
-            $src = $srcMatch[1];
-            if (empty($src)) return $tag;
-            
-            // ---- Resolver caminho absoluto da imagem ----
-            $absPath = '';
-            
-            // data:image — TCPDF suporta nativamente, deixar como está
-            if (strpos($src, 'data:image') === 0) {
-                return $tag;
-            }
-            
-            // Caminho relativo (ex: "imagens/25_2025/foto.jpg")
-            if (strpos($src, 'http') !== 0 && strpos($src, '/') !== 0) {
-                $candidate = $oficiosDir . '/' . $src;
-                if (file_exists($candidate)) {
-                    $absPath = realpath($candidate);
-                }
-            }
-            
-            // Caminho absoluto no servidor (ex: "/atlas/oficios/imagens/foto.jpg")
-            if (!$absPath && strpos($src, '/') === 0) {
-                $candidate = $docRoot . $src;
-                if (file_exists($candidate)) {
-                    $absPath = realpath($candidate);
-                }
-            }
-            
-            // URL completa — extrair path local
-            if (!$absPath && strpos($src, 'http') === 0) {
-                $parsed = parse_url($src);
-                if (!empty($parsed['path'])) {
-                    $candidate = $docRoot . $parsed['path'];
-                    if (file_exists($candidate)) {
-                        $absPath = realpath($candidate);
-                    }
-                }
-            }
-            
-            // Não encontrou o arquivo — retorna tag original (TCPDF tentará com o src original)
-            if (!$absPath) {
-                return $tag;
-            }
-            
-            // Normalizar barras para / (TCPDF aceita forward slashes no Windows)
-            $absPath = str_replace('\\', '/', $absPath);
-            
-            // ---- Calcular dimensões em mm para o TCPDF ----
-            $pctWidth = 80; // padrão
-            if (preg_match('/max-width:\s*(\d+)%/i', $tag, $wm)) {
-                $pctWidth = intval($wm[1]);
-            } elseif (preg_match('/width:\s*(\d+)%/i', $tag, $wm)) {
-                $pctWidth = intval($wm[1]);
-            } elseif (preg_match('/width\s*=\s*["\']?(\d+)/i', $tag, $wm)) {
-                // width como atributo em px — estimar proporção
-                $pctWidth = min(100, round(intval($wm[1]) / 640 * 100));
-            }
-            
-            $imgWidthMm = round($contentWidthMm * $pctWidth / 100);
-            $imgWidthMm = max(10, min($contentWidthMm, $imgWidthMm));
-            
-            // Calcular altura proporcional com base nas dimensões reais
-            $imgHeightMm = 0;
-            $imgInfo = @getimagesize($absPath);
-            if ($imgInfo && $imgInfo[0] > 0) {
-                $ratio = $imgInfo[1] / $imgInfo[0];
-                $imgHeightMm = round($imgWidthMm * $ratio);
-            }
-            
-            // ---- Montar tag limpa para TCPDF ----
-            // TCPDF interpreta width/height como mm (unidade do documento)
-            // Não usar htmlspecialchars no path — TCPDF precisa do caminho literal
-            $newTag = '<img src="' . $absPath . '" width="' . $imgWidthMm . '"';
-            if ($imgHeightMm > 0) {
-                $newTag .= ' height="' . $imgHeightMm . '"';
-            }
-            $newTag .= '>';
-            
-            return $newTag;
-        },
-        $html
-    );
-    
-    return $html;
-}
 ?>
-

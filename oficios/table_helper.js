@@ -894,7 +894,9 @@
         var align = document.getElementById('_aiAlign').value;
 
         // Montar HTML da imagem
-        var style = 'max-width:' + width + '%;height:auto;';
+        // width => largura efetiva no documento e no PDF (o slider define esse valor)
+        // max-width:100% => nunca ultrapassa a area util da pagina
+        var style = 'width:' + width + '%;max-width:100%;height:auto;';
         var wrapStyle = '';
 
         if (align === 'center') {
