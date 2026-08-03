@@ -36,15 +36,19 @@ $uploadDirToken = str_replace('/', '_', $proximoNumero);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $numero = getNextOficioNumber($conn);
-    $destinatario = $conn->real_escape_string($_POST['destinatario']);
-    $assunto = $conn->real_escape_string($_POST['assunto']);
-    $corpo = $conn->real_escape_string(trim(preg_replace('/\r\n|\r|\n/', '', $_POST['corpo'])));
-    $assinante = $conn->real_escape_string($_POST['assinante']);
-    $data = $conn->real_escape_string($_POST['data']);
-    $tratamento = $conn->real_escape_string($_POST['tratamento']);
-    $cargo = $conn->real_escape_string($_POST['cargo']);
-    $cargo_assinante = $conn->real_escape_string($_POST['cargo_assinante']);
-    $dados_complementares = $conn->real_escape_string($_POST['dados_complementares']);
+    // ATENCAO: NAO usar real_escape_string aqui.
+    // O INSERT abaixo usa prepared statement (bind_param), que ja escapa os valores.
+    // Escapar duas vezes gravava o HTML com barras invertidas (src=\"imagens/...\"),
+    // o que deixava as imagens quebradas no oficio e no PDF.
+    $destinatario = $_POST['destinatario'];
+    $assunto = $_POST['assunto'];
+    $corpo = trim(preg_replace('/\r\n|\r|\n/', '', $_POST['corpo']));
+    $assinante = $_POST['assinante'];
+    $data = $_POST['data'];
+    $tratamento = $_POST['tratamento'];
+    $cargo = $_POST['cargo'];
+    $cargo_assinante = $_POST['cargo_assinante'];
+    $dados_complementares = $_POST['dados_complementares'];
 
     $stmt = $conn->prepare("INSERT INTO oficios (destinatario, assunto, corpo, assinante, data, numero, tratamento, cargo, cargo_assinante, dados_complementares) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("ssssssssss", $destinatario, $assunto, $corpo, $assinante, $data, $numero, $tratamento, $cargo, $cargo_assinante, $dados_complementares);

@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection2.php');
+require_once __DIR__ . '/base_calculo_lib.php';
 date_default_timezone_set('America/Sao_Paulo');
 
 // CSRF para chamadas ao módulo de pedidos (usado no AJAX abaixo)
@@ -1291,7 +1292,19 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
     .pa-viewer{ width:100%; height:78vh; background:#0f172a; display:flex; align-items:center; justify-content:center; }
     .pa-viewer iframe{ width:100%; height:100%; border:0; background:#fff; }
     .pa-viewer img{ max-width:100%; max-height:100%; object-fit:contain; }
-    </style>  
+    
+        /* ===== Base de cálculo por ato ===== */
+        .base-ato{display:inline-block;background:#eff6ff;color:#1e40af;border-radius:6px;
+                  padding:2px 8px;font-weight:700;font-size:.82rem;white-space:nowrap}
+        .base-ato-falta{display:inline-block;background:#fef2f2;color:#b91c1c;border-radius:6px;
+                        padding:2px 8px;font-weight:700;font-size:.78rem;white-space:nowrap}
+        .base-ato-faixa{color:#64748b;font-size:.7rem}
+        .card-base-ato{background:#eff6ff;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;
+                       padding:6px 10px;margin:6px 0;font-size:.82rem;color:#1e40af}
+        .card-base-ato.falta{background:#fef2f2;border-left-color:#dc2626;color:#b91c1c}
+        .aviso-base-legado{background:#fffbeb;border-left:4px solid #b45309;border-radius:0 8px 8px 0;
+                           padding:10px 14px;margin:12px 0;font-size:.85rem;color:#92400e}
+</style>  
 </head>  
 <body>  
 <?php include(__DIR__ . '/../menu.php'); ?>  
@@ -1440,11 +1453,14 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     <label for="cpf_cliente">CPF/CNPJ do Apresentante:</label>  
                     <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente" value="<?php echo $ordem_servico['cpf_cliente']; ?>" readonly>  
                 </div>  
-                <div class="form-group col-md-2">  
-                    <label for="base_calculo">Base de Cálculo:</label>  
-                    <input type="text" class="form-control" id="base_calculo" name="base_calculo" value="<?php echo 'R$ ' . number_format($ordem_servico['base_de_calculo'], 2, ',', '.'); ?>" readonly>  
-                </div>  
-                <div class="form-group col-md-2">  
+                <?php
+                /* A base de cálculo agora é POR ATO — veja a coluna na tabela de
+                   itens abaixo. O campo que ficava aqui foi removido: uma base
+                   única não representa uma O.S. com dois atos de valor declarado.
+                   As O.S. ANTIGAS, que só têm a base no nível da O.S., exibem o
+                   valor no aviso logo abaixo da tabela de itens. */
+                ?>
+                <div class="form-group col-md-4">  
                     <label for="total_os">Valor Total:</label>  
                     <input type="text" class="form-control" id="total_os" name="total_os" value="<?php echo 'R$ ' . number_format($ordem_servico['total_os'], 2, ',', '.'); ?>" readonly>  
                 </div>  
@@ -1580,6 +1596,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <th>Total</th>  
                             <th>Qtd Liquidada</th>  
                             <th>Status</th>  
+                            <th>Base de Cálculo</th>  
                             <th>Ações</th>  
                         </tr>  
                     </thead>  
@@ -1610,6 +1627,31 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                                 <?php endif; ?>  
                             </td>  
                             <td>  
+                                <?php
+                                    /* Base de cálculo DO ATO. Só faz sentido nos atos
+                                       cobrados por faixa de valor declarado; nos demais
+                                       a célula fica vazia. */
+                                    $__base  = $item['base_de_calculo'] ?? null;
+                                    $__faixa = bc_extrair_faixa($item['descricao']);
+                                    $__temBase = ($__base !== null && (float) $__base >= 0.001);
+                                ?>
+                                <?php if ($__temBase): ?>
+                                    <span class="base-ato" title="<?php echo $__faixa ? htmlspecialchars('Faixa do ato: ' . $__faixa['rotulo'], ENT_QUOTES, 'UTF-8') : ''; ?>">
+                                        R$ <?php echo number_format((float) $__base, 2, ',', '.'); ?>
+                                    </span>
+                                    <?php if ($__faixa): ?>
+                                        <br><small class="base-ato-faixa"><?php echo htmlspecialchars($__faixa['rotulo'], ENT_QUOTES, 'UTF-8'); ?></small>
+                                    <?php endif; ?>
+                                <?php elseif ($__faixa): ?>
+                                    <span class="base-ato-falta" title="Ato cobrado por faixa de valor declarado, mas sem base informada. Informe pela tela de edição da O.S.">
+                                        <i class="fa fa-exclamation-triangle"></i> não informada
+                                    </span>
+                                    <br><small class="base-ato-faixa"><?php echo htmlspecialchars($__faixa['rotulo'], ENT_QUOTES, 'UTF-8'); ?></small>
+                                <?php else: ?>
+                                    <small class="text-muted">—</small>
+                                <?php endif; ?>
+                            </td>  
+                            <td>  
                                 <?php if ($item['status'] != 'Cancelado' && $item['status'] != 'liquidado' && $qtde_pagamentos > 0): ?>  
                                     <button type="button" class="btn btn-primary btn-sm"  
                                     onclick="liquidarAto(  
@@ -1627,6 +1669,28 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                                         </tbody>
                 </table>
             </div>
+
+            <?php
+            /* O.S. ANTIGA: base gravada só no nível da O.S., antes de a base
+               passar a ser por ato. Nenhum item tem base própria, mas a O.S.
+               tem — então o valor é exibido aqui para não se perder. */
+            $__baseOs = (float) ($ordem_servico['base_de_calculo'] ?? 0);
+            $__algumItemComBase = false;
+            foreach ($ordem_servico_itens as $__it) {
+                if (($__it['base_de_calculo'] ?? null) !== null && (float) $__it['base_de_calculo'] >= 0.001) {
+                    $__algumItemComBase = true;
+                    break;
+                }
+            }
+            ?>
+            <?php if ($__baseOs >= 0.001 && !$__algumItemComBase): ?>
+                <div class="aviso-base-legado">
+                    <b>Base de cálculo desta O.S.: R$ <?php echo number_format($__baseOs, 2, ',', '.'); ?></b><br>
+                    O.S. lançada antes de a base de cálculo passar a ser informada por ato, por isso
+                    ela vale para a O.S. inteira. Nos lançamentos novos a base é registrada no
+                    próprio ato de valor declarado.
+                </div>
+            <?php endif; ?>
 
             <!-- CARDS MOBILE -->
             <div class="mobile-cards">
@@ -1660,6 +1724,26 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     <?php if (!empty($item['descricao'])): ?>
                     <div class="card-description">
                         <?php echo $item['descricao']; ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Base de cálculo do ato (só nos atos de valor declarado) -->
+                    <?php
+                        $__base  = $item['base_de_calculo'] ?? null;
+                        $__faixa = bc_extrair_faixa($item['descricao']);
+                        $__temBase = ($__base !== null && (float) $__base >= 0.001);
+                    ?>
+                    <?php if ($__temBase): ?>
+                    <div class="card-base-ato">
+                        <b>Base de cálculo:</b> R$ <?php echo number_format((float) $__base, 2, ',', '.'); ?>
+                        <?php if ($__faixa): ?>
+                            <br><small><?php echo htmlspecialchars($__faixa['rotulo'], ENT_QUOTES, 'UTF-8'); ?></small>
+                        <?php endif; ?>
+                    </div>
+                    <?php elseif ($__faixa): ?>
+                    <div class="card-base-ato falta">
+                        <b><i class="fa fa-exclamation-triangle"></i> Base de cálculo não informada</b>
+                        <br><small><?php echo htmlspecialchars($__faixa['rotulo'], ENT_QUOTES, 'UTF-8'); ?></small>
                     </div>
                     <?php endif; ?>
 

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/corpo_helper.php';
 $servername = "localhost";
 $username = "root";
 $password = "";
@@ -22,6 +23,9 @@ if ($result->num_rows === 0) {
 }
 
 $oficioData = $result->fetch_assoc();
+if (isset($oficioData['corpo'])) {
+    $oficioData['corpo'] = atlasCorpoLimpo($oficioData['corpo']);
+}
 $stmt->close();
 $conn->close();
 

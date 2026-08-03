@@ -3,6 +3,7 @@ require('../oficios/tcpdf/tcpdf.php');
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_funcionario.php';
 
 date_default_timezone_set('America/Sao_Paulo');
 
@@ -65,7 +66,7 @@ $atos = fetchData(
     'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total
      FROM atos_liquidados al
      JOIN ordens_de_servico os ON al.ordem_servico_id = os.id
-     WHERE ' . ($tipo === 'unificado' ? '' : 'al.funcionario = :funcionario AND ') . 'DATE(al.data) = :data',
+     WHERE ' . ($tipo === 'unificado' ? '' : cx_func_sql('al.funcionario') . ' = :funcionario AND ') . 'DATE(al.data) = :data',
     $params
 );
 
@@ -73,7 +74,7 @@ $atosManuais = fetchData(
     'SELECT os.id as ordem_servico_id, os.cliente, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total
      FROM atos_manuais_liquidados aml
      JOIN ordens_de_servico os ON aml.ordem_servico_id = os.id
-     WHERE ' . ($tipo === 'unificado' ? '' : 'aml.funcionario = :funcionario AND ') . 'DATE(aml.data) = :data',
+     WHERE ' . ($tipo === 'unificado' ? '' : cx_func_sql('aml.funcionario') . ' = :funcionario AND ') . 'DATE(aml.data) = :data',
     $params
 );
 
@@ -81,7 +82,7 @@ $pagamentos = fetchData(
     'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento
      FROM pagamento_os po
      JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
-     WHERE ' . ($tipo === 'unificado' ? '' : 'po.funcionario = :funcionario AND ') . 'DATE(po.data_pagamento) = :data',
+     WHERE ' . ($tipo === 'unificado' ? '' : cx_func_sql('po.funcionario') . ' = :funcionario AND ') . 'DATE(po.data_pagamento) = :data',
     $params
 );
 
@@ -89,7 +90,7 @@ $devolucoes = fetchData(
     'SELECT os.id as ordem_de_servico_id, os.cliente, do.forma_devolucao, do.total_devolucao
      FROM devolucao_os do
      JOIN ordens_de_servico os ON do.ordem_de_servico_id = os.id
-     WHERE ' . ($tipo === 'unificado' ? '' : 'do.funcionario = :funcionario AND ') . 'DATE(do.data_devolucao) = :data',
+     WHERE ' . ($tipo === 'unificado' ? '' : cx_func_sql('do.funcionario') . ' = :funcionario AND ') . 'DATE(do.data_devolucao) = :data',
     $params
 );
 

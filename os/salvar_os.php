@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/base_calculo_lib.php';
 date_default_timezone_set('America/Sao_Paulo');
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -48,9 +49,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Obtém o ID da OS inserida
         $os_id = $conn->lastInsertId();
 
+        // Coluna da base por ato (idempotente).
+        bc_migrar($conn);
+
         $stmt = $conn->prepare("INSERT INTO ordens_de_servico_itens 
-            (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, ordem_exibicao) 
-            VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :ferrfis, :total, :ordem_exibicao)");
+            (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, ordem_exibicao, base_de_calculo) 
+            VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :ferrfis, :total, :ordem_exibicao, :base_de_calculo)");
         
         foreach ($itens as $item) {
             $ordem_servico_id = $os_id;
@@ -65,6 +69,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $ferrfis = str_replace(',', '.', $item['ferrfis'] ?? '0');
             $total = str_replace(',', '.', $item['total']);
             $ordem_exibicao = $item['ordem_exibicao']; 
+
+            // ---------- BASE DE CÁLCULO DO ATO ----------
+            // A tela já valida, mas a checagem que vale é esta: o navegador
+            // pode ser contornado, e um ato de faixa gravado sem base
+            // trava a selagem depois, longe de quem lançou.
+            $baseBruta = $item['base_de_calculo'] ?? '';
+            $base_de_calculo = ($baseBruta === '' || $baseBruta === null)
+                ? null : bc_valor($baseBruta);
+
+            $faixaAto = bc_extrair_faixa($descricao);
+            $ehIsento = stripos((string) $ato, '(isento)') !== false;
+
+            if ($faixaAto && !$ehIsento) {
+                $vb = bc_validar((float) $base_de_calculo, $faixaAto);
+                if (!$vb['ok']) {
+                    $conn->rollBack();
+                    echo json_encode(['error' => 'Ato ' . $ato . ': ' . $vb['mensagem']]);
+                    exit;
+                }
+            }
+
+            if ($base_de_calculo !== null && $base_de_calculo <= 0) {
+                $base_de_calculo = null;
+            }
         
             $stmt->bindParam(':ordem_servico_id', $ordem_servico_id);
             $stmt->bindParam(':ato', $ato);
@@ -78,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bindParam(':ferrfis', $ferrfis);
             $stmt->bindParam(':total', $total);
             $stmt->bindParam(':ordem_exibicao', $ordem_exibicao); 
+            $stmt->bindParam(':base_de_calculo', $base_de_calculo); 
             $stmt->execute();
         }
         // Confirma a transação

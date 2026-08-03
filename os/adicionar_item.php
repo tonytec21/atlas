@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/base_calculo_lib.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $os_id = $_POST['os_id'];
@@ -16,6 +17,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $ferrfis = isset($_POST['ferrfis']) ? $_POST['ferrfis'] : 0;
     $total = $_POST['total'];
 
+    // ---------- BASE DE CÁLCULO DO ATO ----------
+    // A tela valida antes de enviar, mas a checagem que vale é esta: um ato
+    // de faixa gravado sem base trava a selagem depois, longe de quem lançou.
+    $baseBruta = $_POST['base_de_calculo'] ?? '';
+    $base_de_calculo = ($baseBruta === '' || $baseBruta === null) ? null : bc_valor($baseBruta);
+
+    $faixaAto = bc_extrair_faixa($descricao);
+    $ehIsento = stripos((string) $ato, '(isento)') !== false;
+
+    if ($faixaAto && !$ehIsento) {
+        $vb = bc_validar((float) $base_de_calculo, $faixaAto);
+        if (!$vb['ok']) {
+            echo json_encode(['error' => 'Ato ' . $ato . ': ' . $vb['mensagem']]);
+            exit;
+        }
+    }
+
+    if ($base_de_calculo !== null && $base_de_calculo <= 0) {
+        $base_de_calculo = null;
+    }
+
     try {
         $conn = getDatabaseConnection();
 
@@ -23,7 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $conn->beginTransaction();
 
         // Adiciona o item na tabela `ordens_de_servico_itens`
-        $stmt = $conn->prepare("INSERT INTO ordens_de_servico_itens (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total) VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :ferrfis, :total)");
+        bc_migrar($conn);
+
+        $stmt = $conn->prepare("INSERT INTO ordens_de_servico_itens (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, base_de_calculo) VALUES (:ordem_servico_id, :ato, :quantidade, :desconto_legal, :descricao, :emolumentos, :ferc, :fadep, :femp, :ferrfis, :total, :base_de_calculo)");
+        $stmt->bindParam(':base_de_calculo', $base_de_calculo);
         $stmt->bindParam(':ordem_servico_id', $os_id);
         $stmt->bindParam(':ato', $ato);
         $stmt->bindParam(':quantidade', $quantidade);

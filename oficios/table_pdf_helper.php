@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/corpo_helper.php';
+
 /**
  * Atlas - Table PDF Helper
  * Normaliza HTML de tabelas geradas pelo CKEditor para renderização perfeita no TCPDF
@@ -474,6 +476,9 @@ function atlasWriteBlocoImagem($pdf, $innerHtml, $align = 'center') {
  * @param float $contentWidthMm Largura da area de conteudo em mm
  */
 function renderCorpoOficioPdf($pdf, $conteudoOficio, $contentWidthMm = 160) {
+    // Desfazer escapes indevidos de oficios antigos (\" nos atributos das tags)
+    $conteudoOficio = atlasCorpoLimpo($conteudoOficio);
+
     // Decodificar entidades HTML
     $conteudoOficio = html_entity_decode($conteudoOficio, ENT_QUOTES, 'UTF-8');
 

@@ -1,0 +1,37 @@
+# =====================================================================
+# API do módulo O.S. — Atlas
+# ---------------------------------------------------------------------
+# Encaminha /os/api/v1/... para o index.php e repassa o cabeçalho
+# Authorization, que o Apache/CGI costuma engolir.
+# =====================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /os/api/
+
+    # Preserva o Authorization: Bearer ... (some em SetHandler/CGI)
+    RewriteCond %{HTTP:Authorization} ^(.+)$
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+
+    # Arquivo ou diretório existente é servido normalmente
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# Nunca servir a documentação nem arquivos auxiliares por HTTP
+<FilesMatch "\.(md|log|sql|bak)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>

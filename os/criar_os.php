@@ -741,11 +741,7 @@ $atosSemValor = json_decode(
                     <label for="cpf_cliente">CPF/CNPJ do Apresentante:</label>  
                     <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente">  
                 </div>  
-                <div class="form-group col-md-2">  
-                    <label for="base_calculo">Base de Cálculo:</label>  
-                    <input type="text" class="form-control" id="base_calculo" name="base_calculo">  
-                </div>  
-                <div class="form-group col-md-2">  
+                <div class="form-group col-md-4">  
                     <label for="total_os">Valor Total da OS:</label>  
                     <input type="text" class="form-control" id="total_os" name="total_os" readonly>  
                 </div>  
@@ -787,6 +783,29 @@ $atosSemValor = json_decode(
                     <input type="text" class="form-control" id="descricao" name="descricao" required>  
                 </div>  
             </div>  
+
+            <!-- Base de cálculo DO ATO. Aparece só quando a descrição do ato
+                 traz faixa de valor declarado (ex.: "De R$ 327.953,99 a
+                 R$ 409.942,47"). Em atos sem faixa o bloco fica oculto. -->
+            <div class="form-row" id="grupoBaseAto" style="display:none">
+                <div class="form-group col-md-4">
+                    <label for="base_ato">
+                        Base de Cálculo do Ato: <span style="color:#dc2626">*</span>
+                    </label>
+                    <input type="text" class="form-control" id="base_ato" name="base_ato"
+                           placeholder="0,00" autocomplete="off">
+                    <small id="faixaBaseAto" style="font-weight:600;color:#64748b"></small>
+                </div>
+                <div class="form-group col-md-8" style="display:flex;align-items:center;margin-top:29px">
+                    <div style="background:#eff6ff;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;
+                                padding:8px 12px;font-size:.82rem;color:#1e40af;width:100%">
+                        <b>Ato com valor declarado.</b> Informe o valor do negócio jurídico
+                        (o valor do imóvel, da doação etc.). Ele precisa estar dentro da faixa
+                        do ato escolhido — se estiver fora, selecione o ato da faixa correta.
+                    </div>
+                </div>
+            </div>
+  
 
             <div class="form-row">  
                 <div class="form-group col-md-2">  
@@ -844,6 +863,7 @@ $atosSemValor = json_decode(
                             <th>FEMP</th>  
                             <th>FERRFIS</th>  
                             <th>Total</th>  
+                            <th>Base de Cálculo</th>  
                             <th>Ações</th>  
                         </tr>  
                     </thead>  
@@ -900,7 +920,8 @@ $atosSemValor = json_decode(
 </button>  
 
 <!-- ===================== SCRIPTS ===================== -->  
-<script src="../script/jquery-3.5.1.min.js"></script>  
+<script src="../script/jquery-3.5.1.min.js"></script>
+<script src="base_calculo_ato.js"></script>  
 <script src="../script/jquery-ui.min.js"></script>  
 <script src="../script/jquery.mask.min.js"></script>  
 <script src="../script/bootstrap.bundle.min.js"></script>  
@@ -954,6 +975,7 @@ $atosSemValor = json_decode(
             const femp = $tr.find('td').eq(8).text();  
             const ferrfis = $tr.find('td').eq(9).text();  
             const total = $tr.find('td').eq(10).text();  
+            const baseAto = $tr.attr('data-base') || '';  
             const isISS = $tr.attr('id') === 'ISS_ROW';  
 
             const cardClass = isISS ? 'item-card iss-card' : 'item-card';  
@@ -969,6 +991,9 @@ $atosSemValor = json_decode(
                     <span class="card-ato">  
                         <i class="fa fa-file-text-o"></i> ${ato}  
                     </span>  
+                    ${baseAto ? `<div style="font-size:.78rem;color:#1e40af;background:#eff6ff;
+                        border-radius:6px;padding:3px 8px;margin:4px 0;display:inline-block">
+                        <b>Base:</b> ${BaseCalculoAto.brl(baseAto)}</div>` : ''}  
 
                     ${descricao ? `<div class="card-description">${descricao}</div>` : ''}  
 
@@ -1160,7 +1185,12 @@ $atosSemValor = json_decode(
             .on('blur', updateSalvarButtonState);  
 
         // Máscaras de valores  
-        $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').mask('#.##0,00', {reverse: true});  
+        $('#base_ato, #emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').mask('#.##0,00', {reverse: true});  
+
+        // Realce imediato: verde dentro da faixa, vermelho fora.
+        $(document).on('input blur', '#base_ato', function () {
+            BaseCalculoAto.realcar();
+        });  
 
         // Submit do formulário  
         $('#osForm').on('submit', function(e) {  
@@ -1202,12 +1232,24 @@ $atosSemValor = json_decode(
                 return;  
             }  
 
+            // ---------- BASE DE CÁLCULO DO ATO ----------
+            // Ato com faixa de valor declarado só entra na O.S. com a base
+            // informada E dentro da faixa. Base fora da faixa quase sempre
+            // significa ato errado: o valor pertence a outra faixa da tabela.
+            var vb = BaseCalculoAto.validarFormulario();
+            if (!vb.ok) {
+                showAlert(vb.mensagem, 'error');
+                $('#base_ato').focus();
+                return;
+            }
+            var baseAto = vb.base;   // null quando o ato não tem faixa
+
             // Valores UNITÁRIos (já com desconto) — usados para recalcular ao alterar a quantidade
             var q0 = (quantidade > 0) ? quantidade : 1;
             var uEmol = emolumentos / q0, uFerc = ferc / q0, uFadep = fadep / q0,
                 uFemp = femp / q0, uFerrfis = ferrfis / q0, uTotal = total / q0;
 
-            var item = '<tr data-uemol="' + uEmol + '" data-uferc="' + uFerc + '" data-ufadep="' + uFadep + '" data-ufemp="' + uFemp + '" data-uferrfis="' + uFerrfis + '" data-utotal="' + uTotal + '">' +  
+            var item = '<tr data-base="' + (baseAto === null ? '' : baseAto) + '" data-uemol="' + uEmol + '" data-uferc="' + uFerc + '" data-ufadep="' + uFadep + '" data-ufemp="' + uFemp + '" data-uferrfis="' + uFerrfis + '" data-utotal="' + uTotal + '">' +  
                 '<td>' + ordemExibicao + '</td>' +   
                 '<td>' + ato + '</td>' +  
                 '<td class="qtd-edit" contenteditable="true" title="Clique para alterar a quantidade">' + quantidade + '</td>' +  
@@ -1219,6 +1261,7 @@ $atosSemValor = json_decode(
                 '<td>' + femp.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' + ferrfis.toFixed(2).replace('.', ',') + '</td>' +  
                 '<td>' + total.toFixed(2).replace('.', ',') + '</td>' +  
+                '<td class="base-ato-td">' + (baseAto ? BaseCalculoAto.brl(baseAto) : '—') + '</td>' +
                 '<td>' +
                 '<button type="button" class="btn btn-warning btn-sm" onclick="marcarItemIsento(this)">' +
                     '<i class="fa fa-ban"></i> Ato Isento' +
@@ -1237,6 +1280,7 @@ $atosSemValor = json_decode(
             // Limpar campos  
             $('#ato').val('');  
             __atoState = null;
+            BaseCalculoAto.limpar();
             $('#quantidade').val('1');  
             $('#desconto_legal').val('0');  
             $('#descricao').val('');  
@@ -1353,6 +1397,7 @@ $atosSemValor = json_decode(
     // forçando o usuário a buscar o ato novamente.
     function invalidarAtoBuscado() {
         __atoState = null;
+        BaseCalculoAto.limpar();
         $('#descricao').val('');
         $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').val('');
         $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').prop('readonly', true);
@@ -1385,6 +1430,10 @@ $atosSemValor = json_decode(
                     };
 
                     $('#descricao').val(response.DESCRICAO);
+
+                    // Mostra (ou esconde) a base de cálculo conforme a faixa
+                    // de valor declarado escrita na descrição do ato.
+                    BaseCalculoAto.aplicarFaixa(response.DESCRICAO);
                     // Volta os campos de valor para somente-leitura (caso viessem
                     // do modo "Adicionar Ato Manualmente").
                     $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').prop('readonly', true);
@@ -1455,6 +1504,7 @@ $atosSemValor = json_decode(
     // ===================== ADICIONAR ATO MANUAL =====================  
     function adicionarAtoManual() {  
         __atoState = null;   // modo manual: valores digitados pelo usuário
+        BaseCalculoAto.limpar();   // ato manual não tem faixa de tabela
         $('#ato').val('0');                  
         $('#descricao').val('').prop('readonly', false);  
         $('#emolumentos').val('0,00').prop('readonly', false);  
@@ -1529,7 +1579,10 @@ $atosSemValor = json_decode(
         var total_os = $('#total_os').val().replace(/\./g, '').replace(',', '.');  
         var descricao_os = $('#descricao_os').val();  
         var observacoes = $('#observacoes').val();  
-        var base_calculo = $('#base_calculo').val().replace(/\./g, '').replace(',', '.');  
+        // A base de cálculo agora é POR ATO (ver itens abaixo). O campo de
+        // nível da O.S. foi removido do formulário; a coluna continua no
+        // banco para as O.S. antigas.
+        var base_calculo = '';  
         var itens = [];  
 
         $('#itensTable tr').each(function(index) {  
@@ -1544,6 +1597,7 @@ $atosSemValor = json_decode(
             var ferrfis = $(this).find('td').eq(9).text().replace(/\./g, '').replace(',', '.');  
             var total = $(this).find('td').eq(10).text().replace(/\./g, '').replace(',', '.');  
             var ordem_exibicao = index + 1;  
+            var base_de_calculo = $(this).attr('data-base') || '';  
 
             itens.push({  
                 ato: ato,  
@@ -1556,7 +1610,8 @@ $atosSemValor = json_decode(
                 femp: femp,  
                 ferrfis: ferrfis,  
                 total: total,  
-                ordem_exibicao: ordem_exibicao  
+                ordem_exibicao: ordem_exibicao,  
+                base_de_calculo: base_de_calculo  
             });  
         });  
 

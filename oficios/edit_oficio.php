@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/corpo_helper.php';
 include(__DIR__ . '/../session_check.php');
 checkSession();
 
@@ -117,7 +118,7 @@ include(__DIR__ . '/../menu.php');
                             <i class="fa fa-picture-o"></i> Inserir Imagem
                         </button>
                     </div>
-                    <textarea class="form-control" id="corpo" name="corpo" rows="10" required><?php echo htmlspecialchars($oficioData['corpo']); ?></textarea>
+                    <textarea class="form-control" id="corpo" name="corpo" rows="10" required><?php echo htmlspecialchars(atlasCorpoLimpo($oficioData['corpo'])); ?></textarea>
                 </div>
                 <div class="form-row">
                     <div class="form-group col-md-4">

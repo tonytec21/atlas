@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_funcionario.php';
 date_default_timezone_set('America/Sao_Paulo');
 
 $dini = isset($_GET['data_inicial']) ? $_GET['data_inicial'] : null;
@@ -20,7 +21,7 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
 function sumBetween(PDO $conn, string $sqlBase, array $binds, ?string $func){
     $sql = $sqlBase;
     if ($func && $func !== 'todos') {
-        $sql .= ' AND funcionario = :func';
+        $sql .= ' AND ' . cx_func_sql('funcionario') . ' = :func';
         $binds[':func'] = $func;
     }
     $st=$conn->prepare($sql);
@@ -63,7 +64,7 @@ if ($func && $func !== 'todos') {
     $st = $conn->prepare('
         SELECT forma_de_pagamento, SUM(total_pagamento) AS tot
         FROM pagamento_os
-        WHERE DATE(data_pagamento) BETWEEN :dini AND :dfim AND funcionario = :func
+        WHERE DATE(data_pagamento) BETWEEN :dini AND :dfim AND ' . cx_func_sql('funcionario') . ' = :func
         GROUP BY forma_de_pagamento
     ');
     $st->execute([':dini'=>$dini, ':dfim'=>$dfim, ':func'=>$func]);
@@ -100,19 +101,19 @@ $bindD = [':dini'=>$dini, ':dfim'=>$dfim];
 if ($wf) $bindD[':func'] = $func;
 
 $atos = fetchDataP($conn,
-    'SELECT os.id AS ordem_servico_id, os.cliente, al.funcionario, al.ato, al.descricao, al.quantidade_liquidada, al.total
+    'SELECT os.id AS ordem_servico_id, os.cliente, ' . cx_func_sql('al.funcionario') . ' AS funcionario, al.ato, al.descricao, al.quantidade_liquidada, al.total
      FROM atos_liquidados al JOIN ordens_de_servico os ON al.ordem_servico_id = os.id
-     WHERE DATE(al.data) BETWEEN :dini AND :dfim'.($wf?' AND al.funcionario = :func':''), $bindD);
+     WHERE DATE(al.data) BETWEEN :dini AND :dfim'.($wf?' AND ' . cx_func_sql('al.funcionario') . ' = :func':''), $bindD);
 
 $atosManuais = fetchDataP($conn,
-    'SELECT os.id AS ordem_servico_id, os.cliente, aml.funcionario, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total
+    'SELECT os.id AS ordem_servico_id, os.cliente, ' . cx_func_sql('aml.funcionario') . ' AS funcionario, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total
      FROM atos_manuais_liquidados aml JOIN ordens_de_servico os ON aml.ordem_servico_id = os.id
-     WHERE DATE(aml.data) BETWEEN :dini AND :dfim'.($wf?' AND aml.funcionario = :func':''), $bindD);
+     WHERE DATE(aml.data) BETWEEN :dini AND :dfim'.($wf?' AND ' . cx_func_sql('aml.funcionario') . ' = :func':''), $bindD);
 
 $pagamentos = fetchDataP($conn,
-    'SELECT os.id AS ordem_de_servico_id, os.cliente, po.funcionario, po.forma_de_pagamento, po.total_pagamento
+    'SELECT os.id AS ordem_de_servico_id, os.cliente, ' . cx_func_sql('po.funcionario') . ' AS funcionario, po.forma_de_pagamento, po.total_pagamento
      FROM pagamento_os po JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
-     WHERE DATE(po.data_pagamento) BETWEEN :dini AND :dfim'.($wf?' AND po.funcionario = :func':''), $bindD);
+     WHERE DATE(po.data_pagamento) BETWEEN :dini AND :dfim'.($wf?' AND ' . cx_func_sql('po.funcionario') . ' = :func':''), $bindD);
 
 $devolucoes = fetchDataP($conn,
     'SELECT os.id AS ordem_de_servico_id, os.cliente, do.funcionario, do.forma_devolucao, do.total_devolucao

@@ -91,7 +91,6 @@ try {
     die('Erro ao buscar dados da OS: ' . $e->getMessage());
 }
 ?>
-<?php include(__DIR__ . '/guia/guia.php'); ?>
 <!DOCTYPE html>  
 <html lang="pt-br">  
 <head>  
@@ -821,8 +820,8 @@ try {
                     <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente" value="<?php echo $os['cpf_cliente']; ?>">  
                 </div>  
                 <div class="form-group col-md-2">  
-                    <label for="base_calculo_legado">Base de Cálculo (O.S. antiga):</label>  
-                    <input type="text" class="form-control" id="base_calculo_legado" value="<?php echo number_format($os['base_de_calculo'], 2, ',', '.'); ?>" readonly title="Campo legado. A base agora é informada por ato.">  
+                    <label for="base_calculo">Base de Cálculo:</label>  
+                    <input type="text" class="form-control" id="base_calculo" name="base_calculo" value="<?php echo number_format($os['base_de_calculo'], 2, ',', '.'); ?>">  
                 </div>  
                 <div class="form-group col-md-3">  
                     <label for="total_os">Total OS:</label>  
@@ -865,25 +864,6 @@ try {
                     <label for="descricao">Descrição:</label>  
                     <input type="text" class="form-control" id="descricao" name="descricao" required>  
                 </div>  
-            </div>  
-
-            <!-- Base de cálculo DO ATO: aparece só quando a descrição traz
-                 faixa de valor declarado. -->
-            <div class="form-row" id="grupoBaseAto" style="display:none">
-                <div class="form-group col-md-4">
-                    <label for="base_ato">Base de Cálculo do Ato: <span style="color:#dc2626">*</span></label>
-                    <input type="text" class="form-control" id="base_ato" name="base_ato"
-                           placeholder="0,00" autocomplete="off">
-                    <small id="faixaBaseAto" style="font-weight:600;color:#64748b"></small>
-                </div>
-                <div class="form-group col-md-8" style="display:flex;align-items:center;margin-top:29px">
-                    <div style="background:#eff6ff;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;
-                                padding:8px 12px;font-size:.82rem;color:#1e40af;width:100%">
-                        <b>Ato com valor declarado.</b> Informe o valor do negócio jurídico. Ele precisa
-                        estar dentro da faixa do ato escolhido — se estiver fora, selecione o ato da
-                        faixa correta.
-                    </div>
-                </div>
             </div>  
 
             <div class="form-row">  
@@ -942,7 +922,6 @@ try {
                             <th>FERRFIS</th>  
                             <th>Total</th>  
                             <th>Qtd Liquidada</th>  
-                            <th>Base de Cálculo</th>  
                             <th>Ações</th>  
                         </tr>  
                     </thead>  
@@ -951,18 +930,7 @@ try {
                         <?php foreach ($itens as $item): ?>  
                             <tr data-item-id="<?php echo $item['id']; ?>"  
                                 data-ordem_exibicao="<?php echo $item['ordem_exibicao']; ?>"  
-                                data-base="<?php
-                                    $__b = $item['base_de_calculo'] ?? null;
-                                    echo ($__b !== null && (float)$__b >= 0.001) ? (float)$__b : '';
-                                ?>"  
-                                <?php
-                                    if ($item['ato'] === 'ISS') {
-                                        $issLiqFlag = ((float)($item['quantidade_liquidada'] ?? 0) > 0) ? '1' : '0';
-                                        // id="ISS_ROW" só na linha de ISS AINDA ajustável (não liquidada)
-                                        echo 'data-tipo="iss" data-liquidada="' . $issLiqFlag . '"';
-                                        if ($issLiqFlag === '0') echo ' id="ISS_ROW"';
-                                    }
-                                ?>>  
+                                <?php if ($item['ato'] === 'ISS') echo 'id="ISS_ROW" data-tipo="iss"'; ?>>  
                                 <td class="ordem"><?php echo $item['ordem_exibicao']; ?></td>  
                                 <td><?php echo $item['ato']; ?></td>  
                                 <td><?php echo $item['quantidade']; ?></td>  
@@ -975,11 +943,6 @@ try {
                                 <td><?php echo number_format(isset($item['ferrfis']) ? $item['ferrfis'] : 0, 2, ',', '.'); ?></td>  
                                 <td><?php echo number_format($item['total'], 2, ',', '.'); ?></td>  
                                 <td><?php echo $item['quantidade_liquidada']; ?></td>  
-                                <td class="base-ato-td"><?php
-                                    $__b = $item['base_de_calculo'] ?? null;
-                                    echo ($__b !== null && (float)$__b >= 0.001)
-                                        ? 'R$ ' . number_format((float)$__b, 2, ',', '.') : '—';
-                                ?></td>  
                                 <td>  
                                 <?php if ($item['status'] === 'liquidado'): ?>  
                                     <!-- Se o item estiver liquidado, nenhum botão será mostrado -->  
@@ -1199,7 +1162,6 @@ try {
 </div>  
 
 <script src="../script/jquery-3.5.1.min.js"></script>
-<script src="base_calculo_ato.js"></script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
@@ -1263,7 +1225,7 @@ function salvarOrdemExibicao() {
 function atualizarISS () {
     if (!ISS_CONFIG.ativo) return;   // ISS desligado → nada faz
 
-    // Soma dos EMOLUMENTOS (coluna 5), ignorando QUALQUER linha de ISS
+    // Soma dos EMOLUMENTOS (coluna 5), ignorando a própria linha do ISS
     let totalEmol = 0;
     $('#itensTable tr').each(function () {
         if ($(this).data('tipo') !== 'iss') {
@@ -1272,36 +1234,21 @@ function atualizarISS () {
         }
     });
 
-    const baseISS        = totalEmol * 0.88;
-    const issDevidoTotal = +(baseISS * (ISS_CONFIG.percentual / 100)).toFixed(2);
+    const baseISS  = totalEmol * 0.88;
+    const valorISS = baseISS * (ISS_CONFIG.percentual / 100);
 
-    // ISS já LIQUIDADO (linhas de ISS com data-liquidada="1") -> congelado,
-    // não pode aumentar nem reduzir. Usa o total dessas linhas (coluna 10).
-    let issLiquidado = 0;
-    $('#itensTable tr[data-tipo="iss"][data-liquidada="1"]').each(function () {
-        issLiquidado += parseFloat($(this).find('td').eq(10).text()
-                                  .replace(/\./g, '').replace(',', '.')) || 0;
-    });
-
-    let issAjustavel = +(issDevidoTotal - issLiquidado).toFixed(2);
-    if (issAjustavel < 0) issAjustavel = 0;   // nunca estorna ISS já liquidado
-
-    // Atualiza SOMENTE a linha de ISS ainda ajustável (#ISS_ROW).
+    // Cria ou atualiza a linha fixa
     let $linhaISS = $('#ISS_ROW');
 
     /*  ────────────────────────────────────────────────────────────
-        Se não houver linha de ISS ajustável (todas já liquidadas), não
-        criamos nada aqui no front. O ISS restante (issAjustavel) será
-        lançado numa nova linha de ISS ao salvar (atualizar_os.php).
+        Se não existir ISS na tabela, não fazemos nada.  
+        Assim evitamos criar linhas novas ou duplicadas.
     ────────────────────────────────────────────────────────────*/
-    if ($linhaISS.length === 0) {
-        calcularTotalOS();
-        return;
-    }
+    if ($linhaISS.length === 0) return;
 
-    /* Atualiza a linha de ISS não liquidada com o valor ajustável */
-    $linhaISS.find('td').eq(5).text(issAjustavel.toFixed(2).replace('.', ','));
-    $linhaISS.find('td').eq(10).text(issAjustavel.toFixed(2).replace('.', ','));
+    /* Atualiza valores da linha existente */
+    $linhaISS.find('td').eq(5).text(valorISS.toFixed(2).replace('.', ','));
+    $linhaISS.find('td').eq(10).text(valorISS.toFixed(2).replace('.', ','));
 
     /* Recalcula o total geral depois da alteração */
     calcularTotalOS();
@@ -1347,10 +1294,7 @@ $(document).ready(function() {
         }
     }).blur(); // Chamar a função quando o campo perde o foco
 
-    $('#base_ato, #emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').mask('#.##0,00', {reverse: true});
-
-    // Realce imediato: verde dentro da faixa, vermelho fora.
-    $(document).on('input blur', '#base_ato', function () { BaseCalculoAto.realcar(); });
+    $('#base_calculo, #emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').mask('#.##0,00', {reverse: true});
 
     // Apresentante: bloquear aspas/apóstrofos ao digitar e sanitizar colas
     $('#cliente')
@@ -1426,9 +1370,6 @@ function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
                                 emolumentos = ferc = fadep = femp = ferrfis = 0;
                             }
 
-                            // Mostra/esconde a base conforme a faixa do ato.
-                            BaseCalculoAto.aplicarFaixa(response.DESCRICAO);
-
                             callback({
                                 descricao: response.DESCRICAO,
                                 emolumentos: emolumentos.toFixed(2).replace('.', ','),
@@ -1436,15 +1377,7 @@ function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
                                 fadep: fadep.toFixed(2).replace('.', ','),
                                 femp: femp.toFixed(2).replace('.', ','),
                                 ferrfis: ferrfis.toFixed(2).replace('.', ','),
-                                total: (emolumentos + ferc + fadep + femp + ferrfis).toFixed(2).replace('.', ','),
-                                base: {
-                                    emol:      parseFloat(response.EMOLUMENTOS) || 0,
-                                    ferc:      parseFloat(response.FERC) || 0,
-                                    fadep:     parseFloat(response.FADEP) || 0,
-                                    femp:      parseFloat(response.FEMP) || 0,
-                                    ferrfis:   parseFloat(response.FERRFIS || 0) || 0,
-                                    isExcecao: ATOS_SEM_VALOR.includes(ato.trim())
-                                }
+                                total: (emolumentos + ferc + fadep + femp + ferrfis).toFixed(2).replace('.', ',')
                             });
                         }
                     },
@@ -1464,83 +1397,21 @@ function buscarAtoPorQuantidade(ato, quantidade, descontoLegal, callback) {
 
 
 
-// ===================== ESTADO DO ATO BUSCADO =====================
-// Guarda os valores UNITÁRIOS (sem quantidade e sem desconto) do último ato
-// buscado, para recalcular automaticamente ao alterar a quantidade/desconto e
-// impedir que se salve o valor de uma quantidade antiga.
-var __atoState = null;
-
-// Recalcula os campos de valor a partir do ato buscado + qtd/desconto atuais.
-function aplicarCalculoAto() {
-    if (!__atoState) return false;
-    var quantidade = parseInt($('#quantidade').val(), 10);
-    if (!quantidade || quantidade < 1) quantidade = 1;
-    var desconto = (parseFloat($('#desconto_legal').val()) || 0) / 100;
-
-    var emol    = __atoState.emol    * quantidade * (1 - desconto);
-    var ferc    = __atoState.ferc    * quantidade * (1 - desconto);
-    var fadep   = __atoState.fadep   * quantidade * (1 - desconto);
-    var femp    = __atoState.femp    * quantidade * (1 - desconto);
-    var ferrfis = __atoState.ferrfis * quantidade * (1 - desconto);
-
-    if (__atoState.isExcecao) { emol = ferc = fadep = femp = ferrfis = 0; }
-
-    $('#emolumentos').val(emol.toFixed(2).replace('.', ','));
-    $('#ferc').val(ferc.toFixed(2).replace('.', ','));
-    $('#fadep').val(fadep.toFixed(2).replace('.', ','));
-    $('#femp').val(femp.toFixed(2).replace('.', ','));
-    $('#ferrfis').val(ferrfis.toFixed(2).replace('.', ','));
-    $('#total').val((emol + ferc + fadep + femp + ferrfis).toFixed(2).replace('.', ','));
-    return true;
-}
-
-// Invalida o ato buscado (ex.: código do ato alterado) e limpa os campos,
-// forçando nova busca antes de adicionar.
-function invalidarAtoBuscado() {
-    BaseCalculoAto.limpar();
-    __atoState = null;
-    $('#descricao').val('');
-    $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').val('');
-    $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').prop('readonly', true);
-}
-
 function buscarAto() {
     var ato = $('#ato').val();
     var quantidade = $('#quantidade').val();
     var descontoLegal = $('#desconto_legal').val();
 
     buscarAtoPorQuantidade(ato, quantidade, descontoLegal, function(values) {
-        // Guarda os valores UNITÁRIOS do ato para recálculo automático.
-        __atoState = {
-            ato:       ato.trim(),
-            emol:      values.base.emol,
-            ferc:      values.base.ferc,
-            fadep:     values.base.fadep,
-            femp:      values.base.femp,
-            ferrfis:   values.base.ferrfis,
-            isExcecao: values.base.isExcecao
-        };
         $('#descricao').val(values.descricao);
-        // Volta os campos de valor para somente-leitura (caso viessem do modo manual).
-        $('#emolumentos, #ferc, #fadep, #femp, #ferrfis, #total').prop('readonly', true);
-        // Preenche com a quantidade/desconto atuais.
-        aplicarCalculoAto();
+        $('#emolumentos').val(values.emolumentos);
+        $('#ferc').val(values.ferc);
+        $('#fadep').val(values.fadep);
+        $('#femp').val(values.femp);
+        $('#ferrfis').val(values.ferrfis);
+        $('#total').val(values.total);
     });
 }
-
-// Recalcula/invalida ao alterar quantidade, desconto ou o código do ato.
-$(document).ready(function() {
-    $('#quantidade, #desconto_legal').on('input change', function() {
-        if (__atoState && $('#ato').val().trim() === __atoState.ato) {
-            aplicarCalculoAto();
-        }
-    });
-    $('#ato').on('input', function() {
-        if (__atoState && $(this).val().trim() !== __atoState.ato) {
-            invalidarAtoBuscado();
-        }
-    });
-});
 
 function adicionarISS() {
     var totalEmolumentos = 0;
@@ -1622,8 +1493,6 @@ function adicionarISS() {
 }
 
 function adicionarAtoManual() {
-    __atoState = null;   // modo manual: valores digitados pelo usuário
-    BaseCalculoAto.limpar();
     $('#ato').val('0');                  
     $('#descricao').val('').prop('readonly', false);
     $('#emolumentos').val('0,00').prop('readonly', false);
@@ -1637,16 +1506,6 @@ function adicionarAtoManual() {
 function adicionarItem() {
     var os_id = $('#os_id').val();
     var ato = $('#ato').val();
-    // Proteção contra valores da quantidade antiga: se um ato foi buscado,
-    // recalcula com a quantidade/desconto atuais; se o código do ato mudou
-    // desde a busca, exige nova busca antes de adicionar.
-    if (typeof __atoState !== 'undefined' && __atoState) {
-        if (ato.trim() !== __atoState.ato) {
-            showAlert('O código do ato foi alterado após a busca. Clique em "Buscar Ato" novamente antes de adicionar.', 'error');
-            return;
-        }
-        aplicarCalculoAto();
-    }
     var quantidade = $('#quantidade').val();
     var descontoLegal = $('#desconto_legal').val();
     var descricao = $('#descricao').val();
@@ -1665,15 +1524,6 @@ function adicionarItem() {
         return;
     }
 
-    // ---------- BASE DE CÁLCULO DO ATO ----------
-    var vb = BaseCalculoAto.validarFormulario();
-    if (!vb.ok) {
-        showAlert(vb.mensagem, 'error');
-        $('#base_ato').focus();
-        return;
-    }
-    var baseAto = vb.base;
-
     $.ajax({
         url: 'adicionar_item.php',
         type: 'POST',
@@ -1688,8 +1538,7 @@ function adicionarItem() {
             fadep: fadep,
             femp: femp,
             ferrfis: ferrfis,
-            total: total,
-            base_de_calculo: (baseAto === null ? '' : baseAto)
+            total: total
         },
         success: function(response) {
             try {
@@ -1697,8 +1546,7 @@ function adicionarItem() {
                 if (res.error) {
                     showAlert(res.error, 'error');
                 } else {
-                    adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos.toFixed(2).replace('.', ','), ferc.toFixed(2).replace('.', ','), fadep.toFixed(2).replace('.', ','), femp.toFixed(2).replace('.', ','), ferrfis.toFixed(2).replace('.', ','), total.toFixed(2).replace('.', ','), res.id, baseAto);
-                    BaseCalculoAto.limpar();
+                    adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos.toFixed(2).replace('.', ','), ferc.toFixed(2).replace('.', ','), fadep.toFixed(2).replace('.', ','), femp.toFixed(2).replace('.', ','), ferrfis.toFixed(2).replace('.', ','), total.toFixed(2).replace('.', ','), res.id);
                     atualizarISS();          // recalcula ou cria o ISS
                     calcularTotalOS();       // soma geral
                     showAlert('Item adicionado com sucesso!', 'success', true);
@@ -2003,9 +1851,8 @@ function calcularTotalOS() {
 }
 
 
-function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, itemId, baseAto) {
-    baseAto = (baseAto === undefined || baseAto === null) ? '' : baseAto;
-    var item = '<tr data-item-id="' + (itemId || '') + '" data-base="' + baseAto + '">' +
+function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, itemId) {
+    var item = '<tr data-item-id="' + (itemId || '') + '">' +
         '<td>#</td>' + // Nova coluna para o índice #
         '<td>' + ato + '</td>' + // Coluna "Ato"
         '<td>' + quantidade + '</td>' + // Coluna "Quantidade"
@@ -2018,7 +1865,6 @@ function adicionarItemAosItensTable(ato, quantidade, descontoLegal, descricao, e
         '<td>' + ferrfis + '</td>' + // Coluna "FERRFIS"
         '<td>' + total + '</td>' + // Coluna "Total"
         '<td>0</td>' + // Coluna "Qtd Liquidada" (0 para novos itens)
-        '<td class="base-ato-td">' + (baseAto ? BaseCalculoAto.brl(baseAto) : '—') + '</td>' +
         '<td>' +
             '<button type="button" class="btn btn-warning btn-sm" onclick="marcarItemIsento(this)"><i class="fa fa-ban"></i> Ato Isento</button> ' +
             '<button type="button" class="btn btn-edit btn-sm" onclick="alterarQuantidade(this)"><i class="fa fa-pencil" aria-hidden="true"></i></button>' +
@@ -2080,7 +1926,7 @@ function salvarOS() {
             total_os: total_os,
             descricao_os: descricao_os,
             observacoes: observacoes,
-            base_calculo: base_calculo   // legado: mantido só para O.S. antigas
+            base_calculo: base_calculo
         },
         success: function(response) {
             console.log(response);

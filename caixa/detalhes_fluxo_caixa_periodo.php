@@ -6,6 +6,8 @@ error_reporting(E_ALL);
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_funcionario.php';
+
 
 header('Content-Type: application/json');
 
@@ -23,13 +25,17 @@ try {
 
     // WHERE por funcionário
     $W = function($alias) use ($func) {
-        return ($func && $func !== 'todos') ? " AND {$alias}.funcionario = :func " : " ";
+        // Filtra pelo funcionario JA NORMALIZADO: assim as liquidacoes feitas
+        // pela API ("API/<sistema>: <pessoa>") caem no caixa do colaborador.
+        return ($func && $func !== 'todos')
+            ? ' AND ' . cx_func_sql($alias . '.funcionario') . ' = :func '
+            : ' ';
     };
     $bindBase = [':dini'=>$dini, ':dfim'=>$dfim];
     if ($func && $func !== 'todos') $bindBase[':func'] = $func;
 
     // ATOS LIQUIDADOS
-    $sql = 'SELECT os.id AS ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total, al.funcionario, al.data
+    $sql = 'SELECT os.id AS ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total, ' . cx_func_sql('al.funcionario') . ' AS funcionario, al.funcionario AS funcionario_origem, al.data
             FROM atos_liquidados al
             JOIN ordens_de_servico os ON al.ordem_servico_id = os.id
             WHERE DATE(al.data) BETWEEN :dini AND :dfim' . $W('al');
@@ -38,7 +44,7 @@ try {
     $atos = $st->fetchAll(PDO::FETCH_ASSOC);
 
     // ATOS MANUAIS
-    $sql = 'SELECT os.id AS ordem_servico_id, os.cliente, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total, aml.funcionario, aml.data
+    $sql = 'SELECT os.id AS ordem_servico_id, os.cliente, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total, ' . cx_func_sql('aml.funcionario') . ' AS funcionario, aml.funcionario AS funcionario_origem, aml.data
             FROM atos_manuais_liquidados aml
             JOIN ordens_de_servico os ON aml.ordem_servico_id = os.id
             WHERE DATE(aml.data) BETWEEN :dini AND :dfim' . $W('aml');
@@ -47,7 +53,7 @@ try {
     $atos_manuais = $st->fetchAll(PDO::FETCH_ASSOC);
 
     // PAGAMENTOS
-    $sql = 'SELECT os.id AS ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento
+    $sql = 'SELECT os.id AS ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, ' . cx_func_sql('po.funcionario') . ' AS funcionario, po.funcionario AS funcionario_origem, po.data_pagamento
             FROM pagamento_os po
             JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
             WHERE DATE(po.data_pagamento) BETWEEN :dini AND :dfim' . $W('po');

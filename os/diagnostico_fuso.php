@@ -60,8 +60,8 @@ try {
  * ------------------------------------------------------------------ */
 $alvos = [
     'ordens_de_servico'        => ['data_criacao', 'cancelado_em', 'data_entrega'],
-    'atos_liquidados'          => ['data_liquidacao'],
-    'atos_manuais_liquidados'  => ['data_liquidacao'],
+    'atos_liquidados'          => ['data', 'data_liquidacao'],
+    'atos_manuais_liquidados'  => ['data', 'data_liquidacao'],
     'pagamento_os'             => ['data_pagamento'],
     'anexos_os'                => ['data'],
     'logs_ordens_de_servico'   => ['data_edicao'],

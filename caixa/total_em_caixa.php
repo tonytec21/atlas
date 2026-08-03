@@ -2,6 +2,8 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_funcionario.php';
+
 
 header('Content-Type: application/json');
 
@@ -18,7 +20,7 @@ try {
     $saldoInicial = $stmt->fetchColumn();
 
     // Atos Liquidados
-    $sql = 'SELECT total FROM atos_liquidados WHERE funcionario = :funcionario AND DATE(data) = :data';
+    $sql = 'SELECT total FROM atos_liquidados WHERE ' . cx_func_sql('funcionario') . ' = :funcionario AND DATE(data) = :data';
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':funcionario', $funcionario);
     $stmt->bindParam(':data', $data_caixa);
@@ -28,7 +30,7 @@ try {
     }, 0);
 
     // Pagamentos
-    $sql = 'SELECT total_pagamento, forma_de_pagamento FROM pagamento_os WHERE funcionario = :funcionario AND DATE(data_pagamento) = :data';
+    $sql = 'SELECT total_pagamento, forma_de_pagamento FROM pagamento_os WHERE ' . cx_func_sql('funcionario') . ' = :funcionario AND DATE(data_pagamento) = :data';
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':funcionario', $funcionario);
     $stmt->bindParam(':data', $data_caixa);
@@ -46,7 +48,7 @@ try {
     }
 
     // Devoluções
-    $sql = 'SELECT total_devolucao, forma_devolucao FROM devolucao_os WHERE funcionario = :funcionario AND DATE(data_devolucao) = :data';
+    $sql = 'SELECT total_devolucao, forma_devolucao FROM devolucao_os WHERE ' . cx_func_sql('funcionario') . ' = :funcionario AND DATE(data_devolucao) = :data';
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':funcionario', $funcionario);
     $stmt->bindParam(':data', $data_caixa);

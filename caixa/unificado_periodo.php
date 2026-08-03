@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_funcionario.php';
 date_default_timezone_set('America/Sao_Paulo');
 
 $conn = getDatabaseConnection();
@@ -76,7 +77,7 @@ function sumBetween(PDO $conn, string $sqlBase, array $binds, ?string $func)
 {
     $sql = $sqlBase;
     if ($func && $func !== 'todos') {
-        $sql .= ' AND funcionario = :func';
+        $sql .= ' AND ' . cx_func_sql('funcionario') . ' = :func';
         $binds[':func'] = $func;
     }
     $st = $conn->prepare($sql);
@@ -140,7 +141,7 @@ if ($funcionarioSelected === 'todos') {
     $st = $conn->prepare('
         SELECT forma_de_pagamento, SUM(total_pagamento) AS tot
         FROM pagamento_os
-        WHERE DATE(data_pagamento) BETWEEN :dini AND :dfim AND funcionario = :func
+        WHERE DATE(data_pagamento) BETWEEN :dini AND :dfim AND ' . cx_func_sql('funcionario') . ' = :func
         GROUP BY forma_de_pagamento
     ');
     $st->execute([':dini' => $dini, ':dfim' => $dfim, ':func' => $funcionarioSelected]);

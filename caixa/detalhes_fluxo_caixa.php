@@ -6,6 +6,8 @@ error_reporting(E_ALL);
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_funcionario.php';
+
 
 header('Content-Type: application/json');
 
@@ -29,7 +31,7 @@ try {
 
     if ($tipo === 'unificado') {
         // Atos Liquidados
-        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total, al.funcionario, al.data
+        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total, ' . cx_func_sql('al.funcionario') . ' AS funcionario, al.funcionario AS funcionario_origem, al.data
                 FROM atos_liquidados al
                 JOIN ordens_de_servico os ON al.ordem_servico_id = os.id
                 WHERE DATE(al.data) = :data';
@@ -39,7 +41,7 @@ try {
         $atos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Atos Manuais Liquidados
-        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total, aml.funcionario, aml.data
+        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total, ' . cx_func_sql('aml.funcionario') . ' AS funcionario, aml.funcionario AS funcionario_origem, aml.data
                 FROM atos_manuais_liquidados aml
                 JOIN ordens_de_servico os ON aml.ordem_servico_id = os.id
                 WHERE DATE(aml.data) = :data';
@@ -53,7 +55,7 @@ try {
         $__temAnexosOs = false; try { $__st2 = $conn->query("SHOW TABLES LIKE 'anexos_os'"); $__temAnexosOs = $__st2 && $__st2->fetch(); } catch (\Throwable $e) {}
         $__anexSel = $__temAnexos ? ', (SELECT COUNT(*) FROM pagamento_os_anexos a WHERE a.pagamento_id = po.id) AS anexos_count' : ', 0 AS anexos_count';
         $__anexSel .= $__temAnexosOs ? ", (SELECT COUNT(*) FROM anexos_os aa WHERE aa.ordem_servico_id = os.id AND aa.status = 'ativo') AS os_anexos_count" : ', 0 AS os_anexos_count';
-        $sql = 'SELECT po.id AS pagamento_id, os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento' . $__anexSel . '
+        $sql = 'SELECT po.id AS pagamento_id, os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, ' . cx_func_sql('po.funcionario') . ' AS funcionario, po.funcionario AS funcionario_origem, po.data_pagamento' . $__anexSel . '
                 FROM pagamento_os po
                 JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
                 WHERE DATE(po.data_pagamento) = :data';
@@ -197,10 +199,10 @@ try {
 
     } else {
         // Atos Liquidados
-        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total, al.funcionario, al.data
+        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, al.ato, al.descricao, al.quantidade_liquidada, al.total, ' . cx_func_sql('al.funcionario') . ' AS funcionario, al.funcionario AS funcionario_origem, al.data
                 FROM atos_liquidados al
                 JOIN ordens_de_servico os ON al.ordem_servico_id = os.id
-                WHERE al.funcionario = :funcionario AND DATE(al.data) = :data';
+                WHERE ' . cx_func_sql('al.funcionario') . ' = :funcionario AND DATE(al.data) = :data';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->bindParam(':data', $data);
@@ -208,10 +210,10 @@ try {
         $atos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Atos Manuais Liquidados
-        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total, aml.funcionario, aml.data
+        $sql = 'SELECT os.id as ordem_servico_id, os.cliente, aml.ato, aml.descricao, aml.quantidade_liquidada, aml.total, ' . cx_func_sql('aml.funcionario') . ' AS funcionario, aml.funcionario AS funcionario_origem, aml.data
                 FROM atos_manuais_liquidados aml
                 JOIN ordens_de_servico os ON aml.ordem_servico_id = os.id
-                WHERE aml.funcionario = :funcionario AND DATE(aml.data) = :data';
+                WHERE ' . cx_func_sql('aml.funcionario') . ' = :funcionario AND DATE(aml.data) = :data';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->bindParam(':data', $data);
@@ -223,10 +225,10 @@ try {
         $__temAnexosOs = false; try { $__st2 = $conn->query("SHOW TABLES LIKE 'anexos_os'"); $__temAnexosOs = $__st2 && $__st2->fetch(); } catch (\Throwable $e) {}
         $__anexSel = $__temAnexos ? ', (SELECT COUNT(*) FROM pagamento_os_anexos a WHERE a.pagamento_id = po.id) AS anexos_count' : ', 0 AS anexos_count';
         $__anexSel .= $__temAnexosOs ? ", (SELECT COUNT(*) FROM anexos_os aa WHERE aa.ordem_servico_id = os.id AND aa.status = 'ativo') AS os_anexos_count" : ', 0 AS os_anexos_count';
-        $sql = 'SELECT po.id AS pagamento_id, os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, po.funcionario, po.data_pagamento' . $__anexSel . '
+        $sql = 'SELECT po.id AS pagamento_id, os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, ' . cx_func_sql('po.funcionario') . ' AS funcionario, po.funcionario AS funcionario_origem, po.data_pagamento' . $__anexSel . '
                 FROM pagamento_os po
                 JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
-                WHERE po.funcionario = :funcionario AND DATE(po.data_pagamento) = :data';
+                WHERE ' . cx_func_sql('po.funcionario') . ' = :funcionario AND DATE(po.data_pagamento) = :data';
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':funcionario', $funcionarios);
         $stmt->bindParam(':data', $data);

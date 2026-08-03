@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_funcionario.php';
 date_default_timezone_set('America/Sao_Paulo');
 ?>
 <?php include(__DIR__ . '/../os/guia/guia.php'); ?>
@@ -309,13 +310,13 @@ date_default_timezone_set('America/Sao_Paulo');
                                 SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
                                 SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos
                             FROM (
-                                SELECT funcionario, data, "ato" as tipo, total 
+                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data, "ato" as tipo, total 
                                 FROM atos_liquidados
                                 UNION ALL
-                                SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
+                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
                                 FROM pagamento_os
                                 UNION ALL
-                                SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
+                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
                                 FROM devolucao_os
                                 UNION ALL
                                 SELECT funcionario, data, "saida" as tipo, valor_saida as total
@@ -342,13 +343,13 @@ date_default_timezone_set('America/Sao_Paulo');
                                 SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos,
                                 SUM(CASE WHEN tipo = "caixa" THEN total ELSE 0 END) as saldo_inicial
                             FROM (
-                                SELECT funcionario, data, "ato" as tipo, total 
+                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data, "ato" as tipo, total 
                                 FROM atos_liquidados
                                 UNION ALL
-                                SELECT funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
+                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
                                 FROM pagamento_os
                                 UNION ALL
-                                SELECT funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
+                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
                                 FROM devolucao_os
                                 UNION ALL
                                 SELECT funcionario, data, "saida" as tipo, valor_saida as total
