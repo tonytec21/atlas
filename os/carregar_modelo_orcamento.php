@@ -1,5 +1,6 @@
 <?php
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/base_calculo_lib.php';
 header('Content-Type: application/json');
 
 if (isset($_GET['id'])) {
@@ -23,6 +24,24 @@ if (isset($_GET['id'])) {
         $stmt->bindParam(':id', $modelo_id);
         $stmt->execute();
         $itens = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        /* Base de cálculo por ato.
+           O modelo NÃO guarda a base: ela é do caso concreto (o valor do
+           imóvel muda a cada escritura). O que o modelo carrega é a
+           informação de que o ato EXIGE base, para a tela pedir ao
+           escrevente antes de deixar salvar. */
+        foreach ($itens as &$it) {
+            $faixa = bc_extrair_faixa($it['descricao'] ?? '');
+            $it['exige_base_de_calculo'] = $faixa !== null;
+            $it['faixa_de_valor'] = $faixa ? [
+                'tipo'   => $faixa['tipo'],
+                'minimo' => $faixa['minimo'],
+                'maximo' => $faixa['maximo'],
+                'rotulo' => $faixa['rotulo'],
+            ] : null;
+            $it['base_de_calculo'] = null;
+        }
+        unset($it);
 
         // Retornar tudo no JSON
         echo json_encode([

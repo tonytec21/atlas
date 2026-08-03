@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/base_calculo_lib.php';
 date_default_timezone_set('America/Sao_Paulo');
 
 $issConfig     = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);
@@ -775,7 +776,15 @@ try {
         #itensTable td:not(.desc-edit) {
             -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
         }
-    </style>  
+    
+        /* ===== Base de cálculo editável na tabela ===== */
+        #itensTable td.base-edit{cursor:pointer;font-weight:700;white-space:nowrap}
+        #itensTable td.base-edit:hover{background:#eff6ff}
+        #itensTable td.base-edit:focus{outline:2px solid #2563eb;outline-offset:-2px;background:#fff}
+        #itensTable td.base-pendente{background:#fef2f2;color:#b91c1c;font-style:italic}
+        #itensTable td.base-erro{background:#fef2f2;color:#b91c1c}
+        #itensTable td.base-ok{background:#f0fdf4;color:#15803d}
+</style>  
 </head>  
 <body>  
 <?php include(__DIR__ . '/../menu.php'); ?>  
@@ -951,10 +960,13 @@ try {
                         <?php foreach ($itens as $item): ?>  
                             <tr data-item-id="<?php echo $item['id']; ?>"  
                                 data-ordem_exibicao="<?php echo $item['ordem_exibicao']; ?>"  
-                                data-base="<?php
-                                    $__b = $item['base_de_calculo'] ?? null;
-                                    echo ($__b !== null && (float)$__b >= 0.001) ? (float)$__b : '';
-                                ?>"  
+                                <?php
+                                    $__b0 = $item['base_de_calculo'] ?? null;
+                                    $__fx0 = bc_extrair_faixa($item['descricao'] ?? '');
+                                ?>
+                                data-base="<?php echo ($__b0 !== null && (float) $__b0 >= 0.001) ? (float) $__b0 : ''; ?>"  
+                                data-exige-base="<?php echo $__fx0 ? '1' : '0'; ?>"  
+                                data-faixa="<?php echo $__fx0 ? htmlspecialchars($__fx0['rotulo'], ENT_QUOTES, 'UTF-8') : ''; ?>"  
                                 <?php
                                     if ($item['ato'] === 'ISS') {
                                         $issLiqFlag = ((float)($item['quantidade_liquidada'] ?? 0) > 0) ? '1' : '0';
@@ -975,11 +987,19 @@ try {
                                 <td><?php echo number_format(isset($item['ferrfis']) ? $item['ferrfis'] : 0, 2, ',', '.'); ?></td>  
                                 <td><?php echo number_format($item['total'], 2, ',', '.'); ?></td>  
                                 <td><?php echo $item['quantidade_liquidada']; ?></td>  
-                                <td class="base-ato-td"><?php
+                                <?php
                                     $__b = $item['base_de_calculo'] ?? null;
-                                    echo ($__b !== null && (float)$__b >= 0.001)
-                                        ? 'R$ ' . number_format((float)$__b, 2, ',', '.') : '—';
-                                ?></td>  
+                                    $__temB = ($__b !== null && (float) $__b >= 0.001);
+                                    $__fx = bc_extrair_faixa($item['descricao'] ?? '');
+                                ?>
+                                <?php if ($__fx): ?>
+                                    <td class="base-ato-td base-edit" contenteditable="true"
+                                        title="<?php echo htmlspecialchars('Faixa deste ato: ' . $__fx['rotulo'], ENT_QUOTES, 'UTF-8'); ?>"><?php
+                                        echo $__temB ? 'R$ ' . number_format((float) $__b, 2, ',', '.') : 'informar';
+                                    ?></td>  
+                                <?php else: ?>
+                                    <td class="base-ato-td">—</td>  
+                                <?php endif; ?>
                                 <td>  
                                 <?php if ($item['status'] === 'liquidado'): ?>  
                                     <!-- Se o item estiver liquidado, nenhum botão será mostrado -->  
@@ -1200,6 +1220,36 @@ try {
 
 <script src="../script/jquery-3.5.1.min.js"></script>
 <script src="base_calculo_ato.js"></script>
+<script src="base_calculo_inline.js"></script>
+<script>
+/* Na EDIÇÃO os itens já existem no banco, então a base editada in-line
+   precisa ser persistida na hora — como já acontece com a quantidade.
+   Roda depois do handler de base_calculo_inline.js (mesmo evento, ordem
+   de registro), então data-base já está validado quando isto executa. */
+$(document).on('focusout', '#itensTable td.base-edit', function () {
+    var $tr = $(this).closest('tr');
+    var itemId = $tr.attr('data-item-id');
+    if (!itemId) { return; }              // item ainda não salvo
+
+    $.ajax({
+        url: 'atualizar_base_item.php',
+        type: 'POST',
+        dataType: 'json',
+        data: {
+            item_id: itemId,
+            base_de_calculo: $tr.attr('data-base') || ''
+        },
+        success: function (r) {
+            if (r && r.error) {
+                showAlert(r.error, 'error');
+            }
+        },
+        error: function () {
+            showAlert('Não foi possível gravar a base de cálculo. Tente novamente.', 'error');
+        }
+    });
+});
+</script>
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
@@ -2061,6 +2111,16 @@ function atualizarTotalOS(os_id) {
 }
 
 function salvarOS() {
+    // Ato de faixa sem base (ou fora da faixa) impede o salvamento — mesma
+    // regra da criação. Vale sobretudo para itens vindos de modelo.
+    if (window.BaseCalculoInline) {
+        var vb = window.BaseCalculoInline.verificar('#itensTable');
+        if (!vb.ok) {
+            showAlert(window.BaseCalculoInline.mensagem(vb), 'error');
+            return;
+        }
+    }
+
     var os_id = $('#os_id').val();
     var cliente = $('#cliente').val().replace(/["'“”‘’]/g, '');
     var cpf_cliente = $('#cpf_cliente').val();

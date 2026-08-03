@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/base_calculo_lib.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $modelo_id       = $_POST['id']; // ID do modelo a editar
@@ -48,13 +49,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $quantidade     = $item['quantidade'];
             $desconto_legal = $item['desconto_legal'];
             $descricao      = $item['descricao'];
-            // Convertendo vírgula em ponto
-            $emolumentos    = str_replace(',', '.', $item['emolumentos']);
-            $ferc           = str_replace(',', '.', $item['ferc']);
-            $fadep          = str_replace(',', '.', $item['fadep']);
-            $femp           = str_replace(',', '.', $item['femp']);
-            $ferrfis        = str_replace(',', '.', ($item['ferrfis'] ?? '0'));
-            $total          = str_replace(',', '.', $item['total']);
+            /* Normalização dos valores vindos da tela.
+               O JS envia o TEXTO da célula, em formato brasileiro. A conversão
+               antiga (str_replace de ',' por '.') não removia o separador de
+               MILHAR: "8.388,96" virava "8.388.96" e o MySQL, ao converter para
+               DECIMAL, parava no segundo ponto e gravava 8,39.
+               Só aparecia acima de R$ 1.000,00 — por isso passou despercebido
+               até entrarem os atos de valor declarado.
+               bc_valor() trata os dois formatos ("8.388,96" e "8388.96"). */
+            $emolumentos    = bc_valor($item['emolumentos']);
+            $ferc           = bc_valor($item['ferc']);
+            $fadep          = bc_valor($item['fadep']);
+            $femp           = bc_valor($item['femp']);
+            $ferrfis        = bc_valor($item['ferrfis'] ?? '0');
+            $total          = bc_valor($item['total']);
 
             $stmtItem->bindParam(':modelo_id', $modelo_id);
             $stmtItem->bindParam(':ato', $ato);

@@ -689,7 +689,15 @@ $atosSemValor = json_decode(
             margin-left: 6px;
             opacity: .7;
         }
-    </style>  
+    
+        /* ===== Base de cálculo editável na tabela ===== */
+        #itensTable td.base-edit{cursor:pointer;font-weight:700;white-space:nowrap}
+        #itensTable td.base-edit:hover{background:#eff6ff}
+        #itensTable td.base-edit:focus{outline:2px solid #2563eb;outline-offset:-2px;background:#fff}
+        #itensTable td.base-pendente{background:#fef2f2;color:#b91c1c;font-style:italic}
+        #itensTable td.base-erro{background:#fef2f2;color:#b91c1c}
+        #itensTable td.base-ok{background:#f0fdf4;color:#15803d}
+</style>  
 </head>  
 <body>  
 <?php include(__DIR__ . '/../menu.php'); ?>  
@@ -921,7 +929,8 @@ $atosSemValor = json_decode(
 
 <!-- ===================== SCRIPTS ===================== -->  
 <script src="../script/jquery-3.5.1.min.js"></script>
-<script src="base_calculo_ato.js"></script>  
+<script src="base_calculo_ato.js"></script>
+<script src="base_calculo_inline.js"></script>  
 <script src="../script/jquery-ui.min.js"></script>  
 <script src="../script/jquery.mask.min.js"></script>  
 <script src="../script/bootstrap.bundle.min.js"></script>  
@@ -954,7 +963,16 @@ $atosSemValor = json_decode(
     function updateSalvarButtonState() {  
         const hasItems   = $('#itensTable tr').length > 0;  
         const hasCliente = $('#cliente').val().trim().length > 0;  
-        $('#btnSalvarOS').prop('disabled', !(hasItems && hasCliente));  
+
+        // Ato de faixa sem base (ou com base fora da faixa) trava o salvamento.
+        // Acontece sobretudo ao montar o orçamento a partir de um MODELO: o
+        // modelo traz os atos, mas não o valor do negócio.
+        const base = (window.BaseCalculoInline)
+            ? window.BaseCalculoInline.verificar('#itensTable')
+            : { ok: true };
+
+        $('#btnSalvarOS').prop('disabled', !(hasItems && hasCliente && base.ok));
+        $('#btnSalvarOS').attr('title', base.ok ? '' : 'Informe a base de cálculo dos atos com valor declarado.');
     }  
 
     // ===================== ATUALIZAR CARDS MOBILE =====================  
@@ -1249,7 +1267,11 @@ $atosSemValor = json_decode(
             var uEmol = emolumentos / q0, uFerc = ferc / q0, uFadep = fadep / q0,
                 uFemp = femp / q0, uFerrfis = ferrfis / q0, uTotal = total / q0;
 
-            var item = '<tr data-base="' + (baseAto === null ? '' : baseAto) + '" data-uemol="' + uEmol + '" data-uferc="' + uFerc + '" data-ufadep="' + uFadep + '" data-ufemp="' + uFemp + '" data-uferrfis="' + uFerrfis + '" data-utotal="' + uTotal + '">' +  
+            var faixaDoAto = BaseCalculoAto.faixaAtual();
+            var item = '<tr data-base="' + (baseAto === null ? '' : baseAto) + '"'
+                     + ' data-faixa="' + (faixaDoAto ? faixaDoAto.rotulo.replace(/"/g,'&quot;') : '') + '"'
+                     + ' data-exige-base="' + (faixaDoAto ? 1 : 0) + '"'
+                     + ' data-uemol="' + uEmol + '" data-uferc="' + uFerc + '" data-ufadep="' + uFadep + '" data-ufemp="' + uFemp + '" data-uferrfis="' + uFerrfis + '" data-utotal="' + uTotal + '">' +  
                 '<td>' + ordemExibicao + '</td>' +   
                 '<td>' + ato + '</td>' +  
                 '<td class="qtd-edit" contenteditable="true" title="Clique para alterar a quantidade">' + quantidade + '</td>' +  
@@ -1572,6 +1594,14 @@ $atosSemValor = json_decode(
             return;  
         }  
 
+        if (window.BaseCalculoInline) {
+            var vb = window.BaseCalculoInline.verificar('#itensTable');
+            if (!vb.ok) {
+                showAlert(window.BaseCalculoInline.mensagem(vb), 'error');
+                return;
+            }
+        }  
+
         $('#btnSalvarOS').prop('disabled', true);  
 
         var cliente = $('#cliente').val().replace(/["'""'']/g, '');  
@@ -1713,12 +1743,18 @@ $atosSemValor = json_decode(
 
                 if (response.itens) {
                     response.itens.forEach(function (item) {
-                        const emolumentos = parseFloat((item.emolumentos || '0').replace(',', '.'));
-                        const ferc        = parseFloat((item.ferc        || '0').replace(',', '.'));
-                        const fadep       = parseFloat((item.fadep       || '0').replace(',', '.'));
-                        const femp        = parseFloat((item.femp        || '0').replace(',', '.'));
-                        const ferrfis     = parseFloat((item.ferrfis     || '0').replace(',', '.'));
-                        const total       = parseFloat((item.total       || '0').replace(',', '.'));
+                        /* BaseCalculoAto.valor() em vez de replace(',','.'):
+                           trata "8388.96" (vindo do banco) e "8.388,96" (formato
+                           brasileiro) sem confundir o separador de milhar com o
+                           decimal — o replace simples transformava 8.388,96 em
+                           8,39. */
+                        const V = (x) => BaseCalculoAto.valor(x == null ? 0 : x);
+                        const emolumentos = V(item.emolumentos);
+                        const ferc        = V(item.ferc);
+                        const fadep       = V(item.fadep);
+                        const femp        = V(item.femp);
+                        const ferrfis     = V(item.ferrfis);
+                        const total       = V(item.total);
 
                         const ordemExibicao = $('#itensTable tr').length + 1;
 
@@ -1735,8 +1771,19 @@ $atosSemValor = json_decode(
                         const dataU    = isISS ? '' :
                             ` data-uemol="${uEmol}" data-uferc="${uFerc}" data-ufadep="${uFadep}" data-ufemp="${uFemp}" data-uferrfis="${uFerrfis}" data-utotal="${uTotal}"`;
 
+                        // Base de cálculo: o modelo não guarda (ela é do caso
+                        // concreto). Se o ato for de faixa, a célula entra
+                        // pedindo o valor e o botão Salvar fica travado até
+                        // ser preenchida.
+                        const exigeBase = !isISS && !!item.exige_base_de_calculo;
+                        const faixaRot  = (item.faixa_de_valor && item.faixa_de_valor.rotulo) || '';
+                        const celulaBase = exigeBase
+                            ? `<td class="base-ato-td base-edit base-pendente" contenteditable="true"
+                                   title="Ato com valor declarado (${faixaRot}). Clique e informe a base de cálculo.">informar</td>`
+                            : '<td class="base-ato-td">—</td>';
+
                         const row = `
-                            <tr${dataU}>
+                            <tr${dataU} data-base="" data-faixa="${faixaRot.replace(/"/g,'&quot;')}" data-exige-base="${exigeBase ? 1 : 0}">
                                 <td>${ordemExibicao}</td>
                                 <td>${item.ato}</td>
                                 <td${attrQtd}>${item.quantidade}</td>
@@ -1748,6 +1795,7 @@ $atosSemValor = json_decode(
                                 <td>${femp.toFixed(2).replace('.', ',')}</td>
                                 <td>${ferrfis.toFixed(2).replace('.', ',')}</td>
                                 <td>${total.toFixed(2).replace('.', ',')}</td>
+                                ${celulaBase}
                                 <td>
                                     <button type="button" class="btn btn-warning btn-sm" onclick="marcarItemIsento(this)">
                                         <i class="fa fa-ban"></i> Ato Isento
