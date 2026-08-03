@@ -2067,7 +2067,13 @@ function salvarOS() {
     var total_os = $('#total_os').val().replace(/\./g, '').replace(',', '.');
     var descricao_os = $('#descricao_os').val();
     var observacoes = $('#observacoes').val();
-    var base_calculo = $('#base_calculo').val().replace(/\./g, '').replace(',', '.');
+    // Campo LEGADO. O input virou #base_calculo_legado (somente leitura) e some
+    // por completo nas O.S. novas, então o valor precisa ser lido com guarda —
+    // sem ela, .val() devolve undefined e quebra o salvamento inteiro.
+    var $baseLegado = $('#base_calculo_legado');
+    var base_calculo = $baseLegado.length
+        ? String($baseLegado.val() || '').replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')
+        : '';
 
     $.ajax({
         url: 'atualizar_os.php',

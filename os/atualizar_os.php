@@ -11,7 +11,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $cliente = mb_strtoupper(trim($_POST['cliente']), 'UTF-8');
     $cpf_cliente = $_POST['cpf_cliente'];
     $total_os = str_replace(',', '.', $_POST['total_os']);
-    $base_calculo = str_replace(',', '.', $_POST['base_calculo']);
+    /* Base de cálculo do NÍVEL DA O.S. — campo LEGADO.
+       A base agora é informada POR ATO. O campo do topo virou somente leitura
+       (O.S. antigas) ou nem existe (O.S. novas), então o POST pode chegar
+       vazio ou ausente. Nesse caso a coluna NÃO é tocada: gravar 0,00 apagaria
+       a base das O.S. lançadas antes da mudança, que só têm o valor ali. */
+    $base_calculo = isset($_POST['base_calculo']) ? trim((string) $_POST['base_calculo']) : '';
+    $atualizarBase = ($base_calculo !== '');
+    if ($atualizarBase) {
+        /* O valor pode chegar em dois formatos: já normalizado pelo JS
+           ("280000.00") ou como o usuário digitou ("280.000,00"). A vírgula é
+           o que distingue os dois — sem ela, o ponto JÁ É o separador decimal
+           e não pode ser removido. */
+        if (strpos($base_calculo, ',') !== false) {
+            $base_calculo = str_replace('.', '', $base_calculo);   // separador de milhar
+            $base_calculo = str_replace(',', '.', $base_calculo);  // decimal
+        }
+        if (!is_numeric($base_calculo)) {
+            $atualizarBase = false;
+        }
+    }
     $descricao_os = $_POST['descricao_os'];
     $observacoes = $_POST['observacoes'];
 
@@ -22,13 +41,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $conn->beginTransaction();
 
         // Atualiza a OS na tabela `ordens_de_servico`
-        $stmt = $conn->prepare("UPDATE ordens_de_servico SET cliente = :cliente, cpf_cliente = :cpf_cliente, total_os = :total_os, descricao_os = :descricao_os, observacoes = :observacoes, base_de_calculo = :base_calculo WHERE id = :id");
+        $sqlOs = "UPDATE ordens_de_servico SET cliente = :cliente, cpf_cliente = :cpf_cliente, "
+               . "total_os = :total_os, descricao_os = :descricao_os, observacoes = :observacoes"
+               . ($atualizarBase ? ", base_de_calculo = :base_calculo" : "")
+               . " WHERE id = :id";
+        $stmt = $conn->prepare($sqlOs);
         $stmt->bindParam(':cliente', $cliente);
         $stmt->bindParam(':cpf_cliente', $cpf_cliente);
         $stmt->bindParam(':total_os', $total_os);
         $stmt->bindParam(':descricao_os', $descricao_os);
         $stmt->bindParam(':observacoes', $observacoes);
-        $stmt->bindParam(':base_calculo', $base_calculo);
+        if ($atualizarBase) {
+            $stmt->bindParam(':base_calculo', $base_calculo);
+        }
         $stmt->bindParam(':id', $os_id);
         $stmt->execute();
 
