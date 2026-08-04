@@ -732,6 +732,14 @@ body.dark-mode footer .footer-content a:hover {
     bottom: 90px !important;
   }
 }
+
+    /* ===== Base de cálculo editável na tabela de itens ===== */
+    #itensTable td.base-edit{cursor:pointer;font-weight:700;white-space:nowrap}
+    #itensTable td.base-edit:hover{background:#eff6ff}
+    #itensTable td.base-edit:focus{outline:2px solid #2563eb;outline-offset:-2px;background:#fff}
+    #itensTable td.base-pendente{background:#fef2f2;color:#b91c1c;font-style:italic}
+    #itensTable td.base-erro{background:#fef2f2;color:#b91c1c}
+    #itensTable td.base-ok{background:#f0fdf4;color:#15803d}
 </style>
 </head>
 
@@ -905,6 +913,24 @@ body.dark-mode footer .footer-content a:hover {
           </div>
         </div>
 
+        <!-- Base de cálculo DO ATO. Aparece só quando a descrição do ato traz
+             faixa de valor declarado. Mesma regra do módulo O.S. -->
+        <div class="form-row" id="grupoBaseAto" style="display:none">
+          <div class="form-group col-md-4">
+            <label for="base_ato">Base de Cálculo do Ato: <span style="color:#dc2626">*</span></label>
+            <input type="text" class="form-control" id="base_ato" name="base_ato"
+                   placeholder="0,00" autocomplete="off">
+            <small id="faixaBaseAto" style="font-weight:600;color:#64748b"></small>
+          </div>
+          <div class="form-group col-md-8" style="display:flex;align-items:center;margin-top:29px">
+            <div style="background:#eff6ff;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;
+                        padding:8px 12px;font-size:.82rem;color:#1e40af;width:100%">
+              <b>Ato com valor declarado.</b> Informe o valor do negócio jurídico. Ele precisa
+              estar dentro da faixa do ato escolhido — se estiver fora, selecione o ato da faixa
+              correta.
+          </div>
+        </div>
+
         <div class="form-row">
           <div class="form-group col-md-2">
             <label for="emolumentos">Emolumentos:</label>
@@ -956,6 +982,7 @@ body.dark-mode footer .footer-content a:hover {
                   <th>FEMP</th>
                   <th>FERRFIS</th>
                   <th>Total</th>
+                  <th>Base de Cálculo</th>
                   <th></th>
                 </tr>
               </thead>
@@ -981,6 +1008,8 @@ body.dark-mode footer .footer-content a:hover {
 <script src="../script/jquery-ui.min.js"></script>
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/jquery.mask.min.js"></script>
+<script src="../os/base_calculo_ato.js"></script>
+<script src="../os/base_calculo_inline.js"></script>
 <script src="../script/sweetalert2.js"></script>
 <script>
 // Fallback do JS do SweetAlert2 se o arquivo local não existir
@@ -1265,7 +1294,8 @@ $(function(){
   });
 
   // máscaras de moeda (inclui TOTAL)
-  $('#base_calculo,#emolumentos,#ferc,#fadep,#femp,#total_os,#total').mask('#.##0,00',{reverse:true});
+  $('#base_calculo,#base_ato,#emolumentos,#ferc,#fadep,#femp,#total_os,#total').mask('#.##0,00',{reverse:true});
+  $(document).on('input blur', '#base_ato', function(){ BaseCalculoAto.realcar(); });
 
   // Telefone: sempre celular com nono dígito
   $('#requerente_tel').mask('(00) 00000-0000');
@@ -1583,6 +1613,7 @@ function buscarAto(){
       const total = emolumentos + ferc + fadep + femp + ferrfis;
 
       $('#descricao').val(resp.DESCRICAO);
+      BaseCalculoAto.aplicarFaixa(resp.DESCRICAO);
       $('#emolumentos').val(emolumentos.toFixed(2).replace('.',','));
       $('#ferc').val(ferc.toFixed(2).replace('.',','));
       $('#fadep').val(fadep.toFixed(2).replace('.',','));
@@ -1594,6 +1625,7 @@ function buscarAto(){
 }
 
 function adicionarAtoManual(){
+  BaseCalculoAto.limpar();   // ato manual não tem faixa de tabela
   $('#ato').val('0');
   $('#descricao').prop('readonly',false).val('');
   $('#emolumentos,#ferc,#fadep,#femp,#ferrfis').prop('readonly',false).val('0,00');
@@ -1624,10 +1656,19 @@ function adicionarItemOS(){
   const isExcecao = ATOS_SEM_VALOR.includes(codigoAto);
   if ((isNaN(total) || total <= 0) && !isExcecao) { return toast('error','Informe um Total válido ou preencha os valores do ato.'); }
 
+  // Ato com faixa de valor declarado só entra com a base informada E dentro
+  // da faixa. Base fora da faixa quase sempre significa ato errado.
+  const vb = BaseCalculoAto.validarFormulario();
+  if (!vb.ok) { $('#base_ato').focus(); return toast('error', vb.mensagem); }
+  const baseAto  = vb.base;
+  const faixaAto = BaseCalculoAto.faixaAtual();
+
   const ordem = $('#itensTable tr').length + 1;
 
   $('#itensTable').append(`
-    <tr>
+    <tr data-base="${baseAto === null ? '' : baseAto}"
+        data-exige-base="${faixaAto ? 1 : 0}"
+        data-faixa="${faixaAto ? escapeHtml(faixaAto.rotulo) : ''}">
       <td>${ordem}</td>
       <td>${escapeHtml(ato)}</td>
       <td>${qtd}</td>
@@ -1639,6 +1680,10 @@ function adicionarItemOS(){
       <td>${fmt(totalPart(femp))}</td>
       <td>${fmt(totalPart(ferrfis))}</td>
       <td>${fmt(total)}</td>
+      ${faixaAto
+        ? `<td class="base-ato-td base-edit" contenteditable="true"
+               title="Faixa deste ato: ${escapeHtml(faixaAto.rotulo)}">${baseAto ? BaseCalculoAto.brl(baseAto) : 'informar'}</td>`
+        : '<td class="base-ato-td">—</td>'}
       <td>
         <button type="button" class="btn btn-sm btn-warning" onclick="marcarItemIsento(this)">
           <i class="fa fa-ban"></i> Ato Isento
@@ -1656,6 +1701,7 @@ function adicionarItemOS(){
   $('#descricao').val('').prop('readonly',true);
   $('#emolumentos,#ferc,#fadep,#femp,#ferrfis').val('').prop('readonly',true);
   $('#total').val('').prop('readonly',true);
+  BaseCalculoAto.limpar();
 }
 
 window.marcarItemIsento = function(btn){
@@ -1821,8 +1867,10 @@ function gatherFormData(){
   const itens = [];
   if (!isento){
     $('#itensTable tr').each(function(idx){
-      const tds = $(this).find('td');
+      const $tr = $(this);
+      const tds = $tr.find('td');
       itens.push({
+        base_de_calculo: $tr.attr('data-base') || '',
         ato: tds.eq(1).text(),
         quantidade: tds.eq(2).text(),
         desconto_legal: tds.eq(3).text().replace('%',''),
@@ -1839,6 +1887,12 @@ function gatherFormData(){
     if (itens.length===0){
       toast('error','Adicione ao menos um item na O.S. ou marque "Ato isento".');
       return null;
+    }
+
+    // Ato de faixa sem base (ou fora da faixa) impede o envio do pedido.
+    if (window.BaseCalculoInline){
+      const vb = window.BaseCalculoInline.verificar('#itensTable');
+      if (!vb.ok){ toast('error', window.BaseCalculoInline.mensagem(vb)); return null; }
     }
   }
 

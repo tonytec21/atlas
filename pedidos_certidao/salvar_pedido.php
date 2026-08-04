@@ -3,6 +3,7 @@
 include(__DIR__ . '/../os/session_check.php');
 checkSession();
 include(__DIR__ . '/../os/db_connection.php');
+require_once __DIR__ . '/../os/base_calculo_lib.php';
 date_default_timezone_set('America/Sao_Paulo');
 
 header('Content-Type: application/json');
@@ -126,6 +127,7 @@ function ensureSchema(PDO $conn){
     ferrfis DECIMAL(12,2) NOT NULL DEFAULT 0,
     total DECIMAL(12,2) NOT NULL DEFAULT 0,
     ordem_exibicao INT NOT NULL DEFAULT 1,
+    base_de_calculo DECIMAL(15,2) NULL,
     INDEX idx_os_item (ordem_servico_id),
     CONSTRAINT fk_os_item FOREIGN KEY (ordem_servico_id)
       REFERENCES ordens_de_servico(id) ON DELETE CASCADE
@@ -197,8 +199,14 @@ function ensureSchemaDistribuicao(PDO $conn) {
 /* Conversores */
 function br_money_to_decimal($v) {
   $v = preg_replace('/[^\d,.\-]/', '', (string)$v);
-  $v = str_replace('.', '', $v);
-  $v = str_replace(',', '.', $v);
+  /* A vírgula é o que distingue os formatos: havendo vírgula, o ponto é
+     separador de MILHAR e sai; sem vírgula, o ponto JÁ É o decimal e fica.
+     A versão anterior removia o ponto sempre, então "8388.96" — formato que
+     chega de JSON ou da API — virava 838896. */
+  if (strpos($v, ',') !== false) {
+    $v = str_replace('.', '', $v);
+    $v = str_replace(',', '.', $v);
+  }
   if ($v === '' || $v === '.' || $v === '-.') return 0.0;
   return (float)$v;
 }
@@ -552,9 +560,12 @@ try {
     ]);
     $os_id = $conn->lastInsertId();
 
+    /* Coluna da base por ato (idempotente, para bases já existentes). */
+    bc_migrar($conn);
+
     $stmtItem = $conn->prepare("INSERT INTO ordens_de_servico_itens
-        (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, ordem_exibicao)
-         VALUES (:os,:ato,:qtd,:descleg,:descr,:em,:fe,:fa,:fm,:ff,:tot,:ordem)");
+        (ordem_servico_id, ato, quantidade, desconto_legal, descricao, emolumentos, ferc, fadep, femp, ferrfis, total, ordem_exibicao, base_de_calculo)
+         VALUES (:os,:ato,:qtd,:descleg,:descr,:em,:fe,:fa,:fm,:ff,:tot,:ordem,:base)");
 
     foreach($itens as $it){
       $em  = br_money_to_decimal($it['emolumentos'] ?? 0);
@@ -563,6 +574,27 @@ try {
       $fm  = br_money_to_decimal($it['femp'] ?? 0);
       $ff  = br_money_to_decimal($it['ferrfis'] ?? 0);
       $tot = br_money_to_decimal($it['total'] ?? 0);
+
+      /* ---------- BASE DE CÁLCULO DO ATO ----------
+         A tela valida antes de enviar, mas a checagem que vale é esta: um ato
+         de faixa gravado sem base trava a selagem depois, longe de quem lançou. */
+      $baseBruta = $it['base_de_calculo'] ?? '';
+      $baseItem  = ($baseBruta === '' || $baseBruta === null) ? null : bc_valor($baseBruta);
+
+      $faixaAto = bc_extrair_faixa($it['descricao'] ?? '');
+      $ehIsento = stripos((string)($it['ato'] ?? ''), '(isento)') !== false;
+
+      if ($faixaAto && !$ehIsento) {
+        $vb = bc_validar((float)$baseItem, $faixaAto);
+        if (!$vb['ok']) {
+          $conn->rollBack();
+          if (ob_get_length()) ob_clean();
+          echo json_encode(['error' => 'Ato ' . ($it['ato'] ?? '') . ': ' . $vb['mensagem']]);
+          exit;
+        }
+      }
+      if ($baseItem !== null && $baseItem <= 0) { $baseItem = null; }
+
       $stmtItem->execute([
         ':os'    => $os_id,
         ':ato'   => $it['ato'],
@@ -575,7 +607,8 @@ try {
         ':fm'    => $fm,
         ':ff'    => $ff,
         ':tot'   => $tot,
-        ':ordem' => (int)$it['ordem_exibicao']
+        ':ordem' => (int)$it['ordem_exibicao'],
+        ':base'  => $baseItem
       ]);
     }
   }
