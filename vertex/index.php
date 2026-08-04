@@ -22,6 +22,7 @@ if (!headers_sent()) {
 require_once __DIR__ . '/session_check.php';
 checkSession();                              // redireciona para ../login.php se não autenticado
 require_once __DIR__ . '/db_connection2.php'; // fornece $conn (mysqli), padrão do Atlas
+require_once __DIR__ . '/geo_extract_v2.php'; // extração de coordenadas v2 (saneamento + cadeia SIGEF)
 
 // Fuso horário do Maranhão (UTC-3, sem horário de verão) — corrige a data/hora dos relatórios.
 date_default_timezone_set('America/Fortaleza');
@@ -361,12 +362,18 @@ function haversine($a, $b) {
     return 2 * $R * asin(sqrt($s));
 }
 
-/** Perímetro do polígono fechado, em metros. */
+/** Perímetro do polígono fechado, em metros.
+ *  Medido no PLANO DE PROJEÇÃO UTM — mesmo critério da área (fórmula de Gauss) e
+ *  o mesmo que os memoriais georreferenciados declaram ("todos os azimutes e
+ *  distâncias, área e perímetro foram calculados no plano de projeção UTM").
+ *  Antes era medido por haversine sobre a esfera, o que dava ~0,3% a mais e não
+ *  batia com o perímetro escrito no documento. */
 function polygonPerimeterM($pts) {
-    $p = 0; $k = count($pts);
+    $u = array_map(function ($p) { return geoToUTM($p[0], $p[1]); }, $pts);
+    $p = 0; $k = count($u);
     for ($i = 0; $i < $k; $i++) {
         $j = ($i + 1) % $k;
-        $p += haversine($pts[$i], $pts[$j]);
+        $p += hypot($u[$j][0] - $u[$i][0], $u[$j][1] - $u[$i][1]);
     }
     return $p;
 }
@@ -490,12 +497,16 @@ function extractUTMCoordinates($rawText, $zone = 23, $south = true) {
         && abs($pares[0][1] - $pares[$k-1][1]) < 0.05) {
         array_pop($pares);
     }
+    // rede de segurança: descarta coordenadas geograficamente impossíveis para o mesmo imóvel
+    // (estações de referência RBMC/IBGE, coordenadas de outro documento coladas no mesmo texto)
+    $avisosF = [];
+    $pares = geoV2FiltrarDiscrepantes($pares, $avisosF);
     $pts = [];
     foreach ($pares as $p) {
         $g = utmToGeo($p[1], $p[0], $zone, $south); // utmToGeo(east, north)
         if ($g[0] >= -90 && $g[0] <= 90 && $g[1] >= -180 && $g[1] <= 180) $pts[] = [$g[0], $g[1]];
     }
-    return ['pts' => $pts, 'utm' => $pares, 'e_count' => $ne, 'n_count' => $nn];
+    return ['pts' => $pts, 'utm' => $pares, 'e_count' => $ne, 'n_count' => $nn, 'avisos' => $avisosF];
 }
 
 /**
@@ -699,7 +710,11 @@ function extractUTMTabelaSimples($rawText, $zone = 23, $south = true) {
     if ($k > 3 && abs($pares[0][0] - $pares[$k-1][0]) < 0.05 && abs($pares[0][1] - $pares[$k-1][1]) < 0.05) {
         array_pop($pares);
     }
-    // sanidade: vértices de um mesmo imóvel devem estar próximos (< 100 km)
+    // sanidade: descarta os vértices discrepantes (estações de referência, coordenadas de outro
+    // documento) em vez de invalidar a tabela inteira; só desiste se o que sobrar for incoerente.
+    $avisosF = [];
+    $pares = geoV2FiltrarDiscrepantes($pares, $avisosF);
+    if (count($pares) < 3) return $vazio;
     $maxd = 0.0;
     foreach ($pares as $a) foreach ($pares as $b) { $d = hypot($a[0]-$b[0], $a[1]-$b[1]); if ($d > $maxd) $maxd = $d; }
     if ($maxd > 100000) return $vazio;
@@ -832,10 +847,53 @@ function utmResolverZona(array $pares, $refLat, $refLng, $south = true) {
 }
 
 function buildGeoData($memorial, $refLat = null, $refLng = null) {
-    $res = extractGeoCoordinates($memorial);   // 1º GMS rotulado (Longitude:/Latitude:)
-    $pts = $res['pts'];
-    $fonte = 'gms';
-    $utmPares = null;
+    // 0-A) SANEAMENTO (v2): remove o bloco de estações de referência (RBMC/IBGE) e o rodapé
+    // cartorário antes de qualquer extração — essas coordenadas têm a MESMA forma das dos
+    // vértices e, quando capturadas, explodem a área (caso real: 874 ha lidos como 15 milhões).
+    $sanV2   = geoV2Sanear($memorial);
+    $memorial = $sanV2['texto'];
+    $avisosV2 = $sanV2['avisos'];
+
+    // 0-B) CADEIA SIGEF NARRATIVA (v2): "<az> - <dist>m, até o vértice X de coordenadas N.. e E..".
+    // Lê o memorial como uma CADEIA: reconstrói vértices cuja coordenada se perdeu na digitação,
+    // recupera vértices órfãos e confere cada coordenada contra o caminhamento.
+    $pts = []; $fonte = 'gms'; $utmPares = null; $res = ['invalidos' => []];
+    $v2 = extractMemorialGeorreferenciado($memorial, 23, true);
+    if (!empty($v2['ok']) && count($v2['pares']) >= 3) {
+        $utmPares = $v2['pares'];                       // [[N,E], ...]
+        foreach ($v2['pares'] as $p) {
+            $g = utmToGeo($p[1], $p[0], 23, true);      // (east, north)
+            if ($g[0] >= -34 && $g[0] <= 6 && $g[1] >= -74 && $g[1] <= -34) $pts[] = [$g[0], $g[1]];
+        }
+        if (count($pts) >= 3) {
+            $fonte = 'sigef_cadeia';
+            $avisosV2 = array_merge($avisosV2, $v2['avisos']);
+        } else { $pts = []; $utmPares = null; }
+    }
+
+    // 0-C) CADEIA FLEXÍVEL (v2): "…distância de 304,66 metros e … azimute plano de 90°00'00'',
+    // chega-se no marco ME-237…" — ordem distância→azimute (não reconhecida pelos extratores
+    // antigos) e lado sem azimute por ser limite natural (rio/grota), resolvido pelo fechamento.
+    if (count($pts) < 3) {
+        $vf = extractCadeiaFlexPoligono($memorial, 23, true);
+        if (!empty($vf['ok']) && count($vf['pares']) >= 3) {
+            $tmp = [];
+            foreach ($vf['pares'] as $p) {
+                $g = utmToGeo($p[1], $p[0], 23, true);
+                if ($g[0] >= -34 && $g[0] <= 6 && $g[1] >= -74 && $g[1] <= -34) $tmp[] = [$g[0], $g[1]];
+            }
+            if (count($tmp) >= 3) {
+                $pts = $tmp; $utmPares = $vf['pares']; $fonte = 'cadeia_flex';
+                $avisosV2 = array_merge($avisosV2, $vf['avisos']);
+            }
+        }
+    }
+
+    if (count($pts) < 3) {
+        $res = extractGeoCoordinates($memorial);   // 1º GMS rotulado (Longitude:/Latitude:)
+        $pts = $res['pts'];
+        $fonte = 'gms';
+    }
     if (count($pts) < 3) {                       // 2º GMS sem rótulo (tabela SIGEF/INCRA)
         $tab = extractGeoCoordinatesTabela($memorial);
         if (count($tab['pts']) >= 3) { $pts = $tab['pts']; $fonte = 'gms_tabela'; $res = $tab; }
@@ -898,7 +956,7 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
     // (erro de digitação no documento) usando os azimutes/distâncias do memorial.
     $corrigidos = [];
     $avisoTrav = '';
-    if (count($pts) >= 3) {
+    if (count($pts) >= 3 && $fonte !== 'sigef_cadeia' && $fonte !== 'cadeia_flex') {   // as cadeias v2 já reconstroem e conferem
         $invalidos = $res['invalidos'] ?? []; // vértices com minuto/segundo >= 60 (erro claro)
         $legs = extractTraverseLegsLoose($memorial);
         if (count($legs) < max(3, count($pts) - 1)) {           // formato tabular (sem a palavra "azimute")
@@ -952,6 +1010,24 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
     }
     if ($avisoAncora !== '') {
         $data['aviso_geometria'] = trim($avisoAncora . ' ' . ($data['aviso_geometria'] ?? ''));
+    }
+    // CONFERÊNCIA FINAL (v2): a área/perímetro calculados batem com o que o documento declara?
+    // É o que impede uma extração absurda de chegar ao mapa sem aviso.
+    if (!empty($data['ok'])) {
+        $conf = geoV2Conferir($memorial, $data['area_ha'] ?? 0, $data['perimetro_m'] ?? 0, 2.0);
+        if ($conf) $avisosV2 = array_merge($conf, $avisosV2);
+        $data['area_declarada_m2']      = geoV2AreaDeclarada($memorial);
+        $data['perimetro_declarado_m']  = geoV2PerimetroDeclarado($memorial);
+    }
+
+    // avisos do saneamento/cadeia v2 (estações ignoradas, vértices reconstruídos/recuperados)
+    if (!empty($avisosV2)) {
+        $data['avisos_extracao'] = $avisosV2;
+        $data['aviso_geometria'] = trim(implode(' ', $avisosV2) . ' ' . ($data['aviso_geometria'] ?? ''));
+    }
+    if ($fonte === 'sigef_cadeia') {
+        $data['rotulos_vertices']  = $v2['rotulos'] ?? [];
+        $data['divergencias_coord'] = $v2['divergencias'] ?? [];
     }
     return $data;
 }
@@ -1049,6 +1125,18 @@ function extractUTMVerticesRotulados($rawText, $zone = 23, $south = true) {
                 $typos[] = $vv[0] . ': easting ' . $intp . ' fora da faixa UTM e não corrigível automaticamente';
             }
         }
+    }
+
+    // rede de segurança: remove vértices geograficamente impossíveis (estações de referência)
+    $paresF = []; foreach ($verts as $vv) $paresF[] = [$vv[1], $vv[2]];
+    $avisosF = [];
+    $mantidos = geoV2FiltrarDiscrepantes($paresF, $avisosF);
+    if (count($mantidos) !== count($paresF) && count($mantidos) >= 3) {
+        $novo = [];
+        foreach ($verts as $vv) {
+            foreach ($mantidos as $mm) { if ($mm[0] === $vv[1] && $mm[1] === $vv[2]) { $novo[] = $vv; break; } }
+        }
+        if (count($novo) >= 3) { $verts = $novo; $typos = array_merge($typos, $avisosF); }
     }
 
     $utm = []; $pts = []; $rot = [];
@@ -1212,9 +1300,107 @@ function laudoSeDiscrepante($memorial) {
 function vxLabel($raw) {
     $raw = strtoupper(trim((string)$raw));
     $raw = strtr($raw, ['I' => '1', 'L' => '1']); // OCR comum no número
+    // rótulos completos do SIGEF (CRA-M-0967, CP5-M-0304, CRA-P-1264) ficam como estão
+    if (preg_match('/^[A-Z]{1,4}\d{0,2}-[A-Z]{1,2}-?\d{1,5}$/', $raw)) return $raw;
     if (preg_match('/([A-Z]{1,3})[-\s]?0*(\d{1,4})/', $raw, $m)) return $m[1] . '-' . (int)$m[2];
     if (preg_match('/0*(\d{1,4})/', $raw, $m)) return 'V-' . (int)$m[1];
     return 'V-?';
+}
+
+/** Confrontantes do memorial SIGEF narrativo ("segue confrontando com FAZENDA X, com o(s)
+ *  seguinte(s) azimute(s)" / "situado no limite da FAZ Y"). */
+function vxConfrontantes($t) {
+    $out = [];
+    if (preg_match_all('/confrontando\s+com\s+(?:o\s+|a\s+)?([^,;(]{3,80}?)\s*,?\s*com\s+o\(s\)/iu', $t, $m1)) {
+        foreach ($m1[1] as $c) $out[] = trim($c);
+    }
+    if (preg_match_all('/situad[oa]\s+no\s+limite\s+d[ao]s?\s+([^(;]{3,80}?)\s*(?:\(|;)/iu', $t, $m2)) {
+        foreach ($m2[1] as $c) $out[] = trim($c);
+    }
+    if (preg_match('/margem da (Estrada[^,.;]+)/su', $t, $mc)) $out[] = trim($mc[1]);
+    if (preg_match_all('/limitar com (?:as\s+)?terras do (?:Sr\.?|Sra\.?)?\s*([^,.;]+)/su', $t, $mc2)) {
+        foreach ($mc2[1] as $nome) $out[] = trim($nome);
+    }
+    $lim = [];
+    foreach ($out as $c) {
+        $c = trim(preg_replace('/\s+/', ' ', $c));
+        if ($c === '' || strlen($c) < 3) continue;
+        if (!in_array($c, $lim, true)) $lim[] = $c;
+    }
+    return array_slice($lim, 0, 12);
+}
+
+/** Monta o laudo do painel a partir do resultado da cadeia v2, no MESMO formato que o
+ *  analisador antigo devolvia — para o front-end e detectarInconsistenciasCoord() não
+ *  precisarem mudar. Área e perímetro no plano UTM, como o memorial declara. */
+function vxLaudoDaCadeia($t, array $v2, $zone = 23, $south = true) {
+    $utm = $v2['pares'];
+    $nv  = count($utm);
+
+    $div = []; foreach ($v2['divergencias'] as $d) $div[$d['rotulo']] = $d['delta'];
+    $rec = []; foreach ($v2['reconstruidos'] as $r) $rec[$r['rotulo']] = $r;
+
+    $vx = [];
+    for ($i = 0; $i < $nv; $i++) {
+        $rot = $v2['rotulos'][$i] ?? ('V-' . ($i + 1));
+        $g   = utmToGeo($utm[$i][1], $utm[$i][0], $zone, $south);
+        $vx[] = [
+            'rot' => $rot, 'N' => $utm[$i][0], 'E' => $utm[$i][1],
+            'lat' => $g[0], 'lng' => $g[1],
+            'typo' => null,
+            'suspeito' => isset($div[$rot]),
+            'desvio_m' => isset($div[$rot]) ? round($div[$rot], 2) : null,
+            'reconstruido' => isset($rec[$rot]),
+        ];
+    }
+
+    $areaM2 = 0.0; $per = 0.0;
+    for ($i = 0; $i < $nv; $i++) {
+        $j = ($i + 1) % $nv;
+        $areaM2 += $utm[$i][1] * $utm[$j][0] - $utm[$j][1] * $utm[$i][0];
+        $per    += hypot($utm[$j][1] - $utm[$i][1], $utm[$j][0] - $utm[$i][0]);
+    }
+    $areaM2 = abs($areaM2) / 2.0;
+
+    $legPara = []; foreach (($v2['legs'] ?? []) as $lg) { if (!empty($lg['para'])) $legPara[$lg['para']] = $lg; }
+    $lados = [];
+    for ($i = 0; $i < $nv; $i++) {
+        $j = ($i + 1) % $nv;
+        $dN = $utm[$j][0] - $utm[$i][0]; $dE = $utm[$j][1] - $utm[$i][1];
+        $distC = hypot($dN, $dE);
+        $azC   = fmod(rad2deg(atan2($dE, $dN)) + 360.0, 360.0);
+        $row = ['de' => $vx[$i]['rot'], 'para' => $vx[$j]['rot'],
+                'dist_calc' => round($distC, 2), 'az_calc' => round($azC, 4),
+                'dist_decl' => null, 'az_decl' => null, 'suspeito' => false];
+        $lg = $legPara[$vx[$j]['rot']] ?? null;
+        if ($lg) {
+            $ad = abs($azC - $lg['az']); if ($ad > 180) $ad = 360 - $ad;
+            $row['dist_decl'] = round($lg['dist'], 2);
+            $row['az_decl']   = round($lg['az'], 4);
+            $row['suspeito']  = (abs($distC - $lg['dist']) > 3.0) || ($ad > 0.5);
+        }
+        $lados[] = $row;
+    }
+
+    $areaDeclM2 = geoV2AreaDeclarada($t);
+    $perDecl    = geoV2PerimetroDeclarado($t);
+    $susp = [];
+    foreach ($vx as $v) if (!empty($v['suspeito'])) $susp[] = $v['rot'];
+
+    return [
+        'ok' => true, 'zona' => $zone, 'hemisferio' => $south ? 'sul' : 'norte',
+        'datum' => (preg_match('/SIRGAS/i', $t) ? 'SIRGAS2000' : (preg_match('/SAD[-\s]?69/i', $t) ? 'SAD-69' : '')),
+        'mc' => (preg_match('/(\d{2})\s*°?\s*W\s*Gr/i', $t, $mm) ? $mm[1] . 'W' : ''),
+        'num_vertices' => $nv, 'vertices' => $vx, 'legs' => $v2['legs'] ?? [], 'lados' => $lados,
+        'area_m2' => round($areaM2, 2), 'area_ha' => round($areaM2 / 10000, 4),
+        'perimetro_m' => round($per, 2),
+        'area_declarada_ha' => ($areaDeclM2 !== null) ? round($areaDeclM2 / 10000, 4) : null,
+        'perimetro_declarado_m' => $perDecl,
+        'typos' => [], 'suspeitos' => $susp,
+        'confrontantes' => vxConfrontantes($t),
+        'avisos' => $v2['avisos'] ?? [],
+        'fonte' => 'cadeia_v2',
+    ];
 }
 /** Faixas plausíveis UTM (Brasil, hemisfério sul). */
 function vxBandaN($v) { return $v >= 1000000 && $v <= 10000000; }
@@ -1233,8 +1419,31 @@ function analisarMemorialVertex($memorial, $zone = 23, $south = true) {
     $t = normalizeGeoText($memorial);
     $num = '\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?';
 
+    /* ---- CAMINHO PREFERENCIAL: a cadeia v2 (mesma que monta o polígono do mapa) ----
+     * Antes, este analisador tinha um regex de rótulo próprio
+     * ([A-Z]{1,3}[-\s]?[0-9lLI]{1,4}) que só aceitava LETRAS+DÍGITOS. Num memorial com
+     * rótulos como CRA-M-0967 / CRA-P-1264 / CP5-M-0304, apenas os "CP5" casavam
+     * (CP + 5) — 6 vértices de 43. O painel do mapa chama este analisador por
+     * 'analisar_vertex' e SOBRESCREVE área/perímetro/tabela com o resultado, então o
+     * card exibia 62,62 ha e 4.694,05 m (o hexágono dos 6 CP5) enquanto o polígono
+     * desenhado e o editor mostravam os 874,6602 ha corretos.
+     * Usar a cadeia v2 elimina a divergência: card, mapa e editor passam a ler a
+     * MESMA geometria. */
+    $v2 = extractMemorialGeorreferenciado($memorial, $zone, $south);
+    if (empty($v2['ok']) || count($v2['pares']) < 3) {
+        $vf = extractCadeiaFlexPoligono($memorial, $zone, $south);
+        if (!empty($vf['ok']) && count($vf['pares']) >= 3) {
+            $v2 = ['ok' => true, 'pares' => $vf['pares'], 'rotulos' => $vf['rotulos'],
+                   'legs' => [], 'reconstruidos' => [], 'divergencias' => [], 'avisos' => $vf['avisos']];
+        }
+    }
+    if (!empty($v2['ok']) && count($v2['pares']) >= 3) {
+        return vxLaudoDaCadeia($t, $v2, $zone, $south);
+    }
+
     // ---- vértices rotulados em prosa: "vértice P-1, de coordenadas N=.. e E=.." ----
-    $reV = '/(?:v[ée]rtice|ponto|marco|estaca)\s+([A-Z]{1,3}[-\s]?[0-9lLI]{1,4})\b[^NE]{0,90}?\bN\s*=?\s*(' . $num . ')\s*(?:m\b)?[^NE]{0,25}?\bE\s*=?\s*(' . $num . ')/su';
+    // rótulo tolerante: P-1, M-12, CP5-M-0304, CRA-M-0967, CRA-P-1264
+    $reV = '/(?:v[ée]rtice|ponto|marco|estaca)\s+([A-Z]{1,4}[0-9]{0,2}(?:[-\s][A-Z]{1,2})?[-\s]?[0-9lLI]{1,5})\b[^NE]{0,90}?\bN\s*=?\s*(' . $num . ')\s*(?:m\b)?[^NE]{0,25}?\bE\s*=?\s*(' . $num . ')/su';
     preg_match_all($reV, $t, $mV, PREG_SET_ORDER);
     $vx = [];
     foreach ($mV as $x) {
@@ -3240,7 +3449,10 @@ COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
    "registro_anterior_matricula": número da matrícula ANTERIOR da qual ESTA se originou, citada no registro de abertura/R-1 (ex.: 'imóvel havido por desmembramento da matrícula 1.234' => 1234). Apenas o número. Senão "",
    "registro_anterior_tipo": como ESTA se originou da anterior — 'desmembramento', 'unificacao' ou 'georreferenciamento' — senão ""
 },
-"memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. REGRA PRINCIPAL E OBRIGATÓRIA: sempre que o documento trouxer a Longitude e a Latitude (ou Norte/Este UTM) de cada vértice, transcreva TODAS elas — nunca omita as coordenadas, mesmo que também existam azimutes e distâncias. Os formatos possíveis: (a) texto corrido começando em 'Inicia-se a descrição...' com as coordenadas de cada vértice entre parênteses (ex.: '(Longitude: -45°37'17,183", Latitude: -07°08'36,589")') — transcreva cada par Longitude/Latitude; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; (c) uma TABELA (SIGEF/INCRA ou planta) com colunas de Latitude/Longitude — transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'); ou (d) uma TABELA de LEVANTAMENTO TOPOGRÁFICO com colunas UTM 'Coord. N(Y)'/'Coord. E(X)' — transcreva cada vértice PREFIXANDO os valores (ex.: 'P1 N=9.222.799,638 E=445.517,024'). ADICIONALMENTE (nunca no lugar das coordenadas): se houver azimutes e distâncias entre os pontos, inclua também cada lado numa linha própria no formato 'De P1 Para P2, azimute 285°27'21,60", distância 4,50 m'. E se o documento informar ÁREA e/ou PERÍMETRO totais, inclua-os ao final tal como aparecem (ex.: 'Área: 246,8798 m² Perímetro: 113,4541 m'). Inclua TODOS os vértices com suas coordenadas; não converta, não arredonde, não omita nenhuma coordenada
+"memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. REGRA PRINCIPAL E OBRIGATÓRIA: sempre que o documento trouxer a Longitude e a Latitude (ou Norte/Este UTM) de cada vértice, transcreva TODAS elas — nunca omita as coordenadas, mesmo que também existam azimutes e distâncias. Os formatos possíveis: (a) texto corrido começando em 'Inicia-se a descrição...' com as coordenadas de cada vértice entre parênteses (ex.: '(Longitude: -45°37'17,183", Latitude: -07°08'36,589")') — transcreva cada par Longitude/Latitude; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; (c) uma TABELA (SIGEF/INCRA ou planta) com colunas de Latitude/Longitude — transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'); ou (d) uma TABELA de LEVANTAMENTO TOPOGRÁFICO com colunas UTM 'Coord. N(Y)'/'Coord. E(X)' — transcreva cada vértice PREFIXANDO os valores (ex.: 'P1 N=9.222.799,638 E=445.517,024'). ADICIONALMENTE (nunca no lugar das coordenadas): se houver azimutes e distâncias entre os pontos, inclua também cada lado numa linha própria no formato 'De P1 Para P2, azimute 285°27'21,60", distância 4,50 m'. E se o documento informar ÁREA e/ou PERÍMETRO totais, inclua-os ao final tal como aparecem (ex.: 'Área: 246,8798 m² Perímetro: 113,4541 m'). Inclua TODOS os vértices com suas coordenadas; não converta, não arredonde, não omita nenhuma coordenada.
+NUNCA transcreva as coordenadas das ESTAÇÕES DE REFERÊNCIA usadas na amarração do levantamento — memoriais certificados encerram com trechos como 'georreferenciadas ao Sistema Geodésico Brasileiro, a partir da estação ativa IBGE-BELE-93620, de coordenadas N=9.844.131,659m E=782.362,747m, Meridiano Central 51° WGr'. Essas coordenadas são de estações da RBMC/IBGE (Belém, Brasília, Crato etc.), ficam a centenas de quilômetros do imóvel e em outra zona UTM: elas NÃO são vértices do perímetro. Pare a transcrição no último vértice do perímetro. Pode informar, em texto, apenas o DATUM e o Meridiano Central do imóvel (ex.: 'SIRGAS2000, MC 45° WGr'), sem nenhum número de coordenada de estação.
+Preserve o RÓTULO de cada vértice exatamente como no documento (ex.: CRA-M-0967, CP5-M-0304, P1, M-12) e, quando o documento trouxer azimute e distância antes de cada vértice, mantenha a ordem original 'azimute - distância, até o vértice RÓTULO de coordenadas N ... e E ...' — essa cadeia permite ao sistema reconstruir vértices cuja coordenada tenha se perdido na digitação.
+TRANSCREVA LITERALMENTE, INCLUSIVE OS ERROS. Se uma linha estiver truncada, repetida ou sem coordenada (ex.: 'até o vértice CRA-P-1351 de coordenadas N CRA-P-1352 de coordenadas N 9.306.952,038m e E 263.278,269m'), copie-a EXATAMENTE assim. NUNCA junte dois vértices numa linha só, nunca apague um rótulo que ficou sem coordenada, nunca complete uma coordenada que falta e nunca corrija o que parecer erro de digitação. O sistema detecta e reconstrói esses casos pelo azimute/distância — mas só consegue se a transcrição preservar o defeito original. Consertar a linha faz o sistema perder um vértice e errar a área
 }
 PROMPT;
 }
