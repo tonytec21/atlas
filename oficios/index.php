@@ -6,60 +6,27 @@ checkSession();
 require_once __DIR__ . '/assinatura_config.php';
 try { assin_ensure_schema(); } catch (Throwable $e) { /* segue sem travar a listagem */ }
 
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "oficios_db";
+/* ---------------------------------------------------------------------------
+   Motor de busca avançada.
+   A listagem passou a ser carregada por AJAX (buscar_oficios.php), com
+   prepared statements, paginação no servidor, facetas e relevância.
+   Este arquivo apenas monta a interface; os filtros vindos pela URL são
+   restaurados pelo JavaScript (inclusive os links antigos do módulo).
+--------------------------------------------------------------------------- */
+require_once __DIR__ . '/busca_helper.php';
 
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-if ($conn->connect_error) {
-    die("Falha na conexão: " . $conn->connect_error);
+// Total geral de ofícios, apenas para o texto informativo do topo
+$totalGeral = 0;
+try {
+    $c = ofb_db();
+    if ($r = @$c->query("SELECT COUNT(*) AS t FROM `oficios`")) {
+        $row = $r->fetch_assoc();
+        $totalGeral = (int)$row['t'];
+        $r->free();
+    }
+} catch (Throwable $e) {
+    die("Falha na conexão com o banco de dados: " . htmlspecialchars($e->getMessage()));
 }
-
-// Verificar se há filtros aplicados
-$filters = [];
-$filterQuery = "";
-
-// Detecta se há qualquer filtro/consulta ativa
-$hasFilter = false;
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['numero']) || isset($_GET['data']) || isset($_GET['assunto']) || isset($_GET['destinatario']) || isset($_GET['dados_complementares']))) {
-    if (!empty($_GET['numero'])) {
-        $filters[] = "numero LIKE '%" . $conn->real_escape_string($_GET['numero']) . "%'";
-    }
-    if (!empty($_GET['data'])) {
-        $filters[] = "data = '" . $conn->real_escape_string($_GET['data']) . "'";
-    }
-    if (!empty($_GET['assunto'])) {
-        $filters[] = "assunto LIKE '%" . $conn->real_escape_string($_GET['assunto']) . "%'";
-    }
-    if (!empty($_GET['destinatario'])) {
-        $filters[] = "destinatario LIKE '%" . $conn->real_escape_string($_GET['destinatario']) . "%'";
-    }
-    if (!empty($_GET['dados_complementares'])) {
-        $filters[] = "dados_complementares LIKE '%" . $conn->real_escape_string($_GET['dados_complementares']) . "%'";
-    }   
-
-    if (count($filters) > 0) {
-        $filterQuery = "WHERE " . implode(" AND ", $filters);
-        $hasFilter = true;
-    }
-}
-
-// Por padrão (sem filtros) limitar a 20 registros mais recentes
-$limitClause = $hasFilter ? "" : " LIMIT 20";
-
-$sql = "SELECT * FROM oficios $filterQuery ORDER BY id DESC$limitClause";
-$result = $conn->query($sql);
-
-$oficios = [];
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        $oficios[] = $row;
-    }
-}
-
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -73,6 +40,7 @@ $conn->close();
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="busca_avancada.css">
     <style>
         /* =======================================================================
            HERO
@@ -443,128 +411,271 @@ include(__DIR__ . '/../menu.php');
             <section class="page-hero">
                 <div class="title-row">
                     <div class="title-icon"><i class="fa fa-file-text-o"></i></div>
-                    <div>
+                    <div style="flex:1;">
                         <h1>Pesquisa de Ofícios</h1>
                         <div class="subtitle muted">
-                            Consulta e gestão de ofícios com filtros rápidos, visualização em PDF e anexos.
+                            Busca inteligente com operadores, intervalos de datas, filtros por situação e exportação.
                         </div>
-                        <?php if (!$hasFilter): ?>
-                            <div class="mt-2">
-                                <span class="chip"><i class="fa fa-info-circle"></i> Exibindo os 20 mais recentes. Use os filtros para pesquisar mais.</span>
-                            </div>
-                        <?php endif; ?>
+                        <div class="mt-2">
+                            <span class="chip"><i class="fa fa-database"></i> <?php echo number_format($totalGeral, 0, ',', '.'); ?> ofício(s) cadastrado(s)</span>
+                            <span class="chip" style="cursor:pointer;" onclick="AtlasBusca.ajuda()" title="Ver todos os operadores de busca">
+                                <i class="fa fa-question-circle"></i> Como pesquisar
+                            </span>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- FILTROS (UI/UX MODERNO) -->
-            <form id="searchForm" method="GET" class="filter-card">
-                <div class="section-title">Filtros de pesquisa</div>
-                <div class="section-sub">Refine sua busca por número, data, assunto, destinatário e dados complementares.</div>
+            <!-- ================== CENTRAL DE BUSCA ================== -->
+            <div class="filter-card">
 
-                <div class="row">
-                    <div class="col-6 col-md-2 mb-3">
-                        <label for="numero" class="sr-only">Número</label>
-                        <div class="input-chip">
-                            <i class="fa fa-hashtag" aria-hidden="true"></i>
-                            <input type="text" class="form-control" id="numero" name="numero" placeholder="Número"
-                                   value="<?php echo htmlspecialchars($_GET['numero'] ?? ''); ?>">
-                        </div>
+                <!-- Barra de busca principal -->
+                <div class="busca-wrap">
+                    <div class="busca-principal">
+                        <i class="fa fa-search" aria-hidden="true"></i>
+                        <input type="text" id="q" autocomplete="off" spellcheck="false"
+                               placeholder="Pesquisar por número, assunto, destinatário... ou use assunto:penhora dest:banco de:01/01/2026">
+                        <button type="button" class="btn-limpar-busca" title="Limpar busca"
+                                onclick="document.getElementById('q').value='';AtlasBusca.estado.q='';AtlasBusca.buscar();document.getElementById('q').focus();">&times;</button>
+                        <span class="kbd-hint" title="Pressione / para focar a busca">/</span>
                     </div>
-                    <div class="col-6 col-md-2 mb-3">
-                        <label for="data" class="sr-only">Data</label>
-                        <div class="input-chip">
-                            <i class="fa fa-calendar" aria-hidden="true"></i>
-                            <input type="date" class="form-control" id="data" name="data"
-                                   value="<?php echo htmlspecialchars($_GET['data'] ?? ''); ?>">
+                    <div class="busca-sugestoes" id="buscaSugestoes"></div>
+                </div>
+
+                <div class="mt-2 hint text-muted" id="avisoOperador" style="display:none;"></div>
+
+                <!-- Atalhos de período e situação -->
+                <div class="chips-linha">
+                    <button type="button" class="chip-filtro" data-periodo="hoje" onclick="AtlasBusca.aplicarPeriodo('hoje')">
+                        <i class="fa fa-calendar-o"></i> Hoje
+                    </button>
+                    <button type="button" class="chip-filtro" data-periodo="7dias" onclick="AtlasBusca.aplicarPeriodo('7dias')">
+                        <i class="fa fa-calendar"></i> 7 dias
+                    </button>
+                    <button type="button" class="chip-filtro" data-periodo="30dias" onclick="AtlasBusca.aplicarPeriodo('30dias')">
+                        <i class="fa fa-calendar"></i> 30 dias
+                    </button>
+                    <button type="button" class="chip-filtro" data-periodo="mes" onclick="AtlasBusca.aplicarPeriodo('mes')">
+                        <i class="fa fa-calendar-check-o"></i> Este mês
+                    </button>
+                    <button type="button" class="chip-filtro" data-periodo="mespassado" onclick="AtlasBusca.aplicarPeriodo('mespassado')">
+                        <i class="fa fa-calendar-minus-o"></i> Mês passado
+                    </button>
+                    <button type="button" class="chip-filtro" data-periodo="ano" onclick="AtlasBusca.aplicarPeriodo('ano')">
+                        <i class="fa fa-calendar-plus-o"></i> Este ano
+                    </button>
+
+                    <span style="width:1px;background:rgba(0,0,0,.10);margin:0 4px;"></span>
+
+                    <button type="button" class="chip-filtro" data-estado-campo="assinado" data-estado-valor="sim"
+                            onclick="AtlasBusca.alternarEstado('assinado','sim')">
+                        <i class="fa fa-check-circle"></i> Assinados
+                    </button>
+                    <button type="button" class="chip-filtro" data-estado-campo="assinado" data-estado-valor="nao"
+                            onclick="AtlasBusca.alternarEstado('assinado','nao')">
+                        <i class="fa fa-circle-o"></i> Não assinados
+                    </button>
+                    <button type="button" class="chip-filtro" data-estado-campo="travado" data-estado-valor="sim"
+                            onclick="AtlasBusca.alternarEstado('travado','sim')">
+                        <i class="fa fa-lock"></i> Travados
+                    </button>
+                    <button type="button" class="chip-filtro" data-estado-campo="anexo" data-estado-valor="sim"
+                            onclick="AtlasBusca.alternarEstado('anexo','sim')">
+                        <i class="fa fa-paperclip"></i> Com anexo
+                    </button>
+                </div>
+
+                <!-- Chips de filtros ativos (removíveis) -->
+                <div class="chips-ativos" id="chipsAtivos"></div>
+
+                <!-- Buscas salvas -->
+                <div class="salvas-box" id="buscasSalvas"></div>
+
+                <!-- ================== PAINEL AVANÇADO ================== -->
+                <div class="painel-avancado" id="painelAvancado">
+                    <div class="row">
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo" for="f_numero">Número</label>
+                            <div class="input-chip">
+                                <i class="fa fa-hashtag" aria-hidden="true"></i>
+                                <input type="text" class="form-control" id="f_numero" placeholder="145 ou 145/2026" autocomplete="off">
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-12 col-md-4 mb-3">
-                        <label for="assunto" class="sr-only">Assunto</label>
-                        <div class="input-chip">
-                            <i class="fa fa-book" aria-hidden="true"></i>
-                            <input type="text" class="form-control" id="assunto" name="assunto" placeholder="Assunto"
-                                   value="<?php echo htmlspecialchars($_GET['assunto'] ?? ''); ?>">
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo" for="f_destinatario">Destinatário</label>
+                            <div class="input-chip">
+                                <i class="fa fa-user" aria-hidden="true"></i>
+                                <input type="text" class="form-control" id="f_destinatario" placeholder="Nome ou órgão" autocomplete="off">
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-12 col-md-4 mb-3">
-                        <label for="destinatario" class="sr-only">Destinatário</label>
-                        <div class="input-chip">
-                            <i class="fa fa-user" aria-hidden="true"></i>
-                            <input type="text" class="form-control" id="destinatario" name="destinatario" placeholder="Destinatário"
-                                   value="<?php echo htmlspecialchars($_GET['destinatario'] ?? ''); ?>">
+                        <div class="col-12 col-md-6 mb-3">
+                            <label class="campo-rotulo" for="f_assunto">Assunto</label>
+                            <div class="input-chip">
+                                <i class="fa fa-book" aria-hidden="true"></i>
+                                <input type="text" class="form-control" id="f_assunto" placeholder="Assunto do ofício" autocomplete="off">
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-12 col-md-12 mb-3">
-                        <label for="dados_complementares" class="sr-only">Dados Complementares</label>
-                        <div class="input-chip">
-                            <i class="fa fa-file-text" aria-hidden="true"></i>
-                            <input type="text" class="form-control" id="dados_complementares" name="dados_complementares" placeholder="Dados Complementares"
-                                   value="<?php echo htmlspecialchars($_GET['dados_complementares'] ?? ''); ?>">
+
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo" for="f_assinante">Assinante</label>
+                            <div class="input-chip">
+                                <i class="fa fa-pencil" aria-hidden="true"></i>
+                                <input type="text" class="form-control" id="f_assinante" placeholder="Quem assina" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo" for="f_cargo">Cargo</label>
+                            <div class="input-chip">
+                                <i class="fa fa-id-badge" aria-hidden="true"></i>
+                                <input type="text" class="form-control" id="f_cargo" placeholder="Cargo do destinatário" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 mb-3">
+                            <label class="campo-rotulo" for="f_complementos">Dados complementares</label>
+                            <div class="input-chip">
+                                <i class="fa fa-file-text" aria-hidden="true"></i>
+                                <input type="text" class="form-control" id="f_complementos" placeholder="Processo, protocolo, observações..." autocomplete="off">
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 mb-3">
+                            <label class="campo-rotulo" for="f_corpo">Texto do ofício (corpo)</label>
+                            <div class="input-chip">
+                                <i class="fa fa-align-left" aria-hidden="true"></i>
+                                <input type="text" class="form-control" id="f_corpo" placeholder="Palavra contida no corpo do documento" autocomplete="off">
+                            </div>
+                        </div>
+
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo" for="f_data_ini">Data inicial</label>
+                            <div class="input-chip">
+                                <i class="fa fa-calendar" aria-hidden="true"></i>
+                                <input type="date" class="form-control" id="f_data_ini">
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo" for="f_data_fim">Data final</label>
+                            <div class="input-chip">
+                                <i class="fa fa-calendar" aria-hidden="true"></i>
+                                <input type="date" class="form-control" id="f_data_fim">
+                            </div>
+                        </div>
+
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo" for="f_assinado">Assinatura digital</label>
+                            <select class="form-control" id="f_assinado" style="border-radius:12px;">
+                                <option value="">Todos</option>
+                                <option value="sim">Somente assinados</option>
+                                <option value="nao">Somente não assinados</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo" for="f_travado">Edição</label>
+                            <select class="form-control" id="f_travado" style="border-radius:12px;">
+                                <option value="">Todos</option>
+                                <option value="sim">Somente travados</option>
+                                <option value="nao">Somente liberados</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo" for="f_anexo">Anexos</label>
+                            <select class="form-control" id="f_anexo" style="border-radius:12px;">
+                                <option value="">Todos</option>
+                                <option value="sim">Somente com anexo</option>
+                                <option value="nao">Somente sem anexo</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="campo-rotulo">Combinação dos termos</label>
+                            <div class="seg-group">
+                                <button type="button" data-modo="e" class="ativo" title="Traz apenas os ofícios que contenham todos os termos">E (todos)</button>
+                                <button type="button" data-modo="ou" title="Traz os ofícios que contenham qualquer um dos termos">OU (qualquer)</button>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mb-2">
+                            <label style="font-size:.88rem;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
+                                <input type="checkbox" id="f_buscar_corpo">
+                                Incluir o corpo do ofício na busca por palavras livres
+                                <small class="text-muted">(mais abrangente, porém mais lento)</small>
+                            </label>
                         </div>
                     </div>
                 </div>
 
-                <div class="filter-actions mt-2">
-                    <button type="submit" class="btn btn-primary btn-pill">
-                        <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
-                    </button>
-                    <button id="add-button" type="button" class="btn btn-success btn-pill" onclick="window.location.href='cadastrar-oficio.php'">
+                <!-- Sugestões de filtro (facetas) -->
+                <div class="facetas-box" id="facetasBox" style="display:none;"></div>
+
+                <!-- Ações -->
+                <div class="filter-actions mt-3">
+                    <button type="button" class="btn btn-success btn-pill" onclick="window.location.href='cadastrar-oficio.php'">
                         <i class="fa fa-plus" aria-hidden="true"></i> Novo Ofício
                     </button>
-                    <?php if ($hasFilter): ?>
-                        <a href="index.php" class="btn btn-soft btn-pill">
-                            <i class="fa fa-times" aria-hidden="true"></i> Limpar filtros
-                        </a>
-                    <?php endif; ?>
+                    <button type="button" class="btn-toggle-avancado ml-2" id="btnAvancado" onclick="AtlasBusca.abrirAvancado()">
+                        <i class="fa fa-sliders"></i> Filtros avançados
+                    </button>
+                    <button type="button" class="btn-toggle-avancado ml-3" id="btnFacetas" onclick="AtlasBusca.alternarFacetas()">
+                        <i class="fa fa-magic"></i> Sugestões de filtro
+                    </button>
+                    <button type="button" class="btn-toggle-avancado ml-3" onclick="AtlasBusca.salvarBusca()">
+                        <i class="fa fa-bookmark-o"></i> Salvar pesquisa
+                    </button>
+                    <button type="button" class="btn btn-soft btn-pill ml-auto" id="btnLimparTudo" style="display:none;" onclick="AtlasBusca.limparTudo()">
+                        <i class="fa fa-times" aria-hidden="true"></i> Limpar filtros
+                    </button>
                 </div>
+            </div>
 
-                <?php if (!$hasFilter): ?>
-                    <div class="mt-2 hint text-muted">
-                        Dica: para ver mais resultados, use os campos acima e clique em <strong>Filtrar</strong>.
-                    </div>
-                <?php endif; ?>
-            </form>
+            <!-- ================== RESULTADOS ================== -->
+            <div class="resultados-topo">
+                <div class="resultados-info" id="resultadosInfo"></div>
+                <div class="resultados-acoes">
+                    <label class="mb-0 text-muted" style="font-size:.82rem;" for="selOrdem">Ordenar:</label>
+                    <select id="selOrdem">
+                        <option value="relevancia|desc">Mais relevantes</option>
+                        <option value="data|desc">Data (mais recente)</option>
+                        <option value="data|asc">Data (mais antiga)</option>
+                        <option value="numero|desc">Número (maior)</option>
+                        <option value="numero|asc">Número (menor)</option>
+                        <option value="assunto|asc">Assunto (A-Z)</option>
+                        <option value="destinatario|asc">Destinatário (A-Z)</option>
+                    </select>
+                    <select id="selPorPagina" title="Resultados por página">
+                        <option value="10">10 / pág.</option>
+                        <option value="25" selected>25 / pág.</option>
+                        <option value="50">50 / pág.</option>
+                        <option value="100">100 / pág.</option>
+                        <option value="200">200 / pág.</option>
+                    </select>
+                    <button type="button" class="btn btn-soft btn-sm btn-pill" onclick="AtlasBusca.exportar()" title="Exportar o resultado atual em CSV">
+                        <i class="fa fa-download"></i> Exportar
+                    </button>
+                </div>
+            </div>
 
-            <div class="table-responsive table-wrap mt-3">
-                <h5 class="mb-2">Resultados da Pesquisa</h5>
+            <div class="busca-carregando" id="buscaCarregando">
+                <span class="spinner-busca"></span> Consultando ofícios...
+            </div>
+
+            <div class="table-responsive table-wrap" id="tabelaWrap">
                 <table id="tabelaResultados" class="table table-striped table-bordered data-layout">
                     <thead>
                         <tr>
-                            <th>Número</th>
-                            <th>Data</th>
-                            <th>Assunto</th>
-                            <th>Destinatário</th>
+                            <th class="ordenavel" data-ordem="numero">Número <i class="fa fa-sort"></i></th>
+                            <th class="ordenavel" data-ordem="data">Data <i class="fa fa-sort"></i></th>
+                            <th class="ordenavel" data-ordem="assunto">Assunto <i class="fa fa-sort"></i></th>
+                            <th class="ordenavel" data-ordem="destinatario">Destinatário <i class="fa fa-sort"></i></th>
                             <th>Cargo</th>
                             <th style="width: 15%;">Complementos</th>
-                            <th style="width: 10%;">Ações</th>
+                            <th style="width: 104px; min-width: 104px;">Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="oficioTable">
-                        <?php foreach ($oficios as $oficio) : ?>
-                            <?php $assinado = !empty($oficio['assinado']); $ordKey = (int)($oficio['id'] ?? 0); if (preg_match('~^\s*(\d+)\s*/\s*(\d+)\s*$~', (string)$oficio['numero'], $mk)) { $ordKey = ((int)$mk[2]) * 1000000 + (int)$mk[1]; } elseif (preg_match('~(\d+)~', (string)$oficio['numero'], $mk)) { $ordKey = (int)$mk[1]; } ?>
-                            <tr>
-                                <td data-order="<?php echo $ordKey; ?>"><?php echo htmlspecialchars($oficio['numero']); ?></td>
-                                <td data-order="<?php echo date('Y-m-d', strtotime($oficio['data'])); ?>"><?php echo date('d/m/Y', strtotime($oficio['data'])); ?></td>
-                                <td><?php echo htmlspecialchars($oficio['assunto']); ?></td>
-                                <td><?php echo htmlspecialchars($oficio['destinatario']); ?></td>
-                                <td><?php echo htmlspecialchars($oficio['cargo']); ?></td>
-                                <td><?php echo htmlspecialchars($oficio['dados_complementares']); ?></td>
-                                <td data-cell="acoes">
-                                    <button class="btn btn-info btn-sm btn-table" title="Visualizar ofício" onclick="viewOficio('<?php echo $oficio['numero']; ?>', <?php echo $assinado ? 'true' : 'false'; ?>)"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                    <button class="btn btn-sm btn-table <?php echo (($oficio['status'] == 1 || $assinado) ? 'btn-secondary' : 'btn-warning'); ?>" title="<?php echo $assinado ? 'Ofício assinado — edição bloqueada' : 'Editar ofício'; ?>" onclick="editOficio('<?php echo $oficio['numero']; ?>')" <?php if ($oficio['status'] == 1 || $assinado) echo 'disabled'; ?>><i class="fa fa-pencil" aria-hidden="true"></i></button>
-                                    <button class="btn btn-sm btn-primary btn-table" title="Anexos" onclick="viewAttachments('<?php echo $oficio['numero']; ?>')"><i class="fa fa-paperclip" aria-hidden="true"></i></button>
-                                    <button class="btn btn-sm btn-table <?php echo $assinado ? 'btn-secondary' : 'btn-success'; ?>"
-                                            title="<?php echo $assinado ? 'Ofício assinado digitalmente' : 'Assinar digitalmente'; ?>"
-                                            onclick="assinarOficio('<?php echo $oficio['numero']; ?>', <?php echo $assinado ? 'true' : 'false'; ?>)">
-                                        <i class="fa <?php echo $assinado ? 'fa-check-circle' : 'fa-pencil-square-o'; ?>" aria-hidden="true"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
+                    <tbody id="oficioTable"></tbody>
                 </table>
+                <div class="sem-resultados" id="semResultados" style="display:none;"></div>
             </div>
+
+            <div class="paginacao" id="paginacao"></div>
 
         </div>
     </div>
@@ -702,6 +813,7 @@ include(__DIR__ . '/../menu.php');
     <script src="../script/jquery.dataTables.min.js"></script>
     <script src="../script/dataTables.bootstrap4.min.js"></script>
     <script src="../script/sweetalert2.js"></script>
+    <script src="busca_avancada.js"></script>
     <script>
         $(document).ready(function() {
             // Ajuste de altura total do modal ao abrir (fallback)
@@ -712,23 +824,9 @@ include(__DIR__ . '/../menu.php');
                 });
             });
 
-            // DataTables
-            $('#tabelaResultados').DataTable({
-                "language": { "url": "../style/Portuguese-Brasil.json" },
-                "order": [[0, 'desc']],
-                "autoWidth": false
-            });
-
-            // Adicionar labels automáticos para o layout de cards no mobile
-            (function applyDataLabels(){
-                const headers = [];
-                $('#tabelaResultados thead th').each(function(){ headers.push($(this).text().trim()); });
-                $('#tabelaResultados tbody tr').each(function(){
-                    $(this).find('td').each(function(i){
-                        $(this).attr('data-label', headers[i] || '');
-                    });
-                });
-            })();
+            // A tabela de resultados é montada por busca_avancada.js (paginação,
+            // ordenação e filtros ocorrem no servidor). Os data-labels usados no
+            // layout de cards do mobile já são gerados na renderização.
 
             // Recarregar o iframe rapidamente
             $('#refreshPdfBtn').on('click', function(){
@@ -1129,8 +1227,29 @@ include(__DIR__ . '/../menu.php');
                 }
             }
 
-            $('#data').on('change', function() {
+            // Valida os campos de intervalo de datas do painel avançado
+            $('#f_data_ini, #f_data_fim').on('change', function() {
                 validateDate(this);
+
+                // Garante que a data inicial não fique depois da final
+                var ini = $('#f_data_ini').val();
+                var fim = $('#f_data_fim').val();
+                if (ini && fim && ini > fim) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Intervalo invertido',
+                        text: 'A data inicial é posterior à data final. As datas foram trocadas automaticamente.',
+                        timer: 2600,
+                        showConfirmButton: false
+                    });
+                    $('#f_data_ini').val(fim);
+                    $('#f_data_fim').val(ini);
+                    if (typeof AtlasBusca !== 'undefined') {
+                        AtlasBusca.estado.data_ini = fim;
+                        AtlasBusca.estado.data_fim = ini;
+                        AtlasBusca.buscar();
+                    }
+                }
             });
         });
     </script>
