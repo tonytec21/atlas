@@ -5,6 +5,7 @@ require_once __DIR__ . '/config_forja.php';
 $CSRF = forja_csrf();
 $isAdmin = forja_is_admin();
 $temEngine = forja_tem_pdf_engine();
+$LIM = forja_limites_php();
 function eh($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 ?>
 <?php include(__DIR__ . '/../os/guia/guia.php'); ?>
@@ -61,6 +62,10 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
 .result b{ color:var(--fj-text); } .result small{ color:var(--fj-muted); display:block; }
 .spin{ display:none; text-align:center; padding:24px; } .spin .s{ width:42px;height:42px;border:4px solid var(--fj-border);border-top-color:var(--fj-primary);border-radius:50%;animation:fjspin 1s linear infinite;margin:0 auto 10px; }
 @keyframes fjspin{ to{ transform:rotate(360deg); } }
+.spin .fjtxt{ font-weight:700; color:var(--fj-text); margin-bottom:10px; }
+.fjbar{ height:10px; border-radius:999px; background:var(--fj-border); overflow:hidden; max-width:420px; margin:0 auto; }
+.fjbar > i{ display:block; height:100%; width:0; border-radius:999px; background:var(--fj-primary); transition:width .3s ease; }
+.spin .fjpct{ margin-top:8px; font-size:.86rem; font-weight:800; color:var(--fj-muted); letter-spacing:.02em; }
 .hint{ font-size:.82rem; color:var(--fj-muted); background:var(--fj-bg); border:1px dashed var(--fj-border); border-radius:10px; padding:9px 12px; margin:-4px 0 6px; }
 .hint b{ color:var(--fj-text); }
 .badges{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
@@ -123,7 +128,7 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
     <!-- COMPRIMIR -->
     <div class="panel active" id="panel-comprimir">
       <div class="fj-card">
-        <div class="dz" data-dz="comprimir"><div class="dz-ic"><i class="fa fa-compress"></i></div><div class="dz-t">Selecione um PDF para comprimir</div><div class="dz-s">arraste ou clique · máx. 200 MB</div><input type="file" accept="application/pdf" hidden></div>
+        <div class="dz" data-dz="comprimir"><div class="dz-ic"><i class="fa fa-compress"></i></div><div class="dz-t">Selecione um PDF para comprimir</div><div class="dz-s">arraste ou clique · máx. <?php echo eh(forja_human($LIM['efetivo'])); ?></div><input type="file" accept="application/pdf" hidden></div>
         <div class="flist" data-list="comprimir"></div>
         <div class="opts">
           <label>Nível:</label>
@@ -265,6 +270,11 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
 (function(){
   "use strict";
   var CSRF=<?php echo json_encode($CSRF); ?>;
+  var LIMITE=<?php echo (int)$LIM['efetivo']; ?>;
+  var LIMITE_MOTIVO=<?php echo json_encode($LIM['efetivo'] < $LIM['config']
+      ? 'O php.ini está limitando o envio (upload_max_filesize=' . forja_human($LIM['upload'])
+        . ', post_max_size=' . forja_human($LIM['post']) . '). Ajuste os dois e reinicie o Apache.'
+      : ''); ?>;
   var arquivos={comprimir:[],pdf2img:[],img2pdf:[],juntar:[],dividir:[],word2pdf:[],pdf2word:[],ladoA:[],ladoB:[]};
   var multi={comprimir:false,pdf2img:false,img2pdf:true,juntar:true,dividir:false,word2pdf:false,pdf2word:false,ladoA:true,ladoB:true};
   function $(s,c){ return (c||document).querySelector(s); }
@@ -291,7 +301,16 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
   });
 
   function addFiles(key, fileList){
-    var arr=Array.prototype.slice.call(fileList);
+    var arr=Array.prototype.slice.call(fileList), recusados=[];
+    if(LIMITE>0){
+      arr=arr.filter(function(f){ if(f.size>LIMITE){ recusados.push(f.name+' ('+humano(f.size)+')'); return false; } return true; });
+    }
+    if(recusados.length){
+      Swal.fire({icon:'warning',title:'Arquivo acima do limite',
+        html:'Limite atual: <b>'+humano(LIMITE)+'</b><br><small>'+recusados.map(esc).join('<br>')+'</small>'
+             +(LIMITE_MOTIVO?'<div class="hint" style="margin-top:10px;text-align:left">'+esc(LIMITE_MOTIVO)+'</div>':'')});
+    }
+    if(!arr.length){ return; }
     if(!multi[key]){ arquivos[key]=arr.slice(0,1); }
     else { arr.forEach(function(f){ arquivos[key].push(f); }); }
     renderList(key); atualizarBotoes();
@@ -328,18 +347,83 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
     $('#btnPdf2Word').disabled = arquivos.pdf2word.length===0;
     $('#btnMultiplo').disabled = arquivos.ladoA.length===0 || arquivos.ladoB.length===0;
   }
-  function spin(key,on){ document.querySelector('[data-spin="'+key+'"]').style.display=on?'block':'none'; }
   function showResult(key,html){ var r=document.querySelector('[data-result="'+key+'"]'); r.innerHTML=html; r.style.display='block'; }
 
+  /* ============ Andamento: 0–30% envio (XHR) · 30–100% servidor (polling) ============ */
+  (function montarBarras(){
+    Array.prototype.forEach.call(document.querySelectorAll('.spin[data-spin]'), function(w){
+      var lbl=w.querySelector('div:last-child'), base=lbl?lbl.textContent.trim():'Processando…';
+      if(lbl) lbl.style.display='none';
+      w.insertAdjacentHTML('beforeend','<div class="fjtxt"></div><div class="fjbar"><i></i></div><div class="fjpct">0%</div>');
+      w.querySelector('.fjtxt').textContent=base;
+      w.dataset.rotulo=base;
+    });
+  })();
+
+  function novoJob(){ return 'j'+Date.now().toString(36)+Math.random().toString(36).slice(2,10); }
+  function caixa(key){ return document.querySelector('[data-spin="'+key+'"]'); }
+  function setProg(key,pct,txt){
+    var w=caixa(key); if(!w) return;
+    var i=w.querySelector('.fjbar > i'), p=w.querySelector('.fjpct'), l=w.querySelector('.fjtxt');
+    if(pct!=null && i){ pct=Math.max(0,Math.min(100,pct)); i.style.width=pct+'%'; if(p) p.textContent=Math.round(pct)+'%'; }
+    if(txt && l) l.textContent=txt;
+  }
+  function spin(key,on){
+    var w=caixa(key); if(!w) return;
+    w.style.display=on?'block':'none';
+    if(on) setProg(key,0,w.dataset.rotulo||'Processando…');
+  }
+  function pollProgresso(key,job){
+    var vivo=true;
+    var t=setInterval(function(){
+      if(!vivo) return;
+      fetch('progresso.php?job='+encodeURIComponent(job)+'&_='+Date.now(),{credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(j){ if(vivo && j && j.status==='success') setProg(key, 30+(j.pct*0.70), j.texto||'Processando…'); })
+        .catch(function(){});
+    },700);
+    return function(){ vivo=false; clearInterval(t); };
+  }
+  function enviar(url, fd, key, job){
+    return new Promise(function(resolve,reject){
+      var xhr=new XMLHttpRequest(), parar=null;
+      xhr.open('POST',url,true); xhr.withCredentials=true;
+      xhr.upload.onprogress=function(ev){
+        if(!ev.lengthComputable) return;
+        var f=ev.loaded/ev.total;
+        setProg(key, f*30, 'Enviando arquivos… '+humano(ev.loaded)+' de '+humano(ev.total));
+      };
+      xhr.upload.onload=function(){
+        setProg(key,30,'Processando no servidor…');
+        if(!parar) parar=pollProgresso(key,job);
+      };
+      xhr.onload=function(){
+        if(parar) parar();
+        var t=xhr.responseText||'', j=null;
+        try{ j=JSON.parse(t); }catch(e){
+          reject(new Error(xhr.status!==200
+            ? ('O servidor respondeu '+xhr.status+'. '+t.slice(0,140))
+            : ('Resposta inválida: '+t.slice(0,160))));
+          return;
+        }
+        resolve(j);
+      };
+      xhr.onerror=function(){ if(parar) parar(); reject(new Error('Falha de conexão com o servidor.')); };
+      xhr.onabort=function(){ if(parar) parar(); reject(new Error('Envio cancelado.')); };
+      xhr.send(fd);
+    });
+  }
+
   async function processar(key, url, extra, btn){
-    var fd=new FormData(); fd.append('csrf',CSRF);
+    var job=novoJob();
+    var fd=new FormData(); fd.append('csrf',CSRF); fd.append('job',job);
     arquivos[key].forEach(function(f){ fd.append('arquivo[]', f); });
     Object.keys(extra||{}).forEach(function(k){ fd.append(k, extra[k]); });
     btn.disabled=true; spin(key,true); document.querySelector('[data-result="'+key+'"]').style.display='none';
     try{
-      var r=await fetch(url,{method:'POST',body:fd,credentials:'same-origin'});
-      var t=await r.text(); var j; try{ j=JSON.parse(t); }catch(e){ throw new Error('Resposta inválida: '+t.slice(0,160)); }
+      var j=await enviar(url,fd,key,job);
       if(j.status!=='success') throw new Error(j.message||'Falha no processamento.');
+      setProg(key,100,'Concluído');
       return j;
     } finally { spin(key,false); btn.disabled=false; atualizarBotoes(); }
   }
@@ -463,6 +547,7 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
   $('#btnImg2Pdf').addEventListener('click',async function(){
     try{ var j=await processar('img2pdf','imagens_para_pdf.php',{modo:$('#modoImg2Pdf').value},this);
       showResult('img2pdf', baixarHtml(j.token,'PDF gerado', j.paginas+' página(s) · '+humano(j.tamanho)));
+      if(j.aviso) Swal.fire('Concluído com avisos', esc(j.aviso), 'warning');
     }catch(e){ Swal.fire('Erro',e.message,'error'); }
   });
   $('#btnJuntar').addEventListener('click',async function(){
@@ -471,15 +556,15 @@ body.dark-mode .result{ background:rgba(34,197,94,.1); }
     }catch(e){ Swal.fire('Erro',e.message,'error'); }
   });
   $('#btnMultiplo').addEventListener('click',async function(){
-    var btn=this, fd=new FormData();
-    fd.append('csrf',CSRF); fd.append('posicao',document.getElementById('posMultiplo').value);
+    var btn=this, job=novoJob(), fd=new FormData();
+    fd.append('csrf',CSRF); fd.append('job',job); fd.append('posicao',document.getElementById('posMultiplo').value);
     arquivos.ladoA.forEach(function(f){ fd.append('ladoA[]', f); });
     arquivos.ladoB.forEach(function(f){ fd.append('ladoB[]', f); });
     btn.disabled=true; spin('multiplo',true); document.querySelector('[data-result="multiplo"]').style.display='none';
     try{
-      var r=await fetch('juntar_multiplo.php',{method:'POST',body:fd,credentials:'same-origin'});
-      var t=await r.text(); var j; try{ j=JSON.parse(t); }catch(e){ throw new Error('Resposta inválida: '+t.slice(0,160)); }
+      var j=await enviar('juntar_multiplo.php',fd,'multiplo',job);
       if(j.status!=='success') throw new Error(j.message||'Falha ao gerar.');
+      setProg('multiplo',100,'Concluído');
       showResult('multiplo', baixarHtml(j.token,'Resultados (ZIP)', j.total+' PDF(s) gerado(s)'));
     }catch(e){ Swal.fire('Erro',e.message,'error'); }
     finally{ spin('multiplo',false); btn.disabled=false; atualizarBotoes(); }

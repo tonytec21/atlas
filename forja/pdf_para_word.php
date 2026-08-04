@@ -4,7 +4,11 @@ require_once __DIR__ . '/session_check.php'; checkSession();
 require_once __DIR__ . '/config_forja.php';
 header('Content-Type: application/json; charset=utf-8');
 try {
+    forja_checar_post();     /* POST vazio por exceder post_max_size vira mensagem clara */
     if (!forja_csrf_check($_POST['csrf'] ?? '')) throw new RuntimeException('Sessão expirada.');
+    forja_job_iniciar($_POST['job'] ?? '');
+    session_write_close();   /* libera o lock da sessão para o progresso.php */
+    forja_gc();              /* remove o que passou da retenção (tmp e saida) */
     $ups = forja_salvar_uploads(true, false);          // entrada é PDF
     $modo = $_POST['modo'] ?? 'layout';
     if (!in_array($modo, ['formatado', 'simples', 'layout'], true)) $modo = 'formatado';

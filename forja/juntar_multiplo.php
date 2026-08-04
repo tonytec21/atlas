@@ -4,7 +4,11 @@ require_once __DIR__ . '/session_check.php'; checkSession();
 require_once __DIR__ . '/config_forja.php';
 header('Content-Type: application/json; charset=utf-8');
 try {
+    forja_checar_post();     /* POST vazio por exceder post_max_size vira mensagem clara */
     if (!forja_csrf_check($_POST['csrf'] ?? '')) throw new RuntimeException('Sessão expirada.');
+    forja_job_iniciar($_POST['job'] ?? '');
+    session_write_close();   /* libera o lock da sessão para o progresso.php */
+    forja_gc();              /* remove o que passou da retenção (tmp e saida) */
     $a = forja_salvar_uploads(true, false, false, 'ladoA');
     $b = forja_salvar_uploads(true, false, false, 'ladoB');
     $pos = ($_POST['posicao'] ?? 'antes') === 'depois' ? 'depois' : 'antes';

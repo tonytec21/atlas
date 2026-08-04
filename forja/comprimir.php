@@ -4,8 +4,11 @@ require_once __DIR__ . '/session_check.php'; checkSession();
 require_once __DIR__ . '/config_forja.php';
 header('Content-Type: application/json; charset=utf-8');
 try {
+    forja_checar_post();     /* POST vazio por exceder post_max_size vira mensagem clara */
     if (!forja_csrf_check($_POST['csrf'] ?? '')) throw new RuntimeException('Sessão expirada.');
-    forja_gc(6);
+    forja_job_iniciar($_POST['job'] ?? '');
+    session_write_close();   /* libera o lock da sessão para o progresso.php */
+    forja_gc();              /* remove o que passou da retenção (tmp e saida) */
     $ups  = forja_salvar_uploads(true, false);
     $src  = $ups[0]['path'];
     $orig = filesize($src);
@@ -18,9 +21,13 @@ try {
     $base  = preg_replace('~[^A-Za-z0-9_\-]~', '_', pathinfo($ups[0]['nome'], PATHINFO_FILENAME));
     $token = forja_registrar_saida($out, 'comprimido_' . $base . '.pdf');
 
-    // token do original, só para a prévia comparativa (mesma sessão)
-    $copia = forja_dir_tmp() . '/orig_' . bin2hex(random_bytes(5)) . '.pdf';
-    $tokenOrig = @copy($src, $copia) ? forja_registrar_saida($copia, 'original_' . $base . '.pdf') : '';
+    /* Token do original, só para a prévia comparativa. Acima de 300 MB a cópia
+       custaria tempo e o dobro do disco — a prévia lado a lado é dispensada. */
+    $tokenOrig = '';
+    if ($orig <= 300 * 1048576) {
+        $copia = forja_dir_tmp() . '/orig_' . bin2hex(random_bytes(5)) . '.pdf';
+        if (@copy($src, $copia)) $tokenOrig = forja_registrar_saida($copia, 'original_' . $base . '.pdf');
+    }
 
     echo json_encode([
         'status'      => 'success',

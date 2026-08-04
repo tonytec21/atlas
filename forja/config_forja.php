@@ -204,6 +204,7 @@ function forja_rrmdir($dir)
 /** Conversão via LibreOffice headless. Devolve o caminho do arquivo gerado. */
 function forja_lo_convert($src, $convertArg, $infilter, $outExt)
 {
+    forja_prog(15, 'Abrindo no LibreOffice…');
     $so = forja_libreoffice_bin();
     if (!$so) throw new RuntimeException('LibreOffice não encontrado. Instale o LibreOffice e informe o caminho do soffice.exe em "Configurar".');
     $outdir = forja_dir_out() . '/lo_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4);
@@ -215,13 +216,22 @@ function forja_lo_convert($src, $convertArg, $infilter, $outExt)
     $cmd = escapeshellarg($so) . ' --headless --norestore --nolockcheck -env:UserInstallation=' . escapeshellarg($profileUrl)
          . $inf . ' --convert-to ' . escapeshellarg($convertArg)
          . ' --outdir ' . escapeshellarg($outdir) . ' ' . escapeshellarg($src);
+    forja_prog(35, 'Convertendo o documento…');
     $r = forja_exec($cmd);
     forja_rrmdir($profile);
+    forja_prog(85, 'Finalizando…');
     $files = glob($outdir . '/*.' . $outExt);
     if (!$files) {
         $msg = trim($r['out']);
         throw new RuntimeException('Falha na conversão' . ($msg ? ' (' . mb_substr($msg, 0, 200) . ')' : '') . '. Verifique o LibreOffice em "Configurar".');
     }
+    /* Move o resultado para a raiz de saida/ e descarta a pasta do LibreOffice. */
+    $destino = forja_dir_out() . '/lo_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.' . $outExt;
+    if (@rename($files[0], $destino) || (@copy($files[0], $destino) && @unlink($files[0]))) {
+        forja_rrmdir($outdir);
+        $files[0] = $destino;
+    }
+    forja_prog(95, 'Concluído');
     return $files[0];
 }
 function forja_word_para_pdf($src) { return forja_lo_convert($src, 'pdf', '', 'pdf'); }
@@ -264,7 +274,7 @@ function forja_pdf_texto_simples($src)
 {
     $gs = forja_gs_bin();
     if (!$gs) throw new RuntimeException('Para o modo "texto simples" é necessário o Ghostscript. Configure-o ou use outro modo.');
-    $txt = forja_dir_tmp() . '/pdftxt_' . bin2hex(random_bytes(4)) . '.txt';
+    $txt = forja_tmp_registrar(forja_dir_tmp() . '/pdftxt_' . bin2hex(random_bytes(4)) . '.txt');
     forja_exec(escapeshellarg($gs) . ' -sDEVICE=txtwrite -dNOPAUSE -dBATCH -dQUIET -sOutputFile=' . escapeshellarg($txt) . ' ' . escapeshellarg($src));
     if (!is_file($txt)) throw new RuntimeException('Falha ao extrair o texto do PDF.');
     $c = file_get_contents($txt);
@@ -374,7 +384,7 @@ function forja_gs_qualidade_ps($qfactor, $subamostrar = false)
         . "  /GrayACSImageDict  " . $dg . "\n"
         . "  /GrayImageDict     " . $dg . "\n"
         . ">> setdistillerparams\n";
-    $f = forja_dir_tmp() . '/gsq_' . bin2hex(random_bytes(4)) . '.ps';
+    $f = forja_tmp_registrar(forja_dir_tmp() . '/gsq_' . bin2hex(random_bytes(4)) . '.ps');
     file_put_contents($f, $ps);
     return $f;
 }
@@ -427,7 +437,7 @@ function forja_gs_tentativa($src, $dpi, $qfactor, $subamostrar, $cinza, $monoDpi
     $gs = forja_gs_bin();
     if (!$gs) return null;
     $ps  = forja_gs_qualidade_ps($qfactor, $subamostrar);
-    $out = forja_dir_tmp() . '/cmp_' . bin2hex(random_bytes(5)) . '.pdf';
+    $out = forja_tmp_registrar(forja_dir_tmp() . '/cmp_' . bin2hex(random_bytes(5)) . '.pdf');
     $dpi = max(50, (int)$dpi);
 
     $o = [
@@ -474,7 +484,7 @@ function forja_gs_estrutural($src)
 {
     $gs = forja_gs_bin();
     if (!$gs) return null;
-    $out = forja_dir_tmp() . '/cmp_' . bin2hex(random_bytes(5)) . '.pdf';
+    $out = forja_tmp_registrar(forja_dir_tmp() . '/cmp_' . bin2hex(random_bytes(5)) . '.pdf');
     $cmd = forja_arg($gs) . ' -sDEVICE=pdfwrite -dCompatibilityLevel=1.7 -dNOPAUSE -dBATCH -dQUIET -dSAFER'
          . ' -dAutoRotatePages=/None -dDetectDuplicateImages=true -dCompressFonts=true -dSubsetFonts=true'
          . ' -dCompressStreams=true -dEncodeColorImages=true -dEncodeGrayImages=true'
@@ -525,24 +535,218 @@ function forja_normaliza_nivel($n)
 }
 
 /** Limpeza dos temporários/saídas antigos (evita o módulo crescer sem limite). */
-function forja_gc($horas = 6)
+/* =====================================================================
+ * LIMPEZA DE TEMPORÁRIOS
+ * ---------------------------------------------------------------------
+ * Tudo que é criado em forja/tmp durante um processamento (uploads,
+ * imagens preparadas, PDFs normalizados, amostras, tentativas de
+ * compressão) é registrado e apagado no fim do request — exceto os
+ * arquivos que viraram download (registrados via forja_registrar_saida).
+ * Além disso, forja_gc() varre tmp/ e saida/ removendo o que passou da
+ * retenção, inclusive PASTAS (imgs_*, split_*, multi_*, lo_*).
+ * ===================================================================== */
+
+/* ============================ Limites de envio ============================ */
+
+/**
+ * Teto do módulo, em MB (padrão 2048 = 2 GB). O PHP de 32 bits não consegue
+ * tratar arquivos acima de 2 GB (filesize/ftell estouram), então o valor é
+ * reduzido nesse caso.
+ */
+function forja_limite_upload_mb()
 {
-    $lim = time() - max(1, (int)$horas) * 3600;
-    foreach ([forja_dir_tmp(), forja_dir_out()] as $d) {
-        foreach ((array)glob($d . '/*') as $f) {
-            if (!is_file($f)) continue;
-            if (basename($f) === '.htaccess') continue;
-            if (@filemtime($f) < $lim) @unlink($f);
-        }
-    }
+    $c  = forja_config();
+    $mb = (int)($c['limite_upload_mb'] ?? 2048);
+    if ($mb < 10) $mb = 2048;
+    $mb = min(4096, $mb);
+    if (PHP_INT_SIZE < 8) $mb = min($mb, 1900);
+    return $mb;
 }
 
-/** Extrai uma amostra de páginas (usada para calibrar a compressão de arquivos grandes). */
+/** Limites reais: o menor entre a configuração do módulo e o php.ini. */
+function forja_limites_php()
+{
+    $u = forja_ini_bytes(@ini_get('upload_max_filesize'));
+    $p = forja_ini_bytes(@ini_get('post_max_size'));
+    $cfg = forja_limite_upload_mb() * 1048576;
+    $ef  = $cfg;
+    foreach ([$u, $p] as $v) if ($v > 0 && $v < $ef) $ef = $v;
+    return ['upload' => $u, 'post' => $p, 'config' => $cfg, 'efetivo' => $ef,
+            'x64' => (PHP_INT_SIZE >= 8), 'tempo' => (int)@ini_get('max_execution_time')];
+}
+
+/**
+ * Quando o corpo do POST passa do post_max_size, o PHP descarta TUDO — $_POST e
+ * $_FILES chegam vazios e a validação de CSRF acusaria "sessão expirada", que é
+ * enganoso. Aqui o motivo real é identificado antes.
+ */
+function forja_checar_post()
+{
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') return;
+    if (!empty($_POST) || !empty($_FILES)) return;
+    $len = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+    if ($len <= 0) return;
+    $p = forja_ini_bytes(@ini_get('post_max_size'));
+    if ($p > 0 && $len > $p) {
+        throw new RuntimeException('O envio de ' . forja_human($len) . ' passou do limite do servidor ('
+            . 'post_max_size = ' . forja_human($p) . '). Ajuste upload_max_filesize e post_max_size no '
+            . 'php.ini do XAMPP, reinicie o Apache e tente de novo.');
+    }
+    throw new RuntimeException('O servidor descartou o envio de ' . forja_human($len)
+        . '. Verifique upload_max_filesize, post_max_size, max_input_time e o espaço livre em disco.');
+}
+
+/** Espaço livre no disco das pastas de trabalho (0 se não der para medir). */
+function forja_disco_livre()
+{
+    $v = @disk_free_space(forja_dir_tmp());
+    return ($v === false) ? 0 : (float)$v;
+}
+
+function forja_retencao_horas()
+{
+    $c = forja_config();
+    $h = (int)($c['retencao_horas'] ?? 3);
+    return max(1, min(72, $h));
+}
+
+/** Marca um arquivo/pasta de tmp para exclusão automática no fim do request. */
+function forja_tmp_registrar($path)
+{
+    if (empty($GLOBALS['forja_tmp_hook'])) {
+        $GLOBALS['forja_tmp_hook'] = true;
+        register_shutdown_function('forja_tmp_limpar');
+    }
+    $GLOBALS['forja_tmp_files'][$path] = true;
+    return $path;
+}
+
+/** Protege um caminho da limpeza automática (usado pelos downloads). */
+function forja_tmp_manter($path)
+{
+    $GLOBALS['forja_tmp_keep'][$path] = true;
+    return $path;
+}
+
+function forja_tmp_limpar()
+{
+    $keep = (array)($GLOBALS['forja_tmp_keep'] ?? []);
+    foreach (array_keys((array)($GLOBALS['forja_tmp_files'] ?? [])) as $f) {
+        if (isset($keep[$f])) continue;
+        if (is_dir($f)) forja_rrmdir($f);
+        elseif (is_file($f)) @unlink($f);
+    }
+    $GLOBALS['forja_tmp_files'] = [];
+}
+
+function forja_tamanho_caminho($f)
+{
+    if (is_file($f)) return (int)@filesize($f);
+    $s = 0;
+    foreach ((array)glob(rtrim($f, '/\\') . '/*') as $x) $s += forja_tamanho_caminho($x);
+    return $s;
+}
+
+/** Espaço ocupado hoje pelas pastas de trabalho. */
+function forja_uso_disco()
+{
+    $tmp = forja_tamanho_caminho(forja_dir_tmp());
+    $out = forja_tamanho_caminho(forja_dir_out());
+    return ['tmp' => $tmp, 'saida' => $out, 'total' => $tmp + $out];
+}
+
+/**
+ * Remove o que passou da retenção. Com $horas = 0 limpa tudo (menos o
+ * .htaccess e o log de erros). Devolve ['arquivos' => n, 'bytes' => n].
+ */
+function forja_gc($horas = null)
+{
+    if ($horas === null) $horas = forja_retencao_horas();
+    $horas = max(0, (int)$horas);
+    $lim   = time() - $horas * 3600;
+    $n = 0; $bytes = 0;
+
+    foreach ([forja_dir_tmp(), forja_dir_out()] as $d) {
+        foreach ((array)glob($d . '/*') as $f) {
+            $base = basename($f);
+            if (in_array($base, ['.htaccess', 'forja_erros.log'], true)) continue;
+            if ($horas > 0 && @filemtime($f) >= $lim) continue;
+            $bytes += forja_tamanho_caminho($f);
+            if (is_dir($f)) { forja_rrmdir($f); $n++; }
+            elseif (@unlink($f)) { $n++; }
+        }
+    }
+    return ['arquivos' => $n, 'bytes' => $bytes];
+}
+
+/* =====================================================================
+ * PROGRESSO (job)
+ * ---------------------------------------------------------------------
+ * O navegador gera um "job" aleatório, envia junto do POST e consulta
+ * progresso.php a cada ~700 ms. O processamento grava o percentual em
+ * tmp/prog_<job>.json. Para que a consulta não fique presa esperando o
+ * lock do arquivo de sessão, os endpoints chamam session_write_close()
+ * logo após validar o CSRF.
+ * ===================================================================== */
+
+function forja_job_sanitize($id) { return substr(preg_replace('~[^A-Za-z0-9]~', '', (string)$id), 0, 48); }
+
+function forja_job_arquivo($id) { return forja_dir_tmp() . '/prog_' . forja_job_sanitize($id) . '.json'; }
+
+/** Ativa o acompanhamento para este request. Devolve o job (ou '' se não houver). */
+function forja_job_iniciar($id)
+{
+    $id = forja_job_sanitize($id);
+    $GLOBALS['forja_job'] = $id;
+    if ($id === '') return '';
+    forja_prog(1, 'Preparando…');
+    register_shutdown_function(function () use ($id) { @unlink(forja_job_arquivo($id)); });
+    return $id;
+}
+
+/** Grava o andamento. Só faz algo se houver job ativo — seguro chamar sempre. */
+function forja_prog($pct, $texto = '', $extra = [])
+{
+    $id = $GLOBALS['forja_job'] ?? '';
+    if ($id === '') return;
+    $d = array_merge([
+        'pct'   => max(0, min(100, (int)round($pct))),
+        'texto' => (string)$texto,
+        'em'    => time(),
+    ], $extra);
+    @file_put_contents(forja_job_arquivo($id), json_encode($d, JSON_UNESCAPED_UNICODE), LOCK_EX);
+}
+
+/**
+ * Lê o andamento. Quando o job informou uma pasta de saída ("dir"), conta os
+ * arquivos já gerados — assim o Ghostscript, que renderiza tudo numa única
+ * chamada, também mostra progresso real.
+ */
+function forja_prog_ler($id)
+{
+    $f = forja_job_arquivo($id);
+    if (!is_file($f)) return null;
+    $d = json_decode((string)@file_get_contents($f), true);
+    if (!is_array($d)) return null;
+
+    if (!empty($d['dir']) && !empty($d['total']) && !empty($d['formato'])) {
+        $feitas = count(forja_imgs_validas($d['dir'], $d['formato']));
+        $base   = isset($d['base']) ? (float)$d['base'] : 15;
+        $teto   = isset($d['teto']) ? (float)$d['teto'] : 85;
+        $p      = $base + ($teto - $base) * min(1, $feitas / max(1, (int)$d['total']));
+        if ($p > $d['pct']) {
+            $d['pct']   = (int)round($p);
+            $d['texto'] = 'Renderizando página ' . min((int)$d['total'], $feitas + 1) . ' de ' . (int)$d['total'] . '…';
+        }
+    }
+    return ['pct' => (int)$d['pct'], 'texto' => (string)($d['texto'] ?? '')];
+}
+
 function forja_pdf_amostra($src, $paginas = 4)
 {
     $gs = forja_gs_bin();
     if (!$gs) return null;
-    $out = forja_dir_tmp() . '/amo_' . bin2hex(random_bytes(5)) . '.pdf';
+    $out = forja_tmp_registrar(forja_dir_tmp() . '/amo_' . bin2hex(random_bytes(5)) . '.pdf');
     $cmd = forja_arg($gs) . ' -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dQUIET -dSAFER'
          . ' -dFirstPage=1 -dLastPage=' . max(1, (int)$paginas)
          . ' -dPassThroughJPEGImages=true -dAutoRotatePages=/None'
@@ -569,6 +773,7 @@ function forja_comprimir_pdf($src, $nivel = 'recomendado', $opc = [], &$info = n
     $perfis  = forja_perfis_compressao();
     $perfil  = $perfis[$nivel];
     $orig    = (int)filesize($src);
+    forja_prog(5, 'Analisando o PDF…');
     $paginas = forja_pdf_num_paginas($src);
 
     $info = [
@@ -581,14 +786,20 @@ function forja_comprimir_pdf($src, $nivel = 'recomendado', $opc = [], &$info = n
     if (!forja_pdf_tem_imagens($src)) {
         $info['estrategia'] = 'estrutural';
         $info['tentativas'] = 1;
+        forja_prog(40, 'PDF de texto — otimizando a estrutura…');
         $o = forja_gs_estrutural($src);
-        return forja_finalizar_compressao($src, $o, $orig, $info);
+        $fim = forja_finalizar_compressao($src, $o, $orig, $info);
+        forja_prog(100, 'Concluído');
+        return $fim;
     }
     $info['estrategia'] = 'imagem';
 
     /* ---- Arquivos grandes: calibra a escada numa amostra e só depois processa tudo ---- */
     $amostra = null;
-    if ($paginas > 6 && ($orig > 25 * 1024 * 1024 || $paginas > 40)) $amostra = forja_pdf_amostra($src, 4);
+    if ($paginas > 6 && ($orig > 25 * 1024 * 1024 || $paginas > 40)) {
+        forja_prog(12, 'Arquivo grande — calibrando numa amostra…');
+        $amostra = forja_pdf_amostra($src, 4);
+    }
     $ref     = $amostra ?: $src;
     $refTam  = (int)filesize($ref);
     $info['calibrado'] = (bool)$amostra;
@@ -601,7 +812,9 @@ function forja_comprimir_pdf($src, $nivel = 'recomendado', $opc = [], &$info = n
 
     /* ---- Escada progressiva sobre a referência ---- */
     $melhor = null; $melhorTam = $refTam; $passoOk = null;
+    $nPassos = max(1, count($perfil['passos']));
     foreach ($perfil['passos'] as $i => $p) {
+        forja_prog(18 + 55 * $i / $nPassos, 'Comprimindo — tentativa ' . ($i + 1) . ' de ' . $nPassos . ' (' . $p[0] . ' dpi)…');
         $o = forja_gs_tentativa($ref, $p[0], $p[1], $p[2], $cinza);
         $info['tentativas'] = $i + 1;
         if (!$o) continue;
@@ -640,6 +853,7 @@ function forja_comprimir_pdf($src, $nivel = 'recomendado', $opc = [], &$info = n
 
     /* ---- Se trabalhamos numa amostra, aplica agora o passo escolhido no arquivo inteiro ---- */
     if ($amostra) {
+        forja_prog(80, 'Aplicando o melhor ajuste no arquivo inteiro…');
         if ($melhor) @unlink($melhor);
         @unlink($amostra);
         $melhor = $passoOk
@@ -647,7 +861,10 @@ function forja_comprimir_pdf($src, $nivel = 'recomendado', $opc = [], &$info = n
             : forja_gs_estrutural($src);
     }
 
-    return forja_finalizar_compressao($src, $melhor, $orig, $info);
+    forja_prog(95, 'Finalizando…');
+    $fim = forja_finalizar_compressao($src, $melhor, $orig, $info);
+    forja_prog(100, 'Concluído');
+    return $fim;
 }
 
 /** Move o melhor resultado para forja/saida — e nunca devolve arquivo maior que o original. */
@@ -657,7 +874,7 @@ function forja_finalizar_compressao($src, $candidato, $orig, &$info)
         if ($candidato) @unlink($candidato);
         $info['ja_otimizado'] = true;
         $info['dpi'] = null; $info['qualidade'] = null; $info['cinza'] = false;
-        $candidato = forja_dir_tmp() . '/cmp_' . bin2hex(random_bytes(5)) . '.pdf';
+        $candidato = forja_tmp_registrar(forja_dir_tmp() . '/cmp_' . bin2hex(random_bytes(5)) . '.pdf');
         if (!@copy($src, $candidato)) throw new RuntimeException('Falha ao preparar o arquivo de saída.');
     }
     $final = forja_dir_out() . '/comprimido_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.pdf';
@@ -675,7 +892,7 @@ function forja_pdf_previa_jpeg($pdf, $pagina = 1, $dpi = 110)
     $gs = forja_gs_bin();
     if (!$gs) throw new RuntimeException('Ghostscript não configurado.');
     $pagina = max(1, (int)$pagina);
-    $out = forja_dir_tmp() . '/prev_' . bin2hex(random_bytes(5)) . '.jpg';
+    $out = forja_tmp_registrar(forja_dir_tmp() . '/prev_' . bin2hex(random_bytes(5)) . '.jpg');
     $cmd = forja_arg($gs) . ' -sDEVICE=jpeg -dJPEGQ=92 -dNOPAUSE -dBATCH -dQUIET -dSAFER'
          . ' -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -r' . (int)$dpi
          . ' -dFirstPage=' . $pagina . ' -dLastPage=' . $pagina
@@ -720,14 +937,19 @@ function forja_limpar_imgs($dir, $formato)
 /** Quantidade de páginas do PDF. Retorna 0 se não for possível determinar. */
 function forja_pdf_num_paginas($src)
 {
-    /* 1) FPDI — rápido, sem processo externo. */
-    try {
+    $tam = (int)@filesize($src);
+
+    /* 1) FPDI — rápido, sem processo externo. Acima de 200 MB o parser fica caro
+          demais: vai direto para o Ghostscript, que lê o arquivo em streaming. */
+    if ($tam > 0 && $tam <= 200 * 1048576) {
+      try {
         forja_load_libs();
         $cls = 'setasign\\Fpdi\\Tcpdf\\Fpdi';
         $t = new $cls();
         $n = (int)$t->setSourceFile($src);
         if ($n > 0) return $n;
-    } catch (Throwable $e) { /* PDF 1.5+ com object streams: tenta o Ghostscript */ }
+      } catch (Throwable $e) { /* PDF 1.5+ com object streams: tenta o Ghostscript */ }
+    }
 
     /* 2) Ghostscript. */
     if ($gs = forja_gs_bin()) {
@@ -738,9 +960,22 @@ function forja_pdf_num_paginas($src)
         if (preg_match('~(\d+)~', $r['out'], $m) && (int)$m[1] > 0) return (int)$m[1];
     }
 
-    /* 3) Heurística no conteúdo bruto (não funciona com object streams). */
-    $raw = @file_get_contents($src);
-    if ($raw !== false && preg_match_all('~/Type\s*/Page\b~', $raw, $m2)) return count($m2[0]);
+    /* 3) Heurística no conteúdo bruto, lida em blocos de 1 MB — nunca carrega o
+          arquivo inteiro na memória (um PDF de 2 GB derrubaria o PHP). */
+    if ($fp = @fopen($src, 'rb')) {
+        $n = 0; $cauda = '';
+        while (!feof($fp)) {
+            $buf   = $cauda . (string)fread($fp, 1048576);
+            $corte = strlen($cauda);             /* o que veio antes já foi contado */
+            $m = [];
+            if (preg_match_all('~/Type\s*/Page\b~', $buf, $m, PREG_OFFSET_CAPTURE)) {
+                foreach ($m[0] as $hit) if ($hit[1] + strlen($hit[0]) > $corte) $n++;
+            }
+            $cauda = substr($buf, -32);          /* evita cortar o padrão na borda */
+        }
+        fclose($fp);
+        if ($n > 0) return $n;
+    }
 
     return 0;
 }
@@ -755,6 +990,9 @@ function forja_pdf_para_imagens($src, $formato = 'png', $dpi = 150)
 
     $total = forja_pdf_num_paginas($src);   /* 0 = desconhecido */
     $erro  = '';
+    /* "dir/total" faz o progresso.php contar os arquivos já renderizados. */
+    forja_prog(8, $total > 0 ? 'Renderizando ' . $total . ' página(s)…' : 'Renderizando páginas…',
+        $total > 0 ? ['dir' => $dir, 'formato' => $formato, 'total' => $total, 'base' => 8, 'teto' => 88] : []);
 
     $gs = forja_gs_bin();
     if ($gs) {
@@ -777,6 +1015,9 @@ function forja_pdf_para_imagens($src, $formato = 'png', $dpi = 150)
             forja_limpar_imgs($dir, $formato);
             $limite = $total > 0 ? $total : 2000;
             for ($p = 1; $p <= $limite; $p++) {
+                forja_prog($total > 0 ? 8 + 80 * ($p - 1) / $total : 20,
+                    'Renderizando página ' . $p . ($total > 0 ? ' de ' . $total : '') . '…',
+                    $total > 0 ? ['dir' => $dir, 'formato' => $formato, 'total' => $total, 'base' => 8, 'teto' => 88] : []);
                 $alvo = $dir . '/pagina-' . sprintf('%03d', $p) . '.' . $formato;
                 $cmd  = forja_arg($gs) . ' -sDEVICE=' . $device . ' -r' . $dpi . $extra . $comuns
                       . ' -dFirstPage=' . $p . ' -dLastPage=' . $p
@@ -799,48 +1040,569 @@ function forja_pdf_para_imagens($src, $formato = 'png', $dpi = 150)
     $files = forja_imgs_validas($dir, $formato);
     if (!$files) throw new RuntimeException('Nenhuma imagem gerada. Verifique se o Ghostscript/ImageMagick está configurado. ' . mb_substr($erro, 0, 300));
 
+    forja_prog(92, 'Compactando as imagens…');
     $zip = forja_dir_out() . '/imagens_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.zip';
     $za  = new ZipArchive();
     if ($za->open($zip, ZipArchive::CREATE) !== true) throw new RuntimeException('Não foi possível criar o ZIP.');
     foreach ($files as $f) $za->addFile($f, basename($f));
     $za->close();
+    forja_rrmdir($dir);          /* o ZIP já tem tudo — libera o espaço na hora */
 
+    forja_prog(100, 'Concluído');
     return ['zip' => $zip, 'paginas' => count($files)];
 }
 
-function forja_imagens_para_pdf($imagens, $modo = 'imagem')
+/* =====================================================================
+ * IMAGENS → PDF  (motor seguro)
+ * ---------------------------------------------------------------------
+ * Causa clássica do HTTP 500 aqui: o TCPDF, ao receber a imagem original
+ * de um celular/scanner (12–50 MP) com $resize=true, descomprime tudo em
+ * memória via GD (largura × altura × 4 bytes, mais as cópias internas).
+ * Uma foto de 4000×3000 já custa ~48 MB só para abrir; três delas estouram
+ * o memory_limit. O "Allowed memory size exhausted" é um erro FATAL: não é
+ * pego por try/catch, o script morre e o Apache devolve 500 com corpo vazio.
+ *
+ * Solução: reduzir/normalizar cada imagem ANTES do TCPDF (com controle de
+ * memória e liberação imediata), achatar transparência de PNG (evita o
+ * caminho ImagePngAlpha, que exige K_PATH_CACHE gravável) e corrigir a
+ * orientação EXIF das fotos. O tamanho físico da página continua sendo
+ * calculado pelas dimensões ORIGINAIS — só a resolução interna cai.
+ * ===================================================================== */
+
+/** Log simples do módulo (forja/tmp/forja_erros.log). */
+function forja_log($msg)
+{
+    @file_put_contents(forja_dir_tmp() . '/forja_erros.log',
+        date('Y-m-d H:i:s') . ' | ' . str_replace(["\r", "\n"], ' ', $msg) . "\r\n", FILE_APPEND);
+}
+
+/** Traduz mensagens de erro fatal do PHP para algo acionável em pt-BR. */
+function forja_msg_fatal($msg)
+{
+    if (stripos($msg, 'Allowed memory size') !== false || stripos($msg, 'memory_limit') !== false)
+        return 'A conversão esgotou a memória do PHP. Aumente memory_limit no php.ini (sugerido: 1024M), reinicie o Apache e tente novamente — ou envie menos imagens por vez.';
+    if (stripos($msg, 'Maximum execution time') !== false)
+        return 'O tempo máximo de execução do PHP foi atingido. Aumente max_execution_time no php.ini e reinicie o Apache.';
+    if (stripos($msg, 'imagecreatefrom') !== false || stripos($msg, 'undefined function image') !== false)
+        return 'A extensão GD do PHP não está habilitada. Ative extension=gd no php.ini do XAMPP e reinicie o Apache.';
+    if (stripos($msg, 'TCPDF') !== false)
+        return 'Falha na biblioteca TCPDF ao montar o PDF: ' . $msg;
+    return 'Erro interno durante a conversão: ' . $msg;
+}
+
+/** Converte "512M", "1G", "-1" em bytes. */
+function forja_ini_bytes($v)
+{
+    $v = trim((string)$v);
+    if ($v === '')   return 0;
+    if ($v === '-1') return -1;
+    $u = strtolower(substr($v, -1));
+    $n = (float)$v;
+    if     ($u === 'g') $n *= 1073741824;
+    elseif ($u === 'm') $n *= 1048576;
+    elseif ($u === 'k') $n *= 1024;
+    return (int)$n;
+}
+
+/** Tenta garantir pelo menos $mb MB de memory_limit. Devolve true se conseguiu. */
+function forja_memoria_minima($mb)
+{
+    $atual = forja_ini_bytes(@ini_get('memory_limit'));
+    if ($atual === -1) return true;
+    $alvo = (int)$mb * 1048576;
+    if ($atual >= $alvo) return true;
+    @ini_set('memory_limit', (int)$mb . 'M');
+    $novo = forja_ini_bytes(@ini_get('memory_limit'));
+    return ($novo === -1 || $novo >= $alvo);
+}
+
+/** Cor de tipo PNG (4 e 6 = com canal alfa; 3 = paleta, pode ter tRNS). */
+function forja_png_tem_alfa($f)
+{
+    $fh = @fopen($f, 'rb');
+    if (!$fh) return false;
+    $h = fread($fh, 26);
+    fclose($fh);
+    if (strlen($h) < 26) return false;
+    $ct = ord($h[25]);
+    return in_array($ct, [3, 4, 6], true);
+}
+
+/**
+ * Reduz/normaliza a imagem com o ImageMagick. Usado quando o GD não cabe na
+ * memória (imagens muito grandes). O "-define jpeg:size" com o tamanho ALVO faz
+ * a libjpeg decodificar já em escala reduzida (DCT scaling) — medido aqui, a
+ * diferença é de 1,3 s contra 10 s quando o valor é maior que o necessário.
+ */
+function forja_img_reduzir_magick($src, $maxLado, $destino, $ehJpeg = false)
+{
+    $mk = forja_magick_bin();
+    if (!$mk) return false;
+    $hint = $ehJpeg ? ' -define ' . forja_arg('jpeg:size=' . (int)$maxLado . 'x' . (int)$maxLado) : '';
+    $cmd  = forja_arg($mk) . $hint . ' ' . forja_arg($src)
+          . ' -auto-orient -background white -flatten'
+          . ' -thumbnail ' . forja_arg((int)$maxLado . 'x' . (int)$maxLado . '>')
+          . ' -strip -quality 88 ' . forja_arg($destino);
+    $r = forja_exec($cmd);
+    clearstatcache();
+    return ($r['rc'] === 0 && is_file($destino) && filesize($destino) > 100);
+}
+
+/**
+ * Reduz/normaliza com o GD. Devolve o caminho gerado ou null.
+ * Reduções até 2× usam imagescale (3× mais rápido que imagecopyresampled e
+ * visualmente equivalente); reduções maiores usam a reamostragem completa,
+ * que preserva melhor texto fino.
+ */
+function forja_img2pdf_max_px()
+{
+    $cfg = forja_config();
+    $v = (int)($cfg['img2pdf_max_px'] ?? 2600);
+    return ($v < 600) ? 2600 : min(6000, $v);
+}
+
+function forja_img_reduzir_gd($src, $tipo, $w, $h, $rot, $maxLado, $bits, $ehPng)
+{
+    if ($w < 1 || $h < 1 || $tipo < 1) {
+        $i = @getimagesize($src);
+        if (!$i) return null;
+        $w = (int)$i[0]; $h = (int)$i[1]; $tipo = (int)$i[2];
+    }
+
+    $leitores = [
+        IMAGETYPE_JPEG => 'imagecreatefromjpeg',
+        IMAGETYPE_PNG  => 'imagecreatefrompng',
+        IMAGETYPE_GIF  => 'imagecreatefromgif',
+    ];
+    if (defined('IMAGETYPE_WEBP')) $leitores[IMAGETYPE_WEBP] = 'imagecreatefromwebp';
+    if (defined('IMAGETYPE_BMP'))  $leitores[IMAGETYPE_BMP]  = 'imagecreatefrombmp';
+    $fn = $leitores[$tipo] ?? null;
+    if (!$fn || !function_exists($fn)) return null;
+
+    $im = @$fn($src);
+    if (!$im) return null;
+
+    if ($rot !== 0) {
+        $r = @imagerotate($im, $rot, imagecolorallocate($im, 255, 255, 255));
+        if ($r) { imagedestroy($im); $im = $r; $w = imagesx($im); $h = imagesy($im); }
+    }
+
+    $escala = 1.0;
+    if (max($w, $h) > $maxLado) $escala = $maxLado / max($w, $h);
+    $nw = max(1, (int)round($w * $escala));
+    $nh = max(1, (int)round($h * $escala));
+
+    $red = null;
+    if ($escala >= 0.5 && function_exists('imagescale')) {
+        $red = @imagescale($im, $nw, $nh, IMG_BILINEAR_FIXED);
+    }
+    if (!$red) {
+        $red = @imagecreatetruecolor($nw, $nh);
+        if (!$red) { imagedestroy($im); return null; }
+        @imagecopyresampled($red, $im, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    }
+    imagedestroy($im);
+    $im = null;
+
+    /* Achata transparência sobre branco — já no tamanho final, custo mínimo. */
+    $dst = @imagecreatetruecolor($nw, $nh);
+    if (!$dst) { imagedestroy($red); return null; }
+    imagefilledrectangle($dst, 0, 0, $nw, $nh, imagecolorallocate($dst, 255, 255, 255));
+    imagecopy($dst, $red, 0, 0, 0, 0, $nw, $nh);
+    imagedestroy($red);
+
+    /* Digitalização em traço (1–4 bits) continua em PNG; o resto vira JPEG. */
+    $comoPng = ($ehPng && $escala >= 1.0 && (int)$bits <= 4);
+    $tmp = forja_dir_tmp() . '/prep_' . bin2hex(random_bytes(6)) . ($comoPng ? '.png' : '.jpg');
+    $ok  = $comoPng ? @imagepng($dst, $tmp, 6) : @imagejpeg($dst, $tmp, 88);
+    imagedestroy($dst);
+    if (function_exists('gc_collect_cycles')) gc_collect_cycles();
+
+    clearstatcache();
+    if (!$ok || !is_file($tmp)) { @unlink($tmp); return null; }
+    return ['path' => forja_tmp_registrar($tmp), 'w' => $w, 'h' => $h];
+}
+
+/**
+ * Normaliza a imagem para virar página de PDF.
+ * Devolve ['path','w','h','temp'] onde w/h são as dimensões ORIGINAIS
+ * (já corrigidas pela orientação EXIF) — usadas para o tamanho da página.
+ * Devolve null se o arquivo não for imagem legível.
+ */
+function forja_img_preparar($src, $nome = '', $maxLado = 0)
+{
+    if ($nome === '') $nome = basename($src);
+    if ($maxLado <= 0) $maxLado = forja_img2pdf_max_px();
+
+    $info = @getimagesize($src);
+    if (!$info || empty($info[0]) || empty($info[1])) return null;
+
+    $w = (int)$info[0]; $h = (int)$info[1]; $tipo = (int)$info[2];
+    $mime = $info['mime'] ?? '';
+    $mp   = ($w * $h) / 1048576;
+
+    $ehPng  = ($tipo === IMAGETYPE_PNG);
+    $ehJpeg = ($tipo === IMAGETYPE_JPEG);
+    $rot    = 0;
+
+    /* Orientação EXIF (fotos de celular chegam "deitadas"). */
+    if ($ehJpeg && function_exists('exif_read_data')) {
+        $ex = @exif_read_data($src);
+        $o  = isset($ex['Orientation']) ? (int)$ex['Orientation'] : 1;
+        if ($o === 3) $rot = 180; elseif ($o === 6) $rot = -90; elseif ($o === 8) $rot = 90;
+    }
+
+    /* Tolerância de 15%: não compensa reprocessar uma imagem só um pouco maior. */
+    $precisaEscala = (max($w, $h) > $maxLado * 1.15);
+    $precisaAlfa   = ($ehPng && forja_png_tem_alfa($src));
+
+    /* Caminho rápido: nada a fazer, usa o arquivo original (sem perda, custo zero). */
+    if (!$precisaEscala && !$precisaAlfa && $rot === 0 && ($ehJpeg || $ehPng)) {
+        return ['path' => $src, 'w' => $w, 'h' => $h, 'temp' => false];
+    }
+
+    /* GD é o caminho preferido: sem processo externo, ~3× mais rápido que o
+       ImageMagick nas medições. Só cede a vez quando a imagem não cabe na memória. */
+    $temGd  = function_exists('imagecreatetruecolor');
+    $precisa = (int)($w * $h * 4 * 2.3) + 16777216;
+    $cabeGd = $temGd && forja_memoria_minima((int)ceil((memory_get_usage(true) + $precisa) / 1048576) + 96);
+
+    if ($cabeGd) {
+        $r = forja_img_reduzir_gd($src, $tipo, $w, $h, $rot, $maxLado, $info['bits'] ?? 8, $ehPng);
+        if ($r) return ['path' => $r['path'], 'w' => $r['w'], 'h' => $r['h'], 'temp' => true];
+    }
+
+    /* Sem memória (ou o GD falhou): ImageMagick, que não usa memória do PHP. */
+    $tmpJpg = forja_dir_tmp() . '/prep_' . bin2hex(random_bytes(6)) . '.jpg';
+    if (forja_img_reduzir_magick($src, $maxLado, $tmpJpg, $ehJpeg)) {
+        forja_tmp_registrar($tmpJpg);
+        $ni = @getimagesize($tmpJpg);
+        if ($ni && $ni[0] > 0 && $ni[1] > 0) {
+            /* -auto-orient pode ter girado: mantém a proporção física correta. */
+            if (($w > $h) !== ($ni[0] > $ni[1])) { $t = $w; $w = $h; $h = $t; }
+            return ['path' => $tmpJpg, 'w' => $w, 'h' => $h, 'temp' => true];
+        }
+    }
+    @unlink($tmpJpg);
+
+    if (!$temGd)
+        throw new RuntimeException('A extensão GD do PHP não está habilitada (necessária para tratar imagens). Ative extension=gd no php.ini e reinicie o Apache.');
+    if (!$cabeGd)
+        throw new RuntimeException('Imagem "' . $nome . '" (' . round($mp, 1)
+            . ' MP) exige mais memória do que o PHP permite. Aumente memory_limit no php.ini (ex.: 1024M) e reinicie o Apache, ou configure o ImageMagick em "Configurar".');
+    throw new RuntimeException('Não foi possível preparar a imagem "' . $nome . '" (formato ' . ($mime ?: 'desconhecido') . ' ou arquivo corrompido).');
+}
+
+/* =====================================================================
+ * MOTOR RÁPIDO: imagens → PDF sem TCPDF
+ * ---------------------------------------------------------------------
+ * O TCPDF é lento aqui porque carrega fontes, mantém o documento inteiro
+ * em memória e reprocessa cada imagem. Para "imagem em página" nada disso
+ * é necessário: o PDF só precisa de um XObject por página apontando para
+ * os bytes que já estão no arquivo.
+ *   - JPEG  → /DCTDecode  (os bytes do .jpg entram no PDF sem recompressão)
+ *   - PNG   → /FlateDecode com /Predictor 15 (o IDAT entra como está)
+ * O arquivo é gravado em streaming, então o consumo de memória é constante
+ * mesmo com 200 imagens.
+ * ===================================================================== */
+
+/** Lê o cabeçalho do JPEG: dimensões, componentes e se é baseline. */
+function forja_jpeg_scan($f)
+{
+    $fh = @fopen($f, 'rb');
+    if (!$fh) return null;
+    if (fread($fh, 2) !== "\xFF\xD8") { fclose($fh); return null; }
+    $r = null;
+    while (!feof($fh)) {
+        $b = fread($fh, 1);
+        if ($b === '' || $b === false) break;
+        if ($b !== "\xFF") continue;
+        do { $m = fread($fh, 1); } while ($m === "\xFF");
+        if ($m === '' || $m === false) break;
+        $m = ord($m);
+        if ($m === 0xD8 || $m === 0x01 || ($m >= 0xD0 && $m <= 0xD7)) continue;
+        if ($m === 0xD9 || $m === 0xDA) break;              /* SOS: fim do cabeçalho */
+        $l = fread($fh, 2);
+        if (strlen($l) < 2) break;
+        $l = unpack('n', $l)[1];
+        if ($l < 2) break;
+        if (in_array($m, [0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF], true)) {
+            $d = fread($fh, 6);
+            if (strlen($d) < 6) break;
+            $p = unpack('Cprec/nh/nw/Ccomp', $d);
+            $r = ['w' => $p['w'], 'h' => $p['h'], 'comp' => $p['comp'], 'prec' => $p['prec'],
+                  'baseline' => in_array($m, [0xC0, 0xC1], true)];
+            break;
+        }
+        fseek($fh, $l - 2, SEEK_CUR);
+    }
+    fclose($fh);
+    return $r;
+}
+
+/** Lê um PNG simples (sem entrelaçamento, sem alfa) para embutir direto. */
+function forja_png_scan($f)
+{
+    $d = @file_get_contents($f);
+    if ($d === false || substr($d, 0, 8) !== "\x89PNG\r\n\x1a\n") return null;
+    $len = strlen($d); $pos = 8;
+    $idat = ''; $plte = ''; $w = $h = $bd = $ct = 0; $inter = 1; $trns = false;
+    while ($pos + 8 <= $len) {
+        $n    = unpack('N', substr($d, $pos, 4))[1];
+        $tipo = substr($d, $pos + 4, 4);
+        if ($n < 0 || $pos + 12 + $n > $len) break;
+        $body = substr($d, $pos + 8, $n);
+        $pos += 12 + $n;
+        if ($tipo === 'IHDR') {
+            $v = unpack('Nw/Nh/Cbd/Cct/Ccomp/Cfilt/Cinter', $body);
+            $w = $v['w']; $h = $v['h']; $bd = $v['bd']; $ct = $v['ct']; $inter = $v['inter'];
+        } elseif ($tipo === 'PLTE') { $plte .= $body; }
+        elseif ($tipo === 'IDAT')   { $idat .= $body; }
+        elseif ($tipo === 'tRNS')   { $trns = true; }
+        elseif ($tipo === 'IEND')   { break; }
+    }
+    if ($inter !== 0 || $trns || $bd > 8 || $idat === '' || !in_array($ct, [0, 2, 3], true)) return null;
+    if ($ct === 3 && $plte === '') return null;
+    return ['w' => $w, 'h' => $h, 'bd' => $bd, 'ct' => $ct, 'idat' => $idat, 'plte' => $plte,
+            'cores' => ($ct === 2 ? 3 : 1)];
+}
+
+/** Descreve a imagem para o motor rápido, ou null se o formato não servir. */
+function forja_pdf_img_fonte($path)
+{
+    $t = @exif_imagetype($path);
+    if ($t === IMAGETYPE_JPEG) {
+        $j = forja_jpeg_scan($path);
+        /* Progressivo e CMYK não são seguros em /DCTDecode: caem para o TCPDF. */
+        if (!$j || !$j['baseline'] || $j['prec'] != 8 || !in_array($j['comp'], [1, 3], true)) return null;
+        return ['modo' => 'jpg', 'w' => $j['w'], 'h' => $j['h'], 'bpc' => 8,
+                'cs' => ($j['comp'] === 1 ? '/DeviceGray' : '/DeviceRGB'),
+                'filtro' => '/DCTDecode', 'arquivo' => $path, 'tam' => (int)filesize($path)];
+    }
+    if ($t === IMAGETYPE_PNG) {
+        $p = forja_png_scan($path);
+        if (!$p) return null;
+        return ['modo' => 'png', 'w' => $p['w'], 'h' => $p['h'], 'bpc' => $p['bd'],
+                'ct' => $p['ct'], 'plte' => $p['plte'], 'cores' => $p['cores'],
+                'filtro' => '/FlateDecode', 'dados' => $p['idat'], 'tam' => strlen($p['idat'])];
+    }
+    return null;
+}
+
+/** Tamanho da página (em pontos) para a imagem. */
+function forja_pdf_pagina_pt($w, $h, $modo)
+{
+    if ($modo === 'a4') {
+        $pw = ($w > $h) ? 841.89 : 595.28;
+        $ph = ($w > $h) ? 595.28 : 841.89;
+        $m  = 22.68;                                  /* 8 mm */
+        $r  = min(($pw - 2 * $m) / $w, ($ph - 2 * $m) / $h);
+        $dw = $w * $r; $dh = $h * $r;
+        return [$pw, $ph, $dw, $dh, ($pw - $dw) / 2, ($ph - $dh) / 2];
+    }
+    $pw = $w * 72.0 / 96; $ph = $h * 72.0 / 96;       /* mesma regra de 96 dpi */
+    if ($pw > 14000 || $ph > 14000) {                 /* limite do formato PDF */
+        $k = min(14000 / $pw, 14000 / $ph); $pw *= $k; $ph *= $k;
+    }
+    return [$pw, $ph, $pw, $ph, 0, 0];
+}
+
+/**
+ * Grava o PDF em streaming. Devolve o número de páginas, ou 0 se alguma
+ * imagem não for compatível (nesse caso o chamador usa o TCPDF).
+ */
+function forja_pdf_imagens_rapido($fontes, $modo, $out)
+{
+    if (!$fontes) return 0;
+
+    $fh = @fopen($out, 'wb');
+    if (!$fh) throw new RuntimeException('Não foi possível gravar em forja/saida (verifique permissões).');
+
+    $offs = [];
+    $esc = function ($num, $dic, $stream = null, $arquivo = null) use ($fh, &$offs) {
+        $offs[$num] = ftell($fh);
+        fwrite($fh, $num . " 0 obj\n" . $dic);
+        if ($stream !== null || $arquivo !== null) {
+            fwrite($fh, "\nstream\n");
+            if ($arquivo !== null) {
+                $in = fopen($arquivo, 'rb');
+                if ($in) { while (!feof($in)) { $c = fread($in, 1048576); if ($c === '' || $c === false) break; fwrite($fh, $c); } fclose($in); }
+            } else { fwrite($fh, $stream); }
+            fwrite($fh, "\nendstream");
+        }
+        fwrite($fh, "\nendobj\n");
+    };
+
+    fwrite($fh, "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+
+    $prox = 3; $kids = [];                            /* 1 = Catalog, 2 = Pages */
+    $total = count($fontes); $i = 0;
+    foreach ($fontes as $f) {
+        $i++;
+        forja_prog(70 + 25 * $i / max(1, $total), 'Gravando página ' . $i . ' de ' . $total . '…');
+        list($pw, $ph, $dw, $dh, $x, $y) = forja_pdf_pagina_pt($f['pw'], $f['ph'], $modo);
+
+        $cnt = sprintf("q %.2F 0 0 %.2F %.2F %.2F cm /I0 Do Q\n", $dw, $dh, $x, $y);
+        $cid = $prox++;
+        $esc($cid, '<< /Length ' . strlen($cnt) . ' >>', $cnt);
+
+        $palId = 0;
+        if ($f['modo'] === 'png' && $f['ct'] === 3) {
+            $palId = $prox++;
+            $esc($palId, '<< /Length ' . strlen($f['plte']) . ' >>', $f['plte']);
+        }
+
+        $dic = '<< /Type /XObject /Subtype /Image /Width ' . $f['w'] . ' /Height ' . $f['h']
+             . ' /BitsPerComponent ' . $f['bpc'];
+        if ($f['modo'] === 'png') {
+            $dic .= ($f['ct'] === 3)
+                ? ' /ColorSpace [/Indexed /DeviceRGB ' . (intdiv(strlen($f['plte']), 3) - 1) . ' ' . $palId . ' 0 R]'
+                : ' /ColorSpace ' . ($f['ct'] === 2 ? '/DeviceRGB' : '/DeviceGray');
+            $dic .= ' /Filter /FlateDecode /DecodeParms << /Predictor 15 /Colors ' . $f['cores']
+                  . ' /BitsPerComponent ' . $f['bpc'] . ' /Columns ' . $f['w'] . ' >>';
+        } else {
+            $dic .= ' /ColorSpace ' . $f['cs'] . ' /Filter /DCTDecode';
+        }
+        $dic .= ' /Length ' . $f['tam'] . ' >>';
+
+        $xid = $prox++;
+        if ($f['modo'] === 'png') $esc($xid, $dic, $f['dados']);
+        else                      $esc($xid, $dic, null, $f['arquivo']);
+
+        $pid = $prox++;
+        $esc($pid, sprintf('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2F %.2F] '
+            . '/Resources << /XObject << /I0 %d 0 R >> >> /Contents %d 0 R >>', $pw, $ph, $xid, $cid));
+        $kids[] = $pid;
+    }
+
+    $infoId = $prox++;
+    $esc($infoId, '<< /Producer (Atlas Forja) /CreationDate (D:' . date('YmdHis') . ') >>');
+
+    $refs = [];
+    foreach ($kids as $k) $refs[] = $k . ' 0 R';
+    $esc(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    $esc(2, '<< /Type /Pages /Count ' . count($kids) . ' /Kids [' . implode(' ', $refs) . '] >>');
+
+    $maxObj = $prox - 1;
+    $xref = ftell($fh);
+    fwrite($fh, "xref\n0 " . ($maxObj + 1) . "\n0000000000 65535 f \n");
+    for ($n = 1; $n <= $maxObj; $n++) fwrite($fh, sprintf("%010d 00000 n \n", (int)($offs[$n] ?? 0)));
+    fwrite($fh, "trailer\n<< /Size " . ($maxObj + 1) . " /Root 1 0 R /Info " . $infoId . " 0 R >>\n"
+              . "startxref\n" . $xref . "\n%%EOF\n");
+    fclose($fh);
+
+    clearstatcache();
+    return count($kids);
+}
+
+/** Caminho antigo (TCPDF) — usado quando alguma imagem não serve ao motor rápido. */
+function forja_pdf_imagens_tcpdf($itens, $modo, $out)
 {
     forja_load_libs();
+    forja_memoria_minima(768);
+
     $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8');
     $pdf->setPrintHeader(false); $pdf->setPrintFooter(false);
     $pdf->SetAutoPageBreak(false); $pdf->SetMargins(0, 0, 0);
     $pdf->SetCreator('Atlas Forja');
+    $pdf->SetCompression(true);
 
-    $qtd = 0;
-    foreach ($imagens as $img) {
-        $info = @getimagesize($img);
-        if (!$info) continue;
-        $wpx = $info[0]; $hpx = $info[1];
+    $qtd = 0; $total = count($itens);
+    foreach ($itens as $i => $it) {
+        forja_prog(70 + 25 * ($i + 1) / max(1, $total), 'Gravando página ' . ($i + 1) . ' de ' . $total . '…');
+        $wpx = $it['w']; $hpx = $it['h'];
         if ($modo === 'a4') {
-            $orient = $wpx > $hpx ? 'L' : 'P';
-            $pdf->AddPage($orient, 'A4');
+            $pdf->AddPage($wpx > $hpx ? 'L' : 'P', 'A4');
             $pw = $pdf->getPageWidth(); $ph = $pdf->getPageHeight(); $m = 8;
-            $maxW = $pw - 2 * $m; $maxH = $ph - 2 * $m;
-            $ratio = min($maxW / $wpx, $maxH / $hpx);
+            $ratio = min(($pw - 2 * $m) / $wpx, ($ph - 2 * $m) / $hpx);
             $w = $wpx * $ratio; $h = $hpx * $ratio;
-            $x = ($pw - $w) / 2; $y = ($ph - $h) / 2;
-            $pdf->Image($img, $x, $y, $w, $h, '', '', '', true, 300);
+            $pdf->Image($it['path'], ($pw - $w) / 2, ($ph - $h) / 2, $w, $h, '', '', '', false, 300);
         } else {
             $mmW = $wpx * 25.4 / 96; $mmH = $hpx * 25.4 / 96;
+            if ($mmW > 5000 || $mmH > 5000) { $k = min(5000 / $mmW, 5000 / $mmH); $mmW *= $k; $mmH *= $k; }
             $pdf->AddPage($mmW > $mmH ? 'L' : 'P', [$mmW, $mmH]);
-            $pdf->Image($img, 0, 0, $mmW, $mmH, '', '', '', false, 96);
+            $pdf->Image($it['path'], 0, 0, $mmW, $mmH, '', '', '', false, 96);
         }
         $qtd++;
+        if (function_exists('gc_collect_cycles')) gc_collect_cycles();
     }
-    if ($qtd === 0) throw new RuntimeException('Nenhuma imagem válida (use PNG ou JPG).');
-    $out = forja_dir_out() . '/imagens_para_pdf_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.pdf';
     $pdf->Output($out, 'F');
-    return ['path' => $out, 'paginas' => $qtd];
+    $pdf = null;
+    clearstatcache();
+    return $qtd;
+}
+
+function forja_imagens_para_pdf($imagens, $modo = 'imagem')
+{
+    $itens = []; $ignoradas = [];
+    $totalImgs = max(1, count($imagens)); $idxImg = 0;
+
+    foreach ($imagens as $item) {
+        $img  = is_array($item) ? ($item['path'] ?? '') : $item;
+        $nome = is_array($item) ? ($item['nome'] ?? basename($img)) : basename($img);
+        $idxImg++;
+        forja_prog(3 + 65 * ($idxImg - 1) / $totalImgs, 'Preparando imagem ' . $idxImg . ' de ' . $totalImgs . '…');
+
+        if ($img === '' || !is_file($img)) { $ignoradas[] = $nome . ' — arquivo não encontrado.'; continue; }
+        try {
+            $p = forja_img_preparar($img, $nome);
+        } catch (Throwable $e) {
+            $ignoradas[] = $nome . ' — ' . $e->getMessage();
+            forja_log('IMG2PDF preparar: ' . $e->getMessage());
+            continue;
+        }
+        if (!$p) { $ignoradas[] = $nome . ' — não é uma imagem válida (PNG/JPG).'; continue; }
+        $itens[] = $p;
+    }
+
+    if (!$itens) throw new RuntimeException('Nenhuma imagem válida (use PNG ou JPG).'
+        . ($ignoradas ? ' Detalhes: ' . implode(' | ', $ignoradas) : ''));
+
+    forja_prog(70, 'Montando o PDF…');
+    $out = forja_dir_out() . '/imagens_para_pdf_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.pdf';
+
+    /* Formatos que o PDF não embute direto (JPEG progressivo/CMYK, PNG
+       entrelaçado ou com tRNS) são reconvertidos uma única vez para JPEG
+       baseline — evita cair no caminho lento do TCPDF. */
+    $fontes = []; $completo = true;
+    foreach ($itens as $it) {
+        $f = forja_pdf_img_fonte($it['path']);
+        if (!$f) {
+            $re = forja_img_reduzir_gd($it['path'], @exif_imagetype($it['path']) ?: 0,
+                    0, 0, 0, forja_img2pdf_max_px(), 8, false);
+            if ($re) $f = forja_pdf_img_fonte($re['path']);
+        }
+        if (!$f) { $completo = false; break; }
+        $f['pw'] = $it['w']; $f['ph'] = $it['h'];   /* dimensões físicas da página */
+        $fontes[] = $f;
+    }
+
+    $motor = 'rapido';
+    $qtd = 0;
+    if ($completo) {
+        try {
+            $qtd = forja_pdf_imagens_rapido($fontes, $modo, $out);
+        } catch (Throwable $e) {
+            forja_log('IMG2PDF motor rápido: ' . $e->getMessage());
+            $qtd = 0;
+        }
+    }
+    if ($qtd === 0) {                       /* último recurso: TCPDF */
+        @unlink($out);
+        $motor = 'tcpdf';
+        $qtd = forja_pdf_imagens_tcpdf($itens, $modo, $out);
+    }
+
+    if (!is_file($out) || filesize($out) < 100) throw new RuntimeException('O PDF não pôde ser gravado em forja/saida (verifique permissões).');
+    forja_prog(100, 'Concluído');
+
+    return [
+        'path'      => $out,
+        'paginas'   => $qtd,
+        'motor'     => $motor,
+        'ignoradas' => $ignoradas,
+        'pico_mb'   => round(memory_get_peak_usage(true) / 1048576, 1),
+    ];
 }
 
 
@@ -857,7 +1619,7 @@ function forja_pdf_compativel_fpdi($src)
     catch (Throwable $e) { /* provável compressão não suportada — normaliza abaixo */ }
     $gs = forja_gs_bin();
     if (!$gs) throw new RuntimeException('Este PDF usa uma compressão (object streams, PDF 1.5+) que o leitor interno não abre, e o Ghostscript — necessário para convertê-lo — não está configurado.');
-    $out = forja_dir_tmp() . '/norm_' . bin2hex(random_bytes(5)) . '.pdf';
+    $out = forja_tmp_registrar(forja_dir_tmp() . '/norm_' . bin2hex(random_bytes(5)) . '.pdf');
     forja_exec(escapeshellarg($gs) . ' -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH -sOutputFile=' . escapeshellarg($out) . ' ' . escapeshellarg($src));
     if (!is_file($out) || filesize($out) < 100) throw new RuntimeException('Não foi possível normalizar este PDF para leitura.');
     try { $t = new $fpdi(); $t->setSourceFile($out); }
@@ -872,10 +1634,15 @@ function forja_juntar_pdfs($pdfs)
     $pdf = new $fpdi('P', 'mm', 'A4', true, 'UTF-8');
     $pdf->setPrintHeader(false); $pdf->setPrintFooter(false); $pdf->SetAutoPageBreak(false);
     $total = 0;
+    $nArq = max(1, count($pdfs)); $iArq = 0;
     foreach ($pdfs as $p) {
+        $iArq++;
+        forja_prog(3 + 85 * ($iArq - 1) / $nArq, 'Arquivo ' . $iArq . ' de ' . $nArq . '…');
         $p = forja_pdf_compativel_fpdi($p);
         $n = $pdf->setSourceFile($p);
         for ($i = 1; $i <= $n; $i++) {
+            if ($n > 4 && $i % 5 === 0) forja_prog(3 + 85 * (($iArq - 1) + $i / $n) / $nArq,
+                'Arquivo ' . $iArq . '/' . $nArq . ' — página ' . $i . ' de ' . $n . '…');
             $tpl = $pdf->importPage($i); $s = $pdf->getTemplateSize($tpl);
             $pdf->AddPage($s['orientation'], [$s['width'], $s['height']]);
             $pdf->useTemplate($tpl, 0, 0, $s['width'], $s['height'], true);
@@ -883,8 +1650,10 @@ function forja_juntar_pdfs($pdfs)
         }
     }
     if ($total === 0) throw new RuntimeException('Nenhuma página encontrada nos PDFs enviados.');
+    forja_prog(92, 'Gravando o PDF final…');
     $out = forja_dir_out() . '/juntados_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.pdf';
     $pdf->Output($out, 'F');
+    forja_prog(100, 'Concluído');
     return ['path' => $out, 'paginas' => $total];
 }
 
@@ -907,8 +1676,9 @@ function forja_juntar_multiplo($aPaths, $bItens, $posicao = 'antes')
     $za = new ZipArchive();
     if ($za->open($zip, ZipArchive::CREATE) !== true) throw new RuntimeException('Não foi possível criar o ZIP.');
 
-    $usados = []; $n = 0;
+    $usados = []; $n = 0; $nB = max(1, count($bItens));
     foreach ($bItens as $b) {
+        forja_prog(5 + 85 * $n / $nB, 'Documento ' . ($n + 1) . ' de ' . $nB . '…');
         $bNorm = forja_pdf_compativel_fpdi($b['path']);
         $ordem = ($posicao === 'depois') ? array_merge([$bNorm], $aNorm) : array_merge($aNorm, [$bNorm]);
         $pdf = new $fpdi('P', 'mm', 'A4', true, 'UTF-8');
@@ -931,7 +1701,10 @@ function forja_juntar_multiplo($aPaths, $bItens, $posicao = 'antes')
         $za->addFile($out, $nome);
         $n++;
     }
+    forja_prog(95, 'Compactando…');
     $za->close();
+    forja_rrmdir($dir);          /* o ZIP já tem tudo — libera o espaço na hora */
+    forja_prog(100, 'Concluído');
     return ['zip' => $zip, 'total' => $n];
 }
 
@@ -963,8 +1736,9 @@ function forja_dividir_pdf($src, $modo = 'partes', $valor = 2)
 
     $dir = forja_dir_out() . '/split_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4);
     @mkdir($dir, 0775, true);
-    $arqs = []; $p = 1;
+    $arqs = []; $p = 1; $nPartes = max(1, count($ranges));
     foreach ($ranges as $r) {
+        forja_prog(8 + 78 * ($p - 1) / $nPartes, 'Parte ' . $p . ' de ' . $nPartes . '…');
         $pdf = new $fpdi('P', 'mm', 'A4', true, 'UTF-8');
         $pdf->setPrintHeader(false); $pdf->setPrintFooter(false); $pdf->SetAutoPageBreak(false);
         $pdf->setSourceFile($src);
@@ -979,12 +1753,15 @@ function forja_dividir_pdf($src, $modo = 'partes', $valor = 2)
         $arqs[] = $out; $p++;
     }
 
+    forja_prog(90, 'Compactando as partes…');
     $zip = forja_dir_out() . '/partes_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 4) . '.zip';
     $za = new ZipArchive();
     if ($za->open($zip, ZipArchive::CREATE) !== true) throw new RuntimeException('Não foi possível criar o ZIP.');
     foreach ($arqs as $a) $za->addFile($a, basename($a));
     $za->close();
+    forja_rrmdir($dir);          /* o ZIP já tem tudo — libera o espaço na hora */
 
+    forja_prog(100, 'Concluído');
     return ['zip' => $zip, 'partes' => count($ranges), 'total_paginas' => $total];
 }
 
@@ -998,15 +1775,30 @@ function forja_salvar_uploads($somentePdf = false, $somenteImg = false, $word = 
     $errs  = is_array($f['error']) ? $f['error'] : [$f['error']];
     $sizes = is_array($f['size']) ? $f['size'] : [$f['size']];
     $fi = new finfo(FILEINFO_MIME_TYPE);
-    $LIMITE = 200 * 1024 * 1024;
+    $lim    = forja_limites_php();
+    $LIMITE = $lim['efetivo'];
+    $livre  = forja_disco_livre();
     $saved = [];
     foreach ($names as $i => $nm) {
         $err = $errs[$i] ?? UPLOAD_ERR_NO_FILE;
         if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE)
-            throw new RuntimeException('O arquivo "' . $nm . '" excede o limite do servidor. Ajuste upload_max_filesize/post_max_size (veja o .htaccess do módulo).');
+            throw new RuntimeException('O arquivo "' . $nm . '" passou do upload_max_filesize do PHP ('
+                . forja_human(forja_ini_bytes(@ini_get('upload_max_filesize')))
+                . '). Ajuste upload_max_filesize e post_max_size no php.ini do XAMPP e reinicie o Apache.');
         if ($err !== UPLOAD_ERR_OK) continue;
         if (!is_uploaded_file($tmps[$i])) continue;
-        if (($sizes[$i] ?? 0) > $LIMITE) throw new RuntimeException('Arquivo muito grande (máx. 200 MB): ' . $nm);
+        $tam = (int)($sizes[$i] ?? 0);
+        if ($tam > $LIMITE) throw new RuntimeException('O arquivo "' . $nm . '" tem ' . forja_human($tam)
+            . ' e o limite atual é ' . forja_human($LIMITE)
+            . ($lim['efetivo'] < $lim['config']
+                ? ' (imposto pelo php.ini: upload_max_filesize=' . forja_human($lim['upload'])
+                  . ', post_max_size=' . forja_human($lim['post']) . ').'
+                : '.'));
+        /* Compressão/conversão precisa de espaço para as cópias intermediárias. */
+        if ($livre > 0 && $tam > 100 * 1048576 && $livre < $tam * 2.5)
+            throw new RuntimeException('Espaço insuficiente em disco: o arquivo tem ' . forja_human($tam)
+                . ' e restam ' . forja_human($livre) . ' livres. O processamento precisa de cerca de '
+                . forja_human((int)($tam * 2.5)) . '.');
         if ($word) {
             $ext = strtolower(pathinfo($nm, PATHINFO_EXTENSION));
             if (!in_array($ext, ['docx', 'doc', 'odt', 'rtf', 'txt'], true)) throw new RuntimeException('Envie um Word (.docx/.doc), ODT, RTF ou TXT (' . $nm . ').');
@@ -1016,7 +1808,7 @@ function forja_salvar_uploads($somentePdf = false, $somenteImg = false, $word = 
             if ($somenteImg && strpos($mime, 'image/') !== 0) throw new RuntimeException('Apenas imagens PNG/JPG são aceitas (' . $nm . ').');
             $ext = $mime === 'application/pdf' ? 'pdf' : ($mime === 'image/png' ? 'png' : ($mime === 'image/jpeg' ? 'jpg' : 'bin'));
         }
-        $path = forja_dir_tmp() . '/up_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $path = forja_tmp_registrar(forja_dir_tmp() . '/up_' . bin2hex(random_bytes(6)) . '.' . $ext);
         if (!@move_uploaded_file($tmps[$i], $path) && !@copy($tmps[$i], $path))
             throw new RuntimeException('Falha ao salvar o upload: ' . $nm);
         $saved[] = ['path' => $path, 'nome' => $nm];
@@ -1031,6 +1823,7 @@ function forja_human($n) { $n = (int)$n; if ($n < 1024) return $n . ' B'; if ($n
 function forja_registrar_saida($path, $nomeSugerido)
 {
     $token = bin2hex(random_bytes(12));
+    forja_tmp_manter($path);            /* nunca apagar um arquivo que virou download */
     $meta = ['path' => $path, 'nome' => $nomeSugerido, 'em' => time()];
     file_put_contents(forja_dir_tmp() . '/dl_' . $token . '.json', json_encode($meta, JSON_UNESCAPED_UNICODE));
     return $token;

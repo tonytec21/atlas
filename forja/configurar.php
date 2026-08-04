@@ -76,6 +76,35 @@ body.dark-mode{ --fj-bg:#0f1216; --fj-text:#e5e7eb; --fj-muted:#9aa4b2; --fj-car
           <input class="inp" name="lo_path" value="<?php echo eh($cfg['lo_path'] ?? ''); ?>" placeholder="C:\Program Files\LibreOffice\program\soffice.exe">
         </div>
         <div class="field">
+          <label>Tamanho máximo de arquivo enviado (MB)</label>
+          <input class="inp" type="number" min="10" max="4096" step="10" name="limite_upload_mb" value="<?php echo eh($cfg['limite_upload_mb'] ?? 2048); ?>">
+          <?php $L = forja_limites_php(); ?>
+          <div class="hint" style="margin:6px 0 0">
+            Limite em vigor agora: <b><?php echo eh(forja_human($L['efetivo'])); ?></b>
+            (php.ini: upload_max_filesize <b><?php echo eh(forja_human($L['upload'])); ?></b>,
+             post_max_size <b><?php echo eh(forja_human($L['post'])); ?></b>,
+             max_execution_time <b><?php echo (int)$L['tempo']; ?>s</b>).
+            <?php if ($L['efetivo'] < $L['config']): ?>
+              <br><b style="color:#c2410c">O php.ini está segurando o limite.</b> Ajuste os dois valores em
+              <code>C:\xampp\php\php.ini</code> e reinicie o Apache — o <code>.htaccess</code> do módulo só
+              funciona quando o PHP roda como módulo do Apache.
+            <?php endif; ?>
+            <?php if (!$L['x64']): ?>
+              <br><b style="color:#c2410c">Este PHP é de 32 bits</b> e não trata arquivos acima de 2 GB.
+            <?php endif; ?>
+          </div>
+        </div>
+        <div class="field">
+          <label>Retenção dos arquivos gerados (horas)</label>
+          <input class="inp" type="number" min="1" max="72" name="retencao_horas" value="<?php echo eh($cfg['retencao_horas'] ?? 3); ?>">
+          <div class="hint" style="margin:6px 0 0">Depois desse prazo os PDFs/ZIPs gerados e os temporários são apagados sozinhos. Os temporários de cada conversão já são removidos assim que o processamento termina.</div>
+        </div>
+        <div class="field">
+          <label>Resolução máxima em Imagens → PDF (pixels no maior lado)</label>
+          <input class="inp" type="number" min="600" max="6000" step="100" name="img2pdf_max_px" value="<?php echo eh($cfg['img2pdf_max_px'] ?? 2600); ?>">
+          <div class="hint" style="margin:6px 0 0">Padrão <b>2600</b>. Valores maiores deixam o PDF mais pesado e a conversão mais lenta; imagens abaixo do limite passam direto, sem reprocessar.</div>
+        </div>
+        <div class="field">
           <label class="switch"><input type="checkbox" name="forja_ativo" value="S" <?php echo (($cfg['forja_ativo'] ?? 'S')==='S')?'checked':''; ?>> Módulo ativo (mostrar o card no início do Atlas)</label>
         </div>
         <div style="display:flex;justify-content:flex-end">
@@ -94,6 +123,16 @@ body.dark-mode{ --fj-bg:#0f1216; --fj-text:#e5e7eb; --fj-muted:#9aa4b2; --fj-car
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <button type="button" class="fj-pill fj-pri" id="btnInstalarLO"><i class="fa fa-download"></i> Baixar e instalar</button>
         <span class="hint" style="margin:0">Pode levar alguns minutos (pacote grande).</span>
+      </div>
+    </div>
+
+    <div class="card-blk">
+      <h5><i class="fa fa-eraser" style="color:var(--fj-primary)"></i> Espaço em disco</h5>
+      <div class="hint">Os temporários de cada conversão são apagados automaticamente ao fim do processamento. Aqui você vê o que ainda está guardado (downloads recentes) e pode limpar na hora.</div>
+      <div id="usoDisco" class="stat" style="margin-bottom:14px"><span class="d"></span><div><b>Calculando…</b></div></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button type="button" class="fj-pill fj-soft" id="btnLimparVencidos"><i class="fa fa-history"></i> Limpar vencidos</button>
+        <button type="button" class="fj-pill fj-pri" id="btnLimparTudo"><i class="fa fa-trash"></i> Limpar tudo agora</button>
       </div>
     </div>
 
@@ -162,7 +201,33 @@ body.dark-mode{ --fj-bg:#0f1216; --fj-text:#e5e7eb; --fj-muted:#9aa4b2; --fj-car
       testar();
     }catch(e){ Swal.fire('Não foi possível instalar', e.message, 'error'); }
   });
-  testar();
+  /* ---------- Espaço em disco ---------- */
+  async function verUso(){
+    var box=document.getElementById('usoDisco'); if(!box) return;
+    try{
+      var r=await fetch('limpar_tmp.php',{credentials:'same-origin'}); var j=await r.json();
+      if(j.status!=='success') throw new Error(j.message||'Falha.');
+      box.innerHTML='<span class="d"></span><div><b>'+j.total+'</b> em uso · temporários: '+j.tmp+' · gerados: '+j.saida+'<br><small>Retenção atual: '+j.retencao+' h</small></div>';
+    }catch(e){ box.innerHTML='<span class="d"></span><div><b>Não foi possível calcular</b><br><small>'+e.message+'</small></div>'; }
+  }
+  async function limpar(modo){
+    var conf = modo==='tudo'
+      ? await Swal.fire({icon:'warning',title:'Limpar tudo?',text:'Downloads ainda não baixados serão perdidos.',showCancelButton:true,confirmButtonText:'Limpar',cancelButtonText:'Cancelar'})
+      : {isConfirmed:true};
+    if(!conf.isConfirmed) return;
+    try{
+      var fd=new FormData(); fd.append('csrf',CSRF); fd.append('modo',modo);
+      var r=await fetch('limpar_tmp.php',{method:'POST',body:fd,credentials:'same-origin'});
+      var t=await r.text(); var j; try{ j=JSON.parse(t); }catch(e){ throw new Error('Resposta inválida: '+t.slice(0,160)); }
+      if(j.status!=='success') throw new Error(j.message||'Falha.');
+      Swal.fire('Pronto', j.message, 'success');
+      verUso();
+    }catch(e){ Swal.fire('Erro', e.message, 'error'); }
+  }
+  var bV=document.getElementById('btnLimparVencidos'); if(bV) bV.addEventListener('click',function(){ limpar('retencao'); });
+  var bT=document.getElementById('btnLimparTudo');     if(bT) bT.addEventListener('click',function(){ limpar('tudo'); });
+
+  testar(); verUso();
 })();
 
 </script>
