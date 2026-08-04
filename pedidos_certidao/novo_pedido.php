@@ -928,6 +928,7 @@ body.dark-mode footer .footer-content a:hover {
               <b>Ato com valor declarado.</b> Informe o valor do negócio jurídico. Ele precisa
               estar dentro da faixa do ato escolhido — se estiver fora, selecione o ato da faixa
               correta.
+            </div>
           </div>
         </div>
 
@@ -1799,15 +1800,29 @@ function carregarModeloSelecionado(idModelo){
     if (response.error){ toast('error', response.error); return; }
     if (response.itens){
       response.itens.forEach(function(item){
-        const emolumentos = parseFloat((item.emolumentos || '0').replace(',', '.'));
-        const ferc        = parseFloat((item.ferc        || '0').replace(',', '.'));
-        const fadep       = parseFloat((item.fadep       || '0').replace(',', '.'));
-        const femp        = parseFloat((item.femp        || '0').replace(',', '.'));
-        const ferrfis     = parseFloat((item.ferrfis     || '0').replace(',', '.'));
-        const total       = parseFloat((item.total       || '0').replace(',', '.'));
+        /* BaseCalculoAto.valor() em vez de replace(',','.'): trata "8388.96"
+           (vindo do banco) e "8.388,96" (formato brasileiro) sem confundir o
+           separador de milhar com o decimal — o replace simples transformava
+           8.388,96 em 8,39. */
+        const V = (x) => BaseCalculoAto.valor(x == null ? 0 : x);
+        const emolumentos = V(item.emolumentos);
+        const ferc        = V(item.ferc);
+        const fadep       = V(item.fadep);
+        const femp        = V(item.femp);
+        const ferrfis     = V(item.ferrfis);
+        const total       = V(item.total);
         const ordem       = $('#itensTable tr').length + 1;
+
+        /* O modelo não guarda a base — ela é do caso concreto. O que vem é a
+           informação de que o ato EXIGE base, para a tela pedir antes de salvar. */
+        const exigeBase = !!item.exige_base_de_calculo;
+        const faixaRot  = (item.faixa_de_valor && item.faixa_de_valor.rotulo) || '';
+        const celulaBase = exigeBase
+          ? `<td class="base-ato-td base-edit base-pendente" contenteditable="true"
+                 title="Ato com valor declarado (${escapeHtml(faixaRot)}). Clique e informe a base de cálculo.">informar</td>`
+          : '<td class="base-ato-td">—</td>';
         $('#itensTable').append(`
-          <tr>
+          <tr data-base="" data-exige-base="${exigeBase ? 1 : 0}" data-faixa="${escapeHtml(faixaRot)}">
             <td>${ordem}</td>
             <td>${escapeHtml(item.ato)}</td>
             <td>${escapeHtml(item.quantidade)}</td>
@@ -1819,6 +1834,7 @@ function carregarModeloSelecionado(idModelo){
             <td>${fmt(femp)}</td>
             <td>${fmt(ferrfis)}</td>
             <td>${fmt(total)}</td>
+            ${celulaBase}
             <td>
               <button type="button" class="btn btn-sm btn-warning" onclick="marcarItemIsento(this)">
                 <i class="fa fa-ban"></i> Ato Isento
