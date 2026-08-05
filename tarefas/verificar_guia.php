@@ -1,28 +1,47 @@
 <?php
+/**
+ * Atlas · Tarefas — verifica se a tarefa já possui guia de recebimento.
+ *
+ * Mantido por compatibilidade com telas antigas (a chave `guia_existe`
+ * continua igual). Agora devolve também o total emitido e o número da
+ * última guia, usados pelo fluxo de reimpressão.
+ */
+
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+include(__DIR__ . '/guia_helpers.php');
 
-if (isset($_GET['task_id'])) {
-    $task_id = intval($_GET['task_id']);
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
 
-    // Verificar se a guia de recebimento já foi gerada para essa tarefa
-    $stmt = $conn->prepare("SELECT id FROM guia_de_recebimento WHERE task_id = ?");
-    $stmt->bind_param("i", $task_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows > 0) {
-        // Guia encontrada, retornamos sucesso e o task_id (não o guia_id)
-        echo json_encode(['guia_existe' => true, 'task_id' => $task_id]);
-    } else {
-        // Nenhuma guia encontrada
-        echo json_encode(['guia_existe' => false]);
-    }
-
-    $stmt->close();
-    $conn->close();
-} else {
-    echo json_encode(['error' => 'task_id não fornecido']);
+if (!isset($_GET['task_id'])) {
+    echo json_encode(array('error' => 'task_id não fornecido'), JSON_UNESCAPED_UNICODE);
+    exit;
 }
-?>
+
+$task_id = (int) $_GET['task_id'];
+$guias   = guia_listar_por_tarefa($conn, $task_id);
+$total   = count($guias);
+
+$resposta = array(
+    'guia_existe' => $total > 0,
+    'task_id'     => $task_id,
+    'total'       => $total,
+);
+
+if ($total > 0) {
+    $resposta['ultima_guia_id'] = (int) $guias[0]['id'];
+    $resposta['ultima_guia_em'] = guia_data_br(
+        isset($guias[0]['criado_em']) && $guias[0]['criado_em'] !== null && $guias[0]['criado_em'] !== ''
+            ? $guias[0]['criado_em']
+            : $guias[0]['data_recebimento']
+    );
+}
+
+$conn->close();
+
+echo json_encode($resposta, JSON_UNESCAPED_UNICODE);

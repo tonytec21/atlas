@@ -600,7 +600,10 @@ date_default_timezone_set('America/Sao_Paulo');
                         
                         <div class="info-item">  
                             <label for="funcionario">Funcionário</label>  
-                            <input type="text" class="form-control-modern" id="funcionario" name="funcionario" readonly>  
+                            <select class="form-control-modern" id="funcionario" name="funcionario" required>  
+                                <option value="">Carregando...</option>  
+                            </select>  
+                            <small class="guia-hint">Sai impresso na guia. Vem preenchido com o responsável pela tarefa, mas pode ser trocado por quem estiver emitindo.</small>  
                         </div>  
                     </div>  
 
@@ -629,6 +632,147 @@ date_default_timezone_set('America/Sao_Paulo');
             </div>  
         </div>  
     </div>  
+</div>
+
+<!-- Modal Histórico de Guias de Recebimento -->
+<style>
+    #guiaHistoricoModal .modal-body { padding: 1.5rem; }
+
+    #guiaHistoricoModal .guia-hist-info {
+        margin-bottom: 1rem;
+        font-size: .9rem;
+        color: var(--text-secondary, #6c757d);
+    }
+
+    #guiaHistoricoModal .guia-hist-wrapper {
+        max-height: 55vh;
+        overflow-y: auto;
+        border: 1px solid var(--border-color, #dee2e6);
+        border-radius: 8px;
+    }
+
+    #guiaHistoricoTabela { width: 100%; margin: 0; font-size: .875rem; }
+
+    #guiaHistoricoTabela thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--background-secondary, #f1f3f5);
+        color: var(--text-primary, #212529);
+        border-bottom: 2px solid var(--border-color, #dee2e6);
+        padding: .65rem .75rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    #guiaHistoricoTabela tbody td {
+        padding: .6rem .75rem;
+        border-bottom: 1px solid var(--border-color, #eef1f4);
+        vertical-align: middle;
+    }
+
+    #guiaHistoricoTabela tbody tr:last-child td { border-bottom: 0; }
+
+    #guiaHistoricoTabela tbody tr.guia-hist-atual {
+        background: rgba(39, 174, 96, .08);
+    }
+
+    #guiaHistoricoModal .guia-hist-badge {
+        display: inline-block;
+        background: #27ae60;
+        color: #fff;
+        border-radius: 10px;
+        padding: 1px 8px;
+        font-size: .7rem;
+        font-weight: 600;
+        margin-left: 4px;
+    }
+
+    #guiaHistoricoModal .guia-hist-vazio {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-secondary, #6c757d);
+    }
+
+    #guiaHistoricoModal .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        background: var(--background-secondary, #f8f9fa);
+        border-top: 1px solid var(--border-color, #dee2e6);
+    }
+
+    body.dark-mode #guiaHistoricoModal .modal-content { background: var(--background-primary); }
+    body.dark-mode #guiaHistoricoTabela tbody tr.guia-hist-atual { background: rgba(39, 174, 96, .18); }
+
+    /* Dica abaixo do select de funcionário na emissão */
+    #guiaRecebimentoModal .guia-hint {
+        display: block;
+        margin-top: .35rem;
+        font-size: .75rem;
+        line-height: 1.3;
+        color: var(--text-secondary, #6c757d);
+    }
+
+    @media (max-width: 768px) {
+        #guiaHistoricoModal .modal-footer { flex-direction: column-reverse; }
+        #guiaHistoricoModal .modal-footer button { width: 100%; }
+    }
+</style>
+
+<div class="modal fade" id="guiaHistoricoModal" tabindex="-1" role="dialog" aria-labelledby="guiaHistoricoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <!-- Header -->
+            <div class="primary-header">
+                <div class="modal-header-content">
+                    <h5 class="modal-title" id="guiaHistoricoModalLabel">
+                        <i class="fa fa-history"></i> Histórico de Guias de Recebimento
+                    </h5>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body">
+                <div class="guia-hist-info">
+                    Guias emitidas para o Protocolo Geral nº <b id="guiaHistoricoProtocolo"></b>.
+                    Escolha uma guia para reimprimir ou emita uma nova.
+                </div>
+
+                <div class="guia-hist-wrapper">
+                    <table id="guiaHistoricoTabela" class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Guia nº</th>
+                                <th>Recebimento</th>
+                                <th>Apresentante</th>
+                                <th>Funcionário</th>
+                                <th>Emitida em</th>
+                                <th>Emitida por</th>
+                                <th class="text-center">Impressões</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn-close-modal" data-dismiss="modal">
+                    <i class="fa fa-times"></i> Fechar
+                </button>
+                <button type="button" id="btnAtualizarHistoricoGuias" class="action-btn">
+                    <i class="fa fa-refresh"></i> Atualizar
+                </button>
+                <button type="button" id="btnNovaGuiaHistorico" class="action-btn success">
+                    <i class="fa fa-plus"></i> Emitir nova guia
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 
@@ -1542,7 +1686,7 @@ $('#editTaskButton').on('click', function() {
 
 
 // Resolver problema de rolagem com modais empilhados
-$('#addCommentModal, #createSubTaskModal, #guiaRecebimentoModal, #reciboEntregaModal, #vincularOficioModal').on('shown.bs.modal', function() {
+$('#addCommentModal, #createSubTaskModal, #guiaRecebimentoModal, #guiaHistoricoModal, #reciboEntregaModal, #vincularOficioModal').on('shown.bs.modal', function() {
     $('body').addClass('modal-open');
 }).on('hidden.bs.modal', function() {
     $('body').removeClass('modal-open');
@@ -1682,95 +1826,341 @@ $('#viewTaskModal').on('shown.bs.modal', function() {
     });
 
 
-// Função para verificar se a guia de recebimento já foi gerada
-function verificarOuAbrirGuia(taskId) {
+/* ============================================================
+   GUIA DE RECEBIMENTO — emissão, reimpressão e histórico
+   ------------------------------------------------------------
+   Uma tarefa pode ter várias guias. Ao clicar no botão:
+     · nenhuma guia emitida  -> abre direto o formulário de emissão
+     · já existe guia        -> pergunta se é reimpressão ou nova guia
+   O funcionário que sai no impresso é escolhido no formulário; o padrão
+   é o responsável pela tarefa, mas nem sempre é ele quem emite.
+   ============================================================ */
+
+// Lista de funcionários ativos, carregada uma única vez por página.
+var guiaFuncionariosCache = null;
+// Valor de configuracao.json (timbrado S/N), pré-carregado para que a
+// impressão abra a nova aba no mesmo clique e não seja barrada como popup.
+var guiaTimbradoCache = null;
+
+function carregarFuncionariosGuia(callback) {
+    if (guiaFuncionariosCache) {
+        callback(guiaFuncionariosCache);
+        return;
+    }
     $.ajax({
-        url: 'verificar_guia.php', // O arquivo PHP que criamos para verificar a guia
+        url: 'load_employees.php',
         type: 'GET',
-        data: {
-            task_id: taskId
+        dataType: 'json',
+        success: function (dados) {
+            guiaFuncionariosCache = $.isArray(dados) ? dados : [];
+            callback(guiaFuncionariosCache);
         },
-        success: function(response) {
-            var result = JSON.parse(response);
-
-            if (result.guia_existe) {
-                // Se a guia já existe, abrir a guia diretamente com o task_id
-                $.ajax({
-                    url: '../style/configuracao.json',
-                    dataType: 'json',
-                    cache: false,
-                    success: function(data) {
-                        let url = '';
-
-                        if (data.timbrado === 'S') {
-                            url = 'guia_recebimento.php?id=' + taskId; // Usar task_id na URL
-                        } else {
-                            url = 'guia-recebimento.php?id=' + taskId; // Usar task_id na URL
-                        }
-
-                        // Abre a URL correspondente em uma nova aba
-                        window.open(url, '_blank');
-                    },
-                    error: function() {
-                        alert('Erro ao carregar o arquivo de configuração.');
-                    }
-                });
-
-            } else {
-                // Se a guia não existe, abrir o modal para criar a guia
-                $('#guiaRecebimentoModal').modal('show');
-                $('#funcionario').val($('#viewEmployee').val()); // Preencher o funcionário automaticamente
-                $('#cliente').val(''); // Limpar o campo cliente
-                $('#observacoes').val(''); // Limpar o campo observações
-                $('#dataRecebimento').val(''); // Limpar o campo data de recebimento
-                $('#documentosRecebidos').val(''); // Limpar o campo documentos recebidos
-            }
-        },
-        error: function() {
-            alert('Erro ao verificar a guia de recebimento.');
+        error: function () {
+            callback([]);
         }
     });
 }
 
-// Associa a verificação à ação do botão de guia de recebimento
-$('#guiaRecebimentoButton').off('click').on('click', function() {
-    const taskId = $('#taskNumber').text(); // Pega o taskNumber via jQuery
+// Monta o select de funcionário deixando o responsável pela tarefa marcado.
+function preencherSelectFuncionarioGuia(responsavel) {
+    var $sel = $('#funcionario');
+    responsavel = $.trim(responsavel || '');
+
+    $sel.prop('disabled', true).html('<option value="">Carregando...</option>');
+
+    carregarFuncionariosGuia(function (lista) {
+        $sel.empty().append($('<option>').val('').text('Selecione o funcionário'));
+
+        var achouResponsavel = false;
+        $.each(lista, function (i, f) {
+            var nome = f.nome_completo;
+            if (nome === responsavel) {
+                achouResponsavel = true;
+            }
+            $sel.append($('<option>').val(nome).text(nome));
+        });
+
+        // O responsável pode estar inativo hoje e mesmo assim continua sendo
+        // o padrão da tarefa — então entra na lista de qualquer forma.
+        if (responsavel && !achouResponsavel) {
+            $sel.append($('<option>').val(responsavel).text(responsavel + ' (responsável)'));
+        }
+
+        if (responsavel) {
+            $sel.val(responsavel);
+        }
+        $sel.prop('disabled', false);
+    });
+}
+
+// Troca de modal sem deixar o backdrop preso (Bootstrap 4).
+function guiaTrocarModal(fechar, abrir) {
+    var $fechar = $(fechar);
+    if ($fechar.hasClass('show') || $fechar.is(':visible')) {
+        $fechar.one('hidden.bs.modal', function () {
+            $(abrir).modal('show');
+        });
+        $fechar.modal('hide');
+    } else {
+        $(abrir).modal('show');
+    }
+}
+
+// Formulário de emissão de uma nova guia.
+function abrirModalNovaGuia() {
+    $('#cliente').val('');
+    $('#observacoes').val('');
+    $('#dataRecebimento').val('');
+    $('#documentosRecebidos').val('');
+    preencherSelectFuncionarioGuia($('#viewEmployee').val());
+    guiaTrocarModal('#guiaHistoricoModal', '#guiaRecebimentoModal');
+}
+
+// Abre o PDF de uma guia específica (emissão ou reimpressão).
+function abrirImpressaoGuia(guiaId) {
+    var imprimir = function (timbrado) {
+        var arquivo = (timbrado === 'S') ? 'guia_recebimento.php' : 'guia-recebimento.php';
+        window.open(arquivo + '?guia_id=' + encodeURIComponent(guiaId), '_blank');
+    };
+
+    if (guiaTimbradoCache !== null) {
+        imprimir(guiaTimbradoCache);
+        return;
+    }
+
+    $.ajax({
+        url: '../style/configuracao.json',
+        dataType: 'json',
+        cache: false,
+        success: function (data) {
+            guiaTimbradoCache = data.timbrado;
+            imprimir(data.timbrado);
+        },
+        error: function () {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Não foi possível carregar o arquivo de configuração.'
+            });
+        }
+    });
+}
+
+// Preenche e exibe o histórico de guias da tarefa.
+function abrirHistoricoGuias(taskId, guias) {
+    var $tbody = $('#guiaHistoricoTabela tbody').empty();
+    $('#guiaHistoricoProtocolo').text(taskId);
+
+    if (!guias || !guias.length) {
+        $tbody.append('<tr><td colspan="8" class="guia-hist-vazio">Nenhuma guia emitida para este protocolo.</td></tr>');
+    } else {
+        $.each(guias, function (indice, g) {
+            var $tr = $('<tr>');
+            if (indice === 0) {
+                $tr.addClass('guia-hist-atual');
+            }
+
+            $tr.append($('<td>').html(
+                '<b>' + g.id + '</b>' + (indice === 0 ? ' <span class="guia-hist-badge">última</span>' : '')
+            ));
+            $tr.append($('<td>').text(g.data_recebimento_br || '—'));
+            $tr.append($('<td>').text(g.cliente || '—'));
+            $tr.append($('<td>').text(g.funcionario || '—'));
+            $tr.append($('<td>').text(g.criado_em_br || '—'));
+            $tr.append($('<td>').text(g.emitido_por || '—'));
+            $tr.append($('<td>').addClass('text-center').text(g.impressoes));
+            $tr.append($('<td>').addClass('text-center').html(
+                '<button type="button" class="btn btn-sm btn-info btn-reimprimir-guia" data-guia="' + g.id + '">' +
+                '<i class="fa fa-print"></i> Imprimir</button>'
+            ));
+
+            $tbody.append($tr);
+        });
+    }
+
+    guiaTrocarModal('#guiaRecebimentoModal', '#guiaHistoricoModal');
+}
+
+// Ponto de entrada: decide entre emitir, reimprimir ou ver o histórico.
+function verificarOuAbrirGuia(taskId) {
+    $.ajax({
+        url: 'listar_guias.php',
+        type: 'GET',
+        dataType: 'json',
+        data: { task_id: taskId },
+        success: function (resp) {
+            if (!resp || resp.success !== true) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: (resp && resp.error) ? resp.error : 'Erro ao consultar as guias de recebimento.'
+                });
+                return;
+            }
+
+            // Primeira guia da tarefa: vai direto para o formulário.
+            if (resp.total === 0) {
+                abrirModalNovaGuia();
+                return;
+            }
+
+            var ultima = resp.guias[0];
+            var resumo = 'Este protocolo já possui <b>' + resp.total + '</b> guia(s) emitida(s).<br>' +
+                         'Última: guia nº <b>' + ultima.id + '</b> — ' + $('<div>').text(ultima.funcionario).html() +
+                         '<br><small class="text-muted">Emitida em ' + ultima.criado_em_br + '</small>';
+
+            Swal.fire({
+                icon: 'question',
+                title: 'Guia de Recebimento',
+                html: resumo,
+                showDenyButton: true,
+                showCancelButton: true,
+                confirmButtonText: '<i class="fa fa-print"></i> Reimprimir guia emitida',
+                denyButtonText: '<i class="fa fa-plus"></i> Emitir nova guia',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#3498db',
+                denyButtonColor: '#27ae60',
+                reverseButtons: true,
+                footer: '<a href="#" id="linkHistoricoGuias"><i class="fa fa-history"></i> Ver histórico completo</a>',
+                didOpen: function () {
+                    var link = document.getElementById('linkHistoricoGuias');
+                    if (link) {
+                        link.onclick = function (e) {
+                            e.preventDefault();
+                            Swal.close();
+                            abrirHistoricoGuias(taskId, resp.guias);
+                        };
+                    }
+                }
+            }).then(function (escolha) {
+                if (escolha.isConfirmed) {
+                    // Com uma única guia não há o que escolher: imprime direto.
+                    if (resp.total === 1) {
+                        abrirImpressaoGuia(ultima.id);
+                    } else {
+                        abrirHistoricoGuias(taskId, resp.guias);
+                    }
+                } else if (escolha.isDenied) {
+                    abrirModalNovaGuia();
+                }
+            });
+        },
+        error: function () {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Erro ao verificar a guia de recebimento.'
+            });
+        }
+    });
+}
+
+// Botão da barra de ações da tarefa
+$('#guiaRecebimentoButton').off('click').on('click', function () {
+    var taskId = $('#taskNumber').text();
     verificarOuAbrirGuia(taskId);
 });
 
+// Reimpressão a partir da tabela do histórico
+$(document).off('click', '.btn-reimprimir-guia').on('click', '.btn-reimprimir-guia', function () {
+    abrirImpressaoGuia($(this).data('guia'));
+});
 
-// Submissão do formulário de criação de guia
-$('#guiaRecebimentoForm').on('submit', function(e) {
-    e.preventDefault();
+// "Emitir nova guia" dentro do histórico
+$('#btnNovaGuiaHistorico').off('click').on('click', function () {
+    abrirModalNovaGuia();
+});
 
-    var formData = $(this).serialize() + '&task_id=' + $('#taskNumber').text();
-
+// Atualizar o histórico sem fechar o modal
+$('#btnAtualizarHistoricoGuias').off('click').on('click', function () {
+    var taskId = $('#guiaHistoricoProtocolo').text();
     $.ajax({
-        url: 'save_guia_recebimento.php',
-        type: 'POST',
-        data: formData,
-        success: function(response) {
-            try {
-                var result = JSON.parse(response);
-                if (result.success) {
-                    $('#guiaRecebimentoModal').modal('hide');
-                    alert('Guia de recebimento salva com sucesso!');
-                    window.open('guia_recebimento.php?id=' + $('#taskNumber').text(), '_blank');
-                } else {
-                    console.error(result.error);
-                    alert('Erro ao salvar a guia de recebimento: ' + result.error);
-                }
-            } catch (e) {
-                console.error('Erro ao parsear JSON:', e, response);
-                alert('Erro ao salvar a guia de recebimento');
+        url: 'listar_guias.php',
+        type: 'GET',
+        dataType: 'json',
+        data: { task_id: taskId },
+        success: function (resp) {
+            if (resp && resp.success) {
+                abrirHistoricoGuias(taskId, resp.guias);
             }
-        },
-        error: function() {
-            alert('Erro ao salvar a guia de recebimento');
         }
     });
 });
 
+// Emissão de uma nova guia
+$('#guiaRecebimentoForm').off('submit').on('submit', function (e) {
+    e.preventDefault();
+
+    var taskId = $('#taskNumber').text();
+    var funcionario = $.trim($('#funcionario').val() || '');
+
+    if (funcionario === '') {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Selecione o funcionário',
+            text: 'Informe qual funcionário deve constar na guia de recebimento.'
+        });
+        $('#funcionario').focus();
+        return;
+    }
+
+    var $botao = $('button[form="guiaRecebimentoForm"]').prop('disabled', true);
+
+    $.ajax({
+        url: 'save_guia_recebimento.php',
+        type: 'POST',
+        dataType: 'json',
+        data: $(this).serialize() + '&task_id=' + encodeURIComponent(taskId),
+        success: function (result) {
+            if (result && result.success) {
+                $('#guiaRecebimentoModal').modal('hide');
+                $('#viewTitle').data('guiaGerado', true);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Guia emitida!',
+                    html: 'Guia de recebimento nº <b>' + result.guia_id + '</b> gerada com sucesso.',
+                    timer: 2200,
+                    showConfirmButton: false
+                });
+
+                abrirImpressaoGuia(result.guia_id);
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro ao salvar',
+                    text: (result && result.error) ? result.error : 'Erro ao salvar a guia de recebimento.'
+                });
+            }
+        },
+        error: function (xhr) {
+            var mensagem = 'Erro ao salvar a guia de recebimento.';
+            try {
+                var r = JSON.parse(xhr.responseText);
+                if (r && r.error) {
+                    mensagem = r.error;
+                }
+            } catch (err) { /* resposta não era JSON */ }
+
+            Swal.fire({ icon: 'error', title: 'Erro ao salvar', text: mensagem });
+        },
+        complete: function () {
+            $botao.prop('disabled', false);
+        }
+    });
+});
+
+// Pré-carrega a configuração de timbrado logo na abertura da tela.
+$(function () {
+    $.ajax({
+        url: '../style/configuracao.json',
+        dataType: 'json',
+        cache: false,
+        success: function (data) {
+            guiaTimbradoCache = data.timbrado;
+        }
+    });
+});
 
 
 function viewTask(taskToken) {
@@ -2411,7 +2801,7 @@ $('#arquivarAtoForm').on('submit', function(e){
         });
 
         // Adicionar rolagem ao modal principal após fechar o secundário
-        $('#vincularOficioModal, #modalArquivarAto, #reciboEntregaModal, #guiaRecebimentoModal, #createSubTaskModal, #addCommentModal').on('hidden.bs.modal', function () {
+        $('#vincularOficioModal, #modalArquivarAto, #reciboEntregaModal, #guiaRecebimentoModal, #guiaHistoricoModal, #createSubTaskModal, #addCommentModal').on('hidden.bs.modal', function () {
             $('#viewTaskModal').css('overflow-y', 'auto');
         });
 
