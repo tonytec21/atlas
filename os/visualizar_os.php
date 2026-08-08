@@ -129,6 +129,10 @@ $os_items_query->execute();
 $os_items_result = $os_items_query->get_result();
 $ordem_servico_itens = $os_items_result->fetch_all(MYSQLI_ASSOC);
 
+// Observação por linha de pagamento (garante a coluna `observacao` em pagamento_os)
+require_once __DIR__ . '/pagamento_observacao_config.php';
+po_obs_garantir_coluna($conn);
+
 // Buscar dados dos pagamentos
 $pagamentos_query = $conn->prepare("SELECT * FROM pagamento_os WHERE ordem_de_servico_id = ?");
 $pagamentos_query->bind_param("i", $os_id);
@@ -1292,6 +1296,14 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
     .pa-viewer{ width:100%; height:78vh; background:#0f172a; display:flex; align-items:center; justify-content:center; }
     .pa-viewer iframe{ width:100%; height:100%; border:0; background:#fff; }
     .pa-viewer img{ max-width:100%; max-height:100%; object-fit:contain; }
+    /* ===== Observação da linha de pagamento ===== */
+    .btn-obs{ background:#f59e0b; color:#fff; border:0; padding:0 12px; border-radius:var(--radius-md); font-size:13px; }
+    .btn-obs:hover{ background:#d97706; color:#fff; transform:translateY(-2px); box-shadow:var(--shadow-lg); }
+    .pa-acts .btn-obs{ height:32px; min-width:38px; padding:0 12px; margin:0; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; line-height:1; box-sizing:border-box; }
+    .pa-acts .btn-obs i{ line-height:1; font-size:14px; }
+    .pg-obs-cell{ max-width:280px; }
+    .pg-obs{ display:inline-block; font-size:.82rem; color:var(--text-secondary); white-space:normal; word-break:break-word; }
+    .pg-obs-vazia{ color:var(--text-tertiary); }
     
         /* ===== Base de cálculo por ato ===== */
         .base-ato{display:inline-block;background:#eff6ff;color:#1e40af;border-radius:6px;
@@ -2061,6 +2073,16 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         </div>  
                     </div>  
 
+                    <div class="form-group grid-span-2">  
+                        <label for="observacao_pagamento">Observação <small class="text-muted">(opcional)</small></label>  
+                        <textarea class="form-control" id="observacao_pagamento" rows="2" maxlength="500"
+                                  placeholder="Ex.: Transferência efetuada em 01/08/2026; comprovante apresentado somente nesta data."></textarea>  
+                        <small class="form-text text-muted">
+                            Registre aqui divergências de data, apresentação tardia de comprovante, nº do documento etc.
+                            <span id="obsPagamentoContador">0</span>/500
+                        </small>  
+                    </div>  
+
                     <div class="grid-span-2">  
                         <button type="button" id="btnAdicionarPagamento" class="btn btn-primary w-100" onclick="adicionarPagamento()">  
                             <i class="fa fa-plus"></i> Adicionar Pagamento  
@@ -2094,6 +2116,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                                 <th>Valor</th>  
                                 <th>Data Pagamento</th>  
                                 <th>Funcionário</th>  
+                                <th>Observação</th>  
                                 <th>Ações</th>  
                             </tr>  
                         </thead>  
@@ -2108,9 +2131,23 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                                 <td><?php echo 'R$ ' . number_format($pagamento['total_pagamento'], 2, ',', '.'); ?></td>  
                                 <td><?php echo $dataPagtoBr; ?></td>  
                                 <td><?php echo htmlspecialchars($pagamento['funcionario']); ?></td>  
+                                <td class="pg-obs-cell">
+                                    <?php $__obs = trim((string)($pagamento['observacao'] ?? '')); ?>
+                                    <?php if ($__obs !== ''): ?>
+                                        <span class="pg-obs" title="<?php echo htmlspecialchars($__obs, ENT_QUOTES); ?>"><?php echo nl2br(htmlspecialchars($__obs)); ?></span>
+                                    <?php else: ?>
+                                        <span class="pg-obs-vazia">&mdash;</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td>  
                                     <div class="pa-acts">
                                     <?php $__podeAnexo = pa_forma_permite_anexo($pagamento['forma_de_pagamento']); $__nAnx = (int)($__pa_counts[(int)$pagamento['id']] ?? 0); ?>
+                                    <button type="button" title="Observação do pagamento"
+                                            class="btn btn-obs btn-sm js-obs-edit"
+                                            data-pid="<?php echo (int)$pagamento['id']; ?>"
+                                            onclick="editarObservacaoPagamento(<?php echo (int)$pagamento['id']; ?>)">
+                                        <i class="fa fa-comment-o" aria-hidden="true"></i>
+                                    </button>
                                     <?php if ($__podeAnexo): ?>
                                         <button type="button" title="Comprovante de pagamento"
                                                 class="btn btn-attach btn-sm js-pa-open"
@@ -3096,6 +3133,67 @@ $(document).ready(function() {
     })();
 
 
+    /* ===== Observação da linha de pagamento ===== */
+
+    function escaparHtml(texto) {
+        return String(texto == null ? '' : texto)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // Contador de caracteres do campo de observação
+    $(function () {
+        $(document).on('input', '#observacao_pagamento', function () {
+            $('#obsPagamentoContador').text(String(this.value.length));
+        });
+    });
+
+    // Inclui/edita a observação de um pagamento já lançado
+    function editarObservacaoPagamento(pagamentoId) {
+        pagamentoId = parseInt(pagamentoId, 10);
+        if (!pagamentoId) return;
+
+        var registro = pagamentos.find(function (p) { return parseInt(p.id, 10) === pagamentoId; });
+        var atual = (registro && registro.observacao != null) ? String(registro.observacao) : '';
+
+        Swal.fire({
+            title: 'Observação do pagamento',
+            input: 'textarea',
+            inputValue: atual,
+            inputPlaceholder: 'Ex.: Transferência efetuada em 01/08/2026; comprovante apresentado somente nesta data.',
+            inputAttributes: { maxlength: 500, rows: 4 },
+            showCancelButton: true,
+            confirmButtonText: 'Salvar',
+            cancelButtonText: 'Cancelar'
+        }).then(function (result) {
+            if (!result.isConfirmed) return;
+
+            var texto = (result.value || '').trim().slice(0, 500);
+
+            $.ajax({
+                url: 'atualizar_observacao_pagamento.php',
+                type: 'POST',
+                dataType: 'json',
+                data: { pagamento_id: pagamentoId, observacao: texto },
+                success: function (resp) {
+                    if (resp && resp.success) {
+                        if (registro) registro.observacao = resp.observacao || '';
+                        atualizarTabelaPagamentos();
+                        Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Observação salva.' });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Erro!', text: (resp && resp.error) ? resp.error : 'Erro ao salvar observação.' });
+                    }
+                },
+                error: function () {
+                    Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao salvar observação.' });
+                }
+            });
+        });
+    }
+
     // Função para adicionar pagamento
     function adicionarPagamento() {
         const addBtn = $('#btnAdicionarPagamento');
@@ -3103,6 +3201,7 @@ $(document).ready(function() {
 
         var formaPagamento = $('#forma_pagamento').val();
         var valorPagamento = parseFloat($('#valor_pagamento').val().replace('.', '').replace(',', '.'));
+        var observacaoPagamento = ($('#observacao_pagamento').val() || '').trim().slice(0, 500);
 
         if (formaPagamento === "") {
             Swal.fire({ icon: 'error', title: 'Erro!', text: 'Por favor, selecione uma forma de pagamento.' })
@@ -3139,17 +3238,18 @@ $(document).ready(function() {
                 cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    efetuarPagamento(formaPagamento, valorPagamento);
+                    efetuarPagamento(formaPagamento, valorPagamento, observacaoPagamento);
                 } else {
                     addBtn.prop('disabled', false);
                 }
             });
         } else {
-            efetuarPagamento(formaPagamento, valorPagamento);
+            efetuarPagamento(formaPagamento, valorPagamento, observacaoPagamento);
         }
     }
 
-    function efetuarPagamento(formaPagamento, valorPagamento) {
+    function efetuarPagamento(formaPagamento, valorPagamento, observacaoPagamento) {
+        observacaoPagamento = (observacaoPagamento || '').trim().slice(0, 500);
         $('#btnAdicionarPagamento').prop('disabled', true);
 
         $.ajax({
@@ -3161,7 +3261,8 @@ $(document).ready(function() {
                 total_os: <?php echo $ordem_servico['total_os']; ?>,
                 funcionario: '<?php echo $_SESSION['username']; ?>',
                 forma_pagamento: formaPagamento,
-                valor_pagamento: valorPagamento
+                valor_pagamento: valorPagamento,
+                observacao: observacaoPagamento
             },
             success: function(response) {
                 response = JSON.parse(response);
@@ -3171,7 +3272,8 @@ $(document).ready(function() {
                         forma_de_pagamento: formaPagamento,
                         total_pagamento: valorPagamento,
                         data_pagamento:  response.data_pagamento || new Date().toISOString().slice(0,19).replace('T',' '),
-                        funcionario:     '<?php echo $_SESSION['username']; ?>'
+                        funcionario:     '<?php echo $_SESSION['username']; ?>',
+                        observacao:      (typeof response.observacao === 'string') ? response.observacao : observacaoPagamento
                     });
 
                     atualizarTabelaPagamentos();
@@ -3180,6 +3282,8 @@ $(document).ready(function() {
 
                     $('#valor_pagamento').val('');
                     $('#forma_pagamento').val('');
+                    $('#observacao_pagamento').val('');
+                    $('#obsPagamentoContador').text('0');
                     Swal.fire({
                         icon: 'success',
                         title: 'Sucesso!',
@@ -3253,6 +3357,8 @@ $(document).ready(function() {
             const canDelete = !<?php echo $has_liquidated ? 'true':'false'; ?> && (linhaYmd === todayYmd);
 
             var acoesHtml = '';
+            acoesHtml += '<button type="button" title="Observação do pagamento" class="btn btn-obs btn-sm js-obs-edit" data-pid="' + pagamento.id + '" onclick="editarObservacaoPagamento(' + pagamento.id + ')">' +
+                         '<i class="fa fa-comment-o" aria-hidden="true"></i></button> ';
             if (paPermiteAnexo(pagamento.forma_de_pagamento)) {
                 var _n = (PA_COUNTS && PA_COUNTS[pagamento.id]) ? PA_COUNTS[pagamento.id] : 0;
                 var _forma = String(pagamento.forma_de_pagamento || '').replace(/"/g, '&quot;');
@@ -3264,11 +3370,17 @@ $(document).ready(function() {
                 acoesHtml += '<button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(' + pagamento.id + ')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
             }
 
+            var obsTexto = (pagamento.observacao == null) ? '' : String(pagamento.observacao).trim();
+            var obsHtml  = obsTexto !== ''
+                ? '<span class="pg-obs" title="' + escaparHtml(obsTexto) + '">' + escaparHtml(obsTexto).replace(/\n/g, '<br>') + '</span>'
+                : '<span class="pg-obs-vazia">&mdash;</span>';
+
             var cols = [
                 pagamento.forma_de_pagamento || '',
                 'R$ ' + valor.toFixed(2).replace('.', ','),
                 formatarDataBr(pagamento.data_pagamento || ''),
                 pagamento.funcionario || '',
+                obsHtml,
                 '<div class="pa-acts">' + acoesHtml + '</div>'
             ];
 
@@ -3280,7 +3392,8 @@ $(document).ready(function() {
                     <td>${cols[1]}</td>
                     <td>${cols[2]}</td>
                     <td>${cols[3]}</td>
-                    <td>${cols[4]}</td>
+                    <td class="pg-obs-cell">${cols[4]}</td>
+                    <td>${cols[5]}</td>
                 </tr>`);
             }
         });
@@ -4322,7 +4435,8 @@ $(document).ready(function() {
                             forma_de_pagamento: 'Isento de Pagamento',
                             total_pagamento: 0,
                             data_pagamento:  response.data_pagamento || new Date().toISOString().slice(0,19).replace('T',' '),
-                            funcionario:     '<?php echo $_SESSION['username']; ?>'
+                            funcionario:     '<?php echo $_SESSION['username']; ?>',
+                            observacao:      ''
                         });
 
                         atualizarTabelaPagamentos();

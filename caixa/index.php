@@ -911,6 +911,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                             <th>Apresentante</th>
                                             <th>Forma de Pagamento</th>
                                             <th>Total</th>
+                                            <th>Observação</th>
                                             <th>Comprovante</th>
                                         </tr>
                                     </thead>
@@ -1688,6 +1689,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                 <td>${pagamento.cliente}</td>
                                 <td>${pagamento.forma_de_pagamento}</td>
                                 <td>${formatCurrency(pagamento.total_pagamento)}</td>
+                                <td class="cx-obs-cell">${formatObservacaoPagamento(pagamento.observacao)}</td>
                                 <td>${((parseInt(pagamento.anexos_count,10) > 0 || parseInt(pagamento.os_anexos_count,10) > 0)) ? `<button title="Visualizar comprovante" class="btn btn-info btn-sm btn-icon" onclick="verComprovantePagamento(${pagamento.pagamento_id || 0}, ${pagamento.ordem_de_servico_id || 0})"><i class="fa fa-paperclip" aria-hidden="true"></i></button>` : ''}</td>
                             </tr>
                         `);
@@ -2350,6 +2352,22 @@ date_default_timezone_set('America/Sao_Paulo');
             return 'R$ ' + parseFloat(value).toFixed(2).replace('.', ',').replace(/\d(?=(\d{3})+,)/g, '$&.');
         }
 
+        /* ===== Observação da linha de pagamento (lançada no módulo de O.S.) ===== */
+        function escaparHtmlCx(texto) {
+            return String(texto == null ? '' : texto)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatObservacaoPagamento(texto) {
+            var t = (texto == null) ? '' : String(texto).trim();
+            if (t === '') return '<span class="cx-obs-vazia">&mdash;</span>';
+            return '<span class="cx-obs" title="' + escaparHtmlCx(t) + '">' + escaparHtmlCx(t).replace(/\n/g, '<br>') + '</span>';
+        }
+
         function transportarSaldoFecharCaixa() {
             var totalEmCaixa = $('#total_em_caixa').text().replace(/\./g, '').replace(',', '.').replace('R$ ', '');
             var totalEmCaixaFormatado = $('#total_em_caixa').text();
@@ -2525,6 +2543,10 @@ date_default_timezone_set('America/Sao_Paulo');
   /* desfoque do modal de trás quando outro abre por cima */
   .modal .modal-dialog{ transition: filter .2s ease, opacity .2s ease; }
   .modal.is-behind .modal-dialog{ filter: blur(4px); opacity:.85; pointer-events:none; }
+  /* ===== Observação da linha de pagamento ===== */
+  .cx-obs-cell{ max-width:320px; }
+  .cx-obs{ display:inline-block; font-size:.82rem; white-space:normal; word-break:break-word; }
+  .cx-obs-vazia{ color:#9aa3af; }
 </style>
 
 <script>

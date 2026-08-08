@@ -7,6 +7,7 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 require_once __DIR__ . '/caixa_funcionario.php';
+require_once __DIR__ . '/pagamento_observacao_config.php';
 
 
 header('Content-Type: application/json');
@@ -53,7 +54,7 @@ try {
     $atos_manuais = $st->fetchAll(PDO::FETCH_ASSOC);
 
     // PAGAMENTOS
-    $sql = 'SELECT os.id AS ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, ' . cx_func_sql('po.funcionario') . ' AS funcionario, po.funcionario AS funcionario_origem, po.data_pagamento
+    $sql = 'SELECT os.id AS ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento, ' . cx_func_sql('po.funcionario') . ' AS funcionario, po.funcionario AS funcionario_origem, po.data_pagamento' . cx_pag_obs_sql($conn, 'po') . '
             FROM pagamento_os po
             JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
             WHERE DATE(po.data_pagamento) BETWEEN :dini AND :dfim' . $W('po');

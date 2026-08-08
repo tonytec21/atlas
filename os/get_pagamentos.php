@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection2.php');
+require_once __DIR__ . '/pagamento_observacao_config.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'GET') {
     $os_id = $_GET['os_id'];
@@ -12,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
     }
 
     try {
+        po_obs_garantir_coluna($conn);
+
         $stmt = $conn->prepare("SELECT * FROM pagamento_os WHERE ordem_de_servico_id = ?");
         $stmt->bind_param("i", $os_id);
         $stmt->execute();

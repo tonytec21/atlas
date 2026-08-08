@@ -4,6 +4,7 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 require_once __DIR__ . '/caixa_funcionario.php';
+require_once __DIR__ . '/pagamento_observacao_config.php';
 
 date_default_timezone_set('America/Sao_Paulo');
 
@@ -79,7 +80,7 @@ $atosManuais = fetchData(
 );
 
 $pagamentos = fetchData(
-    'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento
+    'SELECT os.id as ordem_de_servico_id, os.cliente, po.forma_de_pagamento, po.total_pagamento' . cx_pag_obs_sql($conn, 'po') . '
      FROM pagamento_os po
      JOIN ordens_de_servico os ON po.ordem_de_servico_id = os.id
      WHERE ' . ($tipo === 'unificado' ? '' : cx_func_sql('po.funcionario') . ' = :funcionario AND ') . 'DATE(po.data_pagamento) = :data',
@@ -423,16 +424,32 @@ renderTable($pdf, 'Atos Manuais',
     ['O.S'=>'8%', 'CLIENTE'=>'34%', 'ATO'=>'10%', 'DESCRIÇÃO'=>'28%', 'QTD'=>'5%', 'TOTAL (R$)'=>'15%']
 );
 
-renderTable($pdf, 'Pagamentos',
-    ['O.S', 'CLIENTE', 'FORMA DE PAGAMENTO', 'TOTAL (R$)'],
-    array_map(fn($p) => [
-        $p['ordem_de_servico_id'],
-        $p['cliente'],
-        $p['forma_de_pagamento'],
-        number_format($p['total_pagamento'], 2, ',', '.')
-    ], $pagamentos),
-    ['O.S'=>'10%', 'CLIENTE'=>'35%', 'FORMA DE PAGAMENTO'=>'40%', 'TOTAL (R$)'=>'15%']
-);
+/* A coluna OBSERVAÇÃO só entra no relatório quando houver ao menos um
+   pagamento com observação, para não desperdiçar largura da página. */
+if (cx_pag_obs_tem_conteudo($pagamentos)) {
+    renderTable($pdf, 'Pagamentos',
+        ['O.S', 'CLIENTE', 'FORMA DE PAGAMENTO', 'TOTAL (R$)', 'OBSERVAÇÃO'],
+        array_map(fn($p) => [
+            $p['ordem_de_servico_id'],
+            $p['cliente'],
+            $p['forma_de_pagamento'],
+            number_format($p['total_pagamento'], 2, ',', '.'),
+            htmlspecialchars(cx_pag_obs_resumo($p['observacao'] ?? '', 90), ENT_QUOTES, 'UTF-8')
+        ], $pagamentos),
+        ['O.S'=>'7%', 'CLIENTE'=>'25%', 'FORMA DE PAGAMENTO'=>'22%', 'TOTAL (R$)'=>'13%', 'OBSERVAÇÃO'=>'33%']
+    );
+} else {
+    renderTable($pdf, 'Pagamentos',
+        ['O.S', 'CLIENTE', 'FORMA DE PAGAMENTO', 'TOTAL (R$)'],
+        array_map(fn($p) => [
+            $p['ordem_de_servico_id'],
+            $p['cliente'],
+            $p['forma_de_pagamento'],
+            number_format($p['total_pagamento'], 2, ',', '.')
+        ], $pagamentos),
+        ['O.S'=>'10%', 'CLIENTE'=>'35%', 'FORMA DE PAGAMENTO'=>'40%', 'TOTAL (R$)'=>'15%']
+    );
+}
 
 renderTable($pdf, 'Total por Tipo de Pagamento',
     ['FORMA DE PAGAMENTO', 'TOTAL (R$)'],

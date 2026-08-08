@@ -223,6 +223,10 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
         .modal-status-pill{ position:absolute; right:48px; top:10px; }
         .card-footer-eq .btn { margin-right:6px; }
         .modal-dialog {max-width: 98%;}
+        /* ===== Observação da linha de pagamento ===== */
+        .cx-obs-cell{ max-width:320px; }
+        .cx-obs{ display:inline-block; font-size:.82rem; white-space:normal; word-break:break-word; }
+        .cx-obs-vazia{ color:#9aa3af; }
     </style>
 </head>
 <body class="light-mode">
@@ -559,6 +563,7 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
                   <th>Apresentante</th>
                   <th>Forma de Pagamento</th>
                   <th>Total</th>
+                  <th>Observação</th>
                 </tr>
                 </thead>
                 <tbody id="detalhesPagamentos"></tbody>
@@ -738,6 +743,18 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
   function formatCurrency(value){
     if (isNaN(value)) return 'R$ 0,00';
     return 'R$ ' + parseFloat(value).toFixed(2).replace('.',',').replace(/\d(?=(\d{3})+,)/g,'$&.');
+  }
+
+  /* ===== Observação da linha de pagamento (lançada no módulo de O.S.) ===== */
+  function escaparHtmlCx(texto){
+    return String(texto == null ? '' : texto)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function formatObservacaoPagamento(texto){
+    var t = (texto == null) ? '' : String(texto).trim();
+    if (t === '') return '<span class="cx-obs-vazia">&mdash;</span>';
+    return '<span class="cx-obs" title="' + escaparHtmlCx(t) + '">' + escaparHtmlCx(t).replace(/\n/g,'<br>') + '</span>';
   }
   function escapeRegex(s){ return String(s||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
   function parseBRMoney(str){
@@ -938,6 +955,7 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
               <td>${p.cliente}</td>
               <td>${p.forma_de_pagamento}</td>
               <td>${formatCurrency(p.total_pagamento)}</td>
+              <td class="cx-obs-cell">${formatObservacaoPagamento(p.observacao)}</td>
             </tr>`);
         });
         $('#totalPagamentos').text(formatCurrency(totalPag));

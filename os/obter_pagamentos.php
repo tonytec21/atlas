@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection2.php');
+require_once __DIR__ . '/pagamento_observacao_config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $os_id = $_POST['os_id'];
@@ -9,6 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!isset($conn)) {
         die(json_encode(['error' => 'Erro ao conectar ao banco de dados']));
     }
+
+    po_obs_garantir_coluna($conn);
 
     $stmt = $conn->prepare("SELECT * FROM pagamento_os WHERE ordem_de_servico_id = ?");
     $stmt->bind_param("i", $os_id);
