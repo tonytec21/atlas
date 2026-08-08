@@ -1,0 +1,173 @@
+/**
+ * Regressão dos defeitos relatados pelo usuário, executados num DOM real.
+ *
+ *  1. Clique na zona de anexos entrava em recursão (RangeError).
+ *  2. Modal sem .modal-content ficava sem cliques e sem rolagem.
+ *  3. Kanban em branco.
+ *  4. Painel sem os gráficos.
+ *  5. Troca rápida de visão deixava a área em branco para sempre.
+ */
+
+const fs = require('fs');
+const { JSDOM } = require('jsdom');
+
+const RAIZ = '/home/claude/build/tarefas';
+const RESP = JSON.parse(fs.readFileSync('/tmp/respostas.json', 'utf8'));
+
+let ok = 0;
+const falhas = [];
+function checar(desc, cond, detalhe) {
+    if (cond) { ok++; console.log('  [OK]    ' + desc); }
+    else { falhas.push(desc + (detalhe ? ' -> ' + detalhe : '')); console.log('  [FALHA] ' + desc + (detalhe ? ' -> ' + detalhe : '')); }
+}
+
+const dom = new JSDOM(fs.readFileSync('/tmp/pagina.html', 'utf8'), {
+    runScripts: 'outside-only', pretendToBeVisual: true,
+    url: 'http://localhost/atlas/tarefas/index.php'
+});
+const { window } = dom;
+window.eval(fs.readFileSync('/home/claude/jsdom/node_modules/jquery/dist/jquery.js', 'utf8'));
+const $ = window.jQuery;
+
+// ---------------------------------------------------------------
+// Teste 1 — recursão da zona de upload
+// ---------------------------------------------------------------
+console.log('\n== 1. Zona de anexos (RangeError) ==');
+{
+    const d = window.document;
+    const zona = d.createElement('div');
+    zona.id = 'zonaUpload';
+    const input = d.createElement('input');
+    input.type = 'file';
+    input.id = 'attachments';
+    zona.appendChild(input);
+    d.body.appendChild(zona);
+
+    // Reproduz o padrão ANTIGO, para provar que ele estourava a pilha.
+    let estourou = false;
+    $('#zonaUpload').on('click', function () { $('#attachments').trigger('click'); });
+    try { $('#zonaUpload').trigger('click'); }
+    catch (e) { estourou = /call stack|too much recursion/i.test(e.message); }
+    checar('padrão antigo realmente estoura a pilha', estourou);
+
+    // Agora o padrão CORRIGIDO.
+    $('#zonaUpload').off('click');
+    let cliquesNoInput = 0;
+    $('#zonaUpload').on('click', function (e) {
+        if (e.target === d.getElementById('attachments')) { return; }
+        cliquesNoInput++;
+        if (cliquesNoInput > 50) { throw new Error('recursão'); }
+        $('#attachments').trigger('click');
+    });
+
+    let erro = null;
+    try { $('#zonaUpload').trigger('click'); } catch (e) { erro = e.message; }
+    checar('padrão corrigido não entra em recursão', erro === null, erro);
+    checar('padrão corrigido abre o seletor uma única vez', cliquesNoInput === 1, 'cliques=' + cliquesNoInput);
+
+    zona.remove();
+}
+
+// ---------------------------------------------------------------
+// Teste 2 — estrutura do modal
+// ---------------------------------------------------------------
+console.log('\n== 2. Modal clicável ==');
+{
+    const md = window.document.getElementById('tfModalDetalhe');
+    const dialog = md.querySelector('.modal-dialog');
+    const content = md.querySelector('.modal-content');
+    checar('modal tem .modal-dialog', !!dialog);
+    checar('modal tem .modal-content (devolve pointer-events)', !!content);
+    checar('.modal-content envolve o corpo rolável',
+        !!(content && content.querySelector('#tfDetalheCorpo')));
+    checar('.modal-content envolve as abas',
+        !!(content && content.querySelector('.tf-abas')));
+    checar('.modal-content envolve a barra de ações',
+        !!(content && content.querySelector('#tfAcaoProtocolo')));
+}
+
+// ---------------------------------------------------------------
+// Ambiente para os testes de visão
+// ---------------------------------------------------------------
+const chamadas = [];
+let atrasoProximaChamada = 0;
+$.ajax = function (opcoes) {
+    const url = opcoes.url || '';
+    const dados = opcoes.data || {};
+    chamadas.push({ url, visao: dados.visao });
+
+    let corpo;
+    if (url.indexOf('tarefas.php') !== -1) {
+        corpo = dados.visao === 'kanban' ? RESP.kanban
+              : dados.visao === 'calendario' ? RESP.calendario : RESP.cards;
+    } else if (url.indexOf('dashboard.php') !== -1) { corpo = RESP.dashboard; }
+    else if (url.indexOf('tarefa.php') !== -1) { corpo = RESP.detalhe; }
+    else { corpo = { success: true }; }
+
+    const atraso = atrasoProximaChamada;
+    atrasoProximaChamada = 0;
+    const d = $.Deferred();
+    setTimeout(() => d.resolve(corpo), atraso);
+    return d.promise();
+};
+$.fn.modal = function () { return this; };
+
+window.TarefasConfig = {
+    csrf: 'x', usuario: 'tony', nome: 'Tony Tec', admin: true, ia_ativa: false,
+    status: ['Iniciada', 'Em Andamento', 'Concluída'],
+    prioridades: ['Baixa', 'Média', 'Alta', 'Crítica'],
+    funcionarios: ['Tony Tec', 'Maria Souza']
+};
+
+const errosJs = [];
+for (const arq of ['tarefas-core.js', 'tarefas-calendario.js', 'tarefas-detalhe.js', 'tarefas-documentos.js']) {
+    try { window.eval(fs.readFileSync(`${RAIZ}/assets/js/${arq}`, 'utf8')); }
+    catch (e) { errosJs.push(arq + ': ' + e.message); }
+}
+$(window.document).ready();
+window.Tarefas.iniciar();
+
+setTimeout(() => {
+    console.log('\n== 3. Carga inicial ==');
+    checar('nenhum erro ao carregar os scripts', errosJs.length === 0, errosJs.join(' | '));
+    checar('KPIs renderizados', $('#tfKpis .tf-kpi').length === 8, $('#tfKpis .tf-kpi').length + ' cartões');
+    checar('gráficos renderizados', $('#tfGraficos .tf-grafico').length === 5,
+        $('#tfGraficos .tf-grafico').length + ' gráficos');
+    checar('bloco de atenção renderizado', $('#tfAtencao .tf-grafico').length === 1);
+    checar('nenhuma caixa de erro no painel',
+        $('#tfPainel').html().indexOf('Não foi possível montar') === -1);
+
+    window.Tarefas.trocarVisao('kanban');
+
+    setTimeout(() => {
+        console.log('\n== 4. Kanban ==');
+        checar('colunas renderizadas', $('#tfKanban .tf-coluna').length === 11,
+            $('#tfKanban .tf-coluna').length + ' colunas');
+        checar('cards distribuídos nas colunas', $('#tfKanban .tf-kcard').length === 6,
+            $('#tfKanban .tf-kcard').length + ' cards');
+        checar('kanban visível (sem tf-oculto)', !$('#tfKanban').hasClass('tf-oculto'));
+        checar('cards arrastáveis', $('#tfKanban .tf-kcard[draggable="true"]').length > 0);
+
+        // ---------------------------------------------------------
+        // Teste 5 — troca rápida de visão
+        // ---------------------------------------------------------
+        console.log('\n== 5. Troca de visão com requisição em voo ==');
+        atrasoProximaChamada = 40;          // a resposta de cards demora
+        window.Tarefas.trocarVisao('cards');
+        window.Tarefas.trocarVisao('lista'); // troca antes de a anterior voltar
+
+        setTimeout(() => {
+            const temLinhas = $('#tfLista .tf-tabela tbody tr').length;
+            checar('lista renderizou mesmo com a busca anterior em voo',
+                temLinhas > 0, temLinhas + ' linhas');
+            checar('a resposta atrasada não vazou para dentro da lista',
+                $('#tfLista .tf-card').length === 0);
+
+            console.log('\n================ RESULTADO ================');
+            console.log('  Passaram: ' + ok);
+            console.log('  Falharam: ' + falhas.length);
+            falhas.forEach(f => console.log('   - ' + f));
+            process.exit(falhas.length ? 1 : 0);
+        }, 160);
+    }, 80);
+}, 120);

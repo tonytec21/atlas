@@ -1,0 +1,51 @@
+/**
+ * Verifica, com a cascata do CSS aplicada de verdade, se os botões que são
+ * links deixaram de ficar com texto da mesma cor do fundo.
+ */
+const fs = require('fs');
+const { JSDOM } = require('jsdom');
+
+const css = fs.readFileSync('/home/claude/build/tarefas/assets/css/tarefas.css', 'utf8');
+
+function testar(rotulo, htmlBotao) {
+    const dom = new JSDOM(`<body class="light-mode">
+        <style>${css}</style>
+        <div class="container-fluid tf-app">${htmlBotao}</div>
+    </body>`);
+    const el = dom.window.document.querySelector('.alvo');
+    const st = dom.window.getComputedStyle(el);
+    const cor = st.color;
+    const fundo = st.backgroundColor;
+    const igual = cor && fundo && cor === fundo;
+    console.log(`  ${igual ? '[FALHA]' : '[OK]   '} ${rotulo}: cor=${cor || '(vazia)'} fundo=${fundo || '(vazio)'}`);
+    return !igual;
+}
+
+console.log('== Botões como link (<a>) ==');
+let ok = true;
+ok &= testar('Nova tarefa (a.tf-btn-primario)',
+    '<a href="#" class="alvo tf-btn tf-btn-primario">Nova tarefa</a>');
+ok &= testar('Voltar (a.tf-btn)',
+    '<a href="#" class="alvo tf-btn">Voltar</a>');
+ok &= testar('Configurar IA (a.tf-btn-ia)',
+    '<a href="#" class="alvo tf-btn tf-btn-ia">Configurar</a>');
+ok &= testar('Excluir (a.tf-btn-perigo)',
+    '<a href="#" class="alvo tf-btn tf-btn-perigo">Excluir</a>');
+
+console.log('\n== Botões como <button> (não deviam ter regredido) ==');
+ok &= testar('Buscar com IA (button.tf-btn-ia)',
+    '<button class="alvo tf-btn tf-btn-ia">Buscar com IA</button>');
+ok &= testar('Aplicar (button.tf-btn-primario)',
+    '<button class="alvo tf-btn tf-btn-primario">Aplicar</button>');
+
+console.log('\n== Link comum continua azul ==');
+{
+    const dom = new JSDOM(`<body><style>${css}</style>
+        <div class="tf-app"><a href="#" class="alvo">um link</a></div></body>`);
+    const st = dom.window.getComputedStyle(dom.window.document.querySelector('.alvo'));
+    const azul = /var\(--tf-primaria\)|rgb/.test(st.color) && st.color !== '';
+    console.log(`  ${azul ? '[OK]   ' : '[FALHA]'} link comum: cor=${st.color || '(vazia)'}`);
+    ok &= azul;
+}
+
+process.exit(ok ? 0 : 1);

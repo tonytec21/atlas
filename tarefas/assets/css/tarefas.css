@@ -1,0 +1,1587 @@
+/*!
+ * Atlas · Tarefas — folha de estilo do módulo (v2).
+ *
+ * Escrita para conviver com o Bootstrap já carregado pelo Atlas sem depender
+ * da versão dele: todas as classes têm prefixo `tf-` e as poucas regras que
+ * tocam elementos genéricos estão restritas ao escopo `.tf-app`.
+ *
+ * Suporta os dois temas do Atlas (body.light-mode / body.dark-mode).
+ */
+
+/* ================================================================== */
+/* Variáveis                                                          */
+/* ================================================================== */
+
+.tf-app {
+    --tf-bg:            #f1f5f9;
+    --tf-surface:       #ffffff;
+    --tf-surface-2:     #f8fafc;
+    --tf-surface-3:     #eef2f7;
+    --tf-border:        #e2e8f0;
+    --tf-border-forte:  #cbd5e1;
+    --tf-texto:         #0f172a;
+    --tf-texto-2:       #64748b;
+    --tf-texto-3:       #94a3b8;
+    --tf-primaria:      #1e40af;
+    --tf-primaria-2:    #3b82f6;
+    --tf-primaria-suave:#eff6ff;
+    /*
+     * Cor primária para superfícies preenchidas com texto branco por cima
+     * (botão principal, cabeçalho de modal, página ativa, marcas da linha do
+     * tempo). Existe separada de --tf-primaria porque esta última também serve
+     * de cor de texto para links e precisa ser clara no tema escuro — usá-la
+     * como fundo lá deixaria branco sobre azul-claro, com contraste de 2,5:1.
+     */
+    --tf-primaria-solida: #1e40af;
+    --tf-sucesso:       #16a34a;
+    --tf-alerta:        #f59e0b;
+    --tf-perigo:        #dc2626;
+    --tf-roxo:          #7c3aed;
+    --tf-sombra:        0 1px 2px rgba(15, 23, 42, .06), 0 4px 12px rgba(15, 23, 42, .05);
+    --tf-sombra-forte:  0 8px 30px rgba(15, 23, 42, .14);
+    --tf-raio:          12px;
+    --tf-raio-sm:       8px;
+
+    /*
+     * Altura reservada para a barra de navegação fixa do Atlas (O.S / Caixa /
+     * Início / Tarefas / Menu), que fica colada no rodapé e cobre qualquer
+     * coisa desenhada embaixo dela — inclusive a barra de rolagem horizontal
+     * do Kanban. Tudo que é fixo ou rolável no módulo respeita esta medida.
+     * Se a altura do menu mudar no Atlas, basta ajustar aqui.
+     */
+    --tf-menu-inferior: 92px;
+    --tf-folga-inferior: calc(var(--tf-menu-inferior) + 20px);
+}
+
+body.dark-mode .tf-app,
+.tf-app.dark {
+    --tf-bg:            #0f1419;
+    --tf-surface:       #171c23;
+    --tf-surface-2:     #1d232c;
+    --tf-surface-3:     #232a34;
+    --tf-border:        #2b333f;
+    --tf-border-forte:  #3a4451;
+    --tf-texto:         #e8edf4;
+    --tf-texto-2:       #97a3b6;
+    --tf-texto-3:       #6b7787;
+    --tf-primaria:      #60a5fa;
+    --tf-primaria-2:    #3b82f6;
+    --tf-primaria-suave:#1a2740;
+    --tf-primaria-solida: #2563eb;
+    --tf-sombra:        0 1px 2px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.25);
+    --tf-sombra-forte:  0 8px 30px rgba(0,0,0,.45);
+}
+
+/* ================================================================== */
+/* Base                                                               */
+/* ================================================================== */
+
+.tf-app {
+    color: var(--tf-texto);
+    font-size: 14px;
+    /* Nada do módulo termina embaixo da barra de navegação do sistema. */
+    padding-bottom: var(--tf-folga-inferior);
+}
+
+/* Rolagem por âncora e foco também param acima do menu. */
+.tf-app {
+    scroll-padding-bottom: var(--tf-folga-inferior);
+}
+
+/*
+ * Exceções: elementos que são eles próprios flutuantes não devem herdar a
+ * folga como espaçamento interno — nesses a folga já entra no posicionamento.
+ */
+.tf-app.tf-lote { padding-bottom: 10px; }
+.modal-dialog.tf-app {
+    padding-bottom: 0;
+    /*
+     * Margem enxuta em cima e a folga do menu embaixo: é o que sobra de altura
+     * livre para o modal ocupar.
+     */
+    margin-top: 1rem;
+    margin-bottom: var(--tf-folga-inferior);
+    width: auto;
+}
+
+/*
+ * Larguras próprias, mais generosas que as do Bootstrap (que para no modal-xl
+ * em 1140px). Em telas largas o modal de detalhe aproveita bem mais espaço,
+ * e o `min()` garante que em telas estreitas ele continue com respiro nas
+ * laterais.
+ */
+.modal-dialog.modal-xl.tf-app { max-width: min(1560px, 95vw); }
+.modal-dialog.modal-lg.tf-app { max-width: min(1040px, 95vw); }
+
+.tf-app *,
+.tf-app *::before,
+.tf-app *::after { box-sizing: border-box; }
+
+/*
+ * O :not(.tf-btn) é essencial. Sem ele, `.tf-app a` (especificidade 0,1,1)
+ * vencia `.tf-btn-primario` (0,1,0), e os botões que são links — "Nova tarefa",
+ * por exemplo — ficavam com texto azul sobre fundo azul. O texto só aparecia ao
+ * passar o mouse, porque aí valia `.tf-btn-primario:hover` (0,2,0).
+ */
+.tf-app a:not(.tf-btn) { color: var(--tf-primaria); text-decoration: none; }
+.tf-app a:not(.tf-btn):hover { text-decoration: underline; }
+.tf-app a.tf-btn { text-decoration: none; }
+
+.tf-mudo   { color: var(--tf-texto-2); }
+.tf-mini   { font-size: .78rem; }
+.tf-forte  { font-weight: 600; }
+.tf-oculto { display: none !important; }
+
+/* ================================================================== */
+/* Cabeçalho da página                                                */
+/* ================================================================== */
+
+.tf-topo {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio);
+    padding: 18px 22px;
+    margin-bottom: 16px;
+    box-shadow: var(--tf-sombra);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.tf-topo-icone {
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--tf-primaria-solida), var(--tf-primaria-2));
+    color: #fff; font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.tf-topo h1 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 650;
+    letter-spacing: -.01em;
+    color: var(--tf-texto);
+}
+
+.tf-topo .tf-sub {
+    margin-top: 2px;
+    font-size: .84rem;
+    color: var(--tf-texto-2);
+}
+
+.tf-topo-acoes { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ================================================================== */
+/* Botões                                                             */
+/* ================================================================== */
+
+.tf-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: var(--tf-raio-sm);
+    border: 1px solid var(--tf-border-forte);
+    background: var(--tf-surface);
+    color: var(--tf-texto);
+    font-size: .85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .15s ease;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.tf-btn,
+.tf-app a.tf-btn { color: var(--tf-texto); }
+/*
+ * O hover neutro precisa excluir as variantes coloridas.
+ *
+ * `.tf-btn:hover` tem especificidade 0,2,0 — a mesma de `.tf-btn-ia:hover` — e
+ * vem antes no arquivo. Como as variantes só redeclaravam `filter` e `color` no
+ * hover, o `background` continuava vindo daqui: fundo claro com fonte branca,
+ * ou seja, o botão sumia ao passar o mouse. Acontecia em "Redigir com IA",
+ * "Buscar com IA", "Excluir" e nos botões de remover da tela de IA.
+ *
+ * Com o :not() o hover neutro só vale para o botão neutro, e cada variante
+ * abaixo declara o próprio fundo explicitamente.
+ */
+.tf-btn:not(.tf-btn-primario):not(.tf-btn-sucesso):not(.tf-btn-perigo):not(.tf-btn-ia):hover,
+.tf-app a.tf-btn:not(.tf-btn-primario):not(.tf-btn-sucesso):not(.tf-btn-perigo):not(.tf-btn-ia):hover {
+    background: var(--tf-surface-3);
+    text-decoration: none;
+    color: var(--tf-texto);
+}
+.tf-btn:active { transform: translateY(1px); }
+.tf-btn:disabled, .tf-btn.tf-carregando { opacity: .55; cursor: not-allowed; }
+
+.tf-btn-primario,
+.tf-app a.tf-btn-primario {
+    background: var(--tf-primaria-solida);
+    border-color: var(--tf-primaria-solida);
+    color: #fff;
+}
+.tf-btn-primario:hover,
+.tf-app a.tf-btn-primario:hover {
+    background: var(--tf-primaria-2);
+    border-color: var(--tf-primaria-2);
+    color: #fff;
+    text-decoration: none;
+}
+
+.tf-btn-sucesso,
+.tf-app a.tf-btn-sucesso { background: var(--tf-sucesso); border-color: var(--tf-sucesso); color: #fff; }
+.tf-btn-sucesso:hover,
+.tf-app a.tf-btn-sucesso:hover {
+    background: var(--tf-sucesso);
+    border-color: var(--tf-sucesso);
+    color: #fff;
+    filter: brightness(1.08);
+    text-decoration: none;
+}
+
+.tf-btn-perigo,
+.tf-app a.tf-btn-perigo { background: var(--tf-perigo); border-color: var(--tf-perigo); color: #fff; }
+.tf-btn-perigo:hover,
+.tf-app a.tf-btn-perigo:hover {
+    background: var(--tf-perigo);
+    border-color: var(--tf-perigo);
+    color: #fff;
+    filter: brightness(1.08);
+    text-decoration: none;
+}
+
+.tf-btn-ia,
+.tf-app a.tf-btn-ia {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    border-color: transparent;
+    color: #fff;
+}
+.tf-btn-ia:hover,
+.tf-app a.tf-btn-ia:hover {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    border-color: transparent;
+    color: #fff;
+    filter: brightness(1.12);
+    text-decoration: none;
+}
+
+.tf-btn-sm { padding: 5px 10px; font-size: .78rem; }
+.tf-btn-icone { padding: 7px 9px; }
+
+/* ================================================================== */
+/* Painel de indicadores                                              */
+/* ================================================================== */
+
+.tf-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.tf-kpi {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio);
+    padding: 14px 16px;
+    box-shadow: var(--tf-sombra);
+    cursor: pointer;
+    transition: all .15s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.tf-kpi::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--tf-cor, var(--tf-primaria));
+}
+
+.tf-kpi:hover { transform: translateY(-2px); box-shadow: var(--tf-sombra-forte); }
+.tf-kpi.tf-ativo { border-color: var(--tf-cor, var(--tf-primaria)); }
+
+.tf-kpi-valor {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--tf-texto);
+    font-variant-numeric: tabular-nums;
+}
+
+.tf-kpi-rotulo {
+    font-size: .76rem;
+    color: var(--tf-texto-2);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.tf-kpi-extra { font-size: .74rem; color: var(--tf-texto-3); margin-top: 4px; }
+
+/* ================================================================== */
+/* Barra de busca e filtros                                           */
+/* ================================================================== */
+
+.tf-painel {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio);
+    box-shadow: var(--tf-sombra);
+    margin-bottom: 16px;
+}
+
+.tf-busca {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    flex-wrap: wrap;
+}
+
+.tf-busca-campo {
+    flex: 1 1 320px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.tf-busca-campo > i {
+    position: absolute;
+    left: 12px;
+    color: var(--tf-texto-3);
+    pointer-events: none;
+}
+
+.tf-input, .tf-select, .tf-textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--tf-border-forte);
+    border-radius: var(--tf-raio-sm);
+    background: var(--tf-surface);
+    color: var(--tf-texto);
+    font-size: .87rem;
+    transition: border-color .15s, box-shadow .15s;
+    font-family: inherit;
+}
+
+.tf-busca-campo .tf-input { padding-left: 34px; }
+
+.tf-input:focus, .tf-select:focus, .tf-textarea:focus {
+    outline: none;
+    border-color: var(--tf-primaria-2);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, .15);
+}
+
+.tf-input[readonly] { background: var(--tf-surface-2); color: var(--tf-texto-2); }
+.tf-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+.tf-rotulo {
+    display: block;
+    font-size: .76rem;
+    font-weight: 600;
+    color: var(--tf-texto-2);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    margin-bottom: 5px;
+}
+
+.tf-chips { display: flex; gap: 7px; padding: 0 14px 12px; flex-wrap: wrap; }
+
+.tf-chip {
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--tf-border-forte);
+    background: var(--tf-surface-2);
+    color: var(--tf-texto-2);
+    font-size: .79rem;
+    cursor: pointer;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.tf-chip:hover { border-color: var(--tf-primaria-2); color: var(--tf-texto); }
+.tf-chip.tf-ativo {
+    background: var(--tf-primaria-solida);
+    border-color: var(--tf-primaria-solida);
+    color: #fff;
+}
+.tf-chip b { font-variant-numeric: tabular-nums; }
+
+.tf-filtros {
+    border-top: 1px solid var(--tf-border);
+    padding: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+}
+
+.tf-filtros-rodape {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+/* ================================================================== */
+/* Alternador de visão                                                */
+/* ================================================================== */
+
+.tf-visoes {
+    display: inline-flex;
+    background: var(--tf-surface-3);
+    border-radius: var(--tf-raio-sm);
+    padding: 3px;
+    gap: 2px;
+}
+
+.tf-visao {
+    padding: 7px 13px;
+    border: 0;
+    background: transparent;
+    color: var(--tf-texto-2);
+    font-size: .82rem;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .15s;
+}
+
+.tf-visao:hover { color: var(--tf-texto); }
+.tf-visao.tf-ativo {
+    background: var(--tf-surface);
+    color: var(--tf-primaria);
+    box-shadow: var(--tf-sombra);
+}
+
+/* ================================================================== */
+/* Cards de tarefa                                                    */
+/* ================================================================== */
+
+.tf-grade {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 14px;
+}
+
+.tf-card {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-left: 4px solid var(--tf-prio, var(--tf-texto-3));
+    border-radius: var(--tf-raio);
+    padding: 14px 16px;
+    box-shadow: var(--tf-sombra);
+    cursor: pointer;
+    transition: all .18s ease;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tf-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--tf-sombra-forte);
+    border-color: var(--tf-border-forte);
+}
+
+.tf-card.tf-vencida  { background: linear-gradient(180deg, rgba(220,38,38,.05), transparent 60px); }
+.tf-card.tf-hoje     { background: linear-gradient(180deg, rgba(245,158,11,.07), transparent 60px); }
+.tf-card.tf-marcada  { outline: 2px solid var(--tf-primaria-2); outline-offset: -1px; }
+
+.tf-card-topo {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.tf-card-protocolo {
+    font-size: .74rem;
+    font-weight: 700;
+    color: var(--tf-primaria);
+    letter-spacing: .03em;
+    font-variant-numeric: tabular-nums;
+}
+
+.tf-card-titulo {
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--tf-texto);
+    line-height: 1.35;
+    margin: 2px 0 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.tf-card-desc {
+    font-size: .81rem;
+    color: var(--tf-texto-2);
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.tf-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-size: .78rem;
+    color: var(--tf-texto-2);
+}
+
+.tf-card-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.tf-card-meta i { color: var(--tf-texto-3); width: 13px; text-align: center; }
+
+.tf-card-rodape {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px solid var(--tf-border);
+}
+
+.tf-card-check {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 17px; height: 17px;
+    cursor: pointer;
+    accent-color: var(--tf-primaria);
+    opacity: 0;
+    transition: opacity .15s;
+}
+
+.tf-card:hover .tf-card-check,
+.tf-card-check:checked { opacity: 1; }
+
+/* ================================================================== */
+/* Selos                                                              */
+/* ================================================================== */
+
+.tf-selo {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: .73rem;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.tf-selo-status {
+    color: #fff;
+    background: var(--tf-cor, #94a3b8);
+}
+
+.tf-selo-contorno {
+    background: transparent;
+    border: 1px solid var(--tf-cor, var(--tf-border-forte));
+    color: var(--tf-cor, var(--tf-texto-2));
+}
+
+.tf-selo-vencida  { background: #fee2e2; color: #991b1b; }
+.tf-selo-hoje     { background: #fef3c7; color: #92400e; }
+.tf-selo-proxima  { background: #fef9c3; color: #854d0e; }
+.tf-selo-no-prazo { background: #dcfce7; color: #166534; }
+.tf-selo-encerrada, .tf-selo-sem-prazo { background: var(--tf-surface-3); color: var(--tf-texto-2); }
+
+body.dark-mode .tf-selo-vencida  { background: rgba(220,38,38,.2);  color: #fca5a5; }
+body.dark-mode .tf-selo-hoje     { background: rgba(245,158,11,.2); color: #fcd34d; }
+body.dark-mode .tf-selo-proxima  { background: rgba(234,179,8,.18); color: #fde047; }
+body.dark-mode .tf-selo-no-prazo { background: rgba(22,163,74,.2);  color: #86efac; }
+
+.tf-ponto {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--tf-cor, #94a3b8);
+    flex-shrink: 0;
+}
+
+/* ================================================================== */
+/* Kanban                                                             */
+/* ================================================================== */
+
+.tf-kanban {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    /*
+     * O padding inferior é o que mantém a barra de rolagem horizontal visível:
+     * sem ele ela nasce rente ao fim do elemento e some atrás do menu fixo.
+     */
+    padding-bottom: 16px;
+    margin-bottom: 8px;
+    min-height: 420px;
+    scrollbar-width: thin;
+    overscroll-behavior-x: contain;
+}
+
+/* Barra de rolagem do Kanban um pouco mais grossa, para ficar fácil de pegar. */
+.tf-kanban::-webkit-scrollbar { height: 11px; }
+.tf-kanban::-webkit-scrollbar-track {
+    background: var(--tf-surface-3);
+    border-radius: 999px;
+}
+.tf-kanban::-webkit-scrollbar-thumb {
+    background: var(--tf-border-forte);
+    border-radius: 999px;
+}
+.tf-kanban::-webkit-scrollbar-thumb:hover { background: var(--tf-texto-3); }
+
+.tf-coluna {
+    flex: 0 0 296px;
+    background: var(--tf-surface-2);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio);
+    display: flex;
+    flex-direction: column;
+    /* Desconta o menu fixo para a coluna nunca passar por baixo dele. */
+    max-height: calc(100vh - var(--tf-folga-inferior) - 210px);
+    min-height: 300px;
+}
+
+.tf-coluna-topo {
+    padding: 11px 13px;
+    border-bottom: 1px solid var(--tf-border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    background: var(--tf-surface-2);
+    border-radius: var(--tf-raio) var(--tf-raio) 0 0;
+    z-index: 2;
+}
+
+.tf-coluna-titulo {
+    font-size: .82rem;
+    font-weight: 650;
+    color: var(--tf-texto);
+    flex: 1;
+}
+
+.tf-coluna-contador {
+    background: var(--tf-surface-3);
+    color: var(--tf-texto-2);
+    border-radius: 999px;
+    padding: 1px 9px;
+    font-size: .74rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.tf-coluna-corpo {
+    padding: 10px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.tf-coluna-corpo.tf-alvo {
+    background: var(--tf-primaria-suave);
+    outline: 2px dashed var(--tf-primaria-2);
+    outline-offset: -6px;
+}
+
+.tf-kcard {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-left: 3px solid var(--tf-prio, var(--tf-texto-3));
+    border-radius: var(--tf-raio-sm);
+    padding: 11px 12px;
+    cursor: grab;
+    box-shadow: var(--tf-sombra);
+    transition: box-shadow .15s, transform .15s;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tf-kcard:hover  { box-shadow: var(--tf-sombra-forte); }
+.tf-kcard:active { cursor: grabbing; }
+.tf-kcard.tf-arrastando { opacity: .4; transform: rotate(1.5deg); }
+
+.tf-kcard-titulo {
+    font-size: .84rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--tf-texto);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.tf-kcard-rodape {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .73rem;
+    color: var(--tf-texto-2);
+    flex-wrap: wrap;
+}
+
+.tf-coluna-vazia {
+    text-align: center;
+    padding: 24px 10px;
+    color: var(--tf-texto-3);
+    font-size: .8rem;
+}
+
+/* ================================================================== */
+/* Tabela                                                             */
+/* ================================================================== */
+
+.tf-tabela-caixa {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio);
+    overflow: auto;
+    box-shadow: var(--tf-sombra);
+}
+
+.tf-tabela { width: 100%; border-collapse: collapse; font-size: .84rem; }
+
+.tf-tabela thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--tf-surface-3);
+    color: var(--tf-texto-2);
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 650;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--tf-border);
+    cursor: pointer;
+    user-select: none;
+}
+
+.tf-tabela thead th:hover { color: var(--tf-texto); }
+.tf-tabela thead th.tf-sem-ordem { cursor: default; }
+
+.tf-tabela tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--tf-border);
+    color: var(--tf-texto);
+    vertical-align: middle;
+}
+
+.tf-tabela tbody tr { cursor: pointer; transition: background .12s; }
+.tf-tabela tbody tr:hover { background: var(--tf-surface-2); }
+.tf-tabela tbody tr:last-child td { border-bottom: 0; }
+.tf-tabela .tf-num { font-variant-numeric: tabular-nums; }
+
+/* ================================================================== */
+/* Calendário (implementação própria, sem CDN)                        */
+/* ================================================================== */
+
+.tf-cal {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio);
+    box-shadow: var(--tf-sombra);
+    overflow: hidden;
+}
+
+.tf-cal-topo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--tf-border);
+    flex-wrap: wrap;
+}
+
+.tf-cal-mes {
+    font-size: 1.05rem;
+    font-weight: 650;
+    text-transform: capitalize;
+    min-width: 190px;
+}
+
+.tf-cal-grade {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+}
+
+.tf-cal-dia-nome {
+    padding: 9px 6px;
+    text-align: center;
+    font-size: .73rem;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--tf-texto-2);
+    background: var(--tf-surface-3);
+    border-bottom: 1px solid var(--tf-border);
+}
+
+.tf-cal-cel {
+    min-height: 108px;
+    border-right: 1px solid var(--tf-border);
+    border-bottom: 1px solid var(--tf-border);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    background: var(--tf-surface);
+}
+
+.tf-cal-cel:nth-child(7n) { border-right: 0; }
+.tf-cal-cel.tf-fora  { background: var(--tf-surface-2); }
+.tf-cal-cel.tf-hoje  { background: var(--tf-primaria-suave); }
+
+.tf-cal-num {
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--tf-texto-2);
+    align-self: flex-end;
+    font-variant-numeric: tabular-nums;
+}
+
+.tf-cal-cel.tf-hoje .tf-cal-num {
+    background: var(--tf-primaria-solida);
+    color: #fff;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+}
+
+.tf-cal-evt {
+    font-size: .72rem;
+    padding: 3px 6px;
+    border-radius: 5px;
+    color: #fff;
+    background: var(--tf-cor, #64748b);
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.4;
+    border-left: 3px solid rgba(0,0,0,.2);
+}
+
+.tf-cal-evt:hover { filter: brightness(1.12); }
+.tf-cal-evt.tf-evt-vencida { box-shadow: inset 0 0 0 1px #dc2626; }
+.tf-cal-mais { font-size: .7rem; color: var(--tf-texto-2); cursor: pointer; padding-left: 4px; }
+
+/* ================================================================== */
+/* Modal de detalhe                                                   */
+/* ================================================================== */
+
+.tf-modal-conteudo {
+    background: var(--tf-surface);
+    border-radius: var(--tf-raio);
+    border: 1px solid var(--tf-border);
+    overflow: hidden;
+
+    /*
+     * Coluna flexível com teto de altura: cabeçalho, barra de ações, abas e
+     * rodapé ficam fixos e o corpo estica para ocupar tudo o que sobrar. Antes
+     * o corpo tinha uma altura calculada na mão, que precisava supor a altura
+     * das outras partes e por isso ficava sempre curta demais.
+     */
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - var(--tf-folga-inferior) - 2rem);
+}
+
+.tf-modal-topo,
+.tf-barra-acoes,
+.tf-abas,
+.tf-modal-rodape { flex: 0 0 auto; }
+
+/*
+ * Nos modais de guia, recibo e arquivamento o <form> envolve o corpo e o
+ * rodapé. Sem repassar a flexibilidade para ele, o corpo não teria como
+ * esticar nem rolar, e o conteúdo seria cortado pelo `overflow: hidden` do
+ * contêiner.
+ */
+.tf-modal-conteudo > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.tf-modal-topo {
+    background: linear-gradient(135deg, var(--tf-primaria-solida), #1e3a8a);
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.tf-modal-topo h5 { margin: 0; font-size: 1.02rem; font-weight: 650; display: flex; align-items: center; gap: 9px; }
+.tf-modal-topo .tf-fechar {
+    margin-left: auto;
+    background: rgba(255,255,255,.15);
+    border: 0; color: #fff;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.05rem;
+    display: grid; place-items: center;
+    transition: background .15s;
+}
+.tf-modal-topo .tf-fechar:hover { background: rgba(255,255,255,.28); }
+
+.tf-barra-acoes {
+    display: flex;
+    gap: 7px;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--tf-border);
+    background: var(--tf-surface-2);
+    overflow-x: auto;
+    flex-wrap: wrap;
+}
+
+.tf-abas {
+    display: flex;
+    gap: 2px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--tf-border);
+    background: var(--tf-surface);
+    overflow-x: auto;
+}
+
+.tf-aba {
+    padding: 11px 15px;
+    border: 0;
+    background: transparent;
+    color: var(--tf-texto-2);
+    font-size: .85rem;
+    font-weight: 550;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: all .15s;
+}
+
+.tf-aba:hover { color: var(--tf-texto); }
+.tf-aba.tf-ativo { color: var(--tf-primaria); border-bottom-color: var(--tf-primaria); }
+
+.tf-aba-contador {
+    background: var(--tf-surface-3);
+    color: var(--tf-texto-2);
+    border-radius: 999px;
+    padding: 0 7px;
+    font-size: .7rem;
+    font-weight: 700;
+}
+
+/* Rodapé de modal com ações alinhadas à direita. */
+.tf-modal-rodape {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--tf-border);
+    background: var(--tf-surface-2);
+    flex-wrap: wrap;
+}
+
+/* Caixa de seleção com a mesma pegada visual dos demais controles. */
+.tf-check-caixa {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--tf-primaria);
+    cursor: pointer;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+/* Zona de upload desativada (quando os anexos são reaproveitados). */
+.tf-zona-upload.tf-desativada {
+    opacity: .45;
+    pointer-events: none;
+    border-style: solid;
+}
+
+.tf-modal-corpo {
+    padding: 20px 22px;
+    /* `min-height: 0` é o que permite ao item flexível encolher e rolar. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.tf-aba-painel { display: none; }
+.tf-aba-painel.tf-ativo { display: block; }
+
+.tf-info-grade {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px 16px;
+    margin-bottom: 18px;
+}
+
+.tf-info-item .tf-rotulo { margin-bottom: 4px; }
+.tf-info-valor {
+    background: var(--tf-surface-2);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio-sm);
+    padding: 9px 12px;
+    font-size: .87rem;
+    color: var(--tf-texto);
+    min-height: 38px;
+    word-break: break-word;
+}
+
+.tf-bloco {
+    background: var(--tf-surface-2);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio);
+    padding: 15px 17px;
+    margin-bottom: 16px;
+}
+
+.tf-bloco-titulo {
+    font-size: .82rem;
+    font-weight: 650;
+    color: var(--tf-texto);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tf-bloco-titulo .tf-btn { margin-left: auto; }
+
+/* ================================================================== */
+/* Anexos                                                             */
+/* ================================================================== */
+
+.tf-anexos { display: flex; flex-direction: column; gap: 8px; }
+
+.tf-anexo {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 12px;
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio-sm);
+    transition: border-color .15s;
+}
+
+.tf-anexo:hover { border-color: var(--tf-primaria-2); }
+.tf-anexo.tf-sumido { opacity: .55; }
+
+.tf-anexo-icone {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    background: var(--tf-surface-3);
+    color: var(--tf-texto-2);
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.tf-anexo-nome {
+    flex: 1;
+    font-size: .84rem;
+    word-break: break-all;
+    line-height: 1.35;
+}
+
+.tf-anexo-nome small { display: block; color: var(--tf-texto-3); font-size: .74rem; }
+.tf-anexo-acoes { display: flex; gap: 5px; flex-shrink: 0; }
+
+.tf-zona-upload {
+    border: 2px dashed var(--tf-border-forte);
+    border-radius: var(--tf-raio);
+    padding: 22px;
+    text-align: center;
+    color: var(--tf-texto-2);
+    cursor: pointer;
+    transition: all .15s;
+    background: var(--tf-surface);
+}
+
+.tf-zona-upload:hover, .tf-zona-upload.tf-sobre {
+    border-color: var(--tf-primaria-2);
+    background: var(--tf-primaria-suave);
+    color: var(--tf-primaria);
+}
+
+.tf-zona-upload i { font-size: 1.7rem; display: block; margin-bottom: 8px; }
+
+/* ================================================================== */
+/* Linha do tempo                                                     */
+/* ================================================================== */
+
+.tf-tempo { position: relative; padding-left: 30px; }
+
+.tf-tempo::before {
+    content: '';
+    position: absolute;
+    left: 11px; top: 6px; bottom: 6px;
+    width: 2px;
+    background: var(--tf-border);
+}
+
+.tf-tempo-item { position: relative; margin-bottom: 16px; }
+
+.tf-tempo-marca {
+    position: absolute;
+    left: -30px; top: 3px;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--tf-primaria-solida);
+    color: #fff;
+    display: grid; place-items: center;
+    font-size: .68rem;
+    border: 3px solid var(--tf-surface);
+}
+
+.tf-tempo-item.tf-sub .tf-tempo-marca { background: var(--tf-alerta); }
+.tf-tempo-item.tf-sistema .tf-tempo-marca { background: var(--tf-texto-3); }
+
+.tf-tempo-caixa {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio-sm);
+    padding: 11px 14px;
+}
+
+.tf-tempo-item.tf-sub .tf-tempo-caixa { border-left: 3px solid var(--tf-alerta); }
+
+.tf-tempo-cabec {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 6px;
+    font-size: .78rem;
+    color: var(--tf-texto-2);
+    flex-wrap: wrap;
+}
+
+.tf-tempo-autor { font-weight: 650; color: var(--tf-texto); }
+.tf-tempo-texto { font-size: .87rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.tf-tempo-acoes { margin-left: auto; display: flex; gap: 4px; }
+
+/* ================================================================== */
+/* Checklist                                                          */
+/* ================================================================== */
+
+.tf-check-lista { display: flex; flex-direction: column; gap: 6px; }
+
+.tf-check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 12px;
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio-sm);
+}
+
+.tf-check-item input[type=checkbox] {
+    width: 17px; height: 17px;
+    accent-color: var(--tf-sucesso);
+    cursor: pointer;
+    margin-top: 1px;
+    flex-shrink: 0;
+}
+
+.tf-check-item.tf-feito .tf-check-texto {
+    text-decoration: line-through;
+    color: var(--tf-texto-3);
+}
+
+.tf-check-texto { flex: 1; font-size: .86rem; line-height: 1.45; }
+.tf-check-texto small { display: block; color: var(--tf-texto-3); font-size: .72rem; margin-top: 2px; }
+
+.tf-progresso {
+    height: 6px;
+    background: var(--tf-surface-3);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.tf-progresso > div {
+    height: 100%;
+    background: var(--tf-sucesso);
+    border-radius: 999px;
+    transition: width .3s ease;
+}
+
+/* ================================================================== */
+/* Painel de IA                                                       */
+/* ================================================================== */
+
+.tf-ia-caixa {
+    background: linear-gradient(135deg, rgba(124,58,237,.06), rgba(59,130,246,.06));
+    border: 1px solid rgba(124,58,237,.22);
+    border-radius: var(--tf-raio);
+    padding: 15px 17px;
+    margin-bottom: 14px;
+}
+
+.tf-ia-titulo {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: .84rem;
+    font-weight: 650;
+    color: var(--tf-roxo);
+    margin-bottom: 10px;
+}
+
+body.dark-mode .tf-ia-titulo { color: #c4b5fd; }
+
+.tf-ia-acoes { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+
+.tf-ia-saida {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio-sm);
+    padding: 13px 15px;
+    font-size: .87rem;
+    line-height: 1.62;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.tf-ia-saida:empty { display: none; }
+
+.tf-ia-rodape {
+    display: flex;
+    gap: 7px;
+    margin-top: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: .74rem;
+    color: var(--tf-texto-3);
+}
+
+.tf-ia-chat {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 4px;
+    margin-bottom: 10px;
+}
+
+.tf-msg {
+    padding: 10px 13px;
+    border-radius: 12px;
+    font-size: .86rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 88%;
+}
+
+.tf-msg-user {
+    align-self: flex-end;
+    background: var(--tf-primaria-solida);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+
+.tf-msg-ia {
+    align-self: flex-start;
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-bottom-left-radius: 4px;
+}
+
+.tf-ia-desligada {
+    text-align: center;
+    padding: 26px 18px;
+    color: var(--tf-texto-2);
+}
+
+.tf-ia-desligada i { font-size: 2rem; color: var(--tf-roxo); display: block; margin-bottom: 10px; }
+
+/* ================================================================== */
+/* Estados                                                            */
+/* ================================================================== */
+
+.tf-vazio {
+    text-align: center;
+    padding: 52px 20px;
+    color: var(--tf-texto-2);
+}
+
+.tf-vazio i { font-size: 2.6rem; color: var(--tf-texto-3); display: block; margin-bottom: 14px; }
+.tf-vazio h4 { font-size: 1rem; font-weight: 600; color: var(--tf-texto); margin: 0 0 6px; }
+.tf-vazio p { font-size: .86rem; margin: 0 0 14px; }
+
+.tf-girando { animation: tf-gira .9s linear infinite; display: inline-block; }
+@keyframes tf-gira { to { transform: rotate(360deg); } }
+
+.tf-esqueleto {
+    background: linear-gradient(90deg, var(--tf-surface-3) 25%, var(--tf-surface-2) 50%, var(--tf-surface-3) 75%);
+    background-size: 200% 100%;
+    animation: tf-brilho 1.4s ease-in-out infinite;
+    border-radius: var(--tf-raio);
+    height: 150px;
+}
+
+@keyframes tf-brilho {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ================================================================== */
+/* Barra de seleção em lote                                           */
+/* ================================================================== */
+
+.tf-lote {
+    position: fixed;
+    left: 50%;
+    /* Acima da barra de navegação do sistema, nunca atrás dela. */
+    bottom: var(--tf-folga-inferior);
+
+    /*
+     * A barra some por visibilidade, não por deslocamento.
+     *
+     * Antes ela era escondida com translateY(140%), contando que a própria
+     * altura a jogasse para fora da tela. Quando o `bottom` passou a reservar
+     * espaço para o menu do sistema, esse empurrão deixou de ser suficiente e
+     * a barra ficava estacionada justamente sobre o menu, visível mesmo sem
+     * nenhuma tarefa selecionada. Com visibility + opacity ela desaparece de
+     * fato, independente da altura que tiver ou de onde estiver ancorada; o
+     * deslocamento fica só para a animação de entrada.
+     */
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(20px);
+
+    background: var(--tf-texto);
+    color: #fff;
+    border-radius: 999px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--tf-sombra-forte);
+    z-index: 1055;
+    transition: transform .22s ease, opacity .18s ease, visibility .22s;
+    flex-wrap: wrap;
+}
+
+.tf-lote.tf-visivel {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+.tf-lote select {
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.25);
+    color: #fff;
+    border-radius: 7px;
+    padding: 5px 9px;
+    font-size: .8rem;
+}
+.tf-lote select option { color: #111; }
+
+/* ================================================================== */
+/* Paginação                                                          */
+/* ================================================================== */
+
+.tf-paginacao {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+}
+
+.tf-pagina {
+    min-width: 34px;
+    padding: 6px 10px;
+    border: 1px solid var(--tf-border-forte);
+    background: var(--tf-surface);
+    color: var(--tf-texto);
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: .82rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.tf-pagina:hover { background: var(--tf-surface-3); }
+.tf-pagina.tf-ativo { background: var(--tf-primaria-solida); border-color: var(--tf-primaria-solida); color: #fff; }
+.tf-pagina:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ================================================================== */
+/* Gráficos do painel                                                 */
+/* ================================================================== */
+
+.tf-graficos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.tf-grafico {
+    background: var(--tf-surface);
+    border: 1px solid var(--tf-border);
+    border-radius: var(--tf-raio);
+    padding: 15px 17px;
+    box-shadow: var(--tf-sombra);
+}
+
+.tf-grafico h4 {
+    font-size: .8rem;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--tf-texto-2);
+    margin: 0 0 14px;
+}
+
+.tf-barra-linha {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 9px;
+    font-size: .8rem;
+}
+
+.tf-barra-nome {
+    width: 40%;
+    color: var(--tf-texto-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tf-barra-trilho {
+    /*
+     * `display: block` aqui e no preenchimento é obrigatório. Os dois são
+     * <span>, e em elemento inline as propriedades `width` e `height` não se
+     * aplicam — o preenchimento nascia com altura zero e as barras apareciam
+     * sempre vazias. O trilho escapava por ser filho de um flex container
+     * (`.tf-barra-linha`), que o converte em bloco automaticamente; o
+     * preenchimento, um nível abaixo, não tinha essa sorte.
+     */
+    display: block;
+    flex: 1;
+    height: 18px;
+    background: var(--tf-surface-3);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.tf-barra-preench {
+    display: block;
+    height: 100%;
+    border-radius: 5px;
+    background: var(--tf-cor, var(--tf-primaria));
+    transition: width .5s ease;
+    min-width: 3px;
+}
+
+.tf-barra-valor {
+    width: 34px;
+    text-align: right;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    color: var(--tf-texto);
+}
+
+.tf-barra-pct {
+    width: 46px;
+    text-align: right;
+    font-size: .74rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--tf-texto-3);
+}
+
+.tf-spark { display: flex; align-items: flex-end; gap: 2px; height: 78px; }
+
+.tf-spark-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 1px;
+    min-width: 3px;
+    position: relative;
+}
+
+.tf-spark-a { background: var(--tf-primaria-2); border-radius: 2px 2px 0 0; }
+.tf-spark-b { background: var(--tf-sucesso);    border-radius: 2px 2px 0 0; }
+
+.tf-legenda { display: flex; gap: 14px; font-size: .76rem; color: var(--tf-texto-2); margin-top: 10px; }
+.tf-legenda span { display: inline-flex; align-items: center; gap: 5px; }
+.tf-legenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* ================================================================== */
+/* Responsivo                                                         */
+/* ================================================================== */
+
+@media (max-width: 768px) {
+    .modal-dialog.tf-app {
+        margin-top: .5rem;
+        margin-left: .5rem;
+        margin-right: .5rem;
+    }
+    .modal-dialog.modal-xl.tf-app,
+    .modal-dialog.modal-lg.tf-app { max-width: none; }
+    .tf-modal-conteudo { max-height: calc(100vh - var(--tf-folga-inferior) - 1rem); }
+
+    .tf-topo { padding: 14px; }
+    .tf-topo-acoes { margin-left: 0; width: 100%; }
+    .tf-grade { grid-template-columns: 1fr; }
+    .tf-modal-corpo { padding: 14px; max-height: 68vh; }
+    .tf-kpis { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+    .tf-kpi-valor { font-size: 1.4rem; }
+    .tf-coluna { flex: 0 0 84vw; }
+    .tf-cal-cel { min-height: 76px; }
+    .tf-abas { padding: 0 8px; }
+}
+
+/* ================================================================== */
+/* Impressão                                                          */
+/* ================================================================== */
+
+@media print {
+    .tf-topo-acoes, .tf-painel, .tf-visoes, .tf-lote, .tf-barra-acoes,
+    .tf-abas, .tf-card-check { display: none !important; }
+    .tf-card, .tf-tabela-caixa { box-shadow: none; break-inside: avoid; }
+}

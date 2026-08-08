@@ -1,0 +1,93 @@
+/**
+ * Verifica se os diálogos passam a nascer dentro do modal aberto — condição
+ * para o Bootstrap não roubar o foco dos campos de texto.
+ */
+const fs = require('fs');
+const { JSDOM } = require('jsdom');
+
+const RAIZ = '/home/claude/build/tarefas';
+let ok = 0; const falhas = [];
+function checar(d, c, det) {
+    if (c) { ok++; console.log('  [OK]    ' + d); }
+    else { falhas.push(d); console.log('  [FALHA] ' + d + (det ? ' -> ' + det : '')); }
+}
+
+const dom = new JSDOM(fs.readFileSync('/tmp/pagina.html', 'utf8'),
+    { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' });
+const { window } = dom;
+window.eval(fs.readFileSync('/home/claude/jsdom/node_modules/jquery/dist/jquery.js', 'utf8'));
+const $ = window.jQuery;
+
+// Captura as opções entregues ao SweetAlert2.
+const recebidas = [];
+window.Swal = {
+    fire: function (o) { recebidas.push(o); return { then: function (cb) { return { then: function(){} }; } }; },
+    close: function () {}, showLoading: function () {}, showValidationMessage: function () {}
+};
+$.ajax = function () { const d = $.Deferred(); return d.promise(); };
+$.fn.modal = function () { return this; };
+window.TarefasConfig = { csrf: 'x', usuario: 'a', nome: 'A', admin: true, ia_ativa: true,
+    status: [], prioridades: [], funcionarios: [] };
+
+for (const arq of ['tarefas-core.js', 'tarefas-calendario.js', 'tarefas-detalhe.js', 'tarefas-documentos.js']) {
+    window.eval(fs.readFileSync(`${RAIZ}/assets/js/${arq}`, 'utf8'));
+}
+
+console.log('== Sem modal aberto ==');
+{
+    const o = window.Tarefas.opcoesDialogo({ title: 'x' });
+    checar('não força âncora quando não há modal', o.target === undefined);
+    checar('mantém heightAuto:false (evita salto de layout)', o.heightAuto === false);
+    checar('preserva as opções recebidas', o.title === 'x');
+}
+
+console.log('\n== Com o modal de detalhe aberto ==');
+{
+    const modal = window.document.getElementById('tfModalDetalhe');
+    modal.classList.add('show');
+
+    const o = window.Tarefas.opcoesDialogo({ title: 'y' });
+    checar('ancora o diálogo no modal aberto', o.target === modal,
+        o.target ? o.target.id : 'sem target');
+
+    // Vigia de foco do Bootstrap: o campo precisa estar contido no modal.
+    const container = window.document.createElement('div');
+    const textarea = window.document.createElement('textarea');
+    container.appendChild(textarea);
+    o.target.appendChild(container);
+    checar('campo de texto fica dentro do modal (Bootstrap não rouba o foco)',
+        modal.contains(textarea));
+
+    window.Tarefas.dlg.ok('salvo');
+    const ult = recebidas[recebidas.length - 1];
+    checar('dlg.ok também é ancorado', ult.target === modal);
+
+    window.Tarefas.dlg.confirmar('excluir?');
+    checar('dlg.confirmar também é ancorado',
+        recebidas[recebidas.length - 1].target === modal);
+
+    window.Tarefas.dlg.carregando('aguarde');
+    checar('dlg.carregando também é ancorado',
+        recebidas[recebidas.length - 1].target === modal);
+
+    modal.classList.remove('show');
+    checar('volta a não ancorar quando o modal fecha',
+        window.Tarefas.opcoesDialogo({}).target === undefined);
+}
+
+console.log('\n== Chamadas diretas ao Swal no código ==');
+{
+    const arquivos = ['tarefas-core.js', 'tarefas-calendario.js', 'tarefas-detalhe.js', 'tarefas-documentos.js'];
+    let cruas = [];
+    arquivos.forEach(a => {
+        const src = fs.readFileSync(`${RAIZ}/assets/js/${a}`, 'utf8');
+        const m = src.match(/Swal\.fire\(\s*\{/g);
+        if (m) { cruas.push(a + ' (' + m.length + ')'); }
+    });
+    checar('nenhum Swal.fire escapa do ajuste de contexto', cruas.length === 0, cruas.join(', '));
+}
+
+console.log('\n================ RESULTADO ================');
+console.log('  Passaram: ' + ok + '   Falharam: ' + falhas.length);
+falhas.forEach(f => console.log('   - ' + f));
+process.exit(falhas.length ? 1 : 0);

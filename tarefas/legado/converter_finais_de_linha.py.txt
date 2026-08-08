@@ -1,0 +1,23 @@
+"""Converte finais de linha lendo o arquivo ANTES de abrir para escrita."""
+import os, sys
+
+modo = sys.argv[1] if len(sys.argv) > 1 else 'lf'
+alvo = ('.php', '.js', '.css', '.md', '.json', '.txt', '.sql')
+n = 0
+for raiz, _, arqs in os.walk('.'):
+    for a in arqs:
+        if not (a.endswith(alvo) or a == '.htaccess'):
+            continue
+        p = os.path.join(raiz, a)
+        with open(p, 'rb') as f:          # lê e fecha primeiro
+            dados = f.read()
+        if not dados:
+            print('IGNORADO (vazio):', p)
+            continue
+        dados = dados.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
+        if modo == 'crlf':
+            dados = dados.replace(b'\n', b'\r\n')
+        with open(p, 'wb') as f:
+            f.write(dados)
+        n += 1
+print(('LF' if modo == 'lf' else 'CRLF') + ':', n, 'arquivos')

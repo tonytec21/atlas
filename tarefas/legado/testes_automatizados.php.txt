@@ -1,0 +1,443 @@
+<?php
+/**
+ * Bateria de testes do módulo Tarefas contra um banco MariaDB real.
+ * Execução: php /tmp/testar.php
+ */
+
+$RAIZ = '/home/claude/build/tarefas';
+
+$_SERVER['REQUEST_METHOD'] = 'GET';
+$_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
+$_SERVER['SCRIPT_NAME'] = '/tarefas/api/teste.php';
+
+$ok = 0; $falhas = array();
+
+function titulo($t) { echo "\n\033[1m== $t ==\033[0m\n"; }
+
+function checar($descricao, $condicao, $detalhe = '')
+{
+    global $ok, $falhas;
+    if ($condicao) {
+        $ok++;
+        echo "  [OK]    $descricao\n";
+    } else {
+        $falhas[] = $descricao . ($detalhe ? " -> $detalhe" : '');
+        echo "  [FALHA] $descricao" . ($detalhe ? " -> $detalhe" : '') . "\n";
+    }
+}
+
+/** Executa um endpoint em processo isolado e devolve a saída decodificada. */
+function chamar($arquivo, $get = array(), $post = array(), $usuario = 'tony')
+{
+    global $RAIZ;
+
+    $script = tempnam(sys_get_temp_dir(), 'tf') . '.php';
+    $codigo = '<?php' . "\n"
+        . '$_GET = ' . var_export($get, true) . ";\n"
+        . '$_POST = ' . var_export($post, true) . ";\n"
+        . '$_REQUEST = array_merge($_GET, $_POST);' . "\n"
+        . '$_SERVER["REQUEST_METHOD"] = ' . var_export($post ? 'POST' : 'GET', true) . ";\n"
+        . '$_SERVER["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest";' . "\n"
+        . 'session_start();' . "\n"
+        . '$_SESSION["username"] = ' . var_export($usuario, true) . ";\n"
+        . '$_SESSION["tarefas_csrf"] = "teste";' . "\n"
+        . '$_POST["_csrf"] = "teste"; $_GET["_csrf"] = "teste"; $_REQUEST["_csrf"] = "teste";' . "\n"
+        . 'require ' . var_export($RAIZ . '/' . $arquivo, true) . ";\n";
+
+    file_put_contents($script, $codigo);
+    $saida = shell_exec('php ' . escapeshellarg($script) . ' 2>&1');
+    @unlink($script);
+
+    $json = json_decode((string) $saida, true);
+    return $json === null ? array('__raw' => trim((string) $saida)) : $json;
+}
+
+require_once $RAIZ . '/core/bootstrap.php';
+require_once $RAIZ . '/core/gemini.php';
+
+/* ================================================================ */
+titulo('Núcleo e conexão');
+
+checar('Conexão PDO abre', db() instanceof PDO);
+checar('Tabela tarefas existe', db_tem_tabela('tarefas'));
+checar('Migração criou tarefas_historico', db_tem_tabela('tarefas_historico'));
+checar('Migração criou tarefas_checklist', db_tem_tabela('tarefas_checklist'));
+checar('Migração criou tarefas_ia_modelos', db_tem_tabela('tarefas_ia_modelos'));
+checar('Coluna ordem_kanban criada', db_tem_coluna('tarefas', 'ordem_kanban'));
+checar('Coluna apresentante criada', db_tem_coluna('tarefas', 'apresentante'));
+
+$total = (int) db_valor('SELECT COUNT(*) FROM tarefas', array(), 0);
+checar('Acervo preservado (6 tarefas)', $total === 6, "encontrado: $total");
+
+/* ================================================================ */
+titulo('Helpers');
+
+checar('data_br formata', data_br('2026-03-15 14:30:00') === '15/03/2026 14:30');
+checar('data_br devolve vazio para nulo', data_br(null) === '');
+checar('data_para_mysql aceita datetime-local',
+    data_para_mysql('2026-03-15T14:30') === '2026-03-15 14:30:00');
+checar('data_para_mysql rejeita lixo', data_para_mysql('abacaxi') === null);
+
+$s = situacao_prazo(date('Y-m-d H:i:s', strtotime('-2 day')), 'Em Andamento');
+checar('situacao_prazo detecta vencida', $s['codigo'] === 'vencida');
+$s = situacao_prazo(date('Y-m-d H:i:s', strtotime('-2 day')), 'Concluída');
+checar('situacao_prazo ignora prazo de concluída', $s['codigo'] === 'encerrada');
+$s = situacao_prazo(date('Y-m-d H:i:s'), 'Em Andamento');
+checar('situacao_prazo detecta hoje', $s['codigo'] === 'hoje');
+
+checar('nome_arquivo_seguro remove travessia',
+    strpos(nome_arquivo_seguro('../../evil.pdf'), '..') === false);
+checar('nome_arquivo_seguro aceita extensão em maiúsculas',
+    strtolower(substr((string) nome_arquivo_seguro('contrato final.PDF'), -4)) === '.pdf');
+checar('nome_arquivo_seguro recusa executável',
+    nome_arquivo_seguro('shell.php') === false);
+checar('nome_arquivo_seguro recusa dupla extensão',
+    nome_arquivo_seguro('nota.pdf.php') === false);
+
+/* Normalização dos formatos históricos de caminho de anexo. */
+$a = anexos_lista('arquivos/a.pdf;arquivos\\b.pdf' . "\n" . 'c.pdf');
+checar('anexos_lista normaliza 3 formatos', count($a) === 3, 'contou ' . count($a));
+checar('anexos_lista prefixa a pasta correta',
+    $a[2]['rel'] === 'arquivos/c.pdf', $a[2]['rel']);
+$a = anexos_lista('../../../etc/passwd');
+checar('anexos_lista bloqueia travessia', count($a) === 0 || strpos($a[0]['rel'], '..') === false);
+
+checar('peso_prioridade ordena', peso_prioridade('Crítica') > peso_prioridade('Baixa'));
+checar('cor_status devolve cor de status conhecido', cor_status('Concluída') !== '');
+
+/* ================================================================ */
+titulo('Visibilidade por usuário');
+
+/* Sem filtro, a tela abre na fila de trabalho: encerradas ficam de fora. */
+$r = chamar('api/tarefas.php', array('visao' => 'cards'), array(), 'tony');
+checar('Admin: fila de trabalho traz 5 (exclui a concluída)',
+    isset($r['total']) && $r['total'] === 5, 'total=' . (isset($r['total']) ? $r['total'] : '?'));
+
+$r = chamar('api/tarefas.php', array('visao' => 'cards', 'incluir_encerradas' => '1'), array(), 'tony');
+checar('Admin: com encerradas, enxerga o acervo inteiro (6)',
+    isset($r['total']) && $r['total'] === 6, 'total=' . (isset($r['total']) ? $r['total'] : '?'));
+
+$r = chamar('api/tarefas.php', array('visao' => 'cards', 'incluir_encerradas' => '1'), array(), 'maria');
+checar('Maria (acesso adicional) enxerga o acervo inteiro',
+    isset($r['total']) && $r['total'] === 6, 'total=' . (isset($r['total']) ? $r['total'] : '?'));
+
+$r = chamar('api/tarefas.php', array('visao' => 'cards', 'incluir_encerradas' => '1'), array(), 'joao');
+$idsJoao = isset($r['tarefas']) ? array_column($r['tarefas'], 'id') : array();
+checar('João enxerga apenas as próprias + concluídas',
+    isset($r['total']) && $r['total'] === 2, 'total=' . (isset($r['total']) ? $r['total'] : '?'));
+checar('João enxerga a tarefa concluída alheia', in_array(4, $idsJoao));
+checar('João NÃO enxerga tarefa da Maria', !in_array(2, $idsJoao));
+checar('João NÃO enxerga a tarefa sem responsável', !in_array(5, $idsJoao));
+
+/* Status legado fora do catálogo precisa continuar aparecendo. */
+$r = chamar('api/tarefas.php', array('status' => 'Em Exigência'), array(), 'tony');
+checar('Status legado fora do catálogo ainda é listado',
+    isset($r['total']) && $r['total'] === 1, 'total=' . (isset($r['total']) ? $r['total'] : '?'));
+checar('Status desconhecido recebe cor padrão',
+    isset($r['tarefas'][0]['status_cor']) && $r['tarefas'][0]['status_cor'] !== '');
+
+/* Exceção histórica: busca por protocolo exato libera uma tarefa. */
+$r = chamar('api/tarefas.php', array('protocol' => '2'), array(), 'joao');
+checar('João localiza tarefa alheia pelo protocolo exato',
+    isset($r['total']) && $r['total'] === 1, 'total=' . (isset($r['total']) ? $r['total'] : '?'));
+
+/* ================================================================ */
+titulo('Filtros e visões');
+
+/*
+ * A tarefa 2 tem prazo exatamente NOW(), então ela migra de "hoje" para
+ * "vencida" no instante seguinte à carga. Por isso o teste confere se a 1
+ * está no conjunto, e não qual veio primeiro.
+ */
+$r = chamar('api/tarefas.php', array('situacao' => 'vencida'));
+$idsVencidas = isset($r['tarefas']) ? array_map('intval', array_column($r['tarefas'], 'id')) : array();
+checar('Filtro "vencida" inclui a tarefa 1', in_array(1, $idsVencidas),
+    'ids=' . implode(',', $idsVencidas));
+checar('Filtro "vencida" não traz a tarefa concluída', !in_array(4, $idsVencidas));
+checar('Filtro "vencida" não traz tarefa no prazo', !in_array(3, $idsVencidas));
+
+$r = chamar('api/tarefas.php', array('situacao' => 'sem_responsavel'));
+checar('Filtro "sem responsável" acha a tarefa 5',
+    isset($r['total']) && $r['total'] === 1);
+
+$r = chamar('api/tarefas.php', array('texto' => 'escritura'));
+checar('Busca textual acha 2 escrituras',
+    isset($r['total']) && $r['total'] === 2, 'total=' . (isset($r['total']) ? $r['total'] : '?'));
+
+$r = chamar('api/tarefas.php', array('category' => '1'));
+checar('Filtro por categoria', isset($r['total']) && $r['total'] === 4,
+    'total=' . (isset($r['total']) ? $r['total'] : '?'));
+
+$r = chamar('api/tarefas.php', array('visao' => 'kanban'));
+checar('Visão kanban devolve colunas', isset($r['colunas']) && count($r['colunas']) > 0);
+$soma = 0;
+foreach ((array) $r['colunas'] as $c) { $soma += count($c['tarefas']); }
+checar('Kanban não perde tarefas', $soma > 0, "soma=$soma");
+
+$r = chamar('api/tarefas.php', array(
+    'visao' => 'calendario',
+    'start' => date('Y-m-d', strtotime('-40 day')),
+    'end'   => date('Y-m-d', strtotime('+40 day')),
+));
+checar('Calendário devolve eventos', isset($r['eventos']) && count($r['eventos']) > 0,
+    'eventos=' . (isset($r['eventos']) ? count($r['eventos']) : '?'));
+
+$r = chamar('api/tarefas.php', array('ordenar' => 'prioridade', 'direcao' => 'desc'));
+checar('Ordenação por prioridade funciona', isset($r['tarefas'][0]['nivel_de_prioridade']));
+
+/* Injeção de SQL nos parâmetros não deve derrubar nem vazar. */
+$r = chamar('api/tarefas.php', array('texto' => "' OR 1=1 -- "));
+checar('Parâmetro com aspas não quebra a consulta',
+    isset($r['success']) && $r['success'] === true);
+checar('Injeção não retorna tudo', isset($r['total']) && $r['total'] === 0,
+    'total=' . (isset($r['total']) ? $r['total'] : '?'));
+
+/* ================================================================ */
+titulo('Detalhe da tarefa');
+
+$token = db_valor('SELECT token FROM tarefas WHERE id = 1');
+$r = chamar('api/tarefa.php', array('token' => $token));
+checar('Detalhe carrega', isset($r['success']) && $r['success']);
+checar('Detalhe traz anexos normalizados', isset($r['tarefa']['anexos']));
+checar('Detalhe traz comentários', isset($r['tarefa']['comentarios'])
+    && count($r['tarefa']['comentarios']) === 1);
+checar('Detalhe traz subtarefas', isset($r['tarefa']['subtarefas'])
+    && count($r['tarefa']['subtarefas']) === 1);
+checar('Detalhe traz permissões', isset($r['tarefa']['permissoes']['editar']));
+
+$r = chamar('api/tarefa.php', array('token' => 'token-que-nao-existe'));
+checar('Token inválido devolve erro tratado',
+    isset($r['success']) && $r['success'] === false);
+
+/* Subtarefa deve apontar para a principal. */
+$tokenSub = db_valor("SELECT token FROM tarefas WHERE sub_categoria = 'Sim'");
+$r = chamar('api/tarefa.php', array('token' => $tokenSub));
+checar('Subtarefa aponta a tarefa principal',
+    isset($r['tarefa']['tarefa_principal']['id']) && (int) $r['tarefa']['tarefa_principal']['id'] === 1);
+
+/* ================================================================ */
+titulo('Ações');
+
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'criar',
+    'title' => 'Tarefa criada pelo teste automatizado',
+    'category' => '2', 'origin' => '1',
+    'deadline' => date('Y-m-d\TH:i', strtotime('+5 day')),
+    'employee' => 'Tony Tec', 'priority' => 'Alta',
+    'description' => 'Verificação de gravação.',
+));
+checar('Criação de tarefa', isset($r['success']) && $r['success'], json_encode($r));
+$novoId = isset($r['id']) ? (int) $r['id'] : 0;
+$novoToken = isset($r['token']) ? $r['token'] : '';
+
+checar('Histórico registrou a criação',
+    (int) db_valor('SELECT COUNT(*) FROM tarefas_historico WHERE tarefa_id = ? AND acao = ?',
+        array($novoId, 'criacao'), 0) === 1);
+
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'status', 'taskToken' => $novoToken, 'status' => 'Concluída'));
+checar('Alteração de status', isset($r['success']) && $r['success'], json_encode($r));
+checar('Status concluído grava data_conclusao',
+    db_valor('SELECT data_conclusao FROM tarefas WHERE id = ?', array($novoId)) !== null);
+
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'status', 'taskToken' => $novoToken, 'status' => 'Status Inventado'));
+checar('Status fora do catálogo é rejeitado',
+    isset($r['success']) && $r['success'] === false);
+
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'comentar', 'taskToken' => $novoToken,
+    'commentDescription' => 'Comentário do teste.'));
+checar('Comentário gravado', isset($r['success']) && $r['success'], json_encode($r));
+
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'checklist_add', 'tarefa_id' => $novoId, 'descricao' => 'Conferir documentação'));
+checar('Item de checklist gravado', isset($r['success']) && $r['success'], json_encode($r));
+$itemId = isset($r['id']) ? (int) $r['id'] : 0;
+
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'checklist_marcar', 'id' => $itemId, 'concluido' => '1'));
+checar('Item de checklist marcado', isset($r['success']) && $r['success']);
+
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'lote', 'ids' => $novoId, 'operacao' => 'prioridade', 'valor' => 'Baixa'));
+checar('Ação em lote aplicada', isset($r['success']) && $r['success'], json_encode($r));
+checar('Lote alterou de fato',
+    db_valor('SELECT nivel_de_prioridade FROM tarefas WHERE id = ?', array($novoId)) === 'Baixa');
+
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'lote', 'ids' => $novoId, 'operacao' => 'campo_invalido', 'valor' => 'x'));
+checar('Lote com operação inválida é rejeitado',
+    isset($r['success']) && $r['success'] === false);
+
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'mover_kanban', 'id' => $novoId, 'status' => 'Em Andamento', 'ordem' => '0'));
+checar('Movimentação no kanban', isset($r['success']) && $r['success'], json_encode($r));
+
+/* CSRF: sem o token a ação precisa ser recusada. */
+$script = tempnam(sys_get_temp_dir(), 'tf') . '.php';
+file_put_contents($script, '<?php session_start(); $_SESSION["username"]="tony";'
+    . ' $_SESSION["tarefas_csrf"]="valido";'
+    . ' $_SERVER["REQUEST_METHOD"]="POST";'
+    . ' $_POST=array("acao"=>"status","taskToken"=>' . var_export($novoToken, true)
+    . ',"status"=>"Concluída","_csrf"=>"errado");'
+    . ' $_REQUEST=$_POST; require ' . var_export($RAIZ . '/api/acoes.php', true) . ';');
+$saidaCsrf = json_decode((string) shell_exec('php ' . escapeshellarg($script) . ' 2>&1'), true);
+@unlink($script);
+checar('CSRF inválido é bloqueado',
+    isset($saidaCsrf['success']) && $saidaCsrf['success'] === false);
+
+/* Permissão: João não pode editar tarefa da Maria. */
+$tokenMaria = db_valor('SELECT token FROM tarefas WHERE id = 2');
+$r = chamar('api/acoes.php', array(), array(
+    'acao' => 'editar', 'taskId' => '2', 'title' => 'Invadido',
+    'category' => '1', 'origin' => '1',
+    'deadline' => date('Y-m-d\TH:i'), 'employee' => 'João Lima'), 'joao');
+checar('João não consegue editar tarefa alheia',
+    isset($r['success']) && $r['success'] === false, json_encode($r));
+checar('Título da tarefa alheia intacto',
+    db_valor('SELECT titulo FROM tarefas WHERE id = 2') !== 'Invadido');
+
+$r = chamar('api/acoes.php', array(), array('acao' => 'excluir', 'id' => $novoId), 'joao');
+checar('Exclusão negada para não administrador',
+    isset($r['success']) && $r['success'] === false);
+
+$r = chamar('api/acoes.php', array(), array('acao' => 'excluir', 'id' => $novoId,
+    'confirmar_subtarefas' => '1'), 'tony');
+checar('Exclusão permitida para administrador',
+    isset($r['success']) && $r['success'], json_encode($r));
+checar('Tarefa de teste removida',
+    (int) db_valor('SELECT COUNT(*) FROM tarefas WHERE id = ?', array($novoId), 0) === 0);
+
+/* ================================================================ */
+titulo('Painel');
+
+$r = chamar('api/dashboard.php');
+checar('Painel responde', isset($r['success']) && $r['success']);
+checar('KPI de vencidas contabiliza', isset($r['cartoes']['vencidas']));
+checar('Série por status preenchida', isset($r['por_status']) && count($r['por_status']) > 0);
+checar('Movimentação tem 30 pontos',
+    isset($r['movimentacao']) && count($r['movimentacao']) === 30,
+    'pontos=' . (isset($r['movimentacao']) ? count($r['movimentacao']) : '?'));
+
+/* ================================================================ */
+titulo('Catálogo de modelos Gemini');
+
+$modelos = ia_modelos(false);
+checar('Migração semeou os modelos', count($modelos) >= 5, 'total=' . count($modelos));
+
+$ids = array_column($modelos, 'modelo_id');
+checar('Contém gemini-3.1-flash-lite', in_array('gemini-3.1-flash-lite', $ids));
+checar('Contém gemini-3.5-flash', in_array('gemini-3.5-flash', $ids));
+checar('Gemini 3.1 Pro usa o sufixo -preview', in_array('gemini-3.1-pro-preview', $ids));
+checar('Nenhum modelo 2.5 (descontinuado) foi semeado',
+    count(array_filter($ids, function ($m) { return strpos($m, '2.5') !== false; })) === 0);
+
+$r = chamar('api/modelos.php', array(), array(
+    'acao' => 'salvar', 'modelo_id' => 'gemini-teste-x', 'apelido' => 'Modelo de Teste',
+    'descricao' => 'Cadastrado pelo teste', 'ativo' => '1', 'suporta_arquivos' => '0'));
+checar('Cadastro de modelo', isset($r['success']) && $r['success'], json_encode($r));
+
+$r = chamar('api/modelos.php', array(), array(
+    'acao' => 'excluir', 'modelo_id' => 'gemini-teste-x'));
+checar('Exclusão de modelo', isset($r['success']) && $r['success'], json_encode($r));
+
+$cfgIa = ia_config();
+$padrao = $cfgIa['modelo_padrao'];
+$r = chamar('api/modelos.php', array(), array('acao' => 'excluir', 'modelo_id' => $padrao));
+checar('Modelo padrão não pode ser excluído',
+    isset($r['success']) && $r['success'] === false, json_encode($r));
+
+$r = chamar('api/modelos.php', array(), array(
+    'acao' => 'ativar', 'modelo_id' => $padrao, 'ativo' => '0'));
+checar('Modelo padrão não pode ser desativado',
+    isset($r['success']) && $r['success'] === false);
+
+checar('IA fica inativa sem chave cadastrada', ia_disponivel() === false);
+
+$r = chamar('api/ia.php', array(), array('recurso' => 'resumir', 'tarefa_id' => '1'));
+checar('IA sem chave devolve erro claro',
+    isset($r['success']) && $r['success'] === false
+    && stripos(isset($r['error']) ? $r['error'] : '', 'configurad') !== false,
+    isset($r['error']) ? $r['error'] : '');
+
+/* ================================================================ */
+titulo('Compatibilidade com os endpoints antigos');
+
+$r = chamar('search_tasks.php', array());
+checar('search_tasks devolve array puro (contrato antigo)',
+    is_array($r) && !isset($r['success']) && count($r) > 0, 'itens=' . count($r));
+checar('search_tasks traz comentarios embutidos', isset($r[0]['comentarios']));
+
+$r = chamar('search_tasks.php', array('format' => 'fc',
+    'start' => date('Y-m-d', strtotime('-40 day')),
+    'end' => date('Y-m-d', strtotime('+40 day'))));
+checar('search_tasks format=fc devolve eventos',
+    is_array($r) && isset($r[0]['start']) && isset($r[0]['extendedProps']['token']));
+
+$r = chamar('view_task.php', array('token' => $token));
+checar('view_task mantém contrato antigo',
+    isset($r['id']) && isset($r['comentarios']) && isset($r['recibo_gerado']));
+
+$r = chamar('get_user_access.php', array(), array(), 'tony');
+checar('get_user_access: admin', isset($r['nivel_de_acesso'])
+    && $r['nivel_de_acesso'] === 'administrador');
+$r = chamar('get_user_access.php', array(), array(), 'joao');
+checar('get_user_access: usuário comum', isset($r['nivel_de_acesso'])
+    && $r['nivel_de_acesso'] === 'usuario');
+
+$r = chamar('get_token.php', array('id' => '1'));
+checar('get_token devolve o token', isset($r['token']) && $r['token'] === $token);
+
+$r = chamar('get_task_info.php', array('hash_tarefa' => $tokenSub));
+checar('get_task_info corrigido (usa token, não hash_tarefa)',
+    isset($r['id_tarefa_principal']) && (int) $r['id_tarefa_principal'] === 1, json_encode($r));
+
+$r = chamar('get_sub_tasks.php', array('id_tarefa_principal' => '1'));
+checar('get_sub_tasks lista a subtarefa', is_array($r) && count($r) === 1);
+
+$r = chamar('load_categories.php');
+checar('load_categories filtra inativas', is_array($r) && count($r) === 3,
+    'itens=' . count($r));
+
+$r = chamar('load_employees.php');
+checar('load_employees lista ativos', is_array($r) && count($r) === 3);
+
+$r = chamar('update_status.php', array(), array(
+    'taskToken' => $token, 'status' => 'Pendente'));
+checar('update_status responde em texto (contrato antigo)',
+    isset($r['__raw']) && stripos($r['__raw'], 'sucesso') !== false,
+    isset($r['__raw']) ? $r['__raw'] : '');
+db_exec("UPDATE tarefas SET status = 'Em Andamento' WHERE id = 1");
+
+$r = chamar('delete_task.php', array(), array('id' => '1'), 'joao');
+checar('delete_task nega para não administrador',
+    isset($r['__raw']) && stripos($r['__raw'], 'administrador') !== false);
+checar('Tarefa 1 continua no banco',
+    (int) db_valor('SELECT COUNT(*) FROM tarefas WHERE id = 1', array(), 0) === 1);
+
+/* ================================================================ */
+titulo('Exportação CSV');
+
+$script = tempnam(sys_get_temp_dir(), 'tf') . '.php';
+file_put_contents($script, '<?php session_start(); $_SESSION["username"]="tony";'
+    . ' $_GET=array(); $_REQUEST=array(); $_SERVER["REQUEST_METHOD"]="GET";'
+    . ' require ' . var_export($RAIZ . '/api/exportar.php', true) . ';');
+$csv = (string) shell_exec('php ' . escapeshellarg($script) . ' 2>&1');
+@unlink($script);
+checar('CSV tem BOM UTF-8', substr($csv, 0, 3) === "\xEF\xBB\xBF");
+checar('CSV usa ponto e vírgula', strpos($csv, 'Protocolo;') !== false);
+checar('CSV traz as 6 tarefas', substr_count(trim($csv), "\n") >= 6,
+    'linhas=' . substr_count(trim($csv), "\n"));
+
+/* ================================================================ */
+echo "\n\033[1m================ RESULTADO ================\033[0m\n";
+echo "  Passaram: $ok\n";
+echo "  Falharam: " . count($falhas) . "\n";
+if ($falhas) {
+    echo "\n  Falhas:\n";
+    foreach ($falhas as $f) { echo "   - $f\n"; }
+    exit(1);
+}
+echo "\n  Tudo certo.\n";
+exit(0);

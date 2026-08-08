@@ -1,0 +1,123 @@
+/**
+ * Estrutura e empilhamento dos modais.
+ *
+ * O primeiro bloco existe por causa de um defeito real: um include mal
+ * posicionado deixou três modais aninhados dentro de outro modal, que fica com
+ * display:none enquanto fechado — e leva os filhos junto. Nenhum deles abria.
+ */
+const fs = require('fs');
+const { JSDOM } = require('jsdom');
+
+const RAIZ = '/home/claude/build/tarefas';
+let ok = 0; const falhas = [];
+function checar(d, c, det) {
+    if (c) { ok++; console.log('  [OK]    ' + d); }
+    else { falhas.push(d + (det ? ' -> ' + det : '')); console.log('  [FALHA] ' + d + (det ? ' -> ' + det : '')); }
+}
+
+const dom = new JSDOM(fs.readFileSync('/tmp/pagina.html', 'utf8'),
+    { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' });
+const { window } = dom;
+const doc = window.document;
+
+const MODAIS = ['tfModalDetalhe', 'guiaRecebimentoModal', 'reciboEntregaModal',
+                'modalArquivarAto', 'createSubTaskModal', 'guiaHistoricoModal',
+                'addCommentModal', 'vincularOficioModal'];
+
+console.log('== Nenhum modal aninhado dentro de outro ==');
+MODAIS.forEach(id => {
+    const el = doc.getElementById(id);
+    if (!el) { checar(id + ' existe', false); return; }
+    const dentroDeOutro = el.parentElement.closest ? el.parentElement.closest('.modal') : null;
+    checar(id, !dentroDeOutro, dentroDeOutro ? 'aninhado em #' + dentroDeOutro.id : '');
+});
+
+console.log('\n== Estrutura mínima do Bootstrap ==');
+MODAIS.forEach(id => {
+    const el = doc.getElementById(id);
+    if (!el) { return; }
+    const temDialog = !!el.querySelector('.modal-dialog');
+    const temContent = !!el.querySelector('.modal-content');
+    checar(id + ' tem .modal-dialog e .modal-content', temDialog && temContent,
+        'dialog=' + temDialog + ' content=' + temContent);
+});
+
+console.log('\n== Empilhamento ==');
+window.eval(fs.readFileSync('/home/claude/jsdom/node_modules/jquery/dist/jquery.js', 'utf8'));
+const $ = window.jQuery;
+$.ajax = function () { return $.Deferred().promise(); };
+$.fn.modal = function () { return this; };
+window.Swal = { fire: () => ({ then: () => ({}) }), close: () => {} };
+window.TarefasConfig = { csrf: 'x', usuario: 'a', nome: 'A', admin: true, ia_ativa: false,
+    status: [], prioridades: [], funcionarios: [] };
+['tarefas-core.js','tarefas-calendario.js','tarefas-detalhe.js','tarefas-documentos.js']
+    .forEach(a => window.eval(fs.readFileSync(`${RAIZ}/assets/js/${a}`, 'utf8')));
+$(doc).ready();
+window.Tarefas.iniciar();
+
+// Simula o Bootstrap: abrir o detalhe e, por cima, o de arquivamento.
+const detalhe = $('#tfModalDetalhe');
+const arquivar = $('#modalArquivarAto');
+
+detalhe.trigger('show.bs.modal');
+detalhe.addClass('show');
+const zDetalhe = parseInt(detalhe.css('z-index'), 10);
+checar('primeiro modal recebe z-index base', zDetalhe === 1050, 'z=' + zDetalhe);
+
+arquivar.trigger('show.bs.modal');
+arquivar.addClass('show');
+const zArquivar = parseInt(arquivar.css('z-index'), 10);
+checar('segundo modal fica acima do primeiro', zArquivar > zDetalhe,
+    zArquivar + ' vs ' + zDetalhe);
+
+// Fechar o de cima não pode tirar a rolagem do de baixo.
+$('body').addClass('modal-open');
+arquivar.removeClass('show').trigger('hidden.bs.modal');
+checar('body mantém modal-open com o modal de baixo ainda aberto',
+    $('body').hasClass('modal-open'));
+
+detalhe.removeClass('show').trigger('hidden.bs.modal');
+checar('z-index é devolvido ao fechar', detalhe[0].style.zIndex === '');
+
+console.log('\n== Aproveitamento de altura e largura ==');
+{
+    const css = fs.readFileSync(`${RAIZ}/assets/css/tarefas.css`, 'utf8');
+    const regra = sel => {
+        const re = new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}');
+        return (css.match(re) || [null, ''])[1];
+    };
+
+    const conteudo = regra('.tf-modal-conteudo');
+    checar('conteúdo do modal é coluna flexível', /display:\s*flex/.test(conteudo) && /flex-direction:\s*column/.test(conteudo));
+    checar('conteúdo tem teto de altura em vh', /max-height:\s*calc\(100vh/.test(conteudo));
+
+    const corpo = regra('.tf-modal-corpo');
+    checar('corpo estica para ocupar o espaço livre', /flex:\s*1 1 auto/.test(corpo));
+    checar('corpo pode encolher e rolar (min-height: 0)', /min-height:\s*0/.test(corpo));
+    checar('corpo não tem mais altura calculada na mão', !/max-height/.test(corpo));
+
+    const form = regra('.tf-modal-conteudo > form');
+    checar('form repassa a flexibilidade ao corpo',
+        /display:\s*flex/.test(form) && /min-height:\s*0/.test(form));
+
+    checar('modal-xl mais largo que o padrão do Bootstrap (1140px)',
+        /max-width:\s*min\(1560px/.test(regra('.modal-dialog.modal-xl.tf-app')));
+    checar('modal-lg com largura própria',
+        /max-width:\s*min\(1040px/.test(regra('.modal-dialog.modal-lg.tf-app')));
+
+    // Altura útil do corpo numa tela de 1080px, descontando as partes fixas.
+    const vh = 1080, menu = 92, folga = menu + 20, margemTopo = 16;
+    const alturaConteudo = vh - folga - 2 * 16;
+    const partesFixas = 64 + 56 + 46;      // topo + barra de ações + abas
+    const corpoUtil = alturaConteudo - partesFixas;
+    const antes = vh - folga - 260;        // fórmula anterior
+    console.log(`  corpo útil: ${corpoUtil}px (antes: ${antes}px)`);
+    checar('altura útil do corpo aumentou', corpoUtil > antes, corpoUtil + ' vs ' + antes);
+    checar('modal não invade o menu do sistema', alturaConteudo + margemTopo + folga <= vh + 16,
+        (alturaConteudo + margemTopo + folga) + ' <= ' + vh);
+}
+
+console.log('\n================ RESULTADO ================');
+console.log('  Passaram: ' + ok + '   Falharam: ' + falhas.length);
+falhas.forEach(f => console.log('   - ' + f));
+process.exit(falhas.length ? 1 : 0);

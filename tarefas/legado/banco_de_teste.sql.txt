@@ -1,0 +1,42 @@
+SET NAMES utf8mb4;
+DROP DATABASE IF EXISTS atlas;
+CREATE DATABASE atlas DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE atlas;
+CREATE TABLE tarefas (
+  id INT AUTO_INCREMENT PRIMARY KEY, token VARCHAR(64), titulo VARCHAR(255),
+  categoria VARCHAR(20), origem VARCHAR(20), descricao TEXT, data_limite DATETIME NULL,
+  funcionario_responsavel VARCHAR(255), criado_por VARCHAR(255), data_criacao DATETIME NULL,
+  data_atualizacao DATETIME NULL, atualizado_por VARCHAR(255), caminho_anexo TEXT,
+  nivel_de_prioridade VARCHAR(50), revisor VARCHAR(255), status VARCHAR(80) DEFAULT 'Em Andamento',
+  data_conclusao DATETIME NULL, sub_categoria VARCHAR(10) NULL, id_tarefa_principal INT NULL,
+  numero_oficio VARCHAR(50) NULL) ENGINE=InnoDB;
+CREATE TABLE funcionarios (id INT AUTO_INCREMENT PRIMARY KEY, nome_completo VARCHAR(255),
+  usuario VARCHAR(100), senha VARCHAR(255), nivel_de_acesso VARCHAR(50), acesso_adicional TEXT,
+  status VARCHAR(20) DEFAULT 'Ativo') ENGINE=InnoDB;
+CREATE TABLE categorias (id INT AUTO_INCREMENT PRIMARY KEY, titulo VARCHAR(255), status VARCHAR(20)) ENGINE=InnoDB;
+CREATE TABLE origem (id INT AUTO_INCREMENT PRIMARY KEY, titulo VARCHAR(255), status VARCHAR(20)) ENGINE=InnoDB;
+CREATE TABLE comentarios (id INT AUTO_INCREMENT PRIMARY KEY, hash_tarefa VARCHAR(64), comentario TEXT,
+  caminho_anexo TEXT, data_comentario DATETIME NULL, data_atualizacao DATETIME NULL,
+  funcionario VARCHAR(255), status VARCHAR(20), id_tarefa_principal INT NULL) ENGINE=InnoDB;
+CREATE TABLE recibos_de_entrega (id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, receptor VARCHAR(255), data_entrega DATETIME NULL) ENGINE=InnoDB;
+CREATE TABLE guia_de_recebimento (id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, cliente VARCHAR(255), data_recebimento DATETIME NULL) ENGINE=InnoDB;
+CREATE TABLE oficios (id INT AUTO_INCREMENT PRIMARY KEY, numero VARCHAR(50), assunto VARCHAR(255)) ENGINE=InnoDB;
+CREATE TABLE cadastro_serventia (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(255)) ENGINE=InnoDB;
+CREATE TABLE logs_tarefas (id INT AUTO_INCREMENT PRIMARY KEY, descricao TEXT) ENGINE=InnoDB;
+INSERT INTO funcionarios (nome_completo,usuario,nivel_de_acesso,acesso_adicional,status) VALUES
+ ('Tony Tec','tony','administrador','','Ativo'),
+ ('Maria Souza','maria','usuario','Controle de Tarefas','Ativo'),
+ ('João Lima','joao','usuario','','Ativo');
+INSERT INTO categorias (titulo,status) VALUES ('Registro de Imóveis','ativo'),('Notas','ativo'),('Certidões','ativo'),('Antiga','inativo');
+INSERT INTO origem (titulo,status) VALUES ('Balcão','ativo'),('Central ONR','ativo'),('Ofício Judicial','ativo');
+INSERT INTO tarefas (token,titulo,categoria,origem,descricao,data_limite,funcionario_responsavel,criado_por,data_criacao,caminho_anexo,nivel_de_prioridade,revisor,status) VALUES
+ (MD5('t1'),'Registro de escritura Lote 12','1','1','Escritura pendente de qualificação.',DATE_SUB(NOW(),INTERVAL 3 DAY),'Tony Tec','tony',DATE_SUB(NOW(),INTERVAL 12 DAY),'arquivos/exemplo.pdf','Alta','Maria Souza','Em Andamento'),
+ (MD5('t2'),'Certidão de inteiro teor','3','1','',NOW(),'Maria Souza','tony',DATE_SUB(NOW(),INTERVAL 5 DAY),'','Média','','Aguardando Documentos'),
+ (MD5('t3'),'Averbação de construção','1','3','Habite-se juntado.',DATE_ADD(NOW(),INTERVAL 4 DAY),'João Lima','maria',DATE_SUB(NOW(),INTERVAL 2 DAY),'','Crítica','Tony Tec','Em Exigência'),
+ (MD5('t4'),'Escritura de doação','2','1','',DATE_ADD(NOW(),INTERVAL 20 DAY),'Tony Tec','tony',DATE_SUB(NOW(),INTERVAL 40 DAY),'','Baixa','','Concluída'),
+ (MD5('t5'),'Retificação de área','1','2','Processo ONR.',DATE_ADD(NOW(),INTERVAL 1 DAY),'','tony',DATE_SUB(NOW(),INTERVAL 1 DAY),'','Média','','Em Andamento');
+UPDATE tarefas SET data_conclusao=DATE_SUB(NOW(),INTERVAL 30 DAY) WHERE status='Concluída';
+INSERT INTO tarefas (token,titulo,categoria,origem,data_limite,funcionario_responsavel,criado_por,data_criacao,nivel_de_prioridade,status,sub_categoria,id_tarefa_principal)
+ VALUES (MD5('s1'),'Conferir cadeia dominial','1','1',DATE_ADD(NOW(),INTERVAL 2 DAY),'Maria Souza','tony',NOW(),'Alta','Em Andamento','Sim',1);
+INSERT INTO comentarios (hash_tarefa,comentario,caminho_anexo,data_comentario,funcionario,status)
+ VALUES (MD5('t1'),'Aguardando ITBI do apresentante.','',NOW(),'tony','Ativo');

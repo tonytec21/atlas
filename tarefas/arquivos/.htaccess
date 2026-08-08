@@ -1,0 +1,4 @@
+# Impede que qualquer arquivo enviado seja executado pelo Apache.
+php_flag engine off
+AddType text/plain .php .php3 .php4 .php5 .phtml .pl .py .cgi .asp .shtml
+Options -ExecCGI -Indexes

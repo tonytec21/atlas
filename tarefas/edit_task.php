@@ -1,586 +1,626 @@
 <?php
-include(__DIR__ . '/session_check.php');
-checkSession();
-include(__DIR__ . '/db_connection.php');
-date_default_timezone_set('America/Sao_Paulo');
+/**
+ * Atlas · Tarefas — edição de tarefa.
+ *
+ * Mantém tudo que a tela anterior fazia (dados, anexos com exclusão, linha do
+ * tempo de comentários com edição e remoção, botão de protocolo geral) num
+ * layout novo e com as consultas preparadas.
+ *
+ * Acesso: administradores, ou o responsável, o revisor e quem criou.
+ */
 
-$taskId = isset($_GET['id']) ? intval($_GET['id']) : 0;
+require_once __DIR__ . '/core/bootstrap.php';
+require_once __DIR__ . '/core/gemini.php';
+exigir_login();
 
-if ($taskId == 0) {
-    die("ID da tarefa inválido.");
+$usuario = usuario_atual();
+$taskId  = entrada_int('id');
+
+$tarefa = $taskId > 0
+    ? db_one('SELECT * FROM tarefas WHERE id = ? LIMIT 1', array($taskId))
+    : null;
+
+if (!$tarefa) {
+    include(__DIR__ . '/../menu.php');
+    echo '<div style="font-family:sans-serif;padding:60px;text-align:center">'
+       . '<h2>Tarefa não encontrada</h2>'
+       . '<p><a href="index.php">Voltar ao Controle de Tarefas</a></p></div>';
+    exit;
 }
 
-// Buscar dados da tarefa
-$sql = "SELECT * FROM tarefas WHERE id = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $taskId);
-$stmt->execute();
-$result = $stmt->get_result();
+$podeEditar = usuario_ve_tudo()
+    || $tarefa['funcionario_responsavel'] === $usuario['nome']
+    || $tarefa['revisor'] === $usuario['nome']
+    || $tarefa['criado_por'] === $usuario['usuario'];
 
-if ($result->num_rows === 0) {
-    die("Tarefa não encontrada.");
+if (!$podeEditar) {
+    include(__DIR__ . '/../menu.php');
+    echo '<div style="font-family:sans-serif;padding:60px;text-align:center">'
+       . '<h2>Sem permissão</h2>'
+       . '<p>Você não é responsável, revisor nem autor desta tarefa.</p>'
+       . '<p><a href="index.php">Voltar</a></p></div>';
+    exit;
 }
 
-$taskData = $result->fetch_assoc();
-$token = $taskData['token'];
+$token        = $tarefa['token'];
+$categorias   = listar_categorias();
+$origens      = listar_origens();
+$funcionarios = listar_funcionarios();
+$prioridades  = array_keys(tarefas_prioridades());
+$statusLista  = array_keys(tarefas_status_catalogo());
 
-// Registrar log da tarefa
-$logSql = "INSERT INTO logs_tarefas (task_id, titulo, categoria, origem, data_limite, funcionario_responsavel, descricao, caminho_anexo, data_criacao, data_edicao, atualizado_por) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-$logStmt = $conn->prepare($logSql);
-$logTaskId = $taskData['id'];
-$logTitulo = $taskData['titulo'];
-$logCategoria = $taskData['categoria'];
-$logOrigem = $taskData['origem'];
-$logDataLimite = $taskData['data_limite'];
-$logFuncionarioResponsavel = $taskData['funcionario_responsavel'];
-$logDescricao = $taskData['descricao'];
-$logCaminhoAnexo = $taskData['caminho_anexo'];
-$logDataCriacao = $taskData['data_criacao'];
-$logDataEdicao = date('Y-m-d H:i:s');
-$logAtualizadoPor = $_SESSION['username'];
-
-$logStmt->bind_param("issssssssss", $logTaskId, $logTitulo, $logCategoria, $logOrigem, $logDataLimite, $logFuncionarioResponsavel, $logDescricao, $logCaminhoAnexo, $logDataCriacao, $logDataEdicao, $logAtualizadoPor);
-$logStmt->execute();
-
-// Buscar categorias
-$sql = "SELECT * FROM categorias WHERE status = 'ativo'";
-$result = $conn->query($sql);
-$categories = [];
-while ($row = $result->fetch_assoc()) {
-    $categories[] = $row;
+/* Categoria/origem podem ter sido desativadas depois: mantemos na lista. */
+$idsCategoria = array_column($categorias, 'id');
+if ($tarefa['categoria'] !== null && $tarefa['categoria'] !== ''
+    && !in_array($tarefa['categoria'], $idsCategoria)) {
+    $extra = db_one('SELECT id, titulo FROM categorias WHERE id = ?', array($tarefa['categoria']));
+    if ($extra) {
+        $extra['titulo'] .= ' (inativa)';
+        $categorias[] = $extra;
+    }
+}
+$idsOrigem = array_column($origens, 'id');
+if ($tarefa['origem'] !== null && $tarefa['origem'] !== ''
+    && !in_array($tarefa['origem'], $idsOrigem)) {
+    $extra = db_one('SELECT id, titulo FROM origem WHERE id = ?', array($tarefa['origem']));
+    if ($extra) {
+        $extra['titulo'] .= ' (inativa)';
+        $origens[] = $extra;
+    }
 }
 
-// Buscar origens
-$sql = "SELECT * FROM origem WHERE status = 'ativo'";
-$result = $conn->query($sql);
-$origins = [];
-while ($row = $result->fetch_assoc()) {
-    $origins[] = $row;
+$prazoInput = '';
+if (!empty($tarefa['data_limite'])) {
+    $ts = strtotime((string) $tarefa['data_limite']);
+    if ($ts !== false) { $prazoInput = date('Y-m-d\TH:i', $ts); }
 }
 
-// Buscar funcionários do banco de dados "atlas"
-$employeeConn = new mysqli("localhost", "root", "", "atlas");
-if ($employeeConn->connect_error) {
-    die("Falha na conexão com o banco atlas: " . $employeeConn->connect_error);
-}
-$employeeConn->set_charset("utf8"); // Definir charset para UTF-8
+$anexos = anexos_lista($tarefa['caminho_anexo']);
 
-$sql = "SELECT nome_completo FROM funcionarios WHERE status = 'ativo'";
-$result = $employeeConn->query($sql);
-$employees = [];
-while ($row = $result->fetch_assoc()) {
-    $employees[] = $row;
-}
-$employeeConn->close();
-
-// Buscar comentários
-$sql = "SELECT * FROM comentarios WHERE hash_tarefa = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("s", $taskData['token']);
-$stmt->execute();
-$result = $stmt->get_result();
-$comments = [];
-while ($row = $result->fetch_assoc()) {
-    $comments[] = $row;
-}
+$comentarios = db_all(
+    'SELECT * FROM comentarios WHERE hash_tarefa = ? ORDER BY data_comentario DESC',
+    array($token)
+);
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Editar Tarefa</title>
+    <title>Atlas · Editar Tarefa nº <?php echo e($tarefa['id']); ?></title>
+
+    <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
-    <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
-    <link rel="stylesheet" href="../style/css/toastr.min.css">
-    <link rel="stylesheet" href="../style/sweetalert2.min.css">
-    <style>
-        .comment-bubble {
-            position: relative;
-            padding: 15px;
-            border-radius: 15px;
-            background: #f1f1f1;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .comment-bubble::before {
-            content: "";
-            position: absolute;
-            bottom: -20px; /* Adjust to align the tail */
-            left: 20px; /* Adjust to align the tail */
-            border-width: 10px 10px 0;
-            border-style: solid;
-            border-color: #f1f1f1 transparent;
-            display: block;
-            width: 0;
-        }
-        .comment-bubble h6 {
-            margin: 0 0 10px;
-        }
-        .comment-bubble p {
-            margin: 0;
-        }
-        .anexo-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px;
-            background: #fff;
-            margin-bottom: 5px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .anexo-item button {
-            margin-left: 10px;
-        }
-        .timeline { position: relative; padding: 20px 0; list-style: none; }
-        .timeline::before { content: ''; position: absolute; top: 0; bottom: 0; width: 2px; background: #e9ecef; left: 20px; margin-right: -1.5px; }
-        .timeline-item { margin: 0; padding: 0 0 20px; position: relative; }
-        .timeline-item::before, .timeline-item::after { content: ""; display: table; }
-        .timeline-item::after { clear: both; }
-        .timeline-item .timeline-panel { position: relative; width: calc(100% - 75px); float: right; border: 1px solid #d4d4d4; background: #ffffff; border-radius: 2px; padding: 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
-        .timeline-item .timeline-panel::before { position: absolute; top: 10px; right: -15px; display: inline-block; border-top: 15px solid transparent; border-left: 15px solid #d4d4d4; border-right: 0 solid #d4d4d4; border-bottom: 15px solid transparent; content: " "; }
-        .timeline-item .timeline-panel::after { position: absolute; top: 11px; right: -14px; display: inline-block; border-top: 14px solid transparent; border-left: 14px solid #ffffff; border-right: 0 solid #ffffff; border-bottom: 14px solid transparent; content: " "; }
-        .timeline-item .timeline-badge { color: #fff; width: 48px; height: 48px; line-height: 52px; font-size: 1.4em; text-align: center; position: absolute; top: 0; left: 0; margin-right: -25px; background-color: #7c7c7c; z-index: 100; border-radius: 50%; }
-        .timeline-item .timeline-badge.primary { background-color: #007bff; }
-        .timeline-item .timeline-badge.success { background-color: #28a745; }
-        .timeline-item .timeline-badge.warning { background-color: #ffc107; }
-        .timeline-item .timeline-badge.danger { background-color: #dc3545; }
-        .dark-mode .comment-bubble { background: #333; color: #fff; }
-        .dark-mode .comment-bubble::before { border-color: #333 transparent; }
-        .dark-mode .timeline::before { background: #444; }
-        .dark-mode .timeline-item .timeline-panel { border-color: #555; background: #444; }
-        .dark-mode .timeline-item .timeline-panel::before { border-left-color: #555; }
-        .dark-mode .timeline-item .timeline-panel::after { border-left-color: #444; }
-        .dark-mode .anexo-item { background: #555; color: #fff; border-color: #666; }
-        .dark-mode .anexo-item button { color: #fff; }
-        .btn-container {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 15px;
-        }
+    <link rel="stylesheet" href="../style/css/sweetalert2.min.css">
+    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.0.8">
 
-        .btn-container {
-                width: 100%;
-                max-width: 600px;
-            }
-
-            .btn {
-                min-width: 150px;
-                margin: 5px;
-            }
-    </style>
+    <script src="../script/jquery-3.5.1.min.js"></script>
 </head>
+
 <body class="light-mode">
-<?php
-include(__DIR__ . '/../menu.php');
-?>
+
+<?php include(__DIR__ . '/../menu.php'); ?>
 
 <div id="main" class="main-content">
-    <div class="container">
-        <!-- HERO / TÍTULO -->
-        <section class="page-hero">
-        <div class="title-row">
-            <div class="title-icon"><i class="fa fa-edit"></i></div>
-            <div class="title-texts">
-            <h1>Edição de Tarefa</h1>
-            <div class="subtitle muted">Protocolo Geral nº.: <?php echo $taskId; ?> — edite, gere a guia e acesse ações rápidas.</div>
-            </div>
-        </div>
-        </section>
-        <hr>
+    <div class="container-fluid tf-app" style="max-width:1080px">
 
-        <!-- AÇÕES (100% responsivo) -->
-        <div class="row">
-        <div class="col-12 col-md-auto mb-2">
-            <button class="btn btn-primary btn-block" id="protocoloButton">
-            <i class="fa fa-print" aria-hidden="true"></i> Guia de Protocolo
-            </button>
-        </div>
-        <div class="col-12 col-md-auto mb-2">
-            <button class="btn btn-success btn-block" onclick="window.location.href='criar-tarefa.php'">
-            <i class="fa fa-plus" aria-hidden="true"></i> Nova Tarefa
-            </button>
-        </div>
-        <div class="col-12 col-md-auto mb-2">
-            <button class="btn btn-secondary btn-block" type="button" onclick="window.location.href='index.php'">
-            <i class="fa fa-search" aria-hidden="true"></i> Pesquisar Tarefas
-            </button>
-        </div>
+        <div class="tf-topo">
+            <div class="tf-topo-icone"><i class="fa fa-pencil"></i></div>
+            <div>
+                <h1>Protocolo Geral nº <?php echo e($tarefa['id']); ?></h1>
+                <div class="tf-sub">
+                    Criada por <?php echo e($tarefa['criado_por']); ?>
+                    em <?php echo e(data_br($tarefa['data_criacao'])); ?>
+                    <?php if ((string) $tarefa['sub_categoria'] === 'Sim'): ?>
+                        · subtarefa da tarefa nº <?php echo e($tarefa['id_tarefa_principal']); ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="tf-topo-acoes">
+                <button class="tf-btn" id="protocoloButton">
+                    <i class="fa fa-print"></i> Protocolo geral
+                </button>
+                <a href="index.php?token=<?php echo e($token); ?>" class="tf-btn">
+                    <i class="fa fa-eye"></i> Ver tarefa
+                </a>
+                <a href="index.php" class="tf-btn">
+                    <i class="fa fa-arrow-left"></i> Voltar
+                </a>
+            </div>
         </div>
 
-        <hr>
-        <form id="editTaskForm" method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="taskId" value="<?php echo htmlspecialchars($taskId); ?>">
-            <input type="hidden" name="taskToken" value="<?php echo htmlspecialchars($token); ?>">
-            <div class="form-row">
-                <div class="form-group col-md-6">
-                    <label for="title">Título da Tarefa:</label>
-                    <input type="text" class="form-control" id="title" name="title" value="<?php echo htmlspecialchars($taskData['titulo']); ?>" required>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="category">Categoria:</label>
-                    <select id="category" name="category" class="form-control" required>
-                        <?php foreach ($categories as $category) : ?>
-                            <option value="<?php echo htmlspecialchars($category['id']); ?>" <?php echo $category['id'] == $taskData['categoria'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($category['titulo']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="origin">Origem:</label>
-                    <select id="origin" name="origin" class="form-control" required>
-                        <?php foreach ($origins as $origin) : ?>
-                            <option value="<?php echo htmlspecialchars($origin['id']); ?>" <?php echo $origin['id'] == $taskData['origem'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($origin['titulo']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="deadline">Data Limite para Conclusão:</label>
-                    <input type="datetime-local" class="form-control" id="deadline" name="deadline" value="<?php echo htmlspecialchars(str_replace(' ', 'T', $taskData['data_limite'])); ?>" required>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="priority">Nível de Prioridade:</label>
-                    <select id="priority" name="priority" class="form-control" required>
-                        <option value="Baixa" <?php echo $taskData['nivel_de_prioridade'] == 'Baixa' ? 'selected' : ''; ?>>Baixa</option>
-                        <option value="Média" <?php echo $taskData['nivel_de_prioridade'] == 'Média' ? 'selected' : ''; ?>>Média</option>
-                        <option value="Alta" <?php echo $taskData['nivel_de_prioridade'] == 'Alta' ? 'selected' : ''; ?>>Alta</option>
-                        <option value="Crítica" <?php echo $taskData['nivel_de_prioridade'] == 'Crítica' ? 'selected' : ''; ?>>Crítica</option>
-                    </select>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="employee">Funcionário Responsável:</label>
-                    <select id="employee" name="employee" class="form-control" required>
-                        <?php foreach ($employees as $employee) : ?>
-                            <option value="<?php echo htmlspecialchars($employee['nome_completo']); ?>" <?php echo $employee['nome_completo'] == $taskData['funcionario_responsavel'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($employee['nome_completo']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group col-md-3">
-                    <label for="reviewer">Revisor (Opcional):</label>
-                    <select id="reviewer" name="reviewer" class="form-control">
-                        <option value="">Selecione</option>
-                        <?php foreach ($employees as $employee) : ?>
-                            <option value="<?php echo htmlspecialchars($employee['nome_completo']); ?>"
-                                <?php echo $employee['nome_completo'] == $taskData['revisor'] ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($employee['nome_completo']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+        <!-- ======================= DADOS ======================= -->
+        <form id="editTaskForm" enctype="multipart/form-data">
+            <input type="hidden" name="taskId" id="taskId" value="<?php echo e($tarefa['id']); ?>">
+            <input type="hidden" name="taskToken" id="taskToken" value="<?php echo e($token); ?>">
+
+            <div class="tf-painel" style="padding:22px;margin-bottom:16px">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">
+
+                    <div style="grid-column:1/-1">
+                        <label class="tf-rotulo">Título <span style="color:var(--tf-perigo)">*</span></label>
+                        <input type="text" class="tf-input" id="title" name="title" required
+                               value="<?php echo e($tarefa['titulo']); ?>">
+                    </div>
+
+                    <div style="grid-column:1/-1">
+                        <label class="tf-rotulo">Descrição</label>
+                        <textarea class="tf-textarea" id="description" name="description"
+                                  rows="5"><?php echo e($tarefa['descricao']); ?></textarea>
+                    </div>
+
+                    <div>
+                        <label class="tf-rotulo">Categoria <span style="color:var(--tf-perigo)">*</span></label>
+                        <select class="tf-select" id="category" name="category" required>
+                            <option value="">Selecione…</option>
+                            <?php foreach ($categorias as $c): ?>
+                                <option value="<?php echo e($c['id']); ?>"
+                                    <?php echo ((string) $c['id'] === (string) $tarefa['categoria']) ? ' selected' : ''; ?>>
+                                    <?php echo e($c['titulo']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="tf-rotulo">Origem <span style="color:var(--tf-perigo)">*</span></label>
+                        <select class="tf-select" id="origin" name="origin" required>
+                            <option value="">Selecione…</option>
+                            <?php foreach ($origens as $o): ?>
+                                <option value="<?php echo e($o['id']); ?>"
+                                    <?php echo ((string) $o['id'] === (string) $tarefa['origem']) ? ' selected' : ''; ?>>
+                                    <?php echo e($o['titulo']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="tf-rotulo">Data limite <span style="color:var(--tf-perigo)">*</span></label>
+                        <input type="datetime-local" class="tf-input" id="deadline" name="deadline"
+                               value="<?php echo e($prazoInput); ?>" required>
+                    </div>
+
+                    <div>
+                        <label class="tf-rotulo">Prioridade</label>
+                        <select class="tf-select" id="priority" name="priority">
+                            <?php foreach ($prioridades as $p): ?>
+                                <option value="<?php echo e($p); ?>"
+                                    <?php echo ($p === $tarefa['nivel_de_prioridade']) ? ' selected' : ''; ?>>
+                                    <?php echo e($p); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="tf-rotulo">Funcionário responsável</label>
+                        <select class="tf-select" id="employee" name="employee">
+                            <option value="">Sem responsável</option>
+                            <?php foreach ($funcionarios as $f): ?>
+                                <option value="<?php echo e($f['nome_completo']); ?>"
+                                    <?php echo ($f['nome_completo'] === $tarefa['funcionario_responsavel']) ? ' selected' : ''; ?>>
+                                    <?php echo e($f['nome_completo']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="tf-rotulo">Revisor</label>
+                        <select class="tf-select" id="reviewer" name="reviewer">
+                            <option value="">Nenhum</option>
+                            <?php foreach ($funcionarios as $f): ?>
+                                <option value="<?php echo e($f['nome_completo']); ?>"
+                                    <?php echo ($f['nome_completo'] === $tarefa['revisor']) ? ' selected' : ''; ?>>
+                                    <?php echo e($f['nome_completo']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="tf-rotulo">Status</label>
+                        <select class="tf-select" id="status" name="status">
+                            <?php foreach ($statusLista as $s): ?>
+                                <option value="<?php echo e($s); ?>"
+                                    <?php echo ($s === $tarefa['status']) ? ' selected' : ''; ?>>
+                                    <?php echo e($s); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <?php if (db_tem_coluna('tarefas', 'apresentante')): ?>
+                    <div>
+                        <label class="tf-rotulo">Apresentante</label>
+                        <input type="text" class="tf-input" id="apresentante" name="apresentante"
+                               value="<?php echo e(isset($tarefa['apresentante']) ? $tarefa['apresentante'] : ''); ?>">
+                    </div>
+                    <?php endif; ?>
+
+                    <div>
+                        <label class="tf-rotulo">Nº do ofício vinculado</label>
+                        <input type="text" class="tf-input" readonly
+                               value="<?php echo e($tarefa['numero_oficio'] !== null && $tarefa['numero_oficio'] !== '' ? $tarefa['numero_oficio'] : '—'); ?>">
+                    </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="description">Descrição:</label>
-                <textarea class="form-control" id="description" name="description" rows="5"><?php echo htmlspecialchars($taskData['descricao']); ?></textarea>
-            </div>
-            <div class="form-group">
-                <input type="file" id="attachments" name="attachments[]" multiple class="form-control-file">
-            </div>
-            <button type="submit" style="margin-top: 1px!important;margin-bottom: 30px!important;" class="btn btn-primary w-100">Salvar Tarefa</button>
-        </form>
-        <hr>
-        <h4>Anexos</h4>
-        <div id="viewAttachments" class="list-group">
-            <?php
-            $anexos = !empty($taskData['caminho_anexo']) ? explode(';', $taskData['caminho_anexo']) : [];
-            if (!empty($anexos)) :
-                foreach ($anexos as $attachment) :
-            ?>
-                <div class="anexo-item">
-                    <span><?php echo htmlspecialchars(basename($attachment)); ?></span>
-                    <button class="btn btn-info btn-sm visualizar-anexo" data-file="<?php echo htmlspecialchars($attachment); ?>"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                    <button class="btn btn-delete btn-sm excluir-anexo" data-file="<?php echo htmlspecialchars($attachment); ?>"><i class="fa fa-trash" aria-hidden="true"></i></button>
-                </div>
-            <?php endforeach; endif; ?>
-        </div>
-        <hr>
-        <h4>Timeline</h4>
-        <div id="commentTimeline" class="timeline">
-            <?php if (!empty($comments)) : ?>
-                <?php foreach ($comments as $comment) : ?>
-                    <div class="timeline-item">
-                        <div class="timeline-badge primary"><i class="fa fa-commenting-o" aria-hidden="true"></i></div>
-                        <div class="timeline-panel">
-                            <div class="timeline-heading">
-                                <h6 class="timeline-title"><?php echo htmlspecialchars($comment['funcionario'] ?? 'Desconhecido'); ?> <small><?php $date = new DateTime($comment['data_comentario']); echo $date->format('d/m/Y H:i:s'); ?></small></h6>
+
+            <!-- ======================= ANEXOS ======================= -->
+            <div class="tf-painel" style="padding:22px;margin-bottom:16px">
+                <h3 style="font-size:.95rem;font-weight:650;margin:0 0 14px">
+                    <i class="fa fa-paperclip"></i> Anexos
+                </h3>
+
+                <div id="viewAttachments" class="tf-anexos" style="margin-bottom:14px">
+                    <?php if (!$anexos): ?>
+                        <p class="tf-mudo tf-mini" style="margin:0">Nenhum anexo nesta tarefa.</p>
+                    <?php else: foreach ($anexos as $a): ?>
+                        <div class="tf-anexo<?php echo $a['existe'] ? '' : ' tf-sumido'; ?>"
+                             data-arquivo="<?php echo e($a['rel']); ?>">
+                            <div class="tf-anexo-icone"><i class="fa fa-file-o"></i></div>
+                            <div class="tf-anexo-nome">
+                                <?php echo e($a['nome']); ?>
+                                <small><?php echo $a['existe']
+                                    ? e($a['tamanho_br'])
+                                    : '<span style="color:var(--tf-perigo)">arquivo não localizado</span>'; ?></small>
                             </div>
-                            <div class="timeline-body">
-                                <p><?php echo htmlspecialchars($comment['comentario']); ?></p>
-                                <?php if (!empty($comment['caminho_anexo'])) : ?>
-                                    <?php
-                                    $commentAttachments = explode(';', $comment['caminho_anexo']);
-                                    foreach ($commentAttachments as $attachment) :
-                                    ?>
-                                        <div class="anexo-item">
-                                            <span><?php echo htmlspecialchars(basename($attachment)); ?></span>
-                                            <button class="btn btn-info btn-sm visualizar-anexo" data-file="<?php echo htmlspecialchars($attachment); ?>"><i class="fa fa-eye" aria-hidden="true"></i></button>
-                                            <button class="btn btn-delete btn-sm excluir-anexo-comentario" data-file="<?php echo htmlspecialchars($attachment); ?>" data-comment="<?php echo $comment['id']; ?>"><i class="fa fa-trash" aria-hidden="true"></i></button>
-                                        </div>
-                                    <?php endforeach; ?>
+                            <div class="tf-anexo-acoes">
+                                <?php if ($a['existe']): ?>
+                                <a class="tf-btn tf-btn-sm" href="<?php echo e($a['url']); ?>" target="_blank">
+                                    <i class="fa fa-external-link"></i>
+                                </a>
                                 <?php endif; ?>
-                                <?php if ($comment['funcionario'] == $_SESSION['username']) : ?>
-                                    <button class="btn btn-edit btn-sm editar-comentario" data-comment='<?php echo json_encode($comment); ?>'><i class="fa fa-pencil" aria-hidden="true"></i></button>
-                                <?php endif; ?>
+                                <button type="button" class="tf-btn tf-btn-sm" data-excluir-anexo>
+                                    <i class="fa fa-trash-o"></i>
+                                </button>
                             </div>
                         </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
+                    <?php endforeach; endif; ?>
+                </div>
 
-<div class="modal fade" id="editCommentModal" tabindex="-1" role="dialog" aria-labelledby="editCommentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editCommentModalLabel">Editar Comentário</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <div class="tf-zona-upload" id="zonaUpload">
+                    <i class="fa fa-cloud-upload"></i>
+                    <strong>Adicionar mais anexos</strong>
+                    <div class="tf-mini tf-mudo" style="margin-top:6px">
+                        Os arquivos novos somam-se aos já existentes.
+                    </div>
+                    <input type="file" id="attachments" name="attachments[]" multiple style="display:none">
+                </div>
+                <div class="tf-anexos" id="listaNovos" style="margin-top:12px"></div>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:24px;flex-wrap:wrap">
+                <a href="index.php" class="tf-btn"><i class="fa fa-times"></i> Cancelar</a>
+                <button type="submit" class="tf-btn tf-btn-primario" id="btnSalvar">
+                    <i class="fa fa-save"></i> Salvar alterações
                 </button>
             </div>
-            <div class="modal-body">
-                <form id="editCommentForm">
-                    <input type="hidden" id="taskToken" name="taskToken" value="<?php echo htmlspecialchars($token); ?>">
-                    <input type="hidden" id="commentId" name="commentId" value="">
-                    <div class="form-group">
-                        <label for="editCommentDescription">Comentário:</label>
-                        <textarea class="form-control" id="editCommentDescription" name="editCommentDescription" rows="5"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="editCommentAttachments">Anexar arquivos:</label>
-                        <input type="file" id="editCommentAttachments" name="editCommentAttachments[]" multiple class="form-control-file">
-                    </div>
-                    <button type="submit" class="btn btn-primary">Salvar Comentário</button>
-                </form>
+        </form>
+
+        <!-- ======================= COMENTÁRIOS ======================= -->
+        <div class="tf-painel" style="padding:22px;margin-bottom:30px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+                <h3 style="font-size:.95rem;font-weight:650;margin:0">
+                    <i class="fa fa-history"></i> Andamento
+                </h3>
+                <button class="tf-btn tf-btn-sm tf-btn-primario" id="btnNovoComentario" style="margin-left:auto">
+                    <i class="fa fa-comment-o"></i> Registrar andamento
+                </button>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+
+            <div id="commentTimeline" class="tf-tempo">
+                <?php if (!$comentarios): ?>
+                    <p class="tf-mudo tf-mini">Nenhum registro ainda.</p>
+                <?php else: foreach ($comentarios as $c):
+                    $anexosCom = anexos_lista($c['caminho_anexo']); ?>
+                    <div class="tf-tempo-item" data-comentario="<?php echo e($c['id']); ?>">
+                        <div class="tf-tempo-marca"><i class="fa fa-comment"></i></div>
+                        <div class="tf-tempo-caixa">
+                            <div class="tf-tempo-cabec">
+                                <span class="tf-tempo-autor"><?php echo e($c['funcionario']); ?></span>
+                                <span><?php echo e(data_br($c['data_comentario'])); ?></span>
+                                <?php if (!empty($c['data_atualizacao'])): ?>
+                                    <span class="tf-mini">(editado em <?php echo e(data_br($c['data_atualizacao'])); ?>)</span>
+                                <?php endif; ?>
+                                <span class="tf-tempo-acoes">
+                                    <button type="button" class="tf-btn tf-btn-sm" data-editar-com>
+                                        <i class="fa fa-pencil"></i>
+                                    </button>
+                                    <button type="button" class="tf-btn tf-btn-sm" data-excluir-com>
+                                        <i class="fa fa-trash-o"></i>
+                                    </button>
+                                </span>
+                            </div>
+                            <div class="tf-tempo-texto"><?php echo e($c['comentario']); ?></div>
+                            <?php if ($anexosCom): ?>
+                            <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+                                <?php foreach ($anexosCom as $a): ?>
+                                    <span class="tf-btn tf-btn-sm" data-anexo-com="<?php echo e($a['rel']); ?>">
+                                        <a href="<?php echo e($a['url']); ?>" target="_blank"
+                                           style="color:inherit"><?php echo e($a['nome']); ?></a>
+                                        <i class="fa fa-times" data-excluir-anexo-com style="cursor:pointer"></i>
+                                    </span>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; endif; ?>
             </div>
         </div>
+
     </div>
 </div>
 
-<script src="../script/jquery-3.5.1.min.js"></script>
-<script src="../script/jquery-3.6.0.min.js"></script>
-<script src="../script/bootstrap.min.js"></script>
-<script src="../script/jquery.mask.min.js"></script>
-<script src="../script/toastr.min.js"></script>
+<script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/sweetalert2.js"></script>
+<script src="../script/toastr.min.js"></script>
+
 <script>
+jQuery(function ($) {
+    'use strict';
 
-    document.addEventListener('DOMContentLoaded', function() {
-        var deadlineInput = document.getElementById('deadline');
-        var now = new Date();
-        var year = now.getFullYear();
-        var month = ('0' + (now.getMonth() + 1)).slice(-2); // Meses são 0-indexados
-        var day = ('0' + now.getDate()).slice(-2);
-        var hours = ('0' + now.getHours()).slice(-2);
-        var minutes = ('0' + now.getMinutes()).slice(-2);
+    var CSRF   = <?php echo json_encode(csrf_token()); ?>;
+    var TOKEN  = <?php echo json_encode($token); ?>;
+    var TASKID = <?php echo (int) $tarefa['id']; ?>;
+    var novos  = [];
 
-        // Formato YYYY-MM-DDTHH:MM
-        var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
-        deadlineInput.min = minDateTime;
+    /** Substitui $.trim, removido no jQuery 4. */
+    function txt(v) {
+        return (v === null || v === undefined) ? '' : String(v).trim();
+    }
 
-        // Caso o valor atual seja anterior ao mínimo, corrige automaticamente
-        if (deadlineInput.value && deadlineInput.value < minDateTime) {
-            deadlineInput.value = minDateTime;
+    function esc(v) {
+        return String(v === null || v === undefined ? '' : v)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function api(dados) {
+        var opcoes = { url: 'api/acoes.php', type: 'POST', dataType: 'json' };
+        if (dados instanceof FormData) {
+            dados.append('_csrf', CSRF);
+            opcoes.data = dados;
+            opcoes.processData = false;
+            opcoes.contentType = false;
+        } else {
+            opcoes.data = $.extend({ _csrf: CSRF }, dados);
         }
+        return $.ajax(opcoes).then(null, function (xhr) {
+            return $.Deferred().reject({
+                error: (xhr.responseJSON && xhr.responseJSON.error) || 'Falha de comunicação.'
+            }).promise();
+        });
+    }
+
+    function erro(t) { Swal.fire({ icon: 'error', title: 'Erro', text: t }); }
+
+    /* ---------------------- Protocolo ---------------------- */
+
+    $('#protocoloButton').on('click', function () {
+        $.ajax({ url: '../style/configuracao.json', dataType: 'json', cache: false })
+            .done(function (cfg) {
+                abrirProtocolo(cfg && cfg.timbrado === 'S');
+            })
+            .fail(function () { abrirProtocolo(false); });
     });
 
-    $(document).ready(function() {
-        // Enviar formulário de edição de tarefa
-        $('#editTaskForm').on('submit', function(e) {
+    function abrirProtocolo(timbrado) {
+        // 'S' = papel já timbrado, usa o arquivo com sublinhado;
+        // 'N' = o PDF desenha o cabeçalho, usa o arquivo com hífen.
+        var arquivo = timbrado ? 'protocolo_geral.php' : 'protocolo-geral.php';
+        window.open(arquivo + '?id=' + TASKID, '_blank');
+    }
+
+    /* ---------------------- Anexos novos ---------------------- */
+
+    function desenharNovos() {
+        var $l = $('#listaNovos').empty();
+        novos.forEach(function (f, i) {
+            $l.append('<div class="tf-anexo">'
+                + '<div class="tf-anexo-icone"><i class="fa fa-file-o"></i></div>'
+                + '<div class="tf-anexo-nome">' + esc(f.name) + '<small>a enviar</small></div>'
+                + '<button type="button" class="tf-btn tf-btn-sm" data-tirar="' + i + '">'
+                + '<i class="fa fa-times"></i></button></div>');
+        });
+    }
+
+    /* Ignora o clique vindo do próprio input: senão vira recursão infinita. */
+    $('#zonaUpload').on('click', function (e) {
+        if (e.target === document.getElementById('attachments')) { return; }
+        $('#attachments').trigger('click');
+    })
+        .on('dragover', function (e) { e.preventDefault(); $(this).addClass('tf-sobre'); })
+        .on('dragleave', function () { $(this).removeClass('tf-sobre'); })
+        .on('drop', function (e) {
             e.preventDefault();
-
-            var formData = new FormData(this);
-            formData.append('taskId', '<?php echo $taskId; ?>');
-            formData.append('updatedBy', '<?php echo $_SESSION["username"]; ?>');
-            formData.append('updatedAt', new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }));
-
-            $.ajax({
-                url: 'save_task_edit.php',
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                dataType: 'json', // Espera um JSON como resposta
-                success: function(response) {
-                    if (response.status === 'success') {
-                        Swal.fire({
-                            title: 'Sucesso!',
-                            text: response.message,
-                            icon: 'success'
-                        }).then(() => {
-                            location.reload();
-                        });
-                    } else {
-                        Swal.fire({
-                            title: 'Erro!',
-                            text: response.message,
-                            icon: 'error'
-                        });
-                    }
-                },
-                error: function() {
-                    Swal.fire({
-                        title: 'Erro!',
-                        text: 'Erro ao salvar a tarefa. Tente novamente.',
-                        icon: 'error'
-                    });
-                }
-            });
+            $(this).removeClass('tf-sobre');
+            Array.prototype.push.apply(novos, e.originalEvent.dataTransfer.files);
+            desenharNovos();
         });
 
+    $('#attachments').on('change', function () {
+        Array.prototype.push.apply(novos, this.files);
+        this.value = '';
+        desenharNovos();
+    });
 
+    $('#listaNovos').on('click', '[data-tirar]', function () {
+        novos.splice(parseInt($(this).data('tirar'), 10), 1);
+        desenharNovos();
+    });
 
-    $(document).ready(function() {
-        // Adiciona o evento de clique ao botão quando a página for carregada
-        $('#protocoloButton').on('click', function() {
-            // Faz a requisição para o JSON
-            $.ajax({
-                url: '../style/configuracao.json',
-                dataType: 'json',
-                cache: false, // Desabilita o cache
-                success: function(data) {
-                    const taskId = '<?php echo $taskId; ?>'; // Pega o taskId via PHP
-                    let url = '';
+    $('#viewAttachments').on('click', '[data-excluir-anexo]', function () {
+        var $bloco = $(this).closest('.tf-anexo');
+        var arquivo = $bloco.data('arquivo');
 
-                    // Verifica o valor do "timbrado" e ajusta a URL
-                    if (data.timbrado === 'S') {
-                        url = 'protocolo_geral.php?id=' + taskId;
-                    } else if (data.timbrado === 'N') {
-                        url = 'protocolo-geral.php?id=' + taskId;
-                    }
-
-                    // Abre a URL correspondente em uma nova aba
-                    window.open(url, '_blank');
-                },
-                error: function() {
-                    alert('Erro ao carregar o arquivo de configuração.');
-                }
-            });
+        Swal.fire({
+            icon: 'warning',
+            title: 'Excluir anexo?',
+            text: 'O arquivo será removido do servidor.',
+            showCancelButton: true,
+            confirmButtonText: 'Excluir',
+            cancelButtonText: 'Cancelar',
+            reverseButtons: true
+        }).then(function (res) {
+            if (!res.isConfirmed) { return; }
+            api({ acao: 'excluir_anexo', taskId: TASKID, file: arquivo })
+                .done(function (r) {
+                    if (!r.success) { erro(r.error); return; }
+                    $bloco.fadeOut(160, function () { $(this).remove(); });
+                    if (window.toastr) { toastr.success('Anexo excluído.'); }
+                })
+                .fail(function (e) { erro(e.error); });
         });
     });
 
+    /* ---------------------- Salvar ---------------------- */
 
-        $(document).on('click', '.visualizar-anexo', function() {
-            var filePath = $(this).data('file');
-            window.open('<?php echo dirname($_SERVER['REQUEST_URI']); ?>/' + filePath, '_blank');
-        });
+    $('#editTaskForm').on('submit', function (e) {
+        e.preventDefault();
 
-        $(document).on('click', '.excluir-anexo', function() {
-            Swal.fire({
-                title: 'Tem certeza que deseja excluir este anexo?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Sim, excluir',
-                cancelButtonText: 'Cancelar',
-                reverseButtons: true
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    var filePath = $(this).data('file');
-                    var taskId = '<?php echo $taskId; ?>';
+        var $b = $('#btnSalvar').prop('disabled', true)
+            .html('<i class="fa fa-circle-o-notch tf-girando"></i> Salvando…');
 
-                    $.ajax({
-                        url: 'delete_attachment.php',
-                        type: 'POST',
-                        data: { file: filePath, taskId: taskId, action: 'delete_attachment' }, // Inclui o campo 'action'
-                        success: function(response) {
-                            Swal.fire(
-                                'Excluído!',
-                                response,
-                                'success'
-                            ).then(() => {
-                                location.reload();
-                            });
-                        },
-                        error: function() {
-                            Swal.fire(
-                                'Erro!',
-                                'Erro ao excluir o anexo.',
-                                'error'
-                            );
-                        }
-                    });
+        var fd = new FormData();
+        fd.append('acao', 'editar');
+
+        $(this).find('input[type=text], input[type=hidden], input[type=datetime-local], select, textarea')
+            .each(function () {
+                var n = $(this).attr('name');
+                if (n) { fd.append(n, $(this).val()); }
+            });
+
+        novos.forEach(function (f) { fd.append('attachments[]', f); });
+
+        api(fd)
+            .done(function (r) {
+                $b.prop('disabled', false).html('<i class="fa fa-save"></i> Salvar alterações');
+                if (!r.success) { erro(r.error); return; }
+
+                if (r.avisos && r.avisos.length) {
+                    Swal.fire({ icon: 'warning', title: 'Salvo com ressalvas',
+                        text: r.avisos.join(' ') }).then(function () { window.location.reload(); });
+                    return;
                 }
+
+                Swal.fire({
+                    icon: 'success', title: 'Alterações salvas',
+                    timer: 1400, showConfirmButton: false
+                }).then(function () { window.location.reload(); });
+            })
+            .fail(function (e2) {
+                $b.prop('disabled', false).html('<i class="fa fa-save"></i> Salvar alterações');
+                erro(e2.error);
             });
-        });
+    });
 
+    /* ---------------------- Comentários ---------------------- */
 
-        $(document).on('click', '.excluir-anexo-comentario', function() {
-            Swal.fire({
-                title: 'Tem certeza que deseja excluir este anexo?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Sim, excluir',
-                cancelButtonText: 'Cancelar',
-                reverseButtons: true
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    var filePath = $(this).data('file');
-                    var commentId = $(this).data('comment');
+    $('#btnNovoComentario').on('click', function () { formComentario(null, ''); });
 
-                    $.ajax({
-                        url: 'delete_comment_attachment.php',
-                        type: 'POST',
-                        data: { file: filePath, commentId: commentId },
-                        success: function(response) {
-                            Swal.fire(
-                                'Excluído!',
-                                'Anexo excluído com sucesso.',
-                                'success'
-                            ).then(() => {
-                                location.reload();
-                            });
-                        },
-                        error: function() {
-                            Swal.fire(
-                                'Erro!',
-                                'Erro ao excluir o anexo.',
-                                'error'
-                            );
-                        }
-                    });
-                }
-            });
-        });
+    $('#commentTimeline').on('click', '[data-editar-com]', function () {
+        var $item = $(this).closest('.tf-tempo-item');
+        formComentario($item.data('comentario'), $item.find('.tf-tempo-texto').text());
+    });
 
+    $('#commentTimeline').on('click', '[data-excluir-com]', function () {
+        var $item = $(this).closest('.tf-tempo-item');
 
-        $(document).on('click', '.editar-comentario', function() {
-            var comment = $(this).data('comment');
-            $('#editCommentDescription').val(comment.comentario);
-            $('#commentId').val(comment.id);
-            $('#editCommentForm').off('submit').on('submit', function(e) {
-                e.preventDefault();
-
-                var formData = new FormData(this);
-                formData.append('commentId', comment.id);
-                formData.append('taskToken', '<?php echo $token; ?>');
-
-                $.ajax({
-                    url: 'edit_comment.php',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        alert('Comentário atualizado com sucesso!');
-                        location.reload();
-                    },
-                    error: function() {
-                        alert('Erro ao atualizar o comentário.');
-                    }
-                });
-            });
-            $('#editCommentModal').modal('show');
+        Swal.fire({
+            icon: 'warning', title: 'Excluir registro?',
+            text: 'Esta ação não pode ser desfeita.',
+            showCancelButton: true, confirmButtonText: 'Excluir',
+            cancelButtonText: 'Cancelar', reverseButtons: true
+        }).then(function (res) {
+            if (!res.isConfirmed) { return; }
+            api({ acao: 'excluir_comentario', id: $item.data('comentario') })
+                .done(function (r) {
+                    if (!r.success) { erro(r.error); return; }
+                    $item.fadeOut(160, function () { $(this).remove(); });
+                })
+                .fail(function (e) { erro(e.error); });
         });
     });
+
+    $('#commentTimeline').on('click', '[data-excluir-anexo-com]', function () {
+        var $selo = $(this).closest('[data-anexo-com]');
+        var comentarioId = $(this).closest('.tf-tempo-item').data('comentario');
+
+        api({ acao: 'excluir_anexo_comentario', commentId: comentarioId, file: $selo.data('anexo-com') })
+            .done(function (r) {
+                if (!r.success) { erro(r.error); return; }
+                $selo.remove();
+            })
+            .fail(function (e) { erro(e.error); });
+    });
+
+    function formComentario(id, textoAtual) {
+        var editando = !!id;
+
+        Swal.fire({
+            title: editando ? 'Editar registro' : 'Registrar andamento',
+            width: 640,
+            html: '<textarea id="cmTexto" class="tf-textarea" rows="6" style="width:100%">'
+                + esc(textoAtual) + '</textarea>'
+                + '<div style="margin-top:12px;text-align:left">'
+                + '<label class="tf-rotulo">Anexos (opcional)</label>'
+                + '<input type="file" id="cmArquivos" multiple class="tf-input"></div>',
+            showCancelButton: true,
+            confirmButtonText: editando ? 'Salvar' : 'Registrar',
+            cancelButtonText: 'Cancelar',
+            reverseButtons: true,
+            focusConfirm: false,
+            preConfirm: function () {
+                var t = $('#cmTexto').val();
+                var arqs = document.getElementById('cmArquivos').files;
+                if (!txt(t) && !arqs.length) {
+                    Swal.showValidationMessage('Escreva um texto ou anexe um arquivo.');
+                    return false;
+                }
+                return { texto: t, arquivos: arqs };
+            }
+        }).then(function (res) {
+            if (!res.isConfirmed) { return; }
+
+            var fd = new FormData();
+            var i;
+
+            if (editando) {
+                fd.append('acao', 'editar_comentario');
+                fd.append('commentId', id);
+                fd.append('taskToken', TOKEN);
+                fd.append('editCommentDescription', res.value.texto);
+                for (i = 0; i < res.value.arquivos.length; i++) {
+                    fd.append('editCommentAttachments[]', res.value.arquivos[i]);
+                }
+            } else {
+                fd.append('acao', 'comentar');
+                fd.append('taskToken', TOKEN);
+                fd.append('commentDescription', res.value.texto);
+                for (i = 0; i < res.value.arquivos.length; i++) {
+                    fd.append('commentAttachments[]', res.value.arquivos[i]);
+                }
+            }
+
+            api(fd)
+                .done(function (r) {
+                    if (!r.success) { erro(r.error); return; }
+                    window.location.reload();
+                })
+                .fail(function (e) { erro(e.error); });
+        });
+    }
+
+    if (window.toastr) {
+        toastr.options = { positionClass: 'toast-bottom-right', timeOut: 3000, progressBar: true };
+    }
+});
 </script>
-<?php
-include(__DIR__ . '/../rodape.php');
-?>
+
 </body>
 </html>

@@ -1,31 +1,48 @@
 <?php
-include(__DIR__ . '/session_check.php');
-checkSession();
-include(__DIR__ . '/db_connection.php');
-date_default_timezone_set('America/Sao_Paulo');
+/**
+ * Atlas · Tarefas — compatibilidade: alteração de status.
+ *
+ * Mesmo contrato de antes (POST taskToken + status, resposta em texto). A
+ * diferença é que o status agora é validado contra o catálogo do módulo e a
+ * alteração fica registrada no histórico.
+ */
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $taskToken = $_POST['taskToken'];
-    $status = $_POST['status'];
-    $data_conclusao = null;
+require_once __DIR__ . '/core/bootstrap.php';
+exigir_login();
 
-    // Verificar se o status é "Concluída", "Finalizado sem prática do ato" ou "Aguardando Retirada"
-    if ($status === 'Concluída' || $status === 'Finalizado sem prática do ato' || $status === 'Aguardando Retirada') {
-        $data_conclusao = date('Y-m-d H:i:s');
-    }
+header('Content-Type: text/plain; charset=utf-8');
 
-    // Atualizar o status da tarefa no banco de dados
-    $sql = "UPDATE tarefas SET status = ?, data_conclusao = ? WHERE token = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sss", $status, $data_conclusao, $taskToken);
-
-    if ($stmt->execute()) {
-        echo "Status atualizado com sucesso!";
-    } else {
-        echo "Erro ao atualizar o status: " . $stmt->error;
-    }
-
-    $stmt->close();
-    $conn->close();
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo 'Método inválido.';
+    exit;
 }
-?>
+
+$token  = entrada('taskToken', '', $_POST);
+$status = entrada('status', '', $_POST);
+
+if ($token === '' || $status === '') {
+    echo 'Informe a tarefa e o status.';
+    exit;
+}
+if (!array_key_exists($status, tarefas_status_catalogo())) {
+    echo 'Status inválido.';
+    exit;
+}
+
+$t = db_one('SELECT id, status FROM tarefas WHERE token = ?', array($token));
+if (!$t) {
+    echo 'Tarefa não encontrada.';
+    exit;
+}
+
+$conclusao = in_array($status, tarefas_status_conclui(), true) ? date('Y-m-d H:i:s') : null;
+
+try {
+    db_exec('UPDATE tarefas SET status = ?, data_conclusao = ? WHERE token = ?',
+        array($status, $conclusao, $token));
+    registrar_historico((int) $t['id'], 'status', 'Status alterado', $t['status'], $status);
+    echo 'Status atualizado com sucesso!';
+} catch (Exception $e) {
+    error_log('[tarefas] update_status: ' . $e->getMessage());
+    echo 'Erro ao atualizar o status.';
+}

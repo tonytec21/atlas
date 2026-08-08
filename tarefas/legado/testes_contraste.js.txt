@@ -1,0 +1,236 @@
+/**
+ * Verificação de contraste dos botões, resolvendo a cascata do CSS na mão.
+ *
+ * Por que não usar o jsdom aqui: ele não trata corretamente o atalho
+ * `background` sobrescrevendo `background-image` entre regras de
+ * especificidade diferente, que é exatamente o mecanismo do defeito. O
+ * analisador abaixo implementa as três coisas que importam — casamento de
+ * seletor, especificidade e ordem — e expande o atalho como o navegador faz.
+ */
+
+const fs = require('fs');
+const css = require('css');
+
+const ARQUIVO = process.env.CSS || '/home/claude/build/tarefas/assets/css/tarefas.css';
+const fonte = fs.readFileSync(ARQUIVO, 'utf8');
+const ast = css.parse(fonte);
+
+/* ------------------------------------------------------------------ */
+/* Variáveis do tema                                                   */
+/* ------------------------------------------------------------------ */
+
+function coletarVariaveis(seletorAlvo) {
+    const vars = {};
+    ast.stylesheet.rules.forEach(r => {
+        if (r.type !== 'rule') { return; }
+        if (!r.selectors.some(s => s.trim() === seletorAlvo)) { return; }
+        r.declarations.forEach(d => {
+            if (d.type === 'declaration' && d.property.startsWith('--')) {
+                vars[d.property] = d.value.trim();
+            }
+        });
+    });
+    return vars;
+}
+
+const varsClaro = coletarVariaveis('.tf-app');
+const varsEscuro = Object.assign({}, varsClaro, coletarVariaveis('body.dark-mode .tf-app'));
+
+function resolver(valor, vars, profundidade = 0) {
+    if (!valor || profundidade > 6) { return valor; }
+    return valor.replace(/var\((--[\w-]+)(?:,\s*([^)]+))?\)/g, (_, nome, alt) =>
+        resolver(vars[nome] !== undefined ? vars[nome] : (alt || ''), vars, profundidade + 1).trim());
+}
+
+/* ------------------------------------------------------------------ */
+/* Casamento de seletor e especificidade                               */
+/* ------------------------------------------------------------------ */
+
+/** Casa um seletor simples (classes, tag e :not) contra o elemento. */
+function casaSimples(parte, el) {
+    const nots = [...parte.matchAll(/:not\(([^)]+)\)/g)].map(m => m[1].trim());
+    const limpo = parte.replace(/:not\([^)]+\)/g, '');
+
+    for (const n of nots) {
+        if (n.startsWith('.') && el.classes.includes(n.slice(1))) { return false; }
+    }
+
+    const classes = [...limpo.matchAll(/\.([\w-]+)/g)].map(m => m[1]);
+    if (!classes.every(c => el.classes.includes(c))) { return false; }
+
+    const tag = (limpo.match(/^([a-zA-Z]+)/) || [])[1];
+    if (tag && tag !== el.tag) { return false; }
+
+    // Pseudo-elementos e pseudo-classes não simuladas invalidam o casamento.
+    if (/::/.test(limpo)) { return false; }
+    if (/:(active|disabled|focus|empty|checked|nth-child|last-child|first-child)/.test(limpo)) { return false; }
+
+    return true;
+}
+
+/**
+ * Casa o seletor completo. Suporta descendência simples: o elemento é o último
+ * componente e os anteriores devem existir na lista de ancestrais.
+ */
+function casa(seletor, el) {
+    if (/[>+~]/.test(seletor)) { return false; }
+    const partes = seletor.trim().split(/\s+/);
+    const alvo = partes[partes.length - 1];
+    if (!casaSimples(alvo, el)) { return false; }
+
+    return partes.slice(0, -1).every(p => el.ancestrais.some(a => casaSimples(p, a)));
+}
+
+function especificidade(seletor) {
+    const semNot = seletor.replace(/:not\(([^)]+)\)/g, ' $1 ');
+    const ids = (semNot.match(/#[\w-]+/g) || []).length;
+    const classes = (semNot.match(/\.[\w-]+|\[[^\]]+\]|:[a-z-]+\(?/g) || [])
+        .filter(t => !/^::/.test(t)).length;
+    const tags = (semNot.match(/(^|\s)[a-zA-Z]+/g) || []).length;
+    return ids * 100 + classes * 10 + tags;
+}
+
+/** Expande o atalho `background` como o navegador. */
+function expandir(prop, valor) {
+    if (prop !== 'background') { return [[prop, valor]]; }
+    const temImagem = /gradient|url\(/i.test(valor);
+    return [
+        ['background-image', temImagem ? valor : 'none'],
+        ['background-color', temImagem ? 'transparent' : valor],
+    ];
+}
+
+/* ------------------------------------------------------------------ */
+/* Contraste                                                           */
+/* ------------------------------------------------------------------ */
+
+function paraRgb(cor) {
+    if (!cor) { return null; }
+    let c = cor.trim().toLowerCase();
+    if (c === 'white') { return [255, 255, 255]; }
+    if (c === 'black') { return [0, 0, 0]; }
+    if (c === 'transparent' || c === 'none') { return null; }
+    let m = c.match(/^#([0-9a-f]{3})$/);
+    if (m) { return m[1].split('').map(h => parseInt(h + h, 16)); }
+    m = c.match(/^#([0-9a-f]{6})$/);
+    if (m) { return [0, 2, 4].map(i => parseInt(m[1].substr(i, 2), 16)); }
+    m = c.match(/^rgba?\(([^)]+)\)/);
+    if (m) { return m[1].split(',').slice(0, 3).map(n => parseFloat(n)); }
+    return null;
+}
+
+function luminancia(rgb) {
+    const [r, g, b] = rgb.map(v => {
+        const x = v / 255;
+        return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contraste(frente, fundo) {
+    const a = paraRgb(frente), b = paraRgb(fundo);
+    if (!a || !b) { return null; }
+    const l1 = luminancia(a), l2 = luminancia(b);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+/** Primeira cor de um gradiente, para servir de fundo efetivo. */
+function fundoEfetivo(est, superficie) {
+    const img = est['background-image'];
+    if (img && img !== 'none') {
+        const m = img.match(/#[0-9a-f]{3,6}|rgba?\([^)]+\)/i);
+        if (m) { return m[0]; }
+    }
+    const cor = est['background-color'];
+    if (cor && cor !== 'transparent') { return cor; }
+    return superficie;
+}
+
+/* ------------------------------------------------------------------ */
+/* Casos                                                               */
+/* ------------------------------------------------------------------ */
+
+let ok = 0; const falhas = [];
+function checar(d, c, det) {
+    if (c) { ok++; console.log('  [OK]    ' + d); }
+    else { falhas.push(d + (det ? ' -> ' + det : '')); console.log('  [FALHA] ' + d + (det ? ' -> ' + det : '')); }
+}
+
+const variantes = [
+    ['neutro',   ['tf-btn']],
+    ['primário', ['tf-btn', 'tf-btn-primario']],
+    ['sucesso',  ['tf-btn', 'tf-btn-sucesso']],
+    ['perigo',   ['tf-btn', 'tf-btn-perigo']],
+    ['IA',       ['tf-btn', 'tf-btn-ia']],
+];
+
+const temas = [
+    ['claro', varsClaro, [{ tag: 'body', classes: ['light-mode'] }, { tag: 'div', classes: ['tf-app'] }]],
+    ['escuro', varsEscuro, [{ tag: 'body', classes: ['dark-mode'] }, { tag: 'div', classes: ['tf-app'] }]],
+];
+
+const MINIMO = 3.0;   // limite de legibilidade para texto de botão
+
+temas.forEach(([tema, vars, ancestrais]) => {
+    [false, true].forEach(hover => {
+        console.log(`\n== Tema ${tema}${hover ? ' · hover' : ''} ==`);
+        variantes.forEach(([nome, classes]) => {
+            ['button', 'a'].forEach(tag => {
+                const el = { tag, classes: classes.slice(), ancestrais };
+                const estilos = computar(el, vars, hover);
+                const superficie = resolver('var(--tf-surface)', vars);
+                const fundo = fundoEfetivo(estilos, superficie);
+                const cor = estilos['color'];
+                const razao = contraste(cor, fundo);
+                checar(`${nome} <${tag}>`, razao !== null && razao >= MINIMO,
+                    `cor=${cor} fundo=${fundo} contraste=${razao ? razao.toFixed(2) : 'n/d'}`);
+            });
+        });
+    });
+});
+
+/**
+ * Resolve as propriedades finais de um elemento.
+ *
+ * No estado hover, as regras com `:hover` entram na disputa; fora dele, são
+ * descartadas. A especificidade é calculada sobre o seletor original, com o
+ * `:hover` incluído, que é como o navegador faz.
+ */
+function computar(el, vars, hover) {
+    const candidatas = [];
+    let ordem = 0;
+
+    ast.stylesheet.rules.forEach(regra => {
+        if (regra.type !== 'rule' || !regra.selectors) { return; }
+        regra.selectors.forEach(sel => {
+            const temHover = /:hover/.test(sel);
+            if (temHover && !hover) { return; }              // regra de hover só vale no hover
+            const selSemHover = sel.replace(/:hover/g, '');
+            if (!casa(selSemHover, el)) { return; }
+            const peso = especificidade(sel);
+            regra.declarations.forEach(d => {
+                if (d.type !== 'declaration') { return; }
+                expandir(d.property, d.value).forEach(([p, v]) => {
+                    candidatas.push({ prop: p, valor: v, peso, ordem: ordem++ });
+                });
+            });
+        });
+    });
+
+    const final = {};
+    candidatas.forEach(c => {
+        const atual = final[c.prop];
+        if (!atual || c.peso > atual.peso || (c.peso === atual.peso && c.ordem > atual.ordem)) {
+            final[c.prop] = c;
+        }
+    });
+
+    const saida = {};
+    Object.keys(final).forEach(p => { saida[p] = resolver(final[p].valor, vars); });
+    return saida;
+}
+
+console.log('\n================ RESULTADO ================');
+console.log('  Passaram: ' + ok + '   Falharam: ' + falhas.length);
+falhas.forEach(f => console.log('   - ' + f));
+process.exit(falhas.length ? 1 : 0);

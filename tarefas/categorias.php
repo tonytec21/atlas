@@ -1,225 +1,270 @@
 <?php
-include(__DIR__ . '/session_check.php');
-checkSession();
-include(__DIR__ . '/db_connection.php');
+/**
+ * Atlas · Tarefas — cadastro de categorias e origens.
+ *
+ * Continua usando os endpoints originais (save_category.php,
+ * update_category.php e delete_category.php), que não foram alterados. O que
+ * mudou é a tela: as duas listas ficam lado a lado, com contagem de uso, e a
+ * exclusão avisa quantas tarefas ficariam órfãs antes de confirmar.
+ */
+
+require_once __DIR__ . '/core/bootstrap.php';
+exigir_login();
+
+if (!usuario_ve_tudo()) {
+    http_response_code(403);
+    echo '<p style="font-family:sans-serif;padding:40px">Acesso restrito aos administradores do sistema.</p>';
+    exit;
+}
+
+/** Lista categorias ou origens já com a contagem de tarefas vinculadas. */
+function listar_com_uso($tabela, $coluna)
+{
+    return db_all(
+        "SELECT x.id, x.titulo, x.status, COUNT(t.id) AS em_uso
+           FROM `$tabela` x
+           LEFT JOIN tarefas t ON t.`$coluna` = x.id
+          GROUP BY x.id, x.titulo, x.status
+          ORDER BY x.titulo"
+    );
+}
+
+$categorias = listar_com_uso('categorias', 'categoria');
+$origens    = listar_com_uso('origem', 'origem');
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Categorias</title>
+    <title>Atlas · Categorias e Origens</title>
+
+    <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
-    <link rel="icon" href="../style/img/favicon.png" type="image/png">
-    <style>
-        .table th:nth-child(1), .table td:nth-child(1) {
-            width: 5%;
-        }
-        .table th:nth-child(3), .table td:nth-child(3) {
-            width: 10%;
-        }
-        .table th:nth-child(2), .table td:nth-child(2) {
-            width: 85%;
-        }
-        .col-md-6 {
-            display: flex;
-            align-items: flex-end;
-        }
-    </style>
+    <link rel="stylesheet" href="../style/css/sweetalert2.min.css">
+    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.0.8">
+
+    <script src="../script/jquery-3.5.1.min.js"></script>
 </head>
+
 <body class="light-mode">
-<?php
-include(__DIR__ . '/../menu.php');
-include(__DIR__ . '/db_connection.php');
-?>
+
+<?php include(__DIR__ . '/../menu.php'); ?>
 
 <div id="main" class="main-content">
-    <div class="container">
-        <h3>Gerenciamento de categorias de tarefas</h3>
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <input type="text" id="search-term" class="form-control" placeholder="Pesquisar categoria">
+    <div class="container-fluid tf-app" style="max-width:1080px">
+
+        <div class="tf-topo">
+            <div class="tf-topo-icone"><i class="fa fa-tags"></i></div>
+            <div>
+                <h1>Categorias e origens</h1>
+                <div class="tf-sub">Classificações usadas no cadastro das tarefas</div>
             </div>
-            <div class="col-md-3">
-                <button id="search-button" class="btn btn-primary w-100">Pesquisar</button>
-            </div>
-            <div class="col-md-3">
-                <button id="add-button" class="btn btn-success w-100" data-toggle="modal" data-target="#addCategoryModal">Cadastrar</button>
+            <div class="tf-topo-acoes">
+                <a href="index.php" class="tf-btn">
+                    <i class="fa fa-arrow-left"></i> Voltar às tarefas
+                </a>
             </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Categoria</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="category-table-body">
-                    <!-- Linhas serão adicionadas dinamicamente -->
-                </tbody>
-            </table>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px">
+
+            <?php
+            $blocos = array(
+                array('tipo' => 'categoria', 'titulo' => 'Categorias', 'icone' => 'fa-folder-o', 'dados' => $categorias),
+                array('tipo' => 'origem',    'titulo' => 'Origens',    'icone' => 'fa-sign-in',  'dados' => $origens),
+            );
+
+            foreach ($blocos as $b): ?>
+            <div class="tf-painel" style="padding:20px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+                    <h3 style="font-size:1rem;font-weight:650;margin:0">
+                        <i class="fa <?php echo $b['icone']; ?>"></i> <?php echo $b['titulo']; ?>
+                    </h3>
+                    <span class="tf-selo tf-selo-contorno"><?php echo count($b['dados']); ?></span>
+                    <button class="tf-btn tf-btn-sm tf-btn-primario" style="margin-left:auto"
+                            data-novo="<?php echo $b['tipo']; ?>">
+                        <i class="fa fa-plus"></i> Adicionar
+                    </button>
+                </div>
+
+                <div class="tf-anexos">
+                    <?php if (!$b['dados']): ?>
+                        <p class="tf-mudo tf-mini" style="margin:0">Nada cadastrado ainda.</p>
+                    <?php else: foreach ($b['dados'] as $item):
+                        $ativo = (strtolower((string) $item['status']) === 'ativo'); ?>
+                        <div class="tf-anexo" data-tipo="<?php echo $b['tipo']; ?>"
+                             data-id="<?php echo e($item['id']); ?>"
+                             data-titulo="<?php echo e($item['titulo']); ?>"
+                             data-status="<?php echo e($item['status']); ?>">
+                            <div class="tf-anexo-icone">
+                                <i class="fa <?php echo $b['icone']; ?>"></i>
+                            </div>
+                            <div class="tf-anexo-nome">
+                                <?php echo e($item['titulo']); ?>
+                                <small>
+                                    <?php echo (int) $item['em_uso']; ?> tarefa(s) ·
+                                    <?php echo $ativo ? 'ativo' : 'inativo'; ?>
+                                </small>
+                            </div>
+                            <div class="tf-anexo-acoes">
+                                <button class="tf-btn tf-btn-sm" data-editar title="Editar">
+                                    <i class="fa fa-pencil"></i>
+                                </button>
+                                <button class="tf-btn tf-btn-sm tf-btn-perigo" data-excluir
+                                        data-uso="<?php echo (int) $item['em_uso']; ?>" title="Excluir">
+                                    <i class="fa fa-trash-o"></i>
+                                </button>
+                            </div>
+                        </div>
+                    <?php endforeach; endif; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+
         </div>
+
+        <p class="tf-mini tf-mudo" style="margin-top:16px">
+            <i class="fa fa-info-circle"></i>
+            Itens em uso não devem ser excluídos: as tarefas antigas passariam a exibir a classificação
+            em branco. Para tirar de circulação sem afetar o acervo, marque como <strong>inativo</strong> —
+            o item deixa de aparecer nos formulários novos e continua sendo exibido nas tarefas que já o usam.
+        </p>
+
     </div>
 </div>
 
-<!-- Modal de Adição de Categoria -->
-<div class="modal fade" id="addCategoryModal" tabindex="-1" role="dialog" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addCategoryModalLabel">Cadastrar Categoria</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="category-form">
-                    <div class="form-group">
-                        <label for="category-name">Nome da Categoria</label>
-                        <input type="text" class="form-control" id="category-name" name="category-name" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Salvar</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+<script src="../script/bootstrap.bundle.min.js"></script>
+<script src="../script/sweetalert2.js"></script>
+<script src="../script/toastr.min.js"></script>
 
-<!-- Modal de Edição de Categoria -->
-<div class="modal fade" id="editCategoryModal" tabindex="-1" role="dialog" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editCategoryModalLabel">Editar Categoria</h5>
-                <button type="button" the close" data-dismiss="modal" aria-label="Fechar">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="edit-category-form">
-                    <input type="hidden" id="edit-category-id" name="edit-category-id">
-                    <div class="form-group">
-                        <label for="edit-category-name">Nome da Categoria</label>
-                        <input type="text" class="form-control" id="edit-category-name" name="edit-category-name" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-
-<script src="../script/jquery-3.5.1.min.js"></script>
-<script src="../script/bootstrap.min.js"></script>
-<script src="../script/jquery.mask.min.js"></script>
 <script>
-    $(document).ready(function() {
-        function loadCategories() {
-            $.ajax({
-                url: 'load_categories.php',
-                type: 'GET',
-                success: function(response) {
-                    const categories = JSON.parse(response);
-                    $('#category-table-body').empty();
-                    categories.forEach(function(category) {
-                        const row = `<tr>
-                            <td>${category.id}</td>
-                            <td>${category.titulo}</td>
-                            <td>
-                                <button class="btn btn-edit btn-sm edit-category" data-id="${category.id}" data-name="${category.titulo}"><i class="fa fa-pencil" aria-hidden="true"></i></button>
-                                <button class="btn btn-delete btn-sm delete-category" data-id="${category.id}"><i class="fa fa-trash" aria-hidden="true"></i></button>
-                            </td>
-                        </tr>`;
-                        $('#category-table-body').append(row);
-                    });
+jQuery(function ($) {
+    'use strict';
+
+    /** Substitui $.trim, removido no jQuery 4. */
+    function txt(v) {
+        return (v === null || v === undefined) ? '' : String(v).trim();
+    }
+
+    function esc(v) {
+        return String(v === null || v === undefined ? '' : v)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function rotulo(tipo) { return tipo === 'categoria' ? 'categoria' : 'origem'; }
+
+    function formulario(tipo, item) {
+        var editando = !!item;
+        var ativo = editando && String(item.status).toLowerCase() === 'ativo';
+
+        Swal.fire({
+            title: (editando ? 'Editar ' : 'Nova ') + rotulo(tipo),
+            width: 520,
+            html: '<div style="text-align:left">'
+                + '<label class="tf-rotulo">Título</label>'
+                + '<input id="ctTitulo" class="tf-input" value="' + esc(editando ? item.titulo : '') + '">'
+                + '<label class="tf-rotulo" style="margin-top:12px">Situação</label>'
+                + '<select id="ctStatus" class="tf-select">'
+                + '<option value="Ativo"' + (!editando || ativo ? ' selected' : '') + '>Ativo</option>'
+                + '<option value="Inativo"' + (editando && !ativo ? ' selected' : '') + '>Inativo</option>'
+                + '</select></div>',
+            showCancelButton: true,
+            confirmButtonText: 'Salvar',
+            cancelButtonText: 'Cancelar',
+            reverseButtons: true,
+            focusConfirm: false,
+            preConfirm: function () {
+                var t = txt($('#ctTitulo').val());
+                if (!t) {
+                    Swal.showValidationMessage('Informe o título.');
+                    return false;
                 }
-            });
-        }
-
-        loadCategories();
-
-        $('#search-button').on('click', function() {
-            var searchTerm = $('#search-term').val().toLowerCase();
-            $('tbody tr').filter(function() {
-                $(this).toggle($(this).text().toLowerCase().indexOf(searchTerm) > -1);
-            });
-        });
-
-        $('#category-form').on('submit', function(e) {
-            e.preventDefault();
-            const categoryName = $('#category-name').val();
-            $.ajax({
-                url: 'save_category.php',
-                type: 'POST',
-                data: { titulo: categoryName },
-                success: function() {
-                    $('#addCategoryModal').modal('hide');
-                    loadCategories();
-                }
-            });
-        });
-
-        $(document).on('click', '.edit-category', function() {
-            const id = $(this).data('id');
-            const name = $(this).data('name');
-            $('#edit-category-id').val(id);
-            $('#edit-category-name').val(name);
-            $('#editCategoryModal').modal('show');
-        });
-
-        $('#edit-category-form').on('submit', function(e) {
-            e.preventDefault();
-            const id = $('#edit-category-id').val();
-            const name = $('#edit-category-name').val();
-            $.ajax({
-                url: 'update_category.php',
-                type: 'POST',
-                data: { id: id, titulo: name },
-                success: function() {
-                    $('#editCategoryModal').modal('hide');
-                    loadCategories();
-                }
-            });
-        });
-
-        $(document).on('click', '.delete-category', function() {
-            const id = $(this).data('id');
-            if (confirm('Tem certeza que deseja excluir esta categoria?')) {
-                $.ajax({
-                    url: 'delete_category.php',
-                    type: 'POST',
-                    data: { id: id },
-                    success: function() {
-                        loadCategories();
-                    }
-                });
+                return { titulo: t, status: $('#ctStatus').val() };
             }
+        }).then(function (res) {
+            if (!res.isConfirmed) { return; }
+
+            var dados = {
+                tipo: tipo,
+                titulo: res.value.titulo,
+                status: res.value.status
+            };
+            if (editando) { dados.id = item.id; }
+
+            $.ajax({
+                url: editando ? 'update_category.php' : 'save_category.php',
+                type: 'POST',
+                data: dados
+            })
+                .done(function () {
+                    if (window.toastr) { toastr.success('Registro salvo.'); }
+                    setTimeout(function () { window.location.reload(); }, 600);
+                })
+                .fail(function () {
+                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível salvar.' });
+                });
+        });
+    }
+
+    $('[data-novo]').on('click', function () {
+        formulario($(this).data('novo'), null);
+    });
+
+    $('[data-editar]').on('click', function () {
+        var $l = $(this).closest('.tf-anexo');
+        formulario($l.data('tipo'), {
+            id: $l.data('id'),
+            titulo: $l.data('titulo'),
+            status: $l.data('status')
         });
     });
-</script>
 
-<script>
+    $('[data-excluir]').on('click', function () {
+        var $l = $(this).closest('.tf-anexo');
+        var uso = parseInt($(this).data('uso'), 10) || 0;
+        var tipo = $l.data('tipo');
 
-    function normalizeText(text) {
-        return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    }
+        var aviso = uso > 0
+            ? '<p style="color:var(--tf-perigo)"><strong>' + uso + ' tarefa(s)</strong> usam esta '
+              + rotulo(tipo) + '. Depois da exclusão, elas ficarão sem essa classificação.<br>'
+              + 'Considere marcar como <strong>inativo</strong> em vez de excluir.</p>'
+            : '<p>Nenhuma tarefa usa esta ' + rotulo(tipo) + '. A exclusão é segura.</p>';
 
-    function formatDateTime(dateTime) {
-        var date = new Date(dateTime);
-        return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
-    }
+        Swal.fire({
+            icon: 'warning',
+            title: 'Excluir "' + esc($l.data('titulo')) + '"?',
+            html: aviso,
+            showCancelButton: true,
+            confirmButtonText: 'Excluir mesmo assim',
+            cancelButtonText: 'Cancelar',
+            reverseButtons: true
+        }).then(function (res) {
+            if (!res.isConfirmed) { return; }
 
-    $(document).ready(function() {
-
+            $.ajax({
+                url: 'delete_category.php',
+                type: 'POST',
+                data: { tipo: tipo, id: $l.data('id') }
+            })
+                .done(function () {
+                    if (window.toastr) { toastr.success('Registro excluído.'); }
+                    setTimeout(function () { window.location.reload(); }, 600);
+                })
+                .fail(function () {
+                    Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível excluir.' });
+                });
+        });
     });
+
+    if (window.toastr) {
+        toastr.options = { positionClass: 'toast-bottom-right', timeOut: 2600, progressBar: true };
+    }
+});
 </script>
 
-<?php include(__DIR__ . '/../rodape.php'); ?>
 </body>
 </html>

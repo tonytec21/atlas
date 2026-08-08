@@ -1,22 +1,14 @@
 <?php
-include(__DIR__ . '/db_connection.php');
-date_default_timezone_set('America/Sao_Paulo');
+/** Atlas · Tarefas — subtarefas de uma tarefa principal (contrato original). */
+require_once __DIR__ . '/core/bootstrap.php';
+api_iniciar();
 
-$id_tarefa_principal = $_GET['id_tarefa_principal'];
+$id = entrada_int('id_tarefa_principal');
+$subs = $id > 0
+    ? db_all("SELECT id, titulo, funcionario_responsavel, data_criacao, data_limite, status
+                FROM tarefas WHERE id_tarefa_principal = ? AND sub_categoria = 'Sim' ORDER BY id",
+             array($id))
+    : array();
 
-$sql = "SELECT id, titulo, funcionario_responsavel, data_criacao, data_limite, status FROM tarefas WHERE id_tarefa_principal = ? AND sub_categoria = 'Sim'";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $id_tarefa_principal);
-$stmt->execute();
-$result = $stmt->get_result();
-
-$subTasks = array();
-while ($row = $result->fetch_assoc()) {
-    $subTasks[] = $row;
-}
-
-echo json_encode($subTasks);
-
-$stmt->close();
-$conn->close();
-?>
+while (ob_get_level() > 0) { ob_end_clean(); }
+echo json_encode($subs, JSON_UNESCAPED_UNICODE);

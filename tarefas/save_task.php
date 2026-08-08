@@ -1,89 +1,72 @@
-<?php  
-header('Content-Type: application/json');  
-include(__DIR__ . '/session_check.php');  
-checkSession();  
-include(__DIR__ . '/db_connection.php');  
-date_default_timezone_set('America/Sao_Paulo');  
+<?php
+/**
+ * Atlas · Tarefas — compatibilidade: criação de tarefa.
+ *
+ * Mesmo contrato do módulo antigo (POST do formulário de criar-tarefa.php,
+ * resposta JSON com success/message/token/redirect). O que mudou por dentro:
+ * os anexos passam por validação de extensão e tamanho, e a criação fica
+ * registrada no histórico.
+ */
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {  
-    try {  
-        $titulo = $_POST['title'];  
-        $categoria = $_POST['category'];  
-        $data_limite = $_POST['deadline'];  
-        $funcionario_responsavel = $_POST['employee'];  
-        $origem = $_POST['origin'];  
-        $descricao = $_POST['description'];  
-        $criado_por = $_POST['createdBy'];  
-        $data_criacao = date('Y-m-d H:i:s');  
-        $token = md5(uniqid(rand(), true));  
-        $caminho_anexo = '';  
-        $nivel_de_prioridade = $_POST['priority'];
-        $revisor = isset($_POST['reviewer']) ? $_POST['reviewer'] : null;  
+require_once __DIR__ . '/core/bootstrap.php';
+api_iniciar();
 
-        // Verifica se há arquivos anexados  
-        if (!empty($_FILES['attachments']['name'][0])) {  
-            $targetDir = "/arquivos/$token/";  
-            $fullTargetDir = __DIR__ . $targetDir;  
-            if (!is_dir($fullTargetDir)) {  
-                mkdir($fullTargetDir, 0777, true);  
-            }  
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    responder_json(array('success' => false, 'message' => 'Método de requisição inválido'), 405);
+}
 
-            foreach ($_FILES['attachments']['name'] as $key => $name) {  
-                $targetFile = $fullTargetDir . basename($name);  
-                if (move_uploaded_file($_FILES['attachments']['tmp_name'][$key], $targetFile)) {  
-                    $caminho_anexo .= "$targetDir" . basename($name) . ";";  
-                }  
-            }  
-            // Remover o ponto e vírgula final  
-            $caminho_anexo = rtrim($caminho_anexo, ';');  
-        }  
+$u = usuario_atual();
 
-        // Inserir dados da tarefa no banco de dados  
-        $sql = "INSERT INTO tarefas (token, titulo, categoria, origem, descricao, data_limite, funcionario_responsavel, criado_por, data_criacao, caminho_anexo, nivel_de_prioridade, revisor)   
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+$titulo = entrada('title', '', $_POST);
+if ($titulo === '') {
+    responder_json(array('success' => false, 'message' => 'Informe o título da tarefa.'));
+}
 
-        $stmt = $conn->prepare($sql);  
-        $stmt->bind_param("ssssssssssss", $token, $titulo, $categoria, $origem, $descricao, $data_limite, $funcionario_responsavel, $criado_por, $data_criacao, $caminho_anexo, $nivel_de_prioridade, $revisor);
+$token = md5(uniqid((string) mt_rand(), true));
+$up = salvar_uploads('attachments', $token);
 
-        if ($stmt->execute()) {  
-            // Capturar o ID da tarefa recém-inserida  
-            $last_id = $stmt->insert_id;  
-        
-            // Preparar a consulta para pegar o token baseado no ID  
-            $query_token = "SELECT token FROM tarefas WHERE id = ?";  
-            $stmt_token = $conn->prepare($query_token);  
-            $stmt_token->bind_param("i", $last_id);  
-            $stmt_token->execute();  
-            $stmt_token->bind_result($token);  
-            $stmt_token->fetch();  
-            $stmt_token->close();  
+$campos = array(
+    'token'                   => $token,
+    'titulo'                  => $titulo,
+    'categoria'               => entrada('category', '', $_POST),
+    'origem'                  => entrada('origin', '', $_POST),
+    'descricao'               => entrada('description', '', $_POST),
+    'data_limite'             => data_para_mysql(entrada('deadline', '', $_POST)),
+    'funcionario_responsavel' => entrada('employee', '', $_POST),
+    'criado_por'              => entrada('createdBy', $u['usuario'], $_POST),
+    'data_criacao'            => date('Y-m-d H:i:s'),
+    'caminho_anexo'           => implode(';', $up['caminhos']),
+    'nivel_de_prioridade'     => entrada('priority', 'Média', $_POST),
+    'revisor'                 => entrada('reviewer', '', $_POST),
+);
 
-            echo json_encode([  
-                'success' => true,  
-                'message' => 'Tarefa salva com sucesso!',  
-                'token' => $token,  
-                'redirect' => "index.php?token=" . $token  
-            ]);  
-        } else {  
-            echo json_encode([  
-                'success' => false,  
-                'message' => 'Erro ao salvar a tarefa: ' . $stmt->error  
-            ]);  
-        }  
+foreach (array('tags', 'apresentante') as $col) {
+    $v = entrada($col, '', $_POST);
+    if ($v !== '' && db_tem_coluna('tarefas', $col)) {
+        $campos[$col] = $v;
+    }
+}
 
-        $stmt->close();  
-        $conn->close();  
+try {
+    $cols = array_keys($campos);
+    db_exec(
+        'INSERT INTO tarefas (`' . implode('`, `', $cols) . '`) VALUES ('
+        . implode(', ', array_fill(0, count($cols), '?')) . ')',
+        array_values($campos)
+    );
+    $novoId = (int) db()->lastInsertId();
+} catch (Exception $e) {
+    error_log('[tarefas] save_task: ' . $e->getMessage());
+    responder_json(array('success' => false, 'message' => 'Erro ao salvar a tarefa.'), 500);
+}
 
-    } catch (Exception $e) {  
-        echo json_encode([  
-            'success' => false,  
-            'message' => 'Erro ao processar a requisição: ' . $e->getMessage()  
-        ]);  
-    }  
-} else {  
-    echo json_encode([  
-        'success' => false,  
-        'message' => 'Método de requisição inválido'  
-    ]);  
-}  
-?>
+registrar_historico($novoId, 'criacao', 'Tarefa criada');
+
+responder_json(array(
+    'success'  => true,
+    'message'  => 'Tarefa salva com sucesso!',
+    'id'       => $novoId,
+    'token'    => $token,
+    'avisos'   => $up['erros'],
+    'redirect' => 'index.php?token=' . $token,
+));

@@ -1,0 +1,54 @@
+/**
+ * Verifica a barra flutuante de ações em lote:
+ *  - invisível enquanto nada estiver selecionado;
+ *  - visível e acima do menu do sistema quando há seleção.
+ */
+const fs = require('fs');
+const { JSDOM } = require('jsdom');
+const css = fs.readFileSync('/home/claude/build/tarefas/assets/css/tarefas.css', 'utf8');
+
+let ok = 0; const falhas = [];
+function checar(d, c, det) {
+    if (c) { ok++; console.log('  [OK]    ' + d); }
+    else { falhas.push(d); console.log('  [FALHA] ' + d + (det ? ' -> ' + det : '')); }
+}
+
+function estilo(classes) {
+    const dom = new JSDOM(`<body class="light-mode"><style>${css}</style>
+        <div class="${classes}" id="tfLote"><span>1 tarefa</span></div></body>`);
+    return dom.window.getComputedStyle(dom.window.document.getElementById('tfLote'));
+}
+
+console.log('== Sem seleção ==');
+{
+    const st = estilo('tf-lote tf-app');
+    checar('barra invisível', st.visibility === 'hidden', 'visibility=' + st.visibility);
+    checar('opacidade zerada', st.opacity === '0', 'opacity=' + st.opacity);
+    checar('não intercepta cliques', st.pointerEvents === 'none', st.pointerEvents);
+}
+
+console.log('\n== Com seleção ==');
+{
+    const st = estilo('tf-lote tf-app tf-visivel');
+    checar('barra visível', st.visibility === 'visible', st.visibility);
+    checar('opacidade cheia', st.opacity === '1', st.opacity);
+    checar('volta a receber cliques', st.pointerEvents === 'auto', st.pointerEvents);
+    checar('ancorada acima do menu', /folga-inferior/.test(st.bottom) || st.bottom !== '', st.bottom);
+}
+
+console.log('\n== Aritmética do método antigo (por que falhava) ==');
+{
+    const menu = 92;            // altura da barra de navegação do Atlas
+    const folga = menu + 20;    // --tf-folga-inferior
+    const altura = 46;          // altura aproximada da pílula
+    const deslocado = folga - (altura * 1.4);   // translateY(140%)
+    console.log(`  bottom=${folga}px, translateY(140%)=${(altura * 1.4).toFixed(0)}px`);
+    console.log(`  => a barra parava a ${deslocado.toFixed(0)}px do rodapé, dentro dos ${menu}px do menu`);
+    checar('método antigo de fato deixava a barra sobre o menu', deslocado > 0 && deslocado < menu,
+        deslocado.toFixed(0) + 'px');
+}
+
+console.log('\n================ RESULTADO ================');
+console.log('  Passaram: ' + ok + '   Falharam: ' + falhas.length);
+falhas.forEach(f => console.log('   - ' + f));
+process.exit(falhas.length ? 1 : 0);

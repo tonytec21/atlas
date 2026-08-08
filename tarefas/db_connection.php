@@ -1,17 +1,19 @@
 <?php
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "atlas";
+/**
+ * Atlas · Tarefas — compatibilidade: db_connection.php.
+ *
+ * Vários arquivos de impressão (protocolo, guia, recibo, ofício) ainda fazem
+ * include deste arquivo e usam a variável $conn (mysqli) e as variáveis
+ * $servername/$username/$password/$dbname. Todas continuam disponíveis, mas
+ * agora vêm de core/config.php, que é o único ponto do módulo que conhece as
+ * credenciais.
+ */
 
-// Criar conexão
-$conn = new mysqli($servername, $username, $password, $dbname);
+require_once __DIR__ . '/core/bootstrap.php';
 
-// Verificar conexão
-if ($conn->connect_error) {
-    die("Falha na conexão: " . $conn->connect_error);
-}
+$servername = TAREFAS_DB_HOST;
+$username   = TAREFAS_DB_USER;
+$password   = TAREFAS_DB_PASS;
+$dbname     = TAREFAS_DB_NAME;
 
-// Configurar a conexão para usar UTF-8
-$conn->set_charset("utf8");
-?>
+$conn = db_mysqli();

@@ -1,0 +1,96 @@
+/**
+ * Verifica as barras do painel: preenchimento visível e percentual correto.
+ */
+const fs = require('fs');
+const { JSDOM } = require('jsdom');
+
+const RAIZ = '/home/claude/build/tarefas';
+const RESP = JSON.parse(fs.readFileSync('/tmp/respostas.json', 'utf8'));
+
+let ok = 0; const falhas = [];
+function checar(d, c, det) {
+    if (c) { ok++; console.log('  [OK]    ' + d); }
+    else { falhas.push(d + (det ? ' -> ' + det : '')); console.log('  [FALHA] ' + d + (det ? ' -> ' + det : '')); }
+}
+
+const dom = new JSDOM(fs.readFileSync('/tmp/pagina.html', 'utf8'),
+    { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' });
+const { window } = dom;
+window.eval(fs.readFileSync('/home/claude/jsdom/node_modules/jquery/dist/jquery.js', 'utf8'));
+const $ = window.jQuery;
+
+$.ajax = function (o) {
+    const url = o.url || '';
+    const corpo = url.indexOf('dashboard') !== -1 ? RESP.dashboard : RESP.cards;
+    const d = $.Deferred(); setTimeout(() => d.resolve(corpo), 0); return d.promise();
+};
+$.fn.modal = function () { return this; };
+window.Swal = { fire: () => ({ then: () => ({}) }), close: () => {} };
+window.TarefasConfig = { csrf: 'x', usuario: 'a', nome: 'A', admin: true, ia_ativa: false,
+    status: [], prioridades: [], funcionarios: [] };
+
+['tarefas-core.js','tarefas-calendario.js','tarefas-detalhe.js','tarefas-documentos.js']
+    .forEach(a => window.eval(fs.readFileSync(`${RAIZ}/assets/js/${a}`, 'utf8')));
+$(window.document).ready();
+window.Tarefas.iniciar();
+
+setTimeout(() => {
+    console.log('== Estrutura das barras ==');
+    const linhas = $('#tfGraficos .tf-barra-linha');
+    checar('barras renderizadas', linhas.length > 0, linhas.length + ' linhas');
+
+    const preench = $('#tfGraficos .tf-barra-preench');
+    checar('todo trilho tem preenchimento', preench.length === linhas.length,
+        preench.length + ' de ' + linhas.length);
+
+    let semLargura = 0, larguras = [];
+    preench.each(function () {
+        const w = this.style.width || '';
+        larguras.push(w);
+        if (!w || w === '0%' || w === '0px') { semLargura++; }
+    });
+    checar('nenhum preenchimento com largura zero', semLargura === 0,
+        'larguras: ' + larguras.join(', '));
+
+    checar('cor aplicada em cada preenchimento',
+        preench.toArray().every(e => /--tf-cor:/.test(e.getAttribute('style') || '')));
+
+    console.log('\n== Percentuais ==');
+    // "Por status" do JSON real: 3 Em Andamento, 1 Em Exigência, 1 Aguardando Documentos = 5
+    const porStatus = RESP.dashboard.por_status;
+    const total = porStatus.reduce((s, d) => s + Number(d.total), 0);
+    const esperado = porStatus.map(d => (Number(d.total) * 100 / total));
+
+    const grafico = $('#tfGraficos .tf-grafico').filter(function () {
+        return $(this).find('h4').text().indexOf('Por status') !== -1;
+    });
+    checar('gráfico "Por status" presente', grafico.length === 1);
+
+    const pcts = grafico.find('.tf-barra-pct').toArray().map(e => parseFloat(e.textContent));
+    checar('percentuais somam 100%', Math.abs(pcts.reduce((a, b) => a + b, 0) - 100) < 1.5,
+        pcts.join(' + ') + ' = ' + pcts.reduce((a, b) => a + b, 0));
+
+    const conferem = esperado.every((v, i) => Math.abs(v - pcts[i]) < 1);
+    checar('percentuais batem com os dados', conferem,
+        'esperado ' + esperado.map(v => v.toFixed(1)).join(',') + ' | obtido ' + pcts.join(','));
+
+    const largurasStatus = grafico.find('.tf-barra-preench').toArray()
+        .map(e => parseFloat(e.style.width));
+    checar('largura da barra acompanha o percentual',
+        largurasStatus.every((w, i) => Math.abs(w - esperado[i]) < 1),
+        largurasStatus.join(','));
+
+    checar('total do grupo exibido', /Total: 5/.test(grafico.text()), grafico.find('p').text());
+
+    console.log('\n== CSS: display dos elementos da barra ==');
+    const css = fs.readFileSync(`${RAIZ}/assets/css/tarefas.css`, 'utf8');
+    const bloco = t => (css.match(new RegExp('\\.' + t + '\\s*\\{[^}]*\\}')) || [''])[0];
+    checar('.tf-barra-trilho declara display', /display:\s*block/.test(bloco('tf-barra-trilho')));
+    checar('.tf-barra-preench declara display (senão width/height não se aplicam)',
+        /display:\s*block/.test(bloco('tf-barra-preench')));
+
+    console.log('\n================ RESULTADO ================');
+    console.log('  Passaram: ' + ok + '   Falharam: ' + falhas.length);
+    falhas.forEach(f => console.log('   - ' + f));
+    process.exit(falhas.length ? 1 : 0);
+}, 120);

@@ -1,0 +1,132 @@
+/**
+ * Executa o front-end do módulo de Tarefas num DOM real (jsdom), com as APIs
+ * respondendo o JSON verdadeiro capturado do PHP. Serve para reproduzir os
+ * defeitos relatados sem depender do navegador.
+ */
+
+const fs = require('fs');
+const { JSDOM } = require('jsdom');
+
+const RAIZ = '/home/claude/build/tarefas';
+const RESP = JSON.parse(fs.readFileSync('/tmp/respostas.json', 'utf8'));
+
+const html = fs.readFileSync('/tmp/pagina.html', 'utf8');
+
+const dom = new JSDOM(html, {
+    runScripts: 'outside-only',
+    pretendToBeVisual: true,
+    url: 'http://localhost/atlas/tarefas/index.php'
+});
+
+const { window } = dom;
+
+const erros = [];
+window.addEventListener('error', (e) => erros.push('window.error: ' + e.message));
+
+// jQuery real dentro do jsdom: avaliado no contexto da janela.
+const jqSrc = fs.readFileSync('/home/claude/jsdom/node_modules/jquery/dist/jquery.js', 'utf8');
+window.eval(jqSrc);
+const $ = window.jQuery;
+
+// Substituto do $.ajax que devolve as respostas reais das APIs.
+const chamadas = [];
+$.ajax = function (opcoes) {
+    const url = (opcoes.url || '');
+    const dados = opcoes.data || {};
+    chamadas.push({ url, visao: dados.visao });
+
+    let corpo = null;
+    if (url.indexOf('tarefas.php') !== -1) {
+        corpo = dados.visao === 'kanban' ? RESP.kanban
+              : dados.visao === 'calendario' ? RESP.calendario
+              : RESP.cards;
+    } else if (url.indexOf('dashboard.php') !== -1) {
+        corpo = RESP.dashboard;
+    } else if (url.indexOf('tarefa.php') !== -1) {
+        corpo = RESP.detalhe;
+    } else {
+        corpo = { success: true };
+    }
+
+    const d = $.Deferred();
+    setTimeout(() => d.resolve(corpo), 0);
+    const p = d.promise();
+    p.done = p.done || function () { return p; };
+    return p;
+};
+
+// Bootstrap 4: .modal() como stub que registra as chamadas.
+const modais = [];
+$.fn.modal = function (acao) {
+    modais.push({ id: this.attr('id'), acao });
+    return this;
+};
+
+window.TarefasConfig = {
+    csrf: 'x', usuario: 'tony', nome: 'Tony Tec', admin: true, ia_ativa: false,
+    status: ['Iniciada', 'Em Andamento', 'Concluída'],
+    prioridades: ['Baixa', 'Média', 'Alta', 'Crítica'],
+    funcionarios: ['Tony Tec', 'Maria Souza']
+};
+
+// Carrega os quatro arquivos JS do módulo.
+for (const arq of ['tarefas-core.js', 'tarefas-calendario.js', 'tarefas-detalhe.js', 'tarefas-documentos.js']) {
+    const codigo = fs.readFileSync(`${RAIZ}/assets/js/${arq}`, 'utf8');
+    try {
+        window.eval(codigo);
+    } catch (e) {
+        erros.push(`${arq}: ${e.message}`);
+    }
+}
+
+// Dispara o document ready e a inicialização.
+try {
+    $(window.document).ready();
+    window.Tarefas.iniciar();
+} catch (e) {
+    erros.push('iniciar(): ' + e.message + '\n' + e.stack.split('\n').slice(0, 4).join('\n'));
+}
+
+setTimeout(() => {
+    console.log('=== ERROS ===');
+    console.log(erros.length ? erros.join('\n') : '(nenhum)');
+
+    console.log('\n=== CHAMADAS DE API ===');
+    chamadas.forEach(c => console.log('  ', c.url, c.visao || ''));
+
+    // Troca para Kanban.
+    erros.length = 0;
+    try {
+        window.Tarefas.trocarVisao('kanban');
+    } catch (e) {
+        erros.push('trocarVisao(kanban): ' + e.message);
+    }
+
+    setTimeout(() => {
+        console.log('\n=== KANBAN ===');
+        console.log('  erros:', erros.length ? erros.join(' | ') : '(nenhum)');
+        console.log('  #tfKanban classes:', $('#tfKanban').attr('class'));
+        console.log('  colunas renderizadas:', $('#tfKanban .tf-coluna').length);
+        console.log('  cards renderizados:', $('#tfKanban .tf-kcard').length);
+        console.log('  html (200 chars):', $('#tfKanban').html().slice(0, 200));
+
+        // Painel.
+        erros.length = 0;
+        try {
+            window.Tarefas.trocarVisao('painel');
+        } catch (e) {
+            erros.push('trocarVisao(painel): ' + e.message + '\n' + e.stack.split('\n').slice(0, 3).join('\n'));
+        }
+
+        setTimeout(() => {
+            console.log('\n=== PAINEL ===');
+            console.log('  erros:', erros.length ? erros.join(' | ') : '(nenhum)');
+            console.log('  KPIs:', $('#tfKpis .tf-kpi').length);
+            console.log('  gráficos:', $('#tfGraficos .tf-grafico').length);
+            console.log('  atenção:', $('#tfAtencao .tf-grafico').length);
+            console.log('  #tfGraficos html:', $('#tfGraficos').html().slice(0, 120));
+
+            process.exit(0);
+        }, 60);
+    }, 60);
+}, 80);

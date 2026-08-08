@@ -1,20 +1,38 @@
 <?php
-include(__DIR__ . '/session_check.php');
-checkSession();
-include(__DIR__ . '/db_connection.php');
+/**
+ * Atlas · Tarefas — compatibilidade: exclusão de tarefa.
+ *
+ * Acrescenta a checagem de permissão que faltava: antes, qualquer usuário
+ * logado conseguia excluir qualquer tarefa chamando este endereço direto.
+ */
 
-$id = $_POST['id'] ?? '';
+require_once __DIR__ . '/core/bootstrap.php';
+exigir_login();
 
-$sql = "DELETE FROM tarefas WHERE id = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $id);
+header('Content-Type: text/plain; charset=utf-8');
 
-if ($stmt->execute()) {
-    echo "Tarefa excluída com sucesso!";
-} else {
-    echo "Erro ao excluir a tarefa: " . $conn->error;
+if (!usuario_ve_tudo()) {
+    echo 'Somente administradores podem excluir tarefas.';
+    exit;
 }
 
-$stmt->close();
-$conn->close();
-?>
+$id = entrada_int('id', 0, $_POST);
+if ($id <= 0) {
+    echo 'Tarefa não informada.';
+    exit;
+}
+
+$t = db_one('SELECT id, titulo FROM tarefas WHERE id = ?', array($id));
+if (!$t) {
+    echo 'Tarefa não encontrada.';
+    exit;
+}
+
+try {
+    db_exec('DELETE FROM tarefas WHERE id = ?', array($id));
+    registrar_historico($id, 'exclusao', 'Tarefa excluída: ' . $t['titulo']);
+    echo 'Tarefa excluída com sucesso!';
+} catch (Exception $e) {
+    error_log('[tarefas] delete_task: ' . $e->getMessage());
+    echo 'Erro ao excluir a tarefa.';
+}

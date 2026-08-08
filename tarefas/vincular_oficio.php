@@ -1,21 +1,30 @@
 <?php
-include(__DIR__ . '/db_connection.php');
+/** Atlas · Tarefas — compatibilidade: vínculo de ofício à tarefa. */
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $taskToken = $_POST['taskToken'];
-    $numeroOficio = $_POST['numeroOficio'];
+require_once __DIR__ . '/core/bootstrap.php';
+exigir_login();
 
-    $sql = "UPDATE tarefas SET numero_oficio = ? WHERE token = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param('ss', $numeroOficio, $taskToken);
+header('Content-Type: text/plain; charset=utf-8');
 
-    if ($stmt->execute()) {
-        echo json_encode(['success' => true]);
-    } else {
-        echo json_encode(['success' => false, 'error' => $stmt->error]);
-    }
+$token  = entrada('taskToken', '', $_POST);
+$numero = entrada('numeroOficio', '', $_POST);
 
-    $stmt->close();
-    $conn->close();
+if ($token === '' || $numero === '') {
+    echo 'Informe a tarefa e o número do ofício.';
+    exit;
 }
-?>
+
+$t = db_one('SELECT id, numero_oficio FROM tarefas WHERE token = ?', array($token));
+if (!$t) {
+    echo 'Tarefa não encontrada.';
+    exit;
+}
+
+try {
+    db_exec('UPDATE tarefas SET numero_oficio = ? WHERE token = ?', array($numero, $token));
+    registrar_historico((int) $t['id'], 'oficio', 'Ofício vinculado', $t['numero_oficio'], $numero);
+    echo 'Ofício vinculado com sucesso!';
+} catch (Exception $e) {
+    error_log('[tarefas] vincular_oficio: ' . $e->getMessage());
+    echo 'Erro ao vincular o ofício.';
+}

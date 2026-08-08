@@ -1,25 +1,19 @@
 <?php
-include(__DIR__ . '/db_connection.php');
-date_default_timezone_set('America/Sao_Paulo');
+/**
+ * Atlas · Tarefas — compatibilidade: consulta do vínculo pai de uma tarefa.
+ *
+ * Correção: a versão anterior consultava a coluna `hash_tarefa` na tabela
+ * `tarefas`, que não existe ali (é da tabela `comentarios`). A consulta
+ * falhava silenciosamente. Aqui usamos `token`, que é o campo correto, e
+ * continuamos aceitando o parâmetro com o nome antigo.
+ */
+require_once __DIR__ . '/core/bootstrap.php';
+api_iniciar();
 
-if (isset($_GET['hash_tarefa'])) {
-    $hash_tarefa = $_GET['hash_tarefa'];
-
-    // Consulta o banco de dados para buscar a tarefa e o id_tarefa_principal
-    $sql = "SELECT id_tarefa_principal FROM tarefas WHERE hash_tarefa = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $hash_tarefa);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        echo json_encode($row);
-    } else {
-        echo json_encode(["id_tarefa_principal" => null]);
-    }
-
-    $stmt->close();
-    $conn->close();
+$token = entrada('hash_tarefa', entrada('token'));
+if ($token === '') {
+    responder_json(array('id_tarefa_principal' => null));
 }
-?>
+
+$v = db_valor('SELECT id_tarefa_principal FROM tarefas WHERE token = ?', array($token));
+responder_json(array('id_tarefa_principal' => $v === null ? null : (int) $v));

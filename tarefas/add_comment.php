@@ -1,65 +1,51 @@
 <?php
-include(__DIR__ . '/session_check.php');
-checkSession();
-include(__DIR__ . '/db_connection.php');
-date_default_timezone_set('America/Sao_Paulo');
+/** Atlas · Tarefas — compatibilidade: novo comentário na linha do tempo. */
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $hash_tarefa = $_POST['taskToken']; // Pegando o token da tarefa
-    $comentario = $_POST['commentDescription'];
-    $data_comentario = date('Y-m-d H:i:s');
-    $funcionario = $_SESSION['username'];
-    $status = 'Ativo'; // Defina o status inicial do comentário
+require_once __DIR__ . '/core/bootstrap.php';
+exigir_login();
 
-    $caminho_anexo = '';
+header('Content-Type: text/plain; charset=utf-8');
 
-    // 1. Consulta o id_tarefa_principal na tabela de tarefas usando o token (hash_tarefa)
-    $sql = "SELECT id_tarefa_principal FROM tarefas WHERE token = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $hash_tarefa);
-    $stmt->execute();
-    $result = $stmt->get_result();
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo 'Método inválido.';
+    exit;
+}
 
-    $id_tarefa_principal = null; // Valor padrão se não encontrar
-    if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        $id_tarefa_principal = $row['id_tarefa_principal'];
-        error_log("ID Tarefa Principal encontrado: " . $id_tarefa_principal);
-    } else {
-        error_log("Nenhuma tarefa encontrada com o token: " . $hash_tarefa);
-    }
-    $stmt->close();
+$u     = usuario_atual();
+$token = entrada('taskToken', '', $_POST);
+$texto = entrada('commentDescription', '', $_POST);
 
-    // Verifica se há arquivos anexados
-    if (!empty($_FILES['commentAttachments']['name'][0])) {
-        $targetDir = "/arquivos/$hash_tarefa/";
-        $fullTargetDir = __DIR__ . $targetDir;
-        if (!is_dir($fullTargetDir)) {
-            mkdir($fullTargetDir, 0777, true);
-        }
+if ($token === '') {
+    echo 'Tarefa não informada.';
+    exit;
+}
 
-        foreach ($_FILES['commentAttachments']['name'] as $key => $name) {
-            $targetFile = $fullTargetDir . basename($name);
-            if (move_uploaded_file($_FILES['commentAttachments']['tmp_name'][$key], $targetFile)) {
-                $caminho_anexo .= "$targetDir" . basename($name) . ";";
-            }
-        }
-        // Remover o ponto e vírgula final
-        $caminho_anexo = rtrim($caminho_anexo, ';');
-    }
+$t = db_one('SELECT id, id_tarefa_principal FROM tarefas WHERE token = ?', array($token));
+if (!$t) {
+    echo 'Tarefa não encontrada.';
+    exit;
+}
 
-    // Inserir comentário no banco de dados, agora incluindo o id_tarefa_principal
-    $sql = "INSERT INTO comentarios (hash_tarefa, comentario, caminho_anexo, data_comentario, funcionario, status, id_tarefa_principal)
-            VALUES (?, ?, ?, ?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ssssssi", $hash_tarefa, $comentario, $caminho_anexo, $data_comentario, $funcionario, $status, $id_tarefa_principal);
+$up = salvar_uploads('commentAttachments', $token);
 
-    if ($stmt->execute()) {
-        echo "Comentário adicionado com sucesso!";
-    } else {
-        echo "Erro ao adicionar comentário: " . $conn->error;
-    }
-
-    $stmt->close();
-    $conn->close();
+try {
+    db_exec(
+        'INSERT INTO comentarios
+            (hash_tarefa, comentario, caminho_anexo, data_comentario, funcionario, status, id_tarefa_principal)
+         VALUES (?, ?, ?, ?, ?, ?, ?)',
+        array(
+            $token,
+            $texto,
+            implode(';', $up['caminhos']),
+            date('Y-m-d H:i:s'),
+            $u['usuario'],
+            'Ativo',
+            $t['id_tarefa_principal'] !== null ? (int) $t['id_tarefa_principal'] : null,
+        )
+    );
+    registrar_historico((int) $t['id'], 'comentario', 'Comentário adicionado');
+    echo 'Comentário adicionado com sucesso!';
+} catch (Exception $e) {
+    error_log('[tarefas] add_comment: ' . $e->getMessage());
+    echo 'Erro ao adicionar comentário.';
 }

@@ -1,16 +1,6 @@
 <?php
-include(__DIR__ . '/db_connection.php');
-
-$sql = "SELECT id, titulo FROM categorias WHERE status = 'ativo'";
-$result = $conn->query($sql);
-
-$categories = array();
-if ($result->num_rows > 0) {
-    while($row = $result->fetch_assoc()) {
-        $categories[] = $row;
-    }
-}
-
-echo json_encode($categories);
-$conn->close();
-?>
+/** Atlas · Tarefas — lista de categorias ativas (contrato original). */
+require_once __DIR__ . '/core/bootstrap.php';
+api_iniciar();
+while (ob_get_level() > 0) { ob_end_clean(); }
+echo json_encode(listar_categorias(), JSON_UNESCAPED_UNICODE);

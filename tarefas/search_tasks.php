@@ -1,203 +1,166 @@
 <?php
-include(__DIR__ . '/session_check.php');
-checkSession();
-include(__DIR__ . '/db_connection.php');
+/**
+ * Atlas · Tarefas — compatibilidade: search_tasks.php.
+ *
+ * Este endpoint era consumido pela tela antiga e pode estar sendo chamado por
+ * outros módulos do Atlas. Foi mantido com o MESMO contrato de saída (array
+ * JSON puro de tarefas, ou array de eventos quando format=fc), mas agora a
+ * consulta é preparada e sem o N+1 de comentários da versão anterior.
+ *
+ * Para telas novas prefira api/tarefas.php, que devolve muito mais dados.
+ */
 
-date_default_timezone_set('America/Sao_Paulo');
+require_once __DIR__ . '/core/bootstrap.php';
+api_iniciar();
 
-// Verificar se o usuário está logado
-if (isset($_SESSION['username'])) {
-    $usuarioLogado = $_SESSION['username'];
-} else {
-    die('Usuário não logado.');
+$u = usuario_atual();
+$isFC = strtolower(entrada('format')) === 'fc';
+
+$protocol    = entrada('protocol');
+$title       = entrada('title');
+$category    = entrada('category');
+$employee    = entrada('employee');
+$revisor     = entrada('revisor');
+$status      = entrada('status');
+$description = entrada('description');
+$priority    = entrada('priority');
+$origin      = entrada('origin');
+$dateStart   = entrada('dateStart');
+$dateEnd     = entrada('dateEnd');
+
+$where  = array('1=1');
+$params = array();
+
+/*
+ * Regra de visibilidade preservada da versão original, inclusive a exceção:
+ * qualquer usuário pode localizar UMA tarefa buscando pelo número exato do
+ * protocolo geral, para acompanhar o andamento sem ver a carteira alheia.
+ */
+$buscaPorProtocolo = ($protocol !== '');
+
+if (!usuario_ve_tudo() && !$buscaPorProtocolo) {
+    $where[] = "(t.status = 'Concluída' OR t.funcionario_responsavel = ? OR t.revisor = ?)";
+    $params[] = $u['nome'];
+    $params[] = $u['nome'];
 }
 
-// Buscar dados do usuário logado
-$sqlUser = "SELECT nome_completo, nivel_de_acesso, acesso_adicional FROM funcionarios WHERE usuario = '$usuarioLogado' AND status = 'ativo'";
-$resultUser = $conn->query($sqlUser);
+if ($buscaPorProtocolo)  { $where[] = 't.id = ?';                        $params[] = (int) $protocol; }
+if ($title !== '')       { $where[] = 't.titulo LIKE ?';                 $params[] = '%' . $title . '%'; }
+if ($category !== '')    { $where[] = 't.categoria = ?';                 $params[] = $category; }
+if ($employee !== '')    { $where[] = 't.funcionario_responsavel LIKE ?'; $params[] = '%' . $employee . '%'; }
+if ($revisor !== '')     { $where[] = 't.revisor LIKE ?';                $params[] = '%' . $revisor . '%'; }
+if ($description !== '') { $where[] = 't.descricao LIKE ?';              $params[] = '%' . $description . '%'; }
+if ($priority !== '')    { $where[] = 't.nivel_de_prioridade = ?';       $params[] = $priority; }
+if ($origin !== '')      { $where[] = 't.origem = ?';                    $params[] = $origin; }
 
-if ($resultUser->num_rows > 0) {
-    $userData = $resultUser->fetch_assoc();
-    $nomeCompleto = $userData['nome_completo'];
-    $nivelAcesso = $userData['nivel_de_acesso'];
-    $acessoAdicional = $userData['acesso_adicional'];
-
-    // Verificar se tem acesso total
-    $acessos = array_map('trim', explode(',', $acessoAdicional));
-    $temAcessoTotal = in_array('Controle de Tarefas', $acessos);
-} else {
-    die('Usuário não encontrado ou inativo.');
+if ($status !== '') {
+    $where[] = 't.status = ?';
+    $params[] = $status;
+} elseif (!$isFC && $protocol === '' && $title === '' && $category === '' && $employee === ''
+          && $revisor === '' && $description === '' && $priority === '' && $origin === ''
+          && $dateStart === '' && $dateEnd === '') {
+    // Carregamento inicial: apenas a fila de trabalho, como na versão antiga.
+    $enc = tarefas_status_encerrados();
+    $where[] = 't.status NOT IN (' . implode(',', array_fill(0, count($enc), '?')) . ')';
+    foreach ($enc as $s) { $params[] = $s; }
 }
 
-// --- Suporte ao FullCalendar ---
-$isFC = isset($_GET['format']) && strtolower(trim($_GET['format'])) === 'fc';
-$fcStartRaw = isset($_GET['start']) ? trim($_GET['start']) : '';
-$fcEndRaw   = isset($_GET['end'])   ? trim($_GET['end'])   : '';
-// FullCalendar normalmente manda YYYY-MM-DD (ou YYYY-MM-DDTHH:MM:SS)
-$fcStart = $fcStartRaw ? substr($fcStartRaw, 0, 10) : '';
-$fcEnd   = $fcEndRaw   ? substr($fcEndRaw,   0, 10) : '';
-
-// Receber parâmetros de pesquisa
-$protocol    = isset($_GET['protocol'])    ? trim($_GET['protocol'])    : '';
-$title       = isset($_GET['title'])       ? trim($_GET['title'])       : '';
-$category    = isset($_GET['category'])    ? trim($_GET['category'])    : '';
-$employee    = isset($_GET['employee'])    ? trim($_GET['employee'])    : '';
-$revisor     = isset($_GET['revisor'])     ? trim($_GET['revisor'])     : '';
-$status      = isset($_GET['status'])      ? trim($_GET['status'])      : '';
-$description = isset($_GET['description']) ? trim($_GET['description']) : '';
-$priority    = isset($_GET['priority'])    ? trim($_GET['priority'])    : '';
-$origin      = isset($_GET['origin'])      ? trim($_GET['origin'])      : '';
-$dateStart   = isset($_GET['dateStart'])   ? trim($_GET['dateStart'])   : '';
-$dateEnd     = isset($_GET['dateEnd'])     ? trim($_GET['dateEnd'])     : '';
-
-// Início da query
-$sql = "SELECT tarefas.*, categorias.titulo AS categoria_titulo, origem.titulo AS origem_titulo 
-        FROM tarefas 
-        LEFT JOIN categorias ON tarefas.categoria = categorias.id 
-        LEFT JOIN origem ON tarefas.origem = origem.id 
-        WHERE 1=1";
-
-// 🔥 Controle de acesso
-// Exceção: qualquer usuário pode LOCALIZAR uma tarefa específica pesquisando pelo
-// número do Protocolo Geral (tarefas.id). Como esse filtro é uma correspondência
-// EXATA de ID, o resultado se limita a essa única tarefa — permitindo apenas o
-// acompanhamento do andamento, sem expor a lista de tarefas de terceiros.
-// A restrição de responsável/revisor continua valendo para qualquer OUTRA busca.
-$buscaPorProtocoloGeral = !empty($protocol);
-
-if ($nivelAcesso === 'usuario' && !$temAcessoTotal && !$buscaPorProtocoloGeral) {
-    $sql .= " AND (tarefas.status = 'Concluída' OR tarefas.funcionario_responsavel = '$nomeCompleto' OR tarefas.revisor = '$nomeCompleto')";
+if ($dateStart !== '' && $dateEnd !== '') {
+    $where[] = 'DATE(t.data_limite) BETWEEN ? AND ?';
+    $params[] = $dateStart;
+    $params[] = $dateEnd;
+} elseif ($dateStart !== '') {
+    $where[] = 'DATE(t.data_limite) >= ?';
+    $params[] = $dateStart;
+} elseif ($dateEnd !== '') {
+    $where[] = 'DATE(t.data_limite) <= ?';
+    $params[] = $dateEnd;
 }
 
-// 🔍 Aplicar filtros
-if (!empty($protocol)) {
-    $sql .= " AND tarefas.id = '" . $conn->real_escape_string($protocol) . "'";
-}
-if (!empty($title)) {
-    $sql .= " AND tarefas.titulo LIKE '%" . $conn->real_escape_string($title) . "%'";
-}
-if (!empty($category)) {
-    $sql .= " AND tarefas.categoria = '" . $conn->real_escape_string($category) . "'";
-}
-if (!empty($employee)) {
-    $sql .= " AND tarefas.funcionario_responsavel LIKE '%" . $conn->real_escape_string($employee) . "%'";
-}
-if (!empty($revisor)) {
-    $sql .= " AND tarefas.revisor LIKE '%" . $conn->real_escape_string($revisor) . "%'";
-}
-if (!empty($status)) {
-    $sql .= " AND tarefas.status = '" . $conn->real_escape_string($status) . "'";
-} elseif (
-    // 🔥 Nenhum filtro aplicado — carregamento inicial (somente para CARDS).
-    // Para o calendário (isFC), queremos ver tudo no intervalo, então NÃO aplicamos esse corte.
-    !$isFC &&
-    empty($protocol) && 
-    empty($title) && 
-    empty($category) && 
-    empty($employee) && 
-    empty($revisor) && 
-    empty($description) && 
-    empty($priority) && 
-    empty($origin) && 
-    empty($dateStart) && 
-    empty($dateEnd)
-) {
-    $sql .= " AND tarefas.status NOT IN ('Concluída', 'Cancelada', 'Finalizado sem prática do ato', 'Aguardando Retirada')";
-}
-if (!empty($description)) {
-    $sql .= " AND tarefas.descricao LIKE '%" . $conn->real_escape_string($description) . "%'";
-}
-if (!empty($priority)) {
-    $sql .= " AND tarefas.nivel_de_prioridade = '" . $conn->real_escape_string($priority) . "'";
-}
-if (!empty($origin)) {
-    $sql .= " AND tarefas.origem = '" . $conn->real_escape_string($origin) . "'";
-}
-
-// 🔍 Filtro por intervalo de datas da data limite (form de busca)
-if (!empty($dateStart) && !empty($dateEnd)) {
-    $sql .= " AND DATE(tarefas.data_limite) BETWEEN '" . $conn->real_escape_string($dateStart) . "' AND '" . $conn->real_escape_string($dateEnd) . "'";
-} elseif (!empty($dateStart)) {
-    $sql .= " AND DATE(tarefas.data_limite) >= '" . $conn->real_escape_string($dateStart) . "'";
-} elseif (!empty($dateEnd)) {
-    $sql .= " AND DATE(tarefas.data_limite) <= '" . $conn->real_escape_string($dateEnd) . "'";
-}
-
-// 🔍 Janela visível do Calendário (apenas quando format=fc)
-if ($isFC && $fcStart !== '' && $fcEnd !== '') {
-    $sql .= " AND DATE(tarefas.data_limite) BETWEEN '" . $conn->real_escape_string($fcStart) . "' AND '" . $conn->real_escape_string($fcEnd) . "'";
-}
-
-// 🔄 Ordenar por ID decrescente
-$sql .= " ORDER BY tarefas.id DESC";
-
-// Executar consulta
-$result = $conn->query($sql);
-
-// ---------------------- Saída para o CALENDÁRIO ----------------------
 if ($isFC) {
-    // Para o calendário, retornamos um array de eventos simples.
-    // Aqui podemos enviar header JSON sem afetar os cards (porque só cai neste bloco quando format=fc).
-    header('Content-Type: application/json; charset=utf-8');
-
-    $events = [];
-    if ($result && $result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-
-            // Constrói o start no formato local "YYYY-MM-DDTHH:MM:SS" (sem Z) para não deslocar o horário no cliente
-            $start = '';
-            if (!empty($row['data_limite'])) {
-                $ts = strtotime($row['data_limite']);
-                $start = date('Y-m-d\TH:i:s', $ts);
-            }
-
-            // Normaliza status (opcional) para usar como classe, se quiser
-            $statusNorm = strtolower($row['status']);
-            $statusNorm = iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$statusNorm);
-            $statusNorm = preg_replace('/[^a-z0-9\s\-]/', '', $statusNorm);
-            $statusNorm = preg_replace('/\s+/', '-', trim($statusNorm));
-
-            $events[] = [
-                'id'    => (string)$row['id'],
-                'title' => $row['titulo'],
-                'start' => $start,
-                'allDay'=> false,
-                'extendedProps' => [
-                    'status'      => $statusNorm,
-                    'token'       => $row['token'],
-                    'funcionario' => $row['funcionario_responsavel'],
-                    'categoria'   => $row['categoria_titulo'],
-                    'origem'      => $row['origem_titulo'],
-                ]
-            ];
-        }
+    $ini = substr(entrada('start'), 0, 10);
+    $fim = substr(entrada('end'), 0, 10);
+    if ($ini !== '' && $fim !== '') {
+        $where[] = 'DATE(t.data_limite) BETWEEN ? AND ?';
+        $params[] = $ini;
+        $params[] = $fim;
     }
+}
 
-    echo json_encode($events, JSON_UNESCAPED_UNICODE);
-    $conn->close();
+$sql = 'SELECT t.*, c.titulo AS categoria_titulo, o.titulo AS origem_titulo
+          FROM tarefas t
+          LEFT JOIN categorias c ON t.categoria = c.id
+          LEFT JOIN origem o ON t.origem = o.id
+         WHERE ' . implode(' AND ', $where) . '
+         ORDER BY t.id DESC
+         LIMIT 3000';
+
+try {
+    $linhas = db_all($sql, $params);
+} catch (Exception $e) {
+    error_log('[tarefas] search_tasks: ' . $e->getMessage());
+    while (ob_get_level() > 0) { ob_end_clean(); }
+    echo json_encode(array());
     exit;
 }
 
-// ---------------------- Saída para os CARDS (COMPORTAMENTO ORIGINAL) ----------------------
-$tasks = [];
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        // Buscar comentários da tarefa (mantido exatamente como no original)
-        $taskToken = $row['token'];
-        $sql_comments = "SELECT * FROM comentarios WHERE hash_tarefa = '$taskToken'";
-        $comments_result = $conn->query($sql_comments);
-        $comments = [];
-        if ($comments_result && $comments_result->num_rows > 0) {
-            while ($comment_row = $comments_result->fetch_assoc()) {
-                $comments[] = $comment_row;
-            }
+/* ---------------------- Saída para o calendário ------------------ */
+if ($isFC) {
+    $eventos = array();
+    foreach ($linhas as $row) {
+        $start = '';
+        if (!empty($row['data_limite'])) {
+            $ts = strtotime((string) $row['data_limite']);
+            if ($ts !== false) { $start = date('Y-m-d\TH:i:s', $ts); }
         }
-        $row['comentarios'] = $comments;
-        $tasks[] = $row;
+        $eventos[] = array(
+            'id'     => (string) $row['id'],
+            'title'  => $row['titulo'],
+            'start'  => $start,
+            'allDay' => false,
+            'extendedProps' => array(
+                'status'      => slug($row['status']),
+                'token'       => $row['token'],
+                'funcionario' => $row['funcionario_responsavel'],
+                'categoria'   => $row['categoria_titulo'],
+                'origem'      => $row['origem_titulo'],
+            ),
+        );
+    }
+    while (ob_get_level() > 0) { ob_end_clean(); }
+    echo json_encode($eventos, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+/* ---------------------- Saída padrão ----------------------------- */
+/*
+ * A versão antiga fazia uma consulta de comentários por tarefa dentro do
+ * laço. Aqui buscamos todos de uma vez e distribuímos em memória.
+ */
+$comentariosPorToken = array();
+if ($linhas) {
+    $tokens = array();
+    foreach ($linhas as $l) {
+        if (!empty($l['token'])) { $tokens[] = $l['token']; }
+    }
+    if ($tokens) {
+        $marc = implode(',', array_fill(0, count($tokens), '?'));
+        try {
+            foreach (db_all("SELECT * FROM comentarios WHERE hash_tarefa IN ($marc)", $tokens) as $c) {
+                $comentariosPorToken[$c['hash_tarefa']][] = $c;
+            }
+        } catch (Exception $e) {
+            error_log('[tarefas] search_tasks comentarios: ' . $e->getMessage());
+        }
     }
 }
 
-// Retornar em JSON (sem alterar header — assim seu front continua fazendo JSON.parse)
-echo json_encode($tasks, JSON_UNESCAPED_UNICODE);
-$conn->close();
-?>
+$tarefas = array();
+foreach ($linhas as $row) {
+    $tk = isset($row['token']) ? $row['token'] : '';
+    $row['comentarios'] = isset($comentariosPorToken[$tk]) ? $comentariosPorToken[$tk] : array();
+    $tarefas[] = $row;
+}
+
+while (ob_get_level() > 0) { ob_end_clean(); }
+echo json_encode($tarefas, JSON_UNESCAPED_UNICODE);
