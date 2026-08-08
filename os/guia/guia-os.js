@@ -10,8 +10,22 @@
  *   GuiaOS.parar()            GuiaOS.proximo()      GuiaOS.anterior()
  *   GuiaOS.autoIniciar(nome)  GuiaOS.jaConcluido(nome)
  *   GuiaOS.esquecer(nome)     GuiaOS.esquecerTudo()
+ *   GuiaOS.configurar({ autoIniciar: true|false })
  *
  * Qualquer elemento com data-guia="nome-do-guia" inicia o guia ao ser clicado.
+ *
+ * ABERTURA AUTOMÁTICA — DESLIGADA POR PADRÃO
+ * ------------------------------------------------------------------
+ * O guia NÃO abre sozinho ao entrar na tela: quem decide é o usuário,
+ * clicando no botão "?" no canto inferior direito. As chamadas de
+ * GuiaOS.autoIniciar(...) espalhadas pelas telas continuam válidas, mas
+ * não fazem nada enquanto a abertura automática estiver desligada.
+ *
+ * Para religar (em todas as telas), carregue antes deste arquivo:
+ *     <script>window.GUIA_OS_AUTO_INICIAR = true;</script>
+ *
+ * Para religar apenas numa tela, depois que este arquivo já carregou:
+ *     GuiaOS.configurar({ autoIniciar: true });
  */
 (function (window, document) {
     'use strict';
@@ -19,6 +33,11 @@
     var PREFIXO = 'atlasGuiaOS.';
     var CHAVE_PENDENTE = PREFIXO + 'pendente';
     var VERSAO = '1.0.0';
+
+    /* Abertura automática do guia ao entrar na tela.
+       Desligada por padrão — o guia só abre pelo botão "?" ou por um
+       elemento com data-guia. Ver o cabeçalho deste arquivo. */
+    var autoIniciarLigado = (window.GUIA_OS_AUTO_INICIAR === true);
 
     var guias = {};      // nome -> { passos: [], opcoes: {} }
     var estado = null;   // guia em execução
@@ -674,6 +693,7 @@
 
     function autoIniciar(nome, cfg) {
         cfg = cfg || {};
+        if (!autoIniciarLigado) { return false; }                      // abertura automática desligada
         if (estado) { return false; }                                  // já há um guia em execução
         if (jaConcluido(nome) || ler('dispensado.' + nome)) { return false; }
         window.setTimeout(function () {
@@ -685,6 +705,16 @@
 
     function emExecucao() {
         return estado ? { nome: estado.nome, indice: estado.indice } : null;
+    }
+
+    /* Liga/desliga a abertura automática em tempo de execução.
+       Ex.: GuiaOS.configurar({ autoIniciar: true }); */
+    function configurar(opcoes) {
+        opcoes = opcoes || {};
+        if (typeof opcoes.autoIniciar === 'boolean') {
+            autoIniciarLigado = opcoes.autoIniciar;
+        }
+        return { autoIniciar: autoIniciarLigado };
     }
 
     function jaConcluido(nome) { return ler('concluido.' + nome) === VERSAO; }
@@ -785,6 +815,8 @@
         anterior: anterior,
         parar: parar,
         emExecucao: emExecucao,
+        configurar: configurar,
+        autoIniciarAtivo: function () { return autoIniciarLigado; },
         aoAbrirModal: aoAbrirModal,
         definirBotaoAjuda: definirBotaoAjuda,
         botaoAjudaAtual: function () { return botaoAjuda.nome; },

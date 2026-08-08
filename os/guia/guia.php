@@ -14,6 +14,13 @@
  * que o include funciona de qualquer pasta. Se precisar forçar um caminho,
  * defina $guiaBaseUrl antes do include (ex.: $guiaBaseUrl = '/atlas/os/guia';).
  *
+ * ABERTURA AUTOMÁTICA: desligada. O guia só abre quando o usuário clica no
+ * botão "?" no canto inferior direito da tela. Para religá-la numa tela
+ * específica, defina antes do include:
+ *
+ *       $guiaAutoIniciar = true;
+ *       include(__DIR__ . '/guia/guia.php');
+ *
  * O ?v= usa a data do arquivo para furar o cache do navegador a cada
  * atualização (são arquivos estáticos; o OPcache não interfere).
  */
@@ -44,6 +51,9 @@ $__vPas = is_file($__guiaPas) ? filemtime($__guiaPas) : time();
 $__vAss = is_file($__guiaAss) ? filemtime($__guiaAss) : time();
 ?>
 <link rel="stylesheet" href="<?php echo $__guiaBase; ?>guia-os.css?v=<?php echo $__vCss; ?>">
+<?php if (!empty($guiaAutoIniciar)): ?>
+<script>window.GUIA_OS_AUTO_INICIAR = true;</script>
+<?php endif; ?>
 <script src="<?php echo $__guiaBase; ?>guia-os.js?v=<?php echo $__vJs; ?>"></script>
 <script src="<?php echo $__guiaBase; ?>guia-os-passos.js?v=<?php echo $__vPas; ?>"></script>
 <!-- Liberação do Assinador SERPRO sem sair da tela (só age em assinar-os.php) -->
