@@ -236,6 +236,22 @@ var Tarefas = (function ($) {
         $('#tfContadorFiltros').text(n > 0 ? n : '').toggle(n > 0);
     }
 
+    /**
+     * Abre ou fecha o painel de filtros.
+     *
+     * @param {boolean} [abrir] força o estado; sem argumento, alterna.
+     */
+    function alternarFiltros(abrir) {
+        var $painel = $('#tfFormFiltros');
+        var aberto = (abrir === undefined) ? !$painel.hasClass('tf-aberto') : !!abrir;
+
+        $painel.toggleClass('tf-aberto', aberto);
+        $('#tfBtnFiltros').attr('aria-expanded', aberto ? 'true' : 'false')
+            .find('i.fa-angle-down, i.fa-angle-up')
+            .toggleClass('fa-angle-down', !aberto)
+            .toggleClass('fa-angle-up', aberto);
+    }
+
     function limparFiltros() {
         $('#tfFormFiltros')[0].reset();
         $('#tfBusca').val('');
@@ -1038,7 +1054,7 @@ var Tarefas = (function ($) {
                 }
 
                 atualizarSeloFiltros();
-                $('#tfFiltros').slideDown(160);
+                alternarFiltros(true);
                 buscar(1);
 
                 if (f.explicacao && window.toastr) {
@@ -1132,9 +1148,7 @@ var Tarefas = (function ($) {
         });
 
         $('#tfBtnFiltros').on('click', function () {
-            $('#tfFiltros').slideToggle(160);
-            $(this).find('i.fa-angle-down, i.fa-angle-up')
-                   .toggleClass('fa-angle-down fa-angle-up');
+            alternarFiltros();
         });
 
         $('#tfBtnLimpar').on('click', limparFiltros);
@@ -1207,6 +1221,7 @@ var Tarefas = (function ($) {
         corPrioridade: corPrioridade,
         buscar: buscar,
         limparFiltros: limparFiltros,
+        alternarFiltros: alternarFiltros,
         trocarVisao: trocarVisao,
         abrir: abrir,
         abrirPorToken: abrirPorToken,

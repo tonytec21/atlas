@@ -1,0 +1,103 @@
+/**
+ * Painel de filtros: abertura, fechamento e integridade dos seletores.
+ *
+ * O defeito original era um id trocado — o JavaScript procurava `#tfFiltros` e
+ * o elemento chama-se `#tfFormFiltros`, então o clique não fazia nada. O
+ * primeiro bloco confere que todo id usado no JS existe de fato na página, o
+ * que pega essa classe de erro em qualquer lugar do módulo.
+ */
+const fs = require('fs');
+const { JSDOM } = require('jsdom');
+
+const RAIZ = '/home/claude/build/tarefas';
+let ok = 0; const falhas = [];
+function checar(d, c, det) {
+    if (c) { ok++; console.log('  [OK]    ' + d); }
+    else { falhas.push(d + (det ? ' -> ' + det : '')); console.log('  [FALHA] ' + d + (det ? ' -> ' + det : '')); }
+}
+
+const html = fs.readFileSync('/tmp/pagina.html', 'utf8');
+const dom = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' });
+const { window } = dom;
+const doc = window.document;
+
+console.log('== Todo #id usado no JS existe na página ==');
+{
+    // Ids do módulo (prefixo tf) referenciados nos arquivos JS.
+    const ids = new Set();
+    ['tarefas-core.js', 'tarefas-calendario.js', 'tarefas-detalhe.js', 'tarefas-documentos.js']
+        .forEach(a => {
+            const src = fs.readFileSync(`${RAIZ}/assets/js/${a}`, 'utf8');
+            for (const m of src.matchAll(/\$\(\s*'#(tf[A-Za-z0-9_]+)'/g)) { ids.add(m[1]); }
+        });
+
+    // Ids criados dinamicamente pelo próprio JS não existem no HTML inicial.
+    const dinamicos = new Set(['tfComTexto', 'tfComArquivos', 'tfRedTipo', 'tfRedTom', 'tfRedExtra',
+        'tfTextoGerado', 'tfIASaida', 'tfIARodape', 'tfIAChat', 'tfIAPergunta', 'tfIAEnviar',
+        'tfIALimpar', 'tfCopiarIA', 'tfNovoItem', 'tfAddItem', 'tfSugerirCheck', 'tfNovoComentario',
+        'tfRedigirIA', 'tfStatusSelect', 'tfSalvarStatus', 'tfAssumir', 'tfZonaUpload',
+        'tfArquivoInput', 'tfFilaUpload', 'tfSaidaAnexoIA', 'tfNovaSubtarefa', 'tfCalAnterior',
+        'tfCalProximo', 'tfCalHoje', 'tfCalMes', 'tfCalGrade', 'tfCalTotal',
+        'tfSubtarefaPrincipalRotulo']);
+
+    // Renderizados só em certas condições do servidor.
+    const condicionais = new Set(['tfBtnBuscaIA']);   // aparece apenas com a IA configurada
+
+    const ausentes = [...ids].filter(i =>
+        !dinamicos.has(i) && !condicionais.has(i) && !doc.getElementById(i));
+    checar(`${ids.size} ids verificados, nenhum ausente`, ausentes.length === 0,
+        ausentes.join(', '));
+}
+
+console.log('\n== Comportamento do painel ==');
+window.eval(fs.readFileSync('/home/claude/jsdom/node_modules/jquery/dist/jquery.js', 'utf8'));
+const $ = window.jQuery;
+$.ajax = function () { const d = $.Deferred(); setTimeout(() => d.resolve({ success: true, tarefas: [], total: 0 }), 0); return d.promise(); };
+$.fn.modal = function () { return this; };
+window.Swal = { fire: () => ({ then: () => ({}) }), close: () => {} };
+window.TarefasConfig = { csrf: 'x', usuario: 'a', nome: 'A', admin: true, ia_ativa: true,
+    status: [], prioridades: [], funcionarios: [] };
+['tarefas-core.js','tarefas-calendario.js','tarefas-detalhe.js','tarefas-documentos.js']
+    .forEach(a => window.eval(fs.readFileSync(`${RAIZ}/assets/js/${a}`, 'utf8')));
+$(doc).ready();
+window.Tarefas.iniciar();
+
+const painel = $('#tfFormFiltros');
+const botao = $('#tfBtnFiltros');
+
+checar('painel começa fechado', !painel.hasClass('tf-aberto'));
+checar('botão marca aria-expanded=false', botao.attr('aria-expanded') === 'false');
+checar('painel não usa style inline (que atrapalharia a grade)',
+    !/display\s*:\s*none/.test(painel.attr('style') || ''), painel.attr('style') || '(sem style)');
+
+botao.trigger('click');
+checar('primeiro clique abre', painel.hasClass('tf-aberto'));
+checar('aria-expanded vira true', botao.attr('aria-expanded') === 'true');
+checar('seta aponta para cima', botao.find('i.fa-angle-up').length === 1);
+
+botao.trigger('click');
+checar('segundo clique fecha', !painel.hasClass('tf-aberto'));
+checar('seta volta para baixo', botao.find('i.fa-angle-down').length === 1);
+
+window.Tarefas.alternarFiltros(true);
+checar('abertura forçada funciona', painel.hasClass('tf-aberto'));
+window.Tarefas.alternarFiltros(false);
+checar('fechamento forçado funciona', !painel.hasClass('tf-aberto'));
+
+console.log('\n== CSS ==');
+{
+    const css = fs.readFileSync(`${RAIZ}/assets/css/tarefas.css`, 'utf8');
+    const regra = sel => {
+        const re = new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}');
+        return (css.match(re) || [null, ''])[1];
+    };
+    checar('.tf-filtros fechado por padrão', /display:\s*none/.test(regra('.tf-filtros')));
+    checar('.tf-filtros.tf-aberto restaura a grade', /display:\s*grid/.test(regra('.tf-filtros.tf-aberto')));
+    checar('animação não limita a altura (não corta campos)',
+        !/max-height/.test(regra('.tf-filtros.tf-aberto')));
+}
+
+console.log('\n================ RESULTADO ================');
+console.log('  Passaram: ' + ok + '   Falharam: ' + falhas.length);
+falhas.forEach(f => console.log('   - ' + f));
+process.exit(falhas.length ? 1 : 0);

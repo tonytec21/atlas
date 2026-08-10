@@ -40,7 +40,7 @@ $iaAtiva = !$migracaoPendente && ia_disponivel();
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/sweetalert2.min.css">
-    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.0.8">
+    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.0.9">
 
     <script src="../script/jquery-3.5.1.min.js"></script>
     <?php
@@ -123,7 +123,8 @@ $iaAtiva = !$migracaoPendente && ia_disponivel();
                 </button>
                 <?php endif; ?>
 
-                <button class="tf-btn" id="tfBtnFiltros">
+                <button class="tf-btn" id="tfBtnFiltros" type="button" aria-expanded="false"
+                        aria-controls="tfFormFiltros">
                     <i class="fa fa-sliders"></i> Filtros
                     <span class="tf-selo tf-selo-status" id="tfContadorFiltros"
                           style="--tf-cor:var(--tf-primaria);display:none"></span>
@@ -147,7 +148,7 @@ $iaAtiva = !$migracaoPendente && ia_disponivel();
             </div>
 
             <!-- Filtros detalhados -->
-            <form id="tfFormFiltros" class="tf-filtros" style="display:none">
+            <form id="tfFormFiltros" class="tf-filtros">
                 <div>
                     <label class="tf-rotulo">Protocolo geral</label>
                     <input type="text" class="tf-input" name="protocol" placeholder="Ex.: 1234">
@@ -419,10 +420,10 @@ window.TarefasConfig = {
 };
 </script>
 
-<script src="assets/js/tarefas-core.js?v=2.0.8"></script>
-<script src="assets/js/tarefas-calendario.js?v=2.0.8"></script>
-<script src="assets/js/tarefas-detalhe.js?v=2.0.8"></script>
-<script src="assets/js/tarefas-documentos.js?v=2.0.8"></script>
+<script src="assets/js/tarefas-core.js?v=2.0.9"></script>
+<script src="assets/js/tarefas-calendario.js?v=2.0.9"></script>
+<script src="assets/js/tarefas-detalhe.js?v=2.0.9"></script>
+<script src="assets/js/tarefas-documentos.js?v=2.0.9"></script>
 
 <script>
 jQuery(function ($) {

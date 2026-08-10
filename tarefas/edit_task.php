@@ -94,7 +94,7 @@ $comentarios = db_all(
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="stylesheet" href="../style/css/sweetalert2.min.css">
-    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.0.8">
+    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.0.9">
 
     <script src="../script/jquery-3.5.1.min.js"></script>
 </head>

@@ -444,6 +444,27 @@ de respiro nas laterais.
 
 ---
 
+## 6j. Correção da revisão 2.0.9
+
+**O botão "Filtros" não abria nada.** O JavaScript procurava `#tfFiltros` e o
+elemento chama-se `#tfFormFiltros`. O seletor não casava com nada, e o clique
+simplesmente não fazia efeito. O mesmo id errado estava na busca com IA, que
+deveria abrir o painel ao aplicar os filtros interpretados.
+
+Havia um segundo defeito escondido atrás do primeiro: o painel era aberto com
+`slideToggle()`, e a animação do jQuery termina devolvendo `display: block` ao
+elemento — o que desmontaria a grade de colunas dos campos. Agora a abertura é
+por classe, preservando o `display: grid`, com a entrada animada por opacidade e
+deslocamento. Deliberadamente não usei transição de altura: em telas estreitas
+os campos empilham e um teto de altura cortaria parte do formulário.
+
+O teste `legado/testes_filtros.js.txt` confere o comportamento do painel e, além
+disso, varre os quatro arquivos JS coletando todo `#id` do módulo que eles usam
+e conferindo se existe na página renderizada — 65 ids hoje. É essa varredura que
+pega a classe de erro que passou despercebida aqui.
+
+---
+
 ## 7. Estrutura da pasta
 
 ```
