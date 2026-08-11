@@ -61,8 +61,16 @@ function lab_variantes(): array
             'porque' => 'Confirma que a falha se repete no momento do teste. Sem isso, um 200 numa '
                       . 'variante seguinte poderia ser só a SEFIN tendo voltado ao ar.',
         ],
+        'ibscbs_101' => [
+            'rotulo' => 'versao="1.01" + grupo IBSCBS (CST 000 / cClassTrib 000001)',
+            'porque' => 'A combinação que a documentação indica. O grupo IBSCBS é filho direto de '
+                      . 'infDPS (NT 004/005) e, na DPS, carrega apenas CST e cClassTrib — os valores '
+                      . 'e alíquotas são calculados pelo Ambiente Nacional. E o envio do IBSCBS só é '
+                      . 'aceito em versao="1.01": na 1.00 dá falha de schema. Por isso as duas '
+                      . 'mudanças andam juntas.',
+        ],
         'versao_101' => [
-            'rotulo' => 'DPS com versao="1.01"',
+            'rotulo' => 'DPS com versao="1.01" (sem IBSCBS)',
             'porque' => 'Em 10/08/2026 — o dia exato em que a emissão parou — entrou em Produção o '
                       . 'CNPJ Alfanumérico, "com atualização dos schemas XML" (comunicado do Portal '
                       . 'NFS-e de 28/07/2026). Os novos esquemas publicados são da série v1.01, e o '
@@ -128,6 +136,21 @@ function lab_aplicar(string $xml, string $variante): string
     };
 
     switch ($variante) {
+        case 'ibscbs_101':
+            $raiz = $dom->documentElement;
+            if ($raiz && $raiz->localName === 'DPS') {
+                $raiz->setAttribute('versao', '1.01');
+            }
+            $infs = $xp->query('//n:infDPS');
+            if ($infs->length > 0 && $xp->query('//n:infDPS/n:IBSCBS')->length === 0) {
+                $inf = $infs->item(0);
+                $g = $dom->createElementNS(LAB_NS, 'IBSCBS');
+                $g->appendChild($dom->createElementNS(LAB_NS, 'CST', '000'));
+                $g->appendChild($dom->createElementNS(LAB_NS, 'cClassTrib', '000001'));
+                $inf->appendChild($g);   // último filho de infDPS, conforme a NT
+            }
+            break;
+
         case 'versao_101':
             $raiz = $dom->documentElement;
             if ($raiz && $raiz->localName === 'DPS') {
