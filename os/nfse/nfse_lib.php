@@ -335,6 +335,17 @@ function nfse_migrar(?PDO $pdo = null): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Permite emitir sem identificar o tomador (facultativo em 2026).
+    $temOmitir = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'nfse_config'
+            AND COLUMN_NAME = 'omitir_tomador'"
+    )->fetchColumn();
+    if ($temOmitir === 0) {
+        $pdo->exec("ALTER TABLE nfse_config ADD COLUMN omitir_tomador TINYINT(1) NOT NULL DEFAULT 0");
+    }
+
     // Colunas de controle do transporte (diagnóstico e antiduplicidade).
     // Idempotente: só cria o que faltar.
     $novas = [
@@ -1082,7 +1093,17 @@ function nfse_montar_dps(array $cfg, array $apuracao, int $numeroDps, ?array $li
 
     $exigeTomador = !empty($cfg['identificar_tomador']) || nfse_exige_individualizacao();
 
-    if ($tomadorDoc !== '' && (strlen($tomadorDoc) === 11 || strlen($tomadorDoc) === 14)) {
+    /* Omitir o tomador é permitido em 2026 ("Tomador não informado") e serve
+       de contorno quando a SEFIN está recusando a identificação — os erros
+       E0206/E0207 vêm justamente da consulta do CPF ao cadastro dela.
+       A partir de 01/01/2027 a individualização passa a ser obrigatória e
+       a opção deixa de valer, por isso nfse_exige_individualizacao() tem
+       precedência sobre ela. */
+    $omitirTomador = !empty($cfg['omitir_tomador']) && !nfse_exige_individualizacao();
+
+    if ($omitirTomador) {
+        $toma = null;
+    } elseif ($tomadorDoc !== '' && (strlen($tomadorDoc) === 11 || strlen($tomadorDoc) === 14)) {
         $toma = [
             (strlen($tomadorDoc) === 14 ? 'CNPJ' : 'CPF') => $tomadorDoc,
             'xNome' => mb_substr($tomadorNome, 0, 150, 'UTF-8'),

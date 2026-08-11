@@ -61,6 +61,12 @@ function lab_variantes(): array
             'porque' => 'Confirma que a falha se repete no momento do teste. Sem isso, um 200 numa '
                       . 'variante seguinte poderia ser só a SEFIN tendo voltado ao ar.',
         ],
+        'sem_toma' => [
+            'rotulo' => 'Sem o grupo toma (tomador não informado)',
+            'porque' => 'A principal suspeita. Os erros E0206 e E0207 mostram que a SEFIN consulta '
+                      . 'o CPF do tomador no cadastro dela durante a recepção — e essa consulta é a '
+                      . 'única parte da DPS que depende de um serviço externo ao processamento.',
+        ],
         'sem_piscofins' => [
             'rotulo' => 'Sem o grupo tribFed/piscofins',
             'porque' => 'A NT 007 mexeu no domínio do CST de PIS/COFINS e acrescentou o campo '
@@ -81,10 +87,6 @@ function lab_variantes(): array
             'rotulo' => 'regEspTrib = 4 (notário/registrador)',
             'porque' => 'A configuração atual manda 0 (nenhum). Para cartório o correto é 4, e o '
                       . 'valor influencia o cálculo do ISS pela Calculadora de Tributos da SEFIN.',
-        ],
-        'sem_toma' => [
-            'rotulo' => 'Sem o grupo toma (tomador não informado)',
-            'porque' => 'Isola o bloco do tomador. Em 2026 informar o tomador ainda é facultativo.',
         ],
         'sem_tottrib' => [
             'rotulo' => 'Sem o grupo totTrib',
