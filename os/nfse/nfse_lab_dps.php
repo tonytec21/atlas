@@ -407,6 +407,7 @@ try {
 
     $catalogo  = lab_variantes();
     $resultados = [];
+    $inconclusivas = [];
     $vencedora = null;
     $conferencia = null;
 
@@ -438,9 +439,26 @@ try {
             continue;
         }
 
-        $r = nfse_http_sefin('POST', 'nfse', ['dpsXmlGZipB64' => base64_encode(gzencode($assinado))], $cfg);
+        /* Transmite com retentativa. Sem isso, um 503 — que é o servidor web
+           recusando antes de a requisição chegar à aplicação — seria contado
+           como "variante recusada", quando na verdade a variante sequer foi
+           avaliada. Num ambiente oscilando, isso invalidaria a rodada inteira. */
+        $tx  = nfse_transmitir_dps($cfg, base64_encode(gzencode($assinado)));
+        $r   = $tx['bruto'];
         $dec = json_decode($r['body'], true);
-        $autorizou = ($r['status'] === 200 && is_array($dec) && !empty($dec['nfseXmlGZipB64']));
+
+        $autorizou = $tx['ok'];
+
+        /* Aqui a distinção é diferente da usada na emissão normal.
+           Para o laboratório, um 500 NÃO é "ambiente fora": é a aplicação
+           recebendo a DPS e quebrando — ou seja, é exatamente o veredito que
+           se está medindo, e a variante conta como recusada.
+           Já 502, 503, 504 e erros de rede vêm do IIS ou do proxy, antes de a
+           requisição chegar à aplicação: aí a variante não chegou a ser
+           avaliada e não pode contar como recusa. */
+        $inconclusivo = !$tx['ok'] && (
+            $r['errno'] !== 0 || in_array((int) $r['status'], [0, 502, 503, 504], true)
+        );
 
         // Registra a tentativa
         $ins = $pdo->prepare(
@@ -489,13 +507,18 @@ try {
 
         $resultados[] = [
             'variante' => $variante, 'numero' => $numero, 'status' => $r['status'],
-            'mensagem' => nfse_resumir_resposta($r), 'xml' => $assinado, 'ok' => $autorizou,
+            'mensagem' => nfse_resumir_resposta($r) . ' (' . $tx['tentativas'] . ' tentativa(s))',
+            'xml' => $assinado, 'ok' => $autorizou, 'inconclusivo' => $inconclusivo,
             'chave' => $autorizou ? ($chave ?? null) : null, 'nota' => $notaId,
         ];
 
         if ($autorizou) {
             $vencedora = $variante;
             break;   // não emite uma segunda nota para a mesma O.S.
+        }
+
+        if ($inconclusivo) {
+            $inconclusivas[] = $variante;
         }
 
         usleep(400000);   // respiro entre tentativas
@@ -527,22 +550,39 @@ try {
            . '<p>A variante <strong>' . lab_h($catalogo[$vencedora]['rotulo']) . '</strong> foi aceita. '
            . 'É essa diferença que a SEFIN está recusando — a correção definitiva é aplicá-la em '
            . '<code>nfse_montar_dps()</code>, no <code>nfse_lib.php</code>. Me mande este resultado que eu faço a alteração.</p></div>';
+    } elseif (!$simular && count($inconclusivas) === count($resultados) && $resultados) {
+        echo '<div class="painel" style="border-left:5px solid #d97706">'
+           . '<h3 style="margin-top:0">Rodada inconclusiva.</h3>'
+           . '<p>Nenhuma variante chegou a ser avaliada: todas voltaram com falha de transporte '
+           . '(503 do servidor web, timeout ou queda de conexão). Isso é o IIS recusando a '
+           . 'requisição <em>antes</em> de ela chegar à aplicação — o conteúdo do DPS nem foi lido. '
+           . '<strong>Repita a rodada mais tarde</strong>; o resultado de agora não diz nada sobre '
+           . 'as variantes.</p></div>';
     } elseif (!$simular) {
-        echo '<div class="painel"><h3 style="margin-top:0">Nenhuma variante passou.</h3>'
-           . '<p>Se todas devolveram 500, a diferença está em algum ponto que estas variantes não '
-           . 'tocam — o candidato seguinte é o grupo <code>IBSCBS</code>, que exige o Anexo VI da '
-           . 'NT 009 e a definição do CST e da classificação tributária do serviço notarial junto '
-           . 'ao contador.</p></div>';
+        echo '<div class="painel"><h3 style="margin-top:0">Nenhuma variante foi aceita.</h3>'
+           . '<p>As que receberam 500 foram efetivamente avaliadas e recusadas.'
+           . (count($inconclusivas) > 0
+                ? ' Atenção: <strong>' . count($inconclusivas) . '</strong> variante(s) voltaram com '
+                . 'falha de transporte e <em>não</em> chegaram a ser testadas — vale repetir a rodada '
+                . 'só com elas.'
+                : ' A diferença está em algum ponto que estas variantes não tocam.')
+           . '</p></div>';
     }
 
     echo '<table><tr><th style="width:34%">Variante</th><th style="width:90px">DPS</th>'
        . '<th style="width:80px">HTTP</th><th>Resposta</th></tr>';
 
     foreach ($resultados as $res) {
-        $pill = $res['ok'] === true
-            ? '<span class="pill p-ok">200</span>'
-            : ($res['status'] === null ? '<span class="pill p-alerta">—</span>'
-                                       : '<span class="pill p-erro">' . (int) $res['status'] . '</span>');
+        if ($res['ok'] === true) {
+            $pill = '<span class="pill p-ok">200</span>';
+        } elseif ($res['status'] === null) {
+            $pill = '<span class="pill p-alerta">—</span>';
+        } elseif (!empty($res['inconclusivo'])) {
+            $pill = '<span class="pill p-alerta">' . (int) $res['status'] . '</span><br>'
+                  . '<small>não testada</small>';
+        } else {
+            $pill = '<span class="pill p-erro">' . (int) $res['status'] . '</span>';
+        }
 
         echo '<tr><td><b>' . lab_h($catalogo[$res['variante']]['rotulo']) . '</b></td>'
            . '<td>' . (int) $res['numero'] . '</td>'
