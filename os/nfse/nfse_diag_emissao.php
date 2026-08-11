@@ -458,7 +458,9 @@ if ($osId > 0 && $cfg && $pfx !== null) {
                  . "Após gzip       : " . strlen($gz) . " bytes\n"
                  . "Base64 (envio)  : " . strlen($payloadB64) . " caracteres\n"
                  . "Tem <Signature> : " . (strpos($xmlAssinado, '<Signature') !== false ? 'sim' : 'NÃO') . "\n"
-                 . "Tem grupo IBSCBS: " . (strpos($xmlAssinado, 'IBSCBS') !== false ? 'sim' : 'não') . "\n";
+                 . "versao do DPS   : " . (preg_match('/<DPS[^>]*versao="([^"]+)"/', $xmlAssinado, $__mv) ? $__mv[1] : '?') . "\n"
+                 . "Tem grupo IBSCBS: " . (strpos($xmlAssinado, 'IBSCBS') !== false ? 'sim' : 'não') . "\n"
+                 . "Tem grupo <toma>: " . (strpos($xmlAssinado, '<toma>') !== false ? 'SIM' : 'não') . "\n";
 
         d_bloco('6. DPS montado e assinado (não enviado)', 'ok',
             'Este é exatamente o XML que sairia para a SEFIN.',

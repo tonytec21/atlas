@@ -59,6 +59,40 @@ try {
     $omitir = !empty($cfg['omitir_tomador']);
     $venceEm = mktime(0, 0, 0, 1, 1, 2027);
     $expirou = nfse_exige_individualizacao();
+
+    /* ---------------------------------------------------------------
+     * Conferência do que realmente sai no XML.
+     *
+     * Marcar a opção na tela e ver o erro repetir não prova nada se a
+     * versão do nfse_lib.php instalada não tiver o recurso — o OPcache
+     * do Apache, em particular, serve o arquivo antigo até ser
+     * reiniciado. Aqui o DPS é montado de verdade (sem enviar) e o
+     * grupo <toma> é procurado no XML resultante.
+     * --------------------------------------------------------------- */
+    $conf = null;
+    $osConf = isset($_POST['os_conf']) ? (int) $_POST['os_conf'] : 0;
+
+    if ($osConf > 0) {
+        try {
+            $cfgFull  = nfse_config(true);
+            $apuracao = nfse_apurar_os($osConf, $cfgFull);
+
+            $numero  = (int) nfse_pdo()->query('SELECT ultimo_numero_dps FROM nfse_config WHERE id = 1')->fetchColumn() + 1;
+            $montado = nfse_montar_dps($cfgFull, $apuracao, $numero, null);
+
+            nfse_autoload();
+            $xml = (new \Nfse\Xml\DpsXmlBuilder)->build($montado['dps']);
+
+            $conf = [
+                'suporta'  => array_key_exists('omitir_tomador', $cfg),
+                'tem_toma' => (strpos($xml, '<toma>') !== false),
+                'versao'   => preg_match('/<DPS[^>]*versao="([^"]+)"/', $xml, $mv) ? $mv[1] : '?',
+                'xml'      => $xml,
+            ];
+        } catch (Throwable $e) {
+            $conf = ['erro' => $e->getMessage()];
+        }
+    }
 } catch (Throwable $e) {
     $erro = $e->getMessage();
 }
@@ -114,6 +148,67 @@ try {
                 <?php echo $omitir ? 'Voltar a identificar o tomador' : 'Parar de enviar o tomador'; ?>
             </button>
         </form>
+    </div>
+
+    <div class="painel">
+        <h3 style="margin:0 0 8px; font-size:15px">Conferir o que realmente sai no XML</h3>
+        <p style="margin:0 0 10px" class="nota">
+            Marcar a opção aqui e ver o erro repetir só prova alguma coisa se a versão instalada
+            do <code>nfse_lib.php</code> tiver o recurso. O OPcache do Apache costuma servir o
+            arquivo antigo até ser reiniciado. Este teste monta o DPS de verdade, sem enviar, e
+            procura o grupo <code>&lt;toma&gt;</code> no XML resultante.
+        </p>
+
+        <form method="post">
+            <label for="os_conf" style="font-weight:600">Nº de uma O.S. liquidada:</label>
+            <input type="number" id="os_conf" name="os_conf" min="1"
+                   value="<?php echo $osConf ?: ''; ?>"
+                   style="padding:8px 10px; border:1px solid var(--borda); border-radius:6px; width:150px">
+            <button type="submit" class="b-liga" style="padding:9px 18px">Conferir</button>
+        </form>
+
+        <?php if ($conf && isset($conf['erro'])): ?>
+            <p style="margin:12px 0 0; color:#b91c1c"><strong>Falhou:</strong> <?php echo tm_h($conf['erro']); ?></p>
+        <?php elseif ($conf): ?>
+            <table style="border-collapse:collapse; width:100%; margin-top:14px; font-size:13px">
+                <tr>
+                    <td style="border:1px solid var(--borda); padding:7px 9px; width:52%">
+                        Versão instalada suporta a opção
+                    </td>
+                    <td style="border:1px solid var(--borda); padding:7px 9px; font-weight:600;
+                               color:<?php echo $conf['suporta'] ? '#16a34a' : '#dc2626'; ?>">
+                        <?php echo $conf['suporta'] ? 'sim' : 'NÃO — nfse_lib.php desatualizado ou OPcache servindo o antigo'; ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid var(--borda); padding:7px 9px">
+                        O XML gerado contém <code>&lt;toma&gt;</code>
+                    </td>
+                    <td style="border:1px solid var(--borda); padding:7px 9px; font-weight:600;
+                               color:<?php echo $conf['tem_toma'] ? '#d97706' : '#16a34a'; ?>">
+                        <?php echo $conf['tem_toma'] ? 'SIM' : 'não'; ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid var(--borda); padding:7px 9px">Atributo <code>versao</code> do DPS</td>
+                    <td style="border:1px solid var(--borda); padding:7px 9px"><?php echo tm_h($conf['versao']); ?></td>
+                </tr>
+            </table>
+
+            <?php if ($omitir && $conf['tem_toma']): ?>
+                <p style="margin:12px 0 0; color:#b91c1c">
+                    <strong>A opção está ligada, mas o tomador continua saindo no XML.</strong>
+                    O teste anterior não valeu: o que foi transmitido ainda tinha o grupo
+                    <code>&lt;toma&gt;</code>. Atualize o <code>nfse_lib.php</code>, reinicie o
+                    Apache (o OPcache não recarrega sozinho) e repita.
+                </p>
+            <?php elseif ($omitir && !$conf['tem_toma']): ?>
+                <p style="margin:12px 0 0; color:#166534">
+                    <strong>Confirmado.</strong> O DPS está saindo sem o tomador — se a emissão
+                    ainda falhar com 500, a hipótese do tomador está descartada de verdade.
+                </p>
+            <?php endif; ?>
+        <?php endif; ?>
     </div>
 
     <div class="painel">
