@@ -335,6 +335,26 @@ function nfse_migrar(?PDO $pdo = null): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Colunas de controle do transporte (diagnóstico e antiduplicidade).
+    // Idempotente: só cria o que faltar.
+    $novas = [
+        'http_status'     => 'SMALLINT UNSIGNED NULL',
+        'tentativas'      => 'SMALLINT UNSIGNED NOT NULL DEFAULT 0',
+        'ultima_tentativa'=> 'DATETIME NULL',
+    ];
+    foreach ($novas as $col => $ddl) {
+        $existe = (int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'nfse_notas'
+                AND COLUMN_NAME = " . $pdo->quote($col)
+        )->fetchColumn();
+
+        if ($existe === 0) {
+            $pdo->exec("ALTER TABLE nfse_notas ADD COLUMN `{$col}` {$ddl}");
+        }
+    }
+
     // Protege o diretório de certificados contra acesso HTTP (Apache).
     if (!is_dir(ATLAS_NFSE_CERTS_DIR)) {
         @mkdir(ATLAS_NFSE_CERTS_DIR, 0700, true);
@@ -1279,6 +1299,31 @@ function nfse_emitir_os_interno(int $osId, bool $forcar = false): array
         ];
     }
 
+    /* ------------------------------------------------------------------
+     * Trava contra duplicidade.
+     *
+     * Uma falha 5xx pode ter ocorrido DEPOIS de a SEFIN gravar a NFS-e —
+     * o 500 é uma exceção dentro da aplicação deles, não uma recusa. Antes
+     * de gastar um novo número de DPS, consulta-se pelo Id da DPS anterior
+     * se a nota já existe do outro lado. Se existir, ela é recuperada e
+     * nenhuma nova é emitida.
+     * ---------------------------------------------------------------- */
+    require_once __DIR__ . '/nfse_transporte.php';
+
+    try {
+        $recuperada = nfse_recuperar_rejeitadas_da_os($osId, $cfg);
+        if ($recuperada) {
+            return [
+                'ok'       => true,
+                'notas'    => [$recuperada],
+                'mensagem' => 'A NFS-e já constava na SEFIN sob a chave ' . ($recuperada['chave_acesso'] ?: '—')
+                            . '. A falha anterior foi apenas no transporte da resposta — nenhuma nota nova foi emitida.',
+            ];
+        }
+    } catch (Throwable $e) {
+        nfse_log('emissao', 'Não foi possível verificar DPS anteriores: ' . $e->getMessage(), 'warn', $osId);
+    }
+
     $apuracao = nfse_apurar_os($osId, $cfg);
 
     if (!$apuracao['totalmente_liquidada']) {
@@ -1313,16 +1358,27 @@ function nfse_emitir_os_interno(int $osId, bool $forcar = false): array
             continue;
         }
 
+        // Assina aqui (e não dentro do SDK) para poder GUARDAR o XML
+        // transmitido: sem ele não há como reenviar o mesmo documento nem
+        // comprovar depois o que saiu daqui.
+        try {
+            $envelope = nfse_assinar_dps($cfg, $montado);
+        } catch (Throwable $e) {
+            $erros[] = 'Falha ao assinar a DPS: ' . $e->getMessage();
+            continue;
+        }
+
         // Grava a intenção antes de sair para a rede (rastreabilidade)
         $ins = $pdo->prepare(
             "INSERT INTO nfse_notas
              (ordem_servico_id, ambiente, serie, numero_dps, id_dps, status,
               valor_servico, valor_reducao, base_calculo, aliquota, valor_iss,
-              tomador_doc, tomador_nome, discriminacao, criado_em, criado_por)
+              tomador_doc, tomador_nome, discriminacao, xml_dps, criado_em, criado_por)
              VALUES (:os, :amb, :serie, :num, :iddps, 'processando',
-                     :vs, :vr, :bc, :aliq, :iss, :tdoc, :tnome, :disc, NOW(), :usr)"
+                     :vs, :vr, :bc, :aliq, :iss, :tdoc, :tnome, :disc, :xmldps, NOW(), :usr)"
         );
         $ins->execute([
+            ':xmldps' => $envelope['xml'],
             ':os'    => $osId,
             ':amb'   => $cfg['ambiente'],
             ':serie' => $cfg['serie_dps'],
@@ -1340,10 +1396,24 @@ function nfse_emitir_os_interno(int $osId, bool $forcar = false): array
         ]);
         $notaId = (int) $pdo->lastInsertId();
 
-        try {
-            $resultado = $nfse->contribuinte()->emitir($montado['dps']);
+        $tx = null;
 
+        try {
+            // Transmissão própria, com captura completa da resposta e
+            // retentativa automática enquanto a falha for passageira.
+            $tx = nfse_transmitir_dps($cfg, $envelope['payload']);
+
+            $pdo->prepare(
+                "UPDATE nfse_notas SET http_status = :st, tentativas = :t, ultima_tentativa = NOW() WHERE id = :id"
+            )->execute([':st' => $tx['status'] ?: null, ':t' => $tx['tentativas'], ':id' => $notaId]);
+
+            if (!$tx['ok']) {
+                throw new RuntimeException($tx['mensagem']);
+            }
+
+            $resultado = (new \Nfse\Xml\NfseXmlParser)->parse($tx['nfse_xml']);
             $chave = nfse_chave50($resultado->infNfse->id ?? null) ?: null;
+
             $upd = $pdo->prepare(
                 "UPDATE nfse_notas
                     SET status = 'autorizada', chave_acesso = :chave, numero_nfse = :num,
@@ -1354,7 +1424,7 @@ function nfse_emitir_os_interno(int $osId, bool $forcar = false): array
                 ':chave' => $chave,
                 ':num'   => $resultado->infNfse->numeroNfse ?? null,
                 ':cv'    => $resultado->infNfse->codigoVerificacao ?? null,
-                ':xml'   => $resultado->nfseXml ?? null,
+                ':xml'   => $tx['nfse_xml'],
                 ':id'    => $notaId,
             ]);
 
@@ -1362,6 +1432,33 @@ function nfse_emitir_os_interno(int $osId, bool $forcar = false): array
             $notas[] = ['id' => $notaId, 'chave' => $chave, 'status' => 'autorizada'];
         } catch (Throwable $e) {
             $msg = $e->getMessage();
+
+            // Antes de dar a DPS por perdida numa falha 5xx, confirma se ela
+            // não gerou nota do lado da SEFIN. Evita emitir duas.
+            if (!empty($tx) && $tx['transitoria']) {
+                try {
+                    $achado = nfse_recuperar_por_dps($cfg, $montado['id_dps']);
+                    if ($achado) {
+                        $pdo->prepare(
+                            "UPDATE nfse_notas
+                                SET status='autorizada', chave_acesso=:c, xml_nfse=:x,
+                                    mensagem='Recuperada pela consulta da DPS após falha de transporte.'
+                              WHERE id=:id"
+                        )->execute([':c' => $achado['chave'], ':x' => $achado['xml'], ':id' => $notaId]);
+
+                        nfse_log('emissao', 'NFS-e recuperada pela consulta da DPS. Chave: ' . $achado['chave'],
+                            'info', $osId, $notaId);
+                        $notas[] = ['id' => $notaId, 'chave' => $achado['chave'], 'status' => 'autorizada'];
+                        continue;
+                    }
+                } catch (Throwable $e2) {
+                    // ambiente indisponível para consultar também; segue para a rejeição
+                }
+
+                $msg = 'Ambiente Nacional indisponível. ' . $msg
+                     . ' — a DPS não chegou a ser processada; use "Reemitir" quando a SEFIN normalizar.';
+            }
+
             $pdo->prepare("UPDATE nfse_notas SET status = 'rejeitada', mensagem = :m WHERE id = :id")
                 ->execute([':m' => mb_substr($msg, 0, 4000, 'UTF-8'), ':id' => $notaId]);
 
