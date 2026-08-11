@@ -34,6 +34,7 @@ if (function_exists('checkSession')) { checkSession(); }
 include(__DIR__ . '/../../checar_acesso_de_administrador.php');
 
 require_once __DIR__ . '/nfse_lib.php';
+require_once __DIR__ . '/nfse_transporte.php';
 
 date_default_timezone_set('America/Sao_Paulo');
 @set_time_limit(120);
@@ -68,6 +69,32 @@ try {
             "SELECT criado_em FROM nfse_notas WHERE status='autorizada' ORDER BY id DESC LIMIT 1"
         )->fetchColumn();
         $dataRef = $ult ? date('Y-m-d', strtotime($ult)) : date('Y-m-d', strtotime('-7 days'));
+    }
+
+    /* A consulta de alíquota depende do formato do código de serviço aceito
+       pela API de parametrização, e um formato errado devolve vazio — que é
+       indistinguível de "não há alíquota cadastrada". Para não produzir um
+       falso negativo, tenta-se cada variação e mostra-se o retorno cru de
+       todas. */
+    $tentativas = [];
+    $base = preg_replace('/\D/', '', (string) ($cfg['ctrib_nac'] ?: '210101'));
+    $formatos = array_unique([
+        nfse_formatar_cod_servico($base),   // 21.01.01.000
+        $base,                              // 210101
+        str_pad($base, 9, '0'),             // 210101000
+    ]);
+
+    foreach ($formatos as $fmt) {
+        $reg = ['formato' => $fmt, 'status' => null, 'corpo' => null];
+        try {
+            $r = nfse_http_adn('parametrizacao/' . rawurlencode($cfg['cod_municipio'])
+                . '/' . rawurlencode($fmt) . '/' . rawurlencode(date('Y-m-d')) . '/aliquota', $cfg);
+            $reg['status'] = $r['status'];
+            $reg['corpo']  = mb_substr($r['body'], 0, 1200, 'UTF-8');
+        } catch (Throwable $e) {
+            $reg['corpo'] = 'Falhou: ' . $e->getMessage();
+        }
+        $tentativas[] = $reg;
     }
 
     try { $convenio = nfse_testar_convenio(); } catch (Throwable $e) { $convenio = ['erro' => $e->getMessage()]; }
@@ -261,6 +288,24 @@ foreach ($listaHist ?: $listaHoje as $a) {
         <p style="margin:12px 0 0; color:var(--cinza)">
             Se a data antiga devolve alíquota e hoje não devolve, achamos a causa.
         </p>
+    </div>
+
+    <div class="painel">
+        <h3>Retorno cru da API de parametrização</h3>
+        <p style="margin:0 0 10px; color:var(--cinza)">
+            O mesmo pedido em três formatos do código de serviço. Se um deles responder 200 com
+            conteúdo e os outros não, o problema era só o formato — e não a falta de alíquota.
+        </p>
+        <table>
+            <tr><th style="width:150px">Código enviado</th><th style="width:70px">HTTP</th><th>Resposta</th></tr>
+            <?php foreach ($tentativas as $t): ?>
+            <tr>
+                <td><code><?php echo pm_h($t['formato']); ?></code></td>
+                <td><?php echo $t['status'] !== null ? (int) $t['status'] : '—'; ?></td>
+                <td><pre style="max-height:150px; margin:0"><?php echo pm_h($t['corpo'] ?: '(vazio)'); ?></pre></td>
+            </tr>
+            <?php endforeach; ?>
+        </table>
     </div>
 
     <div class="painel">

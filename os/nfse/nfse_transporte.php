@@ -121,6 +121,64 @@ function nfse_http_sefin(string $metodo, string $caminho, ?array $json, ?array $
 }
 
 /**
+ * Requisição crua ao ADN (Ambiente de Dados Nacional), que é onde ficam a
+ * parametrização municipal e o cadastro de contribuintes — host diferente
+ * do SEFIN, mesmo certificado.
+ *
+ * @return array{status:int, body:string, headers:string[], erro:string, errno:int, ms:int}
+ */
+function nfse_http_adn(string $caminho, ?array $cfg = null, int $timeout = 30): array
+{
+    $cfg = $cfg ?: nfse_config(true);
+    $ctx = nfse_context($cfg);
+
+    $base = ((string) ($cfg['ambiente'] ?? '2') === '1')
+        ? 'https://adn.nfse.gov.br'
+        : 'https://adn.producaorestrita.nfse.gov.br';
+
+    $tmp = tempnam(sys_get_temp_dir(), 'nfse_adn_');
+    file_put_contents($tmp, $ctx->certificateContent);
+
+    $cabecalhos = [];
+    $ch = curl_init();
+
+    curl_setopt_array($ch, [
+        CURLOPT_URL            => rtrim($base, '/') . '/' . ltrim($caminho, '/'),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_SSLCERTTYPE    => 'P12',
+        CURLOPT_SSLCERT        => $tmp,
+        CURLOPT_SSLCERTPASSWD  => (string) $ctx->certificatePassword,
+        CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+        CURLOPT_CONNECTTIMEOUT => min(20, max(5, (int) ($timeout / 2))),
+        CURLOPT_TIMEOUT        => $timeout,
+        CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_SSL_VERIFYPEER => 0,
+        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        CURLOPT_HEADERFUNCTION => function ($ch, $l) use (&$cabecalhos) {
+            $t = trim($l); if ($t !== '') { $cabecalhos[] = $t; } return strlen($l);
+        },
+    ]);
+
+    $ini  = microtime(true);
+    $body = curl_exec($ch);
+
+    $r = [
+        'status'  => (int) curl_getinfo($ch, CURLINFO_HTTP_CODE),
+        'body'    => ($body === false) ? '' : (string) $body,
+        'headers' => $cabecalhos,
+        'erro'    => curl_error($ch),
+        'errno'   => curl_errno($ch),
+        'ms'      => (int) round((microtime(true) - $ini) * 1000),
+    ];
+
+    curl_close($ch);
+    @unlink($tmp);
+
+    return $r;
+}
+
+/**
  * A falha é passageira (vale insistir) ou definitiva (vale rejeitar)?
  *
  * Passageiras: qualquer 5xx, 408 (timeout), 429 (excesso de requisições)
