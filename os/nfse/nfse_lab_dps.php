@@ -61,6 +61,15 @@ function lab_variantes(): array
             'porque' => 'Confirma que a falha se repete no momento do teste. Sem isso, um 200 numa '
                       . 'variante seguinte poderia ser só a SEFIN tendo voltado ao ar.',
         ],
+        'versao_101' => [
+            'rotulo' => 'DPS com versao="1.01"',
+            'porque' => 'Em 10/08/2026 — o dia exato em que a emissão parou — entrou em Produção o '
+                      . 'CNPJ Alfanumérico, "com atualização dos schemas XML" (comunicado do Portal '
+                      . 'NFS-e de 28/07/2026). Os novos esquemas publicados são da série v1.01, e o '
+                      . 'Atlas ainda declara versao="1.00". Se a recepção passou a carregar só o '
+                      . 'schema novo, o documento antigo não casa com contrato nenhum e a aplicação '
+                      . 'estoura antes de validar — que é exatamente a cara de um 500 sem corpo.',
+        ],
         'sem_toma' => [
             'rotulo' => 'Sem o grupo toma (tomador não informado)',
             'porque' => 'A principal suspeita. Os erros E0206 e E0207 mostram que a SEFIN consulta '
@@ -119,6 +128,13 @@ function lab_aplicar(string $xml, string $variante): string
     };
 
     switch ($variante) {
+        case 'versao_101':
+            $raiz = $dom->documentElement;
+            if ($raiz && $raiz->localName === 'DPS') {
+                $raiz->setAttribute('versao', '1.01');
+            }
+            break;
+
         case 'sem_piscofins':
             $remover('//n:valores/n:trib/n:tribFed');
             break;
