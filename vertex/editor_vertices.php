@@ -446,6 +446,579 @@ function evGerarGeoJSON(array $v, array $meta): string
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
 }
 
+
+/* ===========================================================================
+ * 3-B. MEMORIAL DESCRITIVO EM PDF
+ *      Reaproveita o TCPDF e a GMAPS_STATIC_KEY já usados pelo módulo.
+ * ======================================================================== */
+
+/** Caminho do TCPDF (mesma busca que o index.php faz). */
+function evTcpdfPath()
+{
+    if (file_exists(__DIR__ . '/../oficios/tcpdf/tcpdf.php')) return __DIR__ . '/../oficios/tcpdf/tcpdf.php';
+    if (file_exists(__DIR__ . '/tcpdf/tcpdf.php'))            return __DIR__ . '/tcpdf/tcpdf.php';
+    return false;
+}
+
+/** Chave do Static Maps (lado servidor), lida do index.php para não duplicar. */
+function evStaticKey(): string
+{
+    $f = __DIR__ . '/index.php';
+    if (is_file($f) && ($h = @fopen($f, 'rb'))) {
+        $head = (string) fread($h, 20000);
+        fclose($h);
+        if (preg_match("/define\(\s*'GMAPS_STATIC_KEY'\s*,\s*'([^']*)'/", $head, $m)) return $m[1];
+        if (preg_match("/define\(\s*'GMAPS_KEY'\s*,\s*'([^']*)'/", $head, $m2)) return $m2[1];
+    }
+    return '';
+}
+
+function evEncPolyNum(int $num): string
+{
+    $num = $num << 1;
+    if ($num < 0) $num = ~$num;
+    $out = '';
+    while ($num >= 0x20) { $out .= chr((0x20 | ($num & 0x1f)) + 63); $num >>= 5; }
+    return $out . chr($num + 63);
+}
+function evEncodePolyline(array $pts): string
+{
+    $r = ''; $pLat = 0; $pLng = 0;
+    foreach ($pts as $p) {
+        $la = (int) round($p[0] * 1e5); $lo = (int) round($p[1] * 1e5);
+        $r .= evEncPolyNum($la - $pLat) . evEncPolyNum($lo - $pLng);
+        $pLat = $la; $pLng = $lo;
+    }
+    return $r;
+}
+
+/** Zoom que enquadra a bbox no tamanho pedido (mais justo que o auto-fit do Google). */
+function evZoomBBox(float $lat0, float $lat1, float $lon0, float $lon1, int $w, int $h, float $pad = 1.15): int
+{
+    // y de Mercator em radianos / 2 — o mundo tem altura 2*PI, então a FRAÇÃO do
+    // mundo é (y1-y0)/PI depois dessa divisão por 2. Sem esse /PI o zoom sai
+    // ~1,65 nível abaixo do correto e o enquadramento fica muito aberto.
+    $mercY = function (float $lat) {
+        $s = sin(deg2rad(max(-89.9, min(89.9, $lat))));
+        return max(-M_PI, min(M_PI, log((1 + $s) / (1 - $s)) / 2)) / 2;
+    };
+    $fLat = abs($mercY($lat1) - $mercY($lat0)) / M_PI * $pad;
+    $fLon = abs($lon1 - $lon0) / 360.0 * $pad;
+    $zLat = $fLat > 1e-12 ? floor(log($h / 256 / $fLat, 2)) : 21;
+    $zLon = $fLon > 1e-12 ? floor(log($w / 256 / $fLon, 2)) : 21;
+    return (int) max(1, min(21, min($zLat, $zLon)));
+}
+
+/** URL do Static Maps com o imóvel desenhado e enquadramento fechado. */
+function evStaticMapUrl(array $pts, string $key, int $zoom = 0, int $w = 640, int $h = 460, string $tipo = 'hybrid'): string
+{
+    if (count($pts) < 3 || $key === '') return '';
+    $lats = array_column($pts, 0); $lons = array_column($pts, 1);
+    $cLat = (min($lats) + max($lats)) / 2; $cLon = (min($lons) + max($lons)) / 2;
+    if ($zoom <= 0) $zoom = evZoomBBox(min($lats), max($lats), min($lons), max($lons), $w, $h);
+
+    $anel = $pts;
+    if (abs($anel[0][0] - end($anel)[0]) > 1e-12 || abs($anel[0][1] - end($anel)[1]) > 1e-12) $anel[] = $anel[0];
+
+    $p = ['size=' . $w . 'x' . $h, 'scale=2', 'maptype=' . $tipo, 'format=png',
+          'center=' . round($cLat, 7) . ',' . round($cLon, 7), 'zoom=' . $zoom];
+    $p[] = 'path=' . rawurlencode('color:0x1d4ed8ff|weight:3|fillcolor:0x1d4ed833|enc:' . evEncodePolyline($anel));
+    if (count($pts) <= 60) {
+        $locs = [];
+        foreach ($pts as $q) $locs[] = round($q[0], 6) . ',' . round($q[1], 6);
+        $p[] = 'markers=' . rawurlencode('size:tiny|color:0xffffff|' . implode('|', $locs));
+    }
+    $p[] = 'key=' . $key;
+    return 'https://maps.googleapis.com/maps/api/staticmap?' . implode('&', $p);
+}
+
+function evFetchImg(string $url, &$erro = null)
+{
+    $erro = '';
+    if ($url === '') { $erro = 'sem chave do Static Maps'; return false; }
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true]);
+        $d = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $ct = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $ce = curl_error($ch);
+        curl_close($ch);
+        if ($d !== false && $code === 200 && strpos($ct, 'image') !== false) return $d;
+        $erro = $ce !== '' ? ('cURL: ' . $ce)
+              : ($code !== 200 ? ('HTTP ' . $code . ($d ? ' — ' . substr(strip_tags((string) $d), 0, 140) : ''))
+                               : ('resposta sem imagem (' . $ct . ')'));
+        return false;
+    }
+    if (!ini_get('allow_url_fopen')) { $erro = 'cURL e allow_url_fopen indisponíveis'; return false; }
+    $d = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 15]]));
+    if ($d === false) { $erro = 'file_get_contents falhou'; return false; }
+    return $d;
+}
+
+/**
+ * Texto corrido do memorial, no padrão registral: descreve cada lado nomeando o
+ * confrontante, o azimute plano, a distância e as coordenadas do vértice de chegada.
+ */
+function evDescricaoCorrida(array $v, array $meta): string
+{
+    $n = count($v);
+    $g0 = evUtmToGeo((float) $v[0]['e'], (float) $v[0]['n'], (int) $meta['fuso'], (bool) $meta['sul']);
+    $conf0 = trim((string) ($v[$n - 1]['conf'] ?? ''));
+
+    $t = 'Inicia-se a descrição deste perímetro no vértice <b>' . htmlspecialchars($v[0]['id'])
+       . '</b>, de coordenadas N ' . evBr((float) $v[0]['n'], 3) . ' m e E ' . evBr((float) $v[0]['e'], 3) . ' m'
+       . ' (latitude ' . evFmtDMS($g0['lat'], true) . ' e longitude ' . evFmtDMS($g0['lon'], false) . ')'
+       . ($conf0 !== '' ? ', situado na divisa com ' . htmlspecialchars($conf0) : '') . ';';
+
+    for ($i = 0; $i < $n; $i++) {
+        $j = ($i + 1) % $n;
+        $conf = trim((string) ($v[$i]['conf'] ?? ''));
+        $az   = evAzimute($v[$i], $v[$j]);
+        $d    = evDist($v[$i], $v[$j]);
+
+        $t .= ' deste, segue ' . ($conf !== '' ? 'confrontando com ' . htmlspecialchars($conf) . ', ' : '')
+            . 'com azimute plano de ' . evFmtAz($az) . ' e distância de ' . evBr($d, 2) . ' m, até o vértice <b>'
+            . htmlspecialchars($v[$j]['id']) . '</b>, de coordenadas N ' . evBr((float) $v[$j]['n'], 3)
+            . ' m e E ' . evBr((float) $v[$j]['e'], 3) . ' m;';
+    }
+
+    $t = rtrim($t, ';') . ', ponto inicial da descrição deste perímetro.';
+    return $t;
+}
+
+/** Desenha a planta (vetorial) numa área da página. Devolve a escala 1:N adotada. */
+function evDesenharPlanta($pdf, array $v, float $x0, float $y0, float $bw, float $bh): int
+{
+    $n = count($v);
+    $es = array_column($v, 'e'); $ns = array_column($v, 'n');
+    $eMin = min($es); $eMax = max($es); $nMin = min($ns); $nMax = max($ns);
+    $largM = max($eMax - $eMin, 0.5); $altM = max($nMax - $nMin, 0.5);
+
+    // margem interna para caber rótulos e confrontantes
+    $mm = 15.0;
+    $s = min(($bw - 2 * $mm) / $largM, ($bh - 2 * $mm) / $altM);   // mm por metro
+
+    // escala "redonda" (1:100, 1:150, 1:200, ...)
+    $escalas = [50, 75, 100, 125, 150, 200, 250, 300, 400, 500, 750, 1000, 1500, 2000, 2500, 5000, 10000];
+    $escala = 10000;
+    foreach ($escalas as $E) { if (1000.0 / $E <= $s) { $escala = $E; break; } }
+    $s = 1000.0 / $escala;
+
+    $cx = $x0 + $bw / 2; $cy = $y0 + $bh / 2;
+    $eC = ($eMin + $eMax) / 2; $nC = ($nMin + $nMax) / 2;
+    $PX = fn($e) => $cx + ((float) $e - $eC) * $s;
+    $PY = fn($nn) => $cy - ((float) $nn - $nC) * $s;
+
+    // moldura
+    $pdf->SetDrawColor(190, 198, 210); $pdf->SetLineWidth(0.2);
+    $pdf->Rect($x0, $y0, $bw, $bh);
+
+    // malha de coordenadas UTM
+    $passos = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500];
+    $passo = 500;
+    foreach ($passos as $pp) { if ($pp * $s >= 22) { $passo = $pp; break; } }
+    $pdf->SetDrawColor(228, 233, 240); $pdf->SetLineWidth(0.1);
+    $pdf->SetFont('helvetica', '', 5.2); $pdf->SetTextColor(140, 150, 165);
+    for ($e = ceil(($eC - ($bw / 2) / $s) / $passo) * $passo; $e <= $eC + ($bw / 2) / $s; $e += $passo) {
+        $px = $PX($e); if ($px < $x0 + 1 || $px > $x0 + $bw - 1) continue;
+        $pdf->Line($px, $y0 + 1, $px, $y0 + $bh - 1);
+        $pdf->StartTransform(); $pdf->Rotate(90, $px, $y0 + $bh - 2);
+        $pdf->Text($px + 0.8, $y0 + $bh - 2, 'E=' . number_format($e, 0, ',', '.'));
+        $pdf->StopTransform();
+    }
+    for ($nn = ceil(($nC - ($bh / 2) / $s) / $passo) * $passo; $nn <= $nC + ($bh / 2) / $s; $nn += $passo) {
+        $py = $PY($nn); if ($py < $y0 + 1 || $py > $y0 + $bh - 1) continue;
+        $pdf->Line($x0 + 1, $py, $x0 + $bw - 1, $py);
+        $pdf->Text($x0 + 1.6, $py - 0.6, 'N=' . number_format($nn, 0, ',', '.'));
+    }
+
+    // polígono
+    $pol = [];
+    foreach ($v as $p) { $pol[] = $PX($p['e']); $pol[] = $PY($p['n']); }
+    $pdf->SetLineWidth(0.5);
+    $pdf->SetDrawColor(29, 78, 216); $pdf->SetFillColor(214, 226, 250);
+    $pdf->Polygon($pol, 'DF');
+
+    // centro geométrico na página — define, para cada lado, qual normal aponta para DENTRO
+    $cgx = 0.0; $cgy = 0.0;
+    foreach ($v as $p) { $cgx += $PX($p['e']); $cgy += $PY($p['n']); }
+    $cgx /= $n; $cgy /= $n;
+
+    // rótulos dos lados: distância SEMPRE por dentro, confrontante SEMPRE por fora
+    for ($i = 0; $i < $n; $i++) {
+        $j = ($i + 1) % $n;
+        $ax = $PX($v[$i]['e']); $ay = $PY($v[$i]['n']);
+        $bx = $PX($v[$j]['e']); $by = $PY($v[$j]['n']);
+        $comp = hypot($bx - $ax, $by - $ay);
+        if ($comp < 9) continue;
+
+        $ang = -rad2deg(atan2($by - $ay, $bx - $ax));
+        if ($ang > 90 || $ang < -90) $ang += 180;   // nunca de cabeça para baixo
+
+        $mx0 = ($ax + $bx) / 2; $my0 = ($ay + $by) / 2;
+        $ux = ($bx - $ax) / $comp; $uy = ($by - $ay) / $comp;
+        $nx = -$uy; $ny = $ux;
+        // se a normal apontar para longe do centro, inverte: assim "dentro" é sempre dentro
+        if (($nx * ($cgx - $mx0) + $ny * ($cgy - $my0)) < 0) { $nx = -$nx; $ny = -$ny; }
+
+        $pdf->SetFont('helvetica', 'B', 6.4);
+        $txt = evBr(evDist($v[$i], $v[$j]), 2) . ' m';
+        $tw  = $pdf->GetStringWidth($txt);
+        $mx = $mx0 + $nx * 2.4; $my = $my0 + $ny * 2.4;
+        $pdf->SetTextColor(20, 40, 90);
+        $pdf->StartTransform(); $pdf->Rotate($ang, $mx, $my);
+        $pdf->Text($mx - $tw / 2, $my + 0.9, $txt);
+        $pdf->StopTransform();
+
+        // confrontante, do lado de fora e afastado o bastante para não bater nos vértices
+        $conf = trim((string) ($v[$i]['conf'] ?? ''));
+        if ($conf !== '' && $comp > 14) {
+            $fs = 5.6;
+            $pdf->SetFont('helvetica', '', $fs);
+            $cf = mb_strlen($conf) > 46 ? (mb_substr($conf, 0, 44) . '…') : $conf;
+            // encolhe a fonte se o nome for muito maior que o lado (evita invadir os vizinhos)
+            while ($pdf->GetStringWidth($cf) > $comp * 1.35 && $fs > 3.8) {
+                $fs -= 0.3; $pdf->SetFont('helvetica', '', $fs);
+            }
+            $cw = $pdf->GetStringWidth($cf);
+            $qx = $mx0 - $nx * 5.2; $qy = $my0 - $ny * 5.2;
+            $pdf->SetTextColor(90, 100, 115);
+            $pdf->StartTransform(); $pdf->Rotate($ang, $qx, $qy);
+            $pdf->Text($qx - $cw / 2, $qy + 0.9, $cf);
+            $pdf->StopTransform();
+        }
+    }
+
+    // vértices — o rótulo sai radialmente para FORA do polígono
+    $pdf->SetFont('helvetica', 'B', 6.2);
+    foreach ($v as $p) {
+        $px = $PX($p['e']); $py = $PY($p['n']);
+        $pdf->SetFillColor(255, 255, 255); $pdf->SetDrawColor(29, 78, 216); $pdf->SetLineWidth(0.35);
+        $pdf->Circle($px, $py, 0.85, 0, 360, 'DF');
+
+        $dx = $px - $cgx; $dy = $py - $cgy; $dl = hypot($dx, $dy);
+        if ($dl < 0.001) { $dx = 1; $dy = 0; $dl = 1; }
+        $dx /= $dl; $dy /= $dl;
+        $tw2 = $pdf->GetStringWidth((string) $p['id']);
+        $lx = $px + $dx * 2.6 - $tw2 / 2;
+        $ly = $py + $dy * 2.6 + 0.8;
+        $pdf->SetTextColor(15, 30, 60);
+        $pdf->Text($lx, $ly, (string) $p['id']);
+    }
+
+    // rosa dos ventos
+    $nx = $x0 + $bw - 9; $ny = $y0 + 10;
+    $pdf->SetDrawColor(60, 72, 90); $pdf->SetLineWidth(0.4);
+    $pdf->Line($nx, $ny + 5, $nx, $ny - 4);
+    $pdf->SetFillColor(60, 72, 90);
+    $pdf->Polygon([$nx, $ny - 6.4, $nx - 1.5, $ny - 3.2, $nx + 1.5, $ny - 3.2], 'F');
+    $pdf->SetFont('helvetica', 'B', 6.5); $pdf->SetTextColor(60, 72, 90);
+    $pdf->Text($nx - 1.4, $ny + 8.4, 'NM');
+
+    // barra de escala
+    $mAlvo = [1, 2, 5, 10, 20, 50, 100];
+    $mBar = 10;
+    foreach ($mAlvo as $mA) { if ($mA * $s >= 16 && $mA * $s <= 42) { $mBar = $mA; break; } }
+    $bx0 = $x0 + 4; $by0 = $y0 + $bh - 4.5; $blen = $mBar * $s;
+    $pdf->SetDrawColor(60, 72, 90); $pdf->SetLineWidth(0.35);
+    $pdf->Line($bx0, $by0, $bx0 + $blen, $by0);
+    $pdf->Line($bx0, $by0 - 1.2, $bx0, $by0); $pdf->Line($bx0 + $blen, $by0 - 1.2, $bx0 + $blen, $by0);
+    $pdf->SetFont('helvetica', '', 5.6);
+    $pdf->Text($bx0 + $blen / 2 - 3, $by0 - 1.6, $mBar . ' m');
+    $pdf->SetFont('helvetica', 'B', 6);
+    $pdf->Text($bx0 + $blen + 4, $by0 - 0.2, 'Escala 1:' . $escala);
+
+    $pdf->SetTextColor(0, 0, 0); $pdf->SetDrawColor(0, 0, 0); $pdf->SetLineWidth(0.2);
+    return $escala;
+}
+
+/** Gera e envia o memorial descritivo em PDF. */
+function evGerarMemorialPDF(array $v, array $meta): void
+{
+    $tc = evTcpdfPath();
+    if ($tc === false) {
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "TCPDF não encontrado neste ambiente.\n\n"
+           . "Esperado em um destes caminhos:\n  vertex/tcpdf/tcpdf.php\n  oficios/tcpdf/tcpdf.php\n";
+        return;
+    }
+    require_once $tc;
+
+    $zone = (int) $meta['fuso']; $south = (bool) $meta['sul']; $n = count($v);
+    $mc = abs($zone * 6 - 183);
+    $areaUtm = abs(evAreaSig($v));
+    $kMedio  = evFatorEscala(array_sum(array_column($v, 'e')) / $n);
+    $per = 0.0; for ($i = 0; $i < $n; $i++) $per += evDist($v[$i], $v[($i + 1) % $n]);
+
+    $geo = [];
+    foreach ($v as $p) $geo[] = evUtmToGeo((float) $p['e'], (float) $p['n'], $zone, $south);
+
+    if (!class_exists('EvMemorialPDF')) {
+        class EvMemorialPDF extends TCPDF {
+            public $tituloDoc = 'MEMORIAL DESCRITIVO';
+            public $subDoc = '';
+            public function Header() {
+                $timbrado = __DIR__ . '/../style/img/timbrado.png';
+                if (@file_exists($timbrado)) {
+                    $pw = $this->getPageWidth(); $ph = $this->getPageHeight();
+                    $oL = $this->lMargin; $oR = $this->rMargin; $oT = $this->tMargin;
+                    $oB = $this->bMargin; $oA = $this->AutoPageBreak;
+                    $this->lMargin = 0; $this->rMargin = 0; $this->tMargin = 0;
+                    $this->SetAutoPageBreak(false, 0);
+                    @$this->Image($timbrado, 0, 0, $pw, $ph, '', '', '', false, 300, '', false, false, 0, false, false, false);
+                    $this->lMargin = $oL; $this->rMargin = $oR; $this->tMargin = $oT;
+                    $this->SetAutoPageBreak($oA, $oB);
+                } else {
+                    $this->SetFillColor(13, 148, 136);
+                    $this->Rect(0, 0, $this->getPageWidth(), 3, 'F');
+                }
+                $this->SetY($this->tMargin - 9);
+                $this->SetFont('helvetica', 'B', 8);
+                $this->SetTextColor(90, 100, 115);
+                $this->Cell(0, 5, $this->tituloDoc . ($this->subDoc !== '' ? '  ·  ' . $this->subDoc : ''), 0, 0, 'L');
+                $this->SetTextColor(0, 0, 0);
+            }
+            public function Footer() {
+                $this->SetY(-13);
+                $this->SetFont('helvetica', '', 7);
+                $this->SetTextColor(130, 138, 150);
+                $this->Cell(0, 5, 'Emitido em ' . date('d/m/Y H:i') . ' — Atlas Vertex', 0, 0, 'L');
+                $this->Cell(0, 5, 'Página ' . $this->getAliasNumPage() . ' de ' . $this->getAliasNbPages(), 0, 0, 'R');
+                $this->SetTextColor(0, 0, 0);
+            }
+        }
+    }
+
+    $temTimbrado = @file_exists(__DIR__ . '/../style/img/timbrado.png');
+
+    $pdf = new EvMemorialPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+    $pdf->subDoc = $meta['titulo'];
+    $pdf->SetCreator('Atlas Vertex'); $pdf->SetAuthor('Atlas Vertex');
+    $pdf->SetTitle('Memorial Descritivo — ' . $meta['titulo']);
+    $pdf->setPrintHeader(true); $pdf->setPrintFooter(true);
+    $pdf->SetMargins(18, $temTimbrado ? 34 : 22, 18);
+    $pdf->SetAutoPageBreak(true, $temTimbrado ? 28 : 20);
+    $pdf->AddPage();
+
+    $L = $pdf->getPageWidth() - 36;   // largura útil
+
+    /* ---------- título ---------- */
+    $pdf->SetFont('helvetica', 'B', 15);
+    $pdf->Cell(0, 8, 'MEMORIAL DESCRITIVO', 0, 1, 'C');
+    $pdf->SetFont('helvetica', '', 9.5);
+    $pdf->SetTextColor(90, 100, 115);
+    $pdf->Cell(0, 5, 'Imóvel georreferenciado ao Sistema Geodésico Brasileiro', 0, 1, 'C');
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->Ln(3.5);
+
+    /* ---------- quadro de identificação ---------- */
+    $linhas = [
+        ['Imóvel', $meta['titulo']],
+        ['Matrícula', $meta['matricula'] !== '' ? $meta['matricula'] : '—'],
+        ['Proprietário', $meta['proprietario'] !== '' ? $meta['proprietario'] : '—'],
+        ['Município / UF', trim($meta['municipio'] . ' / ' . $meta['uf'], ' /') ?: '—'],
+        ['Comarca', $meta['comarca'] !== '' ? $meta['comarca'] : '—'],
+        ['Área', evBr($areaUtm, 2) . ' m²  (' . evBr($areaUtm / 10000, 4) . ' ha)'],
+        ['Perímetro', evBr($per, 2) . ' m'],
+        ['Nº de vértices', (string) $n],
+        ['Sistema geodésico', 'SIRGAS 2000'],
+        ['Projeção', 'UTM — fuso ' . $zone . ($south ? ' Sul' : ' Norte') . ', meridiano central ' . $mc . '° W Gr.'],
+        ['Fator de escala (K)', number_format($kMedio, 8, ',', '')],
+    ];
+    $pdf->SetFont('helvetica', '', 9);
+    $wRot = 42;
+    foreach ($linhas as $i => $ln) {
+        $pdf->SetFillColor($i % 2 ? 248 : 242, $i % 2 ? 250 : 245, $i % 2 ? 252 : 249);
+        $pdf->SetFont('helvetica', 'B', 8.5);
+        $pdf->Cell($wRot, 6, ' ' . $ln[0], 0, 0, 'L', true);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->Cell($L - $wRot, 6, ' ' . $ln[1], 0, 1, 'L', true);
+    }
+    $pdf->Ln(5);
+
+    /* ---------- descrição em texto corrido ---------- */
+    $pdf->SetFont('helvetica', 'B', 10.5);
+    $pdf->Cell(0, 6, 'DESCRIÇÃO DO PERÍMETRO', 0, 1, 'L');
+    $pdf->SetDrawColor(13, 148, 136); $pdf->SetLineWidth(0.5);
+    $pdf->Line(18, $pdf->GetY(), 18 + 32, $pdf->GetY());
+    $pdf->SetDrawColor(0, 0, 0); $pdf->SetLineWidth(0.2);
+    $pdf->Ln(2.5);
+
+    $pdf->SetFont('helvetica', '', 9.6);
+    $pdf->writeHTMLCell(0, 0, '', '', '<div style="text-align:justify;line-height:1.55">'
+        . evDescricaoCorrida($v, $meta) . '</div>', 0, 1, false, true, 'J');
+    $pdf->Ln(2.5);
+
+    $sentido = evAreaSig($v) < 0 ? 'horário' : 'anti-horário';
+    $fecho = 'O perímetro acima descrito foi percorrido no sentido ' . $sentido
+        . ', totalizando ' . evBr($per, 2) . ' m, e encerra uma área de ' . evBr($areaUtm, 2)
+        . ' m² (' . evBr($areaUtm / 10000, 4) . ' ha). Todas as coordenadas aqui descritas estão '
+        . 'georreferenciadas ao Sistema Geodésico Brasileiro, a partir do sistema de referência SIRGAS 2000, '
+        . 'e encontram-se representadas no Sistema UTM, referenciadas ao meridiano central ' . $mc
+        . '° W Gr., fuso ' . ($south ? '-' : '') . $zone . '. Todos os azimutes, distâncias, área e perímetro '
+        . 'foram calculados no plano de projeção UTM, adotando-se o fator de escala K = '
+        . number_format($kMedio, 8, ',', '') . '.';
+    $pdf->writeHTMLCell(0, 0, '', '', '<div style="text-align:justify;line-height:1.5">' . $fecho . '</div>', 0, 1, false, true, 'J');
+
+    /* ---------- assinatura ---------- */
+    if (trim((string) $meta['responsavel']) !== '') {
+        $pdf->Ln(14);
+        $cxA = $pdf->getPageWidth() / 2;
+        $pdf->SetDrawColor(60, 72, 90); $pdf->SetLineWidth(0.3);
+        $pdf->Line($cxA - 38, $pdf->GetY(), $cxA + 38, $pdf->GetY());
+        $pdf->Ln(1);
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->Cell(0, 5, $meta['responsavel'], 0, 1, 'C');
+        if (trim((string) $meta['registro']) !== '') {
+            $pdf->SetFont('helvetica', '', 8.5);
+            $pdf->Cell(0, 4.5, $meta['registro'], 0, 1, 'C');
+        }
+        if (trim((string) $meta['art']) !== '') {
+            $pdf->SetFont('helvetica', '', 8.5);
+            $pdf->Cell(0, 4.5, 'ART/TRT nº ' . $meta['art'], 0, 1, 'C');
+        }
+        $pdf->SetFont('helvetica', '', 8.5);
+        $pdf->Cell(0, 5, (trim((string) $meta['municipio']) !== '' ? $meta['municipio'] . ', ' : '')
+                        . strftime_br(), 0, 1, 'C');
+    }
+
+    /* ---------- tabelas ---------- */
+    $pdf->AddPage();
+    $pdf->SetFont('helvetica', 'B', 10.5);
+    $pdf->Cell(0, 6, 'TABELA DE VÉRTICES', 0, 1, 'L');
+    $pdf->SetDrawColor(13, 148, 136); $pdf->SetLineWidth(0.5);
+    $pdf->Line(18, $pdf->GetY(), 18 + 28, $pdf->GetY());
+    $pdf->SetDrawColor(0, 0, 0); $pdf->SetLineWidth(0.2);
+    $pdf->Ln(2.5);
+
+    $wv = [22, 34, 30, 43, 43];
+    $wv[0] = $L - array_sum(array_slice($wv, 1));
+    $pdf->SetFont('helvetica', 'B', 7.6);
+    $pdf->SetFillColor(232, 238, 245); $pdf->SetTextColor(60, 72, 90);
+    foreach (['VÉRTICE', 'NORTE (m)', 'ESTE (m)', 'LATITUDE', 'LONGITUDE'] as $i => $h)
+        $pdf->Cell($wv[$i], 6, $h, 1, $i === 4 ? 1 : 0, 'C', true);
+    $pdf->SetTextColor(0, 0, 0); $pdf->SetFont('helvetica', '', 7.8);
+    foreach ($v as $i => $p) {
+        $fill = $i % 2 === 1;
+        $pdf->SetFillColor(249, 251, 253);
+        $pdf->Cell($wv[0], 5.4, $p['id'], 1, 0, 'C', $fill);
+        $pdf->Cell($wv[1], 5.4, evBr((float) $p['n'], 3), 1, 0, 'R', $fill);
+        $pdf->Cell($wv[2], 5.4, evBr((float) $p['e'], 3), 1, 0, 'R', $fill);
+        $pdf->Cell($wv[3], 5.4, evFmtDMS($geo[$i]['lat'], true), 1, 0, 'C', $fill);
+        $pdf->Cell($wv[4], 5.4, evFmtDMS($geo[$i]['lon'], false), 1, 1, 'C', $fill);
+    }
+
+    $pdf->Ln(6);
+    $pdf->SetFont('helvetica', 'B', 10.5);
+    $pdf->Cell(0, 6, 'TABELA DE LADOS E CONFRONTAÇÕES', 0, 1, 'L');
+    $pdf->SetDrawColor(13, 148, 136); $pdf->SetLineWidth(0.5);
+    $pdf->Line(18, $pdf->GetY(), 18 + 48, $pdf->GetY());
+    $pdf->SetDrawColor(0, 0, 0); $pdf->SetLineWidth(0.2);
+    $pdf->Ln(2.5);
+
+    $wl = [30, 34, 26, 0]; $wl[3] = $L - array_sum(array_slice($wl, 0, 3));
+    $pdf->SetFont('helvetica', 'B', 7.6);
+    $pdf->SetFillColor(232, 238, 245); $pdf->SetTextColor(60, 72, 90);
+    foreach (['LADO', 'AZIMUTE PLANO', 'DISTÂNCIA (m)', 'CONFRONTANTE'] as $i => $h)
+        $pdf->Cell($wl[$i], 6, $h, 1, $i === 3 ? 1 : 0, 'C', true);
+    $pdf->SetTextColor(0, 0, 0); $pdf->SetFont('helvetica', '', 7.8);
+    for ($i = 0; $i < $n; $i++) {
+        $j = ($i + 1) % $n; $fill = $i % 2 === 1;
+        $pdf->SetFillColor(249, 251, 253);
+        $pdf->Cell($wl[0], 5.4, $v[$i]['id'] . ' — ' . $v[$j]['id'], 1, 0, 'C', $fill);
+        $pdf->Cell($wl[1], 5.4, evFmtAz(evAzimute($v[$i], $v[$j])), 1, 0, 'C', $fill);
+        $pdf->Cell($wl[2], 5.4, evBr(evDist($v[$i], $v[$j]), 2), 1, 0, 'R', $fill);
+        $conf = trim((string) ($v[$i]['conf'] ?? '')); if ($conf === '') $conf = '—';
+        $pdf->Cell($wl[3], 5.4, ' ' . (mb_strlen($conf) > 58 ? mb_substr($conf, 0, 56) . '…' : $conf), 1, 1, 'L', $fill);
+    }
+
+    /* ---------- planta + situação ---------- */
+    $pdf->AddPage();
+    $pdf->SetFont('helvetica', 'B', 10.5);
+    $pdf->Cell(0, 6, 'PLANTA DO IMÓVEL', 0, 1, 'L');
+    $pdf->SetDrawColor(13, 148, 136); $pdf->SetLineWidth(0.5);
+    $pdf->Line(18, $pdf->GetY(), 18 + 26, $pdf->GetY());
+    $pdf->SetDrawColor(0, 0, 0); $pdf->SetLineWidth(0.2);
+    $pdf->Ln(2.5);
+
+    $yDes = $pdf->GetY();
+    $hDes = 118;
+    $escala = evDesenharPlanta($pdf, $v, 18, $yDes, $L, $hDes);
+    $pdf->SetY($yDes + $hDes + 2);
+    $pdf->SetFont('helvetica', '', 7.5); $pdf->SetTextColor(110, 120, 135);
+    $pdf->Cell(0, 4, 'Desenho em escala 1:' . $escala . ' — projeção UTM, fuso ' . $zone
+        . ($south ? ' Sul' : ' Norte') . ', SIRGAS 2000. Distâncias em metros no plano de projeção.', 0, 1, 'L');
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->Ln(3);
+
+    /* imagem de satélite — página própria, para caber inteira e sair grande */
+    $pdf->AddPage();
+    $pdf->SetFont('helvetica', 'B', 10.5);
+    $pdf->Cell(0, 6, 'PLANTA DE SITUAÇÃO', 0, 1, 'L');
+    $pdf->SetDrawColor(13, 148, 136); $pdf->SetLineWidth(0.5);
+    $pdf->Line(18, $pdf->GetY(), 18 + 30, $pdf->GetY());
+    $pdf->SetDrawColor(0, 0, 0); $pdf->SetLineWidth(0.2);
+    $pdf->Ln(2.5);
+
+    $pts = [];
+    foreach ($geo as $g) $pts[] = [$g['lat'], $g['lon']];
+    $zoomPedido = (int) ($meta['zoom'] ?? 0);
+    $latsP = array_column($pts, 0); $lonsP = array_column($pts, 1);
+    $zUsado = $zoomPedido > 0 ? $zoomPedido
+            : evZoomBBox(min($latsP), max($latsP), min($lonsP), max($lonsP), 640, 640);
+    $url = evStaticMapUrl($pts, evStaticKey(), $zUsado, 640, 640, 'hybrid');
+    $err = '';
+    $img = $url !== '' ? evFetchImg($url, $err) : false;
+
+    if ($img !== false && $img !== '') {
+        $tmp = tempnam(sys_get_temp_dir(), 'evmap') . '.png';
+        @file_put_contents($tmp, $img);
+
+        // dimensiona pelo espaço que sobra na página, sem estourar a quebra automática
+        $yImg  = $pdf->GetY();
+        $hDisp = $pdf->getPageHeight() - $pdf->getBreakMargin() - $yImg - 9;
+        $wImg  = $L;
+        $hImg  = $wImg;                       // imagem quadrada (640x640)
+        if ($hImg > $hDisp) { $hImg = $hDisp; $wImg = $hImg; }
+        $xImg  = 18 + ($L - $wImg) / 2;
+
+        $pdf->SetAutoPageBreak(false);
+        @$pdf->Image($tmp, $xImg, $yImg, $wImg, $hImg, 'PNG', '', '', false, 300, '', false, false, 1);
+        $pdf->SetAutoPageBreak(true, $temTimbrado ? 28 : 20);
+        @unlink($tmp);
+
+        $pdf->SetDrawColor(190, 198, 210); $pdf->SetLineWidth(0.2);
+        $pdf->Rect($xImg, $yImg, $wImg, $hImg);
+        $pdf->SetDrawColor(0, 0, 0);
+
+        $pdf->SetY($yImg + $hImg + 1.5);
+        $pdf->SetFont('helvetica', '', 7.5); $pdf->SetTextColor(110, 120, 135);
+        $pdf->Cell(0, 4, 'Imagem de satélite com o perímetro do imóvel sobreposto (zoom ' . $zUsado
+            . '). Fonte: Google Maps.', 0, 1, 'L');
+        $pdf->SetTextColor(0, 0, 0);
+    } else {
+        $pdf->SetFont('helvetica', '', 8.5); $pdf->SetTextColor(150, 60, 55);
+        $pdf->MultiCell(0, 5, 'Não foi possível obter a imagem de satélite'
+            . ($err !== '' ? ' (' . $err . ')' : '') . '. Verifique a GMAPS_STATIC_KEY no index.php — ela precisa '
+            . 'ter a Maps Static API habilitada e NÃO pode ter restrição por referrer, pois é usada pelo servidor.',
+            0, 'L');
+        $pdf->SetTextColor(0, 0, 0);
+    }
+
+    $base = evSlug($meta['matricula'] !== '' ? ('matricula_' . $meta['matricula']) : $meta['titulo']);
+    $pdf->Output('memorial_' . $base . '.pdf', 'I');
+}
+
+/** Data por extenso em português (sem depender de locale do sistema). */
+function strftime_br(): string
+{
+    $meses = ['janeiro','fevereiro','março','abril','maio','junho',
+              'julho','agosto','setembro','outubro','novembro','dezembro'];
+    return date('j') . ' de ' . $meses[(int) date('n') - 1] . ' de ' . date('Y');
+}
+
 /* ===========================================================================
  * 4. ENDPOINTS (POST ev_acao=...)
  * ======================================================================== */
@@ -474,12 +1047,31 @@ if (isset($_POST['ev_acao'])) {
             'proprietario' => trim((string) ($m['proprietario'] ?? '')),
             'municipio'    => trim((string) ($m['municipio'] ?? '')),
             'uf'           => trim((string) ($m['uf'] ?? '')),
+            'comarca'      => trim((string) ($m['comarca'] ?? '')),
+            'responsavel'  => trim((string) ($m['responsavel'] ?? '')),
+            'registro'     => trim((string) ($m['registro'] ?? '')),
+            'art'          => trim((string) ($m['art'] ?? '')),
+            'zoom'         => max(0, min(21, (int) ($m['zoom'] ?? 0))),
             'fuso'         => max(1, min(60, (int) ($m['fuso'] ?? 23))),
             'sul'          => (bool) ($m['sul'] ?? true),
         ];
+
+        // Sentido de percurso: o registro costuma descrever no sentido horário.
+        // Ao inverter, o confrontante precisa acompanhar o LADO, não o vértice:
+        // conf[i] descreve o lado i->i+1, que após a inversão vira outro índice.
+        if (!empty($m['inverter']) && count($v) >= 3) {
+            $orig = $v; $nn = count($orig); $rev = array_reverse($orig);
+            for ($k = 0; $k < $nn; $k++) {
+                $rev[$k]['conf'] = $orig[(($nn - 2 - $k) % $nn + $nn) % $nn]['conf'];
+            }
+            $v = $rev;
+        }
         $base = evSlug($meta['matricula'] !== '' ? ('matricula_' . $meta['matricula']) : $meta['titulo']);
 
         switch ($_POST['formato'] ?? 'kml') {
+            case 'pdf':
+                evGerarMemorialPDF($v, $meta);
+                break;
             case 'memorial':
                 header('Content-Type: text/plain; charset=UTF-8');
                 header('Content-Disposition: attachment; filename="memorial_' . $base . '.txt"');
@@ -957,8 +1549,11 @@ $EV_BOOT = [
           A gravação usa a ação <code>atualizar_geometria</code> do Vertex: recalcula área, perímetro, centro e
           coordenadas UTM, e reavalia as inconsistências do imóvel.
         </p>
+        <button id="btPDF" style="width:100%;margin-bottom:7px;padding:9px;font-weight:600">
+          📄 Memorial descritivo em PDF…
+        </button>
         <div class="row2" style="gap:7px">
-          <button id="btKML">KML</button><button id="btMem">Memorial</button>
+          <button id="btKML">KML</button><button id="btMem">Memorial (.txt)</button>
         </div>
         <div class="row2" style="gap:7px;margin-top:7px">
           <button id="btCSV">CSV</button><button id="btGeo">GeoJSON</button>
@@ -1007,6 +1602,47 @@ $EV_BOOT = [
   <footer>
     <button onclick="fecharModal(document.getElementById('dlgSalvar'))">Cancelar</button>
     <button class="pri" id="btConfirmarSalvar">Gravar</button>
+  </footer>
+</dialog>
+
+<dialog id="dlgPDF">
+  <h3>Memorial descritivo em PDF</h3>
+  <div class="dbody">
+    <p style="margin:0 0 13px;font-size:12.5px;color:var(--muted)">
+      Gera o documento completo: identificação, descrição do perímetro em texto corrido,
+      tabela de vértices, tabela de lados e confrontações, planta do imóvel e planta de situação
+      sobre imagem de satélite.
+    </p>
+    <div class="row2">
+      <div class="grp"><label>Comarca</label><input id="p_comarca"></div>
+      <div class="grp"><label>Sentido da descrição</label>
+        <select id="p_sentido">
+          <option value="0">Manter como está</option>
+          <option value="1">Inverter (usar o sentido oposto)</option>
+        </select>
+      </div>
+    </div>
+    <div class="grp"><label>Responsável técnico</label><input id="p_responsavel" placeholder="Nome completo"></div>
+    <div class="row2">
+      <div class="grp"><label>Registro profissional</label><input id="p_registro" placeholder="CREA / CFT / CRT nº"></div>
+      <div class="grp"><label>ART / TRT</label><input id="p_art" placeholder="número"></div>
+    </div>
+    <div class="grp">
+      <label>Zoom da imagem de satélite</label>
+      <select id="p_zoom">
+        <option value="0">Automático (enquadra o imóvel)</option>
+        <option value="21">21 — máximo</option>
+        <option value="20">20 — muito próximo</option>
+        <option value="19">19 — próximo</option>
+        <option value="18">18 — quadra</option>
+        <option value="17">17 — bairro</option>
+      </select>
+    </div>
+    <div id="pdfAviso" style="font-size:11.5px;color:var(--amber-text);min-height:16px"></div>
+  </div>
+  <footer>
+    <button onclick="fecharModal(document.getElementById('dlgPDF'))">Cancelar</button>
+    <button class="pri" id="btGerarPDF">Gerar PDF</button>
   </footer>
 </dialog>
 
@@ -1811,6 +2447,39 @@ function exportar(formato){
   $('expToken').value = BOOT.token||'';
   $('frmExp').submit();
 }
+$('btPDF').addEventListener('click', ()=>{
+  if(V.length<3){ toast('Carregue um imóvel primeiro.'); return; }
+  const semConf = V.filter(p=>!(p.conf||'').trim()).length;
+  $('pdfAviso').textContent = semConf
+    ? `${semConf} de ${V.length} lados estão sem confrontante. Preencha na aba “Vértices” para que a descrição fique completa.`
+    : '';
+  if(META.comarca) $('p_comarca').value = META.comarca;
+  abrirModal($('dlgPDF'));
+});
+$('btGerarPDF').addEventListener('click', ()=>{
+  META.comarca     = $('p_comarca').value.trim();
+  META.responsavel = $('p_responsavel').value.trim();
+  META.registro    = $('p_registro').value.trim();
+  META.art         = $('p_art').value.trim();
+  META.zoom        = parseInt($('p_zoom').value, 10) || 0;
+  META.inverter    = $('p_sentido').value === '1' ? 1 : 0;
+  try{
+    localStorage.setItem('evResp', JSON.stringify({
+      comarca:META.comarca, responsavel:META.responsavel, registro:META.registro, art:META.art
+    }));
+  }catch(e){}
+  fecharModal($('dlgPDF'));
+  exportar('pdf');
+});
+(function(){
+  try{
+    const d=JSON.parse(localStorage.getItem('evResp')||'{}');
+    if(d.comarca)     $('p_comarca').value     = d.comarca;
+    if(d.responsavel) $('p_responsavel').value = d.responsavel;
+    if(d.registro)    $('p_registro').value    = d.registro;
+    if(d.art)         $('p_art').value         = d.art;
+  }catch(e){}
+})();
 $('btKML').addEventListener('click', ()=>exportar('kml'));
 $('btMem').addEventListener('click', ()=>exportar('memorial'));
 $('btCSV').addEventListener('click', ()=>exportar('csv'));
