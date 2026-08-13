@@ -28,7 +28,10 @@ if (!headers_sent()) {
     header('Pragma: no-cache');
     header('Expires: 0');
     header('X-Robots-Tag: noindex, nofollow, noarchive');
-    header('Referrer-Policy: no-referrer');
+    // 'origin' envia SOMENTE esquema+host (https://servidor/) ao Google — nunca o
+    // caminho nem a query string, então o ?t=<token> não vaza. 'no-referrer' NÃO
+    // serve: chaves do Google Maps com restrição por referrer exigem o cabeçalho.
+    header('Referrer-Policy: origin');
 }
 
 require_once __DIR__ . '/session_check.php';
@@ -602,6 +605,7 @@ Não invente medições que não estejam nos dados. Se faltar informação para 
 
 $EV_BOOT = [
     'gmapsKey' => evGmapsKey(),
+    'gmapsMapId' => trim((string) ($evCfg['gmaps_map_id'] ?? '')),
     'idInicial' => (int) ($_GET['id'] ?? 0),
     'token' => $evToken !== '' ? (string) ($_GET['t'] ?? '') : '',
     'usuario' => (string) ($_SESSION['username'] ?? ''),
@@ -613,7 +617,7 @@ $EV_BOOT = [
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="origin">
 <title>Editor de Vértices — Atlas Vertex</title>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -821,9 +825,19 @@ $EV_BOOT = [
         <div id="ev-mapa"></div>
         <div id="apiBox" style="display:none">
           <div class="apiCard">
-            <h3>Mapa indisponível</h3>
+            <h3 id="apiTitulo">Mapa indisponível</h3>
             <p id="apiMsg">Não foi possível carregar o Google Maps com a chave configurada no
                <code>index.php</code> do Vertex.</p>
+            <div id="apiOrigemBox" style="display:none;margin:0 0 12px">
+              <label style="display:block;font-size:10.5px;color:var(--muted);font-weight:600;
+                            text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Origem desta página</label>
+              <div style="display:flex;gap:7px">
+                <code id="apiOrigem" class="mono" style="flex:1;background:var(--panel-2);padding:7px 9px;
+                      border-radius:var(--r-s);border:1px solid var(--line);font-size:12px;
+                      overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></code>
+                <button id="btCopiarOrigem">Copiar</button>
+              </div>
+            </div>
             <button id="btApiCroqui">Usar o croqui</button>
           </div>
         </div>
@@ -1294,13 +1308,18 @@ function elDist(txt){
 }
 
 function initMapa(){
-  AdvCls = (window.google && google.maps.marker && google.maps.marker.AdvancedMarkerElement) || null;
-  map = new google.maps.Map($('ev-mapa'), {
+  // AdvancedMarkerElement SÓ renderiza em mapa com Map ID. Sem Map ID configurado,
+  // usamos o google.maps.Marker clássico — que funciona em qualquer mapa.
+  AdvCls = (BOOT.gmapsMapId && window.google && google.maps.marker
+            && google.maps.marker.AdvancedMarkerElement) || null;
+  const opts = {
     center:{lat:-4.14, lng:-46.9}, zoom:19, mapTypeId:'hybrid', tilt:0,
     gestureHandling:'greedy', streetViewControl:false, rotateControl:false,
     scaleControl:true, maxZoom:22,
     mapTypeControlOptions:{mapTypeIds:['hybrid','satellite','roadmap','terrain']}
-  });
+  };
+  if(BOOT.gmapsMapId) opts.mapId = BOOT.gmapsMapId;
+  map = new google.maps.Map($('ev-mapa'), opts);
   poly = new google.maps.Polygon({map, paths:[], clickable:false, zIndex:2,
     strokeColor:'#1D4ED8', strokeOpacity:1, strokeWeight:2.5, fillColor:'#1D4ED8', fillOpacity:0.24});
   ghostLine = new google.maps.Polyline({map, path:[], clickable:false, zIndex:1,
@@ -1311,8 +1330,18 @@ function initMapa(){
 }
 window.initMapa = initMapa;
 window.gm_authFailure = function(){
-  mapaPronto=false; $('apiBox').style.display='flex';
-  $('apiMsg').textContent='A chave do Google Maps foi recusada (restrição de referrer, faturamento inativo ou API desabilitada). Confira GMAPS_KEY no index.php do Vertex.';
+  mapaPronto=false;
+  $('apiBox').style.display='flex';
+  $('apiTitulo').textContent='O Google recusou a chave do mapa';
+  $('apiMsg').innerHTML =
+      'A <code>GMAPS_KEY</code> do <code>index.php</code> foi rejeitada. As causas mais comuns:'
+    + '<ul style="margin:8px 0 0 16px;padding:0">'
+    + '<li><b>Restrição por referrer</b> — a origem abaixo precisa estar na lista de '
+    + 'referenciadores HTTP permitidos da chave, no Google Cloud Console.</li>'
+    + '<li>Faturamento inativo no projeto, ou <b>Maps JavaScript API</b> desabilitada.</li>'
+    + '</ul>';
+  $('apiOrigem').textContent = location.origin + '/*';
+  $('apiOrigemBox').style.display = 'block';
 };
 
 function reconstruirPinos(){
@@ -1871,6 +1900,10 @@ $('buscaImovel').addEventListener('input', e=>{
   buscaT=setTimeout(()=>abrirLista(e.target.value.trim()), 320);
 });
 $('btVoltar').addEventListener('click', ()=>{ location.href='index.php'; });
+$('btCopiarOrigem').addEventListener('click', ()=>{
+  navigator.clipboard.writeText($('apiOrigem').textContent||'')
+    .then(()=>toast('Origem copiada. Cole na lista de referenciadores HTTP da chave, no Google Cloud Console.', 6000));
+});
 $('btApiCroqui').addEventListener('click', ()=>{
   document.querySelector('#tabsView [data-view="vCroqui"]').click();
 });
