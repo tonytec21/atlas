@@ -1386,14 +1386,95 @@ function showAlert(message, type, reload = false) {
     });
 
 
+/* ------------------------------------------------------------------ *
+ * Documento do apresentante
+ *
+ * Diferente da tela de criação, aqui o campo NÃO é limpo quando o
+ * documento é inválido: numa edição, apagar o que o usuário digitou (ou
+ * o que já estava gravado) faz perder informação. Em vez disso o campo
+ * é destacado e a mensagem fica ao lado, para correção.
+ * ------------------------------------------------------------------ */
+function marcarDocumento(campo, valido, mensagem) {
+    var $c = $(campo);
+    var $aviso = $('#aviso_cpf_cliente');
+
+    if (!$aviso.length) {
+        $aviso = $('<small id="aviso_cpf_cliente" class="text-danger d-block mt-1"></small>');
+        $c.after($aviso);
+    }
+
+    if (valido) {
+        $c.removeClass('is-invalid');
+        $aviso.text('').hide();
+    } else {
+        $c.addClass('is-invalid');
+        $aviso.text(mensagem).show();
+    }
+}
+
+function documentoApresentanteValido() {
+    var d = ($('#cpf_cliente').val() || '').replace(/\D/g, '');
+    if (d.length === 0) return true;               // opcional
+    if (d.length === 11) return validarCPF(d);
+    if (d.length === 14) return validarCNPJ(d);
+    return false;
+}
+
+function validarCPF(cpf) {
+    cpf = String(cpf).replace(/[^\d]+/g, '');
+    if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+    var soma = 0, resto, i;
+    for (i = 1; i <= 9; i++) soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11) resto = 0;
+    if (resto !== parseInt(cpf.substring(9, 10))) return false;
+    soma = 0;
+    for (i = 1; i <= 10; i++) soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11) resto = 0;
+    return resto === parseInt(cpf.substring(10, 11));
+}
+
+function validarCNPJ(cnpj) {
+    cnpj = String(cnpj).replace(/[^\d]+/g, '');
+    if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false;
+    var tamanho = cnpj.length - 2;
+    var numeros = cnpj.substring(0, tamanho);
+    var digitos = cnpj.substring(tamanho);
+    var soma = 0, pos = tamanho - 7, i;
+    for (i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) pos = 9;
+    }
+    var resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+    if (resultado !== parseInt(digitos.charAt(0))) return false;
+    tamanho = tamanho + 1;
+    numeros = cnpj.substring(0, tamanho);
+    soma = 0;
+    pos = tamanho - 7;
+    for (i = tamanho; i >= 1; i--) {
+        soma += numeros.charAt(tamanho - i) * pos--;
+        if (pos < 2) pos = 9;
+    }
+    resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+    return resultado === parseInt(digitos.charAt(1));
+}
+
 $(document).ready(function() {
     // Máscaras e configurações iniciais
     $('#cpf_cliente').on('blur', function() {
         var cpfCnpj = $(this).val().replace(/\D/g, '');
+
         if (cpfCnpj.length === 11) {
             $(this).mask('000.000.000-00', {reverse: true});
+            marcarDocumento(this, validarCPF($(this).val()), 'CPF inválido — confira os números.');
         } else if (cpfCnpj.length === 14) {
             $(this).mask('00.000.000/0000-00', {reverse: true});
+            marcarDocumento(this, validarCNPJ($(this).val()), 'CNPJ inválido — confira os números.');
+        } else if (cpfCnpj.length > 0) {
+            marcarDocumento(this, false, 'O documento deve ter 11 dígitos (CPF) ou 14 (CNPJ).');
+        } else {
+            marcarDocumento(this, true, '');   // campo vazio é permitido
         }
     }).blur(); // Chamar a função quando o campo perde o foco
 
@@ -2121,6 +2202,13 @@ function salvarOS() {
         }
     }
 
+    // O documento inválido é barrado aqui e também no servidor.
+    if (!documentoApresentanteValido()) {
+        $('#cpf_cliente').trigger('blur').focus();
+        showAlert('Corrija o CPF/CNPJ do apresentante antes de salvar.', 'error');
+        return;
+    }
+
     var os_id = $('#os_id').val();
     var cliente = $('#cliente').val().replace(/["'“”‘’]/g, '');
     var cpf_cliente = $('#cpf_cliente').val();
@@ -2152,6 +2240,16 @@ function salvarOS() {
             console.log(response);
             if (response.error) {
                 showAlert(response.error, 'error');
+            } else if (response.aviso) {
+                // Documento antigo mantido: salvou, mas precisa de atenção.
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Salvo, mas confira o documento',
+                    text: response.aviso,
+                    confirmButtonText: 'Entendi'
+                }).then(function() {
+                    window.location.href = 'visualizar_os.php?id=' + os_id;
+                });
             } else {
                 showAlert('Ordem de Serviço atualizada com sucesso!', 'success');
                 setTimeout(function() {

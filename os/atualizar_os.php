@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/documento_validacao.php';
 $issCfg        = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);
 $issAtivo      = !empty($issCfg['ativo']);
 $issPercentual = isset($issCfg['percentual']) ? (float)$issCfg['percentual'] : 0;
@@ -9,7 +10,41 @@ $issPercentual = isset($issCfg['percentual']) ? (float)$issCfg['percentual'] : 0
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $os_id = $_POST['os_id'];
     $cliente = mb_strtoupper(trim($_POST['cliente']), 'UTF-8');
-    $cpf_cliente = $_POST['cpf_cliente'];
+
+    /* Documento do apresentante.
+       Um CPF errado gravado aqui só aparece lá na frente, como rejeição
+       E0206 na emissão da NFS-e — com a O.S. já liquidada e o cliente já
+       fora do balcão. Por isso a checagem é feita aqui, no servidor.
+
+       Exceção: se o valor veio inalterado de um registro antigo, ele passa
+       com aviso. Bloquear seria impedir a correção de qualquer outro campo
+       de O.S. já cadastradas com documento ruim. */
+    $docRes = doc_validar_apresentante($_POST['cpf_cliente'] ?? '');
+    $avisoDoc = '';
+
+    if (!$docRes['ok']) {
+        try {
+            $connChk = getDatabaseConnection();
+            $stChk = $connChk->prepare('SELECT cpf_cliente FROM ordens_de_servico WHERE id = :id');
+            $stChk->execute([':id' => $_POST['os_id']]);
+            $docAtual = (string) $stChk->fetchColumn();
+        } catch (Throwable $e) {
+            $docAtual = '';
+        }
+
+        $inalterado = (doc_apenas_digitos($docAtual) !== ''
+            && doc_apenas_digitos($docAtual) === doc_apenas_digitos($_POST['cpf_cliente'] ?? ''));
+
+        if ($inalterado) {
+            $avisoDoc = $docRes['erro'] . ' O documento foi mantido como estava, mas convém corrigi-lo '
+                      . 'antes de emitir a NFS-e.';
+        } else {
+            echo json_encode(['error' => $docRes['erro']]);
+            exit;
+        }
+    }
+
+    $cpf_cliente = $docRes['ok'] ? $docRes['valor'] : trim((string) ($_POST['cpf_cliente'] ?? ''));
     $total_os = str_replace(',', '.', $_POST['total_os']);
     /* Base de cálculo do NÍVEL DA O.S. — campo LEGADO.
        A base agora é informada POR ATO. O campo do topo virou somente leitura
@@ -169,7 +204,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Confirma a transação
         $conn->commit();
 
-        echo json_encode(['success' => true]);
+        echo json_encode(array_filter([
+            'success' => true,
+            'aviso'   => $avisoDoc !== '' ? $avisoDoc : null,
+        ], static fn($v) => $v !== null));
     } catch (PDOException $e) {
         // Desfaz a transação em caso de erro
         $conn->rollBack();

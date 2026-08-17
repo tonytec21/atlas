@@ -1,6 +1,14 @@
 <?php
 include(__DIR__ . '/session_check.php');
 checkSession();
+
+/* Versão anterior de atualizar_os.php, mantida apenas para referência.
+   Continuava acessível por URL e gravava o documento do apresentante sem
+   validação — o que anularia a checagem feita na versão atual. */
+http_response_code(410);
+echo json_encode(['error' => 'Esta rota foi desativada. Use atualizar_os.php.']);
+exit;
+
 include(__DIR__ . '/db_connection.php');
 $issCfg        = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);
 $issAtivo      = !empty($issCfg['ativo']);

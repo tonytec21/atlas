@@ -3,13 +3,21 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 require_once __DIR__ . '/base_calculo_lib.php';
+require_once __DIR__ . '/documento_validacao.php';
 date_default_timezone_set('America/Sao_Paulo');
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $cliente_raw   = $_POST['cliente'] ?? '';
     $cliente_sanit = preg_replace('/["\'“”‘’]/u', '', $cliente_raw);
     $cliente       = mb_strtoupper(trim($cliente_sanit), 'UTF-8');
-    $cpf_cliente = $_POST['cpf_cliente'];
+    /* A tela de criação já valida no navegador, mas isso não protege o
+       banco: a validação de front-end depende do navegador do usuário. */
+    $docRes = doc_validar_apresentante($_POST['cpf_cliente'] ?? '');
+    if (!$docRes['ok']) {
+        echo json_encode(['error' => $docRes['erro']]);
+        exit;
+    }
+    $cpf_cliente = $docRes['valor'];
     $total_os = str_replace(',', '.', $_POST['total_os']);
     $base_calculo = isset($_POST['base_calculo']) && $_POST['base_calculo'] !== '' ? str_replace(',', '.', $_POST['base_calculo']) : 0;
     $itens = $_POST['itens'];
