@@ -47,7 +47,13 @@ try {
                 AND n.ambiente = :amb
                 AND n.id_dps IS NOT NULL AND n.id_dps <> ''
                 AND (n.chave_acesso IS NULL OR n.chave_acesso = '')
+                AND n.sinc_verificada_em IS NULL
                 AND (n.mensagem IS NULL OR n.mensagem NOT REGEXP 'E[0-9]{3,4}')
+                AND NOT EXISTS (
+                    SELECT 1 FROM nfse_notas v
+                     WHERE v.ordem_servico_id = n.ordem_servico_id
+                       AND v.ambiente = n.ambiente
+                       AND v.status = 'autorizada')
               ORDER BY
                 CASE WHEN n.http_status >= 200 AND n.http_status < 300 THEN 0 ELSE 1 END,
                 n.id DESC
@@ -91,6 +97,12 @@ try {
         $achado = nfse_recuperar_por_dps($cfg, (string) $nota['id_dps'], 25);
 
         if (!$achado) {
+            /* Confirmado que esta DPS não gerou nota: marca para não voltar à
+               fila nas próximas rodadas. A rejeição continua rejeitada — o que
+               muda é só o fato de já ter sido conferida. */
+            $pdo->prepare('UPDATE nfse_notas SET sinc_verificada_em = NOW() WHERE id = :id')
+                ->execute([':id' => $notaId]);
+
             nfse_json([
                 'ok'       => false,
                 'sem_nota' => true,
@@ -108,6 +120,7 @@ try {
             "UPDATE nfse_notas
                 SET status = 'autorizada', chave_acesso = :c, numero_nfse = :n,
                     cod_verificacao = :cv, xml_nfse = :x,
+                    sinc_verificada_em = NOW(),
                     mensagem = 'Sincronizada: a NFS-e já existia no Ambiente Nacional.'
               WHERE id = :id"
         )->execute([

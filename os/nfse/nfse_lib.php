@@ -354,6 +354,19 @@ function nfse_migrar(?PDO $pdo = null): void
         }
     }
 
+    // Marca a data em que a DPS já foi conferida na SEFIN e não gerou nota.
+    // Sem isso a fila de sincronização nunca esvazia: as rejeições genuínas
+    // seriam reconsultadas a cada rodada, para sempre.
+    $temVerif = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'nfse_notas'
+            AND COLUMN_NAME = 'sinc_verificada_em'"
+    )->fetchColumn();
+    if ($temVerif === 0) {
+        $pdo->exec("ALTER TABLE nfse_notas ADD COLUMN sinc_verificada_em DATETIME NULL");
+    }
+
     // Permite emitir sem identificar o tomador (facultativo em 2026).
     $temOmitir = (int) $pdo->query(
         "SELECT COUNT(*) FROM information_schema.COLUMNS

@@ -220,15 +220,28 @@ $totalReemitir = nfse_reemissao_total($ambAtual);
 /* Rejeitadas que podem ter gerado NFS-e no Ambiente Nacional mesmo assim —
    caso típico de resposta de sucesso interpretada como falha. Ficam de fora
    as rejeições com código catalogado, que não geraram nota. */
+/* Duas exclusões importam aqui, e a falta delas era o que fazia o botão
+   anunciar 300 registros quando não havia nada de fato a sincronizar:
+
+   1. rejeições de O.S. que JÁ TÊM nota autorizada. A tentativa falhou, a
+      seguinte deu certo — não há nada para recuperar;
+   2. rejeições já conferidas numa rodada anterior (`sinc_verificada_em`).
+      Sem essa marca, as rejeições genuínas voltavam à fila para sempre. */
 $totalSincronizar = 0;
 try {
     $stSinc = $pdo->prepare(
-        "SELECT COUNT(*) FROM nfse_notas
-          WHERE status = 'rejeitada'
-            AND ambiente = :amb
-            AND id_dps IS NOT NULL AND id_dps <> ''
-            AND (chave_acesso IS NULL OR chave_acesso = '')
-            AND (mensagem IS NULL OR mensagem NOT REGEXP 'E[0-9]{3,4}')"
+        "SELECT COUNT(*) FROM nfse_notas n
+          WHERE n.status = 'rejeitada'
+            AND n.ambiente = :amb
+            AND n.id_dps IS NOT NULL AND n.id_dps <> ''
+            AND (n.chave_acesso IS NULL OR n.chave_acesso = '')
+            AND n.sinc_verificada_em IS NULL
+            AND (n.mensagem IS NULL OR n.mensagem NOT REGEXP 'E[0-9]{3,4}')
+            AND NOT EXISTS (
+                SELECT 1 FROM nfse_notas v
+                 WHERE v.ordem_servico_id = n.ordem_servico_id
+                   AND v.ambiente = n.ambiente
+                   AND v.status = 'autorizada')"
     );
     $stSinc->execute([':amb' => $ambAtual]);
     $totalSincronizar = (int) $stSinc->fetchColumn();
@@ -302,6 +315,27 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
         .mais-linha .limpar{color:#b91c1c}
         .resultado-info{font-size:.82rem;color:#475569}
         .onde{display:inline-block;background:#eff6ff;color:#1e40af;border-radius:4px;padding:1px 8px;margin-left:6px}
+        /* Barra de ações do topo.
+           Estilo próprio, sem depender das classes do tema: com .btn/.btn-info
+           o rótulo quebrava em três linhas e o ícone escapava do botão. */
+        .acoes-topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .btn-topo{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+                  border:1px solid transparent;border-radius:6px;padding:7px 14px;
+                  font-size:.82rem;font-weight:600;line-height:1.2;cursor:pointer;
+                  text-decoration:none;transition:background .15s,border-color .15s}
+        .btn-topo i{font-size:.9rem;line-height:1}
+        .btn-topo span{line-height:1.2}
+        .btn-topo:hover{text-decoration:none}
+        .b-sinc{background:#0e7490;color:#fff}
+        .b-sinc:hover{background:#155e75;color:#fff}
+        .b-reem{background:#d97706;color:#fff}
+        .b-reem:hover{background:#b45309;color:#fff}
+        .b-cfg{background:#fff;color:#475569;border-color:#cbd5e1}
+        .b-cfg:hover{background:#f1f5f9;color:#334155}
+        @media (max-width:575px){
+            .acoes-topo{width:100%;margin-top:10px}
+            .btn-topo{flex:1 1 auto;justify-content:center}
+        }
         .tag-reemitida{display:inline-block;background:#e0f2fe;color:#075985;border-radius:999px;
                        padding:1px 8px;font-size:.68rem;font-weight:700;margin-top:3px}
         #lotebox{text-align:left;font-size:.82rem;max-height:230px;overflow:auto;border:1px solid #e2e8f0;
@@ -318,19 +352,23 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
   <div class="container">
     <div class="d-flex justify-content-between align-items-center flex-wrap">
       <h3 class="m-0">NFS-e emitidas</h3>
-      <div>
+      <div class="acoes-topo">
         <?php if ($totalSincronizar > 0): ?>
-          <button class="btn btn-info btn-sm" onclick="sincronizarTodas()"
+          <button type="button" class="btn-topo b-sinc" onclick="sincronizarTodas()"
                   title="Procura no Ambiente Nacional as NFS-e que já existem lá e corrige o registro local. Nada é emitido.">
-            <i class="fa fa-cloud-download"></i> Sincronizar rejeitadas (<?= (int) $totalSincronizar ?>)
+            <i class="fa fa-cloud-download"></i>
+            <span>Sincronizar rejeitadas (<?= (int) $totalSincronizar ?>)</span>
           </button>
         <?php endif; ?>
         <?php if ($totalReemitir > 0): ?>
-          <button class="btn btn-warning btn-sm" onclick="reemitirTodas()">
-            <i class="fa fa-refresh"></i> Reemitir rejeitadas (<?= (int) $totalReemitir ?>)
+          <button type="button" class="btn-topo b-reem" onclick="reemitirTodas()">
+            <i class="fa fa-refresh"></i>
+            <span>Reemitir rejeitadas (<?= (int) $totalReemitir ?>)</span>
           </button>
         <?php endif; ?>
-        <a href="nfse_config.php" class="btn btn-outline-secondary btn-sm"><i class="fa fa-cog"></i> Configuração</a>
+        <a href="nfse_config.php" class="btn-topo b-cfg">
+          <i class="fa fa-cog"></i><span>Configuração</span>
+        </a>
       </div>
     </div>
     <hr>
