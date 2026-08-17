@@ -29,6 +29,10 @@ $fFuncion   = trim((string) ($_GET['func'] ?? ''));
 $fValorMin  = trim((string) ($_GET['vmin'] ?? ''));
 $fValorMax  = trim((string) ($_GET['vmax'] ?? ''));
 $fOrdem     = (string) ($_GET['ord'] ?? 'recentes');
+$fCampo     = (string) ($_GET['campo'] ?? 'auto');
+if (!in_array($fCampo, ['auto', 'os', 'dps', 'nfse', 'chave', 'tomador', 'doc'], true)) {
+    $fCampo = 'auto';
+}
 $porPagina  = (int) ($_GET['pp'] ?? 30);
 if (!in_array($porPagina, [30, 60, 100, 200], true)) { $porPagina = 30; }
 
@@ -38,6 +42,7 @@ $qsBase = array_filter([
     'amb' => $fAmbiente, 'func' => $fFuncion, 'vmin' => $fValorMin,
     'vmax' => $fValorMax, 'ord' => $fOrdem !== 'recentes' ? $fOrdem : '',
     'pp' => $porPagina !== 30 ? $porPagina : '',
+    'campo' => $fCampo !== 'auto' ? $fCampo : '',
 ], static fn($v) => $v !== '' && $v !== null);
 
 $where = [];
@@ -57,35 +62,94 @@ if ($status === 'reemitir') {
     $params[':ambf'] = $ambAtual;
 }
 if ($busca !== '') {
-    /* A busca aceita chave de acesso, nº da O.S., nº da DPS, nº da NFS-e,
-       nome do tomador e CPF/CNPJ (com ou sem pontuação). */
+    /* ------------------------------------------------------------------
+     * Onde procurar
+     *
+     * Procurar o termo em todos os campos ao mesmo tempo parece prestativo,
+     * mas atrapalha: a chave de acesso tem 50 dígitos, então um "1116"
+     * digitado para achar a O.S. 1116 casa com qualquer chave que contenha
+     * essa sequência em qualquer posição — e o resultado vira uma lista de
+     * notas sem relação com a busca.
+     *
+     * Duas mudanças resolvem:
+     *   1. o usuário pode dizer explicitamente em qual campo procurar;
+     *   2. no modo automático, o formato do termo decide onde faz sentido
+     *      procurar. Número curto é número de documento (O.S., DPS, NFS-e),
+     *      e nunca trecho de chave.
+     * ---------------------------------------------------------------- */
     $somenteDigitos = preg_replace('/\D/', '', $busca);
+    $ehNumero = ctype_digit($busca);
 
     /* A conexão usa prepares NATIVOS (ATTR_EMULATE_PREPARES = false). Nesse
        modo o mesmo placeholder não pode aparecer duas vezes na consulta — o
        driver conta os marcadores e recusa a execução com "Invalid parameter
        number". Por isso cada ocorrência recebe um nome próprio. */
-    $alt = [
-        'chave_acesso LIKE :q1',
-        'tomador_nome LIKE :q2',
-        'REPLACE(REPLACE(REPLACE(tomador_doc, ".", ""), "-", ""), "/", "") LIKE :qdig',
-    ];
-    $params[':q1']   = '%' . $busca . '%';
-    $params[':q2']   = '%' . $busca . '%';
-    $params[':qdig'] = '%' . ($somenteDigitos !== '' ? $somenteDigitos : '\x00') . '%';
+    $alt = [];
 
-    if (ctype_digit($busca)) {
-        $alt[] = 'ordem_servico_id = :qnum1';
-        $alt[] = 'numero_dps = :qnum2';
-        $alt[] = 'CAST(numero_nfse AS CHAR) = :qtxt';
-        $alt[] = 'id = :qnum3';
-        $params[':qnum1'] = (int) $busca;
-        $params[':qnum2'] = (int) $busca;
-        $params[':qnum3'] = (int) $busca;
-        $params[':qtxt']  = $busca;
+    switch ($fCampo) {
+        case 'os':
+            $alt[] = 'ordem_servico_id = :qnum1';
+            $params[':qnum1'] = (int) $somenteDigitos;
+            break;
+
+        case 'dps':
+            $alt[] = 'numero_dps = :qnum1';
+            $params[':qnum1'] = (int) $somenteDigitos;
+            break;
+
+        case 'nfse':
+            $alt[] = 'CAST(numero_nfse AS CHAR) = :qtxt';
+            $params[':qtxt'] = ltrim($somenteDigitos, '0') !== '' ? ltrim($somenteDigitos, '0') : $somenteDigitos;
+            break;
+
+        case 'chave':
+            $alt[] = 'REPLACE(chave_acesso, " ", "") LIKE :q1';
+            $params[':q1'] = '%' . $somenteDigitos . '%';
+            break;
+
+        case 'tomador':
+            $alt[] = 'tomador_nome LIKE :q1';
+            $params[':q1'] = '%' . $busca . '%';
+            break;
+
+        case 'doc':
+            $alt[] = 'REPLACE(REPLACE(REPLACE(tomador_doc, ".", ""), "-", ""), "/", "") LIKE :qdig';
+            $params[':qdig'] = '%' . ($somenteDigitos !== '' ? $somenteDigitos : '\x00') . '%';
+            break;
+
+        default: // automático
+            if ($ehNumero && strlen($busca) <= 9) {
+                /* Número curto: é documento, não chave. Comparação exata,
+                   sem LIKE — é isso que elimina o ruído. */
+                $alt[] = 'ordem_servico_id = :qnum1';
+                $alt[] = 'numero_dps = :qnum2';
+                $alt[] = 'CAST(numero_nfse AS CHAR) = :qtxt';
+                $params[':qnum1'] = (int) $busca;
+                $params[':qnum2'] = (int) $busca;
+                $params[':qtxt']  = ltrim($busca, '0') !== '' ? ltrim($busca, '0') : $busca;
+            } elseif ($ehNumero && strlen($busca) >= 10) {
+                /* Número longo: chave de acesso ou CPF/CNPJ. */
+                $alt[] = 'REPLACE(chave_acesso, " ", "") LIKE :q1';
+                $alt[] = 'REPLACE(REPLACE(REPLACE(tomador_doc, ".", ""), "-", ""), "/", "") LIKE :qdig';
+                $params[':q1']   = '%' . $busca . '%';
+                $params[':qdig'] = '%' . $busca . '%';
+            } else {
+                /* Tem letra ou pontuação: nome do tomador, ou documento
+                   digitado com máscara. */
+                $alt[] = 'tomador_nome LIKE :q1';
+                $params[':q1'] = '%' . $busca . '%';
+
+                if ($somenteDigitos !== '') {
+                    $alt[] = 'REPLACE(REPLACE(REPLACE(tomador_doc, ".", ""), "-", ""), "/", "") LIKE :qdig';
+                    $params[':qdig'] = '%' . $somenteDigitos . '%';
+                }
+            }
+            break;
     }
 
-    $where[] = '(' . implode(' OR ', $alt) . ')';
+    if ($alt) {
+        $where[] = '(' . implode(' OR ', $alt) . ')';
+    }
 }
 
 if ($fDe !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fDe)) {
@@ -237,6 +301,7 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
         .mais-linha a:hover{text-decoration:underline}
         .mais-linha .limpar{color:#b91c1c}
         .resultado-info{font-size:.82rem;color:#475569}
+        .onde{display:inline-block;background:#eff6ff;color:#1e40af;border-radius:4px;padding:1px 8px;margin-left:6px}
         .tag-reemitida{display:inline-block;background:#e0f2fe;color:#075985;border-radius:999px;
                        padding:1px 8px;font-size:.68rem;font-weight:700;margin-top:3px}
         #lotebox{text-align:left;font-size:.82rem;max-height:230px;overflow:auto;border:1px solid #e2e8f0;
@@ -300,13 +365,40 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
     </div>
 
     <form method="get" class="filtros mb-3">
+      <?php
+      $campos = [
+          'auto'    => 'Buscar em tudo',
+          'os'      => 'Nº da O.S.',
+          'dps'     => 'Nº da DPS',
+          'nfse'    => 'Nº da NFS-e',
+          'chave'   => 'Chave de acesso',
+          'tomador' => 'Nome do tomador',
+          'doc'     => 'CPF/CNPJ do tomador',
+      ];
+      $dicas = [
+          'auto'    => 'Chave, nº da O.S., nº da DPS, nº da NFS-e, nome ou CPF/CNPJ',
+          'os'      => 'Número da O.S. — ex.: 1116',
+          'dps'     => 'Número da DPS — ex.: 1739',
+          'nfse'    => 'Número da NFS-e — ex.: 1420',
+          'chave'   => 'Chave de acesso, inteira ou em parte',
+          'tomador' => 'Nome, ou parte dele',
+          'doc'     => 'CPF ou CNPJ, com ou sem pontuação',
+      ];
+      ?>
       <div class="form-row">
-        <div class="col-lg-5 col-md-12 mb-2">
+        <div class="col-lg-3 col-md-5 mb-2">
+          <select name="campo" class="form-control" onchange="this.form.q.focus()">
+            <?php foreach ($campos as $k => $rot): ?>
+              <option value="<?= $k ?>" <?= $fCampo === $k ? 'selected' : '' ?>><?= $rot ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-lg-4 col-md-7 mb-2">
           <input type="text" name="q" class="form-control"
-                 placeholder="Chave, nº da O.S., nº da DPS, nº da NFS-e, nome ou CPF/CNPJ do tomador"
+                 placeholder="<?= $esc($dicas[$fCampo] ?? $dicas['auto']) ?>"
                  value="<?= $esc($busca) ?>">
         </div>
-        <div class="col-lg-3 col-md-5 mb-2">
+        <div class="col-lg-2 col-md-5 mb-2">
           <select name="status" class="form-control">
             <option value="">Todos os status</option>
             <?php foreach ($mapa as $k => $rot): ?>
@@ -325,8 +417,8 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
             <option value="os"       <?= $fOrdem === 'os'       ? 'selected' : '' ?>>Nº da O.S.</option>
           </select>
         </div>
-        <div class="col-lg-2 col-md-3 mb-2">
-          <button class="btn btn-primary btn-block"><i class="fa fa-search"></i> Filtrar</button>
+        <div class="col-lg-1 col-md-3 mb-2">
+          <button class="btn btn-primary btn-block" title="Filtrar"><i class="fa fa-search"></i></button>
         </div>
       </div>
 
@@ -398,6 +490,28 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
       <?php if ($total > 0): ?>
         · serviço <?= $brl($somaFiltro['serv'] ?? 0) ?>
         · ISS <?= $brl($somaFiltro['iss'] ?? 0) ?>
+      <?php endif; ?>
+
+      <?php if ($busca !== ''):
+        /* Diz onde a busca foi feita. No modo automático o critério é
+           deduzido do formato do termo, e o usuário não tem como adivinhar
+           isso — então a tela conta, e oferece o caminho para restringir. */
+        $ondeBuscou = $campos[$fCampo] ?? '';
+        if ($fCampo === 'auto') {
+            $dig = preg_replace('/\D/', '', $busca);
+            if (ctype_digit($busca) && strlen($busca) <= 9) {
+                $ondeBuscou = 'nº da O.S., da DPS ou da NFS-e';
+            } elseif (ctype_digit($busca) && strlen($busca) >= 10) {
+                $ondeBuscou = 'chave de acesso ou CPF/CNPJ';
+            } else {
+                $ondeBuscou = 'nome' . ($dig !== '' ? ' ou CPF/CNPJ' : '') . ' do tomador';
+            }
+        }
+      ?>
+        <span class="onde">buscando por <b><?= $esc($busca) ?></b> em <?= $esc($ondeBuscou) ?></span>
+        <?php if ($fCampo === 'auto' && $total > 1): ?>
+          <span class="text-muted">— para restringir, escolha o campo ao lado da busca.</span>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
 
