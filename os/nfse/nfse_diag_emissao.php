@@ -358,7 +358,7 @@ if ($pfx !== null) {
         if ($chave) {
             $r = d_http('GET', $baseUrl . '/nfse/' . rawurlencode($chave), null, $pfx, $senhaCert);
 
-            if ($r['status'] === 200) {
+            if ($r['status'] >= 200 && $r['status'] < 300) {
                 $nivel = 'ok';
                 $resumo = 'A SEFIN respondeu <strong>200</strong> na consulta. TLS, certificado e serviço de '
                         . 'consulta estão de pé — o problema está no <em>conteúdo</em> do DPS enviado ou '
@@ -529,7 +529,8 @@ if ($enviar && $payloadB64 !== null && $montado !== null) {
 
         $decodificado = json_decode($r['body'], true);
 
-        if ($r['status'] === 200 && is_array($decodificado) && !empty($decodificado['nfseXmlGZipB64'])) {
+        if ($r['status'] >= 200 && $r['status'] < 300
+            && is_array($decodificado) && !empty($decodificado['nfseXmlGZipB64'])) {
             $nfseXml = gzdecode(base64_decode($decodificado['nfseXmlGZipB64']));
             $parser  = new \Nfse\Xml\NfseXmlParser;
             $nota    = $parser->parse($nfseXml);

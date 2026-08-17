@@ -243,9 +243,71 @@ function nfse_assinar_dps(array $cfg, array $montado): array
     $cert    = \Nfse\Signer\Certificate::fromContent($ctx->certificateContent, (string) $ctx->certificatePassword);
     $signer  = new \Nfse\Signer\XmlSigner($cert);
 
-    $xml = $signer->sign($builder->build($montado['dps']), 'infDPS');
+    // Ajustes de leiaute ANTES de assinar — depois da assinatura, qualquer
+    // alteração invalida o digest.
+    $bruto = nfse_ajustar_leiaute_dps($builder->build($montado['dps']), $cfg);
+
+    $xml = $signer->sign($bruto, 'infDPS');
 
     return ['xml' => $xml, 'payload' => base64_encode(gzencode($xml))];
+}
+
+/**
+ * Aplica ao XML do DPS o que o SDK embarcado não sabe gerar:
+ *
+ *  - o atributo `versao` do elemento DPS, hoje fixo em 1.00 no builder;
+ *  - o grupo IBSCBS, que o SDK só implementa com `indZFMALC` e que, na DPS,
+ *    precisa levar CST e cClassTrib (os valores e alíquotas são calculados
+ *    pelo Ambiente Nacional). Conforme a NT 004/005, o grupo é filho direto
+ *    de infDPS.
+ *
+ * Tudo controlado por configuração, para permitir testar em produção sem
+ * mexer em código. Sem configuração, o XML sai exatamente como antes.
+ */
+function nfse_ajustar_leiaute_dps(string $xml, array $cfg): string
+{
+    $versao  = trim((string) ($cfg['dps_versao'] ?? ''));
+    $enviar  = !empty($cfg['ibscbs_enviar']);
+
+    if ($versao === '' && !$enviar) {
+        return $xml;   // nada a fazer
+    }
+
+    $ns = 'http://www.sped.fazenda.gov.br/nfse';
+
+    $dom = new DOMDocument('1.0', 'UTF-8');
+    $dom->preserveWhiteSpace = true;
+    if (!@$dom->loadXML($xml)) {
+        return $xml;   // não conseguiu ler: devolve intacto, nunca corrompe
+    }
+
+    $raiz = $dom->documentElement;
+    if (!$raiz || $raiz->localName !== 'DPS') {
+        return $xml;
+    }
+
+    if ($versao !== '' && $versao !== $raiz->getAttribute('versao')) {
+        $raiz->setAttribute('versao', $versao);
+    }
+
+    if ($enviar) {
+        $xp = new DOMXPath($dom);
+        $xp->registerNamespace('n', $ns);
+
+        $infs = $xp->query('//n:infDPS');
+        if ($infs->length > 0 && $xp->query('//n:infDPS/n:IBSCBS')->length === 0) {
+            $cst   = trim((string) ($cfg['ibscbs_cst'] ?? '')) ?: '000';
+            $class = trim((string) ($cfg['ibscbs_class'] ?? '')) ?: '000001';
+
+            $g = $dom->createElementNS($ns, 'IBSCBS');
+            $g->appendChild($dom->createElementNS($ns, 'CST', $cst));
+            $g->appendChild($dom->createElementNS($ns, 'cClassTrib', $class));
+
+            $infs->item(0)->appendChild($g);
+        }
+    }
+
+    return $dom->saveXML();
 }
 
 /**
@@ -263,12 +325,16 @@ function nfse_transmitir_dps(array $cfg, string $payloadB64, int $tentativas = N
     for ($i = 1; $i <= max(1, $tentativas); $i++) {
         $r = nfse_http_sefin('POST', 'nfse', ['dpsXmlGZipB64' => $payloadB64], $cfg);
 
-        if ($r['status'] === 200) {
+        /* Qualquer 2xx é sucesso. A recepção responde 201 Created quando
+           gera a NFS-e — exigir exatamente 200 fazia uma emissão bem
+           sucedida ser gravada como rejeitada, e a nota ficava órfã:
+           existindo na SEFIN e ausente aqui. */
+        if ($r['status'] >= 200 && $r['status'] < 300) {
             $dec = json_decode($r['body'], true);
 
             if (is_array($dec) && !empty($dec['erros'])) {
                 return [
-                    'ok' => false, 'status' => 200, 'tentativas' => $i, 'transitoria' => false,
+                    'ok' => false, 'status' => $r['status'], 'tentativas' => $i, 'transitoria' => false,
                     'mensagem' => 'Rejeição: ' . json_encode($dec['erros'], JSON_UNESCAPED_UNICODE),
                     'nfse_xml' => null, 'bruto' => $r,
                 ];
@@ -276,15 +342,15 @@ function nfse_transmitir_dps(array $cfg, string $payloadB64, int $tentativas = N
 
             if (is_array($dec) && !empty($dec['nfseXmlGZipB64'])) {
                 return [
-                    'ok' => true, 'status' => 200, 'tentativas' => $i, 'transitoria' => false,
+                    'ok' => true, 'status' => $r['status'], 'tentativas' => $i, 'transitoria' => false,
                     'mensagem' => '', 'nfse_xml' => gzdecode(base64_decode($dec['nfseXmlGZipB64'])),
                     'bruto' => $r,
                 ];
             }
 
             return [
-                'ok' => false, 'status' => 200, 'tentativas' => $i, 'transitoria' => false,
-                'mensagem' => 'Resposta 200 sem XML da NFS-e: ' . nfse_resumir_resposta($r),
+                'ok' => false, 'status' => $r['status'], 'tentativas' => $i, 'transitoria' => false,
+                'mensagem' => 'Resposta ' . $r['status'] . ' sem XML da NFS-e: ' . nfse_resumir_resposta($r),
                 'nfse_xml' => null, 'bruto' => $r,
             ];
         }
@@ -323,7 +389,7 @@ function nfse_recuperar_por_dps(array $cfg, string $idDps, int $timeout = 25): ?
 {
     $r = nfse_http_sefin('GET', 'dps/' . rawurlencode($idDps), null, $cfg, $timeout);
 
-    if ($r['status'] !== 200) {
+    if ($r['status'] < 200 || $r['status'] >= 300) {
         // 404 = a DPS não gerou nota; 5xx/rede = ambiente fora, nada a afirmar.
         // O status é devolvido pela referência para que o chamador saiba
         // distinguir "não existe" de "não deu para verificar".
@@ -339,7 +405,7 @@ function nfse_recuperar_por_dps(array $cfg, string $idDps, int $timeout = 25): ?
 
     $xml = null;
     $rn  = nfse_http_sefin('GET', 'nfse/' . rawurlencode($chave), null, $cfg, $timeout);
-    if ($rn['status'] === 200) {
+    if ($rn['status'] >= 200 && $rn['status'] < 300) {
         $dn = json_decode($rn['body'], true);
         if (is_array($dn) && !empty($dn['nfseXmlGZipB64'])) {
             $xml = gzdecode(base64_decode($dn['nfseXmlGZipB64']));
@@ -370,7 +436,8 @@ function nfse_recuperar_rejeitadas_da_os(int $osId, ?array $cfg = null): ?array
           WHERE ordem_servico_id = :os
             AND ambiente = :amb
             AND status = 'rejeitada'
-            AND (http_status IS NULL OR http_status = 0 OR http_status >= 500)
+            AND (http_status IS NULL OR http_status = 0 OR http_status >= 500
+                 OR (http_status >= 200 AND http_status < 300))
           ORDER BY id DESC
           LIMIT 2"
     );

@@ -335,6 +335,25 @@ function nfse_migrar(?PDO $pdo = null): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Leiaute do DPS: versão declarada e grupo IBSCBS.
+    $novasCfg = [
+        'dps_versao'   => "VARCHAR(5) NOT NULL DEFAULT '1.00'",
+        'ibscbs_enviar'=> "TINYINT(1) NOT NULL DEFAULT 0",
+        'ibscbs_cst'   => "VARCHAR(3) NOT NULL DEFAULT '000'",
+        'ibscbs_class' => "VARCHAR(6) NOT NULL DEFAULT '000001'",
+    ];
+    foreach ($novasCfg as $col => $ddl) {
+        $ex = (int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'nfse_config'
+                AND COLUMN_NAME = " . $pdo->quote($col)
+        )->fetchColumn();
+        if ($ex === 0) {
+            $pdo->exec("ALTER TABLE nfse_config ADD COLUMN `{$col}` {$ddl}");
+        }
+    }
+
     // Permite emitir sem identificar o tomador (facultativo em 2026).
     $temOmitir = (int) $pdo->query(
         "SELECT COUNT(*) FROM information_schema.COLUMNS

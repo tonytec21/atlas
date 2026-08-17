@@ -61,6 +61,25 @@ $resumo = $pdo->query("SELECT status, COUNT(*) c, COALESCE(SUM(valor_iss),0) iss
 /* Fila de reemissão (O.S. distintas com rejeição ainda em aberto). */
 $totalReemitir = nfse_reemissao_total($ambAtual);
 
+/* Rejeitadas que podem ter gerado NFS-e no Ambiente Nacional mesmo assim —
+   caso típico de resposta de sucesso interpretada como falha. Ficam de fora
+   as rejeições com código catalogado, que não geraram nota. */
+$totalSincronizar = 0;
+try {
+    $stSinc = $pdo->prepare(
+        "SELECT COUNT(*) FROM nfse_notas
+          WHERE status = 'rejeitada'
+            AND ambiente = :amb
+            AND id_dps IS NOT NULL AND id_dps <> ''
+            AND (chave_acesso IS NULL OR chave_acesso = '')
+            AND (mensagem IS NULL OR mensagem NOT REGEXP 'E[0-9]{3,4}')"
+    );
+    $stSinc->execute([':amb' => $ambAtual]);
+    $totalSincronizar = (int) $stSinc->fetchColumn();
+} catch (Throwable $e) {
+    $totalSincronizar = 0;   // coluna ausente em base antiga: apenas não oferece o botão
+}
+
 /* Para cada O.S. exibida nesta página, saber se já existe nota válida —
    evita oferecer "tentar novamente" onde não há mais o que emitir. */
 $osComNotaValida = [];
@@ -133,6 +152,12 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
     <div class="d-flex justify-content-between align-items-center flex-wrap">
       <h3 class="m-0">NFS-e emitidas</h3>
       <div>
+        <?php if ($totalSincronizar > 0): ?>
+          <button class="btn btn-info btn-sm" onclick="sincronizarTodas()"
+                  title="Procura no Ambiente Nacional as NFS-e que já existem lá e corrige o registro local. Nada é emitido.">
+            <i class="fa fa-cloud-download"></i> Sincronizar rejeitadas (<?= (int) $totalSincronizar ?>)
+          </button>
+        <?php endif; ?>
         <?php if ($totalReemitir > 0): ?>
           <button class="btn btn-warning btn-sm" onclick="reemitirTodas()">
             <i class="fa fa-refresh"></i> Reemitir rejeitadas (<?= (int) $totalReemitir ?>)
@@ -291,6 +316,106 @@ function verErro(btn) {
         width: 760,
         confirmButtonText: 'Fechar'
     });
+}
+
+/* ------------------------------------------------------------------ *
+ * Sincronização em lote
+ *
+ * Procura no Ambiente Nacional as NFS-e que já existem lá mas ficaram
+ * gravadas aqui como rejeitadas. Só consulta e corrige: nenhuma DPS é
+ * emitida e nenhum número é consumido.
+ * ------------------------------------------------------------------ */
+async function sincronizarTodas() {
+    Swal.fire({ title: 'Levantando as rejeitadas...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    let fila;
+    try {
+        fila = await fetch('nfse_sincronizar_lote.php?acao=fila').then(r => r.json());
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Falha', text: 'Não foi possível levantar a fila.' });
+        return;
+    }
+
+    if (!fila.ok) {
+        Swal.fire({ icon: 'error', title: 'Falha', text: fila.mensagem || 'Erro ao levantar a fila.' });
+        return;
+    }
+    if (!fila.total) {
+        Swal.fire({ icon: 'info', title: 'Nada a sincronizar', text: 'Não há rejeições que possam ter gerado NFS-e.' });
+        return;
+    }
+
+    const conf = await Swal.fire({
+        icon: 'question',
+        title: 'Sincronizar ' + fila.total + ' registro(s)?',
+        html: 'Cada DPS será <b>consultada</b> no Ambiente Nacional. Onde a NFS-e existir lá, o ' +
+              'registro daqui é corrigido.' +
+              (fila.provaveis ? '<br><br><b>' + fila.provaveis + '</b> tiveram resposta de sucesso ' +
+                                'e quase certamente já estão emitidas.' : '') +
+              '<br><br><small class="text-muted">Nenhuma DPS é emitida e nenhum número é consumido. ' +
+              'Consultar leva cerca de um segundo por registro.</small>',
+        width: 640,
+        showCancelButton: true,
+        confirmButtonText: 'Sincronizar',
+        cancelButtonText: 'Voltar',
+        confirmButtonColor: '#0f766e'
+    });
+    if (!conf.isConfirmed) return;
+
+    let recuperadas = 0, semNota = 0, falhas = 0;
+    let parar = false;
+
+    Swal.fire({
+        title: 'Sincronizando...',
+        html: '<div id="sincstat">Preparando…</div><div class="progresso"><i id="sincbar"></i></div>',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: true,
+        confirmButtonText: 'Parar',
+        confirmButtonColor: '#b91c1c'
+    }).then(r => { if (r.isConfirmed) { parar = true; } });
+
+    for (let k = 0; k < fila.itens.length && !parar; k++) {
+        const item = fila.itens[k];
+
+        const stat = document.getElementById('sincstat');
+        if (stat) {
+            stat.innerHTML = 'O.S. <b>' + item.ordem_servico_id + '</b> · DPS ' + item.numero_dps +
+                             ' (' + (k + 1) + ' de ' + fila.total + ')' +
+                             '<br><small>' + recuperadas + ' recuperada(s) · ' +
+                             semNota + ' sem nota · ' + falhas + ' falha(s)</small>';
+        }
+        const bar = document.getElementById('sincbar');
+        if (bar) bar.style.width = Math.round((k / fila.total) * 100) + '%';
+
+        try {
+            const res = await fetch('nfse_sincronizar_lote.php', {
+                method: 'POST',
+                body: new URLSearchParams({ acao: 'uma', nota_id: item.id })
+            }).then(r => r.json());
+
+            if (res.ok) { recuperadas++; }
+            else if (res.sem_nota) { semNota++; }
+            else { falhas++; }
+        } catch (e) {
+            falhas++;
+        }
+    }
+
+    const bar = document.getElementById('sincbar');
+    if (bar) bar.style.width = '100%';
+
+    await Swal.fire({
+        icon: recuperadas > 0 ? 'success' : 'info',
+        title: parar ? 'Interrompido' : 'Concluído',
+        html: '<b>' + recuperadas + '</b> nota(s) recuperada(s).<br>' +
+              '<b>' + semNota + '</b> não geraram NFS-e (rejeição real).' +
+              (falhas ? '<br><b>' + falhas + '</b> não puderam ser consultadas — repita mais tarde.' : '') +
+              (recuperadas ? '<br><br><small class="text-muted">Faça a sincronização antes de usar ' +
+                             "\"Reemitir rejeitadas\", para não emitir nota nova onde já existe uma.</small>" : '')
+    });
+
+    location.reload();
 }
 
 function sincronizar(id) {

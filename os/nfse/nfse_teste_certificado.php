@@ -131,7 +131,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $r   = tc_post_sefin($cfg, $pfx, $senha, ['dpsXmlGZipB64' => base64_encode(gzencode($xml))]);
         $dec = json_decode($r['body'], true);
-        $autorizou = ($r['status'] === 200 && is_array($dec) && !empty($dec['nfseXmlGZipB64']));
+        $autorizou = ($r['status'] >= 200 && $r['status'] < 300
+            && is_array($dec) && !empty($dec['nfseXmlGZipB64']));
 
         // Registra a tentativa como qualquer outra
         $ins = $pdo->prepare(
