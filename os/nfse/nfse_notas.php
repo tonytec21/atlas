@@ -61,21 +61,28 @@ if ($busca !== '') {
        nome do tomador e CPF/CNPJ (com ou sem pontuação). */
     $somenteDigitos = preg_replace('/\D/', '', $busca);
 
+    /* A conexão usa prepares NATIVOS (ATTR_EMULATE_PREPARES = false). Nesse
+       modo o mesmo placeholder não pode aparecer duas vezes na consulta — o
+       driver conta os marcadores e recusa a execução com "Invalid parameter
+       number". Por isso cada ocorrência recebe um nome próprio. */
     $alt = [
-        'chave_acesso LIKE :q',
-        'tomador_nome LIKE :q',
+        'chave_acesso LIKE :q1',
+        'tomador_nome LIKE :q2',
         'REPLACE(REPLACE(REPLACE(tomador_doc, ".", ""), "-", ""), "/", "") LIKE :qdig',
     ];
-    $params[':q']    = '%' . $busca . '%';
+    $params[':q1']   = '%' . $busca . '%';
+    $params[':q2']   = '%' . $busca . '%';
     $params[':qdig'] = '%' . ($somenteDigitos !== '' ? $somenteDigitos : '\x00') . '%';
 
     if (ctype_digit($busca)) {
-        $alt[] = 'ordem_servico_id = :qnum';
-        $alt[] = 'numero_dps = :qnum';
+        $alt[] = 'ordem_servico_id = :qnum1';
+        $alt[] = 'numero_dps = :qnum2';
         $alt[] = 'CAST(numero_nfse AS CHAR) = :qtxt';
-        $alt[] = 'id = :qnum';
-        $params[':qnum'] = (int) $busca;
-        $params[':qtxt'] = $busca;
+        $alt[] = 'id = :qnum3';
+        $params[':qnum1'] = (int) $busca;
+        $params[':qnum2'] = (int) $busca;
+        $params[':qnum3'] = (int) $busca;
+        $params[':qtxt']  = $busca;
     }
 
     $where[] = '(' . implode(' OR ', $alt) . ')';
