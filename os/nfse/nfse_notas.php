@@ -9,6 +9,7 @@ include(__DIR__ . '/../../checar_acesso_de_administrador.php');
 
 require_once __DIR__ . '/nfse_lib.php';
 require_once __DIR__ . '/nfse_reemissao_lib.php';
+require_once __DIR__ . '/nfse_erros.php';
 nfse_migrar();
 nfse_reemissao_migrar();
 
@@ -20,7 +21,24 @@ $ambAtual  = (string) ($cfgAtual['ambiente'] ?? '2');
 $status = $_GET['status'] ?? '';
 $busca  = trim((string) ($_GET['q'] ?? ''));
 $pagina = max(1, (int) ($_GET['p'] ?? 1));
-$porPagina = 30;
+
+$fDe        = trim((string) ($_GET['de'] ?? ''));
+$fAte       = trim((string) ($_GET['ate'] ?? ''));
+$fAmbiente  = trim((string) ($_GET['amb'] ?? ''));
+$fFuncion   = trim((string) ($_GET['func'] ?? ''));
+$fValorMin  = trim((string) ($_GET['vmin'] ?? ''));
+$fValorMax  = trim((string) ($_GET['vmax'] ?? ''));
+$fOrdem     = (string) ($_GET['ord'] ?? 'recentes');
+$porPagina  = (int) ($_GET['pp'] ?? 30);
+if (!in_array($porPagina, [30, 60, 100, 200], true)) { $porPagina = 30; }
+
+/* Preserva os filtros na paginação e nos links. */
+$qsBase = array_filter([
+    'status' => $status, 'q' => $busca, 'de' => $fDe, 'ate' => $fAte,
+    'amb' => $fAmbiente, 'func' => $fFuncion, 'vmin' => $fValorMin,
+    'vmax' => $fValorMax, 'ord' => $fOrdem !== 'recentes' ? $fOrdem : '',
+    'pp' => $porPagina !== 30 ? $porPagina : '',
+], static fn($v) => $v !== '' && $v !== null);
 
 $where = [];
 $params = [];
@@ -39,9 +57,53 @@ if ($status === 'reemitir') {
     $params[':ambf'] = $ambAtual;
 }
 if ($busca !== '') {
-    $where[] = '(chave_acesso LIKE :q OR CAST(ordem_servico_id AS CHAR) = :qexato OR tomador_nome LIKE :q)';
-    $params[':q'] = '%' . $busca . '%';
-    $params[':qexato'] = $busca;
+    /* A busca aceita chave de acesso, nº da O.S., nº da DPS, nº da NFS-e,
+       nome do tomador e CPF/CNPJ (com ou sem pontuação). */
+    $somenteDigitos = preg_replace('/\D/', '', $busca);
+
+    $alt = [
+        'chave_acesso LIKE :q',
+        'tomador_nome LIKE :q',
+        'REPLACE(REPLACE(REPLACE(tomador_doc, ".", ""), "-", ""), "/", "") LIKE :qdig',
+    ];
+    $params[':q']    = '%' . $busca . '%';
+    $params[':qdig'] = '%' . ($somenteDigitos !== '' ? $somenteDigitos : '\x00') . '%';
+
+    if (ctype_digit($busca)) {
+        $alt[] = 'ordem_servico_id = :qnum';
+        $alt[] = 'numero_dps = :qnum';
+        $alt[] = 'CAST(numero_nfse AS CHAR) = :qtxt';
+        $alt[] = 'id = :qnum';
+        $params[':qnum'] = (int) $busca;
+        $params[':qtxt'] = $busca;
+    }
+
+    $where[] = '(' . implode(' OR ', $alt) . ')';
+}
+
+if ($fDe !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fDe)) {
+    $where[] = 'criado_em >= :de';
+    $params[':de'] = $fDe . ' 00:00:00';
+}
+if ($fAte !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fAte)) {
+    $where[] = 'criado_em <= :ate';
+    $params[':ate'] = $fAte . ' 23:59:59';
+}
+if ($fAmbiente === '1' || $fAmbiente === '2') {
+    $where[] = 'ambiente = :ambsel';
+    $params[':ambsel'] = $fAmbiente;
+}
+if ($fFuncion !== '') {
+    $where[] = 'criado_por = :func';
+    $params[':func'] = $fFuncion;
+}
+if ($fValorMin !== '' && is_numeric(str_replace(',', '.', $fValorMin))) {
+    $where[] = 'valor_servico >= :vmin';
+    $params[':vmin'] = (float) str_replace(',', '.', $fValorMin);
+}
+if ($fValorMax !== '' && is_numeric(str_replace(',', '.', $fValorMax))) {
+    $where[] = 'valor_servico <= :vmax';
+    $params[':vmax'] = (float) str_replace(',', '.', $fValorMax);
 }
 
 $sqlWhere = $where ? 'WHERE ' . implode(' AND ', $where) : '';
@@ -50,13 +112,36 @@ $total = $pdo->prepare("SELECT COUNT(*) FROM nfse_notas $sqlWhere");
 $total->execute($params);
 $total = (int) $total->fetchColumn();
 
+$ordens = [
+    'recentes'   => 'id DESC',
+    'antigas'    => 'id ASC',
+    'maior'      => 'valor_servico DESC, id DESC',
+    'menor'      => 'valor_servico ASC, id DESC',
+    'tomador'    => 'tomador_nome ASC, id DESC',
+    'os'         => 'ordem_servico_id DESC',
+];
+$orderBy = $ordens[$fOrdem] ?? $ordens['recentes'];
+
 $offset = ($pagina - 1) * $porPagina;
-$st = $pdo->prepare("SELECT * FROM nfse_notas $sqlWhere ORDER BY id DESC LIMIT $porPagina OFFSET $offset");
+$st = $pdo->prepare("SELECT * FROM nfse_notas $sqlWhere ORDER BY $orderBy LIMIT $porPagina OFFSET $offset");
 $st->execute($params);
 $notas = $st->fetchAll(PDO::FETCH_ASSOC);
 
 $resumo = $pdo->query("SELECT status, COUNT(*) c, COALESCE(SUM(valor_iss),0) iss FROM nfse_notas GROUP BY status")
               ->fetchAll(PDO::FETCH_ASSOC);
+
+/* Quem emitiu — alimenta o filtro por funcionário. */
+$funcionarios = $pdo->query(
+    "SELECT DISTINCT criado_por FROM nfse_notas
+      WHERE criado_por IS NOT NULL AND criado_por <> '' ORDER BY criado_por"
+)->fetchAll(PDO::FETCH_COLUMN);
+
+/* Totais do resultado filtrado — mostram o efeito do filtro em números. */
+$somaFiltro = $pdo->prepare(
+    "SELECT COALESCE(SUM(valor_servico),0) serv, COALESCE(SUM(valor_iss),0) iss FROM nfse_notas $sqlWhere"
+);
+$somaFiltro->execute($params);
+$somaFiltro = $somaFiltro->fetch(PDO::FETCH_ASSOC);
 
 /* Fila de reemissão (O.S. distintas com rejeição ainda em aberto). */
 $totalReemitir = nfse_reemissao_total($ambAtual);
@@ -135,6 +220,16 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
         .chave{font-family:monospace;font-size:.72rem;word-break:break-all}
         td .msg{font-size:.75rem;color:#b91c1c;max-width:280px;display:block}
         .btn-erro{border:0;background:none;padding:0;color:#b91c1c;font-size:.72rem;text-decoration:underline;cursor:pointer}
+        .cod{display:inline-block;background:#fee2e2;color:#991b1b;border-radius:4px;padding:0 5px;font-size:.68rem;font-weight:600;margin-left:4px}
+        .filtros{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 14px 6px}
+        .filtros label{font-size:.74rem;font-weight:600;color:#475569;margin-bottom:2px}
+        .mais{display:none;border-top:1px solid #e2e8f0;margin-top:6px;padding-top:12px}
+        .mais.aberto{display:block}
+        .mais-linha{display:flex;justify-content:space-between;align-items:center;font-size:.8rem;padding:2px 0 6px}
+        .mais-linha a{color:#1e40af;text-decoration:none}
+        .mais-linha a:hover{text-decoration:underline}
+        .mais-linha .limpar{color:#b91c1c}
+        .resultado-info{font-size:.82rem;color:#475569}
         .tag-reemitida{display:inline-block;background:#e0f2fe;color:#075985;border-radius:999px;
                        padding:1px 8px;font-size:.68rem;font-weight:700;margin-top:3px}
         #lotebox{text-align:left;font-size:.82rem;max-height:230px;overflow:auto;border:1px solid #e2e8f0;
@@ -197,23 +292,107 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
       </div>
     </div>
 
-    <form method="get" class="form-row mb-3">
-      <div class="col-md-5 mb-2">
-        <input type="text" name="q" class="form-control" placeholder="Chave de acesso, nº da O.S. ou tomador" value="<?= $esc($busca) ?>">
+    <form method="get" class="filtros mb-3">
+      <div class="form-row">
+        <div class="col-lg-5 col-md-12 mb-2">
+          <input type="text" name="q" class="form-control"
+                 placeholder="Chave, nº da O.S., nº da DPS, nº da NFS-e, nome ou CPF/CNPJ do tomador"
+                 value="<?= $esc($busca) ?>">
+        </div>
+        <div class="col-lg-3 col-md-5 mb-2">
+          <select name="status" class="form-control">
+            <option value="">Todos os status</option>
+            <?php foreach ($mapa as $k => $rot): ?>
+              <option value="<?= $k ?>" <?= $status === $k ? 'selected' : '' ?>><?= $rot ?></option>
+            <?php endforeach; ?>
+            <option value="reemitir" <?= $status === 'reemitir' ? 'selected' : '' ?>>Aguardando reemissão</option>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-4 mb-2">
+          <select name="ord" class="form-control">
+            <option value="recentes" <?= $fOrdem === 'recentes' ? 'selected' : '' ?>>Mais recentes</option>
+            <option value="antigas"  <?= $fOrdem === 'antigas'  ? 'selected' : '' ?>>Mais antigas</option>
+            <option value="maior"    <?= $fOrdem === 'maior'    ? 'selected' : '' ?>>Maior valor</option>
+            <option value="menor"    <?= $fOrdem === 'menor'    ? 'selected' : '' ?>>Menor valor</option>
+            <option value="tomador"  <?= $fOrdem === 'tomador'  ? 'selected' : '' ?>>Tomador (A-Z)</option>
+            <option value="os"       <?= $fOrdem === 'os'       ? 'selected' : '' ?>>Nº da O.S.</option>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-3 mb-2">
+          <button class="btn btn-primary btn-block"><i class="fa fa-search"></i> Filtrar</button>
+        </div>
       </div>
-      <div class="col-md-3 mb-2">
-        <select name="status" class="form-control">
-          <option value="">Todos os status</option>
-          <?php foreach ($mapa as $k => $rot): ?>
-            <option value="<?= $k ?>" <?= $status === $k ? 'selected' : '' ?>><?= $rot ?></option>
-          <?php endforeach; ?>
-          <option value="reemitir" <?= $status === 'reemitir' ? 'selected' : '' ?>>Aguardando reemissão</option>
-        </select>
+
+      <?php
+      $temAvancado = ($fDe !== '' || $fAte !== '' || $fAmbiente !== '' || $fFuncion !== ''
+                      || $fValorMin !== '' || $fValorMax !== '');
+      ?>
+      <div class="mais-linha">
+        <a href="#" onclick="document.getElementById('mais').classList.toggle('aberto'); return false;">
+          <i class="fa fa-sliders"></i> Mais filtros<?= $temAvancado ? ' (ativos)' : '' ?>
+        </a>
+        <?php if ($temAvancado || $busca !== '' || $status !== ''): ?>
+          <a href="nfse_notas.php" class="limpar"><i class="fa fa-times"></i> Limpar filtros</a>
+        <?php endif; ?>
       </div>
-      <div class="col-md-2 mb-2">
-        <button class="btn btn-primary btn-block"><i class="fa fa-search"></i> Filtrar</button>
+
+      <div id="mais" class="mais <?= $temAvancado ? 'aberto' : '' ?>">
+        <div class="form-row">
+          <div class="col-md-3 mb-2">
+            <label>Emitidas de</label>
+            <input type="date" name="de" class="form-control" value="<?= $esc($fDe) ?>">
+          </div>
+          <div class="col-md-3 mb-2">
+            <label>até</label>
+            <input type="date" name="ate" class="form-control" value="<?= $esc($fAte) ?>">
+          </div>
+          <div class="col-md-3 mb-2">
+            <label>Ambiente</label>
+            <select name="amb" class="form-control">
+              <option value="">Todos</option>
+              <option value="1" <?= $fAmbiente === '1' ? 'selected' : '' ?>>Produção</option>
+              <option value="2" <?= $fAmbiente === '2' ? 'selected' : '' ?>>Homologação</option>
+            </select>
+          </div>
+          <div class="col-md-3 mb-2">
+            <label>Emitida por</label>
+            <select name="func" class="form-control">
+              <option value="">Todos</option>
+              <?php foreach ($funcionarios as $f): ?>
+                <option value="<?= $esc($f) ?>" <?= $fFuncion === $f ? 'selected' : '' ?>><?= $esc($f) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-md-3 mb-2">
+            <label>Valor do serviço — de</label>
+            <input type="text" name="vmin" class="form-control" placeholder="0,00" value="<?= $esc($fValorMin) ?>">
+          </div>
+          <div class="col-md-3 mb-2">
+            <label>até</label>
+            <input type="text" name="vmax" class="form-control" placeholder="0,00" value="<?= $esc($fValorMax) ?>">
+          </div>
+          <div class="col-md-3 mb-2">
+            <label>Resultados por página</label>
+            <select name="pp" class="form-control">
+              <?php foreach ([30, 60, 100, 200] as $pp): ?>
+                <option value="<?= $pp ?>" <?= $porPagina === $pp ? 'selected' : '' ?>><?= $pp ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-md-3 mb-2 d-flex align-items-end">
+            <button class="btn btn-primary btn-block"><i class="fa fa-search"></i> Aplicar</button>
+          </div>
+        </div>
       </div>
     </form>
+
+    <div class="resultado-info mb-2">
+      <b><?= (int) $total ?></b> nota(s) encontrada(s)
+      <?php if ($total > 0): ?>
+        · serviço <?= $brl($somaFiltro['serv'] ?? 0) ?>
+        · ISS <?= $brl($somaFiltro['iss'] ?? 0) ?>
+      <?php endif; ?>
+    </div>
 
     <div class="table-responsive">
       <table class="table table-striped table-bordered table-sm">
@@ -242,10 +421,14 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
                 <small class="text-muted">—</small>
               <?php endif; ?>
 
-              <?php if ($n['status'] === 'rejeitada' && $n['mensagem']): ?>
-                <span class="msg"><?= $esc(mb_substr((string) $n['mensagem'], 0, 220)) ?></span>
+              <?php if ($n['status'] === 'rejeitada' && $n['mensagem']):
+                    $e = nfse_erro_traduzir($n['mensagem']); ?>
+                <span class="msg">
+                  <?= $esc($e['titulo']) ?>
+                  <?php if ($e['codigo']): ?><span class="cod"><?= $esc($e['codigo']) ?></span><?php endif; ?>
+                </span>
                 <button type="button" class="btn-erro" data-msg="<?= $esc($n['mensagem']) ?>"
-                        onclick="verErro(this)">ver erro completo</button>
+                        onclick="verErro(this)">retorno técnico</button>
               <?php endif; ?>
 
               <?php if (!empty($n['reemitida_em'])): ?>
@@ -292,7 +475,7 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
       <nav><ul class="pagination pagination-sm">
         <?php for ($i = 1; $i <= $paginas; $i++): ?>
           <li class="page-item <?= $i === $pagina ? 'active' : '' ?>">
-            <a class="page-link" href="?p=<?= $i ?>&status=<?= urlencode($status) ?>&q=<?= urlencode($busca) ?>"><?= $i ?></a>
+            <a class="page-link" href="?<?= http_build_query($qsBase + ['p' => $i]) ?>"><?= $i ?></a>
           </li>
         <?php endfor; ?>
       </ul></nav>

@@ -149,15 +149,52 @@ $__esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
     if ($__rejeitadas && !$__temValida):
         $__ultima = reset($__rejeitadas);
     ?>
-      <div class="alert alert-danger mt-3 mb-0" style="font-size:.8rem">
-        <b>Última tentativa rejeitada (DPS <?= (int) $__ultima['numero_dps'] ?>):</b><br>
-        <?= $__esc(mb_substr((string) $__ultima['mensagem'], 0, 600)) ?>
+      <?php
+      require_once __DIR__ . '/nfse_erros.php';
+      $__err = nfse_erro_traduzir($__ultima['mensagem'] ?? '');
+      $__idDps = nfse_erro_iddps($__ultima['mensagem'] ?? '');
+      ?>
+      <div class="alert alert-danger mt-3 mb-0" style="font-size:.85rem">
+        <div style="font-weight:600; margin-bottom:2px"><?= $__esc($__err['titulo']) ?></div>
+        <?php if ($__err['acao'] !== ''): ?>
+          <div style="font-weight:400"><?= $__esc($__err['acao']) ?></div>
+        <?php endif; ?>
+        <div class="mt-2" style="font-size:.75rem; opacity:.8">
+          Tentativa de <?= $__esc(date('d/m/Y H:i', strtotime((string) $__ultima['criado_em']))) ?>
+          · DPS <?= (int) $__ultima['numero_dps'] ?>
+          <?php if ($__err['codigo']): ?> · código <?= $__esc($__err['codigo']) ?><?php endif; ?>
+          <?php if (trim((string) $__err['detalhe']) !== ''): ?>
+            · <a href="#" onclick="nfseVerDetalheErro(this); return false;"
+                 data-detalhe="<?= $__esc($__err['detalhe']) ?>"
+                 <?= $__idDps ? 'data-iddps="' . $__esc($__idDps) . '"' : '' ?>
+                 style="color:inherit; text-decoration:underline">ver retorno técnico</a>
+          <?php endif; ?>
+        </div>
       </div>
     <?php endif; ?>
   </div>
 </div>
 
 <script>
+/* Retorno bruto da SEFIN — fica fora do caminho de quem só quer emitir,
+   mas à mão de quem precisa abrir chamado. */
+function nfseVerDetalheErro(el) {
+    var idDps = el.dataset.iddps || '';
+    Swal.fire({
+        icon: 'info',
+        title: 'Retorno do Ambiente Nacional',
+        html: (idDps ? '<p style="font-size:.85rem;margin:0 0 8px">Id da DPS: <code>' +
+                       idDps.replace(/[<>&]/g, function (c) { return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c]; }) +
+                       '</code></p>' : '') +
+              '<pre style="text-align:left;white-space:pre-wrap;word-break:break-word;font-size:.72rem;' +
+              'max-height:300px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:10px;border-radius:6px">' +
+              (el.dataset.detalhe || '').replace(/[<>&]/g, function (c) { return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c]; }) +
+              '</pre>',
+        width: 720,
+        confirmButtonText: 'Fechar'
+    });
+}
+
 function nfseEmitir(osId, forcar) {
     Swal.fire({
         icon: 'question',
