@@ -1,0 +1,106 @@
+LIVRO DE DEPÓSITO PRÉVIO — VERSÃO FILTRADA POR DATA DE LIQUIDAÇÃO
+==================================================================
+
+ARQUIVOS
+  • livro_dep_previo.php            -> impresso do livro (substitui o atual)
+  • config_livro_dep_previo.json    -> chave liga/desliga da versão filtrada
+
+INSTALAÇÃO
+  Copie os 2 arquivos para  atlas/relatorios/.
+  Nenhuma alteração de banco, nenhuma dependência nova, o index.php continua
+  apontando para livro_dep_previo.php. Se o .json não existir, o script roda
+  exatamente como antes (comportamento original preservado).
+  Lembre-se do restart do Apache por causa do OPcache.
+
+O QUE A VERSÃO FILTRADA FAZ
+  Com "ativo": true, o livro carrega SOMENTE as O.S. em que pelo menos um ato
+  foi liquidado em data diferente da data do pagamento.
+    - O.S. paga no dia 10 e com TODOS os atos liquidados no dia 10 -> NÃO entra.
+    - O.S. paga no dia 10, com atos liquidados no dia 10 e um ato no dia 12
+      -> ENTRA (basta um ato em data diversa).
+    - O.S. paga no dia 10 e liquidada integralmente no dia 12 -> ENTRA.
+  Quando a O.S. entra, o corpo do registro continua igual ao de hoje: todos os
+  pagamentos, todos os atos, atos manuais, devoluções e saldo.
+
+CHAVES DO JSON
+  ativo                     true liga a versão filtrada, false mantém o livro
+                            completo de sempre.
+
+  base_comparacao           "primeiro_pagamento" (padrão) — compara a data de
+                            cada ato com a data do PRIMEIRO pagamento da O.S.,
+                            que é o critério que você descreveu.
+                            "qualquer_pagamento" — o ato só é considerado
+                            "no mesmo dia" se coincidir com a data de ALGUM
+                            pagamento da O.S. Útil quando há entrada e reforço
+                            de depósito em dias diferentes e você não quer que
+                            a liquidação feita no dia do reforço puxe a O.S.
+                            para o livro.
+
+  incluir_os_sem_liquidacao true (padrão) — O.S. paga e ainda sem nenhum ato
+                            liquidado entra no livro, porque o depósito segue
+                            em aberto. Coloque false se quiser só as O.S. que
+                            já têm liquidação.
+
+  exibir_subtitulo          true imprime, sob o título, a linha "Somente O.S.
+                            com liquidação em data diversa da do pagamento".
+                            Padrão false, para o impresso sair idêntico ao
+                            modelo em uso.
+
+  sufixo_arquivo            sufixo do nome do PDF gerado quando o filtro está
+                            ativo (padrão "_Divergentes"), só para não misturar
+                            os arquivos baixados. Deixe "" para não usar.
+
+  permitir_override_url     true libera testar sem editar o JSON, chamando
+                            livro_dep_previo.php?divergentes=1 ou =0.
+                            Mantenha false em produção.
+
+REGRAS DE DATA
+  A comparação usa DATE(), então funciona tanto com DATE quanto com DATETIME
+  em pagamento_os.data_pagamento, atos_liquidados.data e
+  atos_manuais_liquidados.data. Ato com data NULL é tratado como divergente
+  (entra no livro), para não sumir registro por falha de cadastro.
+
+COMO O FILTRO É APLICADO
+  O filtro NÃO entra na consulta principal. Antes de montar o PDF o script roda
+  3 consultas agregadas (GROUP BY em pagamento_os, atos_liquidados e
+  atos_manuais_liquidados) e monta em memória a lista de O.S. elegíveis; a
+  consulta principal continua sendo a original e as O.S. fora da lista são
+  descartadas no início do laço, antes de qualquer prepared statement.
+  Motivo: EXISTS correlacionado com DATE() não usa índice e faz o MySQL varrer
+  atos_liquidados uma vez por O.S., o que estourava o set_time_limit.
+
+CONFERÊNCIA (rodar no MySQL para comparar com o PDF)
+  SELECT os.id,
+         pg.primeira_data,
+         MIN(DATE(t.data)) AS primeira_liquidacao,
+         MAX(DATE(t.data)) AS ultima_liquidacao
+  FROM ordens_de_servico os
+  INNER JOIN (
+      SELECT ordem_de_servico_id, MIN(DATE(data_pagamento)) AS primeira_data
+      FROM pagamento_os GROUP BY ordem_de_servico_id
+  ) pg ON pg.ordem_de_servico_id = os.id
+  LEFT JOIN (
+      SELECT ordem_servico_id, data FROM atos_liquidados
+      UNION ALL
+      SELECT ordem_servico_id, data FROM atos_manuais_liquidados
+  ) t ON t.ordem_servico_id = os.id
+  GROUP BY os.id, pg.primeira_data
+  HAVING primeira_liquidacao IS NULL
+      OR primeira_liquidacao <> pg.primeira_data
+      OR ultima_liquidacao  <> pg.primeira_data
+  ORDER BY os.id;
+
+DESEMPENHO
+  O peso do livro está no laço: são 4 consultas por O.S. (pagamentos, atos,
+  atos manuais e devoluções). Sem índice nas colunas de ligação, cada uma vira
+  varredura de tabela. Confira com SHOW INDEX e crie o que faltar:
+    ALTER TABLE atos_liquidados         ADD INDEX idx_os (ordem_servico_id, data);
+    ALTER TABLE atos_manuais_liquidados ADD INDEX idx_os (ordem_servico_id, data);
+    ALTER TABLE pagamento_os            ADD INDEX idx_os (ordem_de_servico_id, data_pagamento);
+    ALTER TABLE devolucao_os            ADD INDEX idx_os (ordem_de_servico_id);
+  Com esses índices o livro completo também fica bem mais rápido que hoje.
+
+OBSERVAÇÃO
+  A numeração de livro/folha e a coluna ORDEM continuam sequenciais sobre o que
+  foi efetivamente impresso. Com o filtro ligado, a sequência é a do livro
+  filtrado, não a do livro completo.

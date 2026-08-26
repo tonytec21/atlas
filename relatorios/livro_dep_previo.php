@@ -11,6 +11,151 @@ date_default_timezone_set('America/Sao_Paulo');
 ini_set('memory_limit', '2048M');  
 set_time_limit(600); // 10 minutos  
 
+
+/* =====================================================================
+   MODO "LIQUIDAÇÃO EM DATA DIVERSA DO DEPÓSITO" (ativado por JSON)
+   ---------------------------------------------------------------------
+   Arquivo: config_livro_dep_previo.json (mesma pasta deste script).
+   Quando ativo, o livro carrega SOMENTE as O.S. em que pelo menos um ato
+   foi liquidado em data diferente da data do pagamento. As O.S. cujos
+   atos foram todos liquidados no mesmo dia do pagamento ficam de fora.
+   Se o arquivo não existir, o comportamento é o original (sem filtro).
+   ===================================================================== */
+$LIVRO_CFG = array(
+    'ativo'                     => false,
+    'base_comparacao'           => 'primeiro_pagamento', // ou 'qualquer_pagamento'
+    'incluir_os_sem_liquidacao' => true,
+    'exibir_subtitulo'          => false,
+    'sufixo_arquivo'            => '_Divergentes',
+    'permitir_override_url'     => false
+);
+
+$LIVRO_CFG_FILE = __DIR__ . '/config_livro_dep_previo.json';
+if (is_file($LIVRO_CFG_FILE)) {
+    $cfg_raw = json_decode(file_get_contents($LIVRO_CFG_FILE), true);
+    if (is_array($cfg_raw) && isset($cfg_raw['modo_liquidacao_em_data_diversa'])
+        && is_array($cfg_raw['modo_liquidacao_em_data_diversa'])) {
+        $LIVRO_CFG = array_merge($LIVRO_CFG, $cfg_raw['modo_liquidacao_em_data_diversa']);
+    }
+}
+
+$filtro_divergentes = filter_var($LIVRO_CFG['ativo'], FILTER_VALIDATE_BOOLEAN);
+
+// Override opcional por URL (?divergentes=1 / ?divergentes=0), só se liberado no JSON
+if (filter_var($LIVRO_CFG['permitir_override_url'], FILTER_VALIDATE_BOOLEAN) && isset($_GET['divergentes'])) {
+    $filtro_divergentes = filter_var($_GET['divergentes'], FILTER_VALIDATE_BOOLEAN);
+}
+
+/**
+ * Pré-calcula, em duas varreduras agregadas, quais O.S. têm liquidação em data
+ * diferente da data do pagamento. Devolve um array [id_da_os => true].
+ *
+ * O filtro NÃO vai para a consulta principal de propósito: EXISTS correlacionado
+ * com DATE() não usa índice e faz o MySQL varrer atos_liquidados uma vez por O.S.
+ * Aqui são 3 GROUP BY simples e a decisão acontece em memória.
+ */
+function carregarOsElegiveis($conn, $cfg)
+{
+    $incluir_sem_liq = filter_var($cfg['incluir_os_sem_liquidacao'], FILTER_VALIDATE_BOOLEAN);
+    $por_qualquer    = ($cfg['base_comparacao'] === 'qualquer_pagamento');
+
+    // 1) Datas de pagamento por O.S.
+    $sql = $por_qualquer
+        ? "SELECT DISTINCT ordem_de_servico_id, DATE(data_pagamento) FROM pagamento_os"
+        : "SELECT ordem_de_servico_id, MIN(DATE(data_pagamento)) FROM pagamento_os GROUP BY ordem_de_servico_id";
+
+    $res = $conn->query($sql);
+    if (!$res) {
+        return false;
+    }
+
+    $pag = array();
+    while ($r = $res->fetch_row()) {
+        $id = (int) $r[0];
+        if ($por_qualquer) {
+            $pag[$id][(string) $r[1]] = true;
+        } else {
+            $pag[$id] = $r[1];
+        }
+    }
+    $res->free();
+
+    // 2) Datas de liquidação por O.S. (atos + atos manuais)
+    $liq = array(); // modo qualquer_pagamento: id => [datas]
+    $agg = array(); // modo primeiro_pagamento: id => menor/maior data e nulos
+
+    foreach (array('atos_liquidados', 'atos_manuais_liquidados') as $tabela) {
+        $sql = $por_qualquer
+            ? "SELECT DISTINCT ordem_servico_id, DATE(data) FROM $tabela"
+            : "SELECT ordem_servico_id, MIN(DATE(data)), MAX(DATE(data)),
+                      SUM(CASE WHEN data IS NULL THEN 1 ELSE 0 END)
+               FROM $tabela GROUP BY ordem_servico_id";
+
+        $res = $conn->query($sql);
+        if (!$res) {
+            return false;
+        }
+
+        while ($r = $res->fetch_row()) {
+            $id = (int) $r[0];
+
+            if ($por_qualquer) {
+                $liq[$id][(string) $r[1]] = true;
+                continue;
+            }
+
+            if (!isset($agg[$id])) {
+                $agg[$id] = array('menor' => null, 'maior' => null, 'nulos' => 0);
+            }
+            if ($r[1] !== null && ($agg[$id]['menor'] === null || $r[1] < $agg[$id]['menor'])) {
+                $agg[$id]['menor'] = $r[1];
+            }
+            if ($r[2] !== null && ($agg[$id]['maior'] === null || $r[2] > $agg[$id]['maior'])) {
+                $agg[$id]['maior'] = $r[2];
+            }
+            $agg[$id]['nulos'] += (int) $r[3];
+        }
+        $res->free();
+    }
+
+    // 3) Decide O.S. por O.S.
+    $elegiveis = array();
+
+    foreach ($pag as $id => $info) {
+        $tem_liquidacao = $por_qualquer ? isset($liq[$id]) : isset($agg[$id]);
+
+        // O.S. paga e ainda sem nenhum ato liquidado: depósito em aberto
+        if (!$tem_liquidacao) {
+            if ($incluir_sem_liq) {
+                $elegiveis[$id] = true;
+            }
+            continue;
+        }
+
+        if ($por_qualquer) {
+            // Basta um ato liquidado em dia sem pagamento na O.S.
+            foreach ($liq[$id] as $data_ato => $ignora) {
+                if ($data_ato === '' || !isset($info[$data_ato])) {
+                    $elegiveis[$id] = true;
+                    break;
+                }
+            }
+            continue;
+        }
+
+        // Padrão: compara com a data do primeiro pagamento
+        $a = $agg[$id];
+        if ($a['nulos'] > 0 || $a['menor'] === null
+            || $a['menor'] !== $info || $a['maior'] !== $info) {
+            $elegiveis[$id] = true;
+        }
+    }
+
+    unset($pag, $liq, $agg);
+
+    return $elegiveis;
+}
+
 // Configuração do PDF  
 class LivroDepositoPDF extends TCPDF  
 {  
@@ -79,8 +224,13 @@ $pdf->SetCompression(true);
 $pdf->SetAutoPageBreak(true, 25);  
 $pdf->AddPage();  
 $pdf->SetFont('helvetica', 'B', 12);  
-$pdf->Cell(0, 10, 'Livro de Depósito Prévio', 0, 1, 'C');  
-$pdf->Ln(10);  
+$pdf->Cell(0, 10, 'Livro de Depósito Prévio', 0, 1, 'C');
+if ($filtro_divergentes && filter_var($LIVRO_CFG['exibir_subtitulo'], FILTER_VALIDATE_BOOLEAN)) {
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->Cell(0, 6, 'Somente O.S. com liquidação em data diversa da do pagamento', 0, 1, 'C');
+    $pdf->SetFont('helvetica', 'B', 12);
+}
+$pdf->Ln(10);
 
 // Preparar conexão com otimizações  
 $conn->set_charset("utf8");  
@@ -93,13 +243,26 @@ $atos_stmt = $conn->prepare("SELECT ato, quantidade_liquidada, total, data FROM 
 $atos_manuais_stmt = $conn->prepare("SELECT ato, quantidade_liquidada, total, data FROM atos_manuais_liquidados WHERE ordem_servico_id = ?");  
 $devolucao_stmt = $conn->prepare("SELECT total_devolucao, forma_devolucao, data_devolucao FROM devolucao_os WHERE ordem_de_servico_id = ?");  
 
-// Consulta principal otimizada - usando DISTINCT e índices  
-$os_query = $conn->query("  
-    SELECT DISTINCT os.id, os.cliente, os.cpf_cliente, os.total_os, os.data_criacao   
-    FROM ordens_de_servico os  
-    INNER JOIN pagamento_os po ON os.id = po.ordem_de_servico_id  
-    ORDER BY os.id  
-");  
+// Conjunto de O.S. elegíveis quando o filtro está ligado
+$os_elegiveis = array();
+if ($filtro_divergentes) {
+    $os_elegiveis = carregarOsElegiveis($conn, $LIVRO_CFG);
+    if ($os_elegiveis === false) {
+        die('Erro ao apurar as liquidações: ' . $conn->error);
+    }
+}
+
+// Consulta principal otimizada - usando DISTINCT e índices
+$os_query = $conn->query("
+    SELECT DISTINCT os.id, os.cliente, os.cpf_cliente, os.total_os, os.data_criacao
+    FROM ordens_de_servico os
+    INNER JOIN pagamento_os po ON os.id = po.ordem_de_servico_id
+    ORDER BY os.id
+");
+
+if (!$os_query) {
+    die('Erro ao consultar as ordens de serviço: ' . $conn->error);
+}
 
 // Iniciar buffer para controle de memória  
 ob_start();  
@@ -109,8 +272,13 @@ $contador = 0;
 
 $numero_ordem = 1;
 
-while ($os = $os_query->fetch_assoc()) {  
-    // Verificar se precisa de nova página antes de adicionar conteúdo  
+while ($os = $os_query->fetch_assoc()) {
+    // Filtro por data de liquidação: descarta a O.S. antes de qualquer trabalho
+    if ($filtro_divergentes && !isset($os_elegiveis[(int) $os['id']])) {
+        continue;
+    }
+
+    // Verificar se precisa de nova página antes de adicionar conteúdo
     if ($pdf->GetY() > 250) {  
         $pdf->AddPage();  
     }  
@@ -251,7 +419,13 @@ while ($os = $os_query->fetch_assoc()) {
     $numero_ordem++;
 }  
 
-// Fechar statements  
+// Nenhuma O.S. atendeu ao filtro: registra o fato em vez de entregar folha em branco
+if ($contador === 0) {
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->Cell(0, 6, 'Nenhuma ordem de serviço atende aos critérios do livro.', 1, 1, 'C');
+}
+
+// Fechar statements
 $pagamento_stmt->close();  
 $atos_stmt->close();  
 $atos_manuais_stmt->close();  
@@ -261,7 +435,11 @@ $devolucao_stmt->close();
 ob_end_clean();  
 
 // Nome do arquivo incluindo o número do livro atual  
-$nomeArquivo = 'Livro_Deposito_Previo_Livro_' . $pdf->getLivroAtual() . '.pdf';  
+$sufixo = '';
+if ($filtro_divergentes && !empty($LIVRO_CFG['sufixo_arquivo'])) {
+    $sufixo = preg_replace('/[^A-Za-z0-9_\-]/', '', $LIVRO_CFG['sufixo_arquivo']);
+}
+$nomeArquivo = 'Livro_Deposito_Previo_Livro_' . $pdf->getLivroAtual() . $sufixo . '.pdf';
 
 // Gerar o PDF  
 $pdf->Output($nomeArquivo, 'I');  

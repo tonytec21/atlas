@@ -1,0 +1,10 @@
+{
+    "modo_liquidacao_em_data_diversa": {
+        "ativo": false,
+        "base_comparacao": "primeiro_pagamento",
+        "incluir_os_sem_liquidacao": true,
+        "exibir_subtitulo": false,
+        "sufixo_arquivo": "_Divergentes",
+        "permitir_override_url": false
+    }
+}
