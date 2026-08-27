@@ -224,6 +224,120 @@ function nfse_decrypt(?string $blob): ?string
  * 4. MIGRAÇÕES IDEMPOTENTES
  * ===================================================================== */
 
+/**
+ * Concilia uma tabela existente com o CREATE TABLE que a define.
+ *
+ * Le as colunas declaradas no proprio SQL de criacao, compara com o que
+ * existe no banco e acrescenta o que faltar, na ordem correta. Indices e
+ * restricoes sao ignorados — so colunas.
+ *
+ * POR QUE EXISTE: CREATE TABLE IF NOT EXISTS nao altera tabela que ja
+ * existe. Quando um campo novo entra no schema, quem ja tinha o modulo
+ * instalado continua sem ele, e a primeira consulta que o usa quebra com
+ * "Unknown column". Foi o caso de valor_iss em nfse_notas.
+ *
+ * E idempotente e barata: uma consulta a information_schema por tabela.
+ *
+ * @param string $sqlCreate O mesmo CREATE TABLE usado para criar a tabela.
+ */
+function nfse_conciliar_colunas(PDO $pdo, string $tabela, string $sqlCreate): void
+{
+    $corpo = trim($sqlCreate);
+    $abre = strpos($corpo, '(');
+    $fecha = strrpos($corpo, ')');
+
+    if ($abre === false || $fecha === false || $fecha <= $abre) {
+        return;
+    }
+
+    $corpo = substr($corpo, $abre + 1, $fecha - $abre - 1);
+
+    /* Quebra em definicoes de topo, ignorando virgulas dentro de
+       parenteses — DECIMAL(12,2) nao pode virar duas colunas. */
+    $partes = [];
+    $atual = '';
+    $nivel = 0;
+
+    foreach (str_split($corpo) as $ch) {
+        if ($ch === '(') {
+            $nivel++;
+        } elseif ($ch === ')') {
+            $nivel--;
+        }
+
+        if ($ch === ',' && $nivel === 0) {
+            $partes[] = $atual;
+            $atual = '';
+            continue;
+        }
+
+        $atual .= $ch;
+    }
+
+    $partes[] = $atual;
+
+    $desejadas = [];
+    $anterior = null;
+
+    foreach ($partes as $def) {
+        $def = trim(preg_replace('/\s+/', ' ', $def));
+
+        if ($def === '') {
+            continue;
+        }
+
+        // Indices e restricoes nao sao colunas.
+        if (preg_match('/^(PRIMARY\s+KEY|UNIQUE\s+KEY|UNIQUE|KEY|INDEX|CONSTRAINT|FOREIGN\s+KEY|FULLTEXT|SPATIAL|CHECK)\b/i', $def)) {
+            continue;
+        }
+
+        if (!preg_match('/^`?([a-zA-Z_][\w]*)`?\s+(.+)$/', $def, $m)) {
+            continue;
+        }
+
+        $desejadas[$m[1]] = ['def' => $def, 'depois' => $anterior];
+        $anterior = $m[1];
+    }
+
+    if ($desejadas === []) {
+        return;
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT COLUMN_NAME FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?"
+    );
+    $stmt->execute([$tabela]);
+    $existentes = array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    if ($existentes === []) {
+        return; // tabela ausente: quem cria e o CREATE, nao esta funcao
+    }
+
+    $existentes = array_change_key_case(array_flip($existentes), CASE_LOWER);
+
+    foreach ($desejadas as $nome => $info) {
+        if (isset($existentes[strtolower($nome)])) {
+            continue;
+        }
+
+        $sql = "ALTER TABLE `{$tabela}` ADD COLUMN {$info['def']}";
+
+        // Posiciona onde o schema manda, para a tabela ficar legivel.
+        if ($info['depois'] !== null && isset($existentes[strtolower($info['depois'])])) {
+            $sql .= " AFTER `{$info['depois']}`";
+        }
+
+        try {
+            $pdo->exec($sql);
+            $existentes[strtolower($nome)] = true;
+        } catch (Throwable $e) {
+            // Uma coluna que nao entra nao pode impedir as seguintes.
+            error_log("nfse_conciliar_colunas: {$tabela}.{$nome} — " . $e->getMessage());
+        }
+    }
+}
+
 function nfse_migrar(?PDO $pdo = null): void
 {
     static $feito = false;
@@ -234,7 +348,7 @@ function nfse_migrar(?PDO $pdo = null): void
 
     $pdo = $pdo ?: nfse_pdo();
 
-    $pdo->exec("
+    $sqlConfig = "
         CREATE TABLE IF NOT EXISTS nfse_config (
             id                  TINYINT UNSIGNED NOT NULL PRIMARY KEY,
             ativo               TINYINT(1)      NOT NULL DEFAULT 0,
@@ -282,11 +396,14 @@ function nfse_migrar(?PDO $pdo = null): void
             atualizado_em       DATETIME        NULL,
             atualizado_por      VARCHAR(100)    NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
+    ";
+
+    $pdo->exec($sqlConfig);
+    nfse_conciliar_colunas($pdo, 'nfse_config', $sqlConfig);
 
     $pdo->exec("INSERT IGNORE INTO nfse_config (id) VALUES (1)");
 
-    $pdo->exec("
+    $sqlNotas = "
         CREATE TABLE IF NOT EXISTS nfse_notas (
             id                  INT AUTO_INCREMENT PRIMARY KEY,
             ordem_servico_id    INT             NOT NULL,
@@ -318,9 +435,21 @@ function nfse_migrar(?PDO $pdo = null): void
             KEY idx_nfse_os (ordem_servico_id),
             KEY idx_nfse_status (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
+    ";
 
-    $pdo->exec("
+    $pdo->exec($sqlNotas);
+
+    /* CREATE TABLE IF NOT EXISTS nao acrescenta coluna a tabela ja existente.
+       Quem instalou o modulo antes de um campo entrar no schema fica com o
+       layout antigo, e a primeira consulta que usa o campo novo quebra — foi
+       o que aconteceu com valor_iss em nfse_notas.
+
+       Em vez de tratar campo a campo, conciliamos a tabela com o proprio
+       CREATE acima: qualquer coluna que passe a existir ali passa a ser
+       criada sozinha na proxima carga da pagina. */
+    nfse_conciliar_colunas($pdo, 'nfse_notas', $sqlNotas);
+
+    $sqlLog = "
         CREATE TABLE IF NOT EXISTS nfse_log (
             id           INT AUTO_INCREMENT PRIMARY KEY,
             nota_id      INT          NULL,
@@ -333,7 +462,10 @@ function nfse_migrar(?PDO $pdo = null): void
             KEY idx_log_os (os_id),
             KEY idx_log_nota (nota_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
+    ";
+
+    $pdo->exec($sqlLog);
+    nfse_conciliar_colunas($pdo, 'nfse_log', $sqlLog);
 
     // Leiaute do DPS: versão declarada e grupo IBSCBS.
     $novasCfg = [

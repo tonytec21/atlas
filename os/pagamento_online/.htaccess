@@ -1,0 +1,7 @@
+# Protege a biblioteca interna: nenhum arquivo de lib/ deve ser acessível
+# diretamente pelo navegador.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^lib/ - [F,L]
+</IfModule>
+Options -Indexes

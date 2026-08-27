@@ -65,6 +65,23 @@ if ($__controlarPorAcessosAdicionais) {
     $podeVerBotaoPagamentos = ($isAdmin || $temFluxoDeCaixa);
 }
 /* ================================================================================ */
+/* ===================== PAGAMENTO ONLINE (Parcela Express) =====================
+   Modulo aditivo e opcional. Enquanto o administrador nao habilitar em
+   os/pagamento_online/pe_config.php, $__pePosAtivo e false e a tela se comporta
+   exatamente como antes desta integracao. O is_file() garante que a ausencia
+   da pasta tambem nao quebra nada. */
+$__pePosAtivo = false;
+$__pePagamentoOnlineLib = __DIR__ . '/pagamento_online/pe_lib.php';
+
+if (is_file($__pePagamentoOnlineLib)) {
+    try {
+        require_once $__pePagamentoOnlineLib;
+        $__pePosAtivo = pe_habilitado();
+    } catch (Throwable $__pe_e) {
+        $__pePosAtivo = false; // falha no modulo novo nunca derruba a O.S.
+    }
+}
+/* ============================================================================== */
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $titulo = $_POST['title'];
@@ -4473,5 +4490,8 @@ $(document).ready(function() {
 <?php
 include(__DIR__ . '/../rodape.php');
 ?>
+
+<?php if (!empty($__pePosAtivo)) include __DIR__ . '/pagamento_online/pe_ui.php'; ?>
+
 </body>
 </html>

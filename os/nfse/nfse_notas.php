@@ -294,55 +294,25 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
     <link rel="stylesheet" href="../../style/css/bootstrap.min.css">
     <link rel="stylesheet" href="../../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../../style/css/style.css">
+    <link rel="stylesheet" href="../ui-config.css">
     <link rel="icon" href="../../style/img/favicon.png" type="image/png">
     <style>
-        .kpi{border:1px solid #e2e8f0;border-radius:10px;padding:14px;background:#fff;text-align:center}
-        .kpi .n{font-size:1.5rem;font-weight:700;color:#0f172a}
-        .kpi .l{font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.03em}
-        .kpi.fila{border-color:#fdba74;background:#fff7ed}
-        .kpi.fila .n{color:#c2410c}
-        .chave{font-family:monospace;font-size:.72rem;word-break:break-all}
-        td .msg{font-size:.75rem;color:#b91c1c;max-width:280px;display:block}
-        .btn-erro{border:0;background:none;padding:0;color:#b91c1c;font-size:.72rem;text-decoration:underline;cursor:pointer}
-        .cod{display:inline-block;background:#fee2e2;color:#991b1b;border-radius:4px;padding:0 5px;font-size:.68rem;font-weight:600;margin-left:4px}
-        .filtros{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 14px 6px}
-        .filtros label{font-size:.74rem;font-weight:600;color:#475569;margin-bottom:2px}
-        .mais{display:none;border-top:1px solid #e2e8f0;margin-top:6px;padding-top:12px}
-        .mais.aberto{display:block}
-        .mais-linha{display:flex;justify-content:space-between;align-items:center;font-size:.8rem;padding:2px 0 6px}
-        .mais-linha a{color:#1e40af;text-decoration:none}
-        .mais-linha a:hover{text-decoration:underline}
-        .mais-linha .limpar{color:#b91c1c}
-        .resultado-info{font-size:.82rem;color:#475569}
-        .onde{display:inline-block;background:#eff6ff;color:#1e40af;border-radius:4px;padding:1px 8px;margin-left:6px}
-        /* Barra de ações do topo.
-           Estilo próprio, sem depender das classes do tema: com .btn/.btn-info
-           o rótulo quebrava em três linhas e o ícone escapava do botão. */
-        .acoes-topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-        .btn-topo{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
-                  border:1px solid transparent;border-radius:6px;padding:7px 14px;
-                  font-size:.82rem;font-weight:600;line-height:1.2;cursor:pointer;
-                  text-decoration:none;transition:background .15s,border-color .15s}
-        .btn-topo i{font-size:.9rem;line-height:1}
-        .btn-topo span{line-height:1.2}
-        .btn-topo:hover{text-decoration:none}
-        .b-sinc{background:#0e7490;color:#fff}
-        .b-sinc:hover{background:#155e75;color:#fff}
-        .b-reem{background:#d97706;color:#fff}
-        .b-reem:hover{background:#b45309;color:#fff}
-        .b-cfg{background:#fff;color:#475569;border-color:#cbd5e1}
-        .b-cfg:hover{background:#f1f5f9;color:#334155}
-        @media (max-width:575px){
-            .acoes-topo{width:100%;margin-top:10px}
-            .btn-topo{flex:1 1 auto;justify-content:center}
+        /* Só o que é exclusivo desta tela. O resto vem de ui-config.css. */
+        #lotebox {
+            text-align: left; font-size: 13px; max-height: 230px; overflow: auto;
+            border: 1px solid var(--border-primary, #e5e7eb); border-radius: 10px;
+            padding: 10px; margin-top: 12px;
         }
-        .tag-reemitida{display:inline-block;background:#e0f2fe;color:#075985;border-radius:999px;
-                       padding:1px 8px;font-size:.68rem;font-weight:700;margin-top:3px}
-        #lotebox{text-align:left;font-size:.82rem;max-height:230px;overflow:auto;border:1px solid #e2e8f0;
-                 border-radius:8px;padding:8px;margin-top:10px}
-        #lotebox div{padding:2px 0;border-bottom:1px dashed #eef2f7}
-        .progresso{height:10px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:12px}
-        .progresso i{display:block;height:100%;background:#0f766e;width:0;transition:width .25s}
+        #lotebox div { padding: 3px 0; border-bottom: 1px dashed var(--border-primary, #eef2f7); }
+        .progresso {
+            height: 10px; background: var(--bg-tertiary, #e5e7eb);
+            border-radius: 999px; overflow: hidden; margin-top: 12px;
+        }
+        .progresso i {
+            display: block; height: 100%; width: 0;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            transition: width .25s;
+        }
     </style>
 </head>
 <body>
@@ -350,295 +320,317 @@ $esc = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 
 <div id="main" class="main-content">
   <div class="container">
-    <div class="d-flex justify-content-between align-items-center flex-wrap">
-      <h3 class="m-0">NFS-e emitidas</h3>
-      <div class="acoes-topo">
-        <?php if ($totalSincronizar > 0): ?>
-          <button type="button" class="btn-topo b-sinc" onclick="sincronizarTodas()"
-                  title="Procura no Ambiente Nacional as NFS-e que já existem lá e corrige o registro local. Nada é emitido.">
-            <i class="fa fa-cloud-download"></i>
-            <span>Sincronizar rejeitadas (<?= (int) $totalSincronizar ?>)</span>
-          </button>
-        <?php endif; ?>
-        <?php if ($totalReemitir > 0): ?>
-          <button type="button" class="btn-topo b-reem" onclick="reemitirTodas()">
-            <i class="fa fa-refresh"></i>
-            <span>Reemitir rejeitadas (<?= (int) $totalReemitir ?>)</span>
-          </button>
-        <?php endif; ?>
-        <a href="nfse_config.php" class="btn-topo b-cfg">
-          <i class="fa fa-cog"></i><span>Configuração</span>
-        </a>
-      </div>
-    </div>
-    <hr>
+    <div class="cfg">
 
-    <div class="row mb-4">
-      <?php
-      $mapa = ['autorizada' => 'Autorizadas', 'rejeitada' => 'Rejeitadas', 'cancelada' => 'Canceladas', 'processando' => 'Processando'];
-      foreach ($mapa as $k => $rot):
-          $linha = null;
-          foreach ($resumo as $r) { if ($r['status'] === $k) { $linha = $r; break; } }
-      ?>
-        <div class="col-6 col-md-3 col-lg-2 mb-2">
-          <div class="kpi">
-            <div class="n"><?= (int) ($linha['c'] ?? 0) ?></div>
-            <div class="l"><?= $rot ?></div>
+      <section class="cfg-hero">
+        <div class="cfg-titulo">
+          <div class="cfg-icone"><i class="fa fa-files-o" aria-hidden="true"></i></div>
+          <div>
+            <h1>NFS-e emitidas</h1>
+            <p class="cfg-sub">Histórico de notas do Ambiente Nacional.</p>
+          </div>
+        </div>
+        <div class="cfg-selos">
+          <?php if ($totalSincronizar > 0): ?>
+            <button type="button" class="cfg-btn cfg-btn-marca" onclick="sincronizarTodas()"
+                    title="Procura no Ambiente Nacional as NFS-e que já existem lá e corrige o registro local. Nada é emitido.">
+              <i class="fa fa-cloud-download"></i> Sincronizar rejeitadas (<?= (int) $totalSincronizar ?>)
+            </button>
+          <?php endif; ?>
+          <?php if ($totalReemitir > 0): ?>
+            <button type="button" class="cfg-btn cfg-btn-forte" onclick="reemitirTodas()">
+              <i class="fa fa-refresh"></i> Reemitir rejeitadas (<?= (int) $totalReemitir ?>)
+            </button>
+          <?php endif; ?>
+          <a href="nfse_config.php" class="cfg-btn cfg-btn-neutro"><i class="fa fa-cog"></i> Configuração</a>
+        </div>
+      </section>
+
+      <!-- ============ INDICADORES ============ -->
+      <div class="cfg-kpis">
+        <?php
+        $mapa = ['autorizada' => 'Autorizadas', 'rejeitada' => 'Rejeitadas', 'cancelada' => 'Canceladas', 'processando' => 'Processando'];
+        $classeKpi = ['autorizada' => 'cfg-kpi-ok', 'rejeitada' => 'cfg-kpi-erro', 'cancelada' => '', 'processando' => ''];
+        foreach ($mapa as $k => $rot):
+            $linha = null;
+            foreach ($resumo as $r) { if ($r['status'] === $k) { $linha = $r; break; } }
+        ?>
+          <div class="cfg-kpi <?= $classeKpi[$k] ?>">
+            <div class="cfg-kpi-n"><?= (int) ($linha['c'] ?? 0) ?></div>
+            <div class="cfg-kpi-r"><?= $rot ?></div>
             <?php if ($k === 'autorizada'): ?>
-              <div class="l mt-1">ISS <?= $brl($linha['iss'] ?? 0) ?></div>
+              <div class="cfg-kpi-x">ISS <?= $brl($linha['iss'] ?? 0) ?></div>
             <?php endif; ?>
           </div>
-        </div>
-      <?php endforeach; ?>
-
-      <div class="col-6 col-md-3 col-lg-2 mb-2">
-        <a href="?status=reemitir" style="text-decoration:none">
-          <div class="kpi fila">
-            <div class="n"><?= (int) $totalReemitir ?></div>
-            <div class="l">A reemitir</div>
-            <div class="l mt-1">O.S. na fila</div>
-          </div>
-        </a>
-      </div>
-    </div>
-
-    <form method="get" class="filtros mb-3">
-      <?php
-      $campos = [
-          'auto'    => 'Buscar em tudo',
-          'os'      => 'Nº da O.S.',
-          'dps'     => 'Nº da DPS',
-          'nfse'    => 'Nº da NFS-e',
-          'chave'   => 'Chave de acesso',
-          'tomador' => 'Nome do tomador',
-          'doc'     => 'CPF/CNPJ do tomador',
-      ];
-      $dicas = [
-          'auto'    => 'Chave, nº da O.S., nº da DPS, nº da NFS-e, nome ou CPF/CNPJ',
-          'os'      => 'Número da O.S. — ex.: 1116',
-          'dps'     => 'Número da DPS — ex.: 1739',
-          'nfse'    => 'Número da NFS-e — ex.: 1420',
-          'chave'   => 'Chave de acesso, inteira ou em parte',
-          'tomador' => 'Nome, ou parte dele',
-          'doc'     => 'CPF ou CNPJ, com ou sem pontuação',
-      ];
-      ?>
-      <div class="form-row">
-        <div class="col-lg-3 col-md-5 mb-2">
-          <select name="campo" class="form-control" onchange="this.form.q.focus()">
-            <?php foreach ($campos as $k => $rot): ?>
-              <option value="<?= $k ?>" <?= $fCampo === $k ? 'selected' : '' ?>><?= $rot ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="col-lg-4 col-md-7 mb-2">
-          <input type="text" name="q" class="form-control"
-                 placeholder="<?= $esc($dicas[$fCampo] ?? $dicas['auto']) ?>"
-                 value="<?= $esc($busca) ?>">
-        </div>
-        <div class="col-lg-2 col-md-5 mb-2">
-          <select name="status" class="form-control">
-            <option value="">Todos os status</option>
-            <?php foreach ($mapa as $k => $rot): ?>
-              <option value="<?= $k ?>" <?= $status === $k ? 'selected' : '' ?>><?= $rot ?></option>
-            <?php endforeach; ?>
-            <option value="reemitir" <?= $status === 'reemitir' ? 'selected' : '' ?>>Aguardando reemissão</option>
-          </select>
-        </div>
-        <div class="col-lg-2 col-md-4 mb-2">
-          <select name="ord" class="form-control">
-            <option value="recentes" <?= $fOrdem === 'recentes' ? 'selected' : '' ?>>Mais recentes</option>
-            <option value="antigas"  <?= $fOrdem === 'antigas'  ? 'selected' : '' ?>>Mais antigas</option>
-            <option value="maior"    <?= $fOrdem === 'maior'    ? 'selected' : '' ?>>Maior valor</option>
-            <option value="menor"    <?= $fOrdem === 'menor'    ? 'selected' : '' ?>>Menor valor</option>
-            <option value="tomador"  <?= $fOrdem === 'tomador'  ? 'selected' : '' ?>>Tomador (A-Z)</option>
-            <option value="os"       <?= $fOrdem === 'os'       ? 'selected' : '' ?>>Nº da O.S.</option>
-          </select>
-        </div>
-        <div class="col-lg-1 col-md-3 mb-2">
-          <button class="btn btn-primary btn-block" title="Filtrar"><i class="fa fa-search"></i></button>
-        </div>
-      </div>
-
-      <?php
-      $temAvancado = ($fDe !== '' || $fAte !== '' || $fAmbiente !== '' || $fFuncion !== ''
-                      || $fValorMin !== '' || $fValorMax !== '');
-      ?>
-      <div class="mais-linha">
-        <a href="#" onclick="document.getElementById('mais').classList.toggle('aberto'); return false;">
-          <i class="fa fa-sliders"></i> Mais filtros<?= $temAvancado ? ' (ativos)' : '' ?>
-        </a>
-        <?php if ($temAvancado || $busca !== '' || $status !== ''): ?>
-          <a href="nfse_notas.php" class="limpar"><i class="fa fa-times"></i> Limpar filtros</a>
-        <?php endif; ?>
-      </div>
-
-      <div id="mais" class="mais <?= $temAvancado ? 'aberto' : '' ?>">
-        <div class="form-row">
-          <div class="col-md-3 mb-2">
-            <label>Emitidas de</label>
-            <input type="date" name="de" class="form-control" value="<?= $esc($fDe) ?>">
-          </div>
-          <div class="col-md-3 mb-2">
-            <label>até</label>
-            <input type="date" name="ate" class="form-control" value="<?= $esc($fAte) ?>">
-          </div>
-          <div class="col-md-3 mb-2">
-            <label>Ambiente</label>
-            <select name="amb" class="form-control">
-              <option value="">Todos</option>
-              <option value="1" <?= $fAmbiente === '1' ? 'selected' : '' ?>>Produção</option>
-              <option value="2" <?= $fAmbiente === '2' ? 'selected' : '' ?>>Homologação</option>
-            </select>
-          </div>
-          <div class="col-md-3 mb-2">
-            <label>Emitida por</label>
-            <select name="func" class="form-control">
-              <option value="">Todos</option>
-              <?php foreach ($funcionarios as $f): ?>
-                <option value="<?= $esc($f) ?>" <?= $fFuncion === $f ? 'selected' : '' ?>><?= $esc($f) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-          <div class="col-md-3 mb-2">
-            <label>Valor do serviço — de</label>
-            <input type="text" name="vmin" class="form-control" placeholder="0,00" value="<?= $esc($fValorMin) ?>">
-          </div>
-          <div class="col-md-3 mb-2">
-            <label>até</label>
-            <input type="text" name="vmax" class="form-control" placeholder="0,00" value="<?= $esc($fValorMax) ?>">
-          </div>
-          <div class="col-md-3 mb-2">
-            <label>Resultados por página</label>
-            <select name="pp" class="form-control">
-              <?php foreach ([30, 60, 100, 200] as $pp): ?>
-                <option value="<?= $pp ?>" <?= $porPagina === $pp ? 'selected' : '' ?>><?= $pp ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-          <div class="col-md-3 mb-2 d-flex align-items-end">
-            <button class="btn btn-primary btn-block"><i class="fa fa-search"></i> Aplicar</button>
-          </div>
-        </div>
-      </div>
-    </form>
-
-    <div class="resultado-info mb-2">
-      <b><?= (int) $total ?></b> nota(s) encontrada(s)
-      <?php if ($total > 0): ?>
-        · serviço <?= $brl($somaFiltro['serv'] ?? 0) ?>
-        · ISS <?= $brl($somaFiltro['iss'] ?? 0) ?>
-      <?php endif; ?>
-
-      <?php if ($busca !== ''):
-        /* Diz onde a busca foi feita. No modo automático o critério é
-           deduzido do formato do termo, e o usuário não tem como adivinhar
-           isso — então a tela conta, e oferece o caminho para restringir. */
-        $ondeBuscou = $campos[$fCampo] ?? '';
-        if ($fCampo === 'auto') {
-            $dig = preg_replace('/\D/', '', $busca);
-            if (ctype_digit($busca) && strlen($busca) <= 9) {
-                $ondeBuscou = 'nº da O.S., da DPS ou da NFS-e';
-            } elseif (ctype_digit($busca) && strlen($busca) >= 10) {
-                $ondeBuscou = 'chave de acesso ou CPF/CNPJ';
-            } else {
-                $ondeBuscou = 'nome' . ($dig !== '' ? ' ou CPF/CNPJ' : '') . ' do tomador';
-            }
-        }
-      ?>
-        <span class="onde">buscando por <b><?= $esc($busca) ?></b> em <?= $esc($ondeBuscou) ?></span>
-        <?php if ($fCampo === 'auto' && $total > 1): ?>
-          <span class="text-muted">— para restringir, escolha o campo ao lado da busca.</span>
-        <?php endif; ?>
-      <?php endif; ?>
-    </div>
-
-    <div class="table-responsive">
-      <table class="table table-striped table-bordered table-sm">
-        <thead>
-          <tr>
-            <th>#</th><th>O.S.</th><th>Amb.</th><th>Série/DPS</th><th>Chave / Nº NFS-e</th>
-            <th>Tomador</th><th class="text-right">Serviço</th><th class="text-right">Base</th>
-            <th class="text-right">ISS</th><th>Status</th><th>Emitida em</th><th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-        <?php if (!$notas): ?>
-          <tr><td colspan="12" class="text-center text-muted py-4">Nenhuma NFS-e registrada.</td></tr>
-        <?php endif; ?>
-        <?php foreach ($notas as $n): ?>
-          <tr>
-            <td><?= (int) $n['id'] ?></td>
-            <td><a href="../visualizar_os.php?id=<?= (int) $n['ordem_servico_id'] ?>"><?= (int) $n['ordem_servico_id'] ?></a></td>
-            <td><?= $n['ambiente'] === '1' ? 'Prod.' : 'Homol.' ?></td>
-            <td><?= $esc($n['serie']) ?>/<?= (int) $n['numero_dps'] ?></td>
-            <td>
-              <?php if ($n['chave_acesso']): ?>
-                <span class="chave"><?= $esc($n['chave_acesso']) ?></span>
-                <?php if ($n['numero_nfse']): ?><br><small>Nº <?= $esc($n['numero_nfse']) ?></small><?php endif; ?>
-              <?php else: ?>
-                <small class="text-muted">—</small>
-              <?php endif; ?>
-
-              <?php if ($n['status'] === 'rejeitada' && $n['mensagem']):
-                    $e = nfse_erro_traduzir($n['mensagem']); ?>
-                <span class="msg">
-                  <?= $esc($e['titulo']) ?>
-                  <?php if ($e['codigo']): ?><span class="cod"><?= $esc($e['codigo']) ?></span><?php endif; ?>
-                </span>
-                <button type="button" class="btn-erro" data-msg="<?= $esc($n['mensagem']) ?>"
-                        onclick="verErro(this)">retorno técnico</button>
-              <?php endif; ?>
-
-              <?php if (!empty($n['reemitida_em'])): ?>
-                <span class="tag-reemitida">
-                  <i class="fa fa-check"></i> Reemitida
-                  <?= !empty($n['reemitida_nota_id']) ? ' &rarr; nota #' . (int) $n['reemitida_nota_id'] : '' ?>
-                </span>
-              <?php endif; ?>
-            </td>
-            <td><?= $esc($n['tomador_nome'] ?: 'Não informado') ?></td>
-            <td class="text-right"><?= $brl($n['valor_servico']) ?></td>
-            <td class="text-right"><?= $brl($n['base_calculo']) ?></td>
-            <td class="text-right"><?= $brl($n['valor_iss']) ?></td>
-            <td><?= $badge($n['status']) ?></td>
-            <td><small><?= $n['criado_em'] ? date('d/m/Y H:i', strtotime($n['criado_em'])) : '—' ?></small></td>
-            <td class="text-nowrap">
-              <?php if (in_array($n['status'], ['autorizada', 'cancelada'], true) && $n['chave_acesso']): ?>
-                <a class="btn btn-outline-primary btn-sm" title="DANFSe (PDF)" target="_blank" href="nfse_danfse.php?nota_id=<?= (int) $n['id'] ?>"><i class="fa fa-file-pdf-o"></i></a>
-                <a class="btn btn-outline-success btn-sm" title="Recibo (impressora térmica)" target="_blank" href="nfse_recibo.php?nota_id=<?= (int) $n['id'] ?>"><i class="fa fa-print"></i></a>
-              <?php endif; ?>
-              <?php if ($n['xml_nfse']): ?>
-                <a class="btn btn-outline-secondary btn-sm" title="Baixar XML" href="nfse_xml.php?nota_id=<?= (int) $n['id'] ?>"><i class="fa fa-file-code-o"></i></a>
-              <?php endif; ?>
-
-              <?php if ($podeReemitir($n)): ?>
-                <button class="btn btn-warning btn-sm" title="Tentar emitir novamente"
-                        onclick="reemitirUma(<?= (int) $n['ordem_servico_id'] ?>)">
-                  <i class="fa fa-paper-plane"></i>
-                </button>
-              <?php endif; ?>
-
-              <button class="btn btn-outline-info btn-sm" title="Sincronizar" onclick="sincronizar(<?= (int) $n['id'] ?>)"><i class="fa fa-refresh"></i></button>
-              <?php if ($n['status'] === 'autorizada'): ?>
-                <button class="btn btn-outline-danger btn-sm" title="Cancelar" onclick="cancelar(<?= (int) $n['id'] ?>)"><i class="fa fa-ban"></i></button>
-              <?php endif; ?>
-            </td>
-          </tr>
         <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
 
-    <?php $paginas = (int) ceil($total / $porPagina); if ($paginas > 1): ?>
-      <nav><ul class="pagination pagination-sm">
-        <?php for ($i = 1; $i <= $paginas; $i++): ?>
-          <li class="page-item <?= $i === $pagina ? 'active' : '' ?>">
-            <a class="page-link" href="?<?= http_build_query($qsBase + ['p' => $i]) ?>"><?= $i ?></a>
-          </li>
-        <?php endfor; ?>
-      </ul></nav>
-    <?php endif; ?>
+        <a href="?status=reemitir" class="cfg-kpi cfg-kpi-fila">
+          <div class="cfg-kpi-n"><?= (int) $totalReemitir ?></div>
+          <div class="cfg-kpi-r">A reemitir</div>
+          <div class="cfg-kpi-x">O.S. na fila</div>
+        </a>
+      </div>
+
+      <!-- ============ FILTROS ============ -->
+      <div class="cfg-card">
+        <header><i class="fa fa-search"></i><h2>Buscar</h2></header>
+        <div class="cfg-corpo">
+          <form method="get">
+            <?php
+            $campos = [
+                'auto'    => 'Buscar em tudo',
+                'os'      => 'Nº da O.S.',
+                'dps'     => 'Nº da DPS',
+                'nfse'    => 'Nº da NFS-e',
+                'chave'   => 'Chave de acesso',
+                'tomador' => 'Nome do tomador',
+                'doc'     => 'CPF/CNPJ do tomador',
+            ];
+            $dicas = [
+                'auto'    => 'Chave, nº da O.S., nº da DPS, nº da NFS-e, nome ou CPF/CNPJ',
+                'os'      => 'Número da O.S. — ex.: 1116',
+                'dps'     => 'Número da DPS — ex.: 1739',
+                'nfse'    => 'Número da NFS-e — ex.: 1420',
+                'chave'   => 'Chave de acesso, inteira ou em parte',
+                'tomador' => 'Nome, ou parte dele',
+                'doc'     => 'CPF ou CNPJ, com ou sem pontuação',
+            ];
+            ?>
+            <div class="cfg-grid">
+              <div class="c3">
+                <label class="cfg-rot" for="campo">Procurar em</label>
+                <select name="campo" id="campo" class="cfg-in" onchange="this.form.q.focus()">
+                  <?php foreach ($campos as $k => $rot): ?>
+                    <option value="<?= $k ?>" <?= $fCampo === $k ? 'selected' : '' ?>><?= $rot ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div class="c4">
+                <label class="cfg-rot" for="q">Termo</label>
+                <input type="text" name="q" id="q" class="cfg-in"
+                       placeholder="<?= $esc($dicas[$fCampo] ?? $dicas['auto']) ?>"
+                       value="<?= $esc($busca) ?>">
+              </div>
+              <div class="c2">
+                <label class="cfg-rot" for="status">Status</label>
+                <select name="status" id="status" class="cfg-in">
+                  <option value="">Todos</option>
+                  <?php foreach ($mapa as $k => $rot): ?>
+                    <option value="<?= $k ?>" <?= $status === $k ? 'selected' : '' ?>><?= $rot ?></option>
+                  <?php endforeach; ?>
+                  <option value="reemitir" <?= $status === 'reemitir' ? 'selected' : '' ?>>Aguardando reemissão</option>
+                </select>
+              </div>
+              <div class="c3">
+                <label class="cfg-rot" for="ord">Ordenar por</label>
+                <select name="ord" id="ord" class="cfg-in">
+                  <option value="recentes" <?= $fOrdem === 'recentes' ? 'selected' : '' ?>>Mais recentes</option>
+                  <option value="antigas"  <?= $fOrdem === 'antigas'  ? 'selected' : '' ?>>Mais antigas</option>
+                  <option value="maior"    <?= $fOrdem === 'maior'    ? 'selected' : '' ?>>Maior valor</option>
+                  <option value="menor"    <?= $fOrdem === 'menor'    ? 'selected' : '' ?>>Menor valor</option>
+                  <option value="tomador"  <?= $fOrdem === 'tomador'  ? 'selected' : '' ?>>Tomador (A-Z)</option>
+                  <option value="os"       <?= $fOrdem === 'os'       ? 'selected' : '' ?>>Nº da O.S.</option>
+                </select>
+              </div>
+            </div>
+
+            <?php
+            $temAvancado = ($fDe !== '' || $fAte !== '' || $fAmbiente !== '' || $fFuncion !== ''
+                            || $fValorMin !== '' || $fValorMax !== '');
+            ?>
+            <div id="mais" class="cfg-mais <?= $temAvancado ? 'aberto' : '' ?>">
+              <div class="cfg-grid">
+                <div class="c3">
+                  <label class="cfg-rot" for="de">Emitidas de</label>
+                  <input type="date" name="de" id="de" class="cfg-in" value="<?= $esc($fDe) ?>">
+                </div>
+                <div class="c3">
+                  <label class="cfg-rot" for="ate">Até</label>
+                  <input type="date" name="ate" id="ate" class="cfg-in" value="<?= $esc($fAte) ?>">
+                </div>
+                <div class="c3">
+                  <label class="cfg-rot" for="amb">Ambiente</label>
+                  <select name="amb" id="amb" class="cfg-in">
+                    <option value="">Todos</option>
+                    <option value="1" <?= $fAmbiente === '1' ? 'selected' : '' ?>>Produção</option>
+                    <option value="2" <?= $fAmbiente === '2' ? 'selected' : '' ?>>Homologação</option>
+                  </select>
+                </div>
+                <div class="c3">
+                  <label class="cfg-rot" for="func">Emitida por</label>
+                  <select name="func" id="func" class="cfg-in">
+                    <option value="">Todos</option>
+                    <?php foreach ($funcionarios as $f): ?>
+                      <option value="<?= $esc($f) ?>" <?= $fFuncion === $f ? 'selected' : '' ?>><?= $esc($f) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <div class="c3">
+                  <label class="cfg-rot" for="vmin">Valor do serviço — de</label>
+                  <input type="text" name="vmin" id="vmin" class="cfg-in" placeholder="0,00" value="<?= $esc($fValorMin) ?>">
+                </div>
+                <div class="c3">
+                  <label class="cfg-rot" for="vmax">Até</label>
+                  <input type="text" name="vmax" id="vmax" class="cfg-in" placeholder="0,00" value="<?= $esc($fValorMax) ?>">
+                </div>
+                <div class="c3">
+                  <label class="cfg-rot" for="pp">Resultados por página</label>
+                  <select name="pp" id="pp" class="cfg-in">
+                    <?php foreach ([30, 60, 100, 200] as $pp): ?>
+                      <option value="<?= $pp ?>" <?= $porPagina === $pp ? 'selected' : '' ?>><?= $pp ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="cfg-mais-linha">
+              <span>
+                <a class="cfg-link" onclick="document.getElementById('mais').classList.toggle('aberto'); return false;">
+                  <i class="fa fa-sliders"></i> Mais filtros<?= $temAvancado ? ' (ativos)' : '' ?>
+                </a>
+                <?php if ($temAvancado || $busca !== '' || $status !== ''): ?>
+                  &nbsp;·&nbsp;
+                  <a href="nfse_notas.php" class="cfg-link cfg-link-erro"><i class="fa fa-times"></i> Limpar filtros</a>
+                <?php endif; ?>
+              </span>
+              <button class="cfg-btn cfg-btn-marca"><i class="fa fa-search"></i> Filtrar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ============ RESULTADO ============ -->
+      <div class="cfg-resumo">
+        <span><b><?= (int) $total ?></b> nota(s) encontrada(s)</span>
+        <?php if ($total > 0): ?>
+          <span>· serviço <b><?= $brl($somaFiltro['serv'] ?? 0) ?></b></span>
+          <span>· ISS <b><?= $brl($somaFiltro['iss'] ?? 0) ?></b></span>
+        <?php endif; ?>
+
+        <?php if ($busca !== ''):
+          /* Diz onde a busca foi feita. No modo automático o critério é
+             deduzido do formato do termo, e o usuário não tem como adivinhar
+             isso — então a tela conta, e oferece o caminho para restringir. */
+          $ondeBuscou = $campos[$fCampo] ?? '';
+          if ($fCampo === 'auto') {
+              $dig = preg_replace('/\D/', '', $busca);
+              if (ctype_digit($busca) && strlen($busca) <= 9) {
+                  $ondeBuscou = 'nº da O.S., da DPS ou da NFS-e';
+              } elseif (ctype_digit($busca) && strlen($busca) >= 10) {
+                  $ondeBuscou = 'chave de acesso ou CPF/CNPJ';
+              } else {
+                  $ondeBuscou = 'nome' . ($dig !== '' ? ' ou CPF/CNPJ' : '') . ' do tomador';
+              }
+          }
+        ?>
+          <span class="cfg-marca-busca">buscando <b><?= $esc($busca) ?></b> em <?= $esc($ondeBuscou) ?></span>
+          <?php if ($fCampo === 'auto' && $total > 1): ?>
+            <span style="color:var(--txt-3)">— para restringir, escolha o campo ao lado da busca.</span>
+          <?php endif; ?>
+        <?php endif; ?>
+      </div>
+
+      <div class="cfg-tabela-caixa">
+        <div class="cfg-rolagem">
+          <table class="cfg-tabela">
+            <thead>
+              <tr>
+                <th>#</th><th>O.S.</th><th>Amb.</th><th>Série/DPS</th><th>Chave / Nº NFS-e</th>
+                <th>Tomador</th><th class="num">Serviço</th><th class="num">Base</th>
+                <th class="num">ISS</th><th>Status</th><th>Emitida em</th><th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+            <?php if (!$notas): ?>
+              <tr><td colspan="12" class="cfg-vazio">
+                <?= ($busca !== '' || $status !== '' || $temAvancado)
+                    ? 'Nenhuma nota corresponde aos filtros. Limpe-os para ver todas.'
+                    : 'Nenhuma NFS-e registrada ainda.' ?>
+              </td></tr>
+            <?php endif; ?>
+            <?php
+            $tagStatus = [
+                'autorizada'  => ['cfg-tag-ok', 'Autorizada'],
+                'rejeitada'   => ['cfg-tag-erro', 'Rejeitada'],
+                'cancelada'   => ['cfg-tag-neutro', 'Cancelada'],
+                'processando' => ['cfg-tag-aviso', 'Processando'],
+            ];
+            foreach ($notas as $n): ?>
+              <tr>
+                <td><?= (int) $n['id'] ?></td>
+                <td><a href="../visualizar_os.php?id=<?= (int) $n['ordem_servico_id'] ?>"><?= (int) $n['ordem_servico_id'] ?></a></td>
+                <td><?= $n['ambiente'] === '1' ? 'Prod.' : 'Homol.' ?></td>
+                <td><?= $esc($n['serie']) ?>/<?= (int) $n['numero_dps'] ?></td>
+                <td class="chave">
+                  <?php if ($n['chave_acesso']): ?>
+                    <span class="cfg-chave"><?= $esc($n['chave_acesso']) ?></span>
+                    <?php if ($n['numero_nfse']): ?><br><small>Nº <?= $esc($n['numero_nfse']) ?></small><?php endif; ?>
+                  <?php else: ?>
+                    <span style="color:var(--txt-3)">—</span>
+                  <?php endif; ?>
+
+                  <?php if ($n['status'] === 'rejeitada' && $n['mensagem']):
+                        $e = nfse_erro_traduzir($n['mensagem']); ?>
+                    <span class="cfg-erro-msg">
+                      <?= $esc($e['titulo']) ?>
+                      <?php if ($e['codigo']): ?><span class="cfg-cod"><?= $esc($e['codigo']) ?></span><?php endif; ?>
+                    </span>
+                    <button type="button" class="cfg-btn-texto" data-msg="<?= $esc($n['mensagem']) ?>"
+                            onclick="verErro(this)">retorno técnico</button>
+                  <?php endif; ?>
+
+                  <?php if (!empty($n['reemitida_em'])): ?>
+                    <br><span class="cfg-tag cfg-tag-info" style="margin-top:4px">
+                      <i class="fa fa-check"></i> Reemitida
+                      <?= !empty($n['reemitida_nota_id']) ? ' &rarr; nota #' . (int) $n['reemitida_nota_id'] : '' ?>
+                    </span>
+                  <?php endif; ?>
+                </td>
+                <td class="nome"><?= $esc($n['tomador_nome'] ?: 'Não informado') ?></td>
+                <td class="num"><?= $brl($n['valor_servico']) ?></td>
+                <td class="num"><?= $brl($n['base_calculo']) ?></td>
+                <td class="num"><?= $brl($n['valor_iss']) ?></td>
+                <td>
+                  <?php [$cls, $rot] = $tagStatus[$n['status']] ?? ['cfg-tag-neutro', $n['status']]; ?>
+                  <span class="cfg-tag <?= $cls ?>"><?= $esc($rot) ?></span>
+                </td>
+                <td><small><?= $n['criado_em'] ? date('d/m/Y H:i', strtotime($n['criado_em'])) : '—' ?></small></td>
+                <td>
+                  <div class="cfg-acoes-linha">
+                    <?php if (in_array($n['status'], ['autorizada', 'cancelada'], true) && $n['chave_acesso']): ?>
+                      <a class="cfg-ico cfg-ico-erro" title="DANFSe (PDF)" target="_blank" href="nfse_danfse.php?nota_id=<?= (int) $n['id'] ?>"><i class="fa fa-file-pdf-o"></i></a>
+                      <a class="cfg-ico cfg-ico-ok" title="Recibo (impressora térmica)" target="_blank" href="nfse_recibo.php?nota_id=<?= (int) $n['id'] ?>"><i class="fa fa-print"></i></a>
+                    <?php endif; ?>
+                    <?php if ($n['xml_nfse']): ?>
+                      <a class="cfg-ico" title="Baixar XML" href="nfse_xml.php?nota_id=<?= (int) $n['id'] ?>"><i class="fa fa-file-code-o"></i></a>
+                    <?php endif; ?>
+                    <?php if ($podeReemitir($n)): ?>
+                      <button class="cfg-ico cfg-ico-aviso" title="Tentar emitir novamente"
+                              onclick="reemitirUma(<?= (int) $n['ordem_servico_id'] ?>)"><i class="fa fa-paper-plane"></i></button>
+                    <?php endif; ?>
+                    <button class="cfg-ico cfg-ico-marca" title="Sincronizar" onclick="sincronizar(<?= (int) $n['id'] ?>)"><i class="fa fa-refresh"></i></button>
+                    <?php if ($n['status'] === 'autorizada'): ?>
+                      <button class="cfg-ico cfg-ico-erro" title="Cancelar" onclick="cancelar(<?= (int) $n['id'] ?>)"><i class="fa fa-ban"></i></button>
+                    <?php endif; ?>
+                  </div>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <?php $paginas = (int) ceil($total / $porPagina); if ($paginas > 1): ?>
+        <nav class="cfg-paginacao">
+          <?php for ($i = 1; $i <= $paginas; $i++): ?>
+            <a href="?<?= http_build_query($qsBase + ['p' => $i]) ?>" class="<?= $i === $pagina ? 'atual' : '' ?>"><?= $i ?></a>
+          <?php endfor; ?>
+        </nav>
+      <?php endif; ?>
+
+    </div>
   </div>
 </div>
 

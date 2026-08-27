@@ -1,0 +1,513 @@
+/* =====================================================================
+   ui-config.css — Telas de configuração do Atlas.
+   Usada por os/pagamento_online/pe_config.php e os/nfse/nfse_config.php.
+
+   Segue o design system de criar_os.php: mesma paleta de marca, mesma
+   escala de raios, sombras e espaços, mesmos gestos nos botões. Existe
+   como arquivo único para que as telas de configuração não divirjam
+   entre si nem do resto do sistema.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   Tokens
+   Os valores do tema escuro são declarados aqui de propósito. No Atlas
+   eles vivem inline em index.php e criar_os.php, então não chegam a
+   estas páginas: sem isto, --text-primary manteria a cor do tema claro e
+   os títulos ficariam escuros sobre fundo escuro.
+   ------------------------------------------------------------------- */
+.cfg {
+    --brand:        #4f46e5;
+    --brand-suave:  #818cf8;
+    --sucesso:      #10b981;
+    --aviso:        #f59e0b;
+    --erro:         #ef4444;
+
+    --grad-marca:   linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --grad-sucesso: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --grad-aviso:   linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    --grad-erro:    linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    --grad-neutro:  linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+
+    --txt:      var(--text-primary,   #111827);
+    --txt-2:    var(--text-secondary, #4b5563);
+    --txt-3:    var(--text-tertiary,  #9ca3af);
+    --fundo:    var(--bg-primary,     #ffffff);
+    --fundo-2:  var(--bg-secondary,   #f9fafb);
+    --fundo-3:  var(--bg-tertiary,    #f3f4f6);
+    --elevado:  var(--bg-elevated,    #ffffff);
+    --borda:    var(--border-primary, #e5e7eb);
+    --borda-2:  var(--border-secondary, #d1d5db);
+
+    --sombra:    0 1px 3px rgba(16,24,40,.1), 0 1px 2px rgba(16,24,40,.06);
+    --sombra-md: 0 4px 6px -1px rgba(16,24,40,.1), 0 2px 4px -1px rgba(16,24,40,.06);
+    --sombra-lg: 0 10px 15px -3px rgba(16,24,40,.1), 0 4px 6px -2px rgba(16,24,40,.05);
+    --sombra-xl: 0 20px 25px -5px rgba(16,24,40,.1), 0 10px 10px -5px rgba(16,24,40,.04);
+
+    --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
+    --e-sm: 8px; --e-md: 16px; --e-lg: 24px; --e-xl: 32px;
+
+    color: var(--txt);
+    padding-bottom: 48px;
+}
+
+/* Supre os tokens que faltam nestas telas quando o tema escuro é ligado.
+   Mesmos valores que criar_os.php usa inline. */
+body.dark-mode {
+    --text-primary:     #f9fafb;
+    --text-secondary:   #d1d5db;
+    --text-tertiary:    #9ca3af;
+    --bg-primary:       #111827;
+    --bg-secondary:     #1f2937;
+    --bg-tertiary:      #374151;
+    --bg-elevated:      #1f2937;
+    --border-primary:   #374151;
+    --border-secondary: #4b5563;
+}
+body.dark-mode .cfg {
+    --sombra:    0 1px 3px rgba(0,0,0,.4);
+    --sombra-md: 0 4px 6px -1px rgba(0,0,0,.45);
+    --sombra-lg: 0 10px 15px -3px rgba(0,0,0,.5);
+    --sombra-xl: 0 20px 25px -5px rgba(0,0,0,.55);
+}
+
+/* ---------------------------------------------------------------------
+   Hero
+   ------------------------------------------------------------------- */
+.cfg-hero {
+    background: var(--grad-marca);
+    border-radius: var(--r-xl);
+    padding: var(--e-xl);
+    margin-bottom: var(--e-xl);
+    box-shadow: var(--sombra-xl);
+    color: #fff;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--e-lg); flex-wrap: wrap;
+}
+.cfg-hero .cfg-titulo { display: flex; align-items: center; gap: var(--e-md); min-width: 0; }
+.cfg-hero .cfg-icone {
+    width: 58px; height: 58px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--r-lg);
+    background: rgba(255, 255, 255, .18);
+}
+.cfg-hero .cfg-icone i { font-size: 27px; color: #fff; }
+.cfg-hero h1 { font-size: 30px; font-weight: 800; margin: 0; letter-spacing: -.02em; color: #fff; }
+.cfg-hero .cfg-sub { margin: 5px 0 0; font-size: 14px; color: rgba(255, 255, 255, .82); }
+.cfg-selos { display: flex; gap: var(--e-sm); flex-wrap: wrap; }
+
+.cfg-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 16px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 700; white-space: nowrap;
+    background: rgba(255, 255, 255, .2); color: #fff;
+}
+.cfg-pill-ok     { background: var(--grad-sucesso); box-shadow: var(--sombra); }
+.cfg-pill-warn   { background: var(--grad-aviso);   box-shadow: var(--sombra); }
+.cfg-pill-alerta { background: var(--grad-erro);    box-shadow: var(--sombra); }
+.cfg-pill-off    { background: rgba(255, 255, 255, .2); }
+
+/* Pílulas fora do hero: precisam de fundo próprio, não do véu branco. */
+.cfg-corpo .cfg-pill { font-size: 11.5px; padding: 4px 11px; color: #fff; }
+.cfg-corpo .cfg-pill-off { background: var(--grad-neutro); }
+
+/* ---------------------------------------------------------------------
+   Cartões
+   ------------------------------------------------------------------- */
+.cfg-card {
+    background: var(--elevado);
+    border: 1px solid var(--borda);
+    border-radius: var(--r-lg);
+    margin-bottom: var(--e-lg);
+    overflow: hidden;
+    box-shadow: var(--sombra);
+    transition: box-shadow .3s ease;
+}
+.cfg-card:hover { box-shadow: var(--sombra-md); }
+.cfg-card > header {
+    display: flex; align-items: center; gap: 11px;
+    padding: 15px 20px;
+    background: var(--fundo-3);
+    border-bottom: 1px solid var(--borda);
+}
+.cfg-card > header i { color: var(--brand); font-size: 15px; }
+body.dark-mode .cfg-card > header i { color: var(--brand-suave); }
+.cfg-card > header h2 {
+    font-size: 15px; font-weight: 700; margin: 0; color: var(--txt); letter-spacing: -.01em;
+}
+.cfg-card > header small { margin-left: auto; font-size: 12px; color: var(--txt-3); font-weight: 600; }
+.cfg-corpo { padding: var(--e-lg); }
+.cfg-corpo > :first-child { margin-top: 0; }
+
+/* ---------------------------------------------------------------------
+   Avisos
+   ------------------------------------------------------------------- */
+.cfg-aviso {
+    background: linear-gradient(135deg, rgba(79,70,229,.06), rgba(99,102,241,.06));
+    border: 1px solid var(--borda);
+    border-left: 4px solid var(--brand);
+    border-radius: var(--r-md);
+    padding: var(--e-md) 18px;
+    font-size: 13.5px; line-height: 1.6;
+    color: var(--txt-2);
+    margin-bottom: var(--e-lg);
+}
+.cfg-aviso strong, .cfg-aviso b { color: var(--txt); }
+
+.cfg-msg {
+    border-radius: var(--r-md); padding: 13px 16px;
+    font-size: 13.5px; line-height: 1.55; margin-bottom: var(--e-md);
+    border: 1px solid transparent;
+}
+.cfg-msg-ok   { background: rgba(16,185,129,.1); border-color: rgba(16,185,129,.3); color: #047857; }
+.cfg-msg-warn { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.3); color: #b45309; }
+.cfg-msg-erro { background: rgba(239,68,68,.1);  border-color: rgba(239,68,68,.3);  color: #b91c1c; }
+body.dark-mode .cfg-msg-ok   { color: #6ee7b7; }
+body.dark-mode .cfg-msg-warn { color: #fcd34d; }
+body.dark-mode .cfg-msg-erro { color: #fca5a5; }
+.cfg-msg ul { margin: 7px 0 0; padding-left: 19px; }
+.cfg-msg code { font-size: 12.5px; }
+
+/* ---------------------------------------------------------------------
+   Interruptor e caixas de seleção
+   Desenhados aqui: o custom-control do Bootstrap depende de cores
+   próprias e seus rótulos somem no tema escuro.
+   ------------------------------------------------------------------- */
+.cfg-switch {
+    display: flex; align-items: center; gap: var(--e-md);
+    padding: 18px 20px; margin: 0;
+    border: 2px solid var(--borda); border-radius: var(--r-lg);
+    background: var(--fundo-2);
+    cursor: pointer;
+    transition: all .3s cubic-bezier(.4, 0, .2, 1);
+}
+.cfg-switch:hover { border-color: var(--brand-suave); box-shadow: var(--sombra-md); }
+.cfg-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.cfg-switch .cfg-trilho {
+    flex: none; width: 50px; height: 28px; border-radius: 999px;
+    background: var(--borda-2); position: relative; transition: all .3s ease;
+}
+.cfg-switch .cfg-trilho::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; box-shadow: var(--sombra);
+    transition: transform .3s cubic-bezier(.4, 0, .2, 1);
+}
+.cfg-switch input:checked ~ .cfg-trilho { background: var(--grad-sucesso); }
+.cfg-switch input:checked ~ .cfg-trilho::after { transform: translateX(22px); }
+.cfg-switch input:focus-visible ~ .cfg-trilho { outline: 3px solid rgba(79,70,229,.35); outline-offset: 3px; }
+.cfg-switch:has(input:checked) { border-color: var(--sucesso); background: rgba(16,185,129,.07); }
+.cfg-switch b { display: block; font-size: 15px; font-weight: 700; color: var(--txt); }
+.cfg-switch .cfg-desc { display: block; font-size: 13px; color: var(--txt-2); margin-top: 3px; line-height: 1.5; }
+
+.cfg-check {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 15px 17px; margin: 0;
+    border: 2px solid var(--borda); border-radius: var(--r-md);
+    background: var(--elevado);
+    cursor: pointer;
+    transition: all .3s cubic-bezier(.4, 0, .2, 1);
+}
+.cfg-check:hover { border-color: var(--brand-suave); box-shadow: var(--sombra-md); }
+.cfg-check input { position: absolute; opacity: 0; pointer-events: none; }
+.cfg-check .cfg-box {
+    flex: none; width: 21px; height: 21px; margin-top: 1px;
+    border: 2px solid var(--borda-2); border-radius: var(--r-sm);
+    position: relative; transition: all .2s ease;
+}
+.cfg-check input:checked ~ .cfg-box { background: var(--grad-marca); border-color: transparent; }
+.cfg-check input:checked ~ .cfg-box::after {
+    content: ''; position: absolute; left: 6px; top: 2px;
+    width: 5px; height: 10px;
+    border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+}
+.cfg-check input:focus-visible ~ .cfg-box { outline: 3px solid rgba(79,70,229,.35); outline-offset: 2px; }
+.cfg-check:has(input:checked) { border-color: var(--brand-suave); }
+.cfg-check b { display: block; font-size: 14px; font-weight: 700; color: var(--txt); }
+.cfg-check .cfg-desc { display: block; font-size: 12.5px; color: var(--txt-2); margin-top: 3px; line-height: 1.5; }
+
+/* ---------------------------------------------------------------------
+   Campos
+   Grid de 12 colunas: a largura do campo indica o que se espera dentro
+   dele. UF com duas letras não pode ocupar o mesmo espaço que Cidade.
+   ------------------------------------------------------------------- */
+.cfg-grid {
+    display: grid; grid-template-columns: repeat(12, 1fr);
+    gap: 18px 16px; align-items: start;
+}
+.cfg-grid + .cfg-grid { margin-top: 18px; }
+.cfg .c2 { grid-column: span 2; }  .cfg .c3 { grid-column: span 3; }
+.cfg .c4 { grid-column: span 4; }  .cfg .c5 { grid-column: span 5; }
+.cfg .c6 { grid-column: span 6; }  .cfg .c7 { grid-column: span 7; }
+.cfg .c8 { grid-column: span 8; }  .cfg .c9 { grid-column: span 9; }
+.cfg .c12 { grid-column: 1 / -1; }
+@media (max-width: 768px) { .cfg-grid > * { grid-column: 1 / -1; } }
+
+.cfg label.cfg-rot {
+    display: block; font-size: 13px; font-weight: 700;
+    letter-spacing: .02em; color: var(--txt-2); margin-bottom: 6px;
+}
+.cfg label.cfg-rot .cfg-opcional { font-weight: 500; color: var(--txt-3); }
+.cfg label.cfg-rot .cfg-req { color: var(--erro); margin-left: 2px; }
+
+.cfg .cfg-in {
+    width: 100%; box-sizing: border-box;
+    padding: 10px 14px; font-size: 14px; line-height: 1.5;
+    color: var(--txt); background: var(--fundo);
+    border: 2px solid var(--borda); border-radius: var(--r-md);
+    transition: all .3s ease;
+}
+.cfg select.cfg-in { padding-right: 32px; appearance: auto; }
+.cfg .cfg-in::placeholder { color: var(--txt-3); }
+.cfg .cfg-in:focus {
+    outline: none; border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, .1);
+}
+.cfg .cfg-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.cfg .cfg-dica { font-size: 12.5px; color: var(--txt-3); margin-top: 6px; line-height: 1.5; }
+.cfg .cfg-dica em, .cfg .cfg-dica b { color: var(--txt-2); font-style: normal; font-weight: 600; }
+.cfg .cfg-dica code { font-size: 12px; }
+
+/* ---------------------------------------------------------------------
+   Listas e pares rótulo/valor
+   ------------------------------------------------------------------- */
+.cfg-lista { list-style: none; margin: 0; padding: 0; }
+.cfg-lista li {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 13.5px; color: var(--txt);
+    padding: 9px 0; border-bottom: 1px solid var(--borda);
+}
+.cfg-lista li:last-child { border-bottom: 0; padding-bottom: 0; }
+.cfg-lista li:first-child { padding-top: 0; }
+.cfg-lista i { margin-top: 2px; font-size: 14px; }
+.cfg-lista i.ok  { color: var(--sucesso); }
+.cfg-lista i.bad { color: var(--erro); }
+
+.cfg-dados { display: grid; gap: 10px; margin: 0 0 var(--e-md); }
+.cfg-dado { display: flex; gap: 12px; font-size: 13.5px; align-items: baseline; }
+.cfg-dado dt {
+    flex: none; width: 76px; margin: 0;
+    font-size: 11px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--txt-3);
+}
+.cfg-dado dd { margin: 0; color: var(--txt); word-break: break-word; font-weight: 600; }
+
+.cfg-drop {
+    border: 2px dashed var(--borda); border-radius: var(--r-lg);
+    padding: 18px; background: var(--fundo-2);
+    transition: border-color .3s ease;
+}
+.cfg-drop:hover { border-color: var(--brand-suave); }
+.cfg-drop input[type=file] { font-size: 13px; color: var(--txt-2); width: 100%; }
+
+/* ---------------------------------------------------------------------
+   Botões — mesmos gestos de criar_os.php
+   ------------------------------------------------------------------- */
+.cfg-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 18px; border: none; border-radius: var(--r-md);
+    font-size: 14px; font-weight: 600; line-height: 1.4;
+    background: var(--elevado); color: var(--txt);
+    box-shadow: var(--sombra); cursor: pointer; text-decoration: none;
+    transition: all .3s cubic-bezier(.4, 0, .2, 1);
+}
+.cfg-btn:hover { transform: translateY(-2px); box-shadow: var(--sombra-lg); color: var(--txt); text-decoration: none; }
+.cfg-btn:active { transform: translateY(0); box-shadow: var(--sombra); }
+.cfg-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: var(--sombra); }
+.cfg-btn-neutro  { background: var(--grad-neutro);  color: #fff; }
+.cfg-btn-marca   { background: var(--grad-marca);   color: #fff; }
+.cfg-btn-forte   { background: var(--grad-sucesso); color: #fff; }
+.cfg-btn-perigo  { background: var(--grad-erro);    color: #fff; }
+.cfg-btn-neutro:hover, .cfg-btn-marca:hover,
+.cfg-btn-forte:hover, .cfg-btn-perigo:hover { color: #fff; }
+.cfg-btn-bloco  { width: 100%; }
+.cfg-btn-grande { padding: 16px; font-size: 17px; font-weight: 700; letter-spacing: .02em; }
+
+.cfg-ferramentas { display: flex; flex-wrap: wrap; gap: 10px; }
+.cfg-pilha { display: grid; gap: 10px; }
+
+/* ---------------------------------------------------------------------
+   Layout e encerramento do formulário
+   ------------------------------------------------------------------- */
+.cfg-colunas {
+    display: grid; grid-template-columns: 350px 1fr;
+    gap: var(--e-lg); align-items: start;
+}
+.cfg-colunas > * { min-width: 0; }
+@media (max-width: 1000px) { .cfg-colunas { grid-template-columns: 1fr; } }
+
+/* O formulário termina com a ação em largura total, como em criar_os.php.
+   Nada de barra flutuante: além de destoar do sistema, ela disputava
+   espaço com a navegação inferior do Atlas. */
+.cfg-fim {
+    background: var(--elevado);
+    border: 1px solid var(--borda);
+    border-radius: var(--r-lg);
+    padding: var(--e-lg);
+    box-shadow: var(--sombra);
+    margin-bottom: var(--e-lg);
+}
+.cfg-fim .cfg-nota { font-size: 13px; color: var(--txt-3); margin: 0 0 var(--e-md); }
+.cfg-fim .cfg-linha { display: flex; gap: 10px; flex-wrap: wrap; }
+.cfg-fim .cfg-linha > .cfg-btn-grande { flex: 1 1 260px; }
+
+.cfg-resultado:empty { display: none; }
+.cfg-resultado { margin-top: var(--e-md); }
+
+@media (max-width: 700px) {
+    .cfg-hero { padding: var(--e-lg); }
+    .cfg-hero h1 { font-size: 24px; }
+    .cfg-hero .cfg-icone { width: 48px; height: 48px; }
+    .cfg-hero .cfg-icone i { font-size: 22px; }
+}
+
+/* =====================================================================
+   Listagens
+   Usados por nfse_notas.php. Ficam aqui e não na página para que uma
+   futura tela de listagem herde o mesmo comportamento.
+   ===================================================================== */
+
+/* ---- Indicadores ---- */
+.cfg-kpis {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--e-md); margin-bottom: var(--e-lg);
+}
+.cfg-kpi {
+    background: var(--elevado);
+    border: 1px solid var(--borda);
+    border-radius: var(--r-lg);
+    padding: 18px 16px;
+    text-align: center;
+    box-shadow: var(--sombra);
+    transition: all .3s cubic-bezier(.4, 0, .2, 1);
+    display: block; text-decoration: none;
+}
+a.cfg-kpi:hover { transform: translateY(-2px); box-shadow: var(--sombra-lg); text-decoration: none; }
+.cfg-kpi .cfg-kpi-n {
+    font-size: 30px; font-weight: 800; line-height: 1.1;
+    color: var(--txt); letter-spacing: -.02em;
+}
+.cfg-kpi .cfg-kpi-r {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--txt-3); margin-top: 5px;
+}
+.cfg-kpi .cfg-kpi-x { font-size: 12px; color: var(--txt-2); margin-top: 6px; font-weight: 600; }
+
+/* Cada estado ganha a cor que já significa aquilo no sistema. */
+.cfg-kpi-ok    .cfg-kpi-n { color: var(--sucesso); }
+.cfg-kpi-erro  .cfg-kpi-n { color: var(--erro); }
+.cfg-kpi-fila  { border-color: var(--aviso); background: rgba(245, 158, 11, .07); }
+.cfg-kpi-fila  .cfg-kpi-n { color: var(--aviso); }
+
+/* ---- Tabela ---- */
+.cfg-tabela-caixa {
+    background: var(--elevado);
+    border: 1px solid var(--borda);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sombra);
+    overflow: hidden;
+    margin-bottom: var(--e-lg);
+}
+.cfg-rolagem { overflow-x: auto; }
+.cfg-tabela { width: 100%; border-collapse: separate; border-spacing: 0; margin: 0; }
+.cfg-tabela thead th {
+    background: var(--fundo-3);
+    border-bottom: 2px solid var(--borda);
+    font-weight: 700; text-transform: uppercase;
+    font-size: 11px; letter-spacing: .05em; color: var(--txt-2);
+    padding: 12px 14px; text-align: left; white-space: nowrap;
+}
+.cfg-tabela tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--borda);
+    color: var(--txt); vertical-align: middle; font-size: 13.5px;
+}
+.cfg-tabela tbody tr { transition: background-color .2s ease; }
+.cfg-tabela tbody tr:hover { background: var(--fundo-2); }
+.cfg-tabela tbody tr:last-child td { border-bottom: 0; }
+.cfg-tabela .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cfg-tabela .cfg-vazio { text-align: center; color: var(--txt-3); padding: 44px 14px; font-size: 14px; }
+.cfg-tabela a { color: var(--brand); font-weight: 600; text-decoration: none; }
+.cfg-tabela a:hover { text-decoration: underline; }
+body.dark-mode .cfg-tabela a { color: var(--brand-suave); }
+
+/* ---- Etiquetas de estado ---- */
+.cfg-tag {
+    display: inline-block; padding: 4px 11px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700; white-space: nowrap; color: #fff;
+}
+.cfg-tag-ok      { background: var(--grad-sucesso); }
+.cfg-tag-erro    { background: var(--grad-erro); }
+.cfg-tag-neutro  { background: var(--grad-neutro); }
+.cfg-tag-aviso   { background: var(--grad-aviso); }
+.cfg-tag-info    { background: var(--grad-marca); }
+
+/* ---- Ações compactas dentro da tabela ---- */
+.cfg-acoes-linha { display: flex; gap: 5px; flex-wrap: nowrap; }
+.cfg-ico {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; flex: none;
+    border: 1px solid var(--borda); border-radius: var(--r-sm);
+    background: var(--elevado); color: var(--txt-2);
+    font-size: 13px; cursor: pointer; text-decoration: none;
+    transition: all .2s ease;
+}
+.cfg-ico:hover { transform: translateY(-1px); box-shadow: var(--sombra-md); text-decoration: none; }
+.cfg-ico-marca  { color: var(--brand); }
+.cfg-ico-ok     { color: var(--sucesso); }
+.cfg-ico-aviso  { color: var(--aviso); }
+.cfg-ico-erro   { color: var(--erro); }
+
+/* ---- Paginação ---- */
+.cfg-paginacao { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: var(--e-lg); }
+.cfg-paginacao a {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 38px; height: 38px; padding: 0 11px;
+    border: 1px solid var(--borda); border-radius: var(--r-md);
+    background: var(--elevado); color: var(--txt);
+    font-size: 13.5px; font-weight: 600; text-decoration: none;
+    transition: all .2s ease;
+}
+.cfg-paginacao a:hover { border-color: var(--brand-suave); text-decoration: none; color: var(--txt); }
+.cfg-paginacao a.atual { background: var(--grad-marca); border-color: transparent; color: #fff; }
+
+/* ---- Resumo do resultado ---- */
+.cfg-resumo {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 13.5px; color: var(--txt-2); margin-bottom: var(--e-md);
+}
+.cfg-resumo b { color: var(--txt); }
+.cfg-marca-busca {
+    display: inline-block; padding: 3px 11px; border-radius: 999px;
+    background: rgba(79, 70, 229, .1); color: var(--brand); font-size: 12.5px;
+}
+body.dark-mode .cfg-marca-busca { background: rgba(129, 140, 248, .15); color: var(--brand-suave); }
+
+/* ---- Bloco recolhível ---- */
+.cfg-mais { display: none; border-top: 1px solid var(--borda); margin-top: var(--e-md); padding-top: var(--e-md); }
+.cfg-mais.aberto { display: block; }
+.cfg-mais-linha {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; flex-wrap: wrap; font-size: 13.5px; margin-top: var(--e-md);
+}
+.cfg-link { color: var(--brand); font-weight: 600; text-decoration: none; cursor: pointer; }
+.cfg-link:hover { text-decoration: underline; color: var(--brand); }
+.cfg-link-erro { color: var(--erro); }
+.cfg-link-erro:hover { color: var(--erro); }
+body.dark-mode .cfg-link { color: var(--brand-suave); }
+
+/* ---- Detalhes dentro da célula ---- */
+.cfg-chave { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; word-break: break-all; color: var(--txt-2); }
+.cfg-erro-msg { display: block; font-size: 12px; color: var(--erro); max-width: 300px; margin-top: 4px; }
+.cfg-cod {
+    display: inline-block; background: rgba(239, 68, 68, .12); color: var(--erro);
+    border-radius: var(--r-sm); padding: 1px 6px; font-size: 11px; font-weight: 700; margin-left: 4px;
+}
+.cfg-btn-texto {
+    border: 0; background: none; padding: 0; color: var(--erro);
+    font-size: 12px; text-decoration: underline; cursor: pointer;
+}
+
+/* Colunas com conteúdo longo precisam de largura mínima, senão o nome do
+   tomador quebra em três linhas e a chave domina a tabela. */
+.cfg-tabela .nome  { min-width: 165px; }
+.cfg-tabela .chave { min-width: 210px; max-width: 300px; }

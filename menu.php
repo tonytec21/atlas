@@ -1328,6 +1328,14 @@ $mode_query->close();
                         <i class="fas fa-university"></i>
                         <span>Configuração de Contas</span>
                     </a>
+                    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/os/nfse/nfse_config.php'?>" class="menu-link">
+                        <i class="fas fa-cog"></i>
+                        <span>Nota Fiscal de Serviço Eletrônica</span>
+                    </a>
+                    <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/os/pagamento_online/pe_config.php'?>" class="menu-link">
+                        <i class="fas fa-cog"></i>
+                        <span>Pagamento Online</span>
+                    </a>
                     <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/tarefas_recorrentes.php'?>" class="menu-link">
                         <i class="fas fa-redo-alt"></i>
                         <span>Tarefas Recorrentes</span>
