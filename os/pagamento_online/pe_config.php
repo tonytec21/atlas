@@ -54,7 +54,7 @@ $on = static fn($k) => !empty($cfg[$k]);
 
 <div id="main" class="main-content">
     <div class="container">
-        <div class="cfg">
+        <div class="cfg cfg-pagina">
 
             <section class="cfg-hero">
                 <div class="cfg-titulo">

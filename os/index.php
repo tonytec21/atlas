@@ -21,7 +21,8 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">  
     <link rel="stylesheet" href="../style/css/bootstrap.min.css">  
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">  
-    <link rel="stylesheet" href="../style/css/style.css">  
+    <link rel="stylesheet" href="../style/css/style.css">
+    <link rel="stylesheet" href="ui-config.css">  
 
     <?php  
     $mdiCssLocal = __DIR__ . '/../style/css/materialdesignicons.min.css';  
@@ -1267,80 +1268,281 @@ body.dark-mode footer .footer-content a:hover {
                 </div>  
             </div>  
 
-            <!-- Formulário de filtro -->  
-            <div class="filter-card">  
-                <form id="pesquisarForm" method="GET">  
-                    <div class="form-row align-items-end">  
-                        <div class="form-group col-md-2">  
-                            <label for="os_id">Nº OS:</label>  
-                            <input type="number" class="form-control" id="os_id" name="os_id" min="1">  
-                        </div>  
-                        <div class="form-group col-md-5">  
-                            <label for="cliente">Apresentante:</label>  
-                            <input type="text" class="form-control" id="cliente" name="cliente">  
-                        </div>  
-                        <div class="form-group col-md-3">  
-                            <label for="cpf_cliente">CPF/CNPJ:</label>  
-                            <input type="text" class="form-control" id="cpf_cliente" name="cpf_cliente">  
-                        </div>  
-                        <div class="form-group col-md-2">  
-                            <label for="total_os">Valor Total:</label>  
-                            <input type="text" class="form-control" id="total_os" name="total_os">  
-                        </div>  
-                        <div class="form-group col-md-3">  
-                            <label for="funcionario">Funcionário:</label>  
-                            <select class="form-control" id="funcionario" name="funcionario">  
-                                <option value="">Selecione o Funcionário</option>  
-                                <?php  
-                                $conn = getDatabaseConnection();  
-                                $stmt = $conn->query("SELECT DISTINCT criado_por FROM ordens_de_servico");  
-                                $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);  
-                                foreach ($funcionarios as $funcionario) {  
-                                    echo '<option value="' . $funcionario['criado_por'] . '">' . $funcionario['criado_por'] . '</option>';  
-                                }  
-                                ?>  
-                            </select>  
-                        </div>  
-                        <div class="form-group col-md-3">  
-                            <label for="situacao">Situação:</label>  
-                            <select class="form-control" id="situacao" name="situacao">  
-                                <option value="">Selecione a Situação</option>  
-                                <option value="Ativo">Ativo</option>  
-                                <option value="Cancelado">Cancelado</option>  
-                            </select>  
-                        </div>  
+            <!-- ===================== FILTROS ===================== -->
+            <?php
+            /* A montagem da consulta mora em pesquisa_os_lib.php: são 18
+               filtros, alguns com subconsulta, e misturados ao HTML ninguém
+               consegue conferir se um deles está certo. */
+            require_once __DIR__ . '/pesquisa_os_lib.php';
 
-                        <div class="form-group col-md-3">  
-                            <label for="data_inicial">Data Inicial:</label>  
-                            <input type="date" class="form-control" id="data_inicial" name="data_inicial">  
-                        </div>  
-                        <div class="form-group col-md-3">  
-                            <label for="data_final">Data Final:</label>  
-                            <input type="date" class="form-control" id="data_final" name="data_final">  
-                        </div>  
-                        <div class="form-group col-md-4">  
-                            <label for="descricao_os">Título da O.S:</label>  
-                            <input type="text" class="form-control" id="descricao_os" name="descricao_os">  
-                        </div>  
-                        <div class="form-group col-md-6">  
-                            <label for="observacoes">Observações:</label>  
-                            <input type="text" class="form-control" id="observacoes" name="observacoes">  
-                        </div>  
+            $pf = pos_filtros();
+            $pw = pos_montar_where($pf);
+            $temFiltro = $pw['ativos'] !== [];
 
-                        <div class="form-group col-md-2 d-flex align-items-end">  
-                            <button type="submit" class="btn btn-primary w-100 text-white">  
-                                <i class="fa fa-filter" aria-hidden="true"></i> Filtrar  
-                            </button>  
-                        </div>  
-                    </div>  
-                </form>  
-            </div>  
+            /* "Mais filtros" abre sozinho quando algum filtro avançado está
+               em uso — senão o operador não veria por que o resultado veio
+               daquele jeito. */
+            $avancadoAtivo = ($pf['valor_min'] !== '' || $pf['valor_max'] !== '' || $pf['atos'] !== []
+                || $pf['pagamento'] !== '' || $pf['observacoes'] !== '' || $pf['descricao_os'] !== ''
+                || $pf['total_os'] !== '' || $pf['data_inicial'] !== '' || $pf['data_final'] !== ''
+                || $pf['cpf_cliente'] !== '' || $pf['os_id'] !== '');
 
-                        <hr style="border-color: var(--border-primary); margin: var(--space-xl) 0;">
+            $connF = getDatabaseConnection();
+            $listaFunc = $connF->query("SELECT DISTINCT criado_por FROM ordens_de_servico
+                                         WHERE criado_por IS NOT NULL AND criado_por <> ''
+                                      ORDER BY criado_por")->fetchAll(PDO::FETCH_COLUMN);
+
+            /* Descrição dos atos escolhidos, para o chip mostrar o nome e não
+               só o código — "1.2.3" não diz nada a quem está conferindo. */
+            $descAtos = [];
+            if ($pf['atos'] !== []) {
+                $in = implode(',', array_fill(0, count($pf['atos']), '?'));
+                $stA = $connF->prepare("SELECT ATO, DESCRICAO FROM tabela_emolumentos WHERE ATO IN ($in)");
+                $stA->execute($pf['atos']);
+                foreach ($stA->fetchAll(PDO::FETCH_ASSOC) as $lA) {
+                    $descAtos[$lA['ATO']] = $lA['DESCRICAO'];
+                }
+            }
+
+            $e = static fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+
+            $conn = getDatabaseConnection();
+
+            /* Consulta com os filtros de pesquisa_os_lib.php.
+            O alias "o" é exigido pelas subconsultas de ato e
+            de pagamento, que referenciam o.id. */
+            $sqlBase = 'FROM ordens_de_servico o' . $pw['where'];
+
+            $stTot = $conn->prepare('SELECT COUNT(*) ' . $sqlBase);
+            $stTot->execute($pw['params']);
+            $totalEncontrado = (int) $stTot->fetchColumn();
+
+            /* Somatórios do resultado: dizem em números o efeito
+            do filtro, sem precisar somar a tabela na mão. */
+            $stSoma = $conn->prepare('SELECT COALESCE(SUM(o.total_os),0) ' . $sqlBase);
+            $stSoma->execute($pw['params']);
+            $somaEncontrada = (float) $stSoma->fetchColumn();
+
+            $paginas = max(1, (int) ceil($totalEncontrado / $pf['pp']));
+            $paginaAtual = min($pf['p'], $paginas);
+            $deslocamento = ($paginaAtual - 1) * $pf['pp'];
+
+            $sql = 'SELECT o.* ' . $sqlBase
+            . ' ORDER BY ' . pos_ordem($pf['ord'])
+            . ' LIMIT ' . (int) $pf['pp'] . ' OFFSET ' . (int) $deslocamento;
+
+            $stmt = $conn->prepare($sql);
+            $stmt->execute($pw['params']);
+            $ordens = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            ?>
+
+            <div class="cfg">
+              <div class="cfg-card">
+                <header><i class="fa fa-search"></i><h2>Pesquisar</h2>
+                  <small><?= number_format($totalEncontrado, 0, ',', '.') ?> O.S.<?= $temFiltro ? ' · ' . count($pw['ativos']) . ' filtro(s)' : '' ?></small>
+                </header>
+                <div class="cfg-corpo">
+                  <form id="pesquisarForm" method="GET">
+
+                    <div class="cfg-grid">
+                      <div class="c8">
+                        <label class="cfg-rot" for="q">Busca rápida</label>
+                        <input type="text" class="cfg-in" id="q" name="q" value="<?= $e($pf['q']) ?>"
+                               placeholder="Nº da O.S., apresentante, CPF/CNPJ, título ou observação">
+                        <div class="cfg-dica">Reconhece o formato sozinho. Para precisão, use os campos abaixo.</div>
+                      </div>
+                      <div class="c4">
+                        <label class="cfg-rot" for="ord">Ordenar por</label>
+                        <select class="cfg-in" id="ord" name="ord">
+                          <option value="recentes" <?= $pf['ord']==='recentes'?'selected':'' ?>>Mais recentes</option>
+                          <option value="antigas"  <?= $pf['ord']==='antigas' ?'selected':'' ?>>Mais antigas</option>
+                          <option value="maior"    <?= $pf['ord']==='maior'   ?'selected':'' ?>>Maior valor</option>
+                          <option value="menor"    <?= $pf['ord']==='menor'   ?'selected':'' ?>>Menor valor</option>
+                          <option value="cliente"  <?= $pf['ord']==='cliente' ?'selected':'' ?>>Apresentante (A-Z)</option>
+                          <option value="numero"   <?= $pf['ord']==='numero'  ?'selected':'' ?>>Nº da O.S.</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <!-- Atalhos de período.
+                         São botões e não links porque o período precisa ser um
+                         campo do formulário: como link, ele sumia no primeiro
+                         "Filtrar" e ainda descartava o que já estava digitado. -->
+                    <input type="hidden" id="periodo" name="periodo" value="<?= $e($pf['periodo']) ?>">
+                    <div class="pos-atalhos">
+                      <?php foreach (['hoje'=>'Hoje','ontem'=>'Ontem','semana'=>'Esta semana',
+                                      'mes'=>'Este mês','mes_ant'=>'Mês passado','ano'=>'Este ano'] as $kA=>$rA): ?>
+                        <button type="button" class="pos-chip <?= $pf['periodo']===$kA ? 'ativo' : '' ?>"
+                                data-periodo="<?= $kA ?>"><?= $rA ?></button>
+                      <?php endforeach; ?>
+                      <?php if ($pf['periodo'] !== ''): ?>
+                        <button type="button" class="pos-chip pos-chip-x" data-periodo="">
+                          <i class="fa fa-times"></i> limpar período
+                        </button>
+                      <?php endif; ?>
+                    </div>
+
+                    <div id="maisFiltros" class="cfg-mais <?= $avancadoAtivo ? 'aberto' : '' ?>">
+
+                      <div class="cfg-grid">
+                        <div class="c2">
+                          <label class="cfg-rot" for="os_id">Nº da O.S.</label>
+                          <input type="number" min="1" class="cfg-in" id="os_id" name="os_id" value="<?= $e($pf['os_id']) ?>">
+                        </div>
+                        <div class="c5">
+                          <label class="cfg-rot" for="cliente">Apresentante</label>
+                          <input type="text" class="cfg-in" id="cliente" name="cliente" value="<?= $e($pf['cliente']) ?>">
+                        </div>
+                        <div class="c5">
+                          <label class="cfg-rot" for="cpf_cliente">CPF / CNPJ</label>
+                          <input type="text" class="cfg-in cfg-mono" id="cpf_cliente" name="cpf_cliente" value="<?= $e($pf['cpf_cliente']) ?>">
+                          <div class="cfg-dica">Com ou sem pontuação.</div>
+                        </div>
+                      </div>
+
+                      <!-- ===== Atos praticados ===== -->
+                      <div class="cfg-grid">
+                        <div class="c8">
+                          <label class="cfg-rot" for="atoBusca">Atos praticados</label>
+                          <div class="pos-auto">
+                            <input type="text" class="cfg-in" id="atoBusca" autocomplete="off"
+                                   placeholder="Código ou descrição — ex.: 1.2 ou procuração">
+                            <div id="atoSugestoes" class="pos-sugestoes"></div>
+                          </div>
+                          <div id="atoEscolhidos" class="pos-escolhidos">
+                            <?php foreach ($pf['atos'] as $aSel): ?>
+                              <span class="pos-ato" data-ato="<?= $e($aSel) ?>">
+                                <b><?= $e($aSel) ?></b>
+                                <?php if (!empty($descAtos[$aSel])): ?>
+                                  <span><?= $e(mb_strimwidth($descAtos[$aSel], 0, 42, '…')) ?></span>
+                                <?php endif; ?>
+                                <input type="hidden" name="ato[]" value="<?= $e($aSel) ?>">
+                                <button type="button" class="pos-ato-x" aria-label="Remover">&times;</button>
+                              </span>
+                            <?php endforeach; ?>
+                          </div>
+                          <div class="cfg-dica">Busca dentro dos itens da O.S. Digite para ver sugestões da tabela de emolumentos.</div>
+                        </div>
+                        <div class="c4">
+                          <label class="cfg-rot" for="ato_modo">Quando houver mais de um</label>
+                          <select class="cfg-in" id="ato_modo" name="ato_modo">
+                            <option value="qualquer" <?= $pf['ato_modo']==='qualquer'?'selected':'' ?>>Contém qualquer um</option>
+                            <option value="todos"    <?= $pf['ato_modo']==='todos'   ?'selected':'' ?>>Contém todos</option>
+                          </select>
+                          <div class="cfg-dica">“Todos” exige que a O.S. tenha os dois atos.</div>
+                        </div>
+                      </div>
+
+                      <div class="cfg-grid">
+                        <div class="c3">
+                          <label class="cfg-rot" for="valor_min">Valor — de</label>
+                          <input type="text" class="cfg-in" id="valor_min" name="valor_min" placeholder="0,00" value="<?= $e($pf['valor_min']) ?>">
+                        </div>
+                        <div class="c3">
+                          <label class="cfg-rot" for="valor_max">Até</label>
+                          <input type="text" class="cfg-in" id="valor_max" name="valor_max" placeholder="0,00" value="<?= $e($pf['valor_max']) ?>">
+                        </div>
+                        <div class="c3">
+                          <label class="cfg-rot" for="data_inicial">Criada de</label>
+                          <input type="date" class="cfg-in" id="data_inicial" name="data_inicial" value="<?= $e($pf['data_inicial']) ?>">
+                        </div>
+                        <div class="c3">
+                          <label class="cfg-rot" for="data_final">Até</label>
+                          <input type="date" class="cfg-in" id="data_final" name="data_final" value="<?= $e($pf['data_final']) ?>">
+                        </div>
+                      </div>
+
+                      <div class="cfg-grid">
+                        <div class="c3">
+                          <label class="cfg-rot" for="pagamento">Situação de pagamento</label>
+                          <select class="cfg-in" id="pagamento" name="pagamento">
+                            <option value="">Qualquer</option>
+                            <option value="sem"     <?= $pf['pagamento']==='sem'    ?'selected':'' ?>>Sem pagamento</option>
+                            <option value="parcial" <?= $pf['pagamento']==='parcial'?'selected':'' ?>>Parcial</option>
+                            <option value="quitada" <?= $pf['pagamento']==='quitada'?'selected':'' ?>>Quitada</option>
+                            <option value="credito" <?= $pf['pagamento']==='credito'?'selected':'' ?>>Com crédito</option>
+                          </select>
+                        </div>
+                        <div class="c3">
+                          <label class="cfg-rot" for="situacao">Situação da O.S.</label>
+                          <select class="cfg-in" id="situacao" name="situacao">
+                            <option value="">Todas</option>
+                            <option value="Ativo"     <?= $pf['situacao']==='Ativo'    ?'selected':'' ?>>Ativa</option>
+                            <option value="Cancelado" <?= $pf['situacao']==='Cancelado'?'selected':'' ?>>Cancelada</option>
+                          </select>
+                        </div>
+                        <div class="c3">
+                          <label class="cfg-rot" for="funcionario">Funcionário</label>
+                          <select class="cfg-in" id="funcionario" name="funcionario">
+                            <option value="">Todos</option>
+                            <?php foreach ($listaFunc as $fu): ?>
+                              <option value="<?= $e($fu) ?>" <?= $pf['funcionario']===$fu?'selected':'' ?>><?= $e($fu) ?></option>
+                            <?php endforeach; ?>
+                          </select>
+                        </div>
+                        <div class="c3">
+                          <label class="cfg-rot" for="pp">Resultados por página</label>
+                          <select class="cfg-in" id="pp" name="pp">
+                            <?php foreach ([25,50,100,200] as $ppO): ?>
+                              <option value="<?= $ppO ?>" <?= $pf['pp']===$ppO?'selected':'' ?>><?= $ppO ?></option>
+                            <?php endforeach; ?>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div class="cfg-grid">
+                        <div class="c4">
+                          <label class="cfg-rot" for="descricao_os">Título da O.S.</label>
+                          <input type="text" class="cfg-in" id="descricao_os" name="descricao_os" value="<?= $e($pf['descricao_os']) ?>">
+                        </div>
+                        <div class="c5">
+                          <label class="cfg-rot" for="observacoes">Observações</label>
+                          <input type="text" class="cfg-in" id="observacoes" name="observacoes" value="<?= $e($pf['observacoes']) ?>">
+                        </div>
+                        <div class="c3">
+                          <label class="cfg-rot" for="total_os">Valor exato</label>
+                          <input type="text" class="cfg-in" id="total_os" name="total_os" value="<?= $e($pf['total_os']) ?>">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="cfg-mais-linha">
+                      <span>
+                        <a class="cfg-link" onclick="document.getElementById('maisFiltros').classList.toggle('aberto'); return false;">
+                          <i class="fa fa-sliders"></i> Mais filtros<?= $avancadoAtivo ? ' (ativos)' : '' ?>
+                        </a>
+                        <?php if ($temFiltro): ?>
+                          &nbsp;·&nbsp;
+                          <a href="index.php" class="cfg-link cfg-link-erro"><i class="fa fa-times"></i> Limpar tudo</a>
+                        <?php endif; ?>
+                      </span>
+                      <button type="submit" class="cfg-btn cfg-btn-marca"><i class="fa fa-filter"></i> Filtrar</button>
+                    </div>
+                  </form>
+
+                  <?php if ($temFiltro): ?>
+                    <!-- Filtros ativos: cada um removível sem desfazer os demais -->
+                    <div class="pos-ativos">
+                      <?php foreach ($pw['ativos'] as $ch): ?>
+                        <a href="<?= $e(pos_url([], $ch['chave'])) ?>" class="pos-chip pos-chip-ativo">
+                          <?= $e($ch['rot']) ?> <i class="fa fa-times"></i>
+                        </a>
+                      <?php endforeach; ?>
+                    </div>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </div>
+
+
+
+
+
+
 
             <!-- Resultados -->
             <div class="table-wrap">
-                <h5 class="mb-3">Resultados da Pesquisa</h5>
+
                 
                 <!-- TABELA DESKTOP -->
                 <div class="table-responsive">
@@ -1364,83 +1566,17 @@ body.dark-mode footer .footer-content a:hover {
                     <tbody>
                         <?php
                         $conn = getDatabaseConnection();
-                        $conditions = [];
-                        $params = [];
-                        $filtered = false;
-
-                        if (!empty($_GET['os_id'])) {
-                            $conditions[] = 'id = :os_id';
-                            $params[':os_id'] = $_GET['os_id'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['cliente'])) {
-                            $conditions[] = 'cliente LIKE :cliente';
-                            $params[':cliente'] = '%' . $_GET['cliente'] . '%';
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['cpf_cliente'])) {
-                            $conditions[] = 'cpf_cliente LIKE :cpf_cliente';
-                            $params[':cpf_cliente'] = '%' . $_GET['cpf_cliente'] . '%';
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['total_os'])) {
-                            $conditions[] = 'total_os = :total_os';
-                            $params[':total_os'] = str_replace(',', '.', str_replace('.', '', $_GET['total_os']));
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['data_inicial']) && !empty($_GET['data_final'])) {
-                            $conditions[] = 'DATE(data_criacao) BETWEEN :data_inicial AND :data_final';
-                            $params[':data_inicial'] = $_GET['data_inicial'];
-                            $params[':data_final'] = $_GET['data_final'];
-                            $filtered = true;
-                        } elseif (!empty($_GET['data_inicial'])) {
-                            $conditions[] = 'DATE(data_criacao) >= :data_inicial';
-                            $params[':data_inicial'] = $_GET['data_inicial'];
-                            $filtered = true;
-                        } elseif (!empty($_GET['data_final'])) {
-                            $conditions[] = 'DATE(data_criacao) <= :data_final';
-                            $params[':data_final'] = $_GET['data_final'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['funcionario'])) {
-                            $conditions[] = 'criado_por LIKE :funcionario';
-                            $params[':funcionario'] = $_GET['funcionario'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['situacao'])) {
-                            $conditions[] = 'status = :situacao';
-                            $params[':situacao'] = $_GET['situacao'];
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['descricao_os'])) {
-                            $conditions[] = 'descricao_os LIKE :descricao_os';
-                            $params[':descricao_os'] = '%' . $_GET['descricao_os'] . '%';
-                            $filtered = true;
-                        }
-                        if (!empty($_GET['observacoes'])) {
-                            $conditions[] = 'observacoes LIKE :observacoes';
-                            $params[':observacoes'] = '%' . $_GET['observacoes'] . '%';
-                            $filtered = true;
-                        }
-                        $sql = 'SELECT * FROM ordens_de_servico';
-                        if ($conditions) {
-                            $sql .= ' WHERE ' . implode(' AND ', $conditions);
-                        }
-
-                        if (!$filtered) {
-                            $sql .= ' ORDER BY data_criacao DESC LIMIT 100';
-                        }
-
-                        $stmt = $conn->prepare($sql);
-                        foreach ($params as $key => $value) {
-                            $stmt->bindValue($key, $value);
-                        }
-                        $stmt->execute();
-                        $ordens = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         // Armazena ordens para renderizar cards também
                         $ordensData = [];
 
+                        if (!$ordens) {
+                            $msgVazio = $temFiltro
+                                ? 'Nenhuma O.S. corresponde aos filtros. Remova algum marcador acima para ampliar a busca.'
+                                : 'Nenhuma O.S. cadastrada ainda.';
+                            echo '<tr><td colspan="12" style="text-align:center;padding:44px 14px;'
+                               . 'color:var(--text-tertiary,#9ca3af)">' . $msgVazio . '</td></tr>';
+                        }
                         foreach ($ordens as $ordem) {
                             // Calcula o depósito prévio
                             $stmt = $conn->prepare('SELECT SUM(total_pagamento) as deposito_previo FROM pagamento_os WHERE ordem_de_servico_id = :os_id');
@@ -1751,6 +1887,36 @@ body.dark-mode footer .footer-content a:hover {
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
+                <?php if ($paginas > 1): ?>
+                  <div class="cfg">
+                    <nav class="cfg-paginacao">
+                      <?php
+                      /* Janela de páginas em volta da atual: com 40 páginas,
+                         listar todas empurra a tabela para fora da tela. */
+                      $pIni = max(1, $paginaAtual - 3);
+                      $pFim = min($paginas, $paginaAtual + 3);
+                      $lk = static fn(int $n): string => htmlspecialchars(pos_url(['p' => $n]), ENT_QUOTES);
+                      ?>
+                      <?php if ($paginaAtual > 1): ?>
+                        <a href="<?= $lk($paginaAtual - 1) ?>">&lsaquo;</a>
+                      <?php endif; ?>
+                      <?php if ($pIni > 1): ?>
+                        <a href="<?= $lk(1) ?>">1</a>
+                        <?php if ($pIni > 2): ?><span style="align-self:center;color:var(--txt-3)">…</span><?php endif; ?>
+                      <?php endif; ?>
+                      <?php for ($i = $pIni; $i <= $pFim; $i++): ?>
+                        <a href="<?= $lk($i) ?>" class="<?= $i === $paginaAtual ? 'atual' : '' ?>"><?= $i ?></a>
+                      <?php endfor; ?>
+                      <?php if ($pFim < $paginas): ?>
+                        <?php if ($pFim < $paginas - 1): ?><span style="align-self:center;color:var(--txt-3)">…</span><?php endif; ?>
+                        <a href="<?= $lk($paginas) ?>"><?= $paginas ?></a>
+                      <?php endif; ?>
+                      <?php if ($paginaAtual < $paginas): ?>
+                        <a href="<?= $lk($paginaAtual + 1) ?>">&rsaquo;</a>
+                      <?php endif; ?>
+                    </nav>
+                  </div>
+                <?php endif; ?>
             </div>  
         </div>  
     </div>  
@@ -2727,5 +2893,177 @@ body.dark-mode footer .footer-content a:hover {
     </script>
 
     <?php include(__DIR__ . '/../rodape.php'); ?>
+
+<script>
+/* =====================================================================
+   Autocomplete de atos do filtro avançado.
+   Sem dependências: o campo é um input comum, e os escolhidos viram
+   <input type="hidden" name="ato[]"> — então o formulário continua sendo
+   um GET simples, sem estado em JavaScript.
+   ===================================================================== */
+(function () {
+    'use strict';
+
+    var campo   = document.getElementById('atoBusca');
+    var caixa   = document.getElementById('atoSugestoes');
+    var escolha = document.getElementById('atoEscolhidos');
+
+    if (!campo || !caixa || !escolha) return;
+
+    var temporizador = null;
+    var marcado = -1;
+    var itens = [];
+
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : s;
+        return d.innerHTML;
+    }
+
+    function jaEscolhido(ato) {
+        return !!escolha.querySelector('[data-ato="' + String(ato).replace(/"/g, '\\"') + '"]');
+    }
+
+    function fechar() {
+        caixa.classList.remove('aberto');
+        caixa.innerHTML = '';
+        marcado = -1;
+        itens = [];
+    }
+
+    function adicionar(ato, descricao) {
+        if (!ato || jaEscolhido(ato)) { fechar(); campo.value = ''; return; }
+
+        var el = document.createElement('span');
+        el.className = 'pos-ato';
+        el.setAttribute('data-ato', ato);
+        el.innerHTML = '<b>' + esc(ato) + '</b>' +
+                       (descricao ? '<span>' + esc(descricao.length > 42 ? descricao.slice(0, 42) + '…' : descricao) + '</span>' : '') +
+                       '<input type="hidden" name="ato[]" value="' + esc(ato) + '">' +
+                       '<button type="button" class="pos-ato-x" aria-label="Remover">&times;</button>';
+
+        escolha.appendChild(el);
+        campo.value = '';
+        fechar();
+        campo.focus();
+    }
+
+    function desenhar(lista) {
+        itens = lista;
+
+        if (!lista.length) {
+            caixa.innerHTML = '<div class="pos-sug-vazio">Nenhum ato encontrado.</div>';
+            caixa.classList.add('aberto');
+            return;
+        }
+
+        caixa.innerHTML = lista.map(function (a, i) {
+            return '<div class="pos-sug" data-i="' + i + '">' +
+                   '<b>' + esc(a.ato) + '</b>' +
+                   '<span>' + esc(a.descricao) + '</span>' +
+                   (Number(a.usos) > 0 ? '<em>' + a.usos + ' O.S.</em>' : '') +
+                   '</div>';
+        }).join('');
+
+        caixa.classList.add('aberto');
+    }
+
+    function buscar() {
+        var termo = campo.value.trim();
+
+        if (termo.length < 2) { fechar(); return; }
+
+        fetch('buscar_atos.php?q=' + encodeURIComponent(termo))
+            .then(function (r) { return r.json(); })
+            .then(function (d) { desenhar((d && d.atos) || []); })
+            .catch(function () { fechar(); });
+    }
+
+    campo.addEventListener('input', function () {
+        clearTimeout(temporizador);
+        temporizador = setTimeout(buscar, 250);
+    });
+
+    /* Setas e Enter: quem digita código o dia inteiro não quer tirar a mão
+       do teclado para clicar na sugestão. */
+    campo.addEventListener('keydown', function (ev) {
+        var abertos = caixa.querySelectorAll('.pos-sug');
+
+        if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+            if (!abertos.length) return;
+            ev.preventDefault();
+            marcado += (ev.key === 'ArrowDown' ? 1 : -1);
+            if (marcado < 0) marcado = abertos.length - 1;
+            if (marcado >= abertos.length) marcado = 0;
+            abertos.forEach(function (el, i) { el.classList.toggle('marcado', i === marcado); });
+            abertos[marcado].scrollIntoView({ block: 'nearest' });
+            return;
+        }
+
+        if (ev.key === 'Enter') {
+            /* Só intercepta o Enter quando há sugestão marcada — senão o
+               operador perde o atalho de enviar o formulário. */
+            if (marcado >= 0 && itens[marcado]) {
+                ev.preventDefault();
+                adicionar(itens[marcado].ato, itens[marcado].descricao);
+            } else if (campo.value.trim() !== '' && caixa.classList.contains('aberto')) {
+                ev.preventDefault();
+                if (itens[0]) adicionar(itens[0].ato, itens[0].descricao);
+            }
+            return;
+        }
+
+        if (ev.key === 'Escape') fechar();
+    });
+
+    caixa.addEventListener('click', function (ev) {
+        var alvo = ev.target.closest('.pos-sug');
+        if (!alvo) return;
+        var a = itens[Number(alvo.getAttribute('data-i'))];
+        if (a) adicionar(a.ato, a.descricao);
+    });
+
+    escolha.addEventListener('click', function (ev) {
+        if (ev.target.classList.contains('pos-ato-x')) {
+            ev.target.closest('.pos-ato').remove();
+        }
+    });
+
+    document.addEventListener('click', function (ev) {
+        if (!caixa.contains(ev.target) && ev.target !== campo) fechar();
+    });
+})();
+</script>
+
+<script>
+/* Atalhos de período: gravam no campo escondido e enviam o formulário, de
+   modo que o período conviva com o resto dos filtros em vez de substituí-lo. */
+(function () {
+    'use strict';
+    var form = document.getElementById('pesquisarForm');
+    var campo = document.getElementById('periodo');
+    if (!form || !campo) return;
+
+    document.querySelectorAll('.pos-chip[data-periodo]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var v = b.getAttribute('data-periodo');
+            /* Clicar no atalho já ativo desliga: evita ter de procurar o
+               botão de limpar para desfazer. */
+            campo.value = (campo.value === v && v !== '') ? '' : v;
+
+            /* Período e datas manuais respondem à mesma pergunta; deixar as
+               duas valendo produziria um intervalo que ninguém pediu. */
+            if (campo.value !== '') {
+                var di = document.getElementById('data_inicial');
+                var df = document.getElementById('data_final');
+                if (di) di.value = '';
+                if (df) df.value = '';
+            }
+
+            form.submit();
+        });
+    });
+})();
+</script>
 </body>
 </html>

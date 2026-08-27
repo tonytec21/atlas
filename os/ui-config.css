@@ -47,8 +47,12 @@
     --e-sm: 8px; --e-md: 16px; --e-lg: 24px; --e-xl: 32px;
 
     color: var(--txt);
-    padding-bottom: 48px;
 }
+
+/* O respiro final é do container da página, não da classe: .cfg também
+   envolve blocos pequenos (um resumo, uma paginação), e ali 48px de sobra
+   viram um vão que não se explica. */
+.cfg-pagina { padding-bottom: 48px; }
 
 /* Supre os tokens que faltam nestas telas quando o tema escuro é ligado.
    Mesmos valores que criar_os.php usa inline. */
@@ -511,3 +515,82 @@ body.dark-mode .cfg-link { color: var(--brand-suave); }
    tomador quebra em três linhas e a chave domina a tabela. */
 .cfg-tabela .nome  { min-width: 165px; }
 .cfg-tabela .chave { min-width: 210px; max-width: 300px; }
+
+/* =====================================================================
+   Pesquisa avançada (os/index.php)
+   ===================================================================== */
+
+/* ---- Atalhos e filtros ativos ---- */
+.pos-atalhos, .pos-ativos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.pos-ativos { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--borda); }
+
+.cfg .pos-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 999px;
+    border: 1px solid var(--borda); background: var(--elevado);
+    font-size: 13px; font-weight: 600; color: var(--txt-2);
+    text-decoration: none; cursor: pointer;
+    transition: all .2s cubic-bezier(.4, 0, .2, 1);
+}
+.cfg .pos-chip:hover {
+    border-color: var(--brand-suave); color: var(--txt);
+    text-decoration: none; transform: translateY(-1px);
+}
+.cfg .pos-chip.ativo { background: var(--grad-marca); border-color: transparent; color: #fff; }
+.cfg .pos-chip-ativo { background: rgba(79, 70, 229, .1); border-color: rgba(79, 70, 229, .3); color: var(--brand); }
+.cfg .pos-chip-ativo i { opacity: .6; }
+.cfg .pos-chip-ativo:hover { background: rgba(239, 68, 68, .1); border-color: rgba(239, 68, 68, .35); color: var(--erro); }
+.cfg .pos-chip-ativo:hover i { opacity: 1; }
+.cfg .pos-chip-x { color: var(--erro); border-color: rgba(239, 68, 68, .3); }
+body.dark-mode .cfg .pos-chip-ativo { background: rgba(129, 140, 248, .14); color: var(--brand-suave); }
+
+/* ---- Autocomplete de atos ---- */
+.pos-auto { position: relative; }
+.pos-sugestoes {
+    position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
+    background: var(--elevado);
+    border: 1px solid var(--borda); border-radius: var(--r-md);
+    box-shadow: var(--sombra-lg);
+    max-height: 300px; overflow-y: auto; display: none;
+}
+.pos-sugestoes.aberto { display: block; }
+.pos-sug {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 10px 14px; cursor: pointer;
+    border-bottom: 1px solid var(--borda); font-size: 13.5px;
+}
+.pos-sug:last-child { border-bottom: 0; }
+.pos-sug:hover, .pos-sug.marcado { background: var(--fundo-2); }
+.pos-sug b {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--brand); flex: none; font-size: 13px;
+}
+body.dark-mode .pos-sug b { color: var(--brand-suave); }
+.pos-sug span { color: var(--txt-2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-sug em {
+    font-style: normal; font-size: 11.5px; color: var(--txt-3);
+    flex: none; background: var(--fundo-3); padding: 2px 8px; border-radius: 999px;
+}
+.pos-sug-vazio { padding: 14px; text-align: center; color: var(--txt-3); font-size: 13px; }
+
+/* ---- Atos escolhidos ---- */
+.pos-escolhidos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.pos-escolhidos:empty { display: none; }
+.pos-ato {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 8px 6px 12px; border-radius: var(--r-md);
+    background: rgba(79, 70, 229, .09); border: 1px solid rgba(79, 70, 229, .25);
+    font-size: 13px; color: var(--txt);
+}
+.pos-ato b {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--brand); font-size: 12.5px;
+}
+.pos-ato span { color: var(--txt-2); font-size: 12.5px; }
+.pos-ato-x {
+    border: 0; background: none; color: var(--txt-3);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.pos-ato-x:hover { color: var(--erro); }
+body.dark-mode .pos-ato { background: rgba(129, 140, 248, .14); border-color: rgba(129, 140, 248, .3); }
+body.dark-mode .pos-ato b { color: var(--brand-suave); }
