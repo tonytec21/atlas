@@ -857,7 +857,7 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
     // 0-B) CADEIA SIGEF NARRATIVA (v2): "<az> - <dist>m, até o vértice X de coordenadas N.. e E..".
     // Lê o memorial como uma CADEIA: reconstrói vértices cuja coordenada se perdeu na digitação,
     // recupera vértices órfãos e confere cada coordenada contra o caminhamento.
-    $pts = []; $fonte = 'gms'; $utmPares = null; $res = ['invalidos' => []];
+    $pts = []; $fonte = 'gms'; $utmPares = null; $res = ['invalidos' => []]; $rotulosPlan = [];
     $v2 = extractMemorialGeorreferenciado($memorial, 23, true);
     if (!empty($v2['ok']) && count($v2['pares']) >= 3) {
         $utmPares = $v2['pares'];                       // [[N,E], ...]
@@ -894,6 +894,31 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
         $pts = $res['pts'];
         $fonte = 'gms';
     }
+
+    // 0-D) PLANILHA DE VÉRTICES DO SIGEF (v2): "RÓTULO lon lat alt; RÓTULO az dist confrontante;"
+    // Longitude ANTES da latitude, terceira coluna de altitude e azimutes com a mesma
+    // aparência de coordenada — nenhum extrator anterior lia este formato.
+    if (count($pts) < 3) {
+        $vp = extractPlanilhaSigefGeo($memorial);
+        if (!empty($vp['ok']) && count($vp['pts']) >= 3) {
+            $pts = $vp['pts']; $fonte = 'planilha_sigef'; $utmPares = null;
+            $avisosV2 = array_merge($avisosV2, $vp['avisos']);
+            $rotulosPlan = $vp['rotulos'];
+        }
+    }
+
+    // 0-E) COORDENADAS EM GRAU DECIMAL (v2): "de coordenadas N -45.606018 e E -3.547271".
+    // Memoriais urbanos/loteamento. Os rótulos N/E costumam estar TROCADOS (o valor em N
+    // é a longitude); a classificação é feita pela faixa do valor, não pelo rótulo.
+    if (count($pts) < 3) {
+        $vd = extractCoordenadasDecimais($memorial);
+        if (!empty($vd['ok']) && count($vd['pts']) >= 3) {
+            $pts = $vd['pts']; $fonte = 'grau_decimal'; $utmPares = null;
+            $avisosV2 = array_merge($avisosV2, $vd['avisos']);
+            $rotulosPlan = $vd['rotulos'];
+        }
+    }
+
     if (count($pts) < 3) {                       // 2º GMS sem rótulo (tabela SIGEF/INCRA)
         $tab = extractGeoCoordinatesTabela($memorial);
         if (count($tab['pts']) >= 3) { $pts = $tab['pts']; $fonte = 'gms_tabela'; $res = $tab; }
@@ -956,7 +981,7 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
     // (erro de digitação no documento) usando os azimutes/distâncias do memorial.
     $corrigidos = [];
     $avisoTrav = '';
-    if (count($pts) >= 3 && $fonte !== 'sigef_cadeia' && $fonte !== 'cadeia_flex') {   // as cadeias v2 já reconstroem e conferem
+    if (count($pts) >= 3 && $fonte !== 'sigef_cadeia' && $fonte !== 'cadeia_flex' && $fonte !== 'planilha_sigef' && $fonte !== 'grau_decimal') {   // os extratores v2 já reconstroem e conferem
         $invalidos = $res['invalidos'] ?? []; // vértices com minuto/segundo >= 60 (erro claro)
         $legs = extractTraverseLegsLoose($memorial);
         if (count($legs) < max(3, count($pts) - 1)) {           // formato tabular (sem a palavra "azimute")
@@ -1028,6 +1053,9 @@ function buildGeoData($memorial, $refLat = null, $refLng = null) {
     if ($fonte === 'sigef_cadeia') {
         $data['rotulos_vertices']  = $v2['rotulos'] ?? [];
         $data['divergencias_coord'] = $v2['divergencias'] ?? [];
+    }
+    if (($fonte === 'planilha_sigef' || $fonte === 'grau_decimal') && !empty($rotulosPlan)) {
+        $data['rotulos_vertices'] = $rotulosPlan;
     }
     return $data;
 }
@@ -1439,6 +1467,24 @@ function analisarMemorialVertex($memorial, $zone = 23, $south = true) {
     }
     if (!empty($v2['ok']) && count($v2['pares']) >= 3) {
         return vxLaudoDaCadeia($t, $v2, $zone, $south);
+    }
+    // coordenadas em grau decimal: converte para UTM e usa o mesmo laudo
+    $vd = extractCoordenadasDecimais($memorial);
+    if (!empty($vd['ok']) && count($vd['pts']) >= 3) {
+        $pares = [];
+        foreach ($vd['pts'] as $p) { $u = geoToUTM($p[0], $p[1]); $pares[] = [$u[1], $u[0]]; } // [N, E]
+        return vxLaudoDaCadeia($t, ['ok' => true, 'pares' => $pares, 'rotulos' => $vd['rotulos'],
+            'legs' => [], 'reconstruidos' => [], 'divergencias' => [], 'avisos' => $vd['avisos']],
+            $zone, $south);
+    }
+    // planilha de vértices SIGEF (lon/lat em GMS): converte para UTM e usa o mesmo laudo
+    $vp = extractPlanilhaSigefGeo($memorial);
+    if (!empty($vp['ok']) && count($vp['pts']) >= 3) {
+        $pares = [];
+        foreach ($vp['pts'] as $p) { $u = geoToUTM($p[0], $p[1]); $pares[] = [$u[1], $u[0]]; } // [N, E]
+        return vxLaudoDaCadeia($t, ['ok' => true, 'pares' => $pares, 'rotulos' => $vp['rotulos'],
+            'legs' => [], 'reconstruidos' => [], 'divergencias' => [], 'avisos' => $vp['avisos']],
+            $zone, $south);
     }
 
     // ---- vértices rotulados em prosa: "vértice P-1, de coordenadas N=.. e E=.." ----
@@ -3452,6 +3498,8 @@ COMO DETERMINAR OS TITULARES ATUAIS (regra mais importante):
 "memorial": transcreva a descrição do perímetro com TODOS os vértices e coordenadas, EXATAMENTE como no documento. REGRA PRINCIPAL E OBRIGATÓRIA: sempre que o documento trouxer a Longitude e a Latitude (ou Norte/Este UTM) de cada vértice, transcreva TODAS elas — nunca omita as coordenadas, mesmo que também existam azimutes e distâncias. Os formatos possíveis: (a) texto corrido começando em 'Inicia-se a descrição...' com as coordenadas de cada vértice entre parênteses (ex.: '(Longitude: -45°37'17,183", Latitude: -07°08'36,589")') — transcreva cada par Longitude/Latitude; (b) coordenadas UTM 'E ... m' e 'N ... m' em metros; (c) uma TABELA (SIGEF/INCRA ou planta) com colunas de Latitude/Longitude — transcreva cada linha mantendo a Longitude e a Latitude (ex.: 'D6B-M-10902 -46°51'49,039" -4°05'50,116"'); ou (d) uma TABELA de LEVANTAMENTO TOPOGRÁFICO com colunas UTM 'Coord. N(Y)'/'Coord. E(X)' — transcreva cada vértice PREFIXANDO os valores (ex.: 'P1 N=9.222.799,638 E=445.517,024'). ADICIONALMENTE (nunca no lugar das coordenadas): se houver azimutes e distâncias entre os pontos, inclua também cada lado numa linha própria no formato 'De P1 Para P2, azimute 285°27'21,60", distância 4,50 m'. E se o documento informar ÁREA e/ou PERÍMETRO totais, inclua-os ao final tal como aparecem (ex.: 'Área: 246,8798 m² Perímetro: 113,4541 m'). Inclua TODOS os vértices com suas coordenadas; não converta, não arredonde, não omita nenhuma coordenada.
 NUNCA transcreva as coordenadas das ESTAÇÕES DE REFERÊNCIA usadas na amarração do levantamento — memoriais certificados encerram com trechos como 'georreferenciadas ao Sistema Geodésico Brasileiro, a partir da estação ativa IBGE-BELE-93620, de coordenadas N=9.844.131,659m E=782.362,747m, Meridiano Central 51° WGr'. Essas coordenadas são de estações da RBMC/IBGE (Belém, Brasília, Crato etc.), ficam a centenas de quilômetros do imóvel e em outra zona UTM: elas NÃO são vértices do perímetro. Pare a transcrição no último vértice do perímetro. Pode informar, em texto, apenas o DATUM e o Meridiano Central do imóvel (ex.: 'SIRGAS2000, MC 45° WGr'), sem nenhum número de coordenada de estação.
 Preserve o RÓTULO de cada vértice exatamente como no documento (ex.: CRA-M-0967, CP5-M-0304, P1, M-12) e, quando o documento trouxer azimute e distância antes de cada vértice, mantenha a ordem original 'azimute - distância, até o vértice RÓTULO de coordenadas N ... e E ...' — essa cadeia permite ao sistema reconstruir vértices cuja coordenada tenha se perdido na digitação.
+Se as coordenadas vierem em GRAU DECIMAL (ex.: 'N -45.606018216666700 e E -3.547271864444440'), copie os números com TODAS as casas decimais e mantenha os rótulos como estão no documento, mesmo que pareçam trocados — o sistema identifica sozinho qual valor é latitude e qual é longitude pela faixa numérica. Não converta para grau/minuto/segundo nem para UTM, e não arredonde.
+Se o documento trouxer uma PLANILHA/TABELA DE VÉRTICES do SIGEF (colunas Vértice, Longitude, Latitude, Altitude, Vértice seguinte, Azimute, Distância, Confrontante), transcreva linha a linha mantendo a ORDEM ORIGINAL DAS COLUNAS — inclusive a longitude antes da latitude, que é o padrão do SIGEF — e separe cada linha com ponto e vírgula. Não converta a longitude/latitude para UTM, não inverta as colunas e não descarte a coluna de altitude.
 TRANSCREVA LITERALMENTE, INCLUSIVE OS ERROS. Se uma linha estiver truncada, repetida ou sem coordenada (ex.: 'até o vértice CRA-P-1351 de coordenadas N CRA-P-1352 de coordenadas N 9.306.952,038m e E 263.278,269m'), copie-a EXATAMENTE assim. NUNCA junte dois vértices numa linha só, nunca apague um rótulo que ficou sem coordenada, nunca complete uma coordenada que falta e nunca corrija o que parecer erro de digitação. O sistema detecta e reconstrói esses casos pelo azimute/distância — mas só consegue se a transcrição preservar o defeito original. Consertar a linha faz o sistema perder um vértice e errar a área
 }
 PROMPT;

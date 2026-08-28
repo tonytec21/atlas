@@ -15,6 +15,27 @@ require_once __DIR__ . '/geo_extract_v2.php';
 $falhas = 0;
 $total  = 0;
 
+/** UTM 23S só para o arnês de teste (o index.php não é carregado aqui). */
+function geoV2PlanTesteUTM($lat, $lon, $zone = 23) {
+    $a = 6378137.0; $f = 1 / 298.257223563; $k0 = 0.9996;
+    $e2 = $f * (2 - $f); $ep2 = $e2 / (1 - $e2);
+    $lon0 = deg2rad(($zone - 1) * 6 - 180 + 3);
+    $latR = deg2rad($lat); $lonR = deg2rad($lon);
+    $N = $a / sqrt(1 - $e2 * sin($latR) ** 2);
+    $T = tan($latR) ** 2; $C = $ep2 * cos($latR) ** 2; $A = cos($latR) * ($lonR - $lon0);
+    $M = $a * ((1 - $e2 / 4 - 3 * $e2 ** 2 / 64 - 5 * $e2 ** 3 / 256) * $latR
+       - (3 * $e2 / 8 + 3 * $e2 ** 2 / 32 + 45 * $e2 ** 3 / 1024) * sin(2 * $latR)
+       + (15 * $e2 ** 2 / 256 + 45 * $e2 ** 3 / 1024) * sin(4 * $latR)
+       - (35 * $e2 ** 3 / 3072) * sin(6 * $latR));
+    $east = $k0 * $N * ($A + (1 - $T + $C) * $A ** 3 / 6
+          + (5 - 18 * $T + $T ** 2 + 72 * $C - 58 * $ep2) * $A ** 5 / 120) + 500000.0;
+    $north = $k0 * ($M + $N * tan($latR) * ($A ** 2 / 2
+           + (5 - $T + 9 * $C + 4 * $C ** 2) * $A ** 4 / 24
+           + (61 - 58 * $T + $T ** 2 + 600 * $C - 330 * $ep2) * $A ** 6 / 720));
+    if ($lat < 0) $north += 10000000.0;
+    return [$east, $north];
+}
+
 function ok($cond, $desc, $detalhe = '')
 {
     global $falhas, $total;
@@ -104,6 +125,86 @@ ok($f['lacuna'] !== null && quase($f['lacuna']['az_calc'], 268.2325, 0.01),
    $f['lacuna'] ? geoV2GrauParaDms($f['lacuna']['az_calc']) : 'sem lacuna');
 ok($f['misfech'] < 0.05, 'erro de fechamento < 5 cm',
    number_format($f['misfech'], 3, ',', '.') . ' m');
+
+/* ------------------------------------------------------------------ *
+ *  CASO 2-B — Planilha de vértices do SIGEF achatada em texto corrido
+ *  (São Mateus do Maranhão/MA, 11 vértices). Longitude antes da latitude,
+ *  coluna de altitude e azimutes com a mesma aparência de coordenada.
+ * ------------------------------------------------------------------ */
+$plan = "FTO-P-633 -44\u{00BA}27'59,517 -4\u{00BA}01 '17,054 15,06; FTO-P634 164\u{00B0}57' 522,62 Rodovia Federal BR-316; "
+      . "FTO-P-634 -44\u{00BA}27'55, 118 -4\u{00BA}01'33,484 16.25; FTO--P632 283\u{00B0}06'742,5 Patrim\u{00F4}nio Urbano de S\u{00E3}o Mateus do Maranh\u{00E3}o - MA; "
+      . "FTO-P-632 --44\u{00B0}28'18,562 - 4\u{00B0}01'28,002 13,48; FTO-P-M-631 200\u{00B0}39' 2016,72 Patrimonio Urbano de S\u{00E3}o Mateus do Maranh\u{00E3}o; "
+      . "FTO-M-631 -44\u{00B0}28'41,619 -4\u{00BA}02'29,439 14,22; FTO-M-630 274\u{00B0}08'374,45 Projeto de Assentamento Bocaina; "
+      . "FTO-M-630 -44\u{00B0}28'53,727 -4\u{00BA}02'28,560 13,29 APG-M-676 358\u{00B0}38' 396,03 Projeto de\u{00B7} Assentamento Bocaina; "
+      . "APG-M-676 -44\u{00B0}28'54,030 -4\u{00BA}02'15,671 15,62 FTO-M-629 10\u{00B0}06' :364,08 Projeto de Assentamento Bocaina; "
+      . "FTO-M-629 -44\u{00B0}28'51,959 -4\u{00B0}02'04,002 21,77 FTO-M-628 352\u{00B0}56' 606,34 Projeto de Assentamento Bocaina: "
+      . "FTO-M-628 -44\u{00B0}28'54,374 -4\u{00B0}01'44,412 24,05 FTO-P-100630 28\u{00BA}11' 352,72 Projeto de Assentamento Bocaina; "
+      . "FTO-P-100630 -44\u{00BA}28'48,972 - 4\u{00BA}01'34,292 13,88 FTO-M-627 11\u{00B0}47' 170,68 Projeto de Assentamento Bocaina; "
+      . "FTO-M-627 - 44\u{00B0}28'47,841 -4\u{00BA}01'28,852 11,22 FTO-M-626 45\u{00B0}04' 346,59 Projeto de Assentamento Bocaina; "
+      . "FTOM-626 -44\u{00B0}28'39,885 -4\u{00B0}01'20,885 6,59; FTO-P-633 84\u{00B0}36' 1250,74 Jos\u{00E9} Lu\u{00ED}s Arruda.";
+
+echo "\n== CASO 2-B — Planilha de vértices SIGEF (lon/lat em GMS) ==\n";
+$p = extractPlanilhaSigefGeo($plan);
+ok(!empty($p['ok']), 'a planilha foi reconhecida');
+ok(count($p['pts']) === 11, 'extraiu 11 vértices', 'extraiu ' . count($p['pts']));
+ok(quase($p['pts'][0][0], -4.0214039, 1e-6) && quase($p['pts'][0][1], -44.4665325, 1e-6),
+   'FTO-P-633 com lat/lon corretos (longitude vinha primeiro)');
+ok($p['rotulos'][0] === 'FTO-P-633' && $p['rotulos'][2] === 'FTO-P-632' && $p['rotulos'][10] === 'FTO-M-626',
+   'rótulos normalizados (FTO--P632 e FTOM-626 corrigidos)',
+   implode(',', $p['rotulos']));
+ok(quase($p['altitudes'][1], 16.25, 0.001), 'altitude com ponto decimal ("16.25") lida');
+ok(quase($p['legs'][1]['dist'], 742.50, 0.01) && quase($p['legs'][1]['az'], 283.1, 0.001),
+   'azimute colado na distância ("283°06\'742,5") separado');
+ok($p['legs'][0]['confrontante'] === 'Rodovia Federal BR-316',
+   'confrontante preserva "BR-316"', $p['legs'][0]['confrontante']);
+// nenhum azimute pode ter virado vértice
+$fora = 0;
+foreach ($p['pts'] as $pt) { if ($pt[1] > -44.0 || $pt[1] < -45.0) $fora++; }
+ok($fora === 0, 'nenhum azimute foi confundido com coordenada', $fora . ' fora de faixa');
+// área no plano UTM
+$paresU = [];
+foreach ($p['pts'] as $pt) { $u = geoV2PlanTesteUTM($pt[0], $pt[1]); $paresU[] = [$u[1], $u[0]]; }
+ok(quase(geoV2AreaHa($paresU), 174.2477, 0.001), 'área = 174,2477 ha',
+   number_format(geoV2AreaHa($paresU), 4, ',', '.') . ' ha');
+
+/* ------------------------------------------------------------------ *
+ *  CASO 2-C — Coordenadas em GRAU DECIMAL com os rótulos N/E trocados
+ *  (matrícula 1817, lote urbano em Bom Jardim/MA). O valor escrito como
+ *  "N" é a longitude e o escrito como "E" é a latitude; confiar no rótulo
+ *  joga o imóvel no oceano. Os azimutes declarados são contra-azimutes.
+ * ------------------------------------------------------------------ */
+$m1817 = "Inicia-se a descri\u{00E7}\u{00E3}o deste per\u{00ED}metro no v\u{00E9}rtice 1, de coordenadas N -45.606018216666700 e "
+       . "E -3.547271864444440; deste, segue confrontando com RUA SETE DE SETEMBRO, com os seguintes "
+       . "azimutes e dist\u{00E2}ncias: 310\u{00B0}37'58\" e 9,15 m at\u{00E9} o v\u{00E9}rtice 2, de coordenadas N -45.605955733333300 e "
+       . "E -3.547325809166670; deste, segue confrontando com O LOTE 29, com os seguintes azimutes e "
+       . "dist\u{00E2}ncias: 40\u{00B0}37'58\" e 10,35 m at\u{00E9} o v\u{00E9}rtice 3, de coordenadas N -45.606016462222200 e "
+       . "E -3.547396825277780; deste, segue confrontando com o LOTE 32, com os seguintes azimutes e "
+       . "dist\u{00E2}ncias: 130\u{00B0}37'58\" e 9,15 m at\u{00E9} o v\u{00E9}rtice 4, de coordenadas N -45.606078945555600 e "
+       . "E -3.547342880555560 ; deste, segue confrontando com LOTE 27, com os seguintes azimutes e "
+       . "dist\u{00E2}ncias: 220\u{00B0}37'58\" e 10,35 m at\u{00E9} o v\u{00E9}rtice 1, ponto inicial da descri\u{00E7}\u{00E3}o deste per\u{00ED}metro. "
+       . "\u{00C1}rea: 94,70 m\u{00B2}. Per\u{00ED}metro: 39,00 m. Datum WGS-84.";
+
+echo "\n== CASO 2-C — Grau decimal com rótulos N/E trocados ==\n";
+$g = extractCoordenadasDecimais($m1817);
+ok(!empty($g['ok']), 'o formato em grau decimal foi reconhecido');
+ok(count($g['pts']) === 4, 'extraiu 4 vértices', 'extraiu ' . count($g['pts']));
+ok(quase($g['pts'][0][0], -3.547271864, 1e-8), 'latitude veio do campo rotulado "E"',
+   (string) $g['pts'][0][0]);
+ok(quase($g['pts'][0][1], -45.606018217, 1e-8), 'longitude veio do campo rotulado "N"',
+   (string) $g['pts'][0][1]);
+$temSwap = false; $temContra = false;
+foreach ($g['avisos'] as $a) {
+    if (strpos($a, 'invertidos') !== false)      $temSwap = true;
+    if (strpos($a, 'CONTRA-AZIMUTES') !== false) $temContra = true;
+}
+ok($temSwap, 'avisou que os rótulos N/E estão trocados');
+ok($temContra, 'detectou que os 4 azimutes são contra-azimutes');
+$paresU = [];
+foreach ($g['pts'] as $pt) { $u = geoV2PlanTesteUTM($pt[0], $pt[1]); $paresU[] = [$u[1], $u[0]]; }
+ok(quase(geoV2AreaHa($paresU) * 10000, 94.70, 0.05), 'área = 94,70 m²',
+   number_format(geoV2AreaHa($paresU) * 10000, 2, ',', '.') . ' m²');
+ok(quase(geoV2PerimetroM($paresU), 39.00, 0.05), 'perímetro = 39,00 m',
+   number_format(geoV2PerimetroM($paresU), 2, ',', '.') . ' m');
 
 /* ------------------------------------------------------------------ *
  *  CASO 3 — Filtro de coordenadas discrepantes (rede de segurança)

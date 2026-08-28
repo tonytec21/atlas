@@ -706,3 +706,411 @@ function geoV2Conferir($texto, $areaHa, $perimM, $tolPct = 2.0)
     }
     return $avisos;
 }
+
+/* ---------------------------------------------------------------- *
+ *  PLANILHA DE VÉRTICES DO SIGEF (colunas achatadas em texto corrido)
+ *  --------------------------------------------------------------------
+ *  Formato:
+ *    RÓTULO  <longitude DMS>  <latitude DMS>  <altitude> ;
+ *    RÓTULO_SEGUINTE  <azimute D°M'>  <distância>  <confrontante> ;
+ *
+ *  Exemplo real (São Mateus do Maranhão/MA):
+ *    FTO-P-633 -44º27'59,517 -4º01'17,054 15,06; FTO-P634 164°57' 522,62
+ *    Rodovia Federal BR-316; FTO-P-634 -44º27'55, 118 -4º01'33,484 16.25; ...
+ *
+ *  Três armadilhas que este parser resolve:
+ *
+ *  1) A LONGITUDE VEM ANTES DA LATITUDE (ordem do SIGEF), ao contrário do
+ *     restante do módulo. A classificação é feita pela FAIXA do grau: no
+ *     Brasil |longitude| fica entre 34° e 74°, |latitude| até 34°.
+ *
+ *  2) O AZIMUTE TEM A MESMA CARA DE UMA COORDENADA. "164°57' 522,62" pode ser
+ *     lido como 164°57'52,2" por um parser ingênuo. O discriminador é o valor
+ *     dos SEGUNDOS: captura-se o número inteiro após o apóstrofo e rejeita-se
+ *     o casamento se for >= 60. Assim "522,62" e "742,5" caem fora sozinhos,
+ *     sem depender do espaçamento (que o OCR destrói).
+ *
+ *  3) A TERCEIRA COLUNA É ALTITUDE, não coordenada. Como não está em DMS,
+ *     nunca é confundida — mas é lida e guardada.
+ *
+ *  Ruídos de OCR tratados: "º" no lugar de "°", "--44°28'18,562" (menos
+ *  duplicado), "- 4°01'28,002" (espaço após o sinal), "-44º27'55, 118"
+ *  (espaço dentro do decimal), "16.25" (ponto decimal), "FTO--P632" e
+ *  "FTOM-626" (hífens perdidos), "10°06' :364,08" (dois-pontos intruso).
+ * ---------------------------------------------------------------- */
+
+/** Normaliza o rótulo de um vértice do SIGEF, recolocando hífens perdidos
+ *  pelo OCR: "FTO--P632" -> "FTO-P-632", "FTOM-626" -> "FTO-M-626". */
+function geoV2RotuloSigef($raw)
+{
+    $r = strtoupper(trim((string) $raw));
+    $r = preg_replace('/\s+/', '', $r);
+    $r = preg_replace('/-{2,}/', '-', $r);
+    $r = trim($r, '-');
+    if (preg_match('/^([A-Z]{3})([A-Z])-?(\d{1,6})$/', $r, $m)) return $m[1] . '-' . $m[2] . '-' . $m[3];
+    if (preg_match('/^([A-Z]{2,4})-([A-Z])(\d{1,6})$/', $r, $m)) return $m[1] . '-' . $m[2] . '-' . $m[3];
+    return $r;
+}
+
+/** Lê uma coordenada em grau/minuto/segundo com sinal ou letra de hemisfério.
+ *  Devolve grau decimal, ou null se os segundos forem inválidos (>= 60) — o
+ *  que denuncia que o casamento era, na verdade, um azimute + distância. */
+function geoV2LerDmsAssinado($sinal, $g, $m, $s, $hemi)
+{
+    $seg = (float) str_replace(',', '.', preg_replace('/\s+/', '', (string) $s));
+    if ($seg >= 60.0) return null;
+    $min = (float) preg_replace('/\D/', '', (string) $m);
+    if ($min >= 60.0) return null;
+    $val = (float) preg_replace('/\D/', '', (string) $g) + $min / 60.0 + $seg / 3600.0;
+
+    $neg = (strpos((string) $sinal, '-') !== false);
+    $h   = strtoupper(trim((string) $hemi));
+    if ($h === 'S' || $h === 'W' || $h === 'O') $neg = true;
+    elseif ($h === 'N' || $h === 'E')           $neg = false;
+    elseif (!$neg)                              $neg = true;   // Brasil: sem sinal, assume S/W
+
+    return $neg ? -$val : $val;
+}
+
+/** Distância geodésica (Vincenty inverso, GRS80) em metros.
+ *  As distâncias da planilha SIGEF são geodésicas, não do plano UTM. */
+function geoV2DistGeodesica($lat1, $lon1, $lat2, $lon2)
+{
+    $a = 6378137.0; $f = 1 / 298.257222101; $b = (1 - $f) * $a;
+    $L  = deg2rad($lon2 - $lon1);
+    $U1 = atan((1 - $f) * tan(deg2rad($lat1)));
+    $U2 = atan((1 - $f) * tan(deg2rad($lat2)));
+    $sU1 = sin($U1); $cU1 = cos($U1); $sU2 = sin($U2); $cU2 = cos($U2);
+    $lam = $L; $sSig = 0; $cSig = 0; $sig = 0; $cSqA = 0; $c2sm = 0;
+    for ($it = 0; $it < 100; $it++) {
+        $sLam = sin($lam); $cLam = cos($lam);
+        $sSig = sqrt(($cU2 * $sLam) ** 2 + ($cU1 * $sU2 - $sU1 * $cU2 * $cLam) ** 2);
+        if ($sSig == 0) return 0.0;
+        $cSig = $sU1 * $sU2 + $cU1 * $cU2 * $cLam;
+        $sig  = atan2($sSig, $cSig);
+        $sA   = $cU1 * $cU2 * $sLam / $sSig;
+        $cSqA = 1 - $sA * $sA;
+        $c2sm = ($cSqA != 0) ? $cSig - 2 * $sU1 * $sU2 / $cSqA : 0;
+        $C    = $f / 16 * $cSqA * (4 + $f * (4 - 3 * $cSqA));
+        $lamP = $lam;
+        $lam  = $L + (1 - $C) * $f * $sA * ($sig + $C * $sSig * ($c2sm + $C * $cSig * (-1 + 2 * $c2sm ** 2)));
+        if (abs($lam - $lamP) < 1e-12) break;
+    }
+    $uSq = $cSqA * ($a * $a - $b * $b) / ($b * $b);
+    $A   = 1 + $uSq / 16384 * (4096 + $uSq * (-768 + $uSq * (320 - 175 * $uSq)));
+    $B   = $uSq / 1024 * (256 + $uSq * (-128 + $uSq * (74 - 47 * $uSq)));
+    $dS  = $B * $sSig * ($c2sm + $B / 4 * ($cSig * (-1 + 2 * $c2sm ** 2)
+         - $B / 6 * $c2sm * (-3 + 4 * $sSig ** 2) * (-3 + 4 * $c2sm ** 2)));
+    return $b * $A * ($sig - $dS);
+}
+
+/**
+ * Extrai o polígono de uma planilha de vértices do SIGEF em texto corrido.
+ * Retorna ['ok','pts'(lat,lng),'rotulos','altitudes','legs','avisos'].
+ */
+function extractPlanilhaSigefGeo($texto)
+{
+    $vazio = ['ok' => false, 'pts' => [], 'rotulos' => [], 'altitudes' => [], 'legs' => [], 'avisos' => []];
+
+    $san    = geoV2Sanear($texto);
+    $t      = $san['texto'];
+    $avisos = $san['avisos'];
+
+    // segundos capturados de forma gulosa e validados em PHP (>= 60 => é azimute)
+    $reC = '/(-{1,2}\s*)?(\d{1,3})\s*°\s*(\d{1,2})\s*\'\s*(\d{1,3}(?:[.,]\s?\d{1,4})?)\s*"?\s*([NSEWO])?/u';
+    if (!preg_match_all($reC, $t, $ms, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) return $vazio;
+
+    $coords = [];
+    foreach ($ms as $m) {
+        $v = geoV2LerDmsAssinado($m[1][0] ?? '', $m[2][0], $m[3][0], $m[4][0], $m[5][0] ?? '');
+        if ($v === null) continue;
+        $coords[] = ['val' => $v, 'ini' => $m[0][1], 'fim' => $m[0][1] + strlen($m[0][0])];
+    }
+    if (count($coords) < 6) return $vazio;          // menos de 3 vértices
+
+    $pts = []; $rotulos = []; $alts = []; $legs = [];
+    $nC = count($coords);
+    for ($i = 0; $i + 1 < $nC; $i += 2) {
+        $a = $coords[$i]; $b = $coords[$i + 1];
+        $ga = abs($a['val']); $gb = abs($b['val']);
+
+        if     ($ga >= 34 && $ga <= 74 && $gb <= 34) { $lng = $a['val']; $lat = $b['val']; }
+        elseif ($gb >= 34 && $gb <= 74 && $ga <= 34) { $lng = $b['val']; $lat = $a['val']; }
+        else                                         { $lng = $a['val']; $lat = $b['val']; } // SIGEF: lon primeiro
+
+        if ($lat < -34 || $lat > 6 || $lng < -74 || $lng > -34) continue;
+        $pts[] = [$lat, $lng];
+
+        $antes = substr($t, max(0, $a['ini'] - 60), min(60, $a['ini']));
+        $rot = 'V-' . count($pts);
+        if (preg_match_all('/([A-Z]{2,4}-{1,2}(?:[A-Z]-{1,2})*\d{1,6}|[A-Z]{3,5}-?\d{1,6})\s*$/u', rtrim($antes), $mr)) {
+            $rot = geoV2RotuloSigef(end($mr[1]));
+        }
+        $rotulos[] = $rot;
+
+        $fimTrecho = ($i + 2 < $nC) ? $coords[$i + 2]['ini'] : strlen($t);
+        $trecho    = substr($t, $b['fim'], max(0, $fimTrecho - $b['fim']));
+
+        $alts[] = preg_match('/^\s*[;,]?\s*(\d{1,4}(?:[.,]\d{1,3})?)\s*(?:m\b)?/u', $trecho, $ma)
+            ? geoV2Numero($ma[1]) : null;
+
+        $leg = ['az' => null, 'dist' => null, 'confrontante' => ''];
+        $depois = $trecho;
+        if (preg_match('/(\d{1,3})\s*°\s*(\d{1,2})\s*\'?\s*"?\s*[^0-9]{0,6}?(\d{1,5}(?:[.,]\d{1,3})?)/u', $trecho, $ml, PREG_OFFSET_CAPTURE)) {
+            $az = (float) $ml[1][0] + (float) $ml[2][0] / 60.0;
+            $ds = geoV2Numero($ml[3][0]);
+            if ($az >= 0 && $az <= 360 && $ds > 0 && $ds < 200000) {
+                $leg['az'] = $az; $leg['dist'] = $ds;
+                // o confrontante vem DEPOIS do azimute/distância — quando o OCR come o ";"
+                // que separa as linhas, procurar no trecho inteiro traria o rótulo junto
+                $depois = substr($trecho, $ml[0][1] + strlen($ml[0][0]));
+            }
+        }
+        if (preg_match('/([A-ZÁÂÃÉÊÍÓÔÕÚÇ][^;]{4,90})/u', $depois, $mc)) {
+            $c = preg_replace('/[\s·]+/u', ' ', $mc[1]);
+            $c = preg_replace('/\s*[A-Z]{3,5}-{0,2}[A-Z]{0,2}-{0,2}\d{1,6}\s*$/u', '', $c); // rótulo do próximo vértice colado no fim (exige 3+ letras: não remove "BR-316")
+            $leg['confrontante'] = trim($c, " :;.,-");
+        }
+        $legs[] = $leg;
+    }
+
+    if (count($pts) < 3) return $vazio;
+
+    $k = count($pts);
+    if ($k > 3 && abs($pts[0][0] - $pts[$k-1][0]) < 1e-7 && abs($pts[0][1] - $pts[$k-1][1]) < 1e-7) {
+        array_pop($pts); array_pop($rotulos); array_pop($alts); array_pop($legs);
+    }
+
+    // confere as distâncias declaradas contra as geodésicas calculadas
+    $n = count($pts); $ruins = 0; $pior = 0.0; $comLeg = 0;
+    for ($i = 0; $i < $n; $i++) {
+        if (empty($legs[$i]['dist'])) continue;
+        $j = ($i + 1) % $n;
+        $d = geoV2DistGeodesica($pts[$i][0], $pts[$i][1], $pts[$j][0], $pts[$j][1]);
+        $comLeg++;
+        $dif = abs($d - $legs[$i]['dist']);
+        if ($dif > max(0.5, 0.001 * $legs[$i]['dist'])) { $ruins++; $pior = max($pior, $dif); }
+    }
+    if ($comLeg > 0) {
+        $avisos[] = ($ruins === 0)
+            ? 'Planilha de vértices SIGEF conferida: as ' . $comLeg . ' distâncias declaradas '
+              . 'batem com as calculadas a partir das coordenadas.'
+            : $ruins . ' de ' . $comLeg . ' distâncias declaradas divergem das calculadas '
+              . '(maior diferença ' . number_format($pior, 2, ',', '.') . ' m).';
+    }
+
+    return ['ok' => true, 'pts' => $pts, 'rotulos' => $rotulos, 'altitudes' => $alts,
+            'legs' => $legs, 'avisos' => $avisos];
+}
+
+/* ---------------------------------------------------------------- *
+ *  COORDENADAS EM GRAU DECIMAL (memoriais urbanos / loteamentos)
+ *  --------------------------------------------------------------------
+ *  Formato:
+ *    "no vértice 1, de coordenadas N -45.606018216666700 e
+ *     E -3.547271864444440; deste, segue confrontando com RUA SETE DE
+ *     SETEMBRO, com os seguintes azimutes e distâncias: 310°37'58" e
+ *     9,15 m até o vértice 2, de coordenadas N -45.605955733333300 e
+ *     E -3.547325809166670; ..."
+ *
+ *  Duas particularidades resolvidas aqui:
+ *
+ *  1) OS RÓTULOS "N" e "E" ESTÃO TROCADOS. Nesses memoriais o valor escrito
+ *     como N é a LONGITUDE e o escrito como E é a LATITUDE — herança de quem
+ *     preencheu um modelo feito para UTM com coordenadas geográficas. Confiar
+ *     no rótulo joga o imóvel no meio do oceano. A classificação é feita pela
+ *     FAIXA do valor: no Brasil |longitude| ∈ [34,74] e |latitude| ≤ 34. Só se
+ *     ambos couberem na mesma faixa é que o rótulo entra como desempate.
+ *
+ *  2) OS VALORES SÃO GRAU DECIMAL, não UTM nem DMS. Distinguem-se de UTM pela
+ *     ordem de grandeza (|v| <= 180 contra centenas de milhares) e de um número
+ *     qualquer pela exigência de 3+ casas decimais.
+ *
+ *  Também confere azimutes e distâncias declarados contra os calculados e
+ *  avisa quando o memorial traz CONTRA-AZIMUTES (180° opostos ao sentido do
+ *  caminhamento), erro frequente nesses memoriais de lote urbano.
+ * ---------------------------------------------------------------- */
+
+/** Número decimal preservando o sinal ("-45.606018", "- 3,547271"). */
+function geoV2NumeroSinalizado($raw)
+{
+    $s   = trim((string) $raw);
+    $neg = (strpos($s, '-') !== false);
+    $s   = preg_replace('/[^\d.,]/', '', $s);
+    if ($s === '') return null;
+    $s = (strpos($s, ',') !== false) ? str_replace(['.', ','], ['', '.'], $s) : $s;
+    if (!is_numeric($s)) return null;
+    $v = (float) $s;
+    return $neg ? -$v : $v;
+}
+
+/**
+ * Extrai o polígono de um memorial com coordenadas em GRAU DECIMAL.
+ * Retorna ['ok','pts'(lat,lng),'rotulos','legs','avisos'].
+ */
+function extractCoordenadasDecimais($texto)
+{
+    $vazio = ['ok' => false, 'pts' => [], 'rotulos' => [], 'legs' => [], 'avisos' => []];
+
+    $san    = geoV2Sanear($texto);
+    $t      = $san['texto'];
+    $avisos = $san['avisos'];
+
+    // rótulo + valor decimal com 3+ casas. Case-sensitive de propósito: assim o
+    // conectivo "e" minúsculo do português nunca é lido como rótulo "E".
+    $reL = '/\b(LATITUDE|LONGITUDE|Latitude|Longitude|LAT|LONG|LON|Lat|Long|N|S|E|W|O)\s*[:=]?\s*'
+         . '(-?\s*\d{1,3}[.,]\d{3,})\s*°?/u';
+    preg_match_all($reL, $t, $ms, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+
+    $achados = [];
+    foreach ($ms as $m) {
+        $v = geoV2NumeroSinalizado($m[2][0]);
+        if ($v === null || abs($v) > 180.0) continue;
+        $achados[] = ['rot' => strtoupper($m[1][0]), 'val' => $v,
+                      'ini' => $m[0][1], 'fim' => $m[0][1] + strlen($m[0][0])];
+    }
+
+    // sem rótulos: "de coordenadas -45.606018, -3.547271"
+    if (count($achados) < 6) {
+        $reB = '/coordenadas?\s*[:=]?\s*(-?\s*\d{1,3}[.,]\d{3,})\s*(?:,|;|\se\s|\s+)\s*(-?\s*\d{1,3}[.,]\d{3,})/u';
+        preg_match_all($reB, $t, $mb, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+        $achados = [];
+        foreach ($mb as $m) {
+            $a = geoV2NumeroSinalizado($m[1][0]); $b = geoV2NumeroSinalizado($m[2][0]);
+            if ($a === null || $b === null || abs($a) > 180 || abs($b) > 180) continue;
+            $achados[] = ['rot' => '', 'val' => $a, 'ini' => $m[0][1], 'fim' => $m[0][1] + strlen($m[0][0])];
+            $achados[] = ['rot' => '', 'val' => $b, 'ini' => $m[0][1], 'fim' => $m[0][1] + strlen($m[0][0])];
+        }
+    }
+    if (count($achados) < 6) return $vazio;   // menos de 3 vértices
+
+    $pts = []; $rotulos = []; $trocados = 0; $posFim = [];
+    $nA = count($achados);
+    for ($i = 0; $i + 1 < $nA; $i += 2) {
+        $a = $achados[$i]; $b = $achados[$i + 1];
+        $ga = abs($a['val']); $gb = abs($b['val']);
+
+        // 1º critério: faixa geográfica do Brasil (|lon| 34..74, |lat| <= 34)
+        if     ($ga >= 34 && $ga <= 74 && $gb <= 34) { $lng = $a; $lat = $b; }
+        elseif ($gb >= 34 && $gb <= 74 && $ga <= 34) { $lng = $b; $lat = $a; }
+        else {
+            // 2º critério (ambíguo): aí sim o rótulo decide
+            $aEhLat = in_array($a['rot'], ['LATITUDE', 'LAT', 'N', 'S'], true);
+            if ($aEhLat) { $lat = $a; $lng = $b; } else { $lng = $a; $lat = $b; }
+        }
+
+        if ($lat['val'] < -34 || $lat['val'] > 6)   continue;
+        if ($lng['val'] < -74 || $lng['val'] > -34) continue;
+
+        // o rótulo do que virou longitude diz "latitude"? então estão trocados
+        if (in_array($lng['rot'], ['LATITUDE', 'LAT', 'N', 'S'], true)
+            || in_array($lat['rot'], ['LONGITUDE', 'LONG', 'LON', 'E', 'W', 'O'], true)) $trocados++;
+
+        $pts[] = [$lat['val'], $lng['val']];
+        $posFim[] = max($a['fim'], $b['fim']);
+
+        $antes = substr($t, max(0, $a['ini'] - 70), min(70, $a['ini']));
+        $rot = 'V-' . count($pts);
+        if (preg_match('/(?:v[ée]rtice|ponto|marco|estaca)\s+([A-Z0-9][A-Z0-9\-\.\/]{0,20})[^A-Z0-9]*$/iu', $antes, $mr)) {
+            $r = strtoupper(trim($mr[1], " .,;-"));
+            if ($r !== '') $rot = ctype_digit($r) ? ('V-' . (int) $r) : $r;
+        }
+        $rotulos[] = $rot;
+    }
+
+    if (count($pts) < 3) return $vazio;
+
+    // vértice de fechamento repetido
+    $k = count($pts);
+    if ($k > 3 && abs($pts[0][0] - $pts[$k-1][0]) < 1e-9 && abs($pts[0][1] - $pts[$k-1][1]) < 1e-9) {
+        array_pop($pts); array_pop($rotulos); array_pop($posFim);
+    }
+
+    if ($trocados > 0) {
+        $avisos[] = 'O memorial rotula as coordenadas como "N" e "E", mas os valores estão '
+            . 'invertidos: o que vem como N é a LONGITUDE e o que vem como E é a LATITUDE. '
+            . 'A leitura foi corrigida automaticamente pela faixa de cada valor.';
+    }
+
+    // lados declarados: "310°37'58\" e 9,15 m até o vértice 2"
+    $legs = [];
+    $n = count($pts);
+    for ($i = 0; $i < $n; $i++) {
+        $ini = $posFim[$i];
+        $fim = ($i + 1 < $n) ? $posFim[$i + 1] : strlen($t);
+        $trecho = substr($t, $ini, max(0, $fim - $ini));
+        $leg = ['az' => null, 'dist' => null];
+        if (preg_match('/(\d{1,3})\s*°\s*(\d{1,2})\s*\'\s*(\d{1,2}(?:[.,]\d+)?)?\s*"?\s*e\s*([\d.,]+)\s*m\b/u', $trecho, $ml)) {
+            $az = geoV2Dms($ml[1], $ml[2], $ml[3] ?? '0');
+            $ds = geoV2Numero($ml[4]);
+            if ($az >= 0 && $az <= 360 && $ds > 0) { $leg['az'] = $az; $leg['dist'] = $ds; }
+        }
+        $legs[] = $leg;
+    }
+
+    // confere distâncias e detecta contra-azimutes
+    $ruinsD = 0; $piorD = 0.0; $comLeg = 0; $invertidos = 0; $ruinsA = 0;
+    for ($i = 0; $i < $n; $i++) {
+        if ($legs[$i]['dist'] === null) continue;
+        $j = ($i + 1) % $n;
+        $comLeg++;
+        $d = geoV2DistGeodesica($pts[$i][0], $pts[$i][1], $pts[$j][0], $pts[$j][1]);
+        $dif = abs($d - $legs[$i]['dist']);
+        if ($dif > max(0.05, 0.005 * $legs[$i]['dist'])) { $ruinsD++; $piorD = max($piorD, $dif); }
+
+        if ($legs[$i]['az'] !== null) {
+            $azC = geoV2AzimuteGeodesico($pts[$i][0], $pts[$i][1], $pts[$j][0], $pts[$j][1]);
+            $dA  = abs(fmod($azC - $legs[$i]['az'] + 540.0, 360.0) - 180.0);
+            $dI  = abs(fmod($azC - $legs[$i]['az'] + 360.0, 360.0) - 180.0);
+            if ($dI < 0.5 && $dA > 0.5) $invertidos++;
+            elseif ($dA > 0.5)          $ruinsA++;
+        }
+    }
+    if ($comLeg > 0) {
+        $avisos[] = ($ruinsD === 0)
+            ? 'Coordenadas conferidas: as ' . $comLeg . ' distâncias declaradas batem com as '
+              . 'calculadas a partir dos vértices.'
+            : $ruinsD . ' de ' . $comLeg . ' distâncias declaradas divergem das calculadas '
+              . '(maior diferença ' . number_format($piorD, 3, ',', '.') . ' m).';
+        if ($invertidos > 0 && $invertidos === $comLeg) {
+            $avisos[] = 'Todos os ' . $comLeg . ' azimutes do memorial são CONTRA-AZIMUTES: estão '
+                . '180° opostos ao sentido do caminhamento entre os vértices. A geometria do imóvel '
+                . 'não muda, mas convém corrigir a descrição.';
+        } elseif ($invertidos > 0) {
+            $avisos[] = $invertidos . ' de ' . $comLeg . ' azimutes declarados estão 180° invertidos '
+                . 'em relação ao caminhamento.';
+        }
+        if ($ruinsA > 0) {
+            $avisos[] = $ruinsA . ' azimute(s) declarado(s) não conferem com o caminhamento entre os vértices.';
+        }
+    }
+
+    return ['ok' => true, 'pts' => $pts, 'rotulos' => $rotulos, 'legs' => $legs, 'avisos' => $avisos];
+}
+
+/** Azimute geodésico direto (graus) entre dois pontos, elipsoide GRS80. */
+function geoV2AzimuteGeodesico($lat1, $lon1, $lat2, $lon2)
+{
+    $f = 1 / 298.257222101;
+    $U1 = atan((1 - $f) * tan(deg2rad($lat1)));
+    $U2 = atan((1 - $f) * tan(deg2rad($lat2)));
+    $L  = deg2rad($lon2 - $lon1);
+    $sU1 = sin($U1); $cU1 = cos($U1); $sU2 = sin($U2); $cU2 = cos($U2);
+    $lam = $L;
+    for ($it = 0; $it < 60; $it++) {
+        $sLam = sin($lam); $cLam = cos($lam);
+        $sSig = sqrt(($cU2 * $sLam) ** 2 + ($cU1 * $sU2 - $sU1 * $cU2 * $cLam) ** 2);
+        if ($sSig == 0) return 0.0;
+        $cSig = $sU1 * $sU2 + $cU1 * $cU2 * $cLam;
+        $sig  = atan2($sSig, $cSig);
+        $sA   = $cU1 * $cU2 * $sLam / $sSig;
+        $cSqA = 1 - $sA * $sA;
+        $c2sm = ($cSqA != 0) ? $cSig - 2 * $sU1 * $sU2 / $cSqA : 0;
+        $C    = $f / 16 * $cSqA * (4 + $f * (4 - 3 * $cSqA));
+        $lamP = $lam;
+        $lam  = $L + (1 - $C) * $f * $sA * ($sig + $C * $sSig * ($c2sm + $C * $cSig * (-1 + 2 * $c2sm ** 2)));
+        if (abs($lam - $lamP) < 1e-12) break;
+    }
+    $az = atan2($cU2 * sin($lam), $cU1 * $sU2 - $sU1 * $cU2 * cos($lam));
+    return fmod(rad2deg($az) + 360.0, 360.0);
+}
