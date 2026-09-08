@@ -19,6 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die(json_encode(['success' => false, 'error' => 'Informe o motivo do cancelamento.']));
     }
 
+    // ===== Controle de acesso ao cancelamento (cancelamento_os_config.json) =====
+    require_once(__DIR__ . '/cancelamento_os_lib.php');
+    if (!cancel_os_usuario_pode($conn)) {
+        http_response_code(403);
+        die(json_encode(['success' => false, 'error' => cancel_os_mensagem_negado()]));
+    }
+
     $usuario = $_SESSION['username'] ?? 'sistema';
 
     // ===== Garante colunas de cancelamento na tabela ordens_de_servico =====

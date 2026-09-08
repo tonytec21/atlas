@@ -29,6 +29,12 @@ if ($checkColumn2 && $checkColumn2->num_rows == 0) {
 }
 // ========================================================================
 
+/* ===================== CONTROLE DO BOTÃO "CANCELAR OS" POR JSON ===================== */
+// Lê os/cancelamento_os_config.json (restringir_cancelamento / nivel_liberacao)
+require_once __DIR__ . '/cancelamento_os_lib.php';
+$podeCancelarOS = cancel_os_usuario_pode($conn);
+/* ================================================================================ */
+
 /* ===================== CONTROLE DO BOTÃO "PAGAMENTOS" POR JSON ===================== */
 // Lê a flag no JSON (usa o mesmo configuracao.json já usado no projeto)
 $__configPath = __DIR__ . '/../style/config_os.json';
@@ -1388,7 +1394,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     </div>
                 <?php endif; ?>
 
-                <?php if (!$has_liquidated && $ordem_servico['status'] !== 'Cancelado'): ?>
+                <?php if (!$has_liquidated && $ordem_servico['status'] !== 'Cancelado' && $podeCancelarOS): ?>
                     <div class="col-auto">  
                         <button type="button" class="btn btn-danger btn-sm" onclick="cancelarOS()">  
                             <i class="fa fa-ban" aria-hidden="true"></i> Cancelar OS  
@@ -3963,7 +3969,7 @@ $(document).ready(function() {
                                 Swal.fire({
                                     icon: 'error',
                                     title: 'Erro',
-                                    text: 'Erro ao cancelar a Ordem de Serviço.'
+                                    text: response.error || 'Erro ao cancelar a Ordem de Serviço.'
                                 });
                             }
                         } catch (e) {
@@ -3974,11 +3980,14 @@ $(document).ready(function() {
                             });
                         }
                     },
-                    error: function() {
+                    error: function(xhr) {
+                        // 403 = cancelamento restrito (cancelamento_os_config.json) — mostra a mensagem do servidor
+                        var msg = 'Erro ao cancelar a Ordem de Serviço.';
+                        try { var r = JSON.parse(xhr.responseText || ''); if (r && r.error) msg = r.error; } catch (e) {}
                         Swal.fire({
-                            icon: 'error',
-                            title: 'Erro',
-                            text: 'Erro ao cancelar a Ordem de Serviço.'
+                            icon: xhr.status === 403 ? 'warning' : 'error',
+                            title: xhr.status === 403 ? 'Acesso restrito' : 'Erro',
+                            text: msg
                         });
                     }
                 });

@@ -1,0 +1,12 @@
+{
+  "_descricao": "Controle de quem pode cancelar Ordens de Serviço no módulo O.S. do Atlas. Lido por cancelamento_os_lib.php (botão em visualizar_os.php e validação em cancelar_os.php).",
+  "versao": "1.0",
+  "restringir_cancelamento": false,
+  "nivel_liberacao": 1,
+  "acesso_adicional_caixa": "Fluxo de Caixa",
+  "_ajuda": {
+    "restringir_cancelamento": "false = botão 'Cancelar OS' disponível para todos os colaboradores (comportamento padrão). true = aplica a restrição definida em nivel_liberacao.",
+    "nivel_liberacao": "1 = somente usuários com nivel_de_acesso 'Administrador'. 2 = Administrador OU colaborador que possua o acesso adicional informado em acesso_adicional_caixa (Controle de Caixa).",
+    "acesso_adicional_caixa": "Nome exato do acesso adicional (coluna funcionarios.acesso_adicional, separado por vírgula) que libera o cancelamento no nível 2."
+  }
+}
