@@ -72,6 +72,36 @@ $cns = '';
 $res = $conn->query("SELECT cns FROM cadastro_serventia LIMIT 1");
 if ($res) $cns = $res->fetch_assoc()['cns'] ?? '';
 
+/* 2b. Registro da serventia no painel Atlas (api-atlas) -------------------- */
+/* Envia CNS, razão social e cidade uma vez por dia (marcador em arquivo).     */
+/* A API faz upsert pelo CNS, então reenvios só atualizam o "último acesso".  */
+$registroUrl   = 'http://24.152.39.25/api-atlas/api.php';
+$registroToken = 'API-ATLAS';
+$registroMarca = sys_get_temp_dir().'/atlas_registro_'.md5($cns).'.txt';
+if ($cns && (!is_file($registroMarca) || filemtime($registroMarca) < time()-86400)) {
+  $r = $conn->query("SELECT razao_social, cidade FROM cadastro_serventia LIMIT 1");
+  $srv = $r ? ($r->fetch_assoc() ?: []) : [];
+  $ch = curl_init($registroUrl);
+  curl_setopt_array($ch, [
+    CURLOPT_POST           => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CONNECTTIMEOUT => 2,
+    CURLOPT_TIMEOUT        => 3,
+    CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'X-Atlas-Token: '.$registroToken],
+    CURLOPT_POSTFIELDS     => json_encode([
+      'cns'          => $cns,
+      'razao_social' => $srv['razao_social'] ?? '',
+      'cidade'       => $srv['cidade'] ?? '',
+      'host'         => $_SERVER['HTTP_HOST'] ?? '',
+      'php'          => PHP_VERSION,
+    ], JSON_UNESCAPED_UNICODE),
+  ]);
+  $resp = curl_exec($ch);
+  $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  curl_close($ch);
+  if ($resp !== false && $code === 200) @touch($registroMarca);   // só marca se a API confirmou
+}
+
 /* 3. Chama a API ----------------------------------------------------------- */
 $apiUrl   = 'https://api.sistemaatlas.com.br/api.php';
 $apiToken = 'CHAVE-SECRETA-GERADA';
