@@ -81,6 +81,36 @@ $registroMarca = sys_get_temp_dir().'/atlas_registro_'.md5($cns).'.txt';
 if ($cns && (!is_file($registroMarca) || filemtime($registroMarca) < time()-86400)) {
   $r = $conn->query("SELECT razao_social, cidade FROM cadastro_serventia LIMIT 1");
   $srv = $r ? ($r->fetch_assoc() ?: []) : [];
+
+  /* --- dados do servidor (Windows) --- */
+  $vpnIp = ''; $soVersao = ''; $ramMb = null;
+  if (PHP_OS_FAMILY === 'Windows') {
+    // IPv4 do adaptador "Radmin VPN" (saída do ipconfig em pt-BR ou en)
+    $ipc = (string)@shell_exec('ipconfig');
+    $ipc = @mb_convert_encoding($ipc, 'UTF-8', 'CP850') ?: $ipc;
+    if (preg_match('/Radmin VPN.*?(?:IPv4|Endere\S*\s+IPv4)[^\d]*(\d{1,3}(?:\.\d{1,3}){3})/isu', $ipc, $m)) {
+      $vpnIp = $m[1];
+    } elseif (preg_match('/\b(26\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/', $ipc, $m)) {
+      $vpnIp = $m[1];   // faixa 26.x.x.x usada pelo Radmin VPN
+    }
+    // Versão do Windows e RAM total via PowerShell (um único processo); wmic como reserva
+    $ps = (string)@shell_exec('powershell -NoProfile -NonInteractive -Command "$o=Get-CimInstance Win32_OperatingSystem;$c=Get-CimInstance Win32_ComputerSystem;Write-Output ($o.Caption+\'|\'+$o.Version+\'|\'+$c.TotalPhysicalMemory)" 2>nul');
+    $ps = trim(@mb_convert_encoding($ps, 'UTF-8', 'CP850') ?: $ps);
+    if (substr_count($ps, '|') === 2) {
+      [$cap, $ver, $ram] = explode('|', $ps);
+      $soVersao = trim($cap).' ('.trim($ver).')';
+      $ramMb    = is_numeric(trim($ram)) ? (int)round((float)trim($ram) / 1048576) : null;
+    } else {
+      $w = (string)@shell_exec('wmic os get Caption,Version /value 2>nul');
+      if (preg_match('/Caption=(.+)/', $w, $a) && preg_match('/Version=(.+)/', $w, $b)) $soVersao = trim($a[1]).' ('.trim($b[1]).')';
+      $w = (string)@shell_exec('wmic computersystem get TotalPhysicalMemory /value 2>nul');
+      if (preg_match('/TotalPhysicalMemory=(\d+)/', $w, $a)) $ramMb = (int)round((float)$a[1] / 1048576);
+    }
+  }
+  if ($soVersao === '') $soVersao = php_uname('s').' '.php_uname('r');
+  $discoRaiz  = PHP_OS_FAMILY === 'Windows' ? substr(__DIR__, 0, 3) : '/';   // ex.: C:\
+  $discoTotal = @disk_total_space($discoRaiz);
+  $discoLivre = @disk_free_space($discoRaiz);
   $ch = curl_init($registroUrl);
   curl_setopt_array($ch, [
     CURLOPT_POST           => true,
@@ -94,6 +124,12 @@ if ($cns && (!is_file($registroMarca) || filemtime($registroMarca) < time()-8640
       'cidade'       => $srv['cidade'] ?? '',
       'host'         => $_SERVER['HTTP_HOST'] ?? '',
       'php'          => PHP_VERSION,
+      'vpn_ip'       => $vpnIp,
+      'so'           => $soVersao,
+      'ram_mb'       => $ramMb,
+      'disco_gb'     => $discoTotal ? round($discoTotal / 1073741824, 1) : null,
+      'disco_livre_gb' => $discoLivre ? round($discoLivre / 1073741824, 1) : null,
+      'disco_unidade'=> $discoRaiz,
     ], JSON_UNESCAPED_UNICODE),
   ]);
   $resp = curl_exec($ch);
