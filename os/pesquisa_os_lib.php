@@ -54,9 +54,113 @@ function pos_filtros(): array
         'atos'         => $atos,
         'ato_modo'     => $t('ato_modo') === 'todos' ? 'todos' : 'qualquer',
         'ord'          => $t('ord') !== '' ? $t('ord') : 'recentes',
-        'pp'           => max(10, min(200, (int) ($_GET['pp'] ?? 50))),
+        // pp vazio = sem seleção: 100 últimas sem filtro / tudo (até POS_LIMITE_SEM_PAGINACAO) com filtro
+        'pp'           => ($t('pp') === '' ? null : max(10, min(200, (int) $t('pp')))),
         'p'            => max(1, (int) ($_GET['p'] ?? 1)),
     ];
+}
+
+/** Teto de linhas quando "Resultados por página" fica sem seleção e há filtro. */
+if (!defined('POS_LIMITE_SEM_PAGINACAO')) {
+    define('POS_LIMITE_SEM_PAGINACAO', 1000);
+}
+
+/** Quantidade padrão ao entrar na tela sem filtro e sem "Resultados por página". */
+if (!defined('POS_PADRAO_SEM_FILTRO')) {
+    define('POS_PADRAO_SEM_FILTRO', 100);
+}
+
+/**
+ * Interpreta o campo "Nº da O.S." aceitando:
+ *   120            → uma O.S.
+ *   100-150        → intervalo (também "100 a 150", "100..150", "100 até 150")
+ *   10;25;40       → lista (separador ; ou ,)
+ *   10;20-30;45    → lista e intervalos misturados
+ *
+ * @return array{ids:int[], faixas:array<int,array{0:int,1:int}>}
+ */
+function pos_parse_numeros_os(string $texto): array
+{
+    $ids = [];
+    $faixas = [];
+
+    $texto = mb_strtolower(trim($texto), 'UTF-8');
+    if ($texto === '') {
+        return ['ids' => [], 'faixas' => []];
+    }
+
+    // Normaliza os jeitos de escrever intervalo para "-"
+    $texto = preg_replace('/\s*(?:\.\.|até|ate|a|-|–|—)\s*/u', '-', $texto) ?? $texto;
+
+    foreach (preg_split('/[;,\s]+/', $texto, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $peca) {
+        if (preg_match('/^(\d+)-(\d+)$/', $peca, $m)) {
+            $a = (int) $m[1];
+            $b = (int) $m[2];
+            if ($a > $b) {
+                [$a, $b] = [$b, $a];
+            }
+            if ($a === $b) {
+                $ids[] = $a;
+            } else {
+                $faixas[] = [$a, $b];
+            }
+        } elseif (ctype_digit($peca)) {
+            $ids[] = (int) $peca;
+        }
+        // qualquer outra coisa é ignorada
+    }
+
+    $ids = array_values(array_unique(array_filter($ids, static fn(int $i) => $i > 0)));
+    sort($ids);
+
+    return ['ids' => $ids, 'faixas' => $faixas];
+}
+
+/** Rótulo curto do que foi pedido em "Nº da O.S." (para o chip de filtro ativo). */
+function pos_rotulo_numeros_os(array $n): string
+{
+    $partes = array_map('strval', $n['ids']);
+    foreach ($n['faixas'] as [$a, $b]) {
+        $partes[] = $a . '–' . $b;
+    }
+    if (count($partes) > 6) {
+        $partes = array_merge(array_slice($partes, 0, 6), ['… (+' . (count($partes) - 6) . ')']);
+    }
+
+    return 'O.S. nº ' . implode('; ', $partes);
+}
+
+/**
+ * Monta a condição SQL para números/intervalos de O.S.
+ * Placeholders únicos (prefixo) — ver regra no topo do arquivo.
+ *
+ * @param array{ids:int[], faixas:array<int,array{0:int,1:int}>} $n
+ * @param array<string,mixed> $par  recebe os parâmetros
+ * @return string condição pronta (já entre parênteses) ou '' se não houver nada
+ */
+function pos_cond_numeros_os(array $n, array &$par, string $prefixo = 'nos'): string
+{
+    $partes = [];
+
+    if ($n['ids'] !== []) {
+        $marc = [];
+        foreach ($n['ids'] as $i => $id) {
+            $k = ':' . $prefixo . '_i' . $i;
+            $marc[] = $k;
+            $par[$k] = $id;
+        }
+        $partes[] = 'o.id IN (' . implode(', ', $marc) . ')';
+    }
+
+    foreach ($n['faixas'] as $i => [$a, $b]) {
+        $ka = ':' . $prefixo . '_a' . $i;
+        $kb = ':' . $prefixo . '_b' . $i;
+        $partes[] = "o.id BETWEEN {$ka} AND {$kb}";
+        $par[$ka] = $a;
+        $par[$kb] = $b;
+    }
+
+    return $partes ? '(' . implode(' OR ', $partes) . ')' : '';
 }
 
 /** Converte "1.234,56" ou "1234.56" em float. Devolve null se não for número. */
@@ -130,7 +234,11 @@ function pos_montar_where(array $f): array
            prepares nativos o MySQL recusa o mesmo :nome repetido no mesmo
            comando — o erro é "Invalid parameter number". Por isso os nomes
            são numerados em vez de reaproveitados. */
-        if (ctype_digit($q) && strlen($q) <= 8) {
+        if (preg_match('/^\d+\s*(?:[;,]|-|–|—|\.\.|\s+a\s+|\s+at[ée]\s+)/u', $q)
+                && ($nq = pos_parse_numeros_os($q)) && ($nq['ids'] !== [] || $nq['faixas'] !== [])) {
+            // "10;25;40" ou "100-150" na busca rápida = números de O.S.
+            $cond[] = pos_cond_numeros_os($nq, $par, 'qn');
+        } elseif (ctype_digit($q) && strlen($q) <= 8) {
             $cond[] = '(o.id = :q_id OR o.cliente LIKE :q_a OR o.descricao_os LIKE :q_b)';
             $par[':q_id'] = (int) $q;
             $par[':q_a'] = '%' . $q . '%';
@@ -151,9 +259,14 @@ function pos_montar_where(array $f): array
     }
 
     if ($f['os_id'] !== '') {
-        $cond[] = 'o.id = :os_id';
-        $par[':os_id'] = (int) $f['os_id'];
-        $marcar('O.S. nº ' . (int) $f['os_id'], 'os_id');
+        /* Aceita um número, intervalo (100-150) ou lista separada por ;
+           (10;25;40), inclusive misturados (10;20-30;45). */
+        $n = pos_parse_numeros_os($f['os_id']);
+        $c = pos_cond_numeros_os($n, $par, 'nos');
+        if ($c !== '') {
+            $cond[] = $c;
+            $marcar(pos_rotulo_numeros_os($n), 'os_id');
+        }
     }
 
     if ($f['cliente'] !== '') {

@@ -1323,13 +1323,21 @@ body.dark-mode footer .footer-content a:hover {
             $stSoma->execute($pw['params']);
             $somaEncontrada = (float) $stSoma->fetchColumn();
 
-            $paginas = max(1, (int) ceil($totalEncontrado / $pf['pp']));
+            /* "Resultados por página" é opcional:
+               - sem seleção e sem filtro  → as últimas 100 O.S. (paginadas de 100 em 100)
+               - sem seleção e com filtro  → tudo que o filtro devolver, até POS_LIMITE_SEM_PAGINACAO
+               - com seleção               → pagina no tamanho escolhido */
+            $semPaginacao = ($pf['pp'] === null && $temFiltro);
+            $porPagina = $pf['pp'] ?? ($temFiltro ? POS_LIMITE_SEM_PAGINACAO : POS_PADRAO_SEM_FILTRO);
+            $tetoAtingido = ($semPaginacao && $totalEncontrado > POS_LIMITE_SEM_PAGINACAO);
+
+            $paginas = $semPaginacao ? 1 : max(1, (int) ceil($totalEncontrado / $porPagina));
             $paginaAtual = min($pf['p'], $paginas);
-            $deslocamento = ($paginaAtual - 1) * $pf['pp'];
+            $deslocamento = ($paginaAtual - 1) * $porPagina;
 
             $sql = 'SELECT o.* ' . $sqlBase
             . ' ORDER BY ' . pos_ordem($pf['ord'])
-            . ' LIMIT ' . (int) $pf['pp'] . ' OFFSET ' . (int) $deslocamento;
+            . ' LIMIT ' . (int) $porPagina . ' OFFSET ' . (int) $deslocamento;
 
             $stmt = $conn->prepare($sql);
             $stmt->execute($pw['params']);
@@ -1387,7 +1395,9 @@ body.dark-mode footer .footer-content a:hover {
                       <div class="cfg-grid">
                         <div class="c2">
                           <label class="cfg-rot" for="os_id">Nº da O.S.</label>
-                          <input type="number" min="1" class="cfg-in" id="os_id" name="os_id" value="<?= $e($pf['os_id']) ?>">
+                          <input type="text" class="cfg-in cfg-mono" id="os_id" name="os_id" value="<?= $e($pf['os_id']) ?>"
+                                 placeholder="120 · 100-150 · 10;25;40" inputmode="numeric">
+                          <div class="cfg-dica">Um número, intervalo (100-150) ou vários separados por ; — pode misturar.</div>
                         </div>
                         <div class="c5">
                           <label class="cfg-rot" for="cliente">Apresentante</label>
@@ -1483,10 +1493,12 @@ body.dark-mode footer .footer-content a:hover {
                         <div class="c3">
                           <label class="cfg-rot" for="pp">Resultados por página</label>
                           <select class="cfg-in" id="pp" name="pp">
+                            <option value="" <?= $pf['pp']===null?'selected':'' ?>>Sem limite (obedece só aos filtros)</option>
                             <?php foreach ([25,50,100,200] as $ppO): ?>
                               <option value="<?= $ppO ?>" <?= $pf['pp']===$ppO?'selected':'' ?>><?= $ppO ?></option>
                             <?php endforeach; ?>
                           </select>
+                          <div class="cfg-dica">Sem seleção: ao entrar mostra as últimas <?= POS_PADRAO_SEM_FILTRO ?>; com filtro traz tudo (até <?= number_format(POS_LIMITE_SEM_PAGINACAO,0,',','.') ?>).</div>
                         </div>
                       </div>
 
@@ -1887,6 +1899,15 @@ body.dark-mode footer .footer-content a:hover {
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
+                <?php if (!empty($tetoAtingido)): ?>
+                  <div class="cfg">
+                    <div class="cfg-card" style="padding:10px 14px;color:var(--txt-2)">
+                      <i class="fa fa-info-circle"></i>
+                      O filtro encontrou <?= number_format($totalEncontrado, 0, ',', '.') ?> O.S.; estão sendo exibidas as <?= number_format(POS_LIMITE_SEM_PAGINACAO, 0, ',', '.') ?> primeiras.
+                      Refine a pesquisa ou escolha um valor em "Resultados por página" para paginar.
+                    </div>
+                  </div>
+                <?php endif; ?>
                 <?php if ($paginas > 1): ?>
                   <div class="cfg">
                     <nav class="cfg-paginacao">

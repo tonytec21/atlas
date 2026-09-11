@@ -61,3 +61,28 @@ Antes a tela trazia 100 registros sem filtro, e **todos** os registros quando
 havia filtro — uma pesquisa ampla podia trazer milhares de linhas, cada uma
 disparando cinco subconsultas de saldo. Agora há `LIMIT`/`OFFSET` com janela
 de páginas em volta da atual.
+
+## Nº da O.S.: intervalos e listas
+
+O campo **Nº da O.S.** (e a busca rápida, quando o texto tem esse formato)
+aceita:
+
+- `120` — uma O.S.
+- `100-150` — intervalo (`100 a 150`, `100..150` e `100 até 150` também valem)
+- `10;25;40` — só essas (separador `;` ou `,`)
+- `10;20-30;45` — lista e intervalos misturados
+
+Parse em `pos_parse_numeros_os()`; SQL em `pos_cond_numeros_os()` — `IN` para
+os avulsos e um `BETWEEN` por intervalo, tudo em um único parêntese com `OR`.
+
+## Resultados por página (opcional)
+
+`pp` deixou de ter valor obrigatório:
+
+| `pp` | filtro | resultado |
+|---|---|---|
+| vazio | nenhum | últimas `POS_PADRAO_SEM_FILTRO` (100), paginadas |
+| vazio | algum  | tudo que o filtro devolver, até `POS_LIMITE_SEM_PAGINACAO` (1000), sem paginação — acima disso a tela avisa |
+| 25/50/100/200 | qualquer | pagina no tamanho escolhido |
+
+Os dois limites são constantes no topo de `pesquisa_os_lib.php`.
