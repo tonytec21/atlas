@@ -10,7 +10,7 @@
  *    nada do TCloud na VM (link tcloudsign://local).
  *  - Assinador SERPRO (roda no navegador/estação).
  */
-if (!defined('ASG_VERSAO')) define('ASG_VERSAO', '1.7.1');   // versão do módulo Atlas Signum
+if (!defined('ASG_VERSAO')) define('ASG_VERSAO', '1.7.2');   // versão do módulo Atlas Signum
 // Nível da assinatura no TCloud Assinador: 'basico' (sem carimbo de tempo), 'carimbo' ou 'ltv'.
 // Por enquanto só o básico — a ACT ainda não está configurada no servidor.json.
 if (!defined('ASG_TC_NIVEL')) define('ASG_TC_NIVEL', 'basico');
@@ -22,9 +22,12 @@ if (!defined('ASG_TC_VERSAO_MIN')) define('ASG_TC_VERSAO_MIN', '2.0.0');
 if (!defined('ASG_TC_CMD_WINDOWS')) define('ASG_TC_CMD_WINDOWS', '[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072; irm ' . ASG_TC_URL_INSTALACAO . '/instalar.ps1 | iex');
 if (!defined('ASG_TC_CMD_MAC')) define('ASG_TC_CMD_MAC', 'curl -fsSL ' . ASG_TC_URL_INSTALACAO . '/instalar-mac.sh | bash');
 if (!defined('ASG_TC_CMD_LINUX')) define('ASG_TC_CMD_LINUX', 'wget -qO- ' . ASG_TC_URL_INSTALACAO . '/instalar-linux.sh | bash');
-// Mesmo comando do Windows, pronto para colar na caixa Executar (Win + R): abre o PowerShell e instala.
-// A caixa Executar aceita até 259 caracteres.
-if (!defined('ASG_TC_CMD_EXECUTAR')) define('ASG_TC_CMD_EXECUTAR', 'powershell -NoProfile -ExecutionPolicy Bypass -Command "' . ASG_TC_CMD_WINDOWS . '"');
+// Comando para a caixa Executar (Win + R). Abre o instalador num PowerShell COMO ADMINISTRADOR
+// (o Windows pede permissão; o usuário clica em "Sim") — necessário quando falta o .NET Desktop
+// Runtime 8, que só instala com administrador. -NoExit mantém a janela aberta para ver o resultado.
+// A caixa Executar aceita até 259 caracteres (este fica em 239).
+if (!defined('ASG_TC_CMD_EXECUTAR')) define('ASG_TC_CMD_EXECUTAR', 'powershell -NoProfile -Command "Start-Process powershell -Verb RunAs -ArgumentList '
+    . "'-NoExit -NoProfile -ExecutionPolicy Bypass -Command [Net.ServicePointManager]::SecurityProtocol=3072;irm " . ASG_TC_URL_INSTALACAO . "/instalar.ps1|iex'" . '"');
 // O link tcloudsign:// aponta para o mesmo endereço pelo qual o navegador abriu o Atlas
 // (rede local, VPN/Tailscale…), para a estação chegar ao serviço pelo mesmo caminho e com o mesmo IP.
 if (!defined('ASG_TC_LINK_PELO_NAVEGADOR')) define('ASG_TC_LINK_PELO_NAVEGADOR', true);

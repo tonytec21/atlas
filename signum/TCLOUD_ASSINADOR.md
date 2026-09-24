@@ -1,4 +1,4 @@
-# Atlas Signum — TCloud Assinador (v1.7.1)
+# Atlas Signum — TCloud Assinador (v1.7.2)
 
 O A3 (token) tem dois assinadores, escolhidos por usuário em **Configurar → Certificado A3 → Assinador do token**: **TCloud Assinador** (padrão desde a v1.4.0) ou **Assinador SERPRO**. Na primeira execução da v1.4.0, quem estava no SERPRO só por ser o padrão antigo passa para o TCloud; depois disso, a escolha de cada usuário é respeitada.
 
@@ -16,7 +16,7 @@ Um site não pode abrir o PowerShell nem o Terminal (os navegadores não deixam 
   - Se o link for aberto (app detectado antes, ou o usuário disse que já instalou) e o app não responder em 6 segundos, a própria janela troca para o passo a passo, com **Copiar comando** e **Já instalei — tentar de novo**, e continua esperando por baixo (se o app estava só perguntando "Confiar neste servidor?", segue normalmente). A caixa do Windows pode aparecer por cima; ao fechá-la, as instruções já estão na tela.
 - **Por que não abre o PowerShell direto:** nenhum navegador permite executar comandos, e o Windows não tem link seguro que abra a caixa Executar ou o PowerShell. O botão copia o comando e mostra as teclas.
 - **O botão copia o comando e mostra as teclas:**
-  - Windows: `Win + R` → `Ctrl + V` → `Enter` (o comando da caixa Executar abre o PowerShell com TLS 1.2 e roda o `instalar.ps1`; 212 dos 259 caracteres permitidos);
+  - Windows: `Win + R` → `Ctrl + V` → `Enter` → **Sim** na permissão do Windows. O comando da caixa Executar abre o `instalar.ps1` num PowerShell **como administrador** (`Start-Process -Verb RunAs`), com TLS 1.2 — necessário quando a estação não tem o .NET Desktop Runtime 8; a janela fica aberta no fim (`-NoExit`). 239 dos 259 caracteres permitidos;
   - Mac: `Cmd + Espaço` → "Terminal" → `Cmd + V` → `Enter` (`curl -fsSL https://tcloudsoft.app/download/instalar-mac.sh | bash`);
   - Linux: `Ctrl + Alt + T` → `Ctrl + Shift + V` → `Enter` (`wget -qO- https://tcloudsoft.app/download/instalar-linux.sh | bash`);
   - celular, tablet, ChromeOS: avisa que o assinador roda em Windows, Mac ou Linux.

@@ -78,7 +78,7 @@
     var passos = {
       windows: passo(1, 'Aperte ' + tecla('⊞ Win') + ' + ' + tecla('R') + ' — abre a caixa <b>Executar</b>.') +
                passo(2, 'Aperte ' + tecla('Ctrl') + ' + ' + tecla('V') + ' para colar o comando.') +
-               passo(3, 'Aperte ' + tecla('Enter') + '. O PowerShell abre e instala sozinho.'),
+               passo(3, 'Aperte ' + tecla('Enter') + ' e clique em <b>Sim</b> quando o Windows pedir permissão. O PowerShell abre e instala sozinho.'),
       mac:     passo(1, 'Aperte ' + tecla('⌘ Cmd') + ' + ' + tecla('Espaço') + ', digite <b>Terminal</b> e aperte ' + tecla('Enter') + '.') +
                passo(2, 'Aperte ' + tecla('⌘ Cmd') + ' + ' + tecla('V') + ' para colar o comando.') +
                passo(3, 'Aperte ' + tecla('Enter') + ' e, se pedir, digite a senha do Mac.'),
