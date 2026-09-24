@@ -2,6 +2,15 @@
 require_once __DIR__ . '/session_check.php'; checkSession();
 require_once __DIR__ . '/assinatura_os_config.php';
 os_ensure_schema();
+// TCloud Assinador centralizado no Atlas Signum (1.7.0+). Sem a ponte do Signum, a página não quebra:
+// segue pelo Assinador SERPRO e avisa para atualizar o Signum.
+$USA_TC = false; $TC_FALTA_SIGNUM = false;
+if (is_file(__DIR__ . '/../signum/inc/tcloud_modulo.php')) {
+    require_once __DIR__ . '/../signum/inc/tcloud_modulo.php';
+    $USA_TC = asg_tcm_usa_tcloud();   // escolha do usuário no Configurar do Signum (padrão: TCloud Assinador)
+} else {
+    $TC_FALTA_SIGNUM = true;
+}
 
 $tipo = trim((string)($_GET['tipo'] ?? ''));
 $osId = (int)($_GET['id'] ?? $_GET['os_id'] ?? 0);
@@ -63,7 +72,21 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     .okbadge{ width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;display:flex;align-items:center;justify-content:center;font-size:2.3rem;margin:4px auto 10px; }
     iframe.signed{ width:100%;height:74vh;border:1px solid #e5e9f0;border-radius:12px;margin-top:14px; }
     .range{ width:100%;accent-color:var(--az); }
+    /* ---- responsividade (v1.7.0) ---- */
+    .hero{ flex-wrap:wrap; }
+    .pagewrap canvas{ max-width:100%; }
+    #statusLine{ overflow-wrap:anywhere; }
+    @media(min-width:992px){ .os-side{ position:sticky; top:16px; align-self:flex-start; } }
+    @media(max-width:991.98px){ .canvas-wrap{ max-height:none; padding:10px; } #pages{ gap:12px; } }
+    @media(max-width:575.98px){
+      .wrap{ padding:12px 12px 40px; }   /* >= calha da .row do Bootstrap 5 */
+      .hero h1{ font-size:1.1rem; } .hero .ic{ width:40px; height:40px; font-size:1rem; }
+      .card .hd{ padding:12px 14px; } .card .bd{ padding:14px; }
+      iframe.signed{ height:62vh; }
+      .hint{ font-size:.72rem; padding:6px 10px; white-space:nowrap; }
+    }
 </style>
+<?php if (function_exists('asg_tcm_css')) echo asg_tcm_css(); ?>
 </head>
 <body>
 <div class="wrap">
@@ -71,17 +94,20 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     <div class="ic"><i class="fa fa-file-signature"></i></div>
     <div style="flex:1;min-width:0">
       <h1>Assinar <?php echo h($tituloDoc); ?> — O.S. nº <?php echo $osId; ?></h1>
-      <div class="sub">Assinatura digital ICP-Brasil (PAdES / AD-RB) via Assinador SERPRO.<?php echo $resign ? ' <b style="color:#b45309">· Reassinatura: substituirá a versão anterior.</b>' : ''; ?></div>
-      <div class="mt-1"><span id="serproChip" class="chip"><i class="fa fa-circle"></i> <span id="serproChipTxt">Verificando…</span></span></div>
+      <div class="sub">Assinatura digital ICP-Brasil (PAdES) <?php echo $USA_TC ? 'pelo TCloud Assinador' : 'via Assinador SERPRO'; ?>.<?php echo $resign ? ' <b style="color:#b45309">· Reassinatura: substituirá a versão anterior.</b>' : ''; ?></div>
+      <div class="mt-1"><span id="serproChip" class="chip"><i class="fa fa-circle"></i> <span id="serproChipTxt"><?php echo $USA_TC ? 'TCloud Assinador' : 'Verificando…'; ?></span></span></div>
     </div>
     <a href="javascript:window.close()" class="btn btn-outline-secondary btn-sm"><i class="fa fa-times"></i> Fechar</a>
   </div>
 
+<?php if ($TC_FALTA_SIGNUM): ?>
+<div style="background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:12px;padding:10px 14px;margin:0 0 14px;font-size:.88rem"><b>TCloud Assinador indisponível neste módulo:</b> falta o Atlas Signum 1.7.0 ou mais novo (pasta <code>signum/inc</code>). Por enquanto a assinatura segue pelo Assinador SERPRO.</div>
+<?php endif; ?>
 <?php if ($jaAssinado && !$resign): ?>
   <div class="card"><div class="bd text-center">
     <?php if ($recemOk): ?><div class="okbadge"><i class="fa fa-check"></i></div><h4 style="font-weight:800">Documento assinado com sucesso</h4>
     <?php else: ?><h4 style="font-weight:800">Este documento já está assinado</h4><?php endif; ?>
-    <p class="text-muted">Assinatura digital ICP-Brasil (PAdES / AD-RB)<?php echo !empty($info['assinado_em']) ? ' · assinado em '.date('d/m/Y H:i', strtotime($info['assinado_em'])) : ''; ?>.</p>
+    <p class="text-muted">Assinatura digital ICP-Brasil (PAdES)<?php echo !empty($info['assinado_em']) ? ' · assinado em '.date('d/m/Y H:i', strtotime($info['assinado_em'])) : ''; ?>.</p>
     <div class="d-flex flex-wrap justify-content-center gap-2 mb-2">
       <a class="btn btn-success" href="<?php echo h($assinadoUrl); ?>" target="_blank"><i class="fa fa-external-link-alt"></i> Abrir PDF assinado</a>
       <a class="btn btn-outline-primary" href="assinar-os.php?tipo=<?php echo h($tipo); ?>&id=<?php echo $osId; ?>&resign=1"><i class="fa fa-rotate-right"></i> Assinar novamente</a>
@@ -90,15 +116,18 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     <iframe class="signed" src="<?php echo h($assinadoUrl); ?>"></iframe>
   </div></div>
 <?php else: ?>
+  <?php if ($USA_TC) echo asg_tcm_banner_html(); ?>
   <div class="row">
     <div class="col-12 col-lg-8 order-1">
       <div class="card">
         <div class="hd"><i class="fa fa-file-pdf"></i> Pré-visualização <span class="text-muted ms-auto" style="font-weight:400;font-size:.84rem">clique onde a assinatura deve aparecer</span></div>
         <div class="canvas-wrap"><div id="pages"></div></div>
         <div id="statusLine" style="font-size:.85rem;color:#64748b;padding:10px 18px;border-top:1px solid #eef1f6;min-height:1.2em">Carregando documento…</div>
+        <div class="tcm-mbar"><button id="btnAssinarM" type="button" class="btn-sign" disabled><i class="fa fa-lock"></i> Assinar com o token</button></div>
       </div>
     </div>
-    <div class="col-12 col-lg-4 order-2 mt-3 mt-lg-0">
+    <div class="col-12 col-lg-4 order-2 mt-3 mt-lg-0 os-side">
+      <?php if ($USA_TC): echo asg_tcm_card_html(['card' => 'card', 'hd' => 'hd', 'bd' => 'bd']); else: ?>
       <div class="card"><div class="hd"><i class="fa fa-usb"></i> Assinador SERPRO</div>
         <div class="bd">
           <div id="sAstat" class="astat"><span class="lamp"></span><div><div class="fw-bold" id="sState">Verificando…</div><div class="text-muted" id="sHelp" style="font-size:.82rem">Aguarde a conexão.</div></div></div>
@@ -108,6 +137,7 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
           </div>
         </div>
       </div>
+      <?php endif; ?>
       <div class="card"><div class="hd"><i class="fa fa-stamp"></i> Selo</div>
         <div class="bd">
           <div class="fw-bold"><?php echo h($signer['nome'] ?: '—'); ?></div>
@@ -129,13 +159,16 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <?php if ($mostrarEditor): ?>
 <script src="../oficios/pdfjs/pdf.min.js"></script>
+<?php if ($USA_TC): echo asg_tcm_scripts('tcloud_iniciar.php'); else: ?>
 <script src="../oficios/serpro/serpro-signer-promise.js"></script>
 <script src="../oficios/serpro/serpro-signer-client.js"></script>
+<?php endif; ?>
 <script>
 (function(){
   "use strict";
   var TIPO=<?php echo json_encode($tipo); ?>, OSID=<?php echo json_encode($osId); ?>, CSRF=<?php echo json_encode($CSRF); ?>;
   var NOME=<?php echo json_encode($signer['nome']); ?>, CARGO=<?php echo json_encode($signer['cargo']); ?>;
+  var TC=<?php echo $USA_TC ? 'true' : 'false'; ?>;   // TCloud Assinador (Signum) ou Assinador SERPRO
   var C=window.SerproSignerClient, serproOnline=false, seal={page:null,xn:null,yn:null,wn:0.42};
   if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='../oficios/pdfjs/pdf.worker.min.js';
   function el(id){return document.getElementById(id);}
@@ -156,19 +189,19 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     var pdf=await pdfjsLib.getDocument({data:b64ToU8(r.pdf_base64)}).promise;
     var box=el('pages');box.innerHTML='';
     for(var p=1;p<=pdf.numPages;p++){
-      var page=await pdf.getPage(p),vp=page.getViewport({scale:1.6});
+      var page=await pdf.getPage(p); var vp1=page.getViewport({scale:1}), cssW=Math.min(780, box.clientWidth||780);var vp=page.getViewport({scale:Math.max(1,Math.min(3,cssW*Math.min(2,window.devicePixelRatio||1)/vp1.width))});
       var wrap=document.createElement('div');wrap.className='pagewrap';wrap.dataset.page=p;
-      var cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;
+      var cv=document.createElement('canvas');cv.width=Math.floor(vp.width);cv.height=Math.floor(vp.height);
       var ov=document.createElement('div');ov.className='overlay';
       wrap.appendChild(cv);wrap.appendChild(ov);box.appendChild(wrap);
       if(p===1){var hp=document.createElement('div');hp.className='hint';hp.id='hint';hp.textContent='Clique para posicionar a assinatura';wrap.appendChild(hp);}
       await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
-      (function(pp,o){o.addEventListener('pointerdown',function(ev){if(ev.target.closest('.sealbox'))return;place(pp,o,ev);});})(p,ov);
+      (function(pp,o){o.addEventListener('click',function(ev){if(ev.target.closest('.sealbox'))return;place(pp,o,ev);});})(p,ov);
     }
     status('Clique no documento para posicionar a assinatura.');
   }
   function pageOverlay(p){var w=document.querySelector('.pagewrap[data-page="'+p+'"]');return w?w.querySelector('.overlay'):null;}
-  function place(p,ov,ev){var r=ov.getBoundingClientRect();seal.page=p;seal.xn=Math.min(0.98,Math.max(0,(ev.clientX-r.left)/r.width));seal.yn=Math.min(0.98,Math.max(0,(ev.clientY-r.top)/r.height));var hp=el('hint');if(hp)hp.style.display='none';drawSeal();status('Assinatura na página '+p+'. Arraste para ajustar ou clique em Assinar.');}
+  function place(p,ov,ev){var r=ov.getBoundingClientRect();seal.page=p;seal.xn=Math.min(0.98,Math.max(0,(ev.clientX-r.left)/r.width));seal.yn=Math.min(0.98,Math.max(0,(ev.clientY-r.top)/r.height));var hp=el('hint');if(hp)hp.style.display='none';drawSeal();if(TC)el('btnAssinar').disabled=false;status('Assinatura na página '+p+'. Arraste para ajustar ou clique em Assinar.');}
   var SEAL_RATIO=0.22;
   function drawSeal(){
     document.querySelectorAll('.sealbox').forEach(function(b){b.remove();});
@@ -187,7 +220,7 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     // coluna direita (validação)
     var colR=document.createElement('div');colR.className='colr';
     var v1=document.createElement('div');v1.className='vr';v1.textContent='ICP-Brasil · PAdES';
-    var v2=document.createElement('div');v2.className='vr';v2.textContent='Assinador SERPRO';
+    var v2=document.createElement('div');v2.className='vr';v2.textContent=TC?'TCloud Assinador':'Assinador SERPRO';
     colR.appendChild(v1);colR.appendChild(v2);
     body.appendChild(col);body.appendChild(colR);
     box.appendChild(bar);box.appendChild(body);
@@ -199,7 +232,7 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     enableDrag(box,ov);ov.appendChild(box);
   }
   function enableDrag(box,ov){box.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();var bx=box.getBoundingClientRect(),offX=ev.clientX-bx.left,offY=ev.clientY-bx.top;box.setPointerCapture(ev.pointerId);
-    function move(e){var r=ov.getBoundingClientRect(),W=r.width,H=r.height,w=seal.wn*W,hgt=w*0.42;seal.xn=Math.min(0.98,Math.max(0,(e.clientX-r.left-offX)/W));seal.yn=Math.min(0.98,Math.max(0,(e.clientY-r.top-offY)/H));box.style.left=Math.max(2,Math.min(seal.xn*W,W-w-2))+'px';box.style.top=Math.max(2,Math.min(seal.yn*H,H-hgt-2))+'px';}
+    function move(e){var r=ov.getBoundingClientRect(),W=r.width,H=r.height,w=seal.wn*W,hgt=w*SEAL_RATIO;seal.xn=Math.min(0.98,Math.max(0,(e.clientX-r.left-offX)/W));seal.yn=Math.min(0.98,Math.max(0,(e.clientY-r.top-offY)/H));box.style.left=Math.max(2,Math.min(seal.xn*W,W-w-2))+'px';box.style.top=Math.max(2,Math.min(seal.yn*H,H-hgt-2))+'px';}
     function up(){try{box.releasePointerCapture(ev.pointerId);}catch(_){}box.removeEventListener('pointermove',move);box.removeEventListener('pointerup',up);box.removeEventListener('pointercancel',up);}
     box.addEventListener('pointermove',move);box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);});}
   el('sealW').addEventListener('input',function(){seal.wn=parseFloat(this.value);el('wVal').textContent=Math.round(seal.wn*100)+'%';drawSeal();});
@@ -207,6 +240,12 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
   function serproSignHash(x){return new Promise(function(resolve,reject){try{C.sign('hash',x).success(function(r){if(r&&r.actionCanceled)return reject(new Error('Assinatura cancelada no token.'));if(r&&r.hasError)return reject(new Error(r.errorMessage||r.message||'Erro no Assinador.'));resolve(r);}).error(function(){reject(new Error('Falha ao assinar no token.'));});}catch(e){reject(e);}});}
   async function assinar(){
     if(seal.page==null){status('Clique no documento para posicionar a assinatura.');return;}
+    if(TC){
+      var doc=await TcModulo.assinar({tipo:TIPO,os_id:OSID,page:seal.page,xn:seal.xn,yn:seal.yn,wn:seal.wn});
+      if(doc) location.href='assinar-os.php?tipo='+encodeURIComponent(TIPO)+'&id='+OSID+'&ok=1';
+      else status('Assinatura não concluída. Você pode tentar de novo.');
+      return;
+    }
     if(!serproOnline){status('Assinador SERPRO não conectado.');return;}
     try{
       busy(true,'Preparando o documento…');
@@ -225,10 +264,15 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
   }
   el('btnAssinar').addEventListener('click',assinar);
 
-  setConn('','Verificando Assinador…','Procurando o Assinador…');
-  verifyAndConnect();
+  (function(){ var b=el('btnAssinar'),m=el('btnAssinarM'); if(!b||!m)return; var sync=function(){m.disabled=b.disabled;}; sync();
+    new MutationObserver(sync).observe(b,{attributes:true,attributeFilter:['disabled']});
+    m.addEventListener('click',function(){ if(!b.disabled) b.click(); }); })();
+
+  if(TC){ el('btnAssinar').disabled=true; }
+  else { setConn('','Verificando Assinador…','Procurando o Assinador…'); verifyAndConnect(); }
   loadPreview().catch(function(e){status('Erro na pré-visualização: '+e.message);});
   window.addEventListener('resize',function(){if(seal.page!=null)drawSeal();});
+  if(window.ResizeObserver){ var roT=null; new ResizeObserver(function(){ clearTimeout(roT); roT=setTimeout(function(){ if(seal.page!=null) drawSeal(); },60); }).observe(el('pages')); }
 })();
 </script>
 <?php endif; ?>

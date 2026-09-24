@@ -189,7 +189,7 @@ function nd_draw_seal_box($pdf, $a)
     $pdf->SetTextColor(55, 65, 81); $pdf->SetFont('helvetica', '', 6.4); $pdf->SetX($padL);
     $pdf->Cell($innerW, 3.0, 'Data: ' . $a['quando'], 0, 2, 'L');
     $pdf->SetTextColor(107, 114, 128); $pdf->SetFont('helvetica', '', 5.6); $pdf->SetX($padL);
-    $pdf->Cell($innerW, 2.6, 'ICP-Brasil - PAdES - Assinador SERPRO', 0, 2, 'L');
+    $pdf->Cell($innerW, 2.6, 'ICP-Brasil - PAdES - ' . (defined('ATLAS_SELO_ASSINADOR') ? ATLAS_SELO_ASSINADOR : 'Assinador SERPRO'), 0, 2, 'L');
     if ($a['codigo'] !== '') { $pdf->SetX($padL); $pdf->Cell($innerW, 2.6, 'Verificacao: ' . $a['codigo'], 0, 2, 'L'); }
     $pdf->SetTextColor(0, 0, 0);
 }

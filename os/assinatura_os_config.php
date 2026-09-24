@@ -220,7 +220,7 @@ function os_draw_seal_box($pdf, $a)
     if ($rightW > 18) {
         $pdf->SetTextColor(55,65,81); $pdf->SetFont('helvetica','',5.6);
         $pdf->SetXY($rightX, $top); $pdf->Cell($rightW, 2.4, os_fit($pdf,'ICP-Brasil · PAdES',$rightW,5.6,''), 0, 2, 'R');
-        $pdf->SetX($rightX); $pdf->Cell($rightW, 2.4, os_fit($pdf,'Assinador SERPRO',$rightW,5.6,''), 0, 2, 'R');
+        $pdf->SetX($rightX); $pdf->Cell($rightW, 2.4, os_fit($pdf,(defined('ATLAS_SELO_ASSINADOR') ? ATLAS_SELO_ASSINADOR : 'Assinador SERPRO'),$rightW,5.6,''), 0, 2, 'R');
         $pdf->SetTextColor(17,24,39); $pdf->SetFont('helvetica','',5.6); $pdf->SetX($rightX);
         $pdf->Cell($rightW, 2.6, $a['quando'], 0, 2, 'R');
         if ($a['codigo'] !== '') {

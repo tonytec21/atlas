@@ -17,7 +17,7 @@ try {
             'id'     => (int)$d['id'],
             'nome'   => $d['nome_original'],
             'titular'=> $d['titular'] ?: '',
-            'metodo' => strtoupper($d['metodo'] ?? ''),
+            'metodo' => asg_metodo_rotulo($d),
             'data'   => date('d/m/Y H:i', strtotime($d['assinado_em'])),
             'codigo' => $d['codigo'],
             'tam'    => asg_human($d['tamanho']),

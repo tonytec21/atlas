@@ -238,6 +238,8 @@ final class AtlasPadesSigner
 }
 
 /* ==================== Injeção / ByteRange ==================== */
+// Protegida: o Atlas Signum declara a mesma classe; quem carregar primeiro vale (gravação pelo TCloud Assinador).
+if (!class_exists('AtlasPadesInjector', false)) {
 final class AtlasPadesInjector
 {
     public static function readByteRange($pdf)
@@ -271,3 +273,4 @@ final class AtlasPadesInjector
         return str_replace('/SubFilter /adbe.pkcs7.detached', '/SubFilter /ETSI.CAdES.detached', $pdf);
     }
 }
+} // if !class_exists('AtlasPadesInjector')

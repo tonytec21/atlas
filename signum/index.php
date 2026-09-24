@@ -8,6 +8,8 @@ $CSRF = asg_csrf();
 $cfg = asg_config();
 $u   = asg_ucfg($username);
 $metodo = $u['metodo'] ?? 'a3';
+$assinador = ($metodo === 'a3') ? asg_a3_assinador($u) : '';
+$isTc = ($assinador === 'tcloud');
 $certInfo = asg_cert_info($username);
 $first = asg_listar_filtrado(['page' => 1, 'per' => 20]);
 $docs = $first['rows'];
@@ -16,6 +18,10 @@ if ($metodo === 'a1' && ($cload = asg_cert_load($username))) {
     $pessoa = asg_cert_pessoa($cload['cert']);
     $nomeCarimbo = (!empty($u['usar_cn_titular']) && $pessoa['nome']) ? $pessoa['nome'] : ($u['assinante_nome'] ?: $pessoa['nome']);
     $cpfCarimbo  = $pessoa['cpf'] ?: ($u['assinante_cpf'] ?? '');
+} elseif ($isTc) {
+    // TCloud: a chancela usa o nome e o CPF do certificado escolhido na hora de assinar
+    $nomeCarimbo = 'Titular do certificado';
+    $cpfCarimbo  = '';
 } else {
     $nomeCarimbo = $u['assinante_nome'] ?: ($certInfo['cn'] ?? '(titular do certificado)');
     $cpfCarimbo  = $u['assinante_cpf'] ?? '';
@@ -59,13 +65,16 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
 .dz-t{ font-weight:700; color:var(--sg-text); } .dz-s{ color:var(--sg-muted); font-size:.88rem; margin-top:3px; }
 /* assinatura */
 #signPanel{ display:none; }
-.sig-grid{ display:grid; grid-template-columns:1fr 320px; gap:18px; } @media(max-width:900px){ .sig-grid{ grid-template-columns:1fr; } }
-.pdf-scroll{ background:#0f172a; border-radius:12px; padding:14px; max-height:70vh; overflow:auto; }
-.pagewrap{ position:relative; margin:0 auto 14px; width:max-content; }
-.pagewrap canvas{ display:block; box-shadow:0 8px 30px rgba(0,0,0,.4); border-radius:2px; }
+.sig-grid{ display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:18px; }
+.sig-grid > *{ min-width:0; }                       /* a página do PDF nunca alarga a grade */
+@media(max-width:1100px){ .sig-grid{ grid-template-columns:minmax(0,1fr) 280px; } }
+@media(max-width:900px){ .sig-grid{ grid-template-columns:minmax(0,1fr); } }
+.pdf-scroll{ background:#0f172a; border-radius:12px; padding:14px; max-height:70vh; overflow-y:auto; overflow-x:hidden; }
+.pagewrap{ position:relative; margin:0 auto 14px; width:100%; max-width:900px; }
+.pagewrap canvas{ display:block; width:100%; height:auto; box-shadow:0 8px 30px rgba(0,0,0,.4); border-radius:2px; }
 .overlay{ position:absolute; inset:0; cursor:crosshair; }
 .hint-place{ position:absolute; left:50%; top:12px; transform:translateX(-50%); background:rgba(37,99,235,.92); color:#fff; font-size:.78rem; font-weight:600; padding:5px 12px; border-radius:999px; pointer-events:none; }
-.sealbox{ position:absolute; border:2px solid var(--sg-primary); background:rgba(37,99,235,.12); border-radius:4px; cursor:move; overflow:hidden; box-shadow:0 4px 14px rgba(37,99,235,.3); }
+.sealbox{ touch-action:none; position:absolute; border:2px solid var(--sg-primary); background:rgba(37,99,235,.12); border-radius:4px; cursor:move; overflow:hidden; box-shadow:0 4px 14px rgba(37,99,235,.3); }
 .sealbox .s-bar{ height:4px; background:var(--sg-primary); }
 .sealbox .s-body{ padding:3px 5px; color:#1e1b4b; }
 .sealbox .s-title{ font-weight:800; color:var(--sg-primary); letter-spacing:.02em; }
@@ -88,7 +97,10 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
 .ident-ic{ width:38px; height:38px; border-radius:10px; background:var(--sg-border); color:var(--sg-muted); display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
 .ident.ok .ident-ic{ background:#22c55e; color:#fff; }
 .ident b{ font-size:.9rem; color:var(--sg-text); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .ident small{ display:block; color:var(--sg-muted); }
-.sw{ display:flex; align-items:center; gap:8px; margin:10px 0; font-size:.85rem; color:var(--sg-muted); }
+.sw{ display:flex; align-items:center; gap:8px; margin:10px 0; font-size:.85rem; color:var(--sg-muted); flex-wrap:wrap; }
+.sw .sw-lbl{ white-space:nowrap; }
+.sw .sw-ctl{ display:flex; align-items:center; gap:8px; flex:1 1 220px; min-width:0; }
+.sw input[type=range]{ flex:1; min-width:0; width:100%; }
 .szbtn{ width:30px; height:30px; border-radius:8px; border:1px solid var(--sg-border); background:var(--sg-card); color:var(--sg-text); font-size:1.1rem; font-weight:700; line-height:1; cursor:pointer; flex:0 0 auto; transition:.14s; }
 .szbtn:hover{ border-color:var(--sg-primary); color:var(--sg-primary); }
 /* tabela */
@@ -112,6 +124,57 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
 .tbtn:hover{ border-color:var(--sg-primary); color:var(--sg-primary); }
 .tbtn.dl:hover{ background:#2563eb; color:#fff; border-color:transparent; }
 .tbtn.rm:hover{ background:#fee2e2; color:#b91c1c; border-color:transparent; }
+.sg-ver{ font-size:.72rem; font-weight:700; color:var(--sg-muted); background:var(--sg-bg); border:1px solid var(--sg-border); border-radius:999px; padding:2px 8px; margin-left:6px; vertical-align:middle; }
+.tc-banner{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; background:#fffbeb; border:1px solid #fcd34d; border-radius:18px; padding:16px 20px; margin-bottom:18px; }
+.tc-banner-ic{ width:44px; height:44px; border-radius:12px; background:#f59e0b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.15rem; flex:0 0 auto; }
+.tc-banner-tx{ flex:1 1 280px; min-width:0; } .tc-banner-tx b{ display:block; color:#78350f; } .tc-banner-tx small{ display:block; color:#92400e; font-size:.84rem; margin-top:2px; }
+.tc-banner-bt{ display:flex; gap:8px; flex-wrap:wrap; }
+@media(max-width:760px){ .tc-banner{ padding:14px; } .tc-banner-bt{ width:100%; } .tc-banner-bt .sg-pill{ flex:1 1 auto; justify-content:center; } }
+.tc-note{ font-size:.8rem; color:var(--sg-muted); background:var(--sg-bg); border:1px solid var(--sg-border); border-radius:12px; padding:10px 12px; margin-bottom:14px; }
+/* ---------- responsividade ---------- */
+#main .container{ min-width:0; }
+.sg-hero,.sg-card{ min-width:0; max-width:100%; }
+.sg-title-row > div:first-child{ min-width:0; }
+.side img,.side canvas{ max-width:100%; }
+#docNome{ min-width:0; overflow-wrap:anywhere; }
+.doc-name span:last-child{ overflow-wrap:anywhere; }
+@media(max-width:900px){
+  .pdf-scroll{ max-height:none; }                    /* no celular a página rola junto com a tela */
+  .side{ border-top:1px solid var(--sg-border); padding-top:16px; }
+}
+@media(max-width:760px){
+  #main .container{ padding-left:10px; padding-right:10px; }
+  .sg-hero{ padding:16px; border-radius:16px; }
+  .sg-hero h1{ font-size:1.25rem; }
+  .sg-ic{ width:46px; height:46px; font-size:1.25rem; border-radius:13px; }
+  .sg-actions{ margin-left:0; width:100%; }
+  .sg-actions .chip{ max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sg-card{ padding:14px; border-radius:14px; }
+  .pdf-scroll{ padding:8px; }
+  .dz{ padding:26px 14px; }
+  .filters{ gap:8px; }
+  .f-search{ flex:1 1 100%; min-width:0; }
+  .filters .inp-sm,.filters select{ flex:1 1 140px; min-width:0; }
+  .f-date{ flex:1 1 140px; min-width:0; } .f-date input{ flex:1; min-width:0; width:100%; }
+  .filters #fLimpar{ flex:1 1 100%; justify-content:center; }
+  /* tabela vira cartões */
+  .doc-wrap{ overflow:visible !important; }
+  .doc-table thead{ display:none; }
+  .doc-table, .doc-table tbody, .doc-table tr, .doc-table td{ display:block; width:100%; }
+  .doc-table tr{ border:1px solid var(--sg-border); border-radius:12px; padding:10px 12px; margin-bottom:10px; background:var(--sg-card); }
+  .doc-table tr:hover td{ background:transparent; }
+  .doc-table td{ border:0; padding:5px 0; display:flex; align-items:center; justify-content:space-between; gap:12px; text-align:right !important; }
+  .doc-table td::before{ content:attr(data-label); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--sg-muted); text-align:left; flex:0 0 auto; }
+  .doc-table td:first-child{ display:block; text-align:left !important; padding-bottom:8px; border-bottom:1px solid var(--sg-border); margin-bottom:4px; }
+  .doc-table td:first-child::before{ display:none; }
+  .doc-table td[colspan]{ display:block; } .doc-table td[colspan]::before{ display:none; }
+  .doc-table tr:has(td[colspan]){ border:0; background:transparent; }
+  .pager{ gap:8px; flex-wrap:wrap; }
+}
+@media(max-width:420px){
+  .sg-pill{ padding:8px 12px; font-size:.84rem; }
+  .sealbox .grip{ width:16px; height:16px; }         /* alça maior para o dedo */
+}
 .empty{ text-align:center; padding:50px 20px; color:var(--sg-muted); } .empty i{ font-size:2.4rem; opacity:.35; margin-bottom:10px; }
 </style>
 </head>
@@ -125,11 +188,13 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
         <div class="sg-ic"><i class="fa fa-pencil-square-o"></i></div>
         <div style="min-width:0">
           <h1>Atlas Signum</h1>
-          <div class="sg-sub">Anexe um PDF, posicione o carimbo e assine com seu certificado digital.</div>
+          <div class="sg-sub">Anexe um PDF, posicione o carimbo e assine com seu certificado digital. <span class="sg-ver">v<?php echo eh(ASG_VERSAO); ?></span></div>
         </div>
         <div class="sg-actions">
           <?php if ($metodo === 'a1'): ?>
             <span class="chip <?php echo $certInfo ? 'on':'wait'; ?>"><i class="fa fa-shield"></i> A1 <?php echo $certInfo ? '· '.eh($certInfo['cn']) : 'não configurado'; ?></span>
+          <?php elseif ($isTc): ?>
+            <span class="chip" id="topChip"><i class="fa fa-cloud"></i> TCloud Assinador</span>
           <?php else: ?>
             <span class="chip" id="topChip"><i class="fa fa-plug"></i> Assinador SERPRO</span>
           <?php endif; ?>
@@ -137,6 +202,20 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
         </div>
       </div>
     </section>
+
+    <?php if ($isTc): ?>
+    <!-- aparece enquanto o TCloud Assinador não foi confirmado neste computador -->
+    <div class="tc-banner" id="tcBanner" style="display:none">
+      <div class="tc-banner-ic"><i class="fa fa-download"></i></div>
+      <div class="tc-banner-tx">
+        <b id="tcBanTit">TCloud Assinador ainda não verificado neste computador</b>
+        <small id="tcBanTxt">Para assinar com o seu token, ele precisa estar instalado aqui. A instalação leva menos de um minuto.</small>
+      </div>
+      <div class="tc-banner-bt">
+        <button type="button" class="sg-pill" id="tcBanInstalar" style="background:#d97706;color:#fff;border:0"><i class="fa fa-download"></i> Instalar neste computador</button>
+      </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Upload -->
     <div class="sg-card" id="uploadCard">
@@ -157,11 +236,13 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
       <div class="sig-grid">
         <div>
           <div class="pdf-scroll" id="pages"></div>
-          <div class="sw"><i class="fa fa-arrows-h"></i> Tamanho do carimbo
-            <button type="button" class="szbtn" id="szMinus" title="Diminuir">−</button>
-            <input type="range" id="sealW" min="0.16" max="0.5" step="0.01" value="0.30" style="flex:1">
-            <button type="button" class="szbtn" id="szPlus" title="Aumentar">+</button>
-            <span id="wVal" style="min-width:44px;text-align:right;font-weight:700;color:var(--sg-text)">30%</span>
+          <div class="sw"><span class="sw-lbl"><i class="fa fa-arrows-h"></i> Tamanho do carimbo</span>
+            <span class="sw-ctl">
+              <button type="button" class="szbtn" id="szMinus" title="Diminuir">−</button>
+              <input type="range" id="sealW" min="0.16" max="0.5" step="0.01" value="0.30">
+              <button type="button" class="szbtn" id="szPlus" title="Aumentar">+</button>
+              <span id="wVal" style="min-width:44px;text-align:right;font-weight:700;color:var(--sg-text)">30%</span>
+            </span>
           </div>
           <div id="statusLine" style="color:var(--sg-muted);font-size:.86rem"></div>
         </div>
@@ -172,6 +253,25 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
               <?php if ($certInfo): ?><?php echo eh($certInfo['cn']); ?><br><small style="color:var(--sg-muted)">válido até <?php echo eh($certInfo['ate']); ?></small>
               <?php else: ?><span style="color:#b91c1c">Sem certificado. <a href="configurar.php">Configurar</a></span><?php endif; ?>
             </div>
+          <?php elseif ($isTc): ?>
+            <h6>TCloud Assinador</h6>
+            <div class="sig-astat" id="tcAstat"><span class="dot"></span><div><b id="tcState">Verificando…</b><small id="tcHelp">Consultando o servidor de assinatura…</small></div></div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+              <?php if (asg_tc_modo() === 'local'): ?>
+              <button id="tcAtualizar" class="sg-pill sg-soft" type="button" style="padding:7px 12px;font-size:.82rem"><i class="fa fa-search"></i> Testar agora</button>
+              <?php else: ?>
+              <button id="tcAtualizar" class="sg-pill sg-soft" type="button" style="padding:7px 12px;font-size:.82rem"><i class="fa fa-refresh"></i> Atualizar</button>
+              <?php endif; ?>
+              <button id="tcInstalar" class="sg-pill" type="button" style="display:none;padding:7px 12px;font-size:.82rem;background:#d97706;color:#fff;border:0"><i class="fa fa-download"></i> Instalar nesta estação</button>
+            </div>
+
+            <h6>Como assinar</h6>
+            <ul class="steps">
+              <li class="sig-step" id="tst1"><div class="n">1</div><div>Posicionar a chancela<small>Clique no documento</small></div></li>
+              <li class="sig-step" id="tst2"><div class="n">2</div><div>Escolher o certificado<small>O TCloud Assinador abre neste computador; digite o PIN</small></div></li>
+              <li class="sig-step" id="tst3"><div class="n">3</div><div>Pronto<small>Documento assinado com o seu certificado</small></div></li>
+            </ul>
+            <div class="tc-note"><i class="fa fa-info-circle"></i> <?php echo asg_tc_modo()==='local' ? 'A assinatura é feita pelo TCloud Assinador deste computador.' : 'O PDF não sai do servidor.'; ?> Nome e CPF da chancela vêm do certificado que você escolher.</div>
           <?php else: ?>
             <h6>Assinador SERPRO</h6>
             <div class="sig-astat" id="sAstat"><span class="dot"></span><div><b id="sState">Verificando…</b><small id="sHelp">Procurando o Assinador…</small></div></div>
@@ -223,7 +323,7 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
         <button type="button" class="sg-pill sg-soft" id="fLimpar" style="padding:8px 14px;font-size:.84rem"><i class="fa fa-eraser"></i> Limpar</button>
       </div>
 
-      <div style="overflow-x:auto;position:relative">
+      <div class="doc-wrap" style="overflow-x:auto;position:relative">
         <div id="docLoading" style="display:none;position:absolute;inset:0;background:rgba(255,255,255,.6);z-index:2;align-items:center;justify-content:center">
           <i class="fa fa-spinner fa-spin" style="font-size:1.5rem;color:var(--sg-primary)"></i>
         </div>
@@ -235,12 +335,12 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
           <?php else: foreach ($docs as $d): ?>
             <tr data-id="<?php echo (int)$d['id']; ?>">
               <td><div class="doc-name"><span class="fic"><i class="fa fa-file-pdf-o"></i></span><span><?php echo eh($d['nome_original']); ?></span></div></td>
-              <td><?php echo eh($d['titular'] ?: '—'); ?></td>
-              <td><span class="chip"><?php echo eh(strtoupper($d['metodo'] ?? '')); ?></span></td>
-              <td><?php echo eh(date('d/m/Y H:i', strtotime($d['assinado_em']))); ?></td>
-              <td><span class="chip"><?php echo eh($d['codigo']); ?></span></td>
-              <td><?php echo eh(asg_human($d['tamanho'])); ?></td>
-              <td style="text-align:right"><span style="display:inline-flex;gap:6px">
+              <td data-label="Assinante"><?php echo eh($d['titular'] ?: '—'); ?></td>
+              <td data-label="Método"><span class="chip"><?php echo eh(asg_metodo_rotulo($d)); ?></span></td>
+              <td data-label="Data"><?php echo eh(date('d/m/Y H:i', strtotime($d['assinado_em']))); ?></td>
+              <td data-label="Código"><span class="chip"><?php echo eh($d['codigo']); ?></span></td>
+              <td data-label="Tamanho"><?php echo eh(asg_human($d['tamanho'])); ?></td>
+              <td data-label="Ações" style="text-align:right"><span style="display:inline-flex;gap:6px">
                 <a class="tbtn" href="ver.php?id=<?php echo (int)$d['id']; ?>" target="_blank" title="Visualizar"><i class="fa fa-eye"></i></a>
                 <a class="tbtn dl" href="baixar.php?id=<?php echo (int)$d['id']; ?>" title="Baixar"><i class="fa fa-download"></i></a>
                 <button class="tbtn rm js-del" title="Excluir"><i class="fa fa-trash-o"></i></button>
@@ -265,7 +365,9 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/sweetalert2.js"></script>
 <script src="../oficios/pdfjs/pdf.min.js"></script>
-<?php if ($metodo !== 'a1'): ?>
+<?php if ($isTc): ?>
+<script src="js/tcloud_signum.js?v=<?php echo eh(ASG_VERSAO); ?>"></script>
+<?php elseif ($metodo !== 'a1'): ?>
 <script src="../oficios/serpro/serpro-signer-promise.js"></script>
 <script src="../oficios/serpro/serpro-signer-client.js"></script>
 <?php endif; ?>
@@ -274,6 +376,11 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
   "use strict";
   var CSRF=<?php echo json_encode($CSRF); ?>;
   var METODO=<?php echo json_encode($metodo); ?>;
+  var TCLOUD=<?php echo $isTc ? 'true' : 'false'; ?>;
+  var TC_MODO=<?php echo json_encode($isTc ? asg_tc_modo() : ''); ?>;   // 'local' (a estação assina) ou 'servidor'
+  var TC_NIVEL=<?php echo json_encode(ASG_TC_NIVEL); ?>;
+  var RATIO=<?php echo $isTc ? json_encode(asg_tc_proporcao()) : '0.40'; ?>;   // altura/largura do carimbo
+  var tcPronto=null;   // TCloud: null = verificando, true = serviço ok, false = indisponível
   var PRONTO_A1=<?php echo $prontoA1 ? 'true':'false'; ?>;
   var NOME=<?php echo json_encode($nomeCarimbo); ?>;
   var CPF=<?php echo json_encode($cpfCarimboFmt); ?>;
@@ -333,11 +440,16 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
     if(!window.pdfjsLib) throw new Error('Visualizador PDF (pdf.js) não carregou.');
     pdfDoc=await pdfjsLib.getDocument({data:b64ToU8(r.pdf_base64)}).promise;
     var box=el('pages'); box.innerHTML='';
+    // resolução pela largura real disponível (máx. 900 px de exibição) × densidade da tela
+    var cssW=Math.max(280, Math.min(900, box.clientWidth-28 || 900));
+    var dpr=Math.min(2, window.devicePixelRatio||1);
     for(var p=1;p<=pdfDoc.numPages;p++){
       var page=await pdfDoc.getPage(p);
-      var vp=page.getViewport({scale:1.5});
+      var vp1=page.getViewport({scale:1});
+      var vp=page.getViewport({scale:(cssW/vp1.width)*dpr});
       var wrap=document.createElement('div'); wrap.className='pagewrap'; wrap.dataset.page=p;
-      var cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+      var cv=document.createElement('canvas'); cv.width=Math.floor(vp.width); cv.height=Math.floor(vp.height);
+      cv.style.aspectRatio=vp1.width+' / '+vp1.height;
       var ov=document.createElement('div'); ov.className='overlay';
       wrap.appendChild(cv); wrap.appendChild(ov); box.appendChild(wrap);
       if(p===1){ var hp=document.createElement('div'); hp.className='hint-place'; hp.id='hintPlace'; hp.textContent='Clique para posicionar o carimbo'; wrap.appendChild(hp); }
@@ -356,7 +468,8 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
     seal.page=1; seal.xn=0.60; seal.yn=0.86; seal.wn=0.30;   // posição padrão (rodapé direito)
     status('Pré-visualização simples. Clique em Assinar para continuar.');
   }
-  function bindOverlay(p,ov){ ov.addEventListener('pointerdown',function(ev){ if(ev.target.closest('.sealbox')) return; place(p,ov,ev); }); }
+  // 'click' (e não pointerdown): no celular, arrastar o dedo para rolar a página não reposiciona o carimbo
+  function bindOverlay(p,ov){ ov.addEventListener('click',function(ev){ if(ev.target.closest('.sealbox')) return; place(p,ov,ev); }); }
   function pageOverlay(p){ var w=document.querySelector('.pagewrap[data-page="'+p+'"]'); return w?w.querySelector('.overlay'):null; }
   function place(p,ov,ev){
     var r=ov.getBoundingClientRect();
@@ -372,7 +485,7 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
     if(seal.page==null) return;
     var ov=pageOverlay(seal.page); if(!ov) return;
     var W=ov.clientWidth, H=ov.clientHeight;
-    var w=seal.wn*W, hgt=w*0.40;
+    var w=seal.wn*W, hgt=w*RATIO;
     var left=Math.max(2,Math.min(seal.xn*W, W-w-2));
     var top =Math.max(2,Math.min(seal.yn*H, H-hgt-2));
     var box=document.createElement('div'); box.className='sealbox';
@@ -397,7 +510,7 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
       var bx=box.getBoundingClientRect(); var offX=ev.clientX-bx.left, offY=ev.clientY-bx.top;
       box.setPointerCapture(ev.pointerId);
       function move(e){
-        var r=ov.getBoundingClientRect(); var W=r.width,H=r.height,w=seal.wn*W,hgt=w*0.40;
+        var r=ov.getBoundingClientRect(); var W=r.width,H=r.height,w=seal.wn*W,hgt=w*RATIO;
         seal.xn=Math.min(0.98,Math.max(0,(e.clientX-r.left-offX)/W));
         seal.yn=Math.min(0.98,Math.max(0,(e.clientY-r.top-offY)/H));
         box.style.left=Math.max(2,Math.min(seal.xn*W,W-w-2))+'px';
@@ -420,6 +533,12 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
   function setStep(id,cls){ var e=el(id); if(!e) return; e.classList.remove('active','done'); if(cls) e.classList.add(cls); }
   function updateSteps(){
     if(METODO==='a1') return;
+    if(TCLOUD){
+      setStep('tst1', seal.page==null?'active':'done');
+      setStep('tst2', seal.page==null?'':'active');
+      setStep('tst3','');
+      return;
+    }
     setStep('st1', serproOnline?'done':'active');
     if(!serproOnline){ setStep('st2',''); setStep('st3',''); setStep('st4',''); return; }
     if(!authed){ setStep('st2','active'); setStep('st3',''); setStep('st4',''); return; }
@@ -430,6 +549,7 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
   function refreshAssinarBtn(){
     var b=el('btnAssinar');
     if(METODO==='a1'){ b.disabled = (seal.page==null); return; }
+    if(TCLOUD){ b.disabled = (seal.page==null || tcPronto===false); return; }
     var ab=el('btnAuth'); if(ab) ab.disabled = !serproOnline;
     b.disabled = (!serproOnline || !authed || seal.page==null);
   }
@@ -511,6 +631,7 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
   /* ---------- Assinar ---------- */
   el('btnAssinar').addEventListener('click',async function(){
     if(METODO==='a1'){ if(seal.page==null){ status('Clique no documento para posicionar o carimbo.'); return; } return assinarA1(); }
+    if(TCLOUD){ if(seal.page==null){ status('Clique no documento para posicionar a chancela.'); return; } return assinarTCloud(); }
     if(!serproOnline){ status('Assinador SERPRO não conectado.'); return; }
     if(!authed){ var ok=await autenticar(); if(!ok) return; }
     if(seal.page==null){ status('Clique no documento para posicionar o carimbo.'); return; }
@@ -529,6 +650,69 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
       location.reload();
     }catch(e){ Swal.fire('Não foi possível assinar', e.message, 'error'); }
   });
+
+  /* ---------- TCloud Assinador ---------- */
+  function tcConn(state,label,help,chip){
+    var a=el('tcAstat'); if(a){ a.className='sig-astat '+(state||''); el('tcState').textContent=label; el('tcHelp').textContent=help||''; }
+    if(chip==null) chip=(state==='on'?'pronto':(state==='off'?'indisponível':(state==='wait'?'atenção':'')));
+    var tc=el('topChip'); if(tc){ tc.className='chip '+(state==='on'?'on':(state==='off'?'off':'wait')); tc.innerHTML='<i class="fa fa-cloud"></i> TCloud Assinador'+(chip?' · '+chip:''); }
+    refreshAssinarBtn();
+  }
+  function tcDataHora(d){ function z(n){ return (n<10?'0':'')+n; } return z(d.getDate())+'/'+z(d.getMonth()+1)+' às '+z(d.getHours())+':'+z(d.getMinutes()); }
+  /* Modo na estação: não há nada na VM para consultar e o navegador não enxerga programas instalados.
+     A tela mostra só o que sabe de fato: a última vez que o app respondeu aqui, ou que não respondeu. */
+  function tcStatusLocal(){
+    tcPronto=true;   // nunca bloqueia o botão: a tentativa de assinar também serve de verificação
+    var i=TcSignum.appInfo();
+    if(i.status==='ok') tcConn('on','Detectado neste computador', (i.em?'Respondeu pela última vez em '+tcDataHora(i.em)+'. ':'')+'Se ele foi desinstalado, use “Testar agora”.', 'detectado');
+    else if(i.status==='nao') tcConn('off','Não detectado neste computador','Instale o TCloud Assinador (botão abaixo) ou use “Testar agora”.','não detectado');
+    else tcConn('wait','Ainda não verificado neste computador','Ao assinar, ele abre aqui. Use “Testar agora” para testar antes.','não verificado');
+  }
+  async function tcVerificar(){
+    if(!window.TcSignum){ tcPronto=false; tcConn('off','Script não carregou','Arquivo js/tcloud_signum.js ausente.'); return; }
+    tcConn('','Verificando…','Consultando o servidor de assinatura…');
+    if(TC_MODO==='local'){ tcStatusLocal(); return; }
+    try{
+      var s=await TcSignum.situacao();
+      if(!s.success) throw new Error(s.message||'Falha.');
+      if(!s.instalado){ tcPronto=false; tcConn('off','Não instalado nesta VM', s.mensagem||''); return; }
+      if(!s.disponivel){ tcPronto=false; tcConn('off','Serviço parado', 'Peça ao suporte para iniciar o serviço "TCloud Assinador - Servidor".'); return; }
+      if(!s.token_ok){ tcPronto=false; tcConn('off','Acesso recusado', s.mensagem||''); return; }
+      if(!s.versao_ok){ tcPronto=false; tcConn('off','Servidor desatualizado', s.mensagem||''); return; }
+      tcPronto=true;
+      tcConn('on','Pronto para assinar','Ao assinar, o TCloud Assinador abre neste computador.');
+    }catch(e){ tcPronto=false; tcConn('off','Erro',e.message); }
+  }
+  async function assinarTCloud(){
+    // TcSignum.assinar() só abre o tcloudsign:// com o app detectado ou confirmado; senão, oferece o comando
+    try{
+      var r=await TcSignum.assinar({token:token,page:seal.page,xn:seal.xn,yn:seal.yn,wn:seal.wn});
+      if(!r||!r.doc){ status('Assinatura não concluída. Você pode tentar de novo.'); tcVerificar(); return; }
+      var d=r.doc, extra='';
+      if(d.titular) extra+='<br>Assinante: <b>'+TcSignum.esc(d.titular)+'</b>';
+      if(TC_NIVEL!=='basico') extra+='<br><small>'+(d.carimbo?'Carimbo de tempo'+(d.act?' ('+TcSignum.esc(d.act)+')':'')+' ✔':'Sem carimbo de tempo')+(d.ltv?' · LTV ✔':'')+'</small>';
+      if(d.avisos&&d.avisos.length) extra+='<div style="margin-top:8px;font-size:.8rem;color:#92400e">'+d.avisos.map(TcSignum.esc).join('<br>')+'</div>';
+      await Swal.fire({icon:'success',title:'Documento assinado!',html:'Código: <b>'+TcSignum.esc(d.codigo)+'</b>'+extra,confirmButtonText:'Ver documentos'});
+      location.reload();
+    }catch(e){ Swal.fire('Não foi possível assinar', e.message, 'error'); }
+  }
+  // botão "Instalar nesta estação": só aparece se o assinador não foi detectado neste computador
+  // "Instalar": aparece enquanto o app não foi confirmado neste computador (não detectado ou não verificado)
+  function mostraInstalar(st){
+    var b=el('tcInstalar'); if(b) b.style.display=(st==='ok')?'none':'inline-flex';
+    var bn=el('tcBanner'); if(!bn) return;
+    bn.style.display=(st==='ok')?'none':'flex';
+    el('tcBanTit').textContent = st==='nao' ? 'O TCloud Assinador não foi detectado neste computador' : 'TCloud Assinador ainda não verificado neste computador';
+    el('tcBanTxt').textContent = st==='nao'
+      ? 'Ele não respondeu da última vez. Instale (ou atualize) para assinar com o seu token — leva menos de um minuto.'
+      : 'Para assinar com o seu token, ele precisa estar instalado aqui. A instalação leva menos de um minuto.';
+  }
+  if(TCLOUD){
+    var tbi=el('tcBanInstalar'); if(tbi) tbi.addEventListener('click',function(){ if(window.TcSignum) TcSignum.instalar(); });
+    var tcA=el('tcAtualizar'); if(tcA) tcA.addEventListener('click',async function(){
+      if(TC_MODO==='local' && window.TcSignum){ await TcSignum.verificar(); tcStatusLocal(); } else tcVerificar();
+    });
+  }
 
   async function assinarA1(){
     try{
@@ -560,12 +744,12 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
   function rowHTML(d){
     return '<tr data-id="'+d.id+'">'
       +'<td><div class="doc-name"><span class="fic"><i class="fa fa-file-pdf-o"></i></span><span>'+escHtml(d.nome)+'</span></div></td>'
-      +'<td>'+(d.titular?escHtml(d.titular):'—')+'</td>'
-      +'<td><span class="chip">'+escHtml(d.metodo)+'</span></td>'
-      +'<td>'+escHtml(d.data)+'</td>'
-      +'<td><span class="chip">'+escHtml(d.codigo)+'</span></td>'
-      +'<td>'+escHtml(d.tam)+'</td>'
-      +'<td style="text-align:right"><span style="display:inline-flex;gap:6px">'
+      +'<td data-label="Assinante">'+(d.titular?escHtml(d.titular):'—')+'</td>'
+      +'<td data-label="Método"><span class="chip">'+escHtml(d.metodo)+'</span></td>'
+      +'<td data-label="Data">'+escHtml(d.data)+'</td>'
+      +'<td data-label="Código"><span class="chip">'+escHtml(d.codigo)+'</span></td>'
+      +'<td data-label="Tamanho">'+escHtml(d.tam)+'</td>'
+      +'<td data-label="Ações" style="text-align:right"><span style="display:inline-flex;gap:6px">'
         +'<a class="tbtn" href="ver.php?id='+d.id+'" target="_blank" title="Visualizar"><i class="fa fa-eye"></i></a>'
         +'<a class="tbtn dl" href="baixar.php?id='+d.id+'" title="Baixar"><i class="fa fa-download"></i></a>'
         +'<button class="tbtn rm js-del" title="Excluir"><i class="fa fa-trash-o"></i></button>'
@@ -607,8 +791,20 @@ body.dark-mode{ --sg-bg:#0f1216; --sg-text:#e5e7eb; --sg-muted:#9aa4b2; --sg-car
   el('pgNext').addEventListener('click',function(){ if(docPage<docPages) carregarDocs(docPage+1); });
 
   window.addEventListener('resize', function(){ if(seal.page!=null) drawSeal(); });
+  // a área do PDF também muda sem resize da janela (menu lateral do Atlas, rotação do celular)
+  if(window.ResizeObserver){ var roT=null; new ResizeObserver(function(){ clearTimeout(roT); roT=setTimeout(function(){ if(seal.page!=null) drawSeal(); },60); }).observe(el('pages')); }
 
-  if(METODO!=='a1'){ verifyAndConnect(); }
+  if(TCLOUD){
+    if(window.TcSignum){
+      TcSignum.init({ csrf: CSRF, endpoint: 'tcloud_api.php', urlInstalacao: <?php echo json_encode(ASG_TC_URL_INSTALACAO); ?>,
+                      cmdExecutar: <?php echo json_encode(ASG_TC_CMD_EXECUTAR); ?>, cmdMac: <?php echo json_encode(ASG_TC_CMD_MAC); ?>,
+                      cmdLinux: <?php echo json_encode(ASG_TC_CMD_LINUX); ?>,
+                      aoMudarApp: function(st){ mostraInstalar(st); if(TC_MODO==='local') tcStatusLocal(); } });
+      mostraInstalar(TcSignum.appStatus());
+      var tcI=el('tcInstalar'); if(tcI) tcI.addEventListener('click', function(){ TcSignum.instalar(); });
+    }
+    tcVerificar();
+  } else if(METODO!=='a1'){ verifyAndConnect(); }
 })();
 </script>
 <?php @include(__DIR__ . '/../rodape.php'); ?>

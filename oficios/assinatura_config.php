@@ -339,7 +339,8 @@ function assin_draw_seal_box($pdf, $a)
     $pdf->SetTextColor(107, 114, 128);
     $pdf->SetFont('helvetica', '', 5.6);
     $pdf->SetX($padL);
-    $linha = 'ICP-Brasil - PAdES - Assinador SERPRO';
+    // quem assina: 'Assinador SERPRO' (padrão) ou 'TCloud Assinador' (definido pelo tcloud_iniciar.php)
+    $linha = 'ICP-Brasil - PAdES - ' . (defined('ATLAS_SELO_ASSINADOR') ? ATLAS_SELO_ASSINADOR : 'Assinador SERPRO');
     $pdf->Cell($innerW, 2.6, $linha, 0, 2, 'L');
     if ($a['codigo'] !== '') {
         $pdf->SetX($padL);

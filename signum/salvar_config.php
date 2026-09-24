@@ -12,14 +12,32 @@ try {
         'carimbo_titulo' => trim($_POST['carimbo_titulo'] ?? '') ?: 'Assinado digitalmente',
         'motivo'         => trim($_POST['motivo'] ?? '') ?: 'Assinatura eletrônica de documento',
     ]);
+
+    // GLOBAL — conexão com o TCloud Assinador (em branco = serviço nesta VM / token do servidor.json)
+    if (isset($_POST['tcloud_url'])) {
+        $tcUrl = trim($_POST['tcloud_url']);
+        if ($tcUrl !== '') {
+            if (!preg_match('~^https?://~i', $tcUrl)) $tcUrl = 'http://' . $tcUrl;
+            if (!filter_var($tcUrl, FILTER_VALIDATE_URL)) throw new RuntimeException('Endereço do TCloud Assinador inválido.');
+            $tcUrl = rtrim($tcUrl, '/');
+        }
+        asg_config_set(['tcloud_url' => $tcUrl]);
+    }
+    if (!empty($_POST['tcloud_token_limpar'])) {
+        asg_config_set(['tcloud_token_enc' => null]);
+    } elseif (trim($_POST['tcloud_token'] ?? '') !== '') {
+        asg_config_set(['tcloud_token_enc' => asg_enc(trim($_POST['tcloud_token']))]);
+    }
     if (!empty($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
         asg_salvar_logo($_FILES['logo']['tmp_name'], $_FILES['logo']['name']);
     }
 
     // POR USUÁRIO
     $metodo = ($_POST['metodo'] ?? 'a1') === 'a3' ? 'a3' : 'a1';
+    $assinador = ($_POST['a3_assinador'] ?? 'tcloud') === 'serpro' ? 'serpro' : 'tcloud';
     asg_ucfg_set($u, [
         'metodo'          => $metodo,
+        'a3_assinador'    => $assinador,
         'assinante_nome'  => trim($_POST['assinante_nome'] ?? ''),
         'assinante_cpf'   => preg_replace('~\D~', '', $_POST['assinante_cpf'] ?? ''),
         'assinante_cargo' => trim($_POST['assinante_cargo'] ?? ''),
