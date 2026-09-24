@@ -18,7 +18,11 @@
 
 if (!defined('ASG_TCL_MIN_ABRIR'))    define('ASG_TCL_MIN_ABRIR', 3);
 if (!defined('ASG_TCL_MIN_CONCLUIR')) define('ASG_TCL_MIN_CONCLUIR', 15);
-if (!defined('ASG_TCL_EXIGIR_MESMO_IP')) define('ASG_TCL_EXIGIR_MESMO_IP', true);   // ticket_abrir só do IP de quem clicou
+// Conferência do IP entre o navegador que clicou e o TCloud Assinador que abre o link:
+//   'rede'    (padrão) mesmo IP, OU IPs diferentes da rede interna / IPv4×IPv6 do mesmo computador (registra no log)
+//   'estrito' exige exatamente o mesmo IP
+//   'livre'   não confere (o ticket continua de uso único e com prazo curto)
+if (!defined('ASG_TCL_IP_MODO')) define('ASG_TCL_IP_MODO', (defined('ASG_TCL_EXIGIR_MESMO_IP') && !ASG_TCL_EXIGIR_MESMO_IP) ? 'livre' : 'rede');
 if (!defined('ASG_TCL_MAX_BYTES'))    define('ASG_TCL_MAX_BYTES', 80 * 1024 * 1024);   // arquivo assinado devolvido
 
 class AsgTclErro extends RuntimeException
@@ -67,6 +71,40 @@ function asg_tcl_limpar()
 function asg_tcl_corta($t, $n)
 {
     return function_exists('mb_substr') ? mb_substr($t, 0, $n, 'UTF-8') : (preg_match('~^.{0,' . (int)$n . '}~us', $t, $m) ? $m[0] : substr($t, 0, $n));
+}
+
+/** IP da rede interna? (loopback, privados, link-local, CGNAT/Tailscale 100.64/10, Radmin 26/8, IPv6 local) */
+function asg_tcl_ip_interno($ip)
+{
+    $ip = asg_tc_ip($ip);
+    if ($ip === '') return false;
+    if (strpos($ip, ':') !== false) {                                   // IPv6
+        return $ip === '::1' || preg_match('~^(fe[89ab][0-9a-f]|f[cd][0-9a-f]{2}):~i', $ip) === 1;
+    }
+    $n = ip2long($ip);
+    if ($n === false) return false;
+    foreach ([['127.0.0.0', 8], ['10.0.0.0', 8], ['172.16.0.0', 12], ['192.168.0.0', 16], ['169.254.0.0', 16],
+              ['100.64.0.0', 10], ['26.0.0.0', 8]] as $r) {
+        $mask = -1 << (32 - $r[1]);
+        if (($n & $mask) === (ip2long($r[0]) & $mask)) return true;
+    }
+    return false;
+}
+
+/**
+ * O TCloud Assinador que abriu o link (IP $ipApp) pode atender o pedido criado pelo navegador de $ipPedido?
+ * Devolve true/false; divergências aceitas vão para o log do PHP (auditoria).
+ */
+function asg_tcl_ip_aceito($ipPedido, $ipApp)
+{
+    $a = asg_tc_ip($ipPedido); $b = asg_tc_ip($ipApp);
+    if ($a === '' || $a === $b || ASG_TCL_IP_MODO === 'livre') return true;
+    if (ASG_TCL_IP_MODO === 'estrito') return false;
+    $v6a = strpos($a, ':') !== false; $v6b = strpos($b, ':') !== false;
+    $ok = ($v6a !== $v6b)                                                // mesmo computador por IPv4 num lado e IPv6 no outro
+       || (asg_tcl_ip_interno($a) && asg_tcl_ip_interno($b));           // ambos na rede interna (proxy, VPN, loopback…)
+    if ($ok) error_log("Atlas Signum/TCloud: link aberto de $b (pedido criado por $a) — aceito no modo 'rede'.");
+    return $ok;
 }
 
 /* ------------------------------------------------------------------ prazos */
@@ -318,9 +356,9 @@ function asg_tcl_sonda_atender($acao, $corpo, $id, $ipRemoto)
 
         if ($acao === 'ticket_abrir') {
             if (!empty($st['aberto_em'])) throw new AsgTclErro('Este link de teste já foi usado.', 'usado', 409);
-            if (ASG_TCL_EXIGIR_MESMO_IP && $st['ip'] !== '' && $ip !== $st['ip']) {
-                $st['outro_ip'] = true; asg_tcl_gravar($fh, $st);
-                throw new AsgTclErro('Este teste foi gerado para outro computador.', 'outro_computador', 403);
+            if (!asg_tcl_ip_aceito($st['ip'], $ip)) {
+                $st['outro_ip'] = true; $st['ip_recusado'] = $ip; asg_tcl_gravar($fh, $st);
+                throw new AsgTclErro('Este teste foi gerado para outro computador (criado em ' . $st['ip'] . ', aberto de ' . $ip . ').', 'outro_computador', 403);
             }
             $st['detectado'] = true; $st['aberto_em'] = time(); $st['ip_app'] = $ip; $st['estado'] = 'na_estacao';
             asg_tcl_gravar($fh, $st);
@@ -436,8 +474,9 @@ function asg_tcl_atender($acao, $corpo, $ipRemoto)
         if ($acao === 'ticket_abrir') {
             if (!empty($st['aberto_em'])) throw new AsgTclErro('Este link já foi usado. Clique em "Assinar" no sistema de novo.', 'usado', 409);
             asg_tcl_vivo($st);
-            if (ASG_TCL_EXIGIR_MESMO_IP && $st['ip'] !== '' && $ip !== $st['ip'])
-                throw new AsgTclErro('Este link foi gerado para outro computador. Clique em "Assinar" no sistema a partir deste computador.', 'outro_computador', 403);
+            if (!asg_tcl_ip_aceito($st['ip'], $ip))
+                throw new AsgTclErro('Este link foi gerado para outro computador (criado em ' . $st['ip'] . ', aberto de ' . $ip
+                    . '). Clique em "Assinar" no sistema a partir deste computador.', 'outro_computador', 403);
             $st['aberto_em'] = time(); $st['ip_estacao'] = $ip; $st['estado'] = 'na_estacao'; $st['mensagem'] = '';
             asg_tcl_gravar($fh, $st);
             return ['ok' => true, 'pedido' => [

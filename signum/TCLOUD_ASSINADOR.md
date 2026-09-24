@@ -1,4 +1,4 @@
-# Atlas Signum — TCloud Assinador (v1.7.2)
+# Atlas Signum — TCloud Assinador (v1.7.3)
 
 O A3 (token) tem dois assinadores, escolhidos por usuário em **Configurar → Certificado A3 → Assinador do token**: **TCloud Assinador** (padrão desde a v1.4.0) ou **Assinador SERPRO**. Na primeira execução da v1.4.0, quem estava no SERPRO só por ser o padrão antigo passa para o TCloud; depois disso, a escolha de cada usuário é respeitada.
 
@@ -16,7 +16,7 @@ Um site não pode abrir o PowerShell nem o Terminal (os navegadores não deixam 
   - Se o link for aberto (app detectado antes, ou o usuário disse que já instalou) e o app não responder em 6 segundos, a própria janela troca para o passo a passo, com **Copiar comando** e **Já instalei — tentar de novo**, e continua esperando por baixo (se o app estava só perguntando "Confiar neste servidor?", segue normalmente). A caixa do Windows pode aparecer por cima; ao fechá-la, as instruções já estão na tela.
 - **Por que não abre o PowerShell direto:** nenhum navegador permite executar comandos, e o Windows não tem link seguro que abra a caixa Executar ou o PowerShell. O botão copia o comando e mostra as teclas.
 - **O botão copia o comando e mostra as teclas:**
-  - Windows: `Win + R` → `Ctrl + V` → `Enter` → **Sim** na permissão do Windows. O comando da caixa Executar abre o `instalar.ps1` num PowerShell **como administrador** (`Start-Process -Verb RunAs`), com TLS 1.2 — necessário quando a estação não tem o .NET Desktop Runtime 8; a janela fica aberta no fim (`-NoExit`). 239 dos 259 caracteres permitidos;
+  - Windows: `Win + R` → `Ctrl + V` → `Enter` → **Sim** na permissão do Windows. O comando da caixa Executar roda o `instalar.ps1 -Todos` num PowerShell **como administrador** (`Start-Process -Verb RunAs`), com TLS 1.2: instala o .NET Desktop Runtime 8 quando falta e registra o TCloud Assinador e o link `tcloudsign://` **para todos os usuários** do computador (funciona mesmo quando a senha de administrador é de outra conta). A janela fica aberta no fim (`-NoExit`). 245 dos 259 caracteres permitidos;
   - Mac: `Cmd + Espaço` → "Terminal" → `Cmd + V` → `Enter` (`curl -fsSL https://tcloudsoft.app/download/instalar-mac.sh | bash`);
   - Linux: `Ctrl + Alt + T` → `Ctrl + Shift + V` → `Enter` (`wget -qO- https://tcloudsoft.app/download/instalar-linux.sh | bash`);
   - celular, tablet, ChromeOS: avisa que o assinador roda em Windows, Mac ou Linux.
@@ -50,7 +50,7 @@ O Signum é o ponto central do TCloud Assinador para os outros módulos do Atlas
 1. O usuário clica em Assinar. O Signum cria o pedido (arquivo em `uploads_tmp/tcl_*.json`) com um ticket de 256 bits, guardado só como hash.
 2. O navegador abre `tcloudsign://local?u=http://<endereço do Atlas>/…/signum/tcloud_estacao.php&t=<ticket>`. O endereço é o mesmo que o navegador usou (rede local, VPN…).
 3. O app da estação chama `tcloud_estacao.php?acao=ticket_abrir|ticket_documento|ticket_entregar|ticket_concluir|ticket_recusar` (contrato 3.6 do guia 2.4.0). Essas ações não usam a sessão do Atlas: a credencial é o ticket.
-4. Regras garantidas pelo Signum: um único `ticket_abrir`, só do IP de quem clicou (`ASG_TCL_EXIGIR_MESMO_IP`); as demais ações só do IP que abriu; 3 minutos para abrir e 15 para concluir.
+4. Regras garantidas pelo Signum: um único `ticket_abrir`; conferência do IP de quem clicou × IP do app em `ASG_TCL_IP_MODO` (`rede`, padrão: mesmo IP, ou IPs diferentes da rede interna / IPv4×IPv6 do mesmo computador, registrados no log do PHP; `estrito`: só o mesmo IP; `livre`: sem conferência); as demais ações só do IP que abriu; 3 minutos para abrir e 15 para concluir.
 5. Antes de gravar, o Signum confere o PDF devolvido: a última assinatura precisa cobrir o arquivo inteiro (`/ByteRange` de 0 até o fim), e o titular é lido do certificado dentro da própria assinatura (`NOME:CPF` da ICP-Brasil).
 6. A página acompanha pelo mesmo `tcloud_api.php?acao=status` do outro modo.
 
@@ -88,7 +88,7 @@ Por enquanto **básico** (sem carimbo de tempo), em `ASG_TC_NIVEL` no `config_as
 - `ASG_TC_CMD_EXECUTAR` — comando para a caixa Executar do Windows (Win + R), copiado pelo botão de instalar.
 - `ASG_TC_VERSAO_MIN` — versão mínima do serviço (`2.0.0`).
 - `ASG_TC_LINK_PELO_NAVEGADOR` — link aponta para o host usado pelo navegador (padrão `true`).
-- `ASG_TCL_EXIGIR_MESMO_IP`, `ASG_TCL_MIN_ABRIR`, `ASG_TCL_MIN_CONCLUIR`, `ASG_TCL_MAX_BYTES` — modo local (em `lib/tcloud_local.php`).
+- `ASG_TCL_IP_MODO`, `ASG_TCL_MIN_ABRIR`, `ASG_TCL_MIN_CONCLUIR`, `ASG_TCL_MAX_BYTES` — modo local (em `lib/tcloud_local.php`).
 
 ## Arquivos
 
