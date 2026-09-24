@@ -10,7 +10,7 @@
  *    nada do TCloud na VM (link tcloudsign://local).
  *  - Assinador SERPRO (roda no navegador/estação).
  */
-if (!defined('ASG_VERSAO')) define('ASG_VERSAO', '1.7.3');   // versão do módulo Atlas Signum
+if (!defined('ASG_VERSAO')) define('ASG_VERSAO', '1.7.5');   // versão do módulo Atlas Signum
 // Nível da assinatura no TCloud Assinador: 'basico' (sem carimbo de tempo), 'carimbo' ou 'ltv'.
 // Por enquanto só o básico — a ACT ainda não está configurada no servidor.json.
 if (!defined('ASG_TC_NIVEL')) define('ASG_TC_NIVEL', 'basico');
@@ -18,18 +18,15 @@ if (!defined('ASG_TC_NIVEL')) define('ASG_TC_NIVEL', 'basico');
 if (!defined('ASG_TC_URL_INSTALACAO')) define('ASG_TC_URL_INSTALACAO', 'https://tcloudsoft.app/download');
 // Versão mínima do serviço com o modo link (tcloudsign://), sem pareamento.
 if (!defined('ASG_TC_VERSAO_MIN')) define('ASG_TC_VERSAO_MIN', '2.0.0');
-// Comando de instalação da estação (Windows PowerShell 5.1 precisa ligar o TLS 1.2 para o HTTPS).
+// Comando de instalação no Windows (v1.7.5): colado num PowerShell COMUM, aberto pela caixa Executar
+// (Win + R → powershell → Enter). Instala no perfil de quem está usando o computador, sem administrador.
+// Quando falta o .NET Desktop Runtime 8, o instalador pede administrador (código 2): a tela orienta a
+// repetir o passo 2 com Ctrl + Shift + Enter. O PowerShell 5.1 precisa ligar o TLS 1.2 para o HTTPS.
 if (!defined('ASG_TC_CMD_WINDOWS')) define('ASG_TC_CMD_WINDOWS', '[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072; irm ' . ASG_TC_URL_INSTALACAO . '/instalar.ps1 | iex');
 if (!defined('ASG_TC_CMD_MAC')) define('ASG_TC_CMD_MAC', 'curl -fsSL ' . ASG_TC_URL_INSTALACAO . '/instalar-mac.sh | bash');
 if (!defined('ASG_TC_CMD_LINUX')) define('ASG_TC_CMD_LINUX', 'wget -qO- ' . ASG_TC_URL_INSTALACAO . '/instalar-linux.sh | bash');
-// Comando para a caixa Executar (Win + R). Abre o instalador num PowerShell COMO ADMINISTRADOR
-// (o Windows pede permissão; o usuário clica em "Sim") e instala PARA TODOS OS USUÁRIOS (-Todos):
-// o .NET Desktop Runtime 8 só instala com administrador, e o link tcloudsign:// fica registrado
-// para qualquer usuário do computador (inclusive quando a senha de administrador é de outra conta).
-// -NoExit mantém a janela aberta para ver o resultado. Parâmetros curtos (-nop, -ep) para caber:
-// a caixa Executar aceita até 259 caracteres (este fica em 245).
-if (!defined('ASG_TC_CMD_EXECUTAR')) define('ASG_TC_CMD_EXECUTAR', 'powershell -nop -Command "Start-Process powershell -Verb RunAs -ArgumentList '
-    . "'-NoExit -nop -ep Bypass -Command [Net.ServicePointManager]::SecurityProtocol=3072;&([scriptblock]::Create((irm " . ASG_TC_URL_INSTALACAO . "/instalar.ps1))) -Todos'" . '"');
+// Compatibilidade: o botão "Instalar" copia o mesmo comando do Windows (o do passo 3, colado no PowerShell).
+if (!defined('ASG_TC_CMD_EXECUTAR')) define('ASG_TC_CMD_EXECUTAR', ASG_TC_CMD_WINDOWS);
 // O link tcloudsign:// aponta para o mesmo endereço pelo qual o navegador abriu o Atlas
 // (rede local, VPN/Tailscale…), para a estação chegar ao serviço pelo mesmo caminho e com o mesmo IP.
 if (!defined('ASG_TC_LINK_PELO_NAVEGADOR')) define('ASG_TC_LINK_PELO_NAVEGADOR', true);

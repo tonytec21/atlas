@@ -77,8 +77,11 @@
     var cmd = { windows: CFG.cmdExecutar, mac: CFG.cmdMac, linux: CFG.cmdLinux }[so] || '';
     var passos = {
       windows: passo(1, 'Aperte ' + tecla('⊞ Win') + ' + ' + tecla('R') + ' — abre a caixa <b>Executar</b>.') +
-               passo(2, 'Aperte ' + tecla('Ctrl') + ' + ' + tecla('V') + ' para colar o comando.') +
-               passo(3, 'Aperte ' + tecla('Enter') + ' e clique em <b>Sim</b> quando o Windows pedir permissão. O PowerShell abre e instala sozinho.'),
+               passo(2, 'Digite <b>powershell</b> e aperte ' + tecla('Enter') + '.') +
+               passo(3, 'Na janela do PowerShell, aperte ' + tecla('Ctrl') + ' + ' + tecla('V') + ' (ou clique com o botão direito) para colar o comando e aperte ' + tecla('Enter') + '. Espere a mensagem verde <b>“Instalação concluída”</b>.') +
+               '<li style="list-style:none;margin:8px 0 0;padding:9px 12px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:.82rem;line-height:1.45">' +
+                 '<i class="fa fa-info-circle"></i> Se aparecer em vermelho <b>“Falta o .NET Desktop Runtime 8”</b>: feche a janela e repita o passo 2 apertando ' +
+                 tecla('Ctrl') + ' + ' + tecla('Shift') + ' + ' + tecla('Enter') + ' (abre como administrador); clique em <b>Sim</b> e cole o comando de novo.</li>',
       mac:     passo(1, 'Aperte ' + tecla('⌘ Cmd') + ' + ' + tecla('Espaço') + ', digite <b>Terminal</b> e aperte ' + tecla('Enter') + '.') +
                passo(2, 'Aperte ' + tecla('⌘ Cmd') + ' + ' + tecla('V') + ' para colar o comando.') +
                passo(3, 'Aperte ' + tecla('Enter') + ' e, se pedir, digite a senha do Mac.'),

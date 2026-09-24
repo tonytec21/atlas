@@ -182,7 +182,7 @@ details.adv[open] summary{ margin-bottom:12px; }
 
         <details class="adv">
           <summary><i class="fa fa-terminal"></i> Comandos de instalação para outros computadores</summary>
-          <div class="tc-os"><i class="fa fa-windows"></i> Windows — <b>PowerShell como administrador</b></div>
+          <div class="tc-os"><i class="fa fa-windows"></i> Windows — <b>PowerShell</b> (Win + R → powershell → Enter; sem o .NET 8, abra com Ctrl + Shift + Enter)</div>
           <div class="tc-cmd"><code id="tcCmd"><?php echo eh(ASG_TC_CMD_WINDOWS); ?></code>
             <button type="button" class="tc-copiar" data-alvo="tcCmd" title="Copiar"><i class="fa fa-clipboard"></i></button></div>
           <div class="tc-os"><i class="fa fa-apple"></i> Mac — <b>Terminal</b></div>

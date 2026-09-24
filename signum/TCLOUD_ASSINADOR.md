@@ -1,4 +1,4 @@
-# Atlas Signum — TCloud Assinador (v1.7.3)
+# Atlas Signum — TCloud Assinador (v1.7.5)
 
 O A3 (token) tem dois assinadores, escolhidos por usuário em **Configurar → Certificado A3 → Assinador do token**: **TCloud Assinador** (padrão desde a v1.4.0) ou **Assinador SERPRO**. Na primeira execução da v1.4.0, quem estava no SERPRO só por ser o padrão antigo passa para o TCloud; depois disso, a escolha de cada usuário é respeitada.
 
@@ -16,7 +16,7 @@ Um site não pode abrir o PowerShell nem o Terminal (os navegadores não deixam 
   - Se o link for aberto (app detectado antes, ou o usuário disse que já instalou) e o app não responder em 6 segundos, a própria janela troca para o passo a passo, com **Copiar comando** e **Já instalei — tentar de novo**, e continua esperando por baixo (se o app estava só perguntando "Confiar neste servidor?", segue normalmente). A caixa do Windows pode aparecer por cima; ao fechá-la, as instruções já estão na tela.
 - **Por que não abre o PowerShell direto:** nenhum navegador permite executar comandos, e o Windows não tem link seguro que abra a caixa Executar ou o PowerShell. O botão copia o comando e mostra as teclas.
 - **O botão copia o comando e mostra as teclas:**
-  - Windows: `Win + R` → `Ctrl + V` → `Enter` → **Sim** na permissão do Windows. O comando da caixa Executar roda o `instalar.ps1 -Todos` num PowerShell **como administrador** (`Start-Process -Verb RunAs`), com TLS 1.2: instala o .NET Desktop Runtime 8 quando falta e registra o TCloud Assinador e o link `tcloudsign://` **para todos os usuários** do computador (funciona mesmo quando a senha de administrador é de outra conta). A janela fica aberta no fim (`-NoExit`). 245 dos 259 caracteres permitidos;
+  - Windows (v1.7.5): `Win + R` → digitar `powershell` → `Enter` → na janela, `Ctrl + V` → `Enter`. O comando é o original do `instalar.ps1` (`[Net.ServicePointManager]::SecurityProtocol = … -bor 3072; irm https://tcloudsoft.app/download/instalar.ps1 | iex`), num PowerShell **comum**: instala no perfil de quem está usando o computador, sem administrador e sem os parâmetros que o Windows Defender barrou na v1.7.3 (`-ep Bypass`, `-nop`, `[scriptblock]::Create`, `-Verb RunAs`). **Sem o .NET Desktop Runtime 8** o instalador pede administrador (código 2); a tela orienta a repetir o passo 2 com `Ctrl + Shift + Enter` (PowerShell como administrador) e clicar em **Sim**.
   - Mac: `Cmd + Espaço` → "Terminal" → `Cmd + V` → `Enter` (`curl -fsSL https://tcloudsoft.app/download/instalar-mac.sh | bash`);
   - Linux: `Ctrl + Alt + T` → `Ctrl + Shift + V` → `Enter` (`wget -qO- https://tcloudsoft.app/download/instalar-linux.sh | bash`);
   - celular, tablet, ChromeOS: avisa que o assinador roda em Windows, Mac ou Linux.
@@ -85,7 +85,7 @@ Por enquanto **básico** (sem carimbo de tempo), em `ASG_TC_NIVEL` no `config_as
 - `ASG_TC_NIVEL` — `basico` | `carimbo` | `ltv`.
 - `ASG_TC_URL_INSTALACAO` — de onde a estação baixa o TCloud Assinador (`https://tcloudsoft.app/download`).
 - `ASG_TC_CMD_WINDOWS`, `ASG_TC_CMD_MAC`, `ASG_TC_CMD_LINUX` — comandos de instalação mostrados em Configurar.
-- `ASG_TC_CMD_EXECUTAR` — comando para a caixa Executar do Windows (Win + R), copiado pelo botão de instalar.
+- `ASG_TC_CMD_EXECUTAR` — mantido por compatibilidade; igual a `ASG_TC_CMD_WINDOWS` (o botão de instalar copia o comando do passo 3).
 - `ASG_TC_VERSAO_MIN` — versão mínima do serviço (`2.0.0`).
 - `ASG_TC_LINK_PELO_NAVEGADOR` — link aponta para o host usado pelo navegador (padrão `true`).
 - `ASG_TCL_IP_MODO`, `ASG_TCL_MIN_ABRIR`, `ASG_TCL_MIN_CONCLUIR`, `ASG_TCL_MAX_BYTES` — modo local (em `lib/tcloud_local.php`).
