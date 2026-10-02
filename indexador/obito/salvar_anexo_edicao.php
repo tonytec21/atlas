@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';
 include(__DIR__ . '/db_connection.php');
 session_start();
 date_default_timezone_set('America/Sao_Paulo');

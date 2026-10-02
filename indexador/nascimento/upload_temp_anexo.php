@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['arquivo_pdf'])) {
     $dir = 'anexos/temp/';
     if (!file_exists($dir)) {

@@ -30,7 +30,8 @@ date_default_timezone_set('America/Sao_Paulo');
     <?php include(__DIR__ . '/style.php');?>  
 </head>  
 <body>  
-<?php include(__DIR__ . '/../../menu.php'); ?>  
+<?php include(__DIR__ . '/../../menu.php'); ?>
+<?php $IX_STRIP = ['tipo' => 'nascimento', 'label' => 'Importar arquivo TXT']; include __DIR__ . '/../_core/nav_strip.php'; ?>  
 <div id="main" class="main-content">  
     <div class="container"> 
         <div class="d-flex flex-wrap justify-content-center align-items-center text-center mb-1">  

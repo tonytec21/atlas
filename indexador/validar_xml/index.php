@@ -387,6 +387,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="light-mode">
 <?php include(__DIR__ . '/../../menu.php'); ?>
+<?php $IX_STRIP = ['current' => 'validar', 'tipo' => '', 'label' => 'Validar XML da CRC']; include __DIR__ . '/../_core/nav_strip.php'; ?>
 
 <div id="main" class="main-content">
     <div class="container py-4">

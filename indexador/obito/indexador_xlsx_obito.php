@@ -400,7 +400,8 @@ body {
     </style>
 </head>  
 <body>  
-<?php include(__DIR__ . '/../../menu.php'); ?>  
+<?php include(__DIR__ . '/../../menu.php'); ?>
+<?php $IX_STRIP = ['tipo' => 'obito', 'label' => 'Importar planilha (XLSX)']; include __DIR__ . '/../_core/nav_strip.php'; ?>  
 <main id="main" class="main-content">
   <div class="container">  
     

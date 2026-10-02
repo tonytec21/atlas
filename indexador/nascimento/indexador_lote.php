@@ -109,6 +109,7 @@ date_default_timezone_set('America/Sao_Paulo');
 </head>
 <body>
 <?php include(__DIR__ . '/../../menu.php'); ?>
+<?php $IX_STRIP = ['tipo' => 'nascimento', 'label' => 'Importar anexos em lote']; include __DIR__ . '/../_core/nav_strip.php'; ?>
 <div id="main" class="main-content">
     <div class="container">
         <div class="page-header">

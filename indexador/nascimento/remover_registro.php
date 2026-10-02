@@ -1,4 +1,4 @@
-<?php
+<?php $IX_LEGACY_ADMIN = true; require_once __DIR__ . '/../_core/legacy_guard.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     include(__DIR__ . '/db_connection.php');
 

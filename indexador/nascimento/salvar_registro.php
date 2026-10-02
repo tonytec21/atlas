@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     include(__DIR__ . '/db_connection.php');
 
@@ -116,6 +116,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Mover anexos temporários para o diretório final e salvar no banco de dados
         if (!empty($_POST['arquivo_pdf_paths'])) {
             foreach ($_POST['arquivo_pdf_paths'] as $temp_file_path) {
+                // segurança: só move arquivos enviados para anexos/temp deste módulo
+                $__real = realpath((string)$temp_file_path); $__temp = realpath(__DIR__ . '/anexos/temp');
+                if (!$__real || !$__temp || strpos($__real, $__temp . DIRECTORY_SEPARATOR) !== 0) continue;
                 $dir = 'anexos/' . $last_id . '/';
                 if (!file_exists($dir)) {
                     mkdir($dir, 0777, true);

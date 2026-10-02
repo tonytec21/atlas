@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';
 include(__DIR__ . '/db_connection.php');
 
 $id_nascimento = $_GET['id_nascimento'];

@@ -288,641 +288,242 @@ try {
 } catch (Throwable $e) {
     $USERS_LIST = [];
 }
+/* ============================================================
+   Interface (padrão visual do Indexador — ver _core/ui.php)
+   ============================================================ */
+require_once __DIR__ . '/_core/ui.php';
+$__tot = ['nascimento' => 0, 'casamento' => 0, 'obito' => 0];
+$__mes = $__tot;
+try {
+    foreach (['nascimento', 'casamento', 'obito'] as $__k) {
+        $__T = ix_tipo($__k);
+        $__st = ix_db()->prepare("SELECT COUNT(*) AS n, SUM(`{$__T['col_cadastro']}` >= ?) AS m FROM `{$__T['table']}` WHERE status = ?");
+        $__ini = date('Y-m-01');
+        $__st->bind_param('ss', $__ini, $__T['status_ativo']);
+        $__st->execute();
+        $__r = $__st->get_result()->fetch_assoc();
+        $__tot[$__k] = (int)$__r['n']; $__mes[$__k] = (int)$__r['m'];
+        $__st->close();
+    }
+} catch (Throwable $e) {}
+
+ix_page_start(['title' => 'Indexador', 'base' => '', 'atlas' => '../', 'accent' => 'carga',
+    'head' => '<style>
+    .hub-types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    @media(max-width:980px){.hub-types{grid-template-columns:1fr}}
+    .hub-type{position:relative;padding:18px 18px 16px 22px;display:grid;gap:12px;overflow:hidden}
+    .hub-type::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--ix-type)}
+    .hub-type-top{display:flex;align-items:center;gap:12px}
+    .hub-type-top h2{font-family:var(--ix-serif);font-weight:600;font-size:22px;margin:0;color:var(--ix-ink)}
+    .hub-type-top .ix-title-mark{width:40px;height:40px;border-radius:11px}
+    .hub-drag{margin-left:auto;cursor:grab;color:var(--ix-muted);border:0;background:none;padding:4px;border-radius:6px}
+    .hub-drag:hover{background:var(--ix-sunken)}
+    .hub-num{display:flex;gap:22px;color:var(--ix-muted);font-size:14px}
+    .hub-num b{display:block;font-size:26px;line-height:1.1;color:var(--ix-ink);font-weight:600}
+    .hub-type-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .hub-type.is-dragging{opacity:.5}
+    .hub-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:28px}
+    @media(max-width:980px){.hub-tools{grid-template-columns:1fr}}
+    .hub-tool{display:flex;gap:14px;align-items:flex-start;padding:16px;color:var(--ix-ink)!important;text-decoration:none!important;transition:border-color .15s}
+    .hub-tool:hover{border-color:var(--ix-primary)}
+    .hub-tool .ix-i{width:22px;height:22px;color:var(--ix-primary);margin-top:2px}
+    .hub-tool b{display:block;font-weight:600;margin-bottom:2px}
+    .hub-tool span{font-size:13.5px;color:var(--ix-muted)}
+    .hub-h2{font-family:var(--ix-serif);font-weight:600;font-size:22px;margin:0 0 4px;color:var(--ix-ink)}
+    .hub-prod{padding:18px}
+    .hub-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--ix-line);border-radius:var(--ix-r-m);margin:16px 0;overflow:hidden}
+    .hub-kpis div{padding:12px 16px}
+    .hub-kpis div+div{border-left:1px solid var(--ix-line)}
+    .hub-kpis small{display:flex;align-items:center;gap:6px;color:var(--ix-muted);font-size:13px}
+    .hub-kpis small i{width:9px;height:9px;border-radius:50%;background:var(--c)}
+    .hub-kpis b{font-size:26px;font-weight:600}
+    @media(max-width:700px){.hub-kpis{grid-template-columns:1fr 1fr}.hub-kpis div:nth-child(3){border-left:0}.hub-kpis div:nth-child(n+3){border-top:1px solid var(--ix-line)}}
+    .hub-charts{display:grid;grid-template-columns:1fr 2fr;gap:14px}
+    @media(max-width:980px){.hub-charts{grid-template-columns:1fr}}
+    .hub-chart{border:1px solid var(--ix-line);border-radius:var(--ix-r-m);padding:14px}
+    .hub-chart h3{font-size:14px;font-weight:600;margin:0 0 10px;color:var(--ix-ink)}
+    .hub-chart .wrap{position:relative;height:320px}
+    .hub-chips{display:flex;flex-wrap:wrap;gap:6px}
+    .hub-chips button{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--ix-line-strong);background:var(--ix-surface);color:var(--ix-ink-2);font:500 13px var(--ix-font);cursor:pointer}
+    .hub-chips button.is-active{background:var(--ix-primary);border-color:var(--ix-primary);color:var(--ix-primary-ink)}
+    </style>',
+]);
+ix_tabs('inicio', '');
+$__types = [
+    'nascimento' => ['Nascimento', 'nasc', 'baby'],
+    'casamento'  => ['Casamento', 'casa', 'rings'],
+    'obito'      => ['Óbito', 'obito', 'cross'],
+];
 ?>
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlas - Central de Acesso - Indexador</title>
-
-    <!-- CSS base -->
-    <link rel="stylesheet" href="../style/css/bootstrap.min.css">
-    <link rel="stylesheet" href="../style/css/font-awesome.min.css">
-    <link rel="stylesheet" href="../style/css/style.css">
-    <link rel="icon" href="../style/img/favicon.png" type="image/png">
-
-    <!-- Estilos globais do Hub -->
-    <?php include(__DIR__ . '/../style/style_index.php'); ?>
-
-    <style>
-        /* ======================= BUSCA / GRID ======================= */
-        .search-container { margin-bottom: 30px; }
-        .search-box{
-            width:100%;max-width:800px;padding:12px 20px;border-radius:100px;
-            border:1px solid #e0e0e0;box-shadow:0 2px 5px rgba(0,0,0,.05);
-            font-size:16px;background-image:url('../style/img/search-icon.png');
-            background-repeat:no-repeat;background-position:15px center;background-size:16px;
-            padding-left:45px;display:block;margin:0 auto;
-        }
-        .search-box:focus{outline:none;border-color:#0d6efd;box-shadow:0 2px 8px rgba(13,110,253,.15);}
-        body.dark-mode .search-box{background:#22272e;border-color:#2f3a46;color:#e0e0e0;box-shadow:none;}
-
-        /* ======================= DASHBOARD ======================= */
-        .dashboard { margin-top: 10px; margin-bottom: 35px; }
-        .dash-card{
-            border:1px solid var(--card-border,#e9ecef);
-            border-radius:24px;padding:18px;
-            background:linear-gradient(180deg,var(--card-bg,#fff) 0%,rgba(255,255,255,.92) 100%);
-            box-shadow:0 10px 30px rgba(0,0,0,.08);margin-bottom:16px;
-        }
-        body.dark-mode .dash-card{
-            background:linear-gradient(180deg,#161b22 0%, rgba(22,27,34,.92) 100%);
-            border-color:#2f3a46; box-shadow:none;
-        }
-
-        /* ==== Filtros ==== */
-        .filters-grid{
-            display:grid;
-            grid-template-columns: repeat(12, minmax(0, 1fr));
-            gap:16px;
-            align-items:start;   /* alinhamento pelo topo para evitar sobreposição visual */
-            grid-auto-rows:minmax(0, auto);
-        }
-        .filter-col{ grid-column: span 3; box-sizing:border-box; }
-        .filter-col.user { grid-column: span 3; }
-        .filter-col.wide{ grid-column: span 6; }
-        .filter-col.actions{ grid-column: span 3; display:flex; gap:10px; align-self:start; }
-        @media (max-width:1200px){
-            .filter-col{grid-column: span 6;}
-            .filter-col.wide{grid-column: span 6;}
-            .filter-col.actions{grid-column: span 6;}
-        }
-        @media (max-width:576px){
-            .filter-col, .filter-col.wide, .filter-col.actions{grid-column: span 12;}
-        }
-
-        .filter-label{ font-size:.8rem; color:#6c757d; margin-bottom:6px; font-weight:600; display:block; }
-        .input-icon{ position:relative; }
-        .input-icon > i{
-            position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.6; pointer-events:none;
-        }
-        .input-icon .filter-control{
-            padding-left:38px; border-radius:14px; height:46px; border:1px solid #e6e6e6; width:100%;
-        }
-        body.dark-mode .input-icon .filter-control{ background:#0f141a; border-color:#2f3a46; color:#e0e0e0; }
-
-        .quick-ranges{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
-        .chip{
-            border-radius:999px; padding:6px 12px; border:1px solid #e6e6e6; background:#fff;
-            font-size:.85rem; cursor:pointer; transition:.15s; white-space:nowrap;
-        }
-        .chip:hover{ transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.08); }
-        .chip.active{ background:#0d6efd; color:#fff; border-color:#0d6efd; }
-        body.dark-mode .chip{ background:#0f141a; border-color:#2f3a46; color:#cfd3d7; }
-        body.dark-mode .chip.active{ background:#0d6efd; color:#fff; border-color:#0d6efd; }
-
-        .btn-modern{ border-radius:14px; height:46px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:600; }
-
-        .validator-header{
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            gap:16px;
-            margin-bottom:10px;
-        }
-        @media (max-width:576px){
-            .validator-header{
-                flex-direction:column;
-                align-items:flex-start;
-                gap:8px;
-            }
-        }
-
-        /* ==== KPIs ==== */
-        .kpi-grid{ display:grid; grid-template-columns: repeat(4,1fr); grid-gap:12px; margin-top:6px; }
-        @media (max-width:992px){ .kpi-grid{ grid-template-columns: repeat(2,1fr); } }
-        @media (max-width:576px){ .kpi-grid{ grid-template-columns: 1fr; } }
-        .kpi{ border-radius:18px; padding:18px; color:#fff; display:flex; align-items:center; justify-content:space-between; min-height:86px; }
-        .kpi .kpi-label{ font-size:14px; opacity:.9; }
-        .kpi .kpi-value{ font-size:28px; font-weight:700; }
-        .kpi-primary   { background:linear-gradient(135deg,#0d6efd,#4da3ff); }
-        .kpi-success   { background:linear-gradient(135deg,#198754,#39c076); }
-        .kpi-secondary { background:linear-gradient(135deg,#6c757d,#9aa1a7); }
-        .kpi-pink      { background:linear-gradient(135deg,#e3786f,#ff8a80); }
-
-        /* ==== Gráficos ==== */
-        .charts-grid{ display:grid; grid-template-columns: 1.1fr 1.9fr; grid-gap:16px; margin-top:16px; }
-        @media (max-width:992px){ .charts-grid{ grid-template-columns: 1fr; } }
-        .chart-card{ border:1px dashed var(--card-border,#e9ecef); border-radius:20px; padding:16px; background:var(--card-bg,#fff); }
-        body.dark-mode .chart-card{ background:#0f141a; border-color:#2f3a46; }
-        .chart-title{ font-weight:600; font-size:16px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
-        .chart-wrap{ position:relative; width:100%; height:350px; }
-
-        #sortable-cards{ margin-top: 18px; }
-    </style>
-</head>
-<body class="light-mode">
-
-<?php include(__DIR__ . '/../menu.php'); ?>
-
-<div class="main-container">
-<h1 class="page-title"></h1>
-    <div class="title-divider"></div>
-    <div class="validator-header">
-        <h1 class="page-title"></h1>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <a href="relatorio_detalhado.php" class="btn btn-primary btn-modern">
-                <i class="fa fa-bar-chart"></i> Relatório Detalhado
-            </a>
-            <a href="validar_xml/index.php" class="btn btn-success btn-modern">
-                <i class="fa fa-check-square-o"></i> Validar XML CRC
-            </a>
+    <header class="ix-head">
+        <div>
+            <div class="ix-title">
+                <span class="ix-title-mark"><?= ix_icon('book') ?></span>
+                <h1>Indexador do Registro Civil</h1>
+            </div>
+            <div class="ix-stats"><span><b><?= number_format(array_sum($__tot), 0, ',', '.') ?></b>registros ativos</span><span><b><?= number_format(array_sum($__mes), 0, ',', '.') ?></b>indexados este mês</span></div>
         </div>
-    </div>
-    <!-- ===================== DASHBOARD / GRÁFICOS ===================== -->
-    <div class="dashboard">
-        <div class="dash-card">
-            <!-- Filtros -->
-            <div class="filters-grid">
-                <div class="filter-col">
-                    <span class="filter-label">Data inicial</span>
-                    <div class="input-icon">
-                        <i class="fa fa-calendar-o"></i>
-                        <input type="date" id="fStart" class="form-control filter-control">
-                    </div>
-                </div>
+    </header>
 
-                <div class="filter-col">
-                    <span class="filter-label">Data final</span>
-                    <div class="input-icon">
-                        <i class="fa fa-calendar"></i>
-                        <input type="date" id="fEnd" class="form-control filter-control">
-                    </div>
-                </div>
-
-                <div class="filter-col">
-                    <span class="filter-label">Base da data</span>
-                    <div class="input-icon">
-                        <i class="fa fa-database"></i>
-                        <select id="fBasis" class="form-select filter-control" style="padding-left:38px;">
-                            <option value="cadastro">Data de Cadastro</option>
-                            <option value="registro">Data de Registro</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="filter-col">
-                    <span class="filter-label">Status</span>
-                    <div class="input-icon">
-                        <i class="fa fa-filter"></i>
-                        <select id="fStatus" class="form-select filter-control" style="padding-left:38px;">
-                            <option value="ativos">Somente ativos</option>
-                            <option value="todos">Todos os status</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="filter-col user">
-                    <span class="filter-label">Usuário</span>
-                    <div class="input-icon">
-                        <i class="fa fa-user"></i>
-                        <select id="fUser" class="form-select filter-control" style="padding-left:38px;">
-                            <option value="">Todos os usuários</option>
-                            <?php foreach ($USERS_LIST as $u): ?>
-                                <option value="<?php echo htmlspecialchars($u['usuario']); ?>">
-                                    <?php echo htmlspecialchars($u['nome']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="filter-col wide">
-                    <span class="filter-label">Períodos rápidos</span>
-                    <div class="quick-ranges">
-                        <span class="chip" data-range="7">Últimos 7 dias</span>
-                        <span class="chip" data-range="15">Últimos 15 dias</span>
-                        <span class="chip active" data-range="30">Últimos 30 dias</span>
-                        <span class="chip" data-range="this_month">Este mês</span>
-                        <span class="chip" data-range="last_month">Mês passado</span>
-                        <span class="chip" data-range="ytd">Ano atual</span>
-                    </div>
-                </div>
-
-                <div class="filter-col actions">
-                    <button id="btnApply" class="btn btn-primary btn-modern w-100">
-                        <i class="fa fa-line-chart"></i> Aplicar filtros
-                    </button>
-                    <button id="btnReset" class="btn btn-outline-secondary btn-modern w-100">
-                        <i class="fa fa-refresh"></i> Resetar
-                    </button>
-                </div>
+    <div class="hub-types" id="sortable-cards">
+        <?php foreach ($__types as $__k => [$__lbl, $__acc, $__ic]): ?>
+        <section class="ix-panel hub-type ix-t-<?= $__acc ?>" id="card-<?= $__k ?>" draggable="false">
+            <div class="hub-type-top">
+                <span class="ix-title-mark"><?= ix_icon($__ic) ?></span>
+                <h2><?= $__lbl ?></h2>
+                <button type="button" class="hub-drag" title="Arraste para reordenar" aria-label="Reordenar"><?= ix_icon('grip') ?></button>
             </div>
-
-            <!-- KPIs -->
-            <div class="kpi-grid">
-                <div class="kpi kpi-success">
-                    <div>
-                        <div class="kpi-label">Nascimentos</div>
-                        <div class="kpi-value" id="kpiNascimento">0</div>
-                    </div>
-                    <i class="fa fa-child fa-2x" aria-hidden="true"></i>
-                </div>
-                <div class="kpi kpi-pink">
-                    <div>
-                        <div class="kpi-label">Casamentos</div>
-                        <div class="kpi-value" id="kpiCasamento">0</div>
-                    </div>
-                    <i class="fa fa-heart fa-2x" aria-hidden="true"></i>
-                </div>
-                <div class="kpi kpi-secondary">
-                    <div>
-                        <div class="kpi-label">Óbitos</div>
-                        <div class="kpi-value" id="kpiObito">0</div>
-                    </div>
-                    <i class="fa fa-book fa-2x" aria-hidden="true"></i>
-                </div>
-                <div class="kpi kpi-primary">
-                    <div>
-                        <div class="kpi-label">Total</div>
-                        <div class="kpi-value" id="kpiTotal">0</div>
-                    </div>
-                    <i class="fa fa-bar-chart fa-2x" aria-hidden="true"></i>
-                </div>
+            <div class="hub-num">
+                <div><b><?= number_format($__tot[$__k], 0, ',', '.') ?></b>ativos</div>
+                <div><b><?= number_format($__mes[$__k], 0, ',', '.') ?></b>este mês</div>
             </div>
-
-            <!-- Gráficos -->
-            <div class="charts-grid">
-                <div class="chart-card">
-                    <div class="chart-title">
-                        <i class="fa fa-pie-chart"></i> Quantitativo por tipo de ato
-                    </div>
-                    <div class="chart-wrap">
-                        <canvas id="chartTipos"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <div class="chart-title">
-                        <i class="fa fa-users"></i> Quantitativo por funcionário (Empilhado)
-                    </div>
-                    <div class="chart-wrap">
-                        <canvas id="chartFuncionarios"></canvas>
-                    </div>
-                </div>
+            <div class="hub-type-actions">
+                <a class="ix-btn ix-btn-type" href="<?= $__k ?>/index.php"><?= ix_icon('search') ?>Pesquisar</a>
+                <a class="ix-btn" href="<?= $__k ?>/index.php?novo=1"><?= ix_icon('plus') ?>Novo registro</a>
+                <a class="ix-btn ix-btn-ghost" href="carga_crc/index.php?tipo=<?= $__k ?>"><?= ix_icon('download') ?>Carga</a>
             </div>
-        </div>
-    </div>
-    <!-- =================== /DASHBOARD / GRÁFICOS =================== -->
-
-    <!-- Busca -->
-    <div class="search-container">
-        <input type="text" class="search-box" id="searchModules" placeholder="Buscar módulos...">
+        </section>
+        <?php endforeach; ?>
     </div>
 
-    <div id="sortable-cards">
-        <!-- Nascimento -->
-        <div class="module-card" id="card-nascimento">
-            <div class="card-header">
-                <span class="card-badge badge-documental">Indexador</span>
-                <div class="card-icon icon-agenda">
-                    <i class="fa fa-child"></i>
-                </div>
-            </div>
-            <h3 class="card-title">Nascimento</h3>
-            <p class="card-description">Indexe e pesquise registros de nascimento.</p>
-            <button class="card-button btn-anotacoes" onclick="window.location.href='nascimento/index.php'">
-                <i class="fa fa-arrow-right"></i> Acessar
-            </button>
-        </div>
-
-        <!-- Casamento -->
-        <div class="module-card" id="card-casamento">
-            <div class="card-header">
-                <span class="card-badge badge-documental">Indexador</span>
-                <div class="card-icon icon-contas">
-                    <i class="fa fa-heart"></i>
-                </div>
-            </div>
-            <h3 class="card-title">Casamento</h3>
-            <p class="card-description">Indexe e pesquise registros de casamento.</p>
-            <button class="card-button btn-5" onclick="window.location.href='casamento/index.php'">
-                <i class="fa fa-arrow-right"></i> Acessar
-            </button>
-        </div>
-
-        <!-- Óbito -->
-        <div class="module-card" id="card-obito">
-            <div class="card-header">
-                <span class="card-badge badge-documental">Indexador</span>
-                <div class="card-icon icon-tarefas">
-                    <i class="fa fa-book"></i>
-                </div>
-            </div>
-            <h3 class="card-title">Óbito</h3>
-            <p class="card-description">Indexe e pesquise registros de óbito.</p>
-            <button class="card-button btn-secondary" onclick="window.location.href='obito/index.php'">
-                <i class="fa fa-arrow-right"></i> Acessar
-            </button>
-        </div>
-
-        <!-- Notas -->
-        <!-- <div class="module-card" id="card-notas">
-            <div class="card-header">
-                <span class="card-badge badge-documental">Indexador</span>
-                <div class="card-icon icon-indexador">
-                    <i class="fa fa-file-text-o"></i>
-                </div>
-            </div>
-            <h3 class="card-title">Notas</h3>
-            <p class="card-description">Indexe e pesquise atos de notas.</p>
-            <button class="card-button btn-indexador" onclick="window.location.href='index.php'" disabled>
-                <i class="fa fa-arrow-right"></i> Acessar
-            </button>
-        </div> -->
-
-        <!-- Imóveis -->
-        <!-- <div class="module-card" id="card-imoveis">
-            <div class="card-header">
-                <span class="card-badge badge-documental">Indexador</span>
-                <div class="card-icon icon-os">
-                    <i class="fa fa-home"></i>
-                </div>
-            </div>
-            <h3 class="card-title">Imóveis</h3>
-            <p class="card-description">Indexe e pesquise matrículas de imóveis.</p>
-            <button class="card-button btn-os" onclick="window.location.href='index.php'" disabled>
-                <i class="fa fa-arrow-right"></i> Acessar
-            </button>
-        </div> -->
-
-        <!-- Protesto -->
-        <!-- <div class="module-card" id="card-protesto">
-            <div class="card-header">
-                <span class="card-badge badge-documental">Indexador</span>
-                <div class="card-icon icon-caixa">
-                    <i class="fa fa-gavel"></i>
-                </div>
-            </div>
-            <h3 class="card-title">Protesto</h3>
-            <p class="card-description">Indexe e pesquise títulos de protesto.</p>
-            <button class="card-button btn-success" onclick="window.location.href='index.php'" disabled>
-                <i class="fa fa-arrow-right"></i> Acessar
-            </button>
-        </div> -->
-
-        <!-- Títulos e Documentos -->
-        <!-- <div class="module-card" id="card-titulos-e-documentos">
-            <div class="card-header">
-                <span class="card-badge badge-documental">Indexador</span>
-                <div class="card-icon icon-guia">
-                    <i class="fa fa-briefcase"></i>
-                </div>
-            </div>
-            <h3 class="card-title">Títulos e Documentos</h3>
-            <p class="card-description">Indexe e pesquise registros de títulos e documentos.</p>
-            <button class="card-button btn-4" onclick="window.location.href='index.php'" disabled>
-                <i class="fa fa-arrow-right"></i> Acessar
-            </button>
-        </div> -->
-
-        <!-- Pessoas Jurídicas -->
-        <!-- <div class="module-card" id="card-pessoas-juridicas">
-            <div class="card-header">
-                <span class="card-badge badge-documental">Indexador</span>
-                <div class="card-icon icon-manuais">
-                    <i class="fa fa-building"></i>
-                </div>
-            </div>
-            <h3 class="card-title">Pessoas Jurídicas</h3>
-            <p class="card-description">Indexe e pesquise registros de pessoas jurídicas.</p>
-            <button class="card-button btn-manuais" onclick="window.location.href='index.php'" disabled>
-                <i class="fa fa-arrow-right"></i> Acessar
-            </button>
-        </div> -->
-
-        <!-- Contratos Marítimos -->
-        <!-- <div class="module-card" id="card-contratos-maritimos">
-            <div class="card-header">
-                <span class="card-badge badge-documental">Indexador</span>
-                <div class="card-icon icon-arquivamento">
-                    <i class="fa fa-ship"></i>
-                </div>
-            </div>
-            <h3 class="card-title">Contratos Marítimos</h3>
-            <p class="card-description">Indexe e pesquise registros e contratos marítimos.</p>
-            <button class="card-button btn-arquivamento" onclick="window.location.href='index.php'" disabled>
-                <i class="fa fa-arrow-right"></i> Acessar
-            </button>
-        </div> -->
+    <div class="hub-tools">
+        <a class="ix-panel hub-tool" href="carga_crc/index.php"><?= ix_icon('download') ?><div><b>Exportar carga CRC</b><span>Selecione, valide contra o XSD e gere o XML de nascimento, casamento ou óbito.</span></div></a>
+        <a class="ix-panel hub-tool" href="validar_xml/index.php"><?= ix_icon('shield') ?><div><b>Validar XML da CRC</b><span>Confira um arquivo de carga antes de enviar e veja os erros por registro.</span></div></a>
+        <a class="ix-panel hub-tool" href="relatorio_detalhado.php"><?= ix_icon('chart') ?><div><b>Relatório detalhado</b><span>Produção diária por funcionário e tipo de ato.</span></div></a>
     </div>
-</div>
 
-<!-- Scripts -->
-<script src="../script/jquery-3.6.0.min.js"></script>
-<script src="../script/jquery-ui.min.js"></script>
-<script src="../script/bootstrap.min.js"></script>
-<script src="../script/jquery.mask.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <section class="ix-panel hub-prod" aria-labelledby="hub-prod-t">
+        <h2 class="hub-h2" id="hub-prod-t">Produção da equipe</h2>
+        <div class="ix-grid" style="margin-top:12px">
+            <div class="ix-col ix-col-3 ix-field"><label class="ix-label" for="fStart">Data inicial</label><input type="date" id="fStart" class="ix-input"></div>
+            <div class="ix-col ix-col-3 ix-field"><label class="ix-label" for="fEnd">Data final</label><input type="date" id="fEnd" class="ix-input"></div>
+            <div class="ix-col ix-col-2 ix-field"><label class="ix-label" for="fBasis">Contar pela</label>
+                <select id="fBasis" class="ix-input"><option value="cadastro">Data de cadastro</option><option value="registro">Data do registro</option></select></div>
+            <div class="ix-col ix-col-2 ix-field"><label class="ix-label" for="fStatus">Situação</label>
+                <select id="fStatus" class="ix-input"><option value="ativos">Somente ativos</option><option value="todos">Todas</option></select></div>
+            <div class="ix-col ix-col-2 ix-field"><label class="ix-label" for="fUser">Usuário</label>
+                <select id="fUser" class="ix-input"><option value="">Todos</option>
+                    <?php foreach ($USERS_LIST as $u): ?><option value="<?= htmlspecialchars($u['usuario']) ?>"><?= htmlspecialchars($u['nome']) ?></option><?php endforeach; ?>
+                </select></div>
+        </div>
+        <div class="ix-filters-bar">
+            <div class="hub-chips" role="group" aria-label="Períodos rápidos">
+                <button type="button" class="chip" data-range="7">7 dias</button>
+                <button type="button" class="chip" data-range="15">15 dias</button>
+                <button type="button" class="chip is-active" data-range="30">30 dias</button>
+                <button type="button" class="chip" data-range="this_month">Este mês</button>
+                <button type="button" class="chip" data-range="last_month">Mês passado</button>
+                <button type="button" class="chip" data-range="ytd">Ano atual</button>
+            </div>
+            <span class="ix-spacer"></span>
+            <button type="button" id="btnReset" class="ix-btn ix-btn-ghost"><?= ix_icon('refresh') ?>Restaurar</button>
+            <button type="button" id="btnApply" class="ix-btn ix-btn-primary"><?= ix_icon('chart') ?>Aplicar</button>
+        </div>
 
+        <div class="hub-kpis">
+            <div><small><i style="--c:#0e7c66"></i>Nascimentos</small><b id="kpiNascimento">0</b></div>
+            <div><small><i style="--c:#9c2f55"></i>Casamentos</small><b id="kpiCasamento">0</b></div>
+            <div><small><i style="--c:#4e5592"></i>Óbitos</small><b id="kpiObito">0</b></div>
+            <div><small>Total no período</small><b id="kpiTotal">0</b></div>
+        </div>
+        <div class="hub-charts">
+            <div class="hub-chart"><h3>Por tipo de ato</h3><div class="wrap"><canvas id="chartTipos" aria-label="Gráfico por tipo de ato" role="img"></canvas></div></div>
+            <div class="hub-chart"><h3>Por funcionário</h3><div class="wrap"><canvas id="chartFuncionarios" aria-label="Gráfico por funcionário" role="img"></canvas></div></div>
+        </div>
+    </section>
+<?php
+ob_start(); ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-$(function () {
-    const $start  = $('#fStart');
-    const $end    = $('#fEnd');
-    const $basis  = $('#fBasis');
-    const $status = $('#fStatus');
-    const $user   = $('#fUser');
+(function () {
+    const $ = s => document.querySelector(s);
+    const COLORS = { n: '#0e7c66', c: '#9c2f55', o: '#4e5592' };
+    const today = new Date();
+    const fmt = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const add = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+    const start30 = fmt(add(today, -30));
+    $('#fStart').value = start30; $('#fEnd').value = fmt(today);
+    let cT = null, cF = null;
+    const nf = n => (+n || 0).toLocaleString('pt-BR');
+    const ink = () => getComputedStyle(document.getElementById('ix-app')).getPropertyValue('--ix-muted').trim() || '#5b6878';
+    const grid = () => getComputedStyle(document.getElementById('ix-app')).getPropertyValue('--ix-line').trim() || '#d9e0e7';
 
-    const today      = new Date();
-    const yyyy       = today.getFullYear();
-    const mm         = String(today.getMonth() + 1).padStart(2, '0');
-    const dd         = String(today.getDate()).padStart(2, '0');
-    const todayStr   = `${yyyy}-${mm}-${dd}`;
-
-    function addDays(date, days){ const d = new Date(date); d.setDate(d.getDate()+days); return d; }
-    function format(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${da}`; }
-
-    const start30 = format(addDays(today, -30));
-    $start.val(start30);
-    $end.val(todayStr);
-    $basis.val('cadastro'); // padrão
-
-    const $kNasc = $('#kpiNascimento');
-    const $kObit = $('#kpiObito');
-    const $kCasa = $('#kpiCasamento');
-    const $kTot  = $('#kpiTotal');
-    function formatNumber(n){ try { return (n || 0).toLocaleString('pt-BR'); } catch(e){ return n; } }
-
-    let tiposChart = null;
-    let funcChart  = null;
-
-    function buildOrUpdateCharts(payload){
-        if(payload && payload.ok === false){
-            console.error('Endpoint retornou erro:', payload);
-            return;
+    function draw(p) {
+        if (!p || p.ok === false) { IX.toast((p && p.message) || 'Falha ao calcular estatísticas.', 'err'); return; }
+        $('#kpiNascimento').textContent = nf(p.totals.nascimento);
+        $('#kpiCasamento').textContent = nf(p.totals.casamento);
+        $('#kpiObito').textContent = nf(p.totals.obito);
+        $('#kpiTotal').textContent = nf(p.totals.total);
+        if (typeof Chart === 'undefined') return;
+        Chart.defaults.color = ink(); Chart.defaults.font.family = 'IBM Plex Sans, system-ui, sans-serif';
+        if (cT) cT.destroy();
+        cT = new Chart($('#chartTipos'), { type: 'doughnut',
+            data: { labels: ['Nascimento', 'Casamento', 'Óbito'], datasets: [{ data: [p.totals.nascimento, p.totals.casamento, p.totals.obito], backgroundColor: [COLORS.n, COLORS.c, COLORS.o], borderWidth: 2, borderColor: getComputedStyle(document.getElementById('ix-app')).getPropertyValue('--ix-surface').trim() }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom' } } } });
+        const f = p.by_funcionario;
+        if (cF) cF.destroy();
+        cF = new Chart($('#chartFuncionarios'), { type: 'bar',
+            data: { labels: f.map(i => String(i.funcionario || '').toUpperCase()),
+                datasets: [{ label: 'Nascimento', data: f.map(i => i.nascimento), backgroundColor: COLORS.n, borderRadius: 3 },
+                           { label: 'Casamento', data: f.map(i => i.casamento), backgroundColor: COLORS.c, borderRadius: 3 },
+                           { label: 'Óbito', data: f.map(i => i.obito), backgroundColor: COLORS.o, borderRadius: 3 }] },
+            options: { responsive: true, maintainAspectRatio: false,
+                scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: grid() } } },
+                plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } } } });
+    }
+    function load() {
+        const b = $('#btnApply'); b.classList.add('is-loading');
+        const q = new URLSearchParams({ action: 'stats', start: $('#fStart').value, end: $('#fEnd').value, basis: $('#fBasis').value, status: $('#fStatus').value, user: $('#fUser').value });
+        fetch('index.php?' + q, { credentials: 'same-origin' }).then(r => r.json()).then(draw)
+            .catch(() => IX.toast('Não foi possível carregar a produção.', 'err')).finally(() => b.classList.remove('is-loading'));
+    }
+    document.querySelectorAll('.hub-chips .chip').forEach(c => c.addEventListener('click', () => {
+        document.querySelectorAll('.hub-chips .chip').forEach(x => x.classList.remove('is-active')); c.classList.add('is-active');
+        const now = new Date(); let s, e = fmt(now);
+        switch (c.dataset.range) {
+            case '7': s = fmt(add(now, -7)); break;
+            case '15': s = fmt(add(now, -15)); break;
+            case '30': s = fmt(add(now, -30)); break;
+            case 'this_month': s = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); e = fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0)); break;
+            case 'last_month': s = fmt(new Date(now.getFullYear(), now.getMonth() - 1, 1)); e = fmt(new Date(now.getFullYear(), now.getMonth(), 0)); break;
+            case 'ytd': s = now.getFullYear() + '-01-01'; break;
         }
-        $kNasc.text(formatNumber(payload.totals.nascimento));
-        $kCasa.text(formatNumber(payload.totals.casamento));
-        $kObit.text(formatNumber(payload.totals.obito));
-        $kTot.text(formatNumber(payload.totals.total));
-
-        const tiposData = {
-            labels: ['Nascimento', 'Casamento', 'Óbito'],
-            datasets: [{
-                label:'Atos',
-                data:[
-                    payload.totals.nascimento,
-                    payload.totals.casamento,
-                    payload.totals.obito
-                ],
-                backgroundColor:['#39c076','#ff8a80','#6c757d'],
-                borderWidth:0
-            }]
-        };
-        const tiposOpts = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' }, tooltip:{ mode:'index', intersect:false } } };
-        if (tiposChart) tiposChart.destroy();
-        tiposChart = new Chart(document.getElementById('chartTipos').getContext('2d'), { type:'doughnut', data:tiposData, options:tiposOpts });
-
-        const labels = payload.by_funcionario.map(i => (i.funcionario || '').toString().toUpperCase());
-        const nasc   = payload.by_funcionario.map(i => i.nascimento);
-        const casa   = payload.by_funcionario.map(i => i.casamento);
-        const obit   = payload.by_funcionario.map(i => i.obito);
-
-        const funcData = { labels, datasets:[
-            { label:'Nascimento', data:nasc, backgroundColor:'#39c076' },
-            { label:'Casamento',  data:casa, backgroundColor:'#ff8a80' },
-            { label:'Óbito',      data:obit, backgroundColor:'#6c757d' }
-        ]};
-        const funcOpts = {
-            responsive:true, maintainAspectRatio:false,
-            scales:{
-                x:{ stacked:true, ticks:{ autoSkip:true, maxRotation:45, minRotation:0 } },
-                y:{ stacked:true, beginAtZero:true, precision:0 }
-            },
-            plugins:{
-                legend:{ position:'bottom' },
-                tooltip:{
-                    mode:'index',
-                    intersect:false,
-                    callbacks:{
-                        title: (items) => (items && items.length ? (items[0].label || '').toUpperCase() : '')
-                    }
-                }
-            }
-        };
-        if (funcChart) funcChart.destroy();
-        funcChart = new Chart(document.getElementById('chartFuncionarios').getContext('2d'), { type:'bar', data:funcData, options:funcOpts });
-
-        if (payload.debug) { console.warn('DEBUG servidor:', payload.debug); }
-    }
-
-    function fetchStats(){
-        const params = {
-            action:'stats',
-            start:$start.val(),
-            end:$end.val(),
-            basis:$basis.val(),
-            status:$status.val(),
-            user:$user.val()
-        };
-        $('#btnApply').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Carregando...');
-        $.ajax({
-            url: 'index.php',
-            type: 'GET',
-            dataType: 'json',
-            cache: false,
-            data: params,
-            success: function(resp){ buildOrUpdateCharts(resp); },
-            error: function(xhr){ console.error('Erro AJAX:', xhr.status, xhr.statusText, xhr.responseText); },
-            complete: function(){ $('#btnApply').prop('disabled', false).html('<i class="fa fa-line-chart"></i> Aplicar filtros'); }
-        });
-    }
-
-    // Chips de período — normalizo para string antes de comparar
-    $('.chip').on('click', function(){
-        $('.chip').removeClass('active');
-        $(this).addClass('active');
-
-        const kind = String($(this).data('range'));
-        const now  = new Date();
-
-        let s = $start.val(), e = $end.val();
-
-        switch (kind) {
-            case '7':
-                s = format(addDays(now,-7)); e = format(now); break;
-            case '15':
-                s = format(addDays(now,-15)); e = format(now); break;
-            case '30':
-                s = format(addDays(now,-30)); e = format(now); break;
-            case 'this_month':
-                s = format(new Date(now.getFullYear(), now.getMonth(), 1));
-                e = format(new Date(now.getFullYear(), now.getMonth()+1, 0));
-                break;
-            case 'last_month':
-                s = format(new Date(now.getFullYear(), now.getMonth()-1, 1));
-                e = format(new Date(now.getFullYear(), now.getMonth(), 0));
-                break;
-            case 'ytd':
-                s = `${now.getFullYear()}-01-01`;
-                e = format(now);
-                break;
-        }
-
-        $start.val(s);
-        $end.val(e);
-        fetchStats();
+        $('#fStart').value = s; $('#fEnd').value = e; load();
+    }));
+    $('#btnApply').addEventListener('click', load);
+    ['#fBasis', '#fStatus', '#fUser'].forEach(s => $(s).addEventListener('change', load));
+    $('#btnReset').addEventListener('click', () => {
+        document.querySelectorAll('.hub-chips .chip').forEach(x => x.classList.toggle('is-active', x.dataset.range === '30'));
+        $('#fStart').value = start30; $('#fEnd').value = fmt(today); $('#fBasis').value = 'cadastro'; $('#fStatus').value = 'ativos'; $('#fUser').value = ''; load();
     });
+    load();
+    // redesenha os gráficos quando o tema do Atlas muda
+    new MutationObserver(() => { if (cT) load(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
-    $('#btnApply').on('click', fetchStats);
-    $('#btnReset').on('click', function(){
-        $('.chip').removeClass('active');
-        $('.chip[data-range="30"]').addClass('active');
-        $start.val(start30); $end.val(todayStr);
-        $basis.val('cadastro'); $status.val('ativos'); $user.val('');
-        fetchStats();
+    /* Ordem dos cartões (mesmo armazenamento da versão anterior: save_order/load_order do Atlas) */
+    const box = $('#sortable-cards');
+    let dragEl = null;
+    box.querySelectorAll('.hub-drag').forEach(h => {
+        h.addEventListener('mousedown', () => h.closest('.hub-type').setAttribute('draggable', 'true'));
+        h.addEventListener('touchstart', () => h.closest('.hub-type').setAttribute('draggable', 'true'), { passive: true });
     });
-
-    // Primeira carga
-    fetchStats();
-
-    // Busca de módulos
-    $("#searchModules").on("keyup", function () {
-        const value = $(this).val().toLowerCase();
-        $("#sortable-cards .module-card").filter(function () {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
-        });
+    box.addEventListener('dragstart', e => { dragEl = e.target.closest('.hub-type'); dragEl.classList.add('is-dragging'); });
+    box.addEventListener('dragend', () => { if (!dragEl) return; dragEl.classList.remove('is-dragging'); dragEl.setAttribute('draggable', 'false'); dragEl = null; save(); });
+    box.addEventListener('dragover', e => {
+        e.preventDefault(); if (!dragEl) return;
+        const over = e.target.closest('.hub-type'); if (!over || over === dragEl) return;
+        const r = over.getBoundingClientRect();
+        const after = (e.clientX - r.left) > r.width / 2 || (e.clientY - r.top) > r.height / 2;
+        box.insertBefore(dragEl, after ? over.nextSibling : over);
     });
-
-    // Sortable de cards
-    $("#sortable-cards").sortable({
-        placeholder: "ui-state-highlight",
-        handle: ".card-header",
-        cursor: "move",
-        update: function () { saveCardOrder(); }
-    });
-
-    function saveCardOrder() {
-        let order = [];
-        $("#sortable-cards .module-card").each(function () { order.push($(this).attr('id')); });
-        $.ajax({
-            url: '../save_order.php',
-            type: 'POST',
-            data: { order: order },
-            success: function () { console.log('Ordem salva com sucesso!'); },
-            error: function (xhr, status, error) { console.error('Erro ao salvar a ordem:', error); }
-        });
+    function save() {
+        const fd = new FormData(); box.querySelectorAll('.hub-type').forEach(c => fd.append('order[]', c.id));
+        fetch('../save_order.php', { method: 'POST', body: fd, credentials: 'same-origin' }).catch(() => {});
     }
-    function loadCardOrder() {
-        $.ajax({
-            url: '../load_order.php',
-            type: 'GET',
-            dataType: 'json',
-            success: function (data) {
-                if (data && data.order) { $.each(data.order, function (index, cardId) { $("#" + cardId).appendTo("#sortable-cards"); }); }
-            },
-            error: function (xhr, status, error) { console.error('Erro ao carregar a ordem:', error); }
-        });
-    }
-    loadCardOrder();
-
-    // Alternância de tema
-    $('.mode-switch').on('click', function(){ $('body').toggleClass('dark-mode light-mode'); });
-});
+    fetch('../load_order.php', { credentials: 'same-origin' }).then(r => r.json()).then(d => {
+        (d && d.order || []).forEach(id => { const el = document.getElementById(id); if (el && el.parentNode === box) box.appendChild(el); });
+    }).catch(() => {});
+})();
 </script>
-
-<br><br><br>
-<?php include(__DIR__ . '/../rodape.php'); ?>
-
-</body>
-</html>
+<?php
+ix_page_end(['base' => '', 'atlas' => '../', 'scripts' => ob_get_clean()]);

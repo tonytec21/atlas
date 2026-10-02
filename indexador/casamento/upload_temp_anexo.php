@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';
 session_start();
 $base = __DIR__ . '/anexos/temp/';
 if (!file_exists($base)) { @mkdir($base, 0777, true); }

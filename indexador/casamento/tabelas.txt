@@ -1,4 +1,3 @@
--- Registros de Casamento
 CREATE TABLE IF NOT EXISTS indexador_casamento (
   id                INT AUTO_INCREMENT PRIMARY KEY,
   termo             VARCHAR(20) NOT NULL,
@@ -28,7 +27,6 @@ CREATE TABLE IF NOT EXISTS indexador_casamento (
   UNIQUE KEY uq_indexador_casamento_matricula (matricula)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Anexos dos Registros de Casamento
 CREATE TABLE IF NOT EXISTS indexador_casamento_anexos (
   id             INT AUTO_INCREMENT PRIMARY KEY,
   id_casamento   INT NOT NULL,

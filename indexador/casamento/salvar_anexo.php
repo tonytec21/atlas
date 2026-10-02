@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';
 include(__DIR__ . '/db_connection.php');
 session_start();
 header('Content-Type: application/json; charset=utf-8');

@@ -1,4 +1,4 @@
-<?php
+<?php $IX_LEGACY_ADMIN = true; require_once __DIR__ . '/../_core/legacy_guard.php';
 // Inclui o arquivo de conexão com o banco de dados
 require_once 'db_connection.php';
 

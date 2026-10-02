@@ -352,6 +352,7 @@ function inserirDadosNoBanco($xmlFile, $conn) {
 </head>
 <body class="light-mode">
 <?php include(__DIR__ . '/../../menu.php'); ?>
+<?php $IX_STRIP = ['tipo' => 'nascimento', 'label' => 'Base XML']; include __DIR__ . '/../_core/nav_strip.php'; ?>
 
 <div id="main" class="main-content">
     <div class="container">

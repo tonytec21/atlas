@@ -1,4 +1,4 @@
-<?php
+<?php $IX_LEGACY_ADMIN = true; require_once __DIR__ . '/../_core/legacy_guard.php';
 require_once __DIR__ . '/db_connection.php';
 
 // Obtenção do CNS

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';
 include(__DIR__ . '/db_connection.php');
 header('Content-Type: application/json; charset=utf-8');
 
@@ -58,6 +58,10 @@ $sql = "SELECT id, termo, livro, folha, tipo_casamento,
 
 $params = []; $types = '';
 
+if ($q !== '') {
+    $sql .= " AND (conjuge1_nome LIKE ? OR conjuge2_nome LIKE ?) ";
+    $likeQ = '%'.$q.'%'; $params[] = $likeQ; $params[] = $likeQ; $types .= 'ss';
+}
 if ($qCasado !== '') {
     $sql .= " AND (conjuge1_nome_casado LIKE ? OR conjuge2_nome_casado LIKE ?) ";
     $likeCas = '%'.$qCasado.'%'; $params[] = $likeCas; $params[] = $likeCas; $types .= 'ss';

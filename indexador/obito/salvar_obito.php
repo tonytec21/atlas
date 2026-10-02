@@ -1,4 +1,4 @@
-<?php  
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';  
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {  
     include(__DIR__ . '/db_connection.php');  
     date_default_timezone_set('America/Sao_Paulo');

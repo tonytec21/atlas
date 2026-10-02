@@ -289,6 +289,7 @@ try {
 <body class="light-mode">
 
 <?php include(__DIR__ . '/../menu.php'); ?>
+<?php $IX_STRIP = ['tipo' => '', 'label' => 'Relatório detalhado', 'base' => '', 'current' => 'inicio']; include __DIR__ . '/_core/nav_strip.php'; ?>
 
 <div class="loading-overlay" id="loadingOverlay">
     <i class="fa fa-circle-o-notch loading-spinner"></i>

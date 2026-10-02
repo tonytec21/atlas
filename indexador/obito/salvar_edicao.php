@@ -1,4 +1,4 @@
-<?php  
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';  
 /* ---------------------------------------------------------------  
    Atualizado em 20-mai-2025 para gerar e gravar matrícula no UPDATE  
 ---------------------------------------------------------------- */  

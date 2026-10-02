@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
     include(__DIR__ . '/db_connection.php');
@@ -155,6 +155,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!empty($_POST['arquivo_pdf_paths']) && is_array($_POST['arquivo_pdf_paths'])) {
             foreach ($_POST['arquivo_pdf_paths'] as $tmp) {
+                // segurança: só move arquivos enviados para anexos/temp deste módulo
+                $__real = realpath((string)$tmp); $__temp = realpath(__DIR__ . '/anexos/temp');
+                if (!$__real || !$__temp || strpos($__real, $__temp . DIRECTORY_SEPARATOR) !== 0) continue;
                 $dir = __DIR__ . '/anexos/' . $last_id . '/';
                 if (!file_exists($dir)) { mkdir($dir, 0777, true); }
                 $name = basename($tmp);

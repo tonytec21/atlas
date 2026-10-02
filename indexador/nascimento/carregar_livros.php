@@ -1,4 +1,4 @@
-<?php  
+<?php require_once __DIR__ . '/../_core/legacy_guard.php';  
 include(__DIR__ . '/db_connection.php');  
 
 // Busca todos os livros distintos, convertendo para número para remover zeros à esquerda  
