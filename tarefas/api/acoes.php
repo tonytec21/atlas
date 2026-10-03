@@ -65,6 +65,16 @@ case 'criar_subtarefa':
 
     $token = md5(uniqid((string) mt_rand(), true));
     $prazo = data_para_mysql(entrada('deadline', entrada('data_limite', '', $_POST), $_POST));
+    if ($prazo === null) {
+        responder_erro('Defina a data limite da tarefa.');
+    }
+    if (entrada('employee', entrada('funcionario', '', $_POST), $_POST) === '') {
+        responder_erro('Selecione o funcionário responsável pela tarefa.');
+    }
+    $prioridade = entrada('priority', entrada('prioridade', '', $_POST), $_POST);
+    if (!array_key_exists($prioridade, tarefas_prioridades())) {
+        responder_erro('Selecione a prioridade da tarefa.');
+    }
 
     $caminhoAnexo = '';
     $errosUpload  = array();
@@ -91,7 +101,7 @@ case 'criar_subtarefa':
         'criado_por'              => $u['usuario'],
         'data_criacao'            => date('Y-m-d H:i:s'),
         'caminho_anexo'           => $caminhoAnexo,
-        'nivel_de_prioridade'     => entrada('priority', entrada('prioridade', 'Média', $_POST), $_POST),
+        'nivel_de_prioridade'     => $prioridade,
         'revisor'                 => entrada('reviewer', entrada('revisor', '', $_POST), $_POST),
     );
 

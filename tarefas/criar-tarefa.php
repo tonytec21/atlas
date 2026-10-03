@@ -24,8 +24,12 @@ $iaAtiva = db_tem_tabela('tarefas_ia_modelos') && ia_disponivel();
 $temColunaTags = db_tem_coluna('tarefas', 'tags');
 $temColunaApresentante = db_tem_coluna('tarefas', 'apresentante');
 
-/* Prazo padrão sugerido: próximo dia útil às 17h. */
-$prazoPadrao = date('Y-m-d\TH:i', strtotime('+3 weekday 17:00'));
+/*
+ * "Data limite", "Funcionário responsável" e "Prioridade" começam vazios
+ * de propósito (revisões 2.1.0 e 2.1.1): continuam obrigatórios, mas quem cadastra precisa
+ * escolher conscientemente o prazo e o responsável, em vez de aceitar um
+ * valor pré-preenchido sem perceber.
+ */
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -39,7 +43,7 @@ $prazoPadrao = date('Y-m-d\TH:i', strtotime('+3 weekday 17:00'));
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="stylesheet" href="../style/css/sweetalert2.min.css">
-    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.0.9">
+    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.1.1">
 
     <script src="../script/jquery-3.5.1.min.js"></script>
 </head>
@@ -123,30 +127,25 @@ $prazoPadrao = date('Y-m-d\TH:i', strtotime('+3 weekday 17:00'));
 
                     <div>
                         <label class="tf-rotulo">Data limite <span style="color:var(--tf-perigo)">*</span></label>
-                        <input type="datetime-local" class="tf-input" id="deadline" name="deadline"
-                               value="<?php echo e($prazoPadrao); ?>" required>
+                        <input type="datetime-local" class="tf-input" id="deadline" name="deadline" value="" required>
                     </div>
 
                     <div>
                         <label class="tf-rotulo">Prioridade <span style="color:var(--tf-perigo)">*</span></label>
-                        <select class="tf-select" id="priority" name="priority" required>
+                        <select class="tf-select" id="priority" name="priority" required autocomplete="off">
+                            <option value="" selected>Selecione…</option>
                             <?php foreach ($prioridades as $p): ?>
-                                <option value="<?php echo e($p); ?>"<?php echo $p === 'Média' ? ' selected' : ''; ?>>
-                                    <?php echo e($p); ?>
-                                </option>
+                                <option value="<?php echo e($p); ?>"><?php echo e($p); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
 
                     <div>
                         <label class="tf-rotulo">Funcionário responsável <span style="color:var(--tf-perigo)">*</span></label>
-                        <select class="tf-select" id="employee" name="employee" required>
-                            <option value="">Selecione…</option>
+                        <select class="tf-select" id="employee" name="employee" required autocomplete="off">
+                            <option value="" selected>Selecione…</option>
                             <?php foreach ($funcionarios as $f): ?>
-                                <option value="<?php echo e($f['nome_completo']); ?>"
-                                    <?php echo $f['nome_completo'] === $usuario['nome'] ? ' selected' : ''; ?>>
-                                    <?php echo e($f['nome_completo']); ?>
-                                </option>
+                                <option value="<?php echo e($f['nome_completo']); ?>"><?php echo e($f['nome_completo']); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -378,8 +377,41 @@ jQuery(function ($) {
 
     /* ---------------------- Envio ---------------------- */
 
+    /*
+     * Garante que os campos obrigatórios cheguem vazios mesmo quando o
+     * navegador tenta restaurar o último valor (voltar/avançar, cache de
+     * formulário do Firefox).
+     */
+    $('#employee').val('');
+    $('#deadline').val('');
+    $('#priority').val('');
+    $(window).on('pageshow', function (ev) {
+        if (ev.originalEvent && ev.originalEvent.persisted) {
+            $('#employee').val('');
+            $('#deadline').val('');
+            $('#priority').val('');
+        }
+    });
+
     $('#formTarefa').on('submit', function (e) {
         e.preventDefault();
+
+        var faltando = [];
+        if (txt($('#employee').val()) === '') { faltando.push('Funcionário responsável'); }
+        if (txt($('#deadline').val()) === '') { faltando.push('Data limite'); }
+        if (txt($('#priority').val()) === '') { faltando.push('Prioridade'); }
+        if (faltando.length) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Campos obrigatórios',
+                text: 'Defina: ' + (faltando.length > 1
+                    ? faltando.slice(0, -1).join(', ') + ' e ' + faltando[faltando.length - 1]
+                    : faltando[0]) + '.'
+            });
+            $({ 'Funcionário responsável': '#employee', 'Data limite': '#deadline', 'Prioridade': '#priority' }[faltando[0]])
+                .trigger('focus');
+            return;
+        }
 
         var $b = $('#btnSalvar').prop('disabled', true)
             .html('<i class="fa fa-circle-o-notch tf-girando"></i> Salvando…');

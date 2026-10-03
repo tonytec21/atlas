@@ -1604,3 +1604,77 @@ body.dark-mode .tf-ia-titulo { color: #c4b5fd; }
     .tf-abas, .tf-card-check { display: none !important; }
     .tf-card, .tf-tabela-caixa { box-shadow: none; break-inside: avoid; }
 }
+
+
+/* ================================================================== */
+/* Anexos — baixar compilado em PDF (revisão 2.1.0)                   */
+/* ================================================================== */
+
+.tf-comp-barra {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.tf-comp { margin-top: 12px; }
+
+.tf-comp-todos {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    cursor: pointer;
+    font-size: .88rem;
+}
+
+.tf-comp-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.tf-comp-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--tf-border);
+    border-radius: 8px;
+    background: var(--tf-surface-2);
+}
+
+.tf-comp-marca {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.tf-comp-marca input,
+.tf-comp-todos input { width: 16px; height: 16px; flex-shrink: 0; }
+
+.tf-comp-nome {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .86rem;
+}
+
+.tf-comp-nome small {
+    margin-left: 8px;
+    color: var(--tf-texto-2);
+}
+
+.tf-comp-ordem { display: flex; gap: 4px; flex-shrink: 0; }
+
+.tf-comp-progresso { margin-top: 12px; }
+.tf-comp-progresso .tf-progresso { margin-bottom: 0; }

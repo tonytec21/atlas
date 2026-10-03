@@ -302,13 +302,13 @@ var TarefasDocumentos = (function ($) {
         $('#subTaskTitle').val('');
         $('#subTaskCategory').val(tarefa.categoria || '');
         $('#subTaskOrigin').val(tarefa.origem || '');
-        $('#subTaskEmployee').val(tarefa.funcionario_responsavel || '');
-        $('#subTaskPriority').val(tarefa.nivel_de_prioridade || 'Média');
-
-        // Prazo padrão: o mesmo da tarefa principal, quando houver.
-        if (tarefa.data_limite) {
-            $('#subTaskDeadline').val(String(tarefa.data_limite).replace(' ', 'T').slice(0, 16));
-        }
+        /*
+         * Responsável, data limite e prioridade começam vazios (revisões 2.1.0
+         * e 2.1.1): continuam obrigatórios, mas o usuário precisa defini-los.
+         */
+        $('#subTaskEmployee').val('');
+        $('#subTaskDeadline').val('');
+        $('#subTaskPriority').val('');
 
         $('#tfSubtarefaPrincipalRotulo').text(
             '#' + tarefa.id + ' · ' + Tarefas.corta(tarefa.titulo || '', 46)
@@ -340,6 +340,19 @@ var TarefasDocumentos = (function ($) {
         var titulo = txt($('#subTaskTitle').val());
         if (titulo === '') {
             dlg().aviso('Informe o título da subtarefa.');
+            return;
+        }
+
+        if (txt($('#subTaskDeadline').val()) === '') {
+            dlg().aviso('Defina a data limite da subtarefa.');
+            return;
+        }
+        if (txt($('#subTaskEmployee').val()) === '') {
+            dlg().aviso('Selecione o funcionário responsável pela subtarefa.');
+            return;
+        }
+        if (txt($('#subTaskPriority').val()) === '') {
+            dlg().aviso('Selecione a prioridade da subtarefa.');
             return;
         }
 

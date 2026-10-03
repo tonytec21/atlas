@@ -82,11 +82,10 @@ $tfUsuarioSub = usuario_atual();
                             <label class="tf-rotulo" for="subTaskPriority">
                                 Prioridade <span style="color:var(--tf-perigo)">*</span>
                             </label>
-                            <select id="subTaskPriority" name="priority" class="tf-select" required>
+                            <select id="subTaskPriority" name="priority" class="tf-select" required autocomplete="off">
+                                <option value="" selected>Selecione…</option>
                                 <?php foreach (array_keys(tarefas_prioridades()) as $tfP): ?>
-                                    <option value="<?php echo e($tfP); ?>"<?php echo $tfP === 'Média' ? ' selected' : ''; ?>>
-                                        <?php echo e($tfP); ?>
-                                    </option>
+                                    <option value="<?php echo e($tfP); ?>"><?php echo e($tfP); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -95,12 +94,12 @@ $tfUsuarioSub = usuario_atual();
                             <label class="tf-rotulo" for="subTaskEmployee">
                                 Funcionário responsável <span style="color:var(--tf-perigo)">*</span>
                             </label>
-                            <select id="subTaskEmployee" name="employee" class="tf-select" required>
-                                <option value="">Selecione…</option>
+                            <select id="subTaskEmployee" name="employee" class="tf-select" required autocomplete="off">
+                                <option value="" selected>Selecione…</option>
                                 <?php
+                                // Nenhum funcionário vem pré-selecionado (revisão 2.1.0).
                                 foreach (listar_funcionarios() as $row) {
-                                    $sel = ($row['nome_completo'] === $tfUsuarioSub['nome']) ? ' selected' : '';
-                                    echo "<option value='" . e($row['nome_completo']) . "'" . $sel . ">"
+                                    echo "<option value='" . e($row['nome_completo']) . "'>"
                                        . e($row['nome_completo']) . "</option>";
                                 }
                                 ?>

@@ -1,4 +1,4 @@
-# Atlas · Módulo de Tarefas — versão 2
+# Atlas · Módulo de Tarefas — versão 2 (revisão 2.1.1)
 
 Refatoração completa do módulo, com o acervo existente preservado.
 
@@ -465,6 +465,59 @@ pega a classe de erro que passou despercebida aqui.
 
 ---
 
+## 6k. Revisão 2.1.0
+
+**Responsável e data limite começam vazios.** Na criação de tarefa
+(`criar-tarefa.php`) e de subtarefa (modal da tarefa principal), os campos
+"Funcionário responsável" e "Data limite" não vêm mais preenchidos — antes o
+responsável era o próprio usuário logado (ou o da tarefa principal) e o prazo
+era sugerido automaticamente. Os dois continuam obrigatórios: o formulário não
+envia sem eles e o `api/acoes.php` também recusa a criação se faltar algum,
+para que nenhuma tarefa nasça sem prazo ou sem responsável. A sugestão da IA
+ainda pode preencher o prazo, mas só quando o usuário pede. A edição de tarefas
+existentes não mudou.
+
+**Baixar compilado na aba Anexos.** O botão "Baixar compilado" abre uma caixa
+com os anexos em PDF e imagem (JPG, PNG, GIF, WEBP, BMP), todos marcados. O
+usuário desmarca o que não quer, ajusta a ordem com as setas e clica em "Gerar
+e baixar PDF". Sai um único PDF com:
+
+- todas as páginas dos PDFs escolhidos, como estão;
+- cada imagem numa página A4, na orientação que melhor a aproveita (fotos de
+  celular giradas pelo EXIF são endireitadas);
+- nome `Protocolo <nº> - <título> - Compilado.pdf` (sem acentos, porque alguns
+  navegadores descartam o nome com caracteres especiais e salvam como
+  "download"); o título completo, com acentos, vai nas propriedades do PDF.
+
+A montagem é feita no navegador com a biblioteca pdf-lib 1.17.1 (MIT), que fica
+em `assets/js/vendor/` e só é carregada no primeiro uso do botão. Nada é
+gravado no servidor e os anexos originais não são alterados. Formatos que não
+viram página (Word, Excel, ZIP, áudio…) aparecem listados como fora do
+compilado. PDF protegido por senha e arquivo ausente do servidor são pulados e
+informados ao final, sem impedir a geração do restante.
+
+Arquivos novos: `assets/js/tarefas-compilado.js`,
+`assets/js/vendor/pdf-lib.min.js` e a licença ao lado. Alterados:
+`criar-tarefa.php`, `partials/_modal_subtarefa.php`,
+`assets/js/tarefas-documentos.js`, `assets/js/tarefas-detalhe.js`,
+`assets/css/tarefas.css`, `api/acoes.php` e `index.php` (inclui o script novo).
+O `?v=` dos CSS/JS passou para 2.1.0 para o navegador não usar a versão em
+cache.
+
+---
+
+## 6l. Revisão 2.1.1
+
+**Prioridade também começa vazia.** Na criação de tarefa e de subtarefa, o
+campo "Prioridade" deixou de vir marcado como "Média" e passa a mostrar
+"Selecione…". Continua obrigatório: o formulário não envia sem ele e o
+`api/acoes.php` só aceita uma das prioridades do catálogo (Baixa, Média, Alta,
+Crítica) — antes, se o campo chegasse vazio, gravava "Média" por conta própria.
+A sugestão da IA continua podendo preencher a prioridade quando o usuário pede.
+O `?v=` dos CSS/JS passou para 2.1.1.
+
+---
+
 ## 7. Estrutura da pasta
 
 ```
@@ -484,7 +537,8 @@ tarefas/
 │   └── exportar.php         CSV
 ├── assets/
 │   ├── css/tarefas.css
-│   └── js/                  core, calendário, detalhe, documentos
+│   └── js/                  core, calendário, detalhe, documentos, compilado
+│       └── vendor/          pdf-lib (montagem do PDF compilado)
 ├── partials/
 │   ├── _modais_legado.php   modais herdados, IDs preservados
 │   ├── _modal_subtarefa.php  modal de subtarefa no padrão v2

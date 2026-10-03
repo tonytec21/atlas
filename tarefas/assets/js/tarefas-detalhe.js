@@ -251,9 +251,25 @@ var TarefasDetalhe = (function ($) {
                   + 'PDF, imagens, Office, ZIP e afins — até 40 MB por arquivo</div>'
                   + '<input type="file" id="tfArquivoInput" multiple style="display:none">'
                   + '</div><div id="tfFilaUpload" style="margin:12px 0"></div>' : '')
+            + compiladoHtml(t)
             + '<div class="tf-anexos" style="margin-top:14px">' + lista + '</div>'
             + '<div id="tfSaidaAnexoIA" style="margin-top:14px"></div>'
             + '</div>';
+    }
+
+    /**
+     * Barra "Baixar compilado" + caixa de seleção dos anexos (revisão 2.1.0).
+     * Só aparece quando há ao menos um PDF ou imagem entre os anexos.
+     */
+    function compiladoHtml(t) {
+        if (!window.TarefasCompilado) { return ''; }
+        var botao = TarefasCompilado.botao(t);
+        if (!botao) { return ''; }
+        return '<div class="tf-comp-barra">'
+            + '<span class="tf-mini tf-mudo"><i class="fa fa-paperclip"></i> '
+            + t.anexos.length + ' anexo' + (t.anexos.length === 1 ? '' : 's') + '</span>'
+            + botao + '</div>'
+            + TarefasCompilado.painel(t);
     }
 
     /* ============================================================== */
@@ -515,6 +531,11 @@ var TarefasDetalhe = (function ($) {
         $c.on('click.tfdet', '[data-analisar]', function () {
             analisarAnexo($(this).data('analisar'));
         });
+
+        /* --- compilado em PDF --- */
+        if (window.TarefasCompilado) {
+            TarefasCompilado.ligar($c, '.tfdet', function () { return atual; });
+        }
 
         /* --- checklist --- */
         $c.on('click.tfdet', '#tfAddItem', function () {
