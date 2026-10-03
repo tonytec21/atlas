@@ -3,6 +3,9 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 require_once __DIR__ . '/documento_validacao.php';
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('os_editada', ['os_id' => $_POST['os_id'] ?? 0]);
 $issCfg        = json_decode(file_get_contents(__DIR__ . '/iss_config.json'), true);
 $issAtivo      = !empty($issCfg['ativo']);
 $issPercentual = isset($issCfg['percentual']) ? (float)$issCfg['percentual'] : 0;

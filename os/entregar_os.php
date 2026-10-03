@@ -63,6 +63,9 @@ $recebido_por = trim((string)($_POST['recebido_por'] ?? ''));
 $recebido_doc = trim((string)($_POST['recebido_doc'] ?? ''));
 $observacoes  = trim((string)($_POST['observacoes'] ?? ''));
 $usuario      = $_SESSION['username'] ?? 'sistema';
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('os_entregue', ['os_id' => $os_id]);
 
 if ($os_id <= 0) { if (ob_get_length()) ob_clean(); echo json_encode(['error' => 'O.S. inválida.']); exit; }
 if ($recebido_por === '') { if (ob_get_length()) ob_clean(); echo json_encode(['error' => 'Informe o nome de quem recebeu.']); exit; }

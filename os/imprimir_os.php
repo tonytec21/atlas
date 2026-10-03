@@ -80,6 +80,7 @@ class PDF extends TCPDF
             }
            
            // Restaura o AutoPageBreak e as margens para o conteúdo subsequente
+           if (!empty($GLOBALS['__OSAUD_IMPRESSAO__']) && function_exists('osaud_pdf_marca')) { osaud_pdf_marca($this); } // AUDITORIA O.S.
            $this->SetAutoPageBreak(true, 25); // Ativa novamente o AutoPageBreak com a margem inferior padrão
            $this->SetMargins($currentMargins['left'], $currentMargins['top'], $currentMargins['right']);
            $this->SetY(25); // Define o ponto Y após a imagem para o conteúdo
@@ -170,6 +171,17 @@ if (isset($_GET['id'])) {
     $os_items_result = $os_items_query->get_result();
     $ordem_servico_itens = $os_items_result->fetch_all(MYSQLI_ASSOC);
 
+    /* AUDITORIA O.S.: reprodução de uma versão registrada (auditoria_os_impresso.php).
+       Usa o retrato gravado na auditoria em vez dos dados atuais do banco. */
+    $__osaud = $GLOBALS['__OSAUD_IMPRESSAO__'] ?? null;
+    if (is_array($__osaud)) {
+        $ordem_servico       = $__osaud['os'];
+        $status_os           = $ordem_servico['status'] ?? '';
+        $isCanceled          = ($status_os === 'Cancelado');
+        $GLOBALS['isCanceled'] = $isCanceled;
+        $ordem_servico_itens = $__osaud['itens'];
+    }
+
     // mostrar "DESC. LEGAL %" somente se existir algum valor > 0
     $show_desc_legal = false;
     foreach ($ordem_servico_itens as $it) {
@@ -240,6 +252,16 @@ if (isset($_GET['id'])) {
     $repasses_query->execute();
     $repasses_result = $repasses_query->get_result();
     $total_repasses = $repasses_result->fetch_assoc()['total_repasses'];
+
+    /* AUDITORIA O.S.: totais e assinatura da versão reproduzida */
+    if (is_array($__osaud)) {
+        if ($__osaud['totais']['pagamentos'] !== null) { $total_pagamentos = $__osaud['totais']['pagamentos']; }
+        if ($__osaud['totais']['devolucoes'] !== null) { $total_devolucoes = $__osaud['totais']['devolucoes']; }
+        if ($__osaud['totais']['repasses']   !== null) { $total_repasses   = $__osaud['totais']['repasses']; }
+        $saldo = $total_pagamentos - $ordem_servico['total_os'];
+        $logged_in_user_nome  = 'REPRODUÇÃO PARA AUDITORIA';
+        $logged_in_user_cargo = 'Documento sem valor — gerado a partir do registro de auditoria';
+    }
 
     // Obter informações das contas bancárias
     $contas_query = $conn->prepare("SELECT banco, agencia, tipo_conta, numero_conta, titular_conta, cpf_cnpj_titular, chave_pix, qr_code_pix FROM configuracao_os WHERE status = 'ativa'");
@@ -478,7 +500,7 @@ if (isset($_GET['id'])) {
     }
 
     // Adicionar a imagem da assinatura
-    if (!empty($assinatura_path)) {
+    if (!empty($assinatura_path) && empty($GLOBALS['__OSAUD_IMPRESSAO__'])) {
         $pdf->addSignature($assinatura_path);
     }
 

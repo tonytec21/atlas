@@ -67,6 +67,9 @@ try {
             nfse_json(['ok' => false, 'mensagem' => 'Ordem de Serviço não identificada.']);
         }
 
+        /* AUDITORIA O.S. */
+        require_once __DIR__ . '/../auditoria_os_lib.php';
+        osaud_monitorar('nfse_reemitida', ['os_id' => $osId]);
         $r = nfse_reemitir_os($osId);
         nfse_json($r);
     }

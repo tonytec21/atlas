@@ -2,6 +2,9 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection2.php');
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('repasse_lancado', ['os_id' => $_POST['os_id'] ?? 0]);
 date_default_timezone_set('America/Sao_Paulo');
 
 // IMPORTANTE: não definir Content-Type: application/json aqui — o jQuery passaria

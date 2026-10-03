@@ -86,6 +86,11 @@ try {
 
     // Confirmar transação
     $conn->commit();
+
+    /* AUDITORIA O.S.: abrir a edição inicia uma nova "sessão de edição" —
+       as gravações feitas a partir daqui ficam agrupadas na auditoria. */
+    require_once __DIR__ . '/auditoria_os_lib.php';
+    osaud_nova_sessao_edicao((int) $id);
 } catch (PDOException $e) {
     // Reverter transação em caso de erro
     $conn->rollBack();

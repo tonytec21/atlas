@@ -1,5 +1,9 @@
 <?php
 include(__DIR__ . '/db_connection.php');
+include(__DIR__ . '/session_check.php'); // apenas para identificar o usuário na auditoria
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('itens_reordenados', ['itens' => array_column((array) ($_POST['ordem'] ?? []), 'id')]);
 date_default_timezone_set('America/Sao_Paulo');
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {

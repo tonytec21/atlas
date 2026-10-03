@@ -12,6 +12,9 @@ function tcm_os_gravar($dados, $pdf, $cert, $usuario)
     os_ensure_schema();
     $tipo = (string)($dados['tipo'] ?? ''); $osId = (int)($dados['os_id'] ?? 0);
     if (!os_tipo_valido($tipo) || $osId <= 0) throw new RuntimeException('Documento da O.S. inválido.');
+    /* AUDITORIA O.S. — registra o antes/depois desta operação */
+    require_once __DIR__ . '/auditoria_os_lib.php';
+    osaud_monitorar('documento_assinado', ['os_id' => $osId], ['usuario' => $usuario]);
     if (strncmp($pdf, '%PDF', 4) !== 0) throw new RuntimeException('PDF assinado inválido.');
 
     $slug = os_safe($tipo) . '_' . os_safe($osId);

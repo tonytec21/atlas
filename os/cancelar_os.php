@@ -2,6 +2,9 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection2.php');
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('os_cancelada', ['os_id' => $_POST['os_id'] ?? 0], ['motivo_post' => 'motivo']);
 
 if (!isset($conn)) {
     die(json_encode(['success' => false, 'error' => 'Erro ao conectar ao banco de dados']));

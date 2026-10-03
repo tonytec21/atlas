@@ -67,3 +67,47 @@ inline) sem baixar. Novos arquivos:
 `pagamento_anexos_config.php`, `pa_upload.php`, `pa_listar.php`, `pa_ver.php`,
 `pa_excluir.php`. Cria automaticamente a tabela `pagamento_os_anexos`; os arquivos
 ficam em `os/comprovantes_pagamento/` (com `.htaccess` que desliga o PHP).
+
+
+## Auditoria de O.S. (v1.0.0)
+Página **`auditoria_os.php`** — restrita a administradores (`checar_acesso_de_administrador.php`).
+Atalhos: botão **Auditoria de O.S.** na pesquisa (`index.php`) e **Auditoria** em cada O.S.
+(`visualizar_os.php`), só para administradores.
+
+**O que é registrado** (com a O.S. completa ANTES e DEPOIS de cada operação):
+dados da O.S., atos incluídos/removidos/alterados (quantidade, descrição, base, isento, ordem),
+pagamentos lançados/excluídos/observação, comprovantes enviados/excluídos, anexos incluídos/removidos,
+devoluções e repasses lançados/excluídos, liquidação (ato e O.S.), liberação de liquidação (API),
+cancelamento (com motivo), entrega, NFS-e (emissão, cancelamento, reemissão), documentos assinados,
+criação da O.S. (tela e API) e pagamentos online (Parcela Express).
+
+**Na página:** linha do tempo com filtros (O.S., período, usuário, ação, parte alterada, só exclusões,
+busca), visão por O.S., sessões de trabalho agrupadas (início × fim), comparação campo a campo,
+O.S. completa antes × depois, e o **impresso da O.S. antes e depois** lado a lado (mesmo gerador
+`imprimir_os.php`/`imprimir-os.php`, com faixa "AUDITORIA" no topo). Comprovantes e anexos excluídos
+podem ser abertos a partir do registro. O histórico antigo (`logs_ordens_de_servico`) também aparece.
+
+**Integridade:** cada registro guarda o hash SHA-256 do anterior (por O.S.); alteração manual no banco
+é acusada na página.
+
+**Arquivos novos:** `auditoria_os_lib.php`, `auditoria_os.php`, `auditoria_os_api.php`,
+`auditoria_os_view.php`, `auditoria_os_impresso.php`, `auditoria_os_arquivo.php`.
+**Tabelas criadas automaticamente:** `os_auditoria`, `os_auditoria_meta`.
+
+**Alterados (só uma chamada `osaud_monitorar()` no início — a lógica não mudou):**
+adicionar_item, adicionar_item_os, atualizar_base_item, atualizar_descricao_item,
+atualizar_observacao_pagamento, atualizar_ordem_itens, salvar_ordem_exibicao, atualizar_quantidade_item,
+atualizar_status_item, atualizar_total_os, atualizar_os, cancelar_os, marcar_item_isento, remover_anexo,
+remover_item, remover_pagamento, salvar_pagamento, salvar_anexo, pa_upload, pa_excluir, salvar_devolucao,
+remover_devolucao, salvar_repasse, remover_repasse, liquidar_ato, liquidar_os, entregar_os, salvar_os,
+os_pades_finalize, tcloud_gravar, editar_os (agrupa a sessão de edição), nfse/nfse_emitir,
+nfse/nfse_cancelar, nfse/nfse_reemitir, pagamento_online/pe_venda_status,
+pagamento_online/pe_boleto_consultar, api/index.php; além de imprimir_os.php e imprimir-os.php
+(modo reprodução), index.php e visualizar_os.php (botões).
+
+**Mudança de comportamento:** `pa_excluir.php` não apaga mais o arquivo do comprovante — move para
+`comprovantes_pagamento/_excluidos/`, para que fique visível na auditoria.
+
+**Fora do módulo:** a tela `../liberar_os.php` (Desfazer Liquidações) não está neste pacote. Para
+auditá-la, acrescente no início dela:
+`require_once __DIR__ . '/os/auditoria_os_lib.php'; osaud_monitorar('liquidacao_desfeita', ['os_id' => $osId]);`

@@ -2,6 +2,9 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('item_removido', ['item_id' => $_POST['item_id'] ?? 0]);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $item_id = $_POST['item_id'];

@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/session_check.php'; checkSession();
 require_once __DIR__ . '/pagamento_anexos_config.php';
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('comprovante_removido', ['comprovante_id' => $_POST['id'] ?? 0]);
 header('Content-Type: application/json; charset=utf-8');
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new RuntimeException('Método inválido.');
@@ -16,7 +19,13 @@ try {
 
     $path = realpath(pa_dir() . '/' . $a['arquivo']);
     $base = realpath(pa_dir());
-    if ($path !== false && strncmp($path, $base . DIRECTORY_SEPARATOR, strlen($base)+1) === 0 && is_file($path)) @unlink($path);
+    if ($path !== false && strncmp($path, $base . DIRECTORY_SEPARATOR, strlen($base)+1) === 0 && is_file($path)) {
+        /* AUDITORIA O.S.: o arquivo não é apagado — vai para _excluidos/, para que o
+           administrador possa ver na auditoria o comprovante que foi excluído. */
+        $lixeira = $base . DIRECTORY_SEPARATOR . '_excluidos';
+        if (!is_dir($lixeira)) @mkdir($lixeira, 0775, true);
+        if (!is_dir($lixeira) || !@rename($path, $lixeira . DIRECTORY_SEPARATOR . basename($path))) @unlink($path);
+    }
 
     $d = $conn->prepare("DELETE FROM pagamento_os_anexos WHERE id=?");
     $d->bind_param('i', $id); $d->execute(); $d->close();

@@ -13,6 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $notaId  = (int) ($_POST['nota_id'] ?? 0);
 $cMotivo = trim((string) ($_POST['c_motivo'] ?? ''));
 $xMotivo = trim((string) ($_POST['x_motivo'] ?? ''));
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/../auditoria_os_lib.php';
+osaud_monitorar('nfse_cancelada', ['nota_id' => $notaId], ['motivo' => $xMotivo]);
 
 if ($notaId <= 0) {
     nfse_json(['ok' => false, 'mensagem' => 'NFS-e não informada.']);

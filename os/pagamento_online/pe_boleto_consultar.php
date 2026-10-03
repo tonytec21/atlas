@@ -25,6 +25,9 @@ if (!pe_boleto_habilitado()) {
 
 $localReference = trim((string) ($_POST['local_reference'] ?? $_GET['local_reference'] ?? ''));
 $osId = (int) ($_POST['os_id'] ?? $_GET['os_id'] ?? 0);
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/../auditoria_os_lib.php';
+osaud_monitorar('pagamento_online', ['os_id' => $osId]);
 
 if ($localReference === '' || $osId <= 0) {
     pe_json_erro('Parâmetros inválidos.');

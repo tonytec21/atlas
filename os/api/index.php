@@ -181,7 +181,11 @@ try {
         $corpo = api_corpo();
         api_idempotencia_verificar($rota, $corpo);
 
+        /* AUDITORIA O.S. */
+        require_once __DIR__ . '/../auditoria_os_lib.php';
+        osaud_monitorar('os_criada', ['os_global' => '__osaud_api_os'], ['usuario' => static function () { return function_exists('api_operador') ? api_operador() : 'API'; }]);
         $dados = api_os_criar($corpo);
+        $GLOBALS['__osaud_api_os'] = (int) ($dados['os']['numero'] ?? 0);
         api_marcar_os($dados['os']['numero']);
 
         api_idempotencia_guardar($rota, $corpo, 201, ['sucesso' => true, 'dados' => $dados]);
@@ -295,6 +299,8 @@ try {
             $forma = trim((string) api_exigir($corpo, 'forma_de_pagamento'));
             $valor = api_valor(api_campo($corpo, 'valor', 0));
 
+            require_once __DIR__ . '/../auditoria_os_lib.php';   // AUDITORIA O.S.
+            osaud_monitorar('pagamento_lancado', ['os_id' => $osId], ['usuario' => static function () { return function_exists('api_operador') ? api_operador() : 'API'; }]);
             $dados = api_pagamento_criar($osId, $valor, $forma, [
                 'operador' => $corpo['operador'] ?? null,
             ]);
@@ -331,6 +337,8 @@ try {
             $corpo = api_corpo();
             api_idempotencia_verificar($rota, $corpo);
 
+            require_once __DIR__ . '/../auditoria_os_lib.php';   // AUDITORIA O.S.
+            osaud_monitorar('liquidacao_desfeita', ['os_id' => $osId], ['usuario' => static function () { return function_exists('api_operador') ? api_operador() : 'API'; }, 'motivo' => (string) ($corpo['motivo'] ?? '')]);
             $dados = api_liberar($osId, [
                 'liquidacao_id' => $corpo['liquidacao_id'] ?? null,
                 'item_id'       => $corpo['item_id'] ?? null,
@@ -357,6 +365,8 @@ try {
                 api_erro('quantidade_invalida', 'A quantidade a liquidar deve ser pelo menos 1.', 422);
             }
 
+            require_once __DIR__ . '/../auditoria_os_lib.php';   // AUDITORIA O.S.
+            osaud_monitorar('ato_liquidado', ['os_id' => $osId], ['usuario' => static function () { return function_exists('api_operador') ? api_operador() : 'API'; }]);
             $dados = api_liquidar($osId, $itemId, $qtd, [
                 'selo'      => $corpo['selo'] ?? null,
                 'protocolo' => $corpo['protocolo'] ?? null,

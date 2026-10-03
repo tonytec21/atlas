@@ -23,6 +23,9 @@ pe_guard_operacao();
 $saleId = trim((string) ($_GET['sale_id'] ?? ''));
 $osId = (int) ($_GET['os_id'] ?? 0);
 $observacao = mb_substr(trim((string) ($_GET['observacao'] ?? '')), 0, 500);
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/../auditoria_os_lib.php';
+osaud_monitorar('pagamento_online', ['os_id' => $osId]);
 
 if ($saleId === '' || $osId <= 0) {
     pe_json_erro('Parâmetros inválidos.');

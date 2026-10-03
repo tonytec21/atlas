@@ -4,6 +4,9 @@ checkSession();
 include(__DIR__ . '/db_connection.php');
 require_once __DIR__ . '/base_calculo_lib.php';
 require_once __DIR__ . '/documento_validacao.php';
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('os_criada', ['os_global' => 'os_id']);
 date_default_timezone_set('America/Sao_Paulo');
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {

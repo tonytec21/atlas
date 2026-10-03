@@ -1266,6 +1266,21 @@ body.dark-mode footer .footer-content a:hover {
                         <i class="fa fa-folder-open"></i> Modelos O.S  
                     </a>  
                 </div>  
+                <?php
+                /* AUDITORIA O.S.: atalho só para administradores */
+                $__osaudAdmin = false;
+                try {
+                    $__stAdm = getDatabaseConnection()->prepare("SELECT nivel_de_acesso FROM funcionarios WHERE usuario = ? LIMIT 1");
+                    $__stAdm->execute([$_SESSION['username'] ?? '']);
+                    $__osaudAdmin = in_array(strtolower(trim((string) $__stAdm->fetchColumn())), ['administrador', 'admin'], true);
+                } catch (Throwable $e) { $__osaudAdmin = false; }
+                if ($__osaudAdmin): ?>
+                <div class="col-md-auto mb-2">
+                    <a href="auditoria_os.php" class="btn btn-dark" title="Auditoria das O.S. (administrador)">
+                        <i class="fa fa-shield"></i> Auditoria de O.S.
+                    </a>
+                </div>
+                <?php endif; ?>
             </div>  
 
             <!-- ===================== FILTROS ===================== -->

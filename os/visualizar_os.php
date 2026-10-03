@@ -1402,6 +1402,25 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     </div>
                 <?php endif; ?>
 
+                <?php
+                /* AUDITORIA O.S.: atalho só para administradores */
+                $__osaudAdmin = false;
+                try {
+                    $__stAdm = $conn->prepare("SELECT nivel_de_acesso FROM funcionarios WHERE usuario = ? LIMIT 1");
+                    $__usAdm = (string) ($_SESSION['username'] ?? '');
+                    $__stAdm->bind_param('s', $__usAdm);
+                    $__stAdm->execute();
+                    $__rwAdm = $__stAdm->get_result()->fetch_assoc();
+                    $__stAdm->close();
+                    $__osaudAdmin = in_array(strtolower(trim((string) ($__rwAdm['nivel_de_acesso'] ?? ''))), ['administrador', 'admin'], true);
+                } catch (Throwable $e) { $__osaudAdmin = false; }
+                if ($__osaudAdmin): ?>
+                <div class="col-auto">
+                    <a href="auditoria_os.php?os=<?php echo (int) $os_id; ?>" class="btn btn-dark btn-sm" title="Auditoria desta O.S. (administrador)">
+                        <i class="fa fa-shield" aria-hidden="true"></i> Auditoria
+                    </a>
+                </div>
+                <?php endif; ?>
                 <div class="col-auto">  
                     <button type="button" class="btn btn-4 btn-sm" data-toggle="modal" data-target="#tarefaModal">  
                         <i class="fa fa-clock-o" aria-hidden="true"></i> Criar Tarefa  

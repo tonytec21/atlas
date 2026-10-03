@@ -3,6 +3,9 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 require_once __DIR__ . '/base_calculo_lib.php';
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('item_incluido', ['os_id' => $_POST['os_id'] ?? 0]);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $os_id = $_POST['os_id'];

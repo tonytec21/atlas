@@ -20,6 +20,9 @@ try {
     if (!is_array($sess)) of_fail('Sessão inválida.');
 
     $tipo = $sess['tipo']; $osId = (int)$sess['os_id'];
+    /* AUDITORIA O.S. — registra o antes/depois desta operação */
+    require_once __DIR__ . '/auditoria_os_lib.php';
+    osaud_monitorar('documento_assinado', ['os_id' => $osId]);
     $preparedPath = os_pades_dir() . '/' . basename($sess['prepared']);
     if (!is_file($preparedPath)) of_fail('Arquivo preparado não encontrado.');
 

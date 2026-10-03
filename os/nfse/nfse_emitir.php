@@ -11,6 +11,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $osId   = (int) ($_POST['os_id'] ?? 0);
 $forcar = ($_POST['forcar'] ?? '0') === '1';
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/../auditoria_os_lib.php';
+osaud_monitorar('nfse_emitida', ['os_id' => $osId]);
 
 if ($osId <= 0) {
     nfse_json(['ok' => false, 'mensagem' => 'Ordem de Serviço não informada.']);

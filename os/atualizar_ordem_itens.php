@@ -2,6 +2,9 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('itens_reordenados', ['itens' => array_column((array) ($_POST['ordem'] ?? []), 'id')]);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $ordem = $_POST['ordem'];

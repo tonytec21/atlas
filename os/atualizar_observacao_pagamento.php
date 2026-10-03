@@ -7,6 +7,9 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection2.php');
 require_once __DIR__ . '/pagamento_observacao_config.php';
+/* AUDITORIA O.S. — registra o antes/depois desta operação */
+require_once __DIR__ . '/auditoria_os_lib.php';
+osaud_monitorar('pagamento_observacao', ['pagamento_id' => $_POST['pagamento_id'] ?? 0]);
 date_default_timezone_set('America/Sao_Paulo');
 
 header('Content-Type: application/json; charset=utf-8');
