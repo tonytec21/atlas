@@ -8,3 +8,4 @@ logs/*.jsonl
 logs/*.log
 !*/index.php
 !*/.htaccess
+digitalizacoes/*/

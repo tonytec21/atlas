@@ -169,6 +169,7 @@ $pdfjs       = is_file(__DIR__ . '/../provimentos/pdfjs/web/viewer.html') ? '../
 
     <div id="arq-resultados"></div>
     <div class="arq-paginacao" id="arq-paginacao"></div>
+    <p class="arq-versao" style="text-align:center;color:var(--arq-suave);font-size:.74rem;margin:6px 0 24px">Arquivamento Digital · v<?= arq_e(ARQ_VERSAO) ?></p>
   </div>
 </div>
 

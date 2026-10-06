@@ -43,6 +43,9 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
 <link rel="stylesheet" href="../style/css/font-awesome.min.css">
 <link rel="stylesheet" href="../style/css/style.css">
 <link rel="stylesheet" href="assets/css/arquivamento.css?v=8">
+<?php if (ARQ_SCANNER_ATIVO): ?>
+<link rel="stylesheet" href="assets/css/digitalizador.css?v=<?= arq_e(ARQ_VERSAO) ?>">
+<?php endif; ?>
 <link rel="icon" href="../style/img/favicon.png" type="image/png">
 </head>
 <body class="light-mode">
@@ -57,7 +60,7 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
         <div>
           <div class="arq-sobretitulo"><?= $editando ? 'Registro nº ' . arq_e($id) : 'Novo registro' ?></div>
           <h1><?= $editando ? 'Editar arquivamento' : 'Cadastrar arquivamento' ?></h1>
-          <p>Identifique o ato, informe as partes e anexe os documentos digitalizados.</p>
+          <p>Identifique o ato, informe as partes e anexe os documentos — do computador ou direto do scanner.</p>
         </div>
       </div>
       <a class="arq-btn" href="index.php"><i class="fa fa-arrow-left"></i> Voltar ao acervo</a>
@@ -208,12 +211,22 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
           </div>
         <?php endif; ?>
 
-        <div class="arq-solta" id="solta" tabindex="0" role="button" aria-label="Selecionar arquivos">
-          <i class="fa fa-cloud-upload" aria-hidden="true"></i>
-          <b>Arraste os arquivos aqui</b>
-          <span>ou clique para escolher no computador</span>
-          <input type="file" id="file-input" multiple hidden
-                 <?= ARQ_UPLOAD_ACEITA_TUDO ? '' : 'accept="' . arq_e('.' . implode(',.', $extensoes)) . '"' ?>>
+        <div class="<?= ARQ_SCANNER_ATIVO ? 'arq-entradas' : '' ?>">
+          <div class="arq-solta" id="solta" tabindex="0" role="button" aria-label="Selecionar arquivos">
+            <i class="fa fa-cloud-upload" aria-hidden="true"></i>
+            <b>Arraste os arquivos aqui</b>
+            <span>ou clique para escolher no computador</span>
+            <input type="file" id="file-input" multiple hidden
+                   <?= ARQ_UPLOAD_ACEITA_TUDO ? '' : 'accept="' . arq_e('.' . implode(',.', $extensoes)) . '"' ?>>
+          </div>
+          <?php if (ARQ_SCANNER_ATIVO): ?>
+          <button type="button" class="arq-scan-cta" id="digitalizar-scanner">
+            <span class="arq-scan-cta-ic"><i class="fa fa-print" aria-hidden="true"></i></span>
+            <b>Digitalizar do scanner</b>
+            <span>As páginas vêm direto para cá, viram PDF e entram como anexo</span>
+            <span class="arq-scan-cta-tag">TWAIN · TCloud Scanner</span>
+          </button>
+          <?php endif; ?>
         </div>
 
         <div class="arq-anexos" id="fila" style="margin-top:14px"></div>
@@ -311,7 +324,8 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
       </section>
       <?php endif; ?>
 
-    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;padding-bottom:40px">
+    <div style="display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding-bottom:40px">
+      <span class="arq-versao" style="margin-right:auto;color:var(--arq-suave);font-size:.74rem">Arquivamento Digital · v<?= arq_e(ARQ_VERSAO) ?></span>
       <a class="arq-btn" href="index.php">Cancelar</a>
       <button type="submit" form="arq-form" class="arq-btn arq-btn-p" id="salvar" style="min-width:200px">
         <i class="fa fa-check"></i> <?= $editando ? 'Salvar alterações' : 'Cadastrar arquivamento' ?>
@@ -325,6 +339,9 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
 <script src="../script/bootstrap.min.js"></script>
 <script src="../script/sweetalert2.js"></script>
 <script src="assets/js/dialogos.js?v=6"></script>
+<?php if (ARQ_SCANNER_ATIVO): ?>
+<script src="assets/js/digitalizador.js?v=<?= arq_e(ARQ_VERSAO) ?>"></script>
+<?php endif; ?>
 <script>
 (function () {
   'use strict';
@@ -333,6 +350,7 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
   var PARTES_INICIAIS = <?= json_encode($editando ? $ato['partes_envolvidas'] : [], JSON_UNESCAPED_UNICODE) ?>;
   var MAX_BYTES = <?= (int) ARQ_UPLOAD_MAX_BYTES ?>;
   var EXTENSOES = <?= json_encode($extensoes) ?>;
+  var SCANNER_INSTALAR = <?= json_encode(ARQ_SCANNER_INSTALAR, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?>;
 
   function $(s) { return document.querySelector(s); }
   function esc(v) {
@@ -458,10 +476,13 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
 
   function pintarFila() {
     $('#fila').innerHTML = fila.map(function (f, i) {
+      var doScanner = f.arqPaginas > 0;
       return '<div class="arq-anexo">' +
-        '<div class="arq-anexo-ic"><i class="fa fa-file-o"></i></div>' +
+        '<div class="arq-anexo-ic"><i class="fa ' + (doScanner ? 'fa-print' : 'fa-file-o') + '"></i></div>' +
         '<div class="arq-anexo-info"><div class="arq-anexo-nome">' + esc(f.name) + '</div>' +
-        '<div class="arq-anexo-meta">' + bytes(f.size) + ' · aguardando envio</div></div>' +
+        '<div class="arq-anexo-meta">' + bytes(f.size) +
+          (doScanner ? ' · digitalizado (' + f.arqPaginas + (f.arqPaginas === 1 ? ' página' : ' páginas') + ')' : '') +
+          ' · aguardando envio</div></div>' +
         '<div class="arq-anexo-acoes"><button type="button" class="arq-btn arq-btn-sm arq-btn-ic arq-btn-perigo" data-fila="' + i + '"><i class="fa fa-times"></i></button></div>' +
         '</div>';
     }).join('');
@@ -503,6 +524,24 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
     var b = e.target.closest('[data-fila]');
     if (b) { fila.splice(parseInt(b.dataset.fila, 10), 1); pintarFila(); }
   });
+
+  /* ================= Digitalização pelo scanner (TWAIN) ================= */
+  if (window.ArqScanner && document.getElementById('digitalizar-scanner')) {
+    ArqScanner.iniciar({
+      csrf: CSRF,
+      endpoint: 'api/digitalizacao.php',
+      pdfLib: 'assets/vendor/pdf-lib.min.js',
+      instalar: SCANNER_INSTALAR,
+      maxBytes: MAX_BYTES,
+      container: document.querySelector('.arq'),
+      aoAnexar: function (arquivos) {
+        receber(arquivos);
+        var ult = document.getElementById('fila').lastElementChild;
+        if (ult && ult.scrollIntoView) { ult.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      }
+    });
+    document.getElementById('digitalizar-scanner').addEventListener('click', function () { ArqScanner.abrir(); });
+  }
 
   var existentes = document.getElementById('anexos-existentes');
   if (existentes) {
@@ -737,7 +776,11 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
      especificação do beforeunload não permite conteúdo próprio, justamente
      para páginas não poderem impedir o usuário de sair. */
   window.addEventListener('beforeunload', function (e) {
-    if (saindo || !fila.length) { return; }
+    if (saindo) { return; }
+    // Abrir o link tcloudscan:// não é sair da página.
+    if (window.ArqScanner && ArqScanner.lancando) { return; }
+    var digitalizacaoPendente = window.ArqScanner && ArqScanner.pendente();
+    if (!fila.length && !digitalizacaoPendente) { return; }
     e.preventDefault();
     e.returnValue = '';
   });
@@ -745,7 +788,11 @@ $extensoes   = ARQ_UPLOAD_ACEITA_TUDO ? [] : array_keys(arq_tipos_permitidos());
   // Sair pelos links do próprio módulo não é saída acidental.
   document.addEventListener('click', function (e) {
     var a = e.target.closest('a[href]');
-    if (a && !a.target && a.getAttribute('href').charAt(0) !== '#') { saindo = true; }
+    if (!a || a.target) { return; }
+    var h = a.getAttribute('href');
+    // Links de aplicativo (tcloudscan:, mailto:) não tiram o usuário da página.
+    if (/^[a-z][a-z0-9+.\-]*:/i.test(h) && !/^https?:/i.test(h)) { return; }
+    if (h.charAt(0) !== '#') { saindo = true; }
   });
 })();
 </script>

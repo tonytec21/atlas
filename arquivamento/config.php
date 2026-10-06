@@ -22,6 +22,12 @@ if (is_file(__DIR__ . '/config.local.php')) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Versão do módulo (aparece no rodapé do acervo e do cadastro e vai como
+ * cache-busting nos .js/.css). Mude a cada entrega.
+ * ------------------------------------------------------------------ */
+define('ARQ_VERSAO', '2.1.0');
+
+/* ------------------------------------------------------------------ *
  * Banco de dados
  * ------------------------------------------------------------------ */
 defined('ARQ_DB_HOST')    or define('ARQ_DB_HOST', 'localhost');
@@ -116,6 +122,24 @@ function arq_tipos_permitidos()
  * ------------------------------------------------------------------ */
 // Dias que um registro fica na lixeira antes de ser sinalizado para expurgo.
 defined('ARQ_LIXEIRA_DIAS') or define('ARQ_LIXEIRA_DIAS', 90);
+
+/* ------------------------------------------------------------------ *
+ * Digitalização direta do scanner (TWAIN) pelo TCloud Scanner
+ * ------------------------------------------------------------------ */
+// Mostra o botão "Digitalizar do scanner" no cadastro e na edição.
+defined('ARQ_SCANNER_ATIVO') or define('ARQ_SCANNER_ATIVO', true);
+// Comando exibido para instalar o TCloud Scanner na estação.
+defined('ARQ_SCANNER_INSTALAR') or define('ARQ_SCANNER_INSTALAR',
+    'powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://tcloudsoft.app/download/scanner/instalar.ps1 | iex"');
+// Endereço de api/scanner.php que a estação usa. Vazio = o mesmo endereço
+// que o navegador usou para abrir o Atlas (serve para quase todos os casos).
+// Ex.: 'http://26.10.20.30/atlas/arquivamento/api/scanner.php'
+defined('ARQ_SCANNER_ENDPOINT') or define('ARQ_SCANNER_ENDPOINT', '');
+// Minutos que um pedido de digitalização continua aceitando páginas.
+defined('ARQ_DIG_VALIDADE_MIN') or define('ARQ_DIG_VALIDADE_MIN', 180);
+// Máximo de páginas por digitalização e de bytes por página recebida.
+defined('ARQ_DIG_MAX_PAGINAS') or define('ARQ_DIG_MAX_PAGINAS', 400);
+defined('ARQ_DIG_MAX_BYTES_PAGINA') or define('ARQ_DIG_MAX_BYTES_PAGINA', 40 * 1024 * 1024);
 
 /* ------------------------------------------------------------------ *
  * Selador (TJMA / Portal do Selo)

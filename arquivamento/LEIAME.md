@@ -1,4 +1,7 @@
-# Atlas · Arquivamento Digital — versão remodelada
+# Atlas · Arquivamento Digital — versão 2.1.0
+
+> **Novo na 2.1.0:** digitalização direta do scanner (TWAIN) no cadastro e na
+> edição de arquivamentos, pelo **TCloud Scanner**. Ver a seção 11.
 
 Substituição completa do módulo `arquivamento/`. Mantém o formato de dados em
 disco da versão anterior (JSON em `meta-dados/`, binários em `arquivos/`), então
@@ -220,6 +223,10 @@ api/lixeira.php                 Excluir / restaurar / expurgar
 api/categorias.php              CRUD de categorias
 api/estatisticas.php            KPIs e séries do painel
 
+api/digitalizacao.php           Digitalização: pedido, acompanhamento, páginas (navegador, com sessão)
+api/scanner.php                 Digitalização: recebe as páginas do TCloud Scanner (estação, por token)
+lib/Digitalizacao.php           Pedidos de digitalização em digitalizacoes/<token>/
+
 arquivo.php                     Entrega autenticada de anexo (com Range)
 compilar.php                    manifesto | zip | capa
 capa_arquivamento.php           Capa avulsa para juntada física
@@ -227,6 +234,8 @@ capa_arquivamento.php           Capa avulsa para juntada física
 assets/css/arquivamento.css     Sistema visual do módulo
 assets/js/arquivamento.js       Tela do acervo
 assets/js/compilador.js         Junção de PDF no navegador
+assets/js/digitalizador.js      Janela "Digitalizar do scanner"
+assets/css/digitalizador.css    Estilos da digitalização
 assets/vendor/pdf-lib.min.js    pdf-lib 1.17.1 (MIT)
 ```
 
@@ -352,3 +361,98 @@ próprios ali, justamente para que uma página não consiga impedir o usuário d
 fechá-la. O que dá para controlar é *quando* ele aparece: no `cadastro.php`
 ele só dispara se houver anexo selecionado e ainda não enviado, e a navegação
 feita pelo próprio sistema (salvar, links do módulo) o desliga.
+
+---
+
+## 11. Digitalização direta do scanner (TWAIN)
+
+No passo **03 · Documentos digitalizados** do cadastro e da edição, ao lado da
+área de arrastar arquivos, há o botão **Digitalizar do scanner**. As páginas
+saem do scanner direto para a tela, onde dá para girar, excluir, ampliar e
+arrastar para mudar a ordem. Ao clicar em **Anexar ao arquivamento**, o
+navegador monta um PDF único (ou uma imagem por página) e o arquivo entra na
+fila de anexos exatamente como um arquivo escolhido no computador — o envio
+ao servidor continua sendo o do botão Salvar.
+
+### Como funciona
+
+O navegador não tem acesso a TWAIN. Quem tem é o **TCloud Scanner**, programa
+pequeno instalado na estação (projeto `TCloudScanner`, entregue à parte).
+
+```
+cadastro.php ──(1) cria o pedido──────────────▶ api/digitalizacao.php
+     │                                              (token de 256 bits)
+     └─(2) abre tcloudscan://digitalizar/?u=…&t=…&dpi=…&cor=…
+                    │
+              TCloud Scanner ──(3) TWAIN──▶ scanner
+                    │
+                    └─(4) envia cada página──────▶ api/scanner.php
+                                                    digitalizacoes/<token>/
+cadastro.php ◀──(5) acompanha e mostra as páginas── api/digitalizacao.php
+     │
+     └─(6) monta o PDF (pdf-lib) e põe na fila de anexos
+```
+
+Por que um link `tcloudscan://` e não um serviço em `http://127.0.0.1` na
+estação: desde o Chrome/Edge 142 (*Local Network Access*), página aberta por IP
+da rede não consegue chamar o `127.0.0.1` sem permissão, e essa permissão só
+pode ser pedida por página **HTTPS**. O Atlas roda em HTTP na maior parte das
+serventias. O link de protocolo não sofre essa restrição — é o mesmo caminho
+do modo local do TCloud Assinador.
+
+### Instalação no servidor
+
+1. Extraia o ZIP sobre `atlas/arquivamento/` (só código; nenhum dado é tocado).
+2. Reinicie o Apache (OPcache).
+3. A pasta `digitalizacoes/` já vem com `.htaccess` e `index.php` de bloqueio.
+   Se não existir, ela é criada sozinha no primeiro uso. Em servidor Linux,
+   dê a ela as mesmas permissões de `arquivos/`.
+4. Confira no `php.ini` que `post_max_size` comporta uma página: 300 dpi
+   colorido fica em 1–3 MB; 600 dpi colorido pode passar de 10 MB. O padrão do
+   XAMPP (40M) atende.
+
+### Instalação na estação
+
+PowerShell, sem administrador:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://tcloudsoft.app/download/scanner/instalar.ps1 | iex"
+```
+
+Esse comando aparece também na própria janela de digitalização, com botão de
+copiar, quando o TCloud Scanner não responde.
+
+Na primeira digitalização:
+
+- o navegador pergunta se pode abrir o **TCloud Scanner** — marque
+  **Sempre permitir**;
+- o TCloud Scanner pergunta se aceita enviar digitalizações para aquele
+  endereço do Atlas (fica guardado);
+- se houver mais de um scanner, escolha um; nas próximas vezes ele começa
+  sozinho com o mesmo scanner.
+
+### Configurações (`config.local.php`)
+
+| Constante | Padrão | Para quê |
+|---|---|---|
+| `ARQ_SCANNER_ATIVO` | `true` | Mostra ou esconde o botão de digitalização |
+| `ARQ_SCANNER_INSTALAR` | comando do portal | Texto exibido como comando de instalação |
+| `ARQ_SCANNER_ENDPOINT` | vazio (automático) | URL de `api/scanner.php` vista pela estação. Só preencha se o Atlas estiver atrás de proxy/NAT e o endereço do navegador não servir para a estação |
+| `ARQ_DIG_VALIDADE_MIN` | `180` | Minutos que um pedido aceita páginas |
+| `ARQ_DIG_MAX_PAGINAS` | `400` | Páginas por digitalização |
+| `ARQ_DIG_MAX_BYTES_PAGINA` | 40 MB | Tamanho máximo de uma página recebida |
+
+### Segurança
+
+- `api/scanner.php` não usa sessão: aceita só quem tem o token do pedido,
+  gerado para um usuário logado, aleatório (256 bits) e com validade.
+- Só entram imagens JPEG ou PNG, conferidas pelo conteúdo (`getimagesize`).
+- `digitalizacoes/` nega acesso direto e desliga o PHP. As páginas só saem por
+  `api/digitalizacao.php`, com sessão e conferindo que o pedido é do usuário.
+- O pedido é apagado assim que as páginas viram anexo ou são descartadas; o
+  que sobrar (janela fechada no meio) é limpo automaticamente após o vencimento.
+- O TCloud Scanner só envia para um endereço que o usuário autorizou na
+  primeira vez — um link `tcloudscan://` forjado por outro site não manda
+  digitalização para fora sem essa confirmação.
+- Tudo vai para a auditoria (`acao: digitalizar`): pedido, início na estação
+  (com nome do computador e do scanner), conclusão, anexação ou descarte.
