@@ -41,11 +41,62 @@ final class PosSaleService
      */
     public function terminals(): array
     {
-        $response = $this->http->get(
-            Endpoints::build(Endpoints::path('POS_TERMINALS'), ['seller_id' => $this->config->sellerId])
-        );
+        $seller = $this->http->sellerId();
+        $rotas = array_merge([Endpoints::path('POS_TERMINALS')], Endpoints::POS_TERMINALS_ALTERNATIVAS);
+        $ultimoErro = null;
 
-        return $response['data'] ?? $response['terminals'] ?? [];
+        foreach (array_unique($rotas) as $rota) {
+            try {
+                $response = $this->http->get(Endpoints::build($rota, ['seller_id' => $seller]));
+            } catch (ApiException $e) {
+                if ($e->isRouteMissing()) {
+                    $ultimoErro = $e;
+                    continue;   // tenta a proxima rota
+                }
+                throw $e;
+            }
+
+            return self::normalizarTerminais($response);
+        }
+
+        throw $ultimoErro ?? new ApiException('Nenhuma rota de terminais respondeu.', 404);
+    }
+
+    /**
+     * Normaliza a lista de terminais para [{id, name}].
+     *
+     * @param array<mixed> $response
+     * @return list<array{id:string,name:string}>
+     */
+    public static function normalizarTerminais(array $response): array
+    {
+        $lista = $response['data'] ?? $response['terminals'] ?? $response['pos'] ?? $response['items'] ?? $response;
+
+        if (\is_array($lista) && isset($lista['data']) && \is_array($lista['data'])) {
+            $lista = $lista['data'];
+        }
+        if (!\is_array($lista) || !array_is_list($lista)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($lista as $t) {
+            if (!\is_array($t)) {
+                continue;
+            }
+            $id = (string) ($t['terminal_id'] ?? $t['serial_number'] ?? $t['serial'] ?? $t['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+            $nome = (string) ($t['name'] ?? $t['nome'] ?? $t['description'] ?? $t['model'] ?? '');
+            $serial = (string) ($t['serial_number'] ?? $t['serial'] ?? '');
+            $out[] = [
+                'id' => $id,
+                'name' => trim($nome !== '' ? $nome . ($serial !== '' && $serial !== $nome ? ' (' . $serial . ')' : '') : ($serial ?: $id)),
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -63,7 +114,7 @@ final class PosSaleService
         $response = $this->http->get(
             Endpoints::build(
                 Endpoints::path('POS_INSTALLMENT_SIMULATION'),
-                ['seller_id' => $this->config->sellerId]
+                ['seller_id' => $this->http->sellerId()]
             ),
             ['amount_cents' => $amountCents]
         );
@@ -84,21 +135,14 @@ final class PosSaleService
     {
         $request->validate();
 
-        $payload = $request->toArray($localReference);
+        $payload = $request->toArray($localReference, $this->config);
 
-        $this->repository?->markPending($localReference, $payload);
+        $this->repository?->markPending($localReference, $payload, $request->amountCents);
 
         try {
-            /* Com rateio, a v2 e a rota que aceita split_rules; sem rateio,
-               a v1 basta e evita exigir campos que nao vamos preencher. */
-            $rota = $request->splitRules !== []
-                ? Endpoints::path('POS_SALE_CREATE_SPLIT')
-                : Endpoints::path('POS_SALE_CREATE');
-
             $response = $this->http->post(
-                Endpoints::build($rota, ['seller_id' => $this->config->sellerId]),
+                Endpoints::build(Endpoints::path('POS_SALE_CREATE'), ['seller_id' => $this->http->sellerId()]),
                 $payload,
-                idempotencyKey: $localReference,
             );
         } catch (ApiException $e) {
             // Erro de transporte deixa a venda em estado DESCONHECIDO, nao
@@ -118,7 +162,14 @@ final class PosSaleService
             throw $e;
         }
 
-        $sale = PosSale::fromApi($response, $localReference);
+        $sale = PosSale::fromApi($response, $localReference, $this->config);
+
+        if ($sale->id === '') {
+            /* 2xx sem identificador: nao ha como acompanhar a venda. */
+            $this->repository?->markUnknown($localReference, 'A API aceitou a venda mas nao devolveu o identificador.');
+            throw new ApiException('A Parcela Express aceitou a venda mas não devolveu o identificador. Confira na maquininha antes de tentar de novo.', 502, $response);
+        }
+
         $this->repository?->save($sale);
 
         return $sale;
@@ -129,12 +180,12 @@ final class PosSaleService
     {
         $response = $this->http->get(
             Endpoints::build(Endpoints::path('POS_SALE_STATUS'), [
-                'seller_id' => $this->config->sellerId,
+                'seller_id' => $this->http->sellerId(),
                 'sale_id' => $saleId,
             ])
         );
 
-        return PosSale::fromApi($response);
+        return PosSale::fromApi($response, null, $this->config);
     }
 
     /**
@@ -169,7 +220,7 @@ final class PosSaleService
 
             $response = $this->http->get(
                 Endpoints::build(Endpoints::path('POS_SALE_STATUS'), [
-                    'seller_id' => $this->config->sellerId,
+                    'seller_id' => $this->http->sellerId(),
                     'sale_id' => $saleId,
                 ]),
             );
@@ -185,7 +236,7 @@ final class PosSaleService
                 continue;
             }
 
-            $sale = PosSale::fromApi($response, $lastKnown?->localReference);
+            $sale = PosSale::fromApi($response, $lastKnown?->localReference, $this->config);
             $lastKnown = $sale;
 
             $this->repository?->save($sale);
@@ -211,12 +262,12 @@ final class PosSaleService
     {
         $response = $this->http->post(
             Endpoints::build(Endpoints::path('POS_SALE_INTERRUPT'), [
-                'seller_id' => $this->config->sellerId,
+                'seller_id' => $this->http->sellerId(),
             ]),
-            ['sale_id' => $saleId]
+            ['sale_id' => $saleId, 'id' => $saleId]
         );
 
-        $sale = PosSale::fromApi($response, $saleId);
+        $sale = PosSale::fromApi($response + ['id' => $saleId], null, $this->config);
         $this->repository?->save($sale);
 
         return $sale;
@@ -232,7 +283,7 @@ final class PosSaleService
     {
         $response = $this->http->get(
             Endpoints::build(Endpoints::path('POS_SALE_LIST'), [
-                'seller_id' => $this->config->sellerId,
+                'seller_id' => $this->http->sellerId(),
                 'terminal_id' => $terminalId,
             ]),
             [
@@ -243,7 +294,7 @@ final class PosSaleService
 
         $rows = $response['data'] ?? $response['sales'] ?? [];
 
-        return array_map(static fn (array $row) => PosSale::fromApi($row), $rows);
+        return array_map(fn (array $row) => PosSale::fromApi($row, null, $this->config), $rows);
     }
 }
 

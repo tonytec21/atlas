@@ -98,6 +98,7 @@ final class HttpClient
 
             $this->accessToken = null;
             $this->tokenExpiresAt = null;
+            $this->limparSessao();
 
             return $this->request(
                 $method, $route, $body, $longPoll, $idempotencyKey,
@@ -105,8 +106,10 @@ final class HttpClient
                 alreadyReauthenticated: true,
             );
         } catch (ApiException $e) {
-            $safeToRetry = $e->isRetryable()
-                && ($method !== 'POST' || $idempotencyKey !== null);
+            /* POST nunca e repetido automaticamente: a API nao documenta
+               idempotencia, e repetir a criacao de uma venda ou de um boleto
+               pode cobrar o cliente duas vezes. */
+            $safeToRetry = $e->isRetryable() && $method === 'GET';
 
             if (!$safeToRetry || $attempt >= $maxAttempts) {
                 throw $e;
@@ -147,19 +150,15 @@ final class HttpClient
         $headers = [
             'Accept: application/json',
             'Content-Type: application/json',
-            'User-Agent: TCloud-Atlas/1.0 (+PHP ' . PHP_VERSION . ')',
+            'User-Agent: TCloud-Atlas/' . (\defined('PE_VERSAO') ? PE_VERSAO : '2') . ' (+PHP ' . PHP_VERSION . ')',
         ];
 
         foreach ($this->authHeaders($route) as $header) {
             $headers[] = $header;
         }
 
-        if ($idempotencyKey !== null) {
-            // TODO: confirmar no spec o nome do header de idempotencia.
-            // Se a API nao suportar, a protecao fica por conta do sale_id
-            // enviado no corpo — ver PosSaleService::create().
-            $headers[] = 'Idempotency-Key: ' . $idempotencyKey;
-        }
+        /* Sem cabecalho de idempotencia: a API nao o documenta. A protecao
+           contra duplicidade fica no registro local. */
 
         $ch = curl_init();
 
@@ -174,6 +173,7 @@ final class HttpClient
             CURLOPT_SSL_VERIFYHOST => $this->config->verifyTls ? 2 : 0,
             CURLOPT_FOLLOWLOCATION => false,
         ]);
+        $this->aplicarTls($ch);
 
         if ($body !== null) {
             curl_setopt(
@@ -197,7 +197,7 @@ final class HttpClient
             }
 
             throw new ApiException(
-                "Falha de transporte ao chamar {$method} {$route}: {$curlError}",
+                self::mensagemTransporte($curlErrno, $curlError, "{$method} {$route}"),
                 statusCode: 0,
             );
         }
@@ -248,6 +248,10 @@ final class HttpClient
         $message = $this->extractMessage($payload)
             ?? sprintf('Erro HTTP %d em %s %s.', $status, $method, $route);
 
+        if (str_contains(mb_strtolower($message), 'operation cost') && !str_contains($message, 'custo da operação')) {
+            $message = self::traduzirErro($message);
+        }
+
         return match (true) {
             $status === 401 || $status === 403 => new AuthenticationException(
                 $message, $status, $payload, $rawBody
@@ -278,12 +282,32 @@ final class HttpClient
             trim($t)
         );
 
+        /* Formato da v2: {"message": "...", "errors": ["...", ...]} */
+        if (isset($payload['errors']) && \is_array($payload['errors']) && $payload['errors'] !== []) {
+            $itens = [];
+            foreach ($payload['errors'] as $campo => $err) {
+                if (\is_array($err)) {
+                    $err = $err['message'] ?? $err['msg'] ?? json_encode($err, JSON_UNESCAPED_UNICODE);
+                }
+                $err = trim((string) $err);
+                if ($err !== '') {
+                    $itens[] = \is_string($campo) ? $campo . ': ' . $err : $err;
+                }
+            }
+            if ($itens !== []) {
+                $principal = isset($payload['message']) && \is_string($payload['message']) && !$inutil($payload['message'])
+                    ? trim($payload['message']) . ': '
+                    : '';
+                return $principal . implode(' | ', array_map([self::class, 'traduzirErro'], $itens));
+            }
+        }
+
         // Lista de validacao: e o caso mais informativo.
         if (isset($payload['message']) && \is_array($payload['message'])) {
             $itens = array_filter(array_map('strval', $payload['message']));
 
             if ($itens !== []) {
-                return implode(' | ', $itens);
+                return implode(' | ', array_map([self::class, 'traduzirErro'], $itens));
             }
         }
 
@@ -324,8 +348,13 @@ final class HttpClient
     }
 
     // -------------------------------------------------------------------
-    // Autenticacao — AJUSTAR quando o spec chegar
+    // Autenticacao (POST /v2/auth/login -> id_token + seller.id)
     // -------------------------------------------------------------------
+
+    private ?string $loginSellerId = null;
+
+    /** Nome e documento do estabelecimento, quando o login informa. @var array<string,string> */
+    private array $loginSellerInfo = [];
 
     /** @return list<string> */
     private function authHeaders(string $route): array
@@ -343,11 +372,155 @@ final class HttpClient
         $valid = $this->accessToken !== null
             && ($this->tokenExpiresAt === null || $this->tokenExpiresAt > time() + 30);
 
-        if (!$valid) {
+        if (!$valid && !$this->carregarSessao()) {
             $this->authenticate();
         }
 
         return (string) $this->accessToken;
+    }
+
+    /**
+     * ID do estabelecimento usado nas rotas.
+     *
+     * Vem do PROPRIO LOGIN (seller.id). O valor digitado na
+     * configuracao so e usado se o login nao trouxer o seller — antes ele era
+     * a unica fonte, e um ID diferente do da conta fazia toda chamada falhar.
+     */
+    public function sellerId(): string
+    {
+        $this->token();
+
+        $seller = $this->loginSellerId ?: $this->config->sellerId;
+
+        if ($seller === '') {
+            throw new AuthenticationException(
+                'O login não informou o estabelecimento (seller) e nenhum ID foi configurado. '
+                . 'Informe o ID do estabelecimento na configuração.',
+                statusCode: 401,
+            );
+        }
+
+        return $seller;
+    }
+
+    /** Nome/documento do estabelecimento devolvidos pelo login (para o teste de conexao). */
+    public function loginSellerInfo(): array
+    {
+        return $this->loginSellerInfo;
+    }
+
+    /** Seller devolvido pelo login (ou null se ainda nao houve login). */
+    public function loginSellerId(): ?string
+    {
+        return $this->loginSellerId;
+    }
+
+    private function chaveSessao(): string
+    {
+        return 'pe_token_' . md5($this->config->baseUrl() . '|' . $this->config->username . '|' . sha1($this->config->password));
+    }
+
+    /** Reaproveita o token da sessao PHP (evita um login a cada clique). */
+    private function carregarSessao(): bool
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return false;
+        }
+
+        $s = $_SESSION[$this->chaveSessao()] ?? null;
+
+        if (!\is_array($s) || empty($s['token']) || (int) ($s['expira'] ?? 0) <= time() + 60) {
+            return false;
+        }
+
+        $this->accessToken = (string) $s['token'];
+        $this->tokenExpiresAt = (int) $s['expira'];
+        $this->loginSellerId = isset($s['seller']) && $s['seller'] !== '' ? (string) $s['seller'] : null;
+        $this->loginSellerInfo = \is_array($s['seller_info'] ?? null) ? $s['seller_info'] : [];
+
+        return true;
+    }
+
+    private function salvarSessao(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return;
+        }
+
+        $_SESSION[$this->chaveSessao()] = [
+            'token' => $this->accessToken,
+            'expira' => $this->tokenExpiresAt ?? (time() + 600),
+            'seller' => $this->loginSellerId,
+            'seller_info' => $this->loginSellerInfo,
+        ];
+    }
+
+    private function limparSessao(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            unset($_SESSION[$this->chaveSessao()]);
+        }
+    }
+
+    /** Validade do JWT (campo exp), quando legivel. */
+    private static function expiracaoJwt(string $token): ?int
+    {
+        $partes = explode('.', $token);
+
+        if (\count($partes) !== 3) {
+            return null;
+        }
+
+        $json = base64_decode(strtr($partes[1], '-_', '+/') . str_repeat('=', (4 - \strlen($partes[1]) % 4) % 4), true);
+        $dados = \is_string($json) ? json_decode($json, true) : null;
+
+        return \is_array($dados) && isset($dados['exp']) && is_numeric($dados['exp']) ? (int) $dados['exp'] : null;
+    }
+
+    /** Nome e documento do estabelecimento na resposta de login. */
+    private static function infoSeller(array $payload): array
+    {
+        $sel = $payload['seller'] ?? $payload['data']['seller'] ?? $payload['user']['seller'] ?? null;
+        if (!\is_array($sel)) {
+            return [];
+        }
+
+        $pega = static function (array $chaves) use ($sel): string {
+            foreach ($chaves as $k) {
+                if (isset($sel[$k]) && (\is_string($sel[$k]) || \is_int($sel[$k])) && (string) $sel[$k] !== '') {
+                    return (string) $sel[$k];
+                }
+            }
+            return '';
+        };
+
+        return array_filter([
+            'nome' => $pega(['name', 'trading_name', 'company_name', 'legal_name', 'razao_social', 'nome']),
+            'documento' => $pega(['document', 'cnpj', 'cpf', 'social_security_number', 'document_number', 'tax_id']),
+            'email' => $pega(['email']),
+        ], static fn($v) => $v !== '');
+    }
+
+    /** Seller da resposta de login: seller.id, seller_id, sellerId... */
+    private static function findSeller(array $payload): ?string
+    {
+        $candidatos = [
+            $payload['seller']['id'] ?? null,
+            $payload['data']['seller']['id'] ?? null,
+            $payload['seller_id'] ?? null,
+            $payload['sellerId'] ?? null,
+            $payload['user']['seller_id'] ?? null,
+            $payload['user']['seller']['id'] ?? null,
+            $payload['data']['seller_id'] ?? null,
+        ];
+
+        foreach ($candidatos as $c) {
+            if ((\is_string($c) || \is_int($c)) && (string) $c !== '') {
+                return (string) $c;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -454,9 +627,11 @@ final class HttpClient
             ], JSON_UNESCAPED_UNICODE),
         ]);
 
+        $this->aplicarTls($ch);
+
         $body = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $erro = curl_error($ch) ?: null;
+        $erro = curl_error($ch) ? self::mensagemTransporte(curl_errno($ch), curl_error($ch), 'login') : null;
         curl_close($ch);
 
         $body = is_string($body) ? $body : '';
@@ -470,21 +645,34 @@ final class HttpClient
         return ['status' => $status, 'body' => $body, 'json' => $json, 'erro' => $erro];
     }
 
-    /**
-     * TODO: confirmar rota e nomes dos campos no spec.
-     */
     private function authenticate(): void
     {
-        $response = $this->execute(
-            'POST',
-            Endpoints::path('AUTH_LOGIN'),
-            [
-                'email' => $this->config->username,
-                'password' => $this->config->password,
-            ],
-            longPoll: false,
-            idempotencyKey: null,
-        );
+        $this->limparSessao();
+
+        if ($this->config->username === '' || $this->config->password === '') {
+            throw new AuthenticationException('Usuário e senha da API não configurados.', statusCode: 401);
+        }
+
+        try {
+            $response = $this->execute(
+                'POST',
+                Endpoints::path('AUTH_LOGIN'),
+                [
+                    'email' => $this->config->username,
+                    'password' => $this->config->password,
+                ],
+                longPoll: false,
+                idempotencyKey: null,
+            );
+        } catch (AuthenticationException|ValidationException $e) {
+            throw new AuthenticationException(
+                'Login recusado pela Parcela Express: confira o e-mail e a senha da API (os mesmos do portal). '
+                . 'Detalhe: ' . $e->getMessage(),
+                statusCode: $e->statusCode,
+                payload: $e->payload,
+                rawBody: $e->rawBody,
+            );
+        }
 
         $token = self::findToken($response);
 
@@ -493,14 +681,15 @@ final class HttpClient
 
             throw new AuthenticationException(
                 'O login respondeu, mas nenhum campo de token foi reconhecido. '
-                . 'Campos recebidos: ' . ($campos === [] ? '(resposta vazia)' : implode(', ', $campos))
-                . '. Use "Verificar instalação" para inspecionar a resposta.',
-                statusCode: 0,
+                . 'Campos recebidos: ' . ($campos === [] ? '(resposta vazia)' : implode(', ', $campos)) . '.',
+                statusCode: 401,
                 payload: null,
             );
         }
 
         $this->accessToken = $token;
+        $this->loginSellerId = self::findSeller($response);
+        $this->loginSellerInfo = self::infoSeller($response);
 
         $expiresIn = $response['expires_in']
             ?? $response['expiresIn']
@@ -508,6 +697,68 @@ final class HttpClient
             ?? $response['data']['expiresIn']
             ?? null;
 
-        $this->tokenExpiresAt = is_numeric($expiresIn) ? time() + (int) $expiresIn : null;
+        $this->tokenExpiresAt = is_numeric($expiresIn)
+            ? time() + (int) $expiresIn
+            : (self::expiracaoJwt($token) ?? time() + 1800);
+
+        $this->salvarSessao();
+    }
+
+    // -------------------------------------------------------------------
+    // TLS e mensagens de transporte
+    // -------------------------------------------------------------------
+
+    /** @param \CurlHandle $ch */
+    private function aplicarTls($ch): void
+    {
+        if (!$this->config->verifyTls) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            return;
+        }
+
+        /* Usa o pacote do modulo quando o PHP nao tem um configurado — o caso
+           do XAMPP no Windows, que derrubava as chamadas com erro 60. */
+        $ini = (string) ini_get('curl.cainfo');
+        $bundle = $this->config->caBundle();
+
+        if (($ini === '' || !is_file($ini)) && $bundle !== null) {
+            curl_setopt($ch, CURLOPT_CAINFO, $bundle);
+        }
+    }
+
+    public static function mensagemTransporte(int $errno, string $erro, string $onde): string
+    {
+        return match (true) {
+            \in_array($errno, [60, 77, 35, 51, 58, 59, 83], true) =>
+                'Falha de certificado SSL ao conectar na Parcela Express (' . $erro . '). '
+                . 'Confira se lib/cacert.pem existe ou, em último caso, desative "Verificar certificado SSL" na configuração.',
+            \in_array($errno, [6, 7], true) =>
+                'Não foi possível conectar à Parcela Express (' . $erro . '). Verifique a internet do servidor e a URL da API.',
+            \in_array($errno, [28], true) =>
+                'A Parcela Express demorou demais para responder (' . $onde . ').',
+            default => "Falha de transporte ao chamar {$onde}: {$erro}",
+        };
+    }
+
+    /** Deixa mensagens comuns da API legiveis para o operador. */
+    public static function traduzirErro(string $erro): string
+    {
+        $e = mb_strtolower($erro);
+
+        if (str_contains($e, 'less than operation cost') || str_contains($e, 'operation cost')) {
+            return 'Valor abaixo do custo da operação na Parcela Express — o valor mínimo depende do plano da serventia ('
+                . $erro . ')';
+        }
+
+        return match (true) {
+            str_contains($e, 'social_security_number') => 'CPF/CNPJ do pagador ausente ou inválido (' . $erro . ')',
+            str_contains($e, 'first_name') || str_contains($e, 'last_name') => 'Nome do pagador obrigatório (' . $erro . ')',
+            str_contains($e, 'email') => 'E-mail do pagador ausente ou inválido (' . $erro . ')',
+            str_contains($e, 'phone') => 'Telefone do pagador ausente ou inválido (' . $erro . ')',
+            str_contains($e, 'postal_code') => 'CEP do pagador inválido (' . $erro . ')',
+            str_contains($e, 'terminal') => 'Terminal inválido ou indisponível (' . $erro . ')',
+            default => $erro,
+        };
     }
 }

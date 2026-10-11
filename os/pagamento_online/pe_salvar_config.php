@@ -44,28 +44,30 @@ try {
     $dados = [
         'ativo' => !empty($_POST['ativo']) ? 1 : 0,
         'ambiente' => $ambiente,
-        'seller_id' => trim((string) ($_POST['seller_id'] ?? '')),
         'usuario' => trim((string) ($_POST['usuario'] ?? '')),
         'senha' => $senha,
-        'base_url' => trim((string) ($_POST['base_url'] ?? '')),
         'habilitar_pos' => !empty($_POST['habilitar_pos']) ? 1 : 0,
         'habilitar_boleto' => !empty($_POST['habilitar_boleto']) ? 1 : 0,
-        'timeout_poll_seg' => max(1, min(30, (int) ($_POST['timeout_poll_seg'] ?? 3))),
-        'timeout_venda_seg' => max(60, min(900, (int) ($_POST['timeout_venda_seg'] ?? 300))),
+        'terminais' => mb_substr(trim((string) ($_POST['terminais'] ?? '')), 0, 4000),
+        'seller_id' => mb_substr(preg_replace('/[^A-Za-z0-9\-]/', '', (string) ($_POST['seller_id'] ?? '')) ?? '', 0, 64),
     ];
+
+    /* E-mail em branco: limpa também a senha (passa a valer a conta de
+       homologação no sandbox). */
+    if ($dados['usuario'] === '') {
+        $dados['senha'] = '';
+    }
 
     $stmt = pe_pdo()->prepare(
         "UPDATE pe_config SET
             ativo = :ativo,
             ambiente = :ambiente,
-            seller_id = :seller_id,
             usuario = :usuario,
             senha = :senha,
-            base_url = :base_url,
             habilitar_pos = :habilitar_pos,
             habilitar_boleto = :habilitar_boleto,
-            timeout_poll_seg = :timeout_poll_seg,
-            timeout_venda_seg = :timeout_venda_seg,
+            terminais = :terminais,
+            seller_id = :seller_id,
             atualizado_em = NOW(),
             atualizado_por = :usuario_log
          WHERE id = 1"

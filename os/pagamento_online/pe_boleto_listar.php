@@ -11,8 +11,6 @@ checkSession();
 
 require_once __DIR__ . '/pe_lib.php';
 
-use TCloud\ParcelaExpress\Boleto\BoletoStatus;
-
 pe_guard_operacao();
 
 if (!pe_boleto_habilitado()) {
@@ -28,48 +26,45 @@ if ($osId <= 0) {
 try {
     pe_migrar();
 
-    /* 'failed' fica de fora: são tentativas que a API recusou, então o
-       título nunca existiu. O registro permanece no banco para auditoria,
-       mas mostrá-lo ao operador só geraria dúvida sobre um boleto que o
-       banco desconhece. */
+    /* 'failed' fica de fora: a API recusou, o boleto não existe. */
     $stmt = pe_pdo()->prepare(
-        "SELECT local_reference, remote_id, status, amount_cents, vencimento,
-                linha_digitavel, url_pdf, pix_copia_cola, pagamento_id, pagador_nome
+        "SELECT local_reference, remote_id, remote_sale_id, status, amount_cents, vencimento,
+                linha_digitavel, url_pdf, url_pagamento, pagamento_id, pagador_nome
            FROM pe_boletos
-          WHERE ordem_de_servico_id = ?
-            AND status <> 'failed'
+          WHERE ordem_de_servico_id = ? AND status <> 'failed'
        ORDER BY id DESC"
     );
     $stmt->execute([$osId]);
 
-    $linhas = array_map(static function (array $r): array {
-        $st = BoletoStatus::tryFrom((string) $r['status']);
+    $rotulos = [
+        'pending' => 'Aguardando pagamento', 'paid' => 'Pago', 'overdue' => 'Vencido',
+        'canceled' => 'Cancelado', 'unknown' => 'Emissão não confirmada',
+    ];
+
+    $linhas = array_map(static function (array $r) use ($rotulos): array {
+        $st = (string) $r['status'];
         $venc = $r['vencimento'] ? new DateTimeImmutable((string) $r['vencimento']) : null;
 
-        // Vencido é uma leitura de calendário, não um estado que a API precise
-        // nos informar: se está aberto e a data passou, mostramos como vencido.
-        if ($st === BoletoStatus::Pending && $venc && $venc < new DateTimeImmutable('today')) {
-            $st = BoletoStatus::Overdue;
+        if ($st === 'pending' && $venc && $venc < new DateTimeImmutable('today')) {
+            $st = 'overdue';
         }
 
-        /* Sem remote_id não há o que consultar na API: o botão "Conferir"
-           precisa ficar de fora, senão o operador clica e recebe
-           "Boleto não encontrado". */
-        $temId = !empty($r['remote_id']);
+        $temId = !empty($r['remote_sale_id']) || !empty($r['remote_id']);
 
         return [
             'local_reference' => $r['local_reference'],
             'id'              => $r['remote_id'],
-            'status'          => $st?->value ?? (string) $r['status'],
-            'status_rotulo'   => $st?->rotulo() ?? (string) $r['status'],
-            'aberto'          => ($st?->isOpen() ?? false) && $temId,
-            'indeterminado'   => $st === BoletoStatus::Unknown || !$temId,
-            'pago'            => $st?->isPaid() ?? false,
+            'status'          => $st,
+            'status_rotulo'   => $rotulos[$st] ?? $st,
+            'aberto'          => in_array($st, ['pending', 'overdue'], true) && $temId,
+            'indeterminado'   => $st === 'unknown' || !$temId,
+            'pago'            => $st === 'paid',
             'valor'           => ((int) $r['amount_cents']) / 100,
             'vencimento_br'   => $venc?->format('d/m/Y'),
             'linha_digitavel' => $r['linha_digitavel'],
             'url_pdf'         => $r['url_pdf'],
-            'pix_copia_cola'  => $r['pix_copia_cola'],
+            'url_pagamento'   => $r['url_pagamento'],
+            'pix_copia_cola'  => null,
             'pagador_nome'    => $r['pagador_nome'],
         ];
     }, $stmt->fetchAll(PDO::FETCH_ASSOC));

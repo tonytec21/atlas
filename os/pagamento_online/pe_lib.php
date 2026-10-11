@@ -20,28 +20,14 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+/** Versão do módulo Pagamento Online (exibida na tela de configuração). */
+if (!defined('PE_VERSAO')) {
+    define('PE_VERSAO', '3.0.6');
+}
+
 require_once __DIR__ . '/../atlas_tempo.php';
 
-require_once __DIR__ . '/lib/Config.php';
-require_once __DIR__ . '/lib/Endpoints.php';
-require_once __DIR__ . '/lib/ApiException.php';
-require_once __DIR__ . '/lib/HttpClient.php';
-require_once __DIR__ . '/lib/Pos/PosSaleStatus.php';
-require_once __DIR__ . '/lib/Pos/PosSale.php';
-require_once __DIR__ . '/lib/Pos/PosSaleRepository.php';
-require_once __DIR__ . '/lib/Pos/PosSaleService.php';
-require_once __DIR__ . '/lib/Boleto/Boleto.php';
-require_once __DIR__ . '/lib/Boleto/BoletoService.php';
-
-use TCloud\ParcelaExpress\Config;
-use TCloud\ParcelaExpress\ApiException;
-use TCloud\ParcelaExpress\Endpoints;
-use TCloud\ParcelaExpress\HttpClient;
-use TCloud\ParcelaExpress\Pos\PdoPosSaleRepository;
-use TCloud\ParcelaExpress\Pos\PosSale;
-use TCloud\ParcelaExpress\Pos\PosSaleService;
-use TCloud\ParcelaExpress\Boleto\Boleto;
-use TCloud\ParcelaExpress\Boleto\BoletoService;
+require_once __DIR__ . '/lib/ParcelaExpressClient.php';
 
 /* =====================================================================
  * 1. CONEXAO
@@ -184,15 +170,11 @@ function pe_migrar(?PDO $pdo = null): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS pe_rotas (
-            chave      VARCHAR(60)  NOT NULL,
-            rota       VARCHAR(255) NOT NULL,
-            metodo     VARCHAR(10)  NULL,
-            confirmado DATETIME     NULL,
-            PRIMARY KEY (chave)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
+    /* Colunas acrescentadas depois da criação original das tabelas. */
+    pe_add_coluna($pdo, 'pe_config', 'terminais', 'TEXT NULL');
+    pe_add_coluna($pdo, 'pe_config', 'seller_id', 'VARCHAR(64) NULL');
+    pe_add_coluna($pdo, 'pe_boletos', 'remote_sale_id', 'VARCHAR(64) NULL');
+    pe_add_coluna($pdo, 'pe_boletos', 'url_pagamento', 'VARCHAR(500) NULL');
 
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS pe_log (
@@ -207,6 +189,24 @@ function pe_migrar(?PDO $pdo = null): void
             KEY idx_criado (criado_em)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
+}
+
+/** Acrescenta uma coluna se ela ainda não existir (idempotente). */
+function pe_add_coluna(PDO $pdo, string $tabela, string $coluna, string $definicao): void
+{
+    try {
+        $st = $pdo->prepare(
+            'SELECT 1 FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1'
+        );
+        $st->execute([$tabela, $coluna]);
+
+        if (!$st->fetchColumn()) {
+            $pdo->exec("ALTER TABLE `{$tabela}` ADD COLUMN `{$coluna}` {$definicao}");
+        }
+    } catch (Throwable $e) {
+        error_log('[pe_migrar] ' . $tabela . '.' . $coluna . ': ' . $e->getMessage());
+    }
 }
 
 /* =====================================================================
@@ -292,11 +292,15 @@ function pe_saldo_devido(int $osId): float
  */
 function pe_pendencias(array $cfg): array
 {
-    $faltas = [];
+    /* Em sandbox, sem e-mail/senha, usa-se a conta de homologação da
+       Parcela Express. Em produção as credenciais da serventia são exigidas. */
+    if (($cfg['ambiente'] ?? 'sandbox') !== 'production') {
+        return [];
+    }
 
-    if (empty($cfg['seller_id'])) $faltas[] = 'ID do estabelecimento (Id da Serventia)';
-    if (empty($cfg['usuario']))   $faltas[] = 'Usuario da API';
-    if (empty($cfg['senha']))     $faltas[] = 'Senha da API';
+    $faltas = [];
+    if (empty($cfg['usuario'])) $faltas[] = 'E-mail de acesso';
+    if (empty($cfg['senha']))   $faltas[] = 'Senha de acesso';
 
     return $faltas;
 }
@@ -352,78 +356,66 @@ function pe_boleto_habilitado(): bool
  * 4. CLIENTE DA API
  * ===================================================================== */
 
-function pe_service(): PosSaleService
+/** Cliente da Parcela Express montado a partir da configuração salva. */
+function pe_cliente(?array $cfg = null): ParcelaExpressClient
 {
-    static $service = null;
+    static $cache = null;
 
-    if ($service instanceof PosSaleService) {
-        return $service;
+    if ($cfg === null && $cache instanceof ParcelaExpressClient) {
+        return $cache;
     }
 
-    pe_rotas(); // injeta as rotas confirmadas antes de qualquer chamada
+    $row = $cfg ?? pe_config(true);
+    $sandbox = ($row['ambiente'] ?? 'sandbox') !== 'production';
 
-    $cfg = Config::fromArray(pe_config(true));
-    $http = new HttpClient($cfg);
+    $cliente = new ParcelaExpressClient($sandbox);
+    /* Endereço alternativo apenas para testes internos (variável de ambiente). */
+    $cliente->setBaseUrl((string) getenv('PE_BASE_URL'));
+    $cliente->setEmailAndPassword((string) ($row['usuario'] ?? ''), (string) ($row['senha'] ?? ''));
+    $cliente->setSellerFixo((string) ($row['seller_id'] ?? ''));
 
-    $service = new PosSaleService(
-        $http,
-        $cfg,
-        new PdoPosSaleRepository(pe_pdo(), 'pe_pos_sales')
-    );
+    if ($cfg === null) {
+        $cache = $cliente;
+    }
 
-    return $service;
+    return $cliente;
 }
 
 /**
- * Rotas confirmadas pelo administrador em pe_rotas.php.
+ * Maquininhas cadastradas na configuração (uma por linha: "serial | nome").
  *
- * As constantes de lib/Endpoints.php ja batem com o spec publicado. Este
- * mapa existe para o caso de a API mudar: qualquer rota gravada aqui tem
- * precedencia, sem alteracao de codigo. Carregado uma vez por request.
- *
- * @return array<string,string>
+ * @return list<array{id:string,name:string}>
  */
-function pe_rotas(): array
+function pe_terminais_config(): array
 {
-    static $mapa = null;
+    $texto = (string) (pe_config()['terminais'] ?? '');
+    $out = [];
 
-    if ($mapa !== null) {
-        return $mapa;
-    }
-
-    $mapa = [];
-
-    try {
-        pe_migrar();
-        $r = pe_pdo()->query("SELECT chave, rota FROM pe_rotas");
-
-        while ($linha = $r->fetch(PDO::FETCH_ASSOC)) {
-            $mapa[(string) $linha['chave']] = (string) $linha['rota'];
+    foreach (preg_split('/\R/', $texto) ?: [] as $linha) {
+        $linha = trim($linha);
+        if ($linha === '' || str_starts_with($linha, '#')) {
+            continue;
         }
-    } catch (Throwable $e) {
-        // Sem mapa, valem os padroes de Endpoints.
+        $partes = array_map('trim', explode('|', $linha, 2));
+        if ($partes[0] === '') {
+            continue;
+        }
+        $out[] = ['id' => $partes[0], 'name' => ($partes[1] ?? '') !== '' ? $partes[1] . ' (' . $partes[0] . ')' : $partes[0]];
     }
 
-    Endpoints::aplicarOverrides($mapa);
-
-    return $mapa;
+    return $out;
 }
 
-function pe_boleto_service(): BoletoService
+/** Referência local: OS_{id}_{timestamp}_{sufixo} — única mesmo no mesmo segundo. */
+function pe_referencia(int $osId): string
 {
-    static $service = null;
+    return 'OS_' . $osId . '_' . time() . '_' . bin2hex(random_bytes(2));
+}
 
-    if ($service instanceof BoletoService) {
-        return $service;
-    }
-
-    pe_rotas();
-
-    $cfg = Config::fromArray(pe_config(true));
-
-    $service = new BoletoService(new HttpClient($cfg), $cfg);
-
-    return $service;
+/** Referência enviada à API: OS_{id}_{timestamp} (sem o sufixo local). */
+function pe_referencia_api(string $referenciaLocal): string
+{
+    return (string) preg_replace('/_[0-9a-f]{4}$/', '', $referenciaLocal);
 }
 
 /* =====================================================================
@@ -523,202 +515,91 @@ function pe_log(string $nivel, string $contexto, string $mensagem, ?int $osId = 
  * 6. PONTE COM O FLUXO ATUAL DA O.S.
  * ===================================================================== */
 
-/**
- * Traduz a forma de pagamento da API para o rotulo que a O.S. ja usa
- * hoje no select de "Efetuar Pagamento". Manter esses rotulos e o que
- * garante que recibo, liquidacao e relatorios nao precisem mudar.
- */
-function pe_forma_para_rotulo(string $formPayment): string
+/** CREDITO/DEBITO/PIX -> rótulo já usado em pagamento_os. */
+function pe_forma_para_rotulo(string $modalidade): string
 {
-    return match (strtolower($formPayment)) {
-        'credit' => 'Crédito',
-        'debit'  => 'Débito',
-        'pix'    => 'PIX',
-        default  => 'Crédito',
+    return match (strtoupper($modalidade)) {
+        'DEBITO', 'DEBIT' => 'Débito',
+        'PIX' => 'PIX',
+        default => 'Crédito',
     };
 }
 
 /**
- * Grava a venda aprovada em pagamento_os, exatamente como salvar_pagamento.php
- * faria, e amarra a venda ao pagamento criado.
- *
- * Idempotente: se a venda ja tem pagamento_id, devolve o existente em vez de
- * lancar em duplicidade. Isso importa porque o polling pode ver o status
- * "aprovado" mais de uma vez.
- *
- * @return int id em pagamento_os
+ * Lança o pagamento CONFIRMADO em pagamento_os, como salvar_pagamento.php,
+ * e amarra o lançamento ao registro de origem (pe_pos_sales ou pe_boletos).
+ * Idempotente: se já houver pagamento_id, devolve o mesmo.
  */
-function pe_registrar_pagamento(int $osId, PosSale $sale, string $formaRotulo, ?string $observacao = null): int
+function pe_registrar_pagamento(int $osId, string $tabela, string $localReference, string $forma, ?string $observacao = null): int
 {
-    $pdo = pe_pdo();
-    pe_migrar($pdo);
-
-    // Ja lancado? Devolve o mesmo id.
-    $stmt = $pdo->prepare("SELECT pagamento_id FROM pe_pos_sales WHERE local_reference = ? LIMIT 1");
-    $stmt->execute([$sale->localReference ?? $sale->id]);
-    $existente = $stmt->fetchColumn();
-
-    if ($existente) {
-        return (int) $existente;
+    if (!in_array($tabela, ['pe_pos_sales', 'pe_boletos'], true)) {
+        throw new InvalidArgumentException('Origem inválida.');
     }
 
-    $os = $pdo->prepare("SELECT cliente, total_os FROM ordens_de_servico WHERE id = ? LIMIT 1");
-    $os->execute([$osId]);
-    $dadosOs = $os->fetch(PDO::FETCH_ASSOC) ?: ['cliente' => '', 'total_os' => 0];
-
-    $valor = ($sale->chargedAmountCents ?? $sale->amountCents ?? 0) / 100;
+    $pdo = pe_pdo();
+    pe_migrar($pdo);
 
     $pdo->beginTransaction();
 
     try {
-        $ins = $pdo->prepare(
-            "INSERT INTO pagamento_os
-                (ordem_de_servico_id, cliente, total_os, total_pagamento,
-                 forma_de_pagamento, data_pagamento, funcionario, status, observacao)
-             VALUES (?, ?, ?, ?, ?, NOW(), ?, 'pago', ?)"
-        );
+        $st = $pdo->prepare("SELECT pagamento_id, amount_cents FROM {$tabela} WHERE local_reference = ? LIMIT 1 FOR UPDATE");
+        $st->execute([$localReference]);
+        $reg = $st->fetch(PDO::FETCH_ASSOC);
 
-        $ins->execute([
-            $osId,
-            $dadosOs['cliente'],
-            $dadosOs['total_os'],
-            $valor,
-            $formaRotulo,
-            pe_usuario(),
-            $observacao,
-        ]);
+        if (!$reg) {
+            throw new RuntimeException('Cobrança não encontrada.');
+        }
+        if (!empty($reg['pagamento_id'])) {
+            $pdo->commit();
+            return (int) $reg['pagamento_id'];
+        }
 
-        $pagamentoId = (int) $pdo->lastInsertId();
+        $valor = ((int) $reg['amount_cents']) / 100;
 
-        $upd = $pdo->prepare(
-            "UPDATE pe_pos_sales
-                SET pagamento_id = ?, ordem_de_servico_id = ?, reconciliation_state = 'settled'
-              WHERE local_reference = ?"
-        );
-        $upd->execute([$pagamentoId, $osId, $sale->localReference ?? $sale->id]);
+        $os = $pdo->prepare("SELECT cliente, total_os FROM ordens_de_servico WHERE id = ? LIMIT 1");
+        $os->execute([$osId]);
+        $dadosOs = $os->fetch(PDO::FETCH_ASSOC) ?: ['cliente' => '', 'total_os' => 0];
 
-        $pdo->commit();
-
-        pe_log('info', 'pos', "Venda {$sale->id} lancada como pagamento {$pagamentoId}.", $osId);
-
-        return $pagamentoId;
-    } catch (Throwable $e) {
-        $pdo->rollBack();
-        pe_log('error', 'pos', 'Falha ao lancar pagamento: ' . $e->getMessage(), $osId);
-
-        throw $e;
-    }
-}
-
-/**
- * Lanca em pagamento_os um boleto CONFIRMADO como pago.
- *
- * Chamado apenas pela consulta de status, nunca pela emissao. A forma de
- * pagamento gravada e "Boleto", que ja existe no select da tela.
- *
- * Idempotente: se o boleto ja tem pagamento_id, devolve o existente.
- */
-function pe_registrar_pagamento_boleto(int $osId, Boleto $boleto, string $localReference): int
-{
-    $pdo = pe_pdo();
-    pe_migrar($pdo);
-
-    $stmt = $pdo->prepare("SELECT pagamento_id FROM pe_boletos WHERE local_reference = ? LIMIT 1");
-    $stmt->execute([$localReference]);
-    $existente = $stmt->fetchColumn();
-
-    if ($existente) {
-        return (int) $existente;
-    }
-
-    $os = $pdo->prepare("SELECT cliente, total_os FROM ordens_de_servico WHERE id = ? LIMIT 1");
-    $os->execute([$osId]);
-    $dadosOs = $os->fetch(PDO::FETCH_ASSOC) ?: ['cliente' => '', 'total_os' => 0];
-
-    $valor = ($boleto->paidAmountCents ?? $boleto->amountCents ?? 0) / 100;
-
-    $observacao = null;
-
-    if (pe_tem_coluna_observacao()) {
-        $linha = $boleto->linhaFormatada();
-        $observacao = 'Boleto' . ($linha ? ' ' . $linha : '')
-            . ($boleto->pagoEm ? ' — pago em ' . $boleto->pagoEm->format('d/m/Y') : '');
-    }
-
-    $pdo->beginTransaction();
-
-    try {
-        $ins = $pdo->prepare(
-            "INSERT INTO pagamento_os
-                (ordem_de_servico_id, cliente, total_os, total_pagamento,
-                 forma_de_pagamento, data_pagamento, funcionario, status, observacao)
-             VALUES (?, ?, ?, ?, 'Boleto', NOW(), ?, 'pago', ?)"
-        );
-
-        $ins->execute([
-            $osId,
-            $dadosOs['cliente'],
-            $dadosOs['total_os'],
-            $valor,
-            pe_usuario(),
-            $observacao,
-        ]);
+        if (pe_tem_coluna_observacao()) {
+            $ins = $pdo->prepare(
+                "INSERT INTO pagamento_os
+                    (ordem_de_servico_id, cliente, total_os, total_pagamento,
+                     forma_de_pagamento, data_pagamento, funcionario, status, observacao)
+                 VALUES (?, ?, ?, ?, ?, NOW(), ?, 'pago', ?)"
+            );
+            $ins->execute([$osId, $dadosOs['cliente'], $dadosOs['total_os'], $valor, $forma, pe_usuario(), $observacao]);
+        } else {
+            $ins = $pdo->prepare(
+                "INSERT INTO pagamento_os
+                    (ordem_de_servico_id, cliente, total_os, total_pagamento,
+                     forma_de_pagamento, data_pagamento, funcionario, status)
+                 VALUES (?, ?, ?, ?, ?, NOW(), ?, 'pago')"
+            );
+            $ins->execute([$osId, $dadosOs['cliente'], $dadosOs['total_os'], $valor, $forma, pe_usuario()]);
+        }
 
         $pagamentoId = (int) $pdo->lastInsertId();
 
-        $upd = $pdo->prepare(
-            "UPDATE pe_boletos
-                SET pagamento_id = ?, status = 'paid', paid_amount_cents = ?, pago_em = ?
-              WHERE local_reference = ?"
-        );
-        $upd->execute([
-            $pagamentoId,
-            $boleto->paidAmountCents ?? $boleto->amountCents,
-            $boleto->pagoEm?->format('Y-m-d H:i:s') ?? date('Y-m-d H:i:s'),
-            $localReference,
-        ]);
+        if ($tabela === 'pe_boletos') {
+            $pdo->prepare("UPDATE pe_boletos SET pagamento_id = ?, status = 'paid', pago_em = NOW() WHERE local_reference = ?")
+                ->execute([$pagamentoId, $localReference]);
+        } else {
+            $pdo->prepare("UPDATE pe_pos_sales SET pagamento_id = ?, reconciliation_state = 'settled' WHERE local_reference = ?")
+                ->execute([$pagamentoId, $localReference]);
+        }
 
         $pdo->commit();
 
-        pe_log('info', 'boleto', "Boleto {$boleto->id} confirmado e lancado como pagamento {$pagamentoId}.", $osId);
+        pe_log('info', $tabela === 'pe_boletos' ? 'boleto' : 'pos', "Cobrança {$localReference} lançada como pagamento {$pagamentoId} (R$ {$valor}).", $osId);
 
         return $pagamentoId;
     } catch (Throwable $e) {
-        $pdo->rollBack();
-        pe_log('error', 'boleto', 'Falha ao lancar boleto pago: ' . $e->getMessage(), $osId);
-
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        pe_log('error', 'pagamento', 'Falha ao lançar pagamento: ' . $e->getMessage(), $osId);
         throw $e;
     }
-}
-
-/**
- * Traduz um erro da API em algo acionavel.
- *
- * "Cannot POST /v1/sellers/.../billets" e a pagina 404 do Express: o servidor
- * respondeu, mas nao conhece o caminho. Repetir esse texto ao operador nao
- * ajuda — o que resolve e mapear a rota em pe_rotas.php. Esta funcao existe
- * para que a mensagem diga isso, em vez do texto cru.
- */
-function pe_mensagem_api(ApiException $e, string $chaveRota, string $rotaTentada): string
-{
-    if ($e->isTransportError()) {
-        return 'Não houve resposta da Parcela Express. Verifique a conexão do servidor.';
-    }
-
-    if ($e->isRouteMissing()) {
-        return sprintf(
-            'A API não conhece a rota %s. Abra Configuração → Rotas da API e mapeie a operação "%s" '
-            . 'com o caminho real do spec.',
-            $rotaTentada,
-            $chaveRota
-        );
-    }
-
-    if ($e->statusCode === 401 || $e->statusCode === 403) {
-        return 'A API recusou a operação (' . $e->statusCode . '). Verifique as credenciais e as permissões da conta.';
-    }
-
-    return $e->getMessage();
 }
 
 /**

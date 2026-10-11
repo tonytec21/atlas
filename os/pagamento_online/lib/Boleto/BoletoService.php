@@ -24,31 +24,67 @@ final class BoletoService
     ) {
     }
 
+    /**
+     * Emite o boleto: POST /v2/billets/{seller_id} com uma LISTA de um item,
+     * A resposta tambem e uma lista.
+     */
     public function create(BoletoRequest $request, string $localReference): Boleto
     {
         $request->validate();
 
         $response = $this->http->post(
-            Endpoints::build(Endpoints::path('BOLETO_CREATE'), ['seller_id' => $this->config->sellerId]),
-            $request->toArray($localReference),
-            idempotencyKey: $localReference,
+            Endpoints::build(Endpoints::path('BOLETO_CREATE'), ['seller_id' => $this->http->sellerId()]),
+            [$request->toArray($localReference, $this->config)],
         );
 
-        return Boleto::fromApi($response, $localReference);
+        $boleto = Boleto::fromApi($response, $localReference, $this->config);
+
+        /* Lista vazia ou item com erro proprio. */
+        $item = $boleto->raw;
+        if ($boleto->id === '' && $boleto->saleId === null) {
+            $msg = $item['message'] ?? $item['error'] ?? null;
+            if (is_array($msg)) {
+                $msg = implode(' | ', array_map('strval', $msg));
+            }
+            if (is_string($msg) && $msg !== '') {
+                throw new \TCloud\ParcelaExpress\ValidationException($msg, 400, $item);
+            }
+        }
+
+        return $boleto;
     }
 
     /**
-     * Consulta o boleto.
+     * Situacao do boleto.
      *
-     * A rota nao e aninhada sob /sellers: GET /v1/billets/{billet_id}.
+     * Com sale_id (emissao v2): GET /v2/sellers/{seller}/sales/{sale_id},
+     * Sem ele (boletos antigos): GET /v1/billets/{id}.
      */
-    public function find(string $boletoId): Boleto
+    public function find(string $boletoId, ?string $saleId = null): Boleto
     {
+        if ($saleId !== null && $saleId !== '') {
+            try {
+                $response = $this->http->get(
+                    Endpoints::build(Endpoints::path('BOLETO_STATUS'), [
+                        'seller_id' => $this->http->sellerId(),
+                        'sale_id' => $saleId,
+                    ])
+                );
+
+                return Boleto::fromApi($response, null, $this->config);
+            } catch (\TCloud\ParcelaExpress\ApiException $e) {
+                if (!$e->isRouteMissing() || $boletoId === '') {
+                    throw $e;
+                }
+                /* rota da venda indisponivel: tenta pelo titulo */
+            }
+        }
+
         $response = $this->http->get(
             Endpoints::build(Endpoints::path('BOLETO_SHOW'), ['billet_id' => $boletoId])
         );
 
-        return Boleto::fromApi($response);
+        return Boleto::fromApi($response, null, $this->config);
     }
 
     /**
@@ -82,12 +118,12 @@ final class BoletoService
     {
         $response = $this->http->post(
             Endpoints::build(Endpoints::path('BOLETO_CANCEL'), [
-                'seller_id' => $this->config->sellerId,
+                'seller_id' => $this->http->sellerId(),
                 'billet_id' => $boletoId,
             ])
         );
 
-        return Boleto::fromApi($response);
+        return Boleto::fromApi($response, null, $this->config);
     }
 
     /**
@@ -106,7 +142,7 @@ final class BoletoService
             Endpoints::build(Endpoints::path('BOLETO_PAGAR_SANDBOX'), ['billet_id' => $boletoId])
         );
 
-        return Boleto::fromApi($response);
+        return Boleto::fromApi($response, null, $this->config);
     }
 }
 
@@ -139,6 +175,8 @@ final class BoletoRequest
         public readonly array $endereco = [],
         /** @var array<int,array<string,mixed>> */
         public readonly array $splitRules = [],
+        /** Telefone do pagador (shopper.phone). */
+        public readonly ?string $pagadorTelefone = null,
     ) {
     }
 
@@ -168,9 +206,21 @@ final class BoletoRequest
             throw new \InvalidArgumentException('O vencimento não pode ser anterior a hoje.');
         }
 
-        if ($this->pagadorEmail !== null && $this->pagadorEmail !== ''
-            && !filter_var($this->pagadorEmail, FILTER_VALIDATE_EMAIL)) {
+        /* O e-mail do pagador e obrigatorio na Parcela Express (shopper.email). */
+        if ($this->pagadorEmail === null || trim($this->pagadorEmail) === '') {
+            throw new \InvalidArgumentException(
+                'Informe o e-mail do pagador (obrigatório para emitir o boleto) '
+                . 'ou cadastre um e-mail padrão na configuração do Pagamento Online.'
+            );
+        }
+
+        if (!filter_var(trim($this->pagadorEmail), FILTER_VALIDATE_EMAIL)) {
             throw new \InvalidArgumentException('E-mail do pagador inválido.');
+        }
+
+        $fone = preg_replace('/\D/', '', (string) $this->pagadorTelefone) ?? '';
+        if ($fone !== '' && (strlen($fone) < 10 || strlen($fone) > 11)) {
+            throw new \InvalidArgumentException('Telefone do pagador inválido (use DDD + número).');
         }
 
         /* O endereco nao e opcional na pratica — sem ele a API responde 500.
@@ -199,74 +249,59 @@ final class BoletoRequest
     }
 
     /**
-     * Corpo da emissao, no formato que a API exige.
+     * Corpo de UM boleto para POST /v2/billets/{seller_id} — o envio e uma
+     * lista com este item:
      *
-     * Os nomes vieram da propria API, que rejeitou a primeira tentativa
-     * listando campo a campo. O desenho espelha o Adyen — social_security_number,
-     * shopper_statement, delivery_date e shopper sao exatamente os campos que
-     * o Adyen pede para boleto bancario, o que faz sentido: o gateway por tras
-     * da Parcela Express e Adyen.
-     *
-     * Note o que NAO existe: nao ha campo de referencia nem de protocolo. A
-     * amarracao com a O.S. fica so do nosso lado, em pe_boletos, e aparece
-     * para o pagador via shopper_statement.
+     *   value (centavos), social_security_number, shopper_statement, description,
+     *   delivery_date (ISO, UTC), shopper { first_name, last_name, email, phone,
+     *   billing_address {...} }, with_payment_link, protocol
      *
      * @return array<string,mixed>
      */
-    public function toArray(string $localReference): array
+    public function toArray(string $localReference, ?\TCloud\ParcelaExpress\Config $config = null): array
     {
         [$primeiroNome, $sobrenome] = self::separarNome($this->pagadorNome);
 
-        /* Ambos os campos de texto sao obrigatorios e nao aceitam vazio,
-           entao garantimos um valor mesmo sem descricao informada. */
         $descricao = trim((string) $this->descricao);
-
         if ($descricao === '') {
             $descricao = 'Emolumentos';
         }
 
-        $payload = [
-            /* Em centavos, como no restante da API (o checkout usa
-               amount_cents com o mesmo significado). */
-            'value' => $this->amountCents,
+        $instrucoes = trim((string) $this->instrucoes);
 
-            /* CPF/CNPJ vai na raiz, so digitos — nao dentro do shopper. */
-            'social_security_number' => preg_replace('/\D/', '', $this->pagadorDocumento),
+        /* Vencimento ao meio-dia, em UTC
+           (Y-m-d\TH:i:s\Z). Meio-dia evita que o fuso mude o dia. */
+        $venc = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $this->vencimento->format('Y-m-d') . ' 12:00:00')
+            ?: new \DateTimeImmutable($this->vencimento->format('Y-m-d') . ' 12:00:00');
+        $venc = $venc->setTimezone(new \DateTimeZone('UTC'));
 
-            /**
-             * ATENCAO: description e shopper_statement sao campos DISTINTOS e
-             * ambos obrigatorios.
-             *
-             * A API confirmou os dois separadamente: description sobreviveu a
-             * primeira rodada de validacao (nao foi listado como "should not
-             * exist") e foi cobrado na segunda, quando eu o havia removido
-             * achando que shopper_statement o substituia.
-             *
-             * description  — descricao da cobranca
-             * shopper_statement — texto que identifica a venda para o pagador
-             */
-            'description' => $descricao,
-            'shopper_statement' => $descricao,
-
-            /* ISO 8601 completo: a validacao recusa data pura. */
-            'delivery_date' => $this->vencimento->format('c'),
-
-            'shopper' => [
-                'first_name' => $primeiroNome,
-                'last_name' => $sobrenome,
-                /* Sempre presente, mesmo incompleto: e a ausencia do objeto
-                   que derruba a API com "reading 'complement' of undefined".
-                   Campo vazio ela aceita; objeto ausente, nao. */
-                'billing_address' => $this->enderecoParaApi(),
-            ],
+        $shopper = [
+            'first_name' => $primeiroNome,
+            'last_name' => $sobrenome,
+            'email' => trim((string) $this->pagadorEmail),
+            'billing_address' => $this->enderecoParaApi(),
         ];
 
-        if ($this->pagadorEmail !== null && $this->pagadorEmail !== '') {
-            $payload['shopper']['email'] = $this->pagadorEmail;
+        $fone = preg_replace('/\D/', '', (string) $this->pagadorTelefone) ?? '';
+        if ($fone !== '') {
+            $shopper['phone'] = $fone;
         }
 
-        if ($this->instrucoes !== null && $this->instrucoes !== '') {
-            $payload['instructions'] = $this->instrucoes;
+        $payload = [
+            /* Em CENTAVOS (inteiro): R$ 13,37 vai como 1337. A API le o
+               numero como centavos — com 13.37 ela entendeu R$ 0,13. */
+            'value' => $config ? $config->paraApi($this->amountCents, 'boleto') : $this->amountCents,
+            'social_security_number' => preg_replace('/\D/', '', $this->pagadorDocumento),
+            /* shopper_statement: texto que o pagador ve; description: descricao da cobranca. */
+            'shopper_statement' => mb_substr($instrucoes !== '' ? $instrucoes : $descricao, 0, 255),
+            'description' => mb_substr($descricao, 0, 255),
+            'delivery_date' => $venc->format('Y-m-d\TH:i:s\Z'),
+            'shopper' => $shopper,
+            'with_payment_link' => true,
+        ];
+
+        if ($this->protocol !== null && $this->protocol !== '') {
+            $payload['protocol'] = $this->protocol;
         }
 
         if ($this->splitRules !== []) {

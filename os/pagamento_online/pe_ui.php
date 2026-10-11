@@ -618,6 +618,7 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
                 '<div class="pe-c7">' +
                   '<label class="pe-rotulo" for="pePosTerminal">Terminal</label>' +
                   '<select class="form-control" id="pePosTerminal"><option value="">Carregando…</option></select>' +
+                  '<input type="text" class="form-control pe-num" id="pePosTerminalManual" style="display:none;margin-top:6px" placeholder="Digite o serial da maquininha">' +
                   '<div class="pe-ajuda">Onde o cliente vai passar o cartão.</div>' +
                 '</div>' +
               '</div>' +
@@ -639,39 +640,55 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
           '</div>');
     }
 
+    var OPCAO_MANUAL = '__manual__';
+
+    function terminalEscolhido() {
+        var v = $('#pePosTerminal').val();
+        return v === OPCAO_MANUAL ? $.trim($('#pePosTerminalManual').val()) : v;
+    }
+
     function carregarTerminais() {
         var sel = $('#pePosTerminal');
         if (!sel.length || sel.attr('data-carregado')) return;
 
         sel.html('<option value="">Carregando…</option>');
 
+        function opcaoManual() {
+            sel.append($('<option>').val(OPCAO_MANUAL).text('Outra — digitar o serial…'));
+        }
+
         $.get('pagamento_online/pe_terminais.php', { csrf: PE.csrf }, function (r) {
+            sel.attr('data-carregado', '1').empty();
+
             if (!r || !r.success || !r.terminais || !r.terminais.length) {
-                sel.html('<option value="">Nenhum terminal disponível</option>');
-                nota('#pePosErroTerminal', 'Nenhum terminal vinculado a esta conta. Solicite um à Parcela Express.', 'erro');
+                sel.append('<option value="">Nenhum terminal listado</option>');
+                opcaoManual();
+                nota('#pePosErroTerminal', 'A conta não listou terminais. Digite o serial da maquininha (ou cadastre-a na configuração).', 'warn');
                 return;
             }
 
-            sel.attr('data-carregado', '1').empty().append('<option value="">Selecione o terminal</option>');
+            sel.append('<option value="">Selecione o terminal</option>');
 
             r.terminais.forEach(function (t) {
                 var id = t.id || t.terminal_id || t.serial_number;
                 sel.append($('<option>').val(id).text(t.name || t.serial_number || id));
             });
+            opcaoManual();
 
             // Um terminal só: escolhe sozinho, poupa um clique no balcão.
             if (r.terminais.length === 1) sel.val(sel.find('option').eq(1).val()).trigger('change');
 
-            nota('#pePosErroTerminal', '');
+            nota('#pePosErroTerminal', r.aviso || '', r.aviso ? 'warn' : undefined);
         }, 'json').fail(function (xhr) {
-            sel.html('<option value="">Indisponível</option>');
+            sel.attr('data-carregado', '1').empty().append('<option value="">Lista indisponível</option>');
+            opcaoManual();
             nota('#pePosErroTerminal', erroDo(xhr, 'Não foi possível consultar os terminais.'), 'erro');
         });
     }
 
     function formasBasicas() {
         var l = [{ form_payment: 'pix', installments: 1 }, { form_payment: 'debit', installments: 1 }];
-        for (var n = 1; n <= 21; n++) l.push({ form_payment: 'credit', installments: n });
+        [1, 2, 3, 4, 6, 10, 12].forEach(function (n) { l.push({ form_payment: 'credit', installments: n }); });
         return l;
     }
 
@@ -696,19 +713,7 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
             return;
         }
 
-        box.html('<div class="pe-vazio">Consultando as taxas da serventia…</div>');
-
-        $.get('pagamento_online/pe_simular.php', { csrf: PE.csrf, valor: valor }, function (r) {
-            if (r && r.success && r.opcoes && r.opcoes.length) {
-                desenharParcelas(r.opcoes, false);
-            } else {
-                desenharParcelas(formasBasicas(), true);
-                nota('#pePosNota', 'Taxas indisponíveis. Os valores serão aplicados pela maquininha.', 'warn');
-            }
-        }, 'json').fail(function (xhr) {
-            desenharParcelas(formasBasicas(), true);
-            nota('#pePosNota', erroDo(xhr, 'Taxas indisponíveis.') + ' Os valores serão aplicados pela maquininha.', 'warn');
-        });
+        desenharParcelas(formasBasicas(), true);
     }
 
     function desenharParcelas(opcoes, semTaxas) {
@@ -746,11 +751,18 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
             nota('#pePosNota', 'De 13x a 18x o parcelamento depende de aprovação do banco emissor.', 'warn');
         }
 
-        $('#pePosEnviar').prop('disabled', !$('#pePosTerminal').val());
+        $('#pePosEnviar').prop('disabled', !terminalEscolhido());
     });
 
     $(document).on('change', '#pePosTerminal', function () {
-        $('#pePosEnviar').prop('disabled', !$(this).val() || !PE.forma);
+        var manual = $(this).val() === OPCAO_MANUAL;
+        $('#pePosTerminalManual').toggle(manual);
+        if (manual) $('#pePosTerminalManual').trigger('focus');
+        $('#pePosEnviar').prop('disabled', !terminalEscolhido() || !PE.forma);
+    });
+
+    $(document).on('input', '#pePosTerminalManual', function () {
+        $('#pePosEnviar').prop('disabled', !terminalEscolhido() || !PE.forma);
     });
 
     var debounce = null;
@@ -765,7 +777,7 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
         $.post('pagamento_online/pe_venda_criar.php', {
             csrf: PE.csrf,
             os_id: PE.osId,
-            terminal_id: $('#pePosTerminal').val(),
+            terminal_id: terminalEscolhido(),
             forma: PE.forma,
             parcelas: PE.parcelas,
             valor: lerValor('#pePosValor'),
@@ -849,7 +861,7 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
     $(document).on('click', '#pePosInterromper', function () {
         Swal.fire({
             title: 'Interromper a cobrança?',
-            text: 'A venda será cancelada no terminal.',
+            text: 'O Atlas deixa de aguardar. Se a cobrança ainda estiver na tela da maquininha, cancele-a no aparelho.',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Interromper',
@@ -883,7 +895,6 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
             '<div id="peBoletoEmitidos"></div>' +
             '<div id="peBoletoForm">' +
 
-              '<div class="pe-secao"><span>Cobrança</span></div>' +
               '<div class="pe-grid">' +
                 '<div class="pe-c4">' +
                   '<label class="pe-rotulo" for="peBolValor">Valor</label>' +
@@ -891,69 +902,15 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
                     '<div class="input-group-prepend"><span class="input-group-text">R$</span></div>' +
                     '<input type="text" class="form-control pe-num" id="peBolValor" value="' + fmt(PE.saldo) + '">' +
                   '</div>' +
-                  '<div class="pe-ajuda">Saldo em aberto: ' + brl(PE.saldo) + '</div>' +
-                '</div>' +
-                '<div class="pe-c4">' +
-                  '<label class="pe-rotulo" for="peBolVenc">Vencimento</label>' +
-                  '<input type="date" class="form-control" id="peBolVenc" value="' + PE.vencPadrao + '">' +
-                  '<div class="pe-ajuda">Prazo para o cliente pagar.</div>' +
-                '</div>' +
-                '<div class="pe-c4">' +
-                  '<label class="pe-rotulo" for="peBolInstr">Instruções <span class="pe-opcional">(opcional)</span></label>' +
-                  '<input type="text" class="form-control" id="peBolInstr" maxlength="255" placeholder="Não receber após o vencimento">' +
-                  '<div class="pe-ajuda">Aparece impresso no boleto.</div>' +
-                '</div>' +
-              '</div>' +
-
-              '<div class="pe-secao"><span>Pagador</span></div>' +
-              '<div class="pe-grid">' +
-                '<div class="pe-c12">' +
-                  '<label class="pe-rotulo" for="peBolNome">Nome completo</label>' +
-                  '<input type="text" class="form-control" id="peBolNome" value="' + esc(PE.cliente) + '">' +
-                  '<div class="pe-ajuda">Precisa bater com o cadastro na Receita Federal.</div>' +
+                  '<div class="pe-ajuda">Saldo em aberto: ' + brl(PE.saldo) + ' · vence em 3 dias</div>' +
                 '</div>' +
                 '<div class="pe-c5">' +
+                  '<label class="pe-rotulo" for="peBolNome">Pagador</label>' +
+                  '<input type="text" class="form-control" id="peBolNome" value="' + esc(PE.cliente) + '">' +
+                '</div>' +
+                '<div class="pe-c3">' +
                   '<label class="pe-rotulo" for="peBolDoc">CPF ou CNPJ</label>' +
                   '<input type="text" class="form-control pe-num" id="peBolDoc" value="' + esc(PE.documento) + '" inputmode="numeric" placeholder="000.000.000-00">' +
-                '</div>' +
-                '<div class="pe-c7">' +
-                  '<label class="pe-rotulo" for="peBolEmail">E-mail <span class="pe-opcional">(opcional)</span></label>' +
-                  '<input type="email" class="form-control" id="peBolEmail" placeholder="para enviar o boleto ao cliente">' +
-                '</div>' +
-              '</div>' +
-
-              '<div class="pe-secao"><span>Endereço do pagador</span></div>' +
-              '<div class="pe-grid">' +
-                '<div class="pe-c3">' +
-                  '<label class="pe-rotulo" for="peBolCep">CEP</label>' +
-                  '<input type="text" class="form-control pe-num" id="peBolCep" inputmode="numeric" maxlength="9" placeholder="00000-000">' +
-                  '<div class="pe-ajuda" id="peBolCepAviso">Preenche o resto sozinho.</div>' +
-                '</div>' +
-                '<div class="pe-c7">' +
-                  '<label class="pe-rotulo" for="peBolLogradouro">Logradouro</label>' +
-                  '<input type="text" class="form-control" id="peBolLogradouro">' +
-                  '<div class="pe-ajuda"></div>' +
-                '</div>' +
-                '<div class="pe-c2">' +
-                  '<label class="pe-rotulo" for="peBolNumero">Número</label>' +
-                  '<input type="text" class="form-control" id="peBolNumero" placeholder="S/N">' +
-                  '<div class="pe-ajuda"></div>' +
-                '</div>' +
-                '<div class="pe-c5">' +
-                  '<label class="pe-rotulo" for="peBolBairro">Bairro</label>' +
-                  '<input type="text" class="form-control" id="peBolBairro">' +
-                '</div>' +
-                '<div class="pe-c5">' +
-                  '<label class="pe-rotulo" for="peBolCidade">Cidade</label>' +
-                  '<input type="text" class="form-control" id="peBolCidade">' +
-                '</div>' +
-                '<div class="pe-c2">' +
-                  '<label class="pe-rotulo" for="peBolUf">UF</label>' +
-                  '<input type="text" class="form-control" id="peBolUf" maxlength="2" style="text-transform:uppercase">' +
-                '</div>' +
-                '<div class="pe-c12">' +
-                  '<label class="pe-rotulo" for="peBolComplemento">Complemento <span class="pe-opcional">(opcional)</span></label>' +
-                  '<input type="text" class="form-control" id="peBolComplemento" placeholder="Apto, bloco, sala">' +
                 '</div>' +
               '</div>' +
 
@@ -989,8 +946,8 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
                     '</div>' +
                     '<span class="pe-tag ' + classe + '">' + esc(b.status_rotulo) + '</span>' +
                     (b.url_pdf ? '<a class="pe-btn" href="' + esc(b.url_pdf) + '" target="_blank" rel="noopener">Abrir</a>' : '') +
+                    (b.url_pagamento && b.aberto ? '<a class="pe-btn" href="' + esc(b.url_pagamento) + '" target="_blank" rel="noopener">Link</a>' : '') +
                     (b.aberto ? '<button type="button" class="pe-btn pe-conferir" data-ref="' + esc(b.local_reference) + '">Conferir</button>' : '') +
-                    (b.aberto && PE.sandbox ? '<button type="button" class="pe-btn pe-simular" data-ref="' + esc(b.local_reference) + '" title="Só funciona em sandbox">Simular pagamento</button>' : '') +
                     '</div>' +
                     (b.indeterminado
                        ? '<div class="pe-nota pe-nota-warn" style="margin:-4px 0 8px">Esta emissão não foi confirmada pela Parcela Express. Verifique no portal antes de emitir outro.</div>'
@@ -1035,73 +992,10 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
         });
     });
 
-    /* Busca o endereço pelo CEP. O ViaCEP é público e aceita CORS; se
-       estiver fora do ar ou o micro sem internet, o operador digita à mão —
-       por isso a falha só avisa, não bloqueia. */
-    var cepTimer = null;
-
-    $(document).on('input', '#peBolCep', function () {
-        var campo = $(this);
-        campo.val(String(campo.val() || '').replace(/\D/g, '').slice(0, 8)
-            .replace(/^(\d{5})(\d)/, '$1-$2'));
-
-        var cep = String(campo.val()).replace(/\D/g, '');
-        clearTimeout(cepTimer);
-
-        if (cep.length !== 8) { $('#peBolCepAviso').text('Preenche o resto sozinho.'); return; }
-
-        $('#peBolCepAviso').text('Buscando…');
-
-        cepTimer = setTimeout(function () {
-            $.getJSON('https://viacep.com.br/ws/' + cep + '/json/')
-                .done(function (d) {
-                    if (!d || d.erro) { $('#peBolCepAviso').text('CEP não encontrado — preencha à mão.'); return; }
-
-                    $('#peBolCepAviso').text('Endereço preenchido.');
-                    if (d.logradouro) $('#peBolLogradouro').val(d.logradouro);
-                    if (d.bairro) $('#peBolBairro').val(d.bairro);
-                    if (d.localidade) $('#peBolCidade').val(d.localidade);
-                    if (d.uf) $('#peBolUf').val(d.uf);
-                    if (!$('#peBolNumero').val()) $('#peBolNumero').focus();
-                })
-                .fail(function () {
-                    $('#peBolCepAviso').text('Não foi possível consultar o CEP — preencha à mão.');
-                });
-        }, 400);
-    });
-
-    $(document).on('input', '#peBolUf', function () {
-        $(this).val(String($(this).val() || '').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2));
-    });
-
     $(document).on('input', '#peBolDoc', function () {
         var pos = this.selectionStart === this.value.length;
         $(this).val(mascaraDocumento($(this).val()));
         if (pos) this.setSelectionRange(this.value.length, this.value.length);
-    });
-
-    /* Sandbox: marca o boleto como pago na API, para exercitar o ciclo
-       completo sem esperar compensação bancária. Não existe em produção. */
-    $(document).on('click', '#pagamentoModal .pe-simular', function () {
-        var btn = $(this).prop('disabled', true).text('Simulando…');
-
-        $.post('pagamento_online/pe_boleto_pagar_sandbox.php',
-            { csrf: PE.csrf, local_reference: btn.attr('data-ref') },
-            function (r) {
-                btn.prop('disabled', false).text('Simular pagamento');
-
-                if (!r || !r.success) {
-                    Swal.fire({ icon: 'error', title: 'Não foi possível simular', text: (r && r.error) || '' });
-                    return;
-                }
-
-                Swal.fire({ icon: 'success', title: 'Pago no sandbox', text: r.mensagem || '' });
-                listarBoletos();
-            }, 'json'
-        ).fail(function (xhr) {
-            btn.prop('disabled', false).text('Simular pagamento');
-            Swal.fire({ icon: 'error', title: 'Não foi possível simular', text: erroDo(xhr) });
-        });
     });
 
     $(document).on('click', '#peBolEmitir', function () {
@@ -1121,23 +1015,6 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
             return;
         }
 
-        /* Endereço é obrigatório na prática: sem ele a API responde erro
-           interno em vez de recusar com mensagem. */
-        var faltando = [
-            ['#peBolCep', String($('#peBolCep').val() || '').replace(/\D/g, '').length === 8, 'CEP'],
-            ['#peBolLogradouro', String($('#peBolLogradouro').val() || '').trim() !== '', 'Logradouro'],
-            ['#peBolBairro', String($('#peBolBairro').val() || '').trim() !== '', 'Bairro'],
-            ['#peBolCidade', String($('#peBolCidade').val() || '').trim() !== '', 'Cidade'],
-            ['#peBolUf', String($('#peBolUf').val() || '').trim().length === 2, 'UF']
-        ].filter(function (f) { return !f[1]; });
-
-        if (faltando.length) {
-            nota('#peBolErro', 'Endereço do pagador incompleto: ' +
-                faltando.map(function (f) { return f[2]; }).join(', ') + '.', 'erro');
-            $(faltando[0][0]).focus();
-            return;
-        }
-
         var btn = $(this).prop('disabled', true).text('Emitindo…');
         nota('#peBolErro', '');
 
@@ -1145,18 +1022,8 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
             csrf: PE.csrf,
             os_id: PE.osId,
             valor: lerValor('#peBolValor'),
-            vencimento: $('#peBolVenc').val(),
             pagador_nome: $('#peBolNome').val(),
-            pagador_documento: $('#peBolDoc').val(),
-            pagador_email: $('#peBolEmail').val(),
-            instrucoes: $('#peBolInstr').val(),
-            cep: $('#peBolCep').val(),
-            logradouro: $('#peBolLogradouro').val(),
-            numero: $('#peBolNumero').val(),
-            complemento: $('#peBolComplemento').val(),
-            bairro: $('#peBolBairro').val(),
-            cidade: $('#peBolCidade').val(),
-            uf: $('#peBolUf').val()
+            pagador_documento: $('#peBolDoc').val()
         }, function (r) {
             btn.prop('disabled', false).text('Emitir boleto');
 
@@ -1192,10 +1059,13 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
                 : '<div class="pe-nota pe-nota-warn">A API não retornou a linha digitável. Abra o PDF para obtê-la.</div>') +
               '<div class="pe-botoes">' +
                 (b.linha_digitavel ? '<button type="button" class="pe-btn pe-btn-forte" id="peCopiarLinha">Copiar linha digitável</button>' : '') +
-                (b.url_pdf ? '<a class="pe-btn" href="' + esc(b.url_pdf) + '" target="_blank" rel="noopener">Abrir PDF</a>' : '') +
+                (b.url_pdf ? '<a class="pe-btn" href="' + esc(b.url_pdf) + '" target="_blank" rel="noopener">Abrir boleto</a>' : '') +
+                (b.url_pagamento ? '<a class="pe-btn" href="' + esc(b.url_pagamento) + '" target="_blank" rel="noopener">Link de pagamento</a>' : '') +
+                (b.url_pagamento ? '<button type="button" class="pe-btn" id="peCopiarLink" data-link="' + esc(b.url_pagamento) + '">Copiar link</button>' : '') +
                 (b.pix_copia_cola ? '<button type="button" class="pe-btn" id="peCopiarPix" data-pix="' + esc(b.pix_copia_cola) + '">Copiar código PIX</button>' : '') +
                 '<button type="button" class="pe-btn" id="peNovoBoleto">Emitir outro</button>' +
               '</div>' +
+              (b.qrcode_url ? '<div style="text-align:center;margin-top:10px"><img src="' + esc(b.qrcode_url) + '" alt="QR Code para pagar com PIX ou cartão" style="width:160px;height:160px"><div class="pe-ajuda">Pague com PIX ou cartão</div></div>' : '') +
               '<div class="pe-nota pe-nota-info">Guardado nesta O.S. Use "Conferir" depois que o cliente pagar para dar baixa.</div>' +
             '</div>' +
           '</div>';
@@ -1233,6 +1103,10 @@ body.dark-mode #pagamentoModal.pe-on .pe-barras i { background: var(--pe-slate);
 
     $(document).on('click', '#peCopiarPix', function () {
         copiar($(this).attr('data-pix'), this, 'Copiar código PIX');
+    });
+
+    $(document).on('click', '#peCopiarLink', function () {
+        copiar($(this).attr('data-link'), this, 'Copiar link');
     });
 
     /* ================================================================

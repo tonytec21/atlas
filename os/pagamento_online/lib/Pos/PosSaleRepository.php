@@ -15,7 +15,7 @@ namespace TCloud\ParcelaExpress\Pos;
 interface PosSaleRepository
 {
     /** @param array<string,mixed> $payload */
-    public function markPending(string $localReference, array $payload): void;
+    public function markPending(string $localReference, array $payload, ?int $amountCents = null): void;
 
     public function save(PosSale $sale): void;
 
@@ -43,19 +43,23 @@ final class PdoPosSaleRepository implements PosSaleRepository
     ) {
     }
 
-    public function markPending(string $localReference, array $payload): void
+    public function markPending(string $localReference, array $payload, ?int $amountCents = null): void
     {
+        /* O valor pedido fica gravado ja aqui: e ele que entra em pagamento_os
+           quando a venda for aprovada, mesmo que a API nao o repita no status. */
         $sql = "INSERT INTO {$this->table}
-                    (local_reference, request_payload, reconciliation_state, created_at)
+                    (local_reference, request_payload, amount_cents, reconciliation_state, created_at)
                 VALUES
-                    (:ref, :payload, 'pending', NOW())
+                    (:ref, :payload, :amount, 'pending', NOW())
                 ON DUPLICATE KEY UPDATE
                     request_payload = VALUES(request_payload),
+                    amount_cents = COALESCE(VALUES(amount_cents), amount_cents),
                     updated_at = NOW()";
 
         $this->pdo->prepare($sql)->execute([
             ':ref' => $localReference,
             ':payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            ':amount' => $amountCents,
         ]);
     }
 
@@ -73,7 +77,8 @@ final class PdoPosSaleRepository implements PosSaleRepository
                     remote_id = VALUES(remote_id),
                     pre_capture_status = VALUES(pre_capture_status),
                     transaction_status = VALUES(transaction_status),
-                    charged_amount_cents = VALUES(charged_amount_cents),
+                    amount_cents = COALESCE(amount_cents, VALUES(amount_cents)),
+                    charged_amount_cents = COALESCE(VALUES(charged_amount_cents), charged_amount_cents),
                     raw_payload = VALUES(raw_payload),
                     reconciliation_state = VALUES(reconciliation_state),
                     updated_at = NOW()";

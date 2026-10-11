@@ -73,6 +73,7 @@ $on = static fn($k) => !empty($cfg[$k]);
                         <span class="cfg-pill cfg-pill-off"><i class="fa fa-power-off"></i> Desativado</span>
                     <?php endif; ?>
                     <span class="cfg-pill cfg-pill-off"><?= ($cfg['ambiente'] ?? 'sandbox') === 'production' ? 'PRODUÇÃO' : 'SANDBOX' ?></span>
+                    <span class="cfg-pill cfg-pill-off">v<?= htmlspecialchars(PE_VERSAO, ENT_QUOTES, 'UTF-8') ?></span>
                 </div>
             </section>
 
@@ -141,7 +142,7 @@ $on = static fn($k) => !empty($cfg[$k]);
                 </div>
 
                 <div class="cfg-card">
-                    <header><i class="fa fa-key"></i><h2>Credenciais</h2></header>
+                    <header><i class="fa fa-key"></i><h2>Acesso à Parcela Express</h2></header>
                     <div class="cfg-corpo">
                         <div class="cfg-grid">
                             <div class="c4">
@@ -150,70 +151,47 @@ $on = static fn($k) => !empty($cfg[$k]);
                                     <option value="sandbox" <?= $sel('ambiente', 'sandbox') ?>>Sandbox (homologação)</option>
                                     <option value="production" <?= $sel('ambiente', 'production') ?>>Produção</option>
                                 </select>
-                                <div class="cfg-dica">Comece sempre em sandbox.</div>
                             </div>
-                            <div class="c8">
-                                <label class="cfg-rot" for="seller_id">ID do estabelecimento</label>
-                                <input type="text" class="cfg-in cfg-mono" id="seller_id" name="seller_id"
-                                       value="<?= $v('seller_id') ?>" placeholder="ad9ebef1-e714-48d3-872c-e51911a6d4bf">
-                                <div class="cfg-dica">No CartExpress: <em>Perfil › Dados do Estabelecimento › Id da Serventia</em>.</div>
+                            <div class="c4">
+                                <label class="cfg-rot" for="usuario">E-mail</label>
+                                <input type="text" class="cfg-in" id="usuario" name="usuario" value="<?= $v('usuario') ?>" autocomplete="off">
                             </div>
-                            <div class="c6">
-                                <label class="cfg-rot" for="usuario">Usuário da API</label>
-                                <input type="text" class="cfg-in" id="usuario" name="usuario" value="<?= $v('usuario') ?>">
-                            </div>
-                            <div class="c6">
-                                <label class="cfg-rot" for="senha">Senha da API</label>
-                                <input type="password" class="cfg-in" id="senha" name="senha"
+                            <div class="c4">
+                                <label class="cfg-rot" for="senha">Senha</label>
+                                <input type="password" class="cfg-in" id="senha" name="senha" autocomplete="new-password"
                                        placeholder="<?= !empty($cfg['senha']) ? '•••••••• (mantida)' : '' ?>">
-                                <div class="cfg-dica">Deixe em branco para manter a senha atual.</div>
                             </div>
+                        </div>
+                        <div class="cfg-grid" style="margin-top:12px">
+                            <div class="c12">
+                                <label class="cfg-rot" for="seller_id">ID do estabelecimento <small>(opcional)</small></label>
+                                <input type="text" class="cfg-in cfg-mono" id="seller_id" name="seller_id" value="<?= $v('seller_id') ?>" placeholder="em branco = o estabelecimento informado pelo login">
+                            </div>
+                        </div>
+                        <div class="cfg-dica" style="margin-top:8px">
+                            Preencha o ID do estabelecimento só quando a cobrança precisar sair em nome de um estabelecimento diferente do devolvido pelo login.
+                            No sandbox, com e-mail e senha em branco, é usada a conta de homologação da Parcela Express.
+                            Em produção, informe o e-mail e a senha da serventia. Senha em branco mantém a atual.
                         </div>
                     </div>
                 </div>
 
                 <div class="cfg-card">
-                    <header><i class="fa fa-sliders"></i><h2>Ajustes</h2><small>opcional</small></header>
+                    <header><i class="fa fa-credit-card"></i><h2>Maquininhas</h2></header>
                     <div class="cfg-corpo">
-                        <div class="cfg-grid">
-                            <div class="c4">
-                                <label class="cfg-rot" for="timeout_poll_seg">Intervalo de consulta</label>
-                                <input type="number" class="cfg-in" id="timeout_poll_seg" name="timeout_poll_seg"
-                                       min="1" max="30" value="<?= $v('timeout_poll_seg', '3') ?>">
-                                <div class="cfg-dica">Segundos entre cada verificação de venda no terminal.</div>
-                            </div>
-                            <div class="c4">
-                                <label class="cfg-rot" for="timeout_venda_seg">Prazo no terminal</label>
-                                <input type="number" class="cfg-in" id="timeout_venda_seg" name="timeout_venda_seg"
-                                       min="60" max="900" value="<?= $v('timeout_venda_seg', '300') ?>">
-                                <div class="cfg-dica">Passado esse prazo a cobrança é interrompida.</div>
-                            </div>
-                            <div class="c4">
-                                <label class="cfg-rot" for="base_url">URL base da API</label>
-                                <input type="text" class="cfg-in cfg-mono" id="base_url" name="base_url"
-                                       value="<?= $v('base_url') ?>" placeholder="padrão do ambiente">
-                                <div class="cfg-dica">Só se a Parcela Express indicar outro endereço.</div>
-                            </div>
-                        </div>
+                        <textarea class="cfg-in cfg-mono" id="terminais" name="terminais" rows="3" placeholder="serial | nome (uma por linha)&#10;PB0123456789 | Balcão 1"><?= $v('terminais') ?></textarea>
+                        <div class="cfg-dica">Aparecem na lista ao cobrar. Uma por linha: <code>serial | nome</code>. O operador também pode digitar o serial na hora.</div>
                     </div>
                 </div>
 
                 <div class="cfg-card">
-                    <header><i class="fa fa-stethoscope"></i><h2>Verificação</h2></header>
+                    <header><i class="fa fa-plug"></i><h2>Verificação</h2></header>
                     <div class="cfg-corpo">
-                        <div class="cfg-ferramentas">
-                            <button type="button" class="cfg-btn cfg-btn-marca" id="btnTestar">
-                                <i class="fa fa-plug"></i> Testar conexão
-                            </button>
-                            <a href="pe_diagnostico.php" class="cfg-btn cfg-btn-neutro"><i class="fa fa-list-alt"></i> Verificar instalação</a>
-                            <a href="pe_rotas.php" class="cfg-btn cfg-btn-neutro"><i class="fa fa-sitemap"></i> Rotas da API</a>
-                            <a href="pe_schema.php" class="cfg-btn cfg-btn-neutro"><i class="fa fa-code"></i> Formato dos envios</a>
-                        </div>
-                        <div class="cfg-dica" style="margin-top:11px">
-                            <em>Testar conexão</em> lista os terminais vinculados.
-                            <em>Verificar instalação</em> confere tabelas e colunas — use se o botão não aparecer na O.S.
-                            <em>Rotas</em> e <em>Formato</em> resolvem respostas "Cannot POST" e "Bad Request".
-                        </div>
+                        <button type="button" class="cfg-btn cfg-btn-marca" id="btnTestar">
+                            <i class="fa fa-plug"></i> Testar conexão
+                        </button>
+                        <a href="pe_teste_boleto.php" class="cfg-btn cfg-btn-neutro"><i class="fa fa-barcode"></i> Boleto de teste</a>
+                        <div class="cfg-dica" style="margin-top:11px">Usa a configuração salva: faz o login e mostra a conta e o estabelecimento que vão emitir.</div>
                         <div class="cfg-resultado" id="resultadoTeste"></div>
                     </div>
                 </div>
@@ -277,42 +255,37 @@ $('#btnSalvar').on('click', function () {
 $('#btnTestar').on('click', function () {
     var btn = $(this).prop('disabled', true);
     var box = $('#resultadoTeste')
-        .html('<div class="cfg-msg cfg-msg-warn"><i class="fa fa-spinner fa-spin"></i> Consultando…</div>');
+        .html('<div class="cfg-msg cfg-msg-warn"><i class="fa fa-spinner fa-spin"></i> Testando… (usa a configuração já salva)</div>');
+    var h = function (t) { return $('<div>').text(t == null ? '' : String(t)).html(); };
 
-    function falha(msg, detalhe) {
-        var html = '<div class="cfg-msg cfg-msg-erro"><strong>Não foi possível consultar os terminais.</strong><br>' +
-                   $('<div>').text(msg).html();
-
-        if (detalhe) html += '<br><code>' + $('<div>').text(detalhe).html() + '</code>';
-
-        html += '<br><br>As rotas estão confirmadas contra o spec da Parcela Express. ' +
-                'Falha aqui costuma ser credencial recusada, estabelecimento sem POS vinculado ' +
-                'ou serviço fora do ar — não caminho errado.</div>';
-
-        box.html(html);
-    }
-
-    $.get('pe_terminais.php', { csrf: $('input[name=csrf]').val() }, function (r) {
-        if (!r || !r.success) { falha((r && r.error) || 'Falha na consulta.', r && r.detalhe); return; }
-
-        if (!r.terminais || !r.terminais.length) {
-            box.html('<div class="cfg-msg cfg-msg-warn">Conexão bem-sucedida, mas nenhum terminal está vinculado a esta conta. ' +
-                     'Solicite um terminal de homologação à Parcela Express.</div>');
+    $.get('pe_testar_conexao.php', { csrf: $('input[name=csrf]').val() }, function (r) {
+        if (!r || !r.success) {
+            box.html('<div class="cfg-msg cfg-msg-erro"><strong>Falha no teste.</strong><br>' + h((r && r.error) || 'Falha na consulta.') + '</div>');
             return;
         }
 
-        var html = '<div class="cfg-msg cfg-msg-ok"><strong>Conexão OK.</strong> ' +
-                   r.terminais.length + ' terminal(is) encontrado(s):<ul>';
+        var html = '<div class="cfg-msg ' + (r.login ? 'cfg-msg-ok' : 'cfg-msg-erro') + '">';
+        html += '<strong>' + (r.login ? 'Login OK.' : 'Login recusado.') + '</strong> ' + h(r.login_msg || '');
+        if (r.conta) html += '<br>Conta: <b>' + h(r.conta) + '</b>';
+        if (r.seller_nome || r.seller_documento) html += '<br>Estabelecimento emissor: <b>' + h(r.seller_nome || '') + '</b>' + (r.seller_documento ? ' — documento ' + h(r.seller_documento) : '');
+        if (r.seller) html += '<br>ID do estabelecimento: <code>' + h(r.seller) + '</code> (' + h(r.seller_origem) + ')';
+        if (r.aviso_seller) html += '<br><b>Atenção:</b> ' + h(r.aviso_seller);
+        html += '</div>';
 
-        r.terminais.forEach(function (t) {
-            html += '<li>' + $('<div>').text(t.name || t.serial_number || t.id).html() + '</li>';
-        });
+        if (r.login) {
+            if (r.terminais && r.terminais.length) {
+                html += '<div class="cfg-msg cfg-msg-ok"><strong>' + r.terminais.length + ' maquininha(s):</strong><ul>';
+                r.terminais.forEach(function (t) { html += '<li>' + h(t.name || t.id) + '</li>'; });
+                html += '</ul></div>';
+            } else {
+                html += '<div class="cfg-msg cfg-msg-warn">' + h(r.terminais_msg || 'A conta não listou maquininhas. Cadastre-as em "Maquininhas da serventia" ou digite o serial na hora de cobrar.') + '</div>';
+            }
+        }
 
-        box.html(html + '</ul></div>');
+        box.html(html);
     }, 'json')
     .fail(function (xhr) {
-        falha(peErroDoServidor(xhr, 'Falha na consulta.'),
-              xhr && xhr.responseJSON ? xhr.responseJSON.detalhe : null);
+        box.html('<div class="cfg-msg cfg-msg-erro"><strong>Falha no teste.</strong><br>' + h(peErroDoServidor(xhr, 'Falha na consulta.')) + '</div>');
     })
     .always(function () { btn.prop('disabled', false); });
 });

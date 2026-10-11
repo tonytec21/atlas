@@ -78,42 +78,43 @@ final class PosSaleRequest
         }
     }
 
-    /** @return array<string,mixed> */
-    public function toArray(string $localReference): array
+    /**
+     * Corpo de POST /v2/pos/payments/{seller_id}:
+     *
+     *   terminal_id, amount (reais), is_debit, is_pix, instalments,
+     *   service_id (ate 10 alfanumericos), description, document,
+     *   has_split_rules, split_rules
+     *
+     * O formato anterior (amount_cents, form_payment, pre_capture,
+     * installment_plan) era palpite e a API recusava.
+     *
+     * @return array<string,mixed>
+     */
+    public function toArray(string $localReference, ?\TCloud\ParcelaExpress\Config $config = null): array
     {
+        $serviceId = $this->serviceId !== null && $this->serviceId !== ''
+            ? $this->serviceId
+            : $localReference;
+        $serviceId = substr(preg_replace('/[^a-zA-Z0-9]/', '', $serviceId) ?? '', 0, 10);
+
+        if ($serviceId === '') {
+            $serviceId = substr('POS' . time(), 0, 10);
+        }
+
+        $documento = preg_replace('/\D/', '', (string) ($this->customer['document'] ?? '')) ?? '';
+
         $payload = [
-            'amount_cents' => $this->amountCents,
-            'form_payment' => $this->paymentForm->value,
             'terminal_id' => $this->terminalId,
-            'pre_capture' => true,
-            'installment_plan' => ['number_installments' => $this->installments],
-            'sale_id' => $localReference,
+            'amount' => $config ? $config->paraApi($this->amountCents, 'pos') : $this->amountCents,
+            'is_debit' => $this->paymentForm === PaymentForm::Debit,
+            'instalments' => $this->paymentForm === PaymentForm::Credit ? $this->installments : 1,
+            'service_id' => $serviceId,
+            'is_pix' => $this->paymentForm === PaymentForm::Pix,
+            'description' => mb_substr((string) ($this->description ?? ('Cobrança ' . $serviceId)), 0, 100),
+            'document' => $documento,
+            'has_split_rules' => $this->splitRules !== [],
+            'split_rules' => $this->splitRules,
         ];
-
-        if ($this->orderNumber !== null) {
-            $payload['order_number'] = $this->orderNumber;
-        }
-
-        if ($this->description !== null) {
-            $payload['description'] = $this->description;
-        }
-
-        if ($this->protocol !== null) {
-            $payload['protocol'] = $this->protocol;
-        }
-
-        if ($this->serviceId !== null) {
-            $payload['service_id'] = $this->serviceId;
-        }
-
-        if ($this->customer !== null) {
-            $payload['customer'] = $this->customer;
-        }
-
-        if ($this->splitRules !== []) {
-            $payload['has_split_rules'] = true;
-            $payload['split_rules'] = $this->splitRules;
-        }
 
         return $payload;
     }
@@ -147,26 +148,59 @@ final class PosSale
     }
 
     /** @param array<string,mixed> $data */
-    public static function fromApi(array $data, ?string $localReference = null): self
+    public static function fromApi(array $data, ?string $localReference = null, ?\TCloud\ParcelaExpress\Config $config = null): self
     {
         $row = $data['data'] ?? $data;
 
+        if (\is_array($row) && array_is_list($row)) {
+            $row = $row[0] ?? [];
+        }
+        if (!\is_array($row)) {
+            $row = [];
+        }
+
+        /* Valores: *_cents sempre em centavos; amount/total_amount/value na
+           unidade configurada (centavos, por padrao). */
+        $centavos = static function (array $r, array $chavesCents, array $chavesValor) use ($config): ?int {
+            foreach ($chavesCents as $k) {
+                if (isset($r[$k]) && is_numeric($r[$k])) {
+                    return (int) $r[$k];
+                }
+            }
+            foreach ($chavesValor as $k) {
+                if (isset($r[$k]) && is_numeric($r[$k])) {
+                    return $config ? $config->daApi($r[$k], 'pos') : (int) round((float) $r[$k]);
+                }
+            }
+            return null;
+        };
+
+        $status = $row['status'] ?? $row['transaction_status'] ?? $row['payment_status'] ?? null;
+        if (\is_array($status)) {
+            $status = $status['name'] ?? $status['value'] ?? null;
+        }
+
+        $criado = null;
+        if (!empty($row['created_at'])) {
+            try {
+                $criado = new \DateTimeImmutable((string) $row['created_at']);
+            } catch (\Throwable $e) {
+                $criado = null;
+            }
+        }
+
         return new self(
-            id: (string) ($row['id'] ?? $row['sale_id'] ?? $row['transaction_id'] ?? ''),
-            localReference: $localReference ?? ($row['sale_id'] ?? null),
+            id: (string) ($row['id'] ?? $row['sale_id'] ?? $row['transaction_id'] ?? $row['payment_id'] ?? ''),
+            localReference: $localReference,
             preCaptureStatus: PreCaptureStatus::tryFromApi(
                 $row['pre_capture_status'] ?? $row['pre_capture'] ?? null
             ),
-            transactionStatus: TransactionStatus::tryFromApi($row['status'] ?? null),
-            amountCents: isset($row['amount_cents']) ? (int) $row['amount_cents'] : null,
-            chargedAmountCents: isset($row['charged_amount_cents'])
-                ? (int) $row['charged_amount_cents']
-                : null,
-            orderNumber: $row['order_number'] ?? null,
-            terminalId: $row['terminal_id'] ?? null,
-            createdAt: isset($row['created_at'])
-                ? new \DateTimeImmutable((string) $row['created_at'])
-                : null,
+            transactionStatus: TransactionStatus::tryFromApi($status),
+            amountCents: $centavos($row, ['amount_cents'], ['amount', 'original_amount', 'value']),
+            chargedAmountCents: $centavos($row, ['charged_amount_cents', 'total_amount_cents'], ['total_amount', 'charged_amount']),
+            orderNumber: isset($row['order_number']) ? (string) $row['order_number'] : (isset($row['service_id']) ? (string) $row['service_id'] : null),
+            terminalId: isset($row['terminal_id']) ? (string) $row['terminal_id'] : null,
+            createdAt: $criado,
             raw: $row,
         );
     }

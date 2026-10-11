@@ -69,12 +69,16 @@ enum BoletoStatus: string
             return null;
         }
 
-        return match (strtolower($value)) {
-            'pending', 'open', 'registered', 'aberto', 'registrado' => self::Pending,
-            'paid', 'settled', 'pago', 'liquidado' => self::Paid,
-            'overdue', 'expired', 'vencido' => self::Overdue,
-            'canceled', 'cancelled', 'baixado', 'cancelado' => self::Canceled,
-            'failed', 'error', 'falha' => self::Failed,
+        /* A v2 devolve maiusculas; APPROVED/PAID/SETTLED/
+           CONFIRMED como pago. */
+        return match (strtolower(trim($value))) {
+            'pending', 'open', 'registered', 'created', 'waiting', 'waiting_payment', 'issued',
+            'aberto', 'registrado', 'pendente', 'emitido' => self::Pending,
+            'paid', 'settled', 'approved', 'confirmed', 'succeeded', 'captured',
+            'pago', 'liquidado', 'aprovado', 'compensado' => self::Paid,
+            'overdue', 'expired', 'vencido', 'expirado' => self::Overdue,
+            'canceled', 'cancelled', 'voided', 'refunded', 'baixado', 'cancelado' => self::Canceled,
+            'failed', 'error', 'denied', 'falha' => self::Failed,
             default => null,
         };
     }
@@ -101,19 +105,52 @@ final class Boleto
         public readonly ?string $pixCopiaCola,
         public readonly ?string $urlPdf,
         public readonly array $raw = [],
+        /** Venda criada junto com o boleto: e por ela que se consulta o pagamento. */
+        public readonly ?string $saleId = null,
+        /** Link de pagamento (with_payment_link). */
+        public readonly ?string $urlPagamento = null,
+        /** Imagem do QR Code para pagar com PIX/cartao. */
+        public readonly ?string $qrcodeUrl = null,
     ) {
     }
 
-    /** @param array<string,mixed> $data */
-    public static function fromApi(array $data, ?string $localReference = null): self
+    /**
+     * Le a resposta da emissao (v2: LISTA com um item por boleto) ou da
+     * consulta (venda ou titulo).
+     *
+     * Campos da resposta: id, sale_id, expires_at, barcode, url,
+     * billet_data.payment_link_url, billet_data.qrcode_url.
+     *
+     * @param array<string,mixed> $data
+     */
+    public static function fromApi(array $data, ?string $localReference = null, ?\TCloud\ParcelaExpress\Config $config = null): self
     {
         $row = $data['data'] ?? $data;
+
+        if (is_array($row) && array_is_list($row)) {
+            $row = $row[0] ?? [];
+        }
+        if (!is_array($row)) {
+            $row = [];
+        }
+
+        $bd = is_array($row['billet_data'] ?? null) ? $row['billet_data'] : [];
+        $bl = is_array($row['billet'] ?? null) ? $row['billet'] : [];
+        $pega = static function (array $chaves) use ($row, $bd, $bl) {
+            foreach ([$row, $bd, $bl] as $fonte) {
+                foreach ($chaves as $k) {
+                    if (isset($fonte[$k]) && $fonte[$k] !== '' && !is_array($fonte[$k])) {
+                        return $fonte[$k];
+                    }
+                }
+            }
+            return null;
+        };
 
         $dt = static function (mixed $v): ?\DateTimeImmutable {
             if (!is_string($v) || $v === '') {
                 return null;
             }
-
             try {
                 return new \DateTimeImmutable($v);
             } catch (\Throwable $e) {
@@ -121,24 +158,50 @@ final class Boleto
             }
         };
 
+        $valor = static function (array $chavesCents, array $chavesValor) use ($pega, $config): ?int {
+            $c = $pega($chavesCents);
+            if ($c !== null && is_numeric($c)) {
+                return (int) $c;
+            }
+            $v = $pega($chavesValor);
+            if ($v === null || !is_numeric($v)) {
+                return null;
+            }
+            return $config ? $config->daApi($v, 'boleto') : (int) round((float) $v);
+        };
+
+        $status = $row['status'] ?? $bd['status'] ?? $bl['status'] ?? null;
+        if (is_array($status)) {
+            $status = $status['name'] ?? $status['value'] ?? null;
+        }
+
+        $linha = $pega(['digitable_line', 'linha_digitavel', 'digitableLine', 'pay_number', 'typeable_line']);
+        $barras = $pega(['barcode', 'barcode_number', 'bar_code', 'codigo_barras']);
+        /* Em alguns retornos o "barcode" ja e a linha digitavel (47 digitos). */
+        if ($linha === null && $barras !== null && strlen(preg_replace('/\D/', '', (string) $barras) ?? '') === 47) {
+            $linha = $barras;
+        }
+
+        $urlPdf = $pega(['pdf_url', 'url', 'billet_url', 'link', 'pdf']);
+        $urlPag = $pega(['payment_link_url', 'payment_link', 'checkout_url']);
+        $saleId = $row['sale_id'] ?? $bd['sale_id'] ?? null;
+
         return new self(
-            id: (string) ($row['id'] ?? $row['billet_id'] ?? $row['charge_id'] ?? ''),
+            id: (string) ($row['id'] ?? $row['billet_id'] ?? $bl['id'] ?? $row['charge_id'] ?? ''),
             localReference: $localReference ?? ($row['reference'] ?? null),
-            status: BoletoStatus::tryFromApi($row['status'] ?? null),
-            // A API usa 'value' na emissao; aceitamos as duas grafias.
-            amountCents: isset($row['value'])
-                ? (int) $row['value']
-                : (isset($row['amount_cents']) ? (int) $row['amount_cents'] : null),
-            paidAmountCents: isset($row['paid_value'])
-                ? (int) $row['paid_value']
-                : (isset($row['paid_amount_cents']) ? (int) $row['paid_amount_cents'] : null),
-            vencimento: $dt($row['due_date'] ?? $row['expiration_date'] ?? null),
-            pagoEm: $dt($row['paid_at'] ?? $row['payment_date'] ?? null),
-            linhaDigitavel: $row['digitable_line'] ?? $row['linha_digitavel'] ?? $row['pay_number'] ?? null,
-            codigoBarras: $row['barcode'] ?? $row['barcode_number'] ?? null,
-            pixCopiaCola: $row['pix_code'] ?? $row['qr_code'] ?? null,
-            urlPdf: $row['pdf_url'] ?? $row['url'] ?? $row['link'] ?? null,
+            status: BoletoStatus::tryFromApi($status),
+            amountCents: $valor(['amount_cents', 'value_cents'], ['value', 'amount', 'original_amount']),
+            paidAmountCents: $valor(['paid_amount_cents'], ['paid_value', 'paid_amount', 'amount_paid']),
+            vencimento: $dt($pega(['due_date', 'expiration_date', 'expires_at', 'delivery_date'])),
+            pagoEm: $dt($pega(['paid_at', 'payment_date', 'settled_at'])),
+            linhaDigitavel: $linha !== null ? (string) $linha : null,
+            codigoBarras: $barras !== null ? (string) $barras : null,
+            pixCopiaCola: ($p = $pega(['pix_code', 'pix_copy_paste', 'emv', 'qr_code'])) !== null ? (string) $p : null,
+            urlPdf: $urlPdf !== null ? (string) $urlPdf : null,
             raw: $row,
+            saleId: $saleId !== null && $saleId !== '' ? (string) $saleId : null,
+            urlPagamento: $urlPag !== null ? (string) $urlPag : null,
+            qrcodeUrl: ($q = $pega(['qrcode_url', 'qr_code_url'])) !== null ? (string) $q : null,
         );
     }
 

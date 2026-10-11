@@ -3,24 +3,19 @@
 declare(strict_types=1);
 
 /**
- * pe_boleto_criar.php — Emite um boleto para a O.S.
+ * pe_boleto_criar.php — Emite um boleto (com link de pagamento) para a O.S.
  *
- * ORDEM DAS OPERAÇÕES (aprendida na marra): validar → gravar → chamar a API.
- * Gravar antes de validar deixa registro de boleto que nunca existiu, e o
- * operador vê na lista um título que o banco desconhece.
+ * Envia o nome e o CPF/CNPJ do pagador; vencimento em 3 dias; demais dados
+ * do pagador com os valores padrão do cliente (ParcelaExpressClient).
  *
- * E emitir NÃO é receber: nada é lançado em pagamento_os aqui. O título fica
- * em pe_boletos como pendente até a consulta confirmar a compensação.
+ * Emitir NÃO é receber: nada é lançado em pagamento_os aqui. O boleto fica
+ * pendente até a conferência confirmar o pagamento.
  */
 
 include(__DIR__ . '/../session_check.php');
 checkSession();
 
 require_once __DIR__ . '/pe_lib.php';
-
-use TCloud\ParcelaExpress\ApiException;
-use TCloud\ParcelaExpress\Boleto\BoletoRequest;
-use TCloud\ParcelaExpress\Endpoints;
 
 pe_guard_operacao();
 
@@ -33,46 +28,19 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $osId = (int) ($_POST['os_id'] ?? 0);
-$valorInformado = (float) ($_POST['valor'] ?? 0);
-$vencimentoStr = trim((string) ($_POST['vencimento'] ?? ''));
+$valorInformado = (float) str_replace(',', '.', (string) ($_POST['valor'] ?? 0));
 $nome = trim((string) ($_POST['pagador_nome'] ?? ''));
-$documento = trim((string) ($_POST['pagador_documento'] ?? ''));
-$email = trim((string) ($_POST['pagador_email'] ?? ''));
-$instrucoes = mb_substr(trim((string) ($_POST['instrucoes'] ?? '')), 0, 255);
-
-/* Endereço do pagador. A API não o exige na validação, mas quebra sem ele
-   (erro 500 "reading 'complement' of undefined"). */
-$endereco = [
-    'cep'         => trim((string) ($_POST['cep'] ?? '')),
-    'logradouro'  => trim((string) ($_POST['logradouro'] ?? '')),
-    'numero'      => trim((string) ($_POST['numero'] ?? '')),
-    'complemento' => trim((string) ($_POST['complemento'] ?? '')),
-    'bairro'      => trim((string) ($_POST['bairro'] ?? '')),
-    'cidade'      => trim((string) ($_POST['cidade'] ?? '')),
-    'uf'          => trim((string) ($_POST['uf'] ?? '')),
-];
+$documento = preg_replace('/\D/', '', (string) ($_POST['pagador_documento'] ?? '')) ?? '';
 
 if ($osId <= 0) {
     pe_json_erro('O.S. inválida.');
 }
 
-if ($documento === '') {
-    pe_json_erro('Informe o CPF ou CNPJ do pagador.');
-}
-
-try {
-    $vencimento = new DateTimeImmutable($vencimentoStr !== '' ? $vencimentoStr : '+3 days');
-} catch (Throwable $e) {
-    pe_json_erro('Data de vencimento inválida.');
-}
-
-$localReference = null;
-
 try {
     $pdo = pe_pdo();
     pe_migrar($pdo);
 
-    $stmt = $pdo->prepare("SELECT id, cliente FROM ordens_de_servico WHERE id = ? LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id, cliente, cpf_cliente FROM ordens_de_servico WHERE id = ? LIMIT 1");
     $stmt->execute([$osId]);
     $os = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -80,22 +48,27 @@ try {
         pe_json_erro('O.S. não encontrada.', 404);
     }
 
-    $saldo = pe_saldo_devido($osId);
+    if ($nome === '') {
+        $nome = (string) $os['cliente'];
+    }
+    if ($documento === '') {
+        $documento = preg_replace('/\D/', '', (string) $os['cpf_cliente']) ?? '';
+    }
+    if ($documento === '') {
+        pe_json_erro('Informe o CPF ou CNPJ do pagador.');
+    }
 
+    $saldo = pe_saldo_devido($osId);
     if ($saldo <= 0) {
         pe_json_erro('Esta O.S. não possui saldo em aberto.');
     }
 
     $valor = $valorInformado > 0 ? round($valorInformado, 2) : $saldo;
 
-    /* Boletos que ainda podem ser pagos consomem o saldo. 'failed' fica de
-       fora porque não existe do lado do banco; 'unknown' entra porque pode
-       existir, e nesse caso é mais seguro bloquear do que cobrar em dobro. */
+    /* Boletos ainda pagáveis consomem o saldo. */
     $abertos = $pdo->prepare(
-        "SELECT COALESCE(SUM(amount_cents), 0)
-           FROM pe_boletos
-          WHERE ordem_de_servico_id = ?
-            AND status IN ('pending', 'overdue', 'unknown')"
+        "SELECT COALESCE(SUM(amount_cents), 0) FROM pe_boletos
+          WHERE ordem_de_servico_id = ? AND status IN ('pending', 'overdue', 'unknown')"
     );
     $abertos->execute([$osId]);
     $jaEmitido = ((int) $abertos->fetchColumn()) / 100;
@@ -108,165 +81,125 @@ try {
         ));
     }
 
-    // ---- 1. Monta e VALIDA, antes de gravar qualquer coisa ----
+    // ---- Dados do boleto ----
+    $refId = pe_referencia($osId);
 
-    $localReference = bin2hex(random_bytes(16));
+    $tz = new DateTimeZone('America/Fortaleza');
+    $vencimento = (new DateTimeImmutable('now', $tz))->modify('+3 days');
 
-    $request = new BoletoRequest(
-        amountCents: (int) round($valor * 100),
-        vencimento: $vencimento,
-        pagadorNome: $nome !== '' ? $nome : (string) $os['cliente'],
-        pagadorDocumento: $documento,
-        pagadorEmail: $email !== '' ? $email : null,
-        // Vira shopper_statement: é o que o pagador vê. Como a API não tem
-        // campo de protocolo, é aqui que a O.S. fica visível.
-        descricao: 'O.S. ' . $osId . ' - ' . mb_substr((string) $os['cliente'], 0, 40),
-        instrucoes: $instrucoes !== '' ? $instrucoes : null,
-        protocol: (string) $osId,
-        endereco: $endereco,
-    );
+    $dadosBoleto = [
+        'referencia_id' => pe_referencia_api($refId),
+        'valor' => $valor,
+        'vencimento' => $vencimento->format('Y-m-d\TH:i:s\Z'),
+        'cliente_nome' => $nome,
+        'cliente_documento' => $documento,
+        'cliente_email' => '',
+        'endereco_rua' => '',
+        'endereco_numero' => 'S/N',
+        'endereco_bairro' => '',
+        'endereco_cidade' => '',
+        'endereco_uf' => '',
+        'endereco_cep' => '',
+        'instrucoes' => 'Cobrança OS ' . $osId,
+    ];
 
-    try {
-        $request->validate();
-    } catch (InvalidArgumentException $e) {
-        // Nada foi gravado e nada foi enviado. Só a mensagem volta.
-        pe_json_erro($e->getMessage());
-    }
+    $amountCents = (int) round($valor * 100);
 
-    // ---- 2. Registra a tentativa ----
-    // A partir daqui a chamada vai sair, então precisa haver rastro local
-    // caso a resposta se perca no caminho.
-
-    $ins = $pdo->prepare(
+    $pdo->prepare(
         "INSERT INTO pe_boletos
             (local_reference, ordem_de_servico_id, status, amount_cents, vencimento,
-             pagador_nome, pagador_documento, pagador_email, funcionario, request_payload)
-         VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)"
-    );
-    $ins->execute([
-        $localReference,
-        $osId,
-        $request->amountCents,
-        $vencimento->format('Y-m-d'),
-        $request->pagadorNome,
-        preg_replace('/\D/', '', $documento),
-        $email ?: null,
-        pe_usuario(),
-        json_encode($request->toArray($localReference), JSON_UNESCAPED_UNICODE),
+             pagador_nome, pagador_documento, funcionario, request_payload)
+         VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?)"
+    )->execute([
+        $refId, $osId, $amountCents, $vencimento->format('Y-m-d'),
+        $nome, $documento, pe_usuario(), json_encode($dadosBoleto, JSON_UNESCAPED_UNICODE),
     ]);
 
-    // ---- 3. Chama a API ----
+    // ---- Chamada à API ----
+    $res = pe_cliente()->emitirBoleto($dadosBoleto);
 
-    try {
-        $boleto = pe_boleto_service()->create($request, $localReference);
-    } catch (ApiException $e) {
-        if ($e->isTransportError()) {
-            /* Sem resposta: o boleto PODE ter sido criado. Marcar como
-               falha aqui seria mentira, e apagar o registro seria pior —
-               ficaria um título vivo no banco sem rastro nenhum aqui. */
-            $pdo->prepare("UPDATE pe_boletos SET status = 'unknown', last_error = ? WHERE local_reference = ?")
-                ->execute([mb_substr($e->getMessage(), 0, 500), $localReference]);
+    if (empty($res['success'])) {
+        $semResposta = (int) ($res['http_code'] ?? 0) === 0;
+        $msg = ParcelaExpressClient::mensagemErro($res, 'Erro na emissão do boleto');
 
-            pe_log('error', 'boleto', 'Emissão sem resposta (estado indeterminado): ' . $e->getMessage(), $osId);
-
-            pe_json_erro(
-                'Não houve resposta da Parcela Express. O boleto pode ter sido gerado — '
-                . 'confira no portal antes de emitir outro.',
-                502
-            );
+        /* Recusa da Receita: mostra o que foi enviado, para conferência. */
+        if (stripos($msg, 'Receita Federal') !== false) {
+            $docFmt = strlen($documento) === 11
+                ? preg_replace('/^(\d{3})(\d{3})(\d{3})(\d{2})$/', '$1.$2.$3-$4', $documento)
+                : $documento;
+            $msg .= ' — Enviado: CPF/CNPJ ' . $docFmt . ', pagador "' . $nome . '", conta ' . pe_cliente()->getEmail()
+                . ' (' . ((pe_config()['ambiente'] ?? 'sandbox') === 'production' ? 'produção' : 'sandbox') . ').';
         }
 
-        /* A API respondeu erro: o título não existe do outro lado. O registro
-           fica marcado como falha para auditoria e some da lista do operador. */
-        $pdo->prepare("UPDATE pe_boletos SET status = 'failed', last_error = ? WHERE local_reference = ?")
-            ->execute([mb_substr($e->getMessage(), 0, 500), $localReference]);
+        $pdo->prepare("UPDATE pe_boletos SET status = ?, last_error = ?, raw_payload = ? WHERE local_reference = ?")
+            ->execute([
+                $semResposta ? 'unknown' : 'failed',
+                mb_substr($msg, 0, 500),
+                json_encode($res['data'] ?? null, JSON_UNESCAPED_UNICODE),
+                $refId,
+            ]);
 
-        pe_log('error', 'boleto', 'Emissão recusada pela API: ' . $e->getMessage(), $osId);
+        pe_log('error', 'boleto', 'Emissão recusada (HTTP ' . ($res['http_code'] ?? 0) . '): ' . $msg
+            . ' | resposta: ' . mb_substr((string) json_encode($res['data'] ?? null, JSON_UNESCAPED_UNICODE), 0, 1500), $osId);
 
-        pe_json_erro(
-            pe_mensagem_api($e, 'Emitir boleto', Endpoints::build(
-                Endpoints::path('BOLETO_CREATE'),
-                ['seller_id' => pe_config()['seller_id'] ?? '{seller_id}']
-            )),
-            502
-        );
-    } catch (Throwable $e) {
-        $pdo->prepare("UPDATE pe_boletos SET status = 'failed', last_error = ? WHERE local_reference = ?")
-            ->execute([mb_substr($e->getMessage(), 0, 500), $localReference]);
-
-        pe_log('error', 'boleto', 'Falha inesperada na emissão: ' . $e->getMessage(), $osId);
-
-        pe_json_erro('Não foi possível emitir o boleto: ' . $e->getMessage(), 502);
+        pe_json_erro($semResposta
+            ? $msg . ' O boleto pode ter sido gerado — confira no portal antes de emitir outro.'
+            : $msg, 502);
     }
 
-    // ---- 4. Sucesso ----
+    // ---- Resposta: lista com um boleto ----
+    $data = $res['data'] ?? [];
+    $billet = (is_array($data) && isset($data[0]) && is_array($data[0])) ? $data[0] : (is_array($data) ? $data : []);
 
-    if ($boleto->id === '') {
-        // Respondeu 2xx sem identificador: não dá para consultar depois.
-        $pdo->prepare("UPDATE pe_boletos SET status = 'unknown', last_error = ? WHERE local_reference = ?")
-            ->execute(['A API não retornou identificador do boleto.', $localReference]);
+    $urlBoleto = (string) ($billet['url'] ?? '');
+    $urlPagamento = (string) ($billet['billet_data']['payment_link_url'] ?? $urlBoleto);
+    $linhaDigitavel = (string) ($billet['linha_digitavel'] ?? ($billet['digitable_line'] ?? ''));
+    $codigoBarras = (string) ($billet['barcode'] ?? '');
+    $saleId = (string) ($billet['sale_id'] ?? ($billet['id'] ?? $refId));
+    $billetId = (string) ($billet['id'] ?? $saleId);
 
-        pe_json_erro(
-            'A API respondeu sem identificar o boleto. Confira no portal antes de emitir outro.',
-            502
-        );
+    if ($linhaDigitavel === '' && strlen(preg_replace('/\D/', '', $codigoBarras) ?? '') === 47) {
+        $linhaDigitavel = $codigoBarras;
     }
 
-    /* O POST de emissão não devolve o link do PDF — ele vem de
-       GET /v1/billets/{id}/url. Buscamos aqui para guardar junto. */
-    $urlPdf = $boleto->urlPdf ?? pe_boleto_service()->url($boleto->id);
-
-    $upd = $pdo->prepare(
+    $pdo->prepare(
         "UPDATE pe_boletos
-            SET remote_id = ?, status = ?, linha_digitavel = ?, codigo_barras = ?,
-                pix_copia_cola = ?, url_pdf = ?, raw_payload = ?
+            SET remote_id = ?, remote_sale_id = ?, linha_digitavel = ?, codigo_barras = ?,
+                url_pdf = ?, url_pagamento = ?, raw_payload = ?
           WHERE local_reference = ?"
-    );
-    $upd->execute([
-        $boleto->id,
-        $boleto->status?->value ?? 'pending',
-        $boleto->linhaDigitavel,
-        $boleto->codigoBarras,
-        $boleto->pixCopiaCola,
-        $urlPdf,
-        json_encode($boleto->raw, JSON_UNESCAPED_UNICODE),
-        $localReference,
+    )->execute([
+        $billetId, $saleId, $linhaDigitavel ?: null, $codigoBarras ?: null,
+        $urlBoleto ?: null, $urlPagamento ?: null,
+        json_encode($data, JSON_UNESCAPED_UNICODE), $refId,
     ]);
 
-    /* CONFERENCIA DE UNIDADE.
-       O campo 'value' foi deduzido como centavos — a API não documentou a
-       unidade na mensagem de erro. Se ela interpretar como reais, um boleto
-       de R$ 471,64 vira R$ 47.164,00. Comparamos o que voltou com o que
-       enviamos e avisamos alto se divergir. */
-    $divergencia = null;
+    pe_log('info', 'boleto', "Boleto {$billetId} emitido no valor de R$ {$valor}.", $osId);
 
-    if ($boleto->amountCents !== null && $boleto->amountCents !== $request->amountCents) {
-        $divergencia = sprintf(
-            'Enviamos %d e a API registrou %d. Confira o valor do boleto antes de entregá-lo ao cliente.',
-            $request->amountCents,
-            $boleto->amountCents
-        );
-
-        pe_log('error', 'boleto', 'DIVERGÊNCIA DE VALOR: ' . $divergencia, $osId);
+    $linhaFmt = $linhaDigitavel;
+    $d = preg_replace('/\D/', '', $linhaDigitavel) ?? '';
+    if (strlen($d) === 47) {
+        $linhaFmt = sprintf('%s.%s %s.%s %s.%s %s %s',
+            substr($d, 0, 5), substr($d, 5, 5), substr($d, 10, 5), substr($d, 15, 6),
+            substr($d, 21, 5), substr($d, 26, 6), substr($d, 32, 1), substr($d, 33, 14));
     }
-
-    pe_log('info', 'boleto', "Boleto {$boleto->id} emitido no valor de R$ {$valor}.", $osId);
 
     pe_json_ok([
         'boleto' => [
-            'id' => $boleto->id,
-            'local_reference' => $localReference,
+            'id' => $billetId,
+            'local_reference' => $refId,
             'valor' => $valor,
             'vencimento' => $vencimento->format('Y-m-d'),
             'vencimento_br' => $vencimento->format('d/m/Y'),
-            'linha_digitavel' => $boleto->linhaFormatada(),
-            'linha_crua' => $boleto->linhaDigitavel,
-            'pix_copia_cola' => $boleto->pixCopiaCola,
-            'url_pdf' => $urlPdf,
-            'status' => $boleto->status?->value ?? 'pending',
-            'status_rotulo' => $boleto->status?->rotulo() ?? 'Aguardando pagamento',
-            'pagador_nome' => $request->pagadorNome,
-            'divergencia' => $divergencia,
+            'linha_digitavel' => $linhaFmt ?: null,
+            'linha_crua' => $linhaDigitavel ?: null,
+            'pix_copia_cola' => null,
+            'url_pdf' => $urlBoleto ?: null,
+            'url_pagamento' => $urlPagamento ?: null,
+            'qrcode_url' => $billet['billet_data']['qrcode_url'] ?? null,
+            'status' => 'pending',
+            'status_rotulo' => 'Aguardando pagamento',
+            'pagador_nome' => $nome,
+            'divergencia' => null,
         ],
     ]);
 } catch (Throwable $e) {

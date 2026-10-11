@@ -48,7 +48,18 @@ enum PreCaptureStatus: string
 
     public static function tryFromApi(mixed $value): ?self
     {
-        return \is_string($value) ? self::tryFrom(strtolower($value)) : null;
+        if (!\is_string($value)) {
+            return null;
+        }
+
+        return match (strtolower(trim($value))) {
+            'pending', 'waiting', 'created', 'aguardando' => self::Pending,
+            'sent_to_terminal', 'sent', 'processing', 'in_progress' => self::SentToTerminal,
+            'captured', 'capturado' => self::Captured,
+            'interrupted', 'aborted', 'interrompido' => self::Interrupted,
+            'expired', 'expirado', 'timeout' => self::Expired,
+            default => null,
+        };
     }
 }
 
@@ -82,9 +93,30 @@ enum TransactionStatus: string
         return $this === self::Denied;
     }
 
+    /**
+     * Traduz o status devolvido pela API.
+     *
+     * A v2 devolve o status em maiusculas (APPROVED, PAID,
+     * SETTLED, CONFIRMED como pago e CANCELED, EXPIRED, REFUNDED como
+     * cancelado). Status desconhecido = ainda aguardando (null).
+     */
     public static function tryFromApi(mixed $value): ?self
     {
-        return \is_string($value) ? self::tryFrom(strtolower($value)) : null;
+        if (!\is_string($value)) {
+            return null;
+        }
+
+        return match (strtolower(trim($value))) {
+            'approved', 'paid', 'settled', 'confirmed', 'succeeded', 'success', 'captured',
+            'liquidado', 'pago', 'aprovado', 'aprovada', 'concluido', 'concluído' => self::Approved,
+            'denied', 'declined', 'refused', 'not_authorized', 'recusado', 'recusada', 'negado' => self::Denied,
+            'canceled', 'cancelled', 'voided', 'expired', 'cancelado', 'cancelada', 'interrupted' => self::Canceled,
+            'refunded', 'chargeback', 'estornado' => self::Refunded,
+            'failed', 'error', 'falha', 'erro' => self::Failed,
+            'pending', 'waiting', 'created', 'processing', 'pre_authorized', 'authorized',
+            'aguardando', 'pendente' => self::Pending,
+            default => null,
+        };
     }
 }
 
