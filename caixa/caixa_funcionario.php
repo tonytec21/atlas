@@ -3,7 +3,7 @@
  * =====================================================================
  * caixa_funcionario.php — Normalização do campo "funcionario"
  * ---------------------------------------------------------------------
- * ATLAS-CAIXA-BUILD: 2026-08-01-funcionario-api
+ * ATLAS-CAIXA-BUILD: 2026-08-01-funcionario-api (módulo: ver caixa_versao.php)
  *
  * O PROBLEMA
  * ----------

@@ -2,20 +2,66 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_saldo.php';
 
 header('Content-Type: application/json');
 ob_start();
 
 $response = ['success' => false, 'error' => ''];
+$conn = null;
+$travado = false;
+$funcionario = '';
+$data_caixa = '';
+$ctx = ['acao' => 'deposito_cadastrado', 'referencia_tipo' => 'deposito'];
+$bloqueado = false;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     try {
         $conn = getDatabaseConnection();
 
-        $funcionario = trim(str_replace(' ', '', $_POST['funcionario_deposito']));
-        $data_caixa = $_POST['data_caixa_deposito'];
-        $valor_do_deposito = str_replace(['.', ','], ['', '.'], $_POST['valor_deposito']);
-        $tipo_deposito = $_POST['tipo_deposito'];
+        $funcionario = trim(str_replace(' ', '', $_POST['funcionario_deposito'] ?? ''));
+        $data_caixa = $_POST['data_caixa_deposito'] ?? '';
+        $valor_num = round(cx_parse_valor($_POST['valor_deposito'] ?? '0'), 2);
+        $valor_do_deposito = number_format($valor_num, 2, '.', '');
+        $tipo_deposito = trim($_POST['tipo_deposito'] ?? '');
+
+        if ($funcionario === '' || !cx_data_valida($data_caixa)) {
+            throw new Exception('Caixa inválido (funcionário ou data não informados).');
+        }
+        if ($tipo_deposito === '') {
+            throw new Exception('Selecione o tipo de depósito.');
+        }
+        if ($valor_num <= 0) {
+            throw new Exception('O valor do depósito deve ser maior que zero.');
+        }
+
+        $semComprovante = (isset($_POST['sem_comprovante']) && $_POST['sem_comprovante'] === 'on');
+        $ctx += [
+            'funcionario_caixa' => $funcionario,
+            'data_caixa'        => $data_caixa,
+            'valor'             => $valor_num,
+            'detalhes'          => ['tipo_deposito' => $tipo_deposito, 'sem_comprovante' => $semComprovante],
+        ];
+
+        // ===== Proteção: o depósito não pode ser maior que o saldo em caixa =====
+        if (!cx_lock($conn, $funcionario, $data_caixa)) {
+            throw new Exception('O caixa está sendo atualizado em outra janela. Tente novamente em instantes.');
+        }
+        $travado = true;
+
+        $saldo = cx_saldo_caixa($conn, $funcionario, $data_caixa);
+        $ctx['caixa_id']    = $saldo['caixa_id'];
+        $ctx['saldo_antes'] = $saldo['disponivel'];
+        $bloqueado = true; // as duas exceções abaixo são recusas por regra
+        if ($saldo['caixa_status'] === 'fechado') {
+            throw new Exception('Este caixa já está fechado. Não é possível lançar novos depósitos.');
+        }
+        if (cx_centavos($valor_num) > cx_centavos($saldo['disponivel'])) {
+            $response['disponivel'] = $saldo['disponivel'];
+            throw new Exception('O depósito (' . cx_moeda($valor_num) . ') é maior do que o saldo disponível em caixa ('
+                . cx_moeda(max(0, $saldo['disponivel'])) . ').');
+        }
+        $bloqueado = false;
 
         // Definindo o diretório alvo
         $target_dir = __DIR__ . "/anexos/" . date('d-m-y', strtotime($data_caixa)) . "/" . $funcionario . "/";
@@ -26,7 +72,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         // Decide fluxo: com ou sem comprovante
-        $semComprovante = (isset($_POST['sem_comprovante']) && $_POST['sem_comprovante'] === 'on');
         $file_name_to_save = ''; // será usado no INSERT (vazio quando sem comprovante)
 
         // Se NÃO for "sem comprovante", tenta mover o arquivo enviado
@@ -142,10 +187,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $response['success'] = true;
+        $response['disponivel'] = round($saldo['disponivel'] - $valor_num, 2);
+
+        $ctx['detalhes']['anexo'] = $semComprovante ? null : $file_name_to_save;
+        cx_auditoria_registrar($conn, array_merge($ctx, [
+            'referencia_id' => (int) $depositoId,
+            'saldo_depois'  => $response['disponivel'],
+            'descricao'     => 'Depósito (' . $tipo_deposito . ') de ' . cx_moeda($valor_num) . ' cadastrado'
+                             . ($semComprovante ? ' sem comprovante.' : '.'),
+        ]));
 
     } catch (Exception $e) {
         $response['error'] = $e->getMessage();
+        if ($conn instanceof PDO && !empty($ctx['funcionario_caixa'])) {
+            cx_auditoria_registrar($conn, array_merge($ctx, [
+                'resultado' => $bloqueado ? 'bloqueado' : 'erro',
+                'descricao' => $e->getMessage(),
+            ]));
+        }
+    } finally {
+        if ($travado && $conn instanceof PDO) {
+            cx_unlock($conn, $funcionario, $data_caixa);
+        }
     }
+} else {
+    $response['error'] = 'Método de requisição inválido.';
 }
 
 ob_end_clean();

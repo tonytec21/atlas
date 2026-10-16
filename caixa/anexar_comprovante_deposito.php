@@ -7,6 +7,7 @@ try {
     include(__DIR__ . '/session_check.php');
     checkSession();
     include(__DIR__ . '/db_connection.php');
+    require_once __DIR__ . '/caixa_auditoria.php';
     date_default_timezone_set('America/Sao_Paulo');
 
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -112,6 +113,16 @@ try {
     $up->bindValue(':anexo', $filename, PDO::PARAM_STR);
     $up->bindValue(':id', $depositoId, PDO::PARAM_INT);
     $up->execute();
+
+    cx_auditoria_registrar($conn, [
+        'acao'              => 'comprovante_anexado',
+        'funcionario_caixa' => $funcionario,
+        'data_caixa'        => substr($dataCaixa, 0, 10),
+        'referencia_tipo'   => 'deposito',
+        'referencia_id'     => $depositoId,
+        'descricao'         => 'Comprovante anexado ao depósito #' . $depositoId . '.',
+        'detalhes'          => ['arquivo' => $filename, 'nome_original' => $file['name'], 'anexo_anterior' => $dep['caminho_anexo'] ?: null],
+    ]);
 
     echo json_encode(['success' => true, 'filename' => $filename]);
 } catch (Throwable $e) {

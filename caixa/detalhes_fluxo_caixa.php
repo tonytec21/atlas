@@ -8,6 +8,7 @@ checkSession();
 include(__DIR__ . '/db_connection.php');
 require_once __DIR__ . '/caixa_funcionario.php';
 require_once __DIR__ . '/pagamento_observacao_config.php';
+require_once __DIR__ . '/caixa_saldo.php';
 
 
 header('Content-Type: application/json');
@@ -500,6 +501,13 @@ try {
 
     $totalEmCaixa = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $totalSaidasDespesas - $totalDepositoCaixa - $totalSaldoTransportado;
 
+    // Caixa individual: o "Total em Caixa" segue o mesmo cálculo usado nas validações
+    $caixaInfo = null;
+    if ($tipo !== 'unificado' && cx_data_valida($data)) {
+        $caixaInfo    = cx_saldo_caixa($conn, $funcionarios, $data);
+        $totalEmCaixa = $caixaInfo['disponivel'];
+    }
+
     echo json_encode([
         'atos' => $atos,
         'atosManuais' => $atos_manuais,
@@ -535,7 +543,12 @@ try {
 
         // NOVO: Repasse a credores (Protesto)
         'repasseCredor' => isset($repasseCredor) ? $repasseCredor : [],
-        'totalRepasseCredor' => isset($totalRepasseCredor) ? $totalRepasseCredor : 0.0
+        'totalRepasseCredor' => isset($totalRepasseCredor) ? $totalRepasseCredor : 0.0,
+
+        // Situação do caixa (individual)
+        'caixaStatus' => $caixaInfo ? $caixaInfo['caixa_status'] : null,
+        'origemSaldo' => $caixaInfo ? $caixaInfo['origem_saldo'] : null,
+        'ultimoCaixa' => $caixaInfo ? $caixaInfo['ultimo_caixa'] : false
     ]);
 } catch (Exception $e) {
     echo json_encode(['error' => $e->getMessage()]);

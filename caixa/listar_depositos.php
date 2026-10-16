@@ -2,6 +2,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_saldo.php';
 
 header('Content-Type: application/json');
 
@@ -114,6 +115,21 @@ try {
                         - $totalSaldoTransportado;
     }
 
+    // Caixa individual: usa o mesmo cálculo das validações do servidor
+    $caixaStatus = $caixa ? $caixa['status'] : null;
+    if ($tipo !== 'unificado' && cx_data_valida($data)) {
+        $saldo = cx_saldo_caixa($conn, $funcionarios, $data);
+        $saldoInicial           = $saldo['saldo_inicial'];
+        $totalRecebidoEspecie   = $saldo['recebido_especie'];
+        $totalDevolvidoEspecie  = $saldo['devolvido_especie'];
+        $totalSaidasDespesas    = $saldo['saidas'];
+        $totalDepositoCaixa     = $saldo['depositos'];
+        $totalSaldoTransportado = $saldo['transportado'];
+        $totalEmCaixa           = $saldo['disponivel'];
+        $caixaStatus            = $saldo['caixa_status'];
+        $podeExcluir            = ($caixaStatus === 'aberto') ? 1 : 0;
+    }
+
     // Anexa a flag pode_excluir a cada depósito retornado
     $depositos = array_map(function ($item) use ($podeExcluir) {
         $item['pode_excluir'] = $podeExcluir;
@@ -129,6 +145,8 @@ try {
         'totalDepositoCaixa'    => $totalDepositoCaixa,
         'totalSaldoTransportado'=> $totalSaldoTransportado,
         'totalEmCaixa'          => $totalEmCaixa,
+        'saldoDisponivel'       => $totalEmCaixa,
+        'caixaStatus'           => $caixaStatus,
         'data_caixa'            => $data, 
         'funcionario'           => $funcionarios
     ]);

@@ -1,0 +1,45 @@
+VERIFICAÇÃO EM DUAS ETAPAS (2FA) — ATLAS
+=========================================
+
+Compatível com Google Authenticator e Microsoft Authenticator (padrão TOTP,
+RFC 6238: SHA1, 6 dígitos, 30 segundos). É opcional: só atua se o usuário ativar.
+
+ARQUIVOS
+--------
+- lib/totp.php ................ biblioteca TOTP (gera segredo, gera e valida códigos). Autocontida.
+- 2fa/tfa_setup.php ........... endpoint AJAX para ativar/desativar (usado em atualizar-credenciais.php).
+- 2fa/migracao_2fa.sql ........ adiciona as colunas no banco "atlas".
+- verificar-2fa.php ........... 2ª etapa do login (pede o código de 6 dígitos).
+- script/qrcode.min.js ........ gera o QR Code no navegador (sem depender de internet/CDN).
+- atualizar-credenciais.php ... ganhou o card "Verificação em duas etapas".
+- check_login.php ............. passa pela 2ª etapa quando o usuário tem 2FA ativado.
+
+INSTALAÇÃO
+----------
+1) Rode a migração 2fa/migracao_2fa.sql no banco "atlas" (uma vez).
+2) Suba os arquivos mantendo a estrutura de pastas (atlas/lib, atlas/2fa, atlas/script, e os .php da raiz).
+3) Pronto. Cada usuário ativa quando quiser em "Minhas Credenciais" (atualizar-credenciais.php).
+
+COMO O USUÁRIO ATIVA
+--------------------
+1) Acessa "Minhas Credenciais".
+2) Em "Verificação em duas etapas", clica em "Ativar".
+3) Escaneia o QR Code (ou digita a chave) no Google/Microsoft Authenticator.
+4) Digita o código de 6 dígitos e confirma. A partir daí, todo login pedirá o código.
+
+COMO FUNCIONA NO LOGIN
+----------------------
+- Usuário e senha continuam iguais.
+- Se o usuário NÃO tiver 2FA: login direto, como antes.
+- Se TIVER 2FA: após a senha, abre verificar-2fa.php pedindo o código do app.
+
+DESATIVAR
+---------
+No mesmo card, o usuário informa um código atual do app e clica em "Desativar".
+Se alguém perder o aparelho, um administrador pode desativar manualmente no banco:
+    UPDATE funcionarios SET tfa_enabled = 0, tfa_secret = NULL WHERE usuario = 'LOGIN';
+
+OBSERVAÇÃO DE SEGURANÇA
+----------------------
+O segredo 2FA é gerado no servidor e guardado em funcionarios.tfa_secret.
+A verificação usa janela de ±30s para tolerar diferença de relógio.

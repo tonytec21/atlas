@@ -2,39 +2,45 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/caixa_saldo.php';
 
 date_default_timezone_set('America/Sao_Paulo');
 
-header('Content-Type: application/json');
-
 try {
     $funcionario = $_SESSION['username'];
-    $dataCaixa = date('Y-m-d');
+    $dataCaixa   = date('Y-m-d');
 
     $conn = getDatabaseConnection();
+    cx_garantir_estrutura($conn);
 
-    // Verifica se já existe um caixa para a data atual, para o funcionário, independentemente do status
-    $sql = 'SELECT id FROM caixa WHERE DATE(data_caixa) = :data_caixa AND funcionario = :funcionario LIMIT 1';
-    $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':data_caixa', $dataCaixa);
-    $stmt->bindParam(':funcionario', $funcionario);
-    $stmt->execute();
-    $caixaExistente = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($caixaExistente) {
-        echo json_encode(['aberto' => true]);
-    } else {
-        // Verifica todos os saldos transportados em aberto para o funcionário e soma seus valores
-        $sql = 'SELECT SUM(valor_transportado) as saldo_transportado_total FROM transporte_saldo_caixa WHERE status = "em aberto" AND funcionario = :funcionario';
-        $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':funcionario', $funcionario);
-        $stmt->execute();
-        $transporteSaldo = $stmt->fetch(PDO::FETCH_ASSOC);
-        $saldoTransportadoTotal = $transporteSaldo ? floatval($transporteSaldo['saldo_transportado_total']) : 0.0;
-
-        echo json_encode(['aberto' => false, 'saldo_transportado' => $saldoTransportadoTotal]);
+    // Já existe caixa hoje para o funcionário (qualquer status)?
+    $st = $conn->prepare('SELECT id FROM caixa WHERE funcionario = :f AND DATE(data_caixa) = :d LIMIT 1');
+    $st->execute([':f' => $funcionario, ':d' => $dataCaixa]);
+    if ($st->fetch(PDO::FETCH_ASSOC)) {
+        cx_json(['aberto' => true]);
     }
+
+    // Saldo transportado ainda não utilizado
+    $st = $conn->prepare("SELECT COALESCE(SUM(valor_transportado),0) FROM transporte_saldo_caixa WHERE status = 'em aberto' AND funcionario = :f");
+    $st->execute([':f' => $funcionario]);
+    $saldoTransportado = round((float) $st->fetchColumn(), 2);
+
+    // Caixas anteriores ainda abertos e com dinheiro: bloqueiam a abertura
+    $pendentes = cx_caixas_abertos_com_saldo($conn, $funcionario, $dataCaixa);
+    foreach ($pendentes as &$p) {
+        $p['data_br']       = cx_data_br($p['data']);
+        $p['disponivel_br'] = cx_moeda($p['disponivel']);
+    }
+    unset($p);
+
+    cx_json([
+        'aberto'             => false,
+        'saldo_transportado' => $saldoTransportado,
+        'bloqueado'          => count($pendentes) > 0,
+        'pendentes'          => $pendentes,
+        'is_admin'           => cx_eh_admin($conn, $funcionario),
+        'funcionario'        => $funcionario,
+    ]);
 } catch (Exception $e) {
-    echo json_encode(['error' => $e->getMessage()]);
+    cx_json(['error' => $e->getMessage()]);
 }
-?>

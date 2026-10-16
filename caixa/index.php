@@ -3,9 +3,9 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
 require_once __DIR__ . '/caixa_funcionario.php';
+require_once __DIR__ . '/caixa_saldo.php';
 date_default_timezone_set('America/Sao_Paulo');
 ?>
-<?php include(__DIR__ . '/../os/guia/guia.php'); ?>
 <!DOCTYPE html>
 <html lang="pt-br">
 
@@ -19,7 +19,107 @@ date_default_timezone_set('America/Sao_Paulo');
     <link rel="icon" href="../style/img/favicon.png" type="image/png">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/dataTables.bootstrap4.min.css">
-    <?php include(__DIR__ . '/../style/style_caixa.php'); ?>  
+    <?php include(__DIR__ . '/../style/style_caixa.php'); ?>
+    <?php include(__DIR__ . '/caixa_botoes.php'); ?>
+    <style>
+        /* ===================== Pesquisa do Fluxo de Caixa ===================== */
+        .cxf-panel{ background:#fff; border:1px solid #e5e9f0; border-radius:16px; padding:18px 18px 10px; box-shadow:0 1px 3px rgba(15,23,42,.05); margin:14px 0 18px; }
+        .cxf-panel-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+        .cxf-panel-title{ font-weight:700; font-size:1rem; color:#0f172a; display:flex; align-items:center; gap:8px; margin:0; }
+        .cxf-panel-title i{ color:#2563eb; }
+        .cxf-label{ display:block; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#64748b; margin-bottom:4px; }
+        .cxf-pills{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+        .cxf-pill{ border:1px solid #d6dde8; background:#f8fafc; color:#334155; border-radius:999px; padding:5px 13px; font-size:.82rem; font-weight:600; cursor:pointer; transition:all .15s ease; line-height:1.4; }
+        .cxf-pill:hover{ border-color:#2563eb; color:#2563eb; }
+        .cxf-pill.active{ background:#2563eb; border-color:#2563eb; color:#fff; box-shadow:0 2px 6px rgba(37,99,235,.25); }
+        .cxf-panel .form-control{ border-radius:10px; }
+        .cxf-adv-toggle{ font-size:.85rem; font-weight:600; color:#2563eb; cursor:pointer; user-select:none; background:none; border:0; padding:0; }
+        .cxf-adv-toggle .fa{ transition:transform .2s ease; }
+        .cxf-adv-toggle[aria-expanded="true"] .fa-chevron-down{ transform:rotate(180deg); }
+        .cxf-adv{ border-top:1px dashed #e2e8f0; margin-top:6px; padding-top:12px; }
+        .cxf-checks{ display:flex; flex-wrap:wrap; gap:6px; }
+        .cxf-check{ position:relative; margin:0; }
+        .cxf-check input{ position:absolute; opacity:0; pointer-events:none; }
+        .cxf-check span{ display:inline-flex; align-items:center; gap:6px; border:1px solid #d6dde8; border-radius:10px; padding:5px 10px; font-size:.82rem; color:#334155; cursor:pointer; background:#fff; }
+        .cxf-check input:checked + span{ background:#ecfdf5; border-color:#10b981; color:#047857; font-weight:600; }
+        .cxf-check input:focus-visible + span{ outline:2px solid #2563eb; outline-offset:1px; }
+        .cxf-actions{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:12px 0 6px; }
+        .cxf-actions-spacer{ flex:1 1 auto; }
+        .cxf-view{ display:inline-flex; border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; }
+        .cxf-view-btn{ display:inline-flex; align-items:center; justify-content:center; width:38px; height:34px; padding:0;
+                       border:0; background:#fff; color:#475569; cursor:pointer; }
+        .cxf-view-btn + .cxf-view-btn{ border-left:1px solid #cbd5e1; }
+        .cxf-view-btn.active{ background:#2563eb; color:#fff; }
+        .cxf-active{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 12px; }
+        .cxf-chip{ display:inline-flex; align-items:center; gap:6px; background:#eef2ff; color:#3730a3; border-radius:999px; padding:3px 10px; font-size:.76rem; font-weight:600; }
+        .cxf-kpis{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:14px; }
+        .cxf-kpi{ background:#fff; border:1px solid #e5e9f0; border-left:4px solid #94a3b8; border-radius:12px; padding:10px 12px; }
+        .cxf-kpi .lb{ font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#64748b; }
+        .cxf-kpi .vl{ font-size:1.08rem; font-weight:700; color:#0f172a; white-space:nowrap; }
+        .cxf-kpi .sb{ font-size:.72rem; color:#94a3b8; }
+        .cxf-kpi.k-qtd{ border-left-color:#6366f1; } .cxf-kpi.k-atos{ border-left-color:#2563eb; }
+        .cxf-kpi.k-esp{ border-left-color:#16a34a; } .cxf-kpi.k-conta{ border-left-color:#f59e0b; }
+        .cxf-kpi.k-said{ border-left-color:#dc2626; } .cxf-kpi.k-dep{ border-left-color:#0891b2; }
+        .cxf-kpi.k-cx{ border-left-color:#0f172a; }
+        .cxf-toolbar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .cxf-toolbar h5{ margin:0; font-weight:700; }
+        .cxf-toolbar .cxf-count{ font-size:.82rem; color:#64748b; font-weight:600; margin-left:6px; }
+        .cxf-tools{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+        .cxf-search{ position:relative; }
+        .cxf-search input{ padding-left:30px; border-radius:10px; min-width:220px; }
+        .cxf-search .fa{ position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94a3b8; }
+        .cxf-pend{ display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+        .cxf-tag{ display:inline-flex; align-items:center; gap:4px; font-size:.68rem; font-weight:700; border-radius:6px; padding:2px 7px; }
+        .cxf-tag.warn{ background:#fff7ed; color:#c2410c; }
+        .cxf-tag.info{ background:#eff6ff; color:#1d4ed8; }
+        .cxf-tag.danger{ background:#fef2f2; color:#b91c1c; }
+        .cxf-tag.ok{ background:#ecfdf5; color:#047857; }
+        .cxf-table-wrap{ background:#fff; border:1px solid #e5e9f0; border-radius:14px; overflow:auto; }
+        .cxf-table{ margin:0; font-size:.84rem; }
+        .cxf-table thead th{ position:sticky; top:0; background:#f8fafc; z-index:1; font-size:.7rem; text-transform:uppercase; letter-spacing:.03em; color:#475569; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
+        .cxf-table td{ vertical-align:middle; white-space:nowrap; }
+        .cxf-table td.num, .cxf-table th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+        .cxf-table tbody tr{ cursor:pointer; }
+        .cxf-table tbody tr:hover{ background:#f1f5f9; }
+        .cxf-table tfoot td{ font-weight:700; background:#f8fafc; }
+        .cxf-table .card-actions{ display:flex; gap:4px; flex-wrap:nowrap; }
+        .cxf-empty{ text-align:center; padding:40px 16px; color:#64748b; border:1px dashed #cbd5e1; border-radius:14px; background:#fff; }
+        .cxf-empty .fa{ font-size:2rem; color:#cbd5e1; margin-bottom:8px; display:block; }
+        .cxf-nome{ font-size:.75rem; color:#64748b; margin-top:-2px; }
+        .cxf-versao{ text-align:right; font-size:.72rem; color:#94a3b8; margin:18px 0 6px; }
+        .cxf-hidden{ display:none !important; }
+        /* Abertura do caixa */
+        .cxf-pendentes{ border:1px solid #fecaca; background:#fef2f2; border-radius:12px; padding:12px; margin-bottom:12px; }
+        .cxf-pendentes h6{ color:#b91c1c; font-weight:700; margin-bottom:6px; }
+        .cxf-pendentes ul{ margin:0; padding-left:0; list-style:none; }
+        .cxf-pendentes li{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-top:1px solid #fee2e2; font-size:.88rem; }
+        .cxf-pendentes li:first-child{ border-top:0; }
+        .cxf-disp{ display:flex; align-items:center; justify-content:space-between; gap:10px; border-radius:12px; padding:10px 14px; background:#f0fdf4; border:1px solid #bbf7d0; margin-bottom:14px; }
+        .cxf-disp .lb{ font-size:.75rem; font-weight:700; text-transform:uppercase; color:#15803d; }
+        .cxf-disp .vl{ font-size:1.25rem; font-weight:800; color:#14532d; }
+        .cxf-disp.zero{ background:#fef2f2; border-color:#fecaca; }
+        .cxf-disp.zero .lb, .cxf-disp.zero .vl{ color:#b91c1c; }
+        .btn-saldo-admin{ background:#7c3aed; border-color:#7c3aed; color:#fff; }
+        .btn-saldo-admin:hover{ background:#6d28d9; color:#fff; }
+        @media (max-width: 576px){
+            .cxf-search input{ min-width:0; width:100%; }
+            .cxf-search, .cxf-tools{ width:100%; }
+            .cxf-actions .cxf-btn{ flex:1 1 100%; }
+            .cxf-actions-spacer{ display:none; }
+        }
+        /* Tema escuro do Atlas */
+        body.dark-mode .cxf-panel, body.dark-mode .cxf-kpi, body.dark-mode .cxf-table-wrap, body.dark-mode .cxf-empty{ background:#1e293b; border-color:#334155; }
+        body.dark-mode .cxf-panel-title, body.dark-mode .cxf-kpi .vl{ color:#f1f5f9; }
+        body.dark-mode .cxf-pill, body.dark-mode .cxf-check span{ background:#0f172a; border-color:#334155; color:#cbd5e1; }
+        body.dark-mode .cxf-pill.active{ background:#2563eb; color:#fff; border-color:#2563eb; }
+        body.dark-mode .cxf-table thead th, body.dark-mode .cxf-table tfoot td{ background:#0f172a; color:#cbd5e1; border-color:#334155; }
+        body.dark-mode .cxf-table td{ color:#e2e8f0; border-color:#334155; }
+        body.dark-mode .cxf-table tbody tr:hover{ background:#273449; }
+        body.dark-mode .cxf-chip{ background:#312e81; color:#e0e7ff; }
+        body.dark-mode .cxf-btn-light, body.dark-mode .cxf-btn-dark, body.dark-mode .cxf-btn-green-outline,
+        body.dark-mode .cxf-view-btn{ background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+        body.dark-mode .cxf-view-btn.active{ background:#2563eb !important; color:#fff !important; }
+    </style>
 </head>
 
 <body class="light-mode">
@@ -42,12 +142,14 @@ date_default_timezone_set('America/Sao_Paulo');
     }
 
     $conn = getDatabaseConnection();
+    cx_garantir_estrutura($conn);
+
     $stmt = $conn->prepare('SELECT nivel_de_acesso, status, usuario FROM funcionarios WHERE usuario = :usuario');
     $stmt->bindParam(':usuario', $_SESSION['username']);
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($user['status'] !== 'ativo') {
+    if (!$user || $user['status'] !== 'ativo') {
         echo "<script>alert('O usuário não tem acesso à página.'); window.location.href='../index.php';</script>";
         exit;
     }
@@ -62,18 +164,147 @@ date_default_timezone_set('America/Sao_Paulo');
 
     // Verifica se o nível de acesso é "usuario" e se tem o acesso adicional "Fluxo de Caixa"
     if ($user['nivel_de_acesso'] === 'usuario' && !empty($user['acesso_adicional'])) {
-        $acessosAdicionais = explode(',', $user['acesso_adicional']);
-        $acessosAdicionais = array_map('trim', $acessosAdicionais); 
+        $acessosAdicionais = array_map('trim', explode(',', $user['acesso_adicional']));
         if (in_array('Fluxo de Caixa', $acessosAdicionais)) {
             $temAcessoFluxoDeCaixa = true;
         }
     }
 
-    // ===== NOVO: Período rápido (default: hoje) =====
-    $selectedPeriodo = isset($_GET['periodo']) ? $_GET['periodo'] : 'hoje';
+    $isAdmin           = ($user['nivel_de_acesso'] === 'administrador');
+    $temAcessoCompleto = ($isAdmin || $temAcessoFluxoDeCaixa);
+
+    // ============================ Helpers de saída ============================
+    $h   = function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
+    $js  = function ($v) { return htmlspecialchars(json_encode($v, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); };
+    $fmt = function ($v) { return 'R$ ' . number_format((float) $v, 2, ',', '.'); };
+    $gp  = function ($k, $padrao = '') {
+        return (isset($_GET[$k]) && !is_array($_GET[$k])) ? trim((string) $_GET[$k]) : $padrao;
+    };
+
+    // ============================ Parâmetros da pesquisa ============================
     $hoje = date('Y-m-d');
-    $ultimo7 = date('Y-m-d', strtotime('-6 days')); 
-    $ultimo30 = date('Y-m-d', strtotime('-30 days')); 
+
+    $periodos = [
+        'hoje'           => 'Hoje',
+        'ontem'          => 'Ontem',
+        'ultimos7'       => 'Últimos 7 dias',
+        'semanal'        => 'Esta semana',
+        'semana_passada' => 'Semana passada',
+        'mensal'         => 'Este mês',
+        'mes_passado'    => 'Mês passado',
+        'ultimos30'      => 'Últimos 30 dias',
+        'anual'          => 'Este ano',
+        'todos'          => 'Todos',
+        'personalizado'  => 'Personalizado',
+    ];
+
+    $dataIniGet = $gp('data_inicial');
+    $dataFimGet = $gp('data_final');
+    if ($dataIniGet !== '' && !cx_data_valida($dataIniGet)) { $dataIniGet = ''; }
+    if ($dataFimGet !== '' && !cx_data_valida($dataFimGet)) { $dataFimGet = ''; }
+    $temDatas = ($dataIniGet !== '' || $dataFimGet !== '');
+
+    $selectedPeriodo = $gp('periodo', $temDatas ? 'personalizado' : 'hoje');
+    if ($selectedPeriodo === 'ultimoMes') { $selectedPeriodo = 'ultimos30'; } // links antigos
+    if (!isset($periodos[$selectedPeriodo])) { $selectedPeriodo = 'hoje'; }
+
+    /** Intervalo [inicio, fim] de um período rápido (null = sem restrição). */
+    $intervaloPeriodo = function ($p) use ($hoje) {
+        switch ($p) {
+            case 'hoje':           return [$hoje, $hoje];
+            case 'ontem':          $d = date('Y-m-d', strtotime('-1 day')); return [$d, $d];
+            case 'ultimos7':       return [date('Y-m-d', strtotime('-6 days')), $hoje];
+            case 'semanal':        return [date('Y-m-d', strtotime('monday this week')), date('Y-m-d', strtotime('sunday this week'))];
+            case 'semana_passada': return [date('Y-m-d', strtotime('monday last week')), date('Y-m-d', strtotime('sunday last week'))];
+            case 'mensal':         return [date('Y-m-01'), date('Y-m-t')];
+            case 'mes_passado':    return [date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))];
+            case 'ultimos30':      return [date('Y-m-d', strtotime('-29 days')), $hoje];
+            case 'anual':          return [date('Y-01-01'), date('Y-12-31')];
+            default:               return null;
+        }
+    };
+
+    // Datas efetivas
+    if ($selectedPeriodo === 'personalizado') {
+        $periodoIni = $dataIniGet !== '' ? $dataIniGet : null;
+        $periodoFim = $dataFimGet !== '' ? $dataFimGet : null;
+    } elseif ($selectedPeriodo === 'todos') {
+        $periodoIni = $periodoFim = null;
+    } else {
+        list($periodoIni, $periodoFim) = $intervaloPeriodo($selectedPeriodo);
+    }
+    if ($periodoIni && $periodoFim && $periodoIni > $periodoFim) {
+        list($periodoIni, $periodoFim) = [$periodoFim, $periodoIni];
+    }
+
+    // Funcionário
+    $funcionarioSel = $temAcessoCompleto ? $gp('funcionario', 'todos') : $user['usuario'];
+    if ($funcionarioSel === '') { $funcionarioSel = 'todos'; }
+
+    // Filtros avançados
+    $situacoes = [
+        'todas'     => 'Todas as situações',
+        'aberto'    => 'Abertos (com saldo em caixa)',
+        'fechado'   => 'Fechados / zerados',
+        'zerado'    => 'Abertos sem saldo inicial',
+        'sem_caixa' => 'Movimento sem abertura de caixa',
+        'negativo'  => 'Saldo negativo (inconsistência)',
+    ];
+    $situacao = $gp('situacao', 'todas');
+    if (!isset($situacoes[$situacao])) { $situacao = 'todas'; }
+
+    $possuiOpcoes = [
+        'atos'            => ['Atos liquidados', 'fa-gavel'],
+        'especie'         => ['Recebimento em espécie', 'fa-money'],
+        'conta'           => ['Recebimento em conta', 'fa-credit-card'],
+        'devolucoes'      => ['Devoluções', 'fa-undo'],
+        'saidas'          => ['Saídas e despesas', 'fa-sign-out'],
+        'depositos'       => ['Depósitos', 'fa-university'],
+        'sem_comprovante' => ['Depósito sem comprovante', 'fa-exclamation-triangle'],
+        'transporte'      => ['Saldo transportado', 'fa-share'],
+    ];
+    $possui = [];
+    if (isset($_GET['possui']) && is_array($_GET['possui'])) {
+        foreach ($_GET['possui'] as $p) {
+            if (is_string($p) && isset($possuiOpcoes[$p])) { $possui[] = $p; }
+        }
+        $possui = array_values(array_unique($possui));
+    }
+
+    $valorMinTxt = $gp('valor_min');
+    $valorMaxTxt = $gp('valor_max');
+    $valorMin = $valorMinTxt !== '' ? cx_parse_valor($valorMinTxt) : null;
+    $valorMax = $valorMaxTxt !== '' ? cx_parse_valor($valorMaxTxt) : null;
+
+    $ordenacoes = [
+        'data_desc'    => 'Data (mais recente)',
+        'data_asc'     => 'Data (mais antiga)',
+        'caixa_desc'   => 'Total em caixa (maior)',
+        'caixa_asc'    => 'Total em caixa (menor)',
+        'atos_desc'    => 'Atos liquidados (maior)',
+        'especie_desc' => 'Recebido em espécie (maior)',
+        'func_asc'     => 'Funcionário (A–Z)',
+    ];
+    $ordenar = $gp('ordenar', 'data_desc');
+    if (!isset($ordenacoes[$ordenar])) { $ordenar = 'data_desc'; }
+
+    $avancadoAtivo = ($situacao !== 'todas' || $possui || $valorMin !== null || $valorMax !== null || $ordenar !== 'data_desc');
+
+    // Lista de funcionários (select + nomes nos cards)
+    $queryFuncionarios = $temAcessoCompleto
+        ? "SELECT usuario, nome_completo FROM funcionarios WHERE status = 'ativo' ORDER BY nome_completo"
+        : "SELECT usuario, nome_completo FROM funcionarios WHERE usuario = :usuario";
+    $stmt = $conn->prepare($queryFuncionarios);
+    if (!$temAcessoCompleto) {
+        $stmt->bindParam(':usuario', $user['usuario']);
+    }
+    $stmt->execute();
+    $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $nomesFuncionarios = [];
+    foreach ($conn->query('SELECT usuario, nome_completo FROM funcionarios')->fetchAll(PDO::FETCH_ASSOC) as $f) {
+        $nomesFuncionarios[$f['usuario']] = $f['nome_completo'];
+    }
     ?>
 
     <div id="main" class="main-content">
@@ -83,291 +314,236 @@ date_default_timezone_set('America/Sao_Paulo');
                     <div class="title-icon"><i class="fa fa-university" aria-hidden="true"></i></div>
                     <div class="title-texts">
                         <h1>Pesquisar Fluxo de Caixa</h1>
-                        <div class="subtitle muted">Consulta do fluxo diário com filtros por funcionário, período rápido e intervalo de datas — e ações rápidas.</div>
+                        <div class="subtitle muted">Consulte os caixas por funcionário, período, situação e movimentação — e faça saídas, depósitos e fechamentos.</div>
                     </div>
                 </div>
             </section>
 
-            <hr>
-            <form id="pesquisarForm" method="GET">
+            <!-- ============================ FILTROS ============================ -->
+            <form id="pesquisarForm" method="GET" class="cxf-panel" autocomplete="off">
+                <div class="cxf-panel-head">
+                    <h2 class="cxf-panel-title"><i class="fa fa-sliders" aria-hidden="true"></i> Filtros da pesquisa</h2>
+                    <button type="button" class="cxf-adv-toggle" data-toggle="collapse" data-target="#cxfAvancado"
+                            aria-expanded="<?php echo $avancadoAtivo ? 'true' : 'false'; ?>" aria-controls="cxfAvancado">
+                        Filtros avançados <i class="fa fa-chevron-down" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <input type="hidden" id="periodo" name="periodo" value="<?php echo $h($selectedPeriodo); ?>">
+
+                <span class="cxf-label">Período</span>
+                <div class="cxf-pills" role="group" aria-label="Período">
+                    <?php foreach ($periodos as $chave => $rotulo): ?>
+                        <button type="button" class="cxf-pill<?php echo $selectedPeriodo === $chave ? ' active' : ''; ?>"
+                                data-periodo="<?php echo $h($chave); ?>"><?php echo $h($rotulo); ?></button>
+                    <?php endforeach; ?>
+                </div>
+
                 <div class="form-row">
-                    <div class="form-group col-md-4">
-                        <label for="funcionario">Funcionário:</label>
-                        <select class="form-control" id="funcionario" name="funcionario" <?php echo $user['nivel_de_acesso'] === 'usuario' && !$temAcessoFluxoDeCaixa ? 'disabled' : ''; ?>>
-                            <?php if ($user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxoDeCaixa) { ?>
-                                <option value="todos" <?php echo (isset($_GET['funcionario']) && $_GET['funcionario']=='todos') ? 'selected' : '' ?>>Todos</option>
-                                <option value="caixa_unificado" <?php echo (isset($_GET['funcionario']) && $_GET['funcionario']=='caixa_unificado') ? 'selected' : '' ?>>Caixa Unificado</option>
-                            <?php } ?>
-                            <?php
-                            // Definir a query de acordo com o nível de acesso ou o acesso adicional
-                            $queryFuncionarios = $user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxoDeCaixa ?
-                                "SELECT usuario, nome_completo FROM funcionarios WHERE status = 'ativo'" :
-                                "SELECT usuario, nome_completo FROM funcionarios WHERE usuario = :usuario";
-
-                            $stmt = $conn->prepare($queryFuncionarios);
-                            
-                            if ($user['nivel_de_acesso'] !== 'administrador' && !$temAcessoFluxoDeCaixa) {
-                                $stmt->bindParam(':usuario', $user['usuario']);
-                            }
-                            
-                            $stmt->execute();
-                            $funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                            
-                            foreach ($funcionarios as $funcionario) {
-                                $sel = (isset($_GET['funcionario']) && $_GET['funcionario']==$funcionario['usuario']) ? 'selected' : '';
-                                echo '<option value="' . $funcionario['usuario'] . '" '.$sel.'>' . $funcionario['nome_completo'] . '</option>';
-                            }
-                            ?>
+                    <div class="form-group col-12 col-md-4">
+                        <label class="cxf-label" for="funcionario">Funcionário</label>
+                        <select class="form-control" id="funcionario" name="funcionario" <?php echo $temAcessoCompleto ? '' : 'disabled'; ?>>
+                            <?php if ($temAcessoCompleto): ?>
+                                <option value="todos" <?php echo $funcionarioSel === 'todos' ? 'selected' : ''; ?>>Todos os funcionários</option>
+                                <option value="caixa_unificado" <?php echo $funcionarioSel === 'caixa_unificado' ? 'selected' : ''; ?>>Caixa Unificado (por dia)</option>
+                            <?php endif; ?>
+                            <?php foreach ($funcionarios as $f): ?>
+                                <option value="<?php echo $h($f['usuario']); ?>" <?php echo $funcionarioSel === $f['usuario'] ? 'selected' : ''; ?>>
+                                    <?php echo $h($f['nome_completo']); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
-
-                    <!-- NOVO: Filtro secundário de período -->
-                    <div class="form-group col-md-4">
-                        <label for="periodo">Período:</label>
-                        <select class="form-control" id="periodo" name="periodo">
-                            <option value="hoje" <?php echo $selectedPeriodo==='hoje'?'selected':''; ?>>Hoje (diário)</option>
-                            <option value="semanal" <?php echo $selectedPeriodo==='semanal'?'selected':''; ?>>Esta semana</option>
-                            <option value="mensal" <?php echo $selectedPeriodo==='mensal'?'selected':''; ?>>Este mês</option>
-                            <option value="anual" <?php echo $selectedPeriodo==='anual'?'selected':''; ?>>Este ano</option>
-                            <option value="personalizado" <?php echo $selectedPeriodo==='personalizado'?'selected':''; ?>>Personalizado (datas abaixo)</option>
-                            <option value="todos" <?php echo $selectedPeriodo==='todos'?'selected':''; ?>>Todos</option>
+                    <div class="form-group col-6 col-md-2">
+                        <label class="cxf-label" for="data_inicial">Data inicial</label>
+                        <input type="date" class="form-control" id="data_inicial" name="data_inicial" max="<?php echo $h(date('Y-12-31')); ?>"
+                               value="<?php echo $h($periodoIni ?? ''); ?>">
+                    </div>
+                    <div class="form-group col-6 col-md-2">
+                        <label class="cxf-label" for="data_final">Data final</label>
+                        <input type="date" class="form-control" id="data_final" name="data_final" max="<?php echo $h(date('Y-12-31')); ?>"
+                               value="<?php echo $h($periodoFim ?? ''); ?>">
+                    </div>
+                    <div class="form-group col-12 col-md-4">
+                        <label class="cxf-label" for="situacao">Situação do caixa</label>
+                        <select class="form-control" id="situacao" name="situacao">
+                            <?php foreach ($situacoes as $chave => $rotulo): ?>
+                                <option value="<?php echo $h($chave); ?>" <?php echo $situacao === $chave ? 'selected' : ''; ?>><?php echo $h($rotulo); ?></option>
+                            <?php endforeach; ?>
                         </select>
-                        <small class="text-muted">Filtra os caixas listados. Marque "Modo de visualização" abaixo para gerar um relatório unificado do período.</small>
-                    </div>
-
-                    <div class="form-group col-md-2">
-                        <label for="data_inicial">Data Inicial:</label>
-                        <input type="date" class="form-control" id="data_inicial" name="data_inicial" value="<?php echo isset($_GET['data_inicial'])?htmlspecialchars($_GET['data_inicial']):''; ?>">
-                    </div>
-                    <div class="form-group col-md-2">
-                        <label for="data_final">Data Final:</label>
-                        <input type="date" class="form-control" id="data_final" name="data_final" value="<?php echo isset($_GET['data_final'])?htmlspecialchars($_GET['data_final']):''; ?>">
                     </div>
                 </div>
 
-                <?php if ($user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxoDeCaixa): ?>
-                <div class="form-check mb-2" style="padding-left:1.6rem;">
-                    <input type="checkbox" class="form-check-input" id="modo_visualizacao" name="modo_visualizacao" value="1" <?php echo (isset($_GET['modo_visualizacao']) && $_GET['modo_visualizacao']=='1') ? 'checked' : ''; ?>>
-                    <label class="form-check-label" for="modo_visualizacao">
-                        <strong>Modo de visualização</strong> — consolida as datas dos caixas do período em um único caixa (com funcionário "Todos", unifica também os funcionários), abrindo o card, o modal e o relatório unificados. Apenas consulta: sem cadastro de depósitos, saídas ou fechamentos.
-                    </label>
-                </div>
-                <?php endif; ?>
+                <div id="cxfAvancado" class="collapse<?php echo $avancadoAtivo ? ' show' : ''; ?>">
+                    <div class="cxf-adv">
+                        <span class="cxf-label">Somente caixas com</span>
+                        <div class="cxf-checks mb-3">
+                            <?php foreach ($possuiOpcoes as $chave => $op): ?>
+                                <label class="cxf-check">
+                                    <input type="checkbox" name="possui[]" value="<?php echo $h($chave); ?>" <?php echo in_array($chave, $possui, true) ? 'checked' : ''; ?>>
+                                    <span><i class="fa <?php echo $h($op[1]); ?>" aria-hidden="true"></i> <?php echo $h($op[0]); ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
 
-                <div class="row mb-3">
-                    <div class="col-12 col-md-6">
-                        <button type="submit" style="width: 100%;" class="btn btn-primary">
-                            <i class="fa fa-filter" aria-hidden="true"></i> Filtrar
-                        </button>
+                        <div class="form-row">
+                            <div class="form-group col-6 col-md-3">
+                                <label class="cxf-label" for="valor_min">Total em caixa — mínimo</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+                                    <input type="text" class="form-control cxf-money" id="valor_min" name="valor_min" placeholder="0,00" value="<?php echo $h($valorMinTxt); ?>">
+                                </div>
+                            </div>
+                            <div class="form-group col-6 col-md-3">
+                                <label class="cxf-label" for="valor_max">Total em caixa — máximo</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+                                    <input type="text" class="form-control cxf-money" id="valor_max" name="valor_max" placeholder="0,00" value="<?php echo $h($valorMaxTxt); ?>">
+                                </div>
+                            </div>
+                            <div class="form-group col-12 col-md-6">
+                                <label class="cxf-label" for="ordenar">Ordenar por</label>
+                                <select class="form-control" id="ordenar" name="ordenar">
+                                    <?php foreach ($ordenacoes as $chave => $rotulo): ?>
+                                        <option value="<?php echo $h($chave); ?>" <?php echo $ordenar === $chave ? 'selected' : ''; ?>><?php echo $h($rotulo); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <?php if ($temAcessoCompleto): ?>
+                        <div class="custom-control custom-checkbox mb-2">
+                            <input type="checkbox" class="custom-control-input" id="modo_visualizacao" name="modo_visualizacao" value="1" <?php echo (isset($_GET['modo_visualizacao']) && $_GET['modo_visualizacao'] == '1') ? 'checked' : ''; ?>>
+                            <label class="custom-control-label" for="modo_visualizacao">
+                                <strong>Modo de visualização</strong> — consolida as datas do período em um único caixa (com "Todos os funcionários", unifica também os funcionários). Apenas consulta: sem depósitos, saídas ou fechamentos.
+                            </label>
+                        </div>
+                        <?php endif; ?>
                     </div>
-                    <div class="col-12 col-md-6">
-                        <button type="button" style="width: 100%;" class="btn btn-success" onclick="window.location.href='../analitico/analiticos.php'">
-                            <i class="fa fa-file-excel-o" aria-hidden="true"></i> Relatório Analítico (XLSX)
-                        </button>
-                    </div>
+                </div>
+
+                <div class="cxf-actions">
+                    <button type="submit" class="cxf-btn cxf-btn-primary">
+                        <i class="fa fa-search" aria-hidden="true"></i> Pesquisar
+                    </button>
+                    <a href="index.php" class="cxf-btn cxf-btn-light">
+                        <i class="fa fa-eraser" aria-hidden="true"></i> Limpar filtros
+                    </a>
+                    <span class="cxf-actions-spacer"></span>
+                    <?php if ($isAdmin): ?>
+                    <a href="auditoria.php" class="cxf-btn cxf-btn-dark" title="Auditoria completa do caixa (somente administrador)">
+                        <i class="fa fa-shield" aria-hidden="true"></i> Auditoria
+                    </a>
+                    <?php endif; ?>
+                    <a href="../analitico/analiticos.php" class="cxf-btn cxf-btn-green">
+                        <i class="fa fa-file-excel-o" aria-hidden="true"></i> Relatório Analítico (XLSX)
+                    </a>
                 </div>
             </form>
-            <hr>
 
-            <h5>Resultados da Pesquisa</h5>
-            <div id="cardsResultados" class="row cards-wrap">
-                <?php
-                $conditions = [];
-                $params = [];
-                $filtered = false;
-                $isUnificado = false;
+            <?php
+            // ============================ CONSULTA ============================
+            $conditions = [];
+            $params = [];
+            $filtered = false;
+            $isUnificado = ($temAcessoCompleto && $funcionarioSel === 'caixa_unificado');
 
-                // Verifica se o usuário é "administrador" ou se tem acesso adicional para "Fluxo de Caixa"
-                $temAcessoCompleto = ($user['nivel_de_acesso'] === 'administrador' || in_array('Fluxo de Caixa', explode(',', $user['acesso_adicional'])));
+            if ($funcionarioSel !== 'todos' && $funcionarioSel !== 'caixa_unificado') {
+                $conditions[] = 'funcionario = :funcionario';
+                $params[':funcionario'] = $funcionarioSel;
+                $filtered = true;
+            }
 
-                if (isset($_GET['funcionario']) && $_GET['funcionario'] !== 'todos' && $_GET['funcionario'] !== 'caixa_unificado') {
-                    // Funcionário específico
-                    $conditions[] = 'funcionario = :funcionario';
-                    $params[':funcionario'] = $_GET['funcionario'];
-                    $filtered = true;
-                } elseif ($temAcessoCompleto) {
-                    // Pode ver todos (inclui opção unificado)
-                    if (isset($_GET['funcionario']) && $_GET['funcionario'] === 'caixa_unificado') {
-                        $isUnificado = true;
-                    }
-                } else {
-                    $conditions[] = 'funcionario = :funcionario';
-                    $params[':funcionario'] = $user['usuario'];
-                    $filtered = true;
-                }
+            if ($periodoIni && $periodoFim) {
+                $conditions[] = 'DATE(data) BETWEEN :data_inicial AND :data_final';
+                $params[':data_inicial'] = $periodoIni;
+                $params[':data_final']   = $periodoFim;
+                $filtered = true;
+            } elseif ($periodoIni) {
+                $conditions[] = 'DATE(data) >= :data_inicial';
+                $params[':data_inicial'] = $periodoIni;
+                $filtered = true;
+            } elseif ($periodoFim) {
+                $conditions[] = 'DATE(data) <= :data_final';
+                $params[':data_final'] = $periodoFim;
+                $filtered = true;
+            }
 
-                // ===== Datas: se o usuário informou intervalo manual, usa-o; caso contrário, aplica o "período" rápido
-                $temIntervaloManual = (!empty($_GET['data_inicial']) || !empty($_GET['data_final']));
+            // Datas do relatório unificado (modo de visualização)
+            $relIni = $periodoIni;
+            $relFim = $periodoFim;
+            if ($relIni && !$relFim) { $relFim = $hoje; }
+            if ($relFim && !$relIni) { $relIni = $relFim; }
 
-                if ($temIntervaloManual) {
-                    if (!empty($_GET['data_inicial']) && !empty($_GET['data_final'])) {
-                        $conditions[] = 'DATE(data) BETWEEN :data_inicial AND :data_final';
-                        $params[':data_inicial'] = $_GET['data_inicial'];
-                        $params[':data_final'] = $_GET['data_final'];
-                        $filtered = true;
-                    } elseif (!empty($_GET['data_inicial'])) {
-                        $conditions[] = 'DATE(data) >= :data_inicial';
-                        $params[':data_inicial'] = $_GET['data_inicial'];
-                        $filtered = true;
-                    } elseif (!empty($_GET['data_final'])) {
-                        $conditions[] = 'DATE(data) <= :data_final';
-                        $params[':data_final'] = $_GET['data_final'];
-                        $filtered = true;
-                    }
-                } else {
-                    // Aplica período rápido (default hoje)
-                    if ($selectedPeriodo === 'hoje') {
-                        $conditions[] = 'DATE(data) = :hoje';
-                        $params[':hoje'] = $hoje;
-                        $filtered = true;
-                    } elseif ($selectedPeriodo === 'ultimos7') {
-                        $conditions[] = 'DATE(data) BETWEEN :ini7 AND :fim7';
-                        $params[':ini7'] = $ultimo7;
-                        $params[':fim7'] = $hoje;
-                        $filtered = true;
-                    } elseif ($selectedPeriodo === 'ultimoMes') {
-                        $conditions[] = 'DATE(data) BETWEEN :ini30 AND :fim30';
-                        $params[':ini30'] = $ultimo30;
-                        $params[':fim30'] = $hoje;
-                        $filtered = true;
-                    } elseif ($selectedPeriodo === 'semanal') {
-                        $conditions[] = 'DATE(data) BETWEEN :iniSem AND :fimSem';
-                        $params[':iniSem'] = date('Y-m-d', strtotime('monday this week'));
-                        $params[':fimSem'] = date('Y-m-d', strtotime('sunday this week'));
-                        $filtered = true;
-                    } elseif ($selectedPeriodo === 'mensal') {
-                        $conditions[] = 'DATE(data) BETWEEN :iniMes AND :fimMes';
-                        $params[':iniMes'] = date('Y-m-01');
-                        $params[':fimMes'] = date('Y-m-t');
-                        $filtered = true;
-                    } elseif ($selectedPeriodo === 'anual') {
-                        $conditions[] = 'DATE(data) BETWEEN :iniAno AND :fimAno';
-                        $params[':iniAno'] = date('Y-01-01');
-                        $params[':fimAno'] = date('Y-12-31');
-                        $filtered = true;
-                    } else {
-                        // "todos" / "personalizado" sem datas: sem restrição adicional de data
-                    }
-                }
+            // ===== Modo de visualização (redireciona para o Caixa Unificado do Período) =====
+            $modoVisualizacao = (isset($_GET['modo_visualizacao']) && $_GET['modo_visualizacao'] == '1') && $temAcessoCompleto;
+            $redirecionarPeriodo = false;
+            $avisoTopo = '';
 
-                // ===== Datas efetivas do período (para o relatório unificado) =====
-                if ($temIntervaloManual) {
-                    $periodoIni = !empty($_GET['data_inicial']) ? $_GET['data_inicial'] : null;
-                    $periodoFim = !empty($_GET['data_final'])   ? $_GET['data_final']   : null;
-                    if ($periodoIni && !$periodoFim) $periodoFim = $hoje;
-                    if ($periodoFim && !$periodoIni) $periodoIni = $periodoFim;
-                } else {
-                    switch ($selectedPeriodo) {
-                        case 'hoje':      $periodoIni = $periodoFim = $hoje; break;
-                        case 'semanal':   $periodoIni = date('Y-m-d', strtotime('monday this week')); $periodoFim = date('Y-m-d', strtotime('sunday this week')); break;
-                        case 'mensal':    $periodoIni = date('Y-m-01'); $periodoFim = date('Y-m-t'); break;
-                        case 'anual':     $periodoIni = date('Y-01-01'); $periodoFim = date('Y-12-31'); break;
-                        case 'ultimos7':  $periodoIni = $ultimo7;  $periodoFim = $hoje; break;
-                        case 'ultimoMes': $periodoIni = $ultimo30; $periodoFim = $hoje; break;
-                        default:          $periodoIni = null; $periodoFim = null; // todos
-                    }
-                }
+            if ($modoVisualizacao) {
+                echo '<script>window.MODO_VISUALIZACAO = true; window.__skipAbrirCaixa = true;'
+                    . 'document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("btnTransportarSaldo"); if(b){b.style.display="none";}});'
+                    . '</script>';
+            }
 
-                // ===== Modo de visualização: OPÇÃO explícita (padrão = modo operacional antigo) =====
-                // Quando marcado, abre o "Caixa Unificado (Período)", que consolida AS DATAS dos caixas
-                // do período (e, com funcionário = todos, consolida funcionários E datas) — card, modal e relatório.
-                $modoVisualizacao = (isset($_GET['modo_visualizacao']) && $_GET['modo_visualizacao'] == '1')
-                    && ($user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxoDeCaixa);
-                $redirecionarPeriodo = false;
+            if ($modoVisualizacao && $relIni && $relFim) {
+                $funcParam = ($funcionarioSel !== 'caixa_unificado' && $funcionarioSel !== 'todos') ? $funcionarioSel : 'todos';
+                $urlPeriodo = 'unificado_periodo.php?funcionario=' . urlencode($funcParam)
+                            . '&data_inicial=' . urlencode($relIni) . '&data_final=' . urlencode($relFim);
+                $avisoTopo = '<div class="alert alert-info"><i class="fa fa-eye" aria-hidden="true"></i> '
+                    . 'Abrindo o <strong>Caixa Unificado do Período</strong> (consolida as datas dos caixas)…</div>'
+                    . '<script>window.location.replace(' . json_encode($urlPeriodo) . ');</script>';
+                $redirecionarPeriodo = true;
+            } elseif ($modoVisualizacao) {
+                $avisoTopo = '<div class="alert alert-warning"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> '
+                    . 'Para o modo de visualização, selecione um período (semana, mês, ano) ou um intervalo de datas.</div>';
+            }
 
-                if ($modoVisualizacao) {
-                    echo '<script>window.MODO_VISUALIZACAO = true; window.__skipAbrirCaixa = true;'
-                        .'document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("btnTransportarSaldo"); if(b){b.style.display="none";}});'
-                        .'</script>';
-                }
+            $linhas = [];
+            $limitado = false;
 
-                if ($modoVisualizacao && $periodoIni && $periodoFim) {
-                    // Funcionário específico => consolida as datas dele.
-                    // "todos"/"caixa_unificado" => consolida TODOS os funcionários E todas as datas.
-                    $funcParam = (isset($_GET['funcionario']) && $_GET['funcionario'] !== ''
-                        && $_GET['funcionario'] !== 'caixa_unificado' && $_GET['funcionario'] !== 'todos')
-                        ? $_GET['funcionario'] : 'todos';
-                    $urlPeriodo = 'unificado_periodo.php?funcionario='.urlencode($funcParam)
-                                .'&data_inicial='.urlencode($periodoIni).'&data_final='.urlencode($periodoFim);
-                    echo '<div class="col-12"><div class="alert alert-info"><i class="fa fa-eye" aria-hidden="true"></i> '
-                        .'Abrindo o <strong>Caixa Unificado do Período</strong> (consolida as datas dos caixas)…</div></div>';
-                    echo '<script>window.location.replace('.json_encode($urlPeriodo).');</script>';
-                    $redirecionarPeriodo = true;
-                } elseif ($modoVisualizacao) {
-                    echo '<div class="col-12"><div class="alert alert-warning"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> '
-                        .'Para o modo de visualização, selecione um período (semana, mês, ano) ou um intervalo de datas.</div></div>';
-                }
+            if (!$redirecionarPeriodo) {
+                $uniao = '
+                    SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data, "ato" as tipo, total
+                    FROM atos_liquidados
+                    UNION ALL
+                    SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
+                    FROM pagamento_os
+                    UNION ALL
+                    SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
+                    FROM devolucao_os
+                    UNION ALL
+                    SELECT funcionario, data, "saida" as tipo, valor_saida as total
+                    FROM saidas_despesas WHERE status = "ativo"
+                    UNION ALL
+                    SELECT funcionario, data_caixa as data, "deposito" as tipo, valor_do_deposito as total
+                    FROM deposito_caixa WHERE status = "ativo"
+                    UNION ALL
+                    SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
+                    FROM caixa WHERE status = "aberto"';
 
-                if (!$redirecionarPeriodo) {
+                $campos = '
+                    DATE(data) as data,
+                    SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
+                    SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
+                    SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
+                    SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
+                    SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos';
 
                 if ($isUnificado) {
-                    $sql = 'SELECT 
-                                GROUP_CONCAT(DISTINCT funcionario SEPARATOR ", ") as funcionarios, 
-                                DATE(data) as data,
-                                SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
-                                SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
-                                SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
-                                SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
-                                SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos
-                            FROM (
-                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data, "ato" as tipo, total 
-                                FROM atos_liquidados
-                                UNION ALL
-                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
-                                FROM pagamento_os
-                                UNION ALL
-                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
-                                FROM devolucao_os
-                                UNION ALL
-                                SELECT funcionario, data, "saida" as tipo, valor_saida as total
-                                FROM saidas_despesas WHERE status = "ativo"
-                                UNION ALL
-                                SELECT funcionario, data_caixa as data, "deposito" as tipo, valor_do_deposito as total
-                                FROM deposito_caixa WHERE status = "ativo"
-                                UNION ALL
-                                SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
-                                FROM caixa WHERE status = "aberto"
-                            ) as fluxos';
-                    if ($conditions) {
-                        $sql .= ' WHERE ' . implode(' AND ', $conditions);
-                    }
-                    $sql .= ' GROUP BY DATE(data)';
+                    $sql = 'SELECT GROUP_CONCAT(DISTINCT funcionario SEPARATOR ", ") as funcionarios,' . $campos . ' FROM (' . $uniao . ') as fluxos';
                 } else {
-                    $sql = 'SELECT 
-                                funcionario, 
-                                DATE(data) as data,
-                                SUM(CASE WHEN tipo = "ato" THEN total ELSE 0 END) as total_atos,
-                                SUM(CASE WHEN tipo = "pagamento" THEN total ELSE 0 END) as total_pagamentos,
-                                SUM(CASE WHEN tipo = "devolucao" THEN total ELSE 0 END) as total_devolucoes,
-                                SUM(CASE WHEN tipo = "saida" THEN total ELSE 0 END) as total_saidas,
-                                SUM(CASE WHEN tipo = "deposito" THEN total ELSE 0 END) as total_depositos,
-                                SUM(CASE WHEN tipo = "caixa" THEN total ELSE 0 END) as saldo_inicial
-                            FROM (
-                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data, "ato" as tipo, total 
-                                FROM atos_liquidados
-                                UNION ALL
-                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_pagamento as data, "pagamento" as tipo, total_pagamento as total
-                                FROM pagamento_os
-                                UNION ALL
-                                SELECT ' . cx_func_sql('funcionario') . ' AS funcionario, data_devolucao as data, "devolucao" as tipo, total_devolucao as total
-                                FROM devolucao_os
-                                UNION ALL
-                                SELECT funcionario, data, "saida" as tipo, valor_saida as total
-                                FROM saidas_despesas WHERE status = "ativo"
-                                UNION ALL
-                                SELECT funcionario, data_caixa as data, "deposito" as tipo, valor_do_deposito as total
-                                FROM deposito_caixa WHERE status = "ativo"
-                                UNION ALL
-                                SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
-                                FROM caixa WHERE status = "aberto"
-                            ) as fluxos';
-                    if ($conditions) {
-                        $sql .= ' WHERE ' . implode(' AND ', $conditions);
-                    }
-                    $sql .= ' GROUP BY funcionario, DATE(data)';
+                    $sql = 'SELECT funcionario,' . $campos . ' FROM (' . $uniao . ') as fluxos';
                 }
-
-                $sql .= $filtered ? ' ORDER BY DATE(data) DESC' : ' ORDER BY DATE(data) DESC LIMIT 50';
+                if ($conditions) {
+                    $sql .= ' WHERE ' . implode(' AND ', $conditions);
+                }
+                $sql .= $isUnificado ? ' GROUP BY DATE(data)' : ' GROUP BY funcionario, DATE(data)';
+                $sql .= ' ORDER BY DATE(data) DESC';
+                if (!$filtered) {
+                    $sql .= ' LIMIT 50';
+                    $limitado = true;
+                }
 
                 $stmt = $conn->prepare($sql);
                 foreach ($params as $key => $value) {
@@ -376,198 +552,375 @@ date_default_timezone_set('America/Sao_Paulo');
                 $stmt->execute();
                 $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                foreach ($resultados as $resultado) {
-                    $funcionariosList = $isUnificado ? $resultado['funcionarios'] : $resultado['funcionario'];
-                    $data = $resultado['data'];
-                    $total_atos = $resultado['total_atos'];
-                    $total_pagamentos = $resultado['total_pagamentos'];
-                    $total_devolucoes = $resultado['total_devolucoes'];
-                    $total_saidas = $resultado['total_saidas'];
-                    $total_depositos = $resultado['total_depositos'];
-                    $saldo_inicial_sum = isset($resultado['saldo_inicial']) ? $resultado['saldo_inicial'] : 0.0;
+                foreach ($resultados as $r) {
+                    $data = $r['data'];
 
-                    // Calcula Conta/Espécie/Devolvido em espécie
-                    $stmtInner = $conn->prepare('SELECT forma_de_pagamento, total_pagamento FROM pagamento_os WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_pagamento) = :data');
-                    if (!$isUnificado) { $stmtInner->bindParam(':funcionario', $funcionariosList); }
-                    $stmtInner->bindParam(':data', $data);
-                    $stmtInner->execute();
-                    $pagamentos = $stmtInner->fetchAll(PDO::FETCH_ASSOC);
-
-                    $totalRecebidoConta = 0;
-                    $totalRecebidoEspecie = 0;
-                    foreach ($pagamentos as $pg) {
-                        if (in_array($pg['forma_de_pagamento'], ['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Depósito Bancário', 'Crédito', 'Débito'])) {
-                            $totalRecebidoConta += $pg['total_pagamento'];
-                        } else if ($pg['forma_de_pagamento'] === 'Espécie') {
-                            $totalRecebidoEspecie += $pg['total_pagamento'];
-                        }
-                    }
-
-                    $stmtInner = $conn->prepare('SELECT forma_devolucao, total_devolucao FROM devolucao_os WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_devolucao) = :data');
-                    if (!$isUnificado) { $stmtInner->bindParam(':funcionario', $funcionariosList); }
-                    $stmtInner->bindParam(':data', $data);
-                    $stmtInner->execute();
-                    $devolucoes = $stmtInner->fetchAll(PDO::FETCH_ASSOC);
-
-                    $totalDevolvidoEspecie = 0;
-                    foreach ($devolucoes as $dv) {
-                        if ($dv['forma_devolucao'] === 'Espécie') {
-                            $totalDevolvidoEspecie += $dv['total_devolucao'];
-                        }
-                    }
-
-                    // Depósitos do Caixa
-                    $stmtInner = $conn->prepare('SELECT valor_do_deposito FROM deposito_caixa WHERE ' . ($isUnificado ? '' : 'funcionario = :funcionario AND ') . 'DATE(data_caixa) = :data AND status = "ativo"');
-                    if (!$isUnificado) { $stmtInner->bindParam(':funcionario', $funcionariosList); }
-                    $stmtInner->bindParam(':data', $data);
-                    $stmtInner->execute();
-                    $depositosArr = $stmtInner->fetchAll(PDO::FETCH_ASSOC);
-                    $totalDepositoCaixa = array_reduce($depositosArr, function($carry, $item){ return $carry + $item['valor_do_deposito']; }, 0);
-
-                    // Saldo Transportado (individual)
-                    $stmtInner = $conn->prepare('SELECT valor_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data AND funcionario = :funcionario');
-                    $stmtInner->bindParam(':data', $data);
-                    $stmtInner->bindParam(':funcionario', $funcionariosList);
-                    $stmtInner->execute();
-                    $transportes = $stmtInner->fetchAll(PDO::FETCH_ASSOC);
-                    $totalSaldoTransportado = array_reduce($transportes, function($carry, $item){ return $carry + floatval($item['valor_transportado']); }, 0);
-
-                    // Saldo Inicial (individual) e ID do caixa
-                    $stmtInner = $conn->prepare('SELECT id, saldo_inicial FROM caixa WHERE DATE(data_caixa) = :data' . ($isUnificado ? '' : ' AND funcionario = :funcionario'));
-                    if (!$isUnificado) { $stmtInner->bindParam(':funcionario', $funcionariosList); }
-                    $stmtInner->bindParam(':data', $data);
-                    $stmtInner->execute();
-                    $caixa = $stmtInner->fetch(PDO::FETCH_ASSOC);
-                    $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
-                    $idCaixa = ($caixa && isset($caixa['id'])) ? $caixa['id'] : null;
-
-                    // Total em Caixa (para cor do card e, no individual, exibição)
                     if ($isUnificado) {
-                        $totalEmCaixa_calc = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa;
-                        $stmtInner = $conn->prepare('SELECT SUM(valor_transportado) as total_transportado FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :data');
-                        $stmtInner->bindParam(':data', $data);
-                        $stmtInner->execute();
-                        $saldoTransportadoUni = $stmtInner->fetch(PDO::FETCH_ASSOC);
-                        if ($saldoTransportadoUni && isset($saldoTransportadoUni['total_transportado'])) {
-                            $totalEmCaixa_calc -= $saldoTransportadoUni['total_transportado'];
+                        // ---------- Caixa unificado do dia ----------
+                        $st = $conn->prepare('SELECT forma_de_pagamento, SUM(total_pagamento) AS t FROM pagamento_os WHERE DATE(data_pagamento) = :d GROUP BY forma_de_pagamento');
+                        $st->execute([':d' => $data]);
+                        $conta = 0.0; $especie = 0.0;
+                        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $pg) {
+                            if ($pg['forma_de_pagamento'] === 'Espécie') { $especie += (float) $pg['t']; }
+                            elseif (in_array($pg['forma_de_pagamento'], CX_FORMAS_CONTA, true)) { $conta += (float) $pg['t']; }
                         }
-                    } else {
-                        $totalEmCaixa_calc = $saldoInicial + $totalRecebidoEspecie - $totalDevolvidoEspecie - $total_saidas - $totalDepositoCaixa - $totalSaldoTransportado;
-                    }
+                        $st = $conn->prepare("SELECT COALESCE(SUM(total_devolucao),0) FROM devolucao_os WHERE DATE(data_devolucao) = :d AND forma_devolucao = 'Espécie'");
+                        $st->execute([':d' => $data]);
+                        $devEspecie = (float) $st->fetchColumn();
 
-                    $isClosed = (round($totalEmCaixa_calc, 2) == 0.00);
+                        $st = $conn->prepare("SELECT COALESCE(SUM(valor_do_deposito),0) AS t,
+                                                     COALESCE(SUM(CASE WHEN caminho_anexo IS NULL OR caminho_anexo = '' OR caminho_anexo LIKE 'sem_comprovante_%' THEN 1 ELSE 0 END),0) AS sc
+                                                FROM deposito_caixa WHERE DATE(data_caixa) = :d AND status = 'ativo'");
+                        $st->execute([':d' => $data]);
+                        $dp = $st->fetch(PDO::FETCH_ASSOC);
+
+                        $st = $conn->prepare('SELECT COALESCE(SUM(saldo_inicial),0) FROM caixa WHERE DATE(data_caixa) = :d');
+                        $st->execute([':d' => $data]);
+                        $saldoIni = (float) $st->fetchColumn();
+
+                        $st = $conn->prepare('SELECT COALESCE(SUM(valor_transportado),0) FROM transporte_saldo_caixa WHERE DATE(data_caixa) = :d');
+                        $st->execute([':d' => $data]);
+                        $transp = (float) $st->fetchColumn();
+
+                        $emCaixa = round($saldoIni + $especie - $devEspecie - (float) $r['total_saidas'] - (float) $dp['t'] - $transp, 2);
+
+                        $linhas[] = [
+                            'tipo' => 'unificado', 'funcionario' => (string) $r['funcionarios'], 'nome' => 'Caixa Unificado',
+                            'data' => $data, 'saldo_inicial' => $saldoIni, 'atos' => (float) $r['total_atos'],
+                            'conta' => $conta, 'especie' => $especie, 'devolucoes' => (float) $r['total_devolucoes'],
+                            'saidas' => (float) $r['total_saidas'], 'depositos' => (float) $dp['t'], 'transportado' => $transp,
+                            'em_caixa' => $emCaixa, 'caixa_id' => null, 'caixa_status' => null, 'origem' => null,
+                            'sem_comprovante' => (int) $dp['sc'], 'pode_lancar_saldo' => false, 'ultimo_caixa' => false,
+                        ];
+                    } else {
+                        // ---------- Caixa individual: mesmo cálculo das validações ----------
+                        $func = (string) $r['funcionario'];
+                        $s = cx_saldo_caixa($conn, $func, $data);
+                        $linhas[] = [
+                            'tipo' => 'individual', 'funcionario' => $func, 'nome' => $nomesFuncionarios[$func] ?? '',
+                            'data' => $data, 'saldo_inicial' => $s['saldo_inicial'], 'atos' => (float) $r['total_atos'],
+                            'conta' => $s['recebido_conta'], 'especie' => $s['recebido_especie'], 'devolucoes' => $s['total_devolucoes'],
+                            'saidas' => $s['saidas'], 'depositos' => $s['depositos'], 'transportado' => $s['transportado'],
+                            'em_caixa' => $s['disponivel'], 'caixa_id' => $s['caixa_id'], 'caixa_status' => $s['caixa_status'],
+                            'origem' => $s['origem_saldo'], 'sem_comprovante' => $s['depositos_sem_comprovante'],
+                            'pode_lancar_saldo' => cx_pode_lancar_saldo_inicial($s), 'ultimo_caixa' => $s['ultimo_caixa'],
+                        ];
+                    }
+                }
+
+                // ===== Situação e filtros pós-cálculo =====
+                foreach ($linhas as &$l) {
+                    // Zerado = fechado; exceto o caixa atual do funcionário, que segue aberto até o fechamento
+                    $caixaCorrente = ($l['tipo'] === 'individual' && $l['caixa_status'] === 'aberto' && $l['ultimo_caixa']);
+                    $l['fechado'] = (cx_centavos($l['em_caixa']) === 0) && !$caixaCorrente;
+                }
+                unset($l);
+
+                $linhas = array_values(array_filter($linhas, function ($l) use ($situacao, $possui, $valorMin, $valorMax) {
+                    switch ($situacao) {
+                        case 'aberto':    if ($l['fechado']) return false; break;
+                        case 'fechado':   if (!$l['fechado']) return false; break;
+                        case 'zerado':    if (!($l['tipo'] === 'individual' && $l['pode_lancar_saldo'] && $l['origem'] === 'zerado')) return false; break;
+                        case 'sem_caixa': if (!($l['tipo'] === 'individual' && $l['caixa_id'] === null)) return false; break;
+                        case 'negativo':  if (cx_centavos($l['em_caixa']) >= 0) return false; break;
+                    }
+                    $mapa = [
+                        'atos' => 'atos', 'especie' => 'especie', 'conta' => 'conta', 'devolucoes' => 'devolucoes',
+                        'saidas' => 'saidas', 'depositos' => 'depositos', 'sem_comprovante' => 'sem_comprovante',
+                        'transporte' => 'transportado',
+                    ];
+                    foreach ($possui as $p) {
+                        if (cx_centavos($l[$mapa[$p]]) <= 0) return false;
+                    }
+                    if ($valorMin !== null && cx_centavos($l['em_caixa']) < cx_centavos($valorMin)) return false;
+                    if ($valorMax !== null && cx_centavos($l['em_caixa']) > cx_centavos($valorMax)) return false;
+                    return true;
+                }));
+
+                // ===== Ordenação =====
+                usort($linhas, function ($a, $b) use ($ordenar) {
+                    switch ($ordenar) {
+                        case 'data_asc':     return strcmp($a['data'], $b['data']) ?: strcmp($a['funcionario'], $b['funcionario']);
+                        case 'caixa_desc':   return $b['em_caixa'] <=> $a['em_caixa'];
+                        case 'caixa_asc':    return $a['em_caixa'] <=> $b['em_caixa'];
+                        case 'atos_desc':    return $b['atos'] <=> $a['atos'];
+                        case 'especie_desc': return $b['especie'] <=> $a['especie'];
+                        case 'func_asc':     return strcasecmp($a['funcionario'], $b['funcionario']) ?: strcmp($b['data'], $a['data']);
+                        default:             return strcmp($b['data'], $a['data']) ?: strcmp($a['funcionario'], $b['funcionario']);
+                    }
+                });
+            }
+
+            // ===== Indicadores =====
+            $kpi = ['qtd' => count($linhas), 'abertos' => 0, 'fechados' => 0, 'atos' => 0.0, 'especie' => 0.0,
+                    'conta' => 0.0, 'saidas' => 0.0, 'depositos' => 0.0, 'em_caixa' => 0.0];
+            foreach ($linhas as $l) {
+                $l['fechado'] ? $kpi['fechados']++ : $kpi['abertos']++;
+                foreach (['atos', 'especie', 'conta', 'saidas', 'depositos', 'em_caixa'] as $k) {
+                    $kpi[$k] += $l[$k];
+                }
+            }
+
+            // ===== Filtros ativos (chips) =====
+            $chips = [];
+            if ($funcionarioSel === 'caixa_unificado') {
+                $chips[] = 'Caixa Unificado';
+            } elseif ($funcionarioSel !== 'todos') {
+                $chips[] = 'Funcionário: ' . ($nomesFuncionarios[$funcionarioSel] ?? $funcionarioSel);
+            }
+            if ($periodoIni || $periodoFim) {
+                $txt = ($periodoIni && $periodoFim && $periodoIni === $periodoFim)
+                    ? cx_data_br($periodoIni)
+                    : (($periodoIni ? cx_data_br($periodoIni) : '…') . ' a ' . ($periodoFim ? cx_data_br($periodoFim) : '…'));
+                $chips[] = ($selectedPeriodo !== 'personalizado' ? $periodos[$selectedPeriodo] . ': ' : 'Período: ') . $txt;
+            } else {
+                $chips[] = 'Período: todos';
+            }
+            if ($situacao !== 'todas') { $chips[] = $situacoes[$situacao]; }
+            foreach ($possui as $p) { $chips[] = 'Com ' . mb_strtolower($possuiOpcoes[$p][0], 'UTF-8'); }
+            if ($valorMin !== null) { $chips[] = 'Em caixa ≥ ' . $fmt($valorMin); }
+            if ($valorMax !== null) { $chips[] = 'Em caixa ≤ ' . $fmt($valorMax); }
+
+            // ===== Renderização das ações (cards e tabela) =====
+            $renderAcoes = function (array $l) use ($modoVisualizacao, $isAdmin, $h, $js) {
+                $html = '';
+                if ($l['tipo'] === 'individual') {
+                    $f = $l['funcionario']; $d = $l['data'];
+                    if (!$modoVisualizacao) {
+                        $html .= '<button type="button" title="Saídas e Despesas" class="btn btn-delete btn-sm btn-icon" onclick="event.stopPropagation(); cadastrarSaida(' . $js($f) . ', ' . $js($d) . ')"><i class="fa fa-sign-out" aria-hidden="true"></i></button>';
+                        $html .= '<button type="button" title="Depósito do Caixa" class="btn btn-success btn-sm btn-icon" onclick="event.stopPropagation(); cadastrarDeposito(' . $js($f) . ', ' . $js($d) . ')"><i class="fa fa-university" aria-hidden="true"></i></button>';
+                        if ($isAdmin && $l['pode_lancar_saldo']) {
+                            $html .= '<button type="button" title="Lançar saldo inicial (administrador)" class="btn btn-saldo-admin btn-sm btn-icon" onclick="event.stopPropagation(); abrirSaldoInicialAdmin('
+                                . $js($l['caixa_id']) . ', ' . $js($f) . ', ' . $js($d) . ', ' . $js($l['saldo_inicial']) . ')"><i class="fa fa-plus-square" aria-hidden="true"></i></button>';
+                        }
+                    }
+                    $printUrl = $l['caixa_id']
+                        ? 'imprimir_fechamento_caixa.php?id=' . urlencode((string) $l['caixa_id'])
+                        : 'imprimir_fechamento_caixa.php?funcionario=' . urlencode($f) . '&data=' . urlencode($d);
+                    if ($isAdmin) {
+                        $audUrl = 'auditoria.php?' . http_build_query(['funcionario_caixa' => $f, 'data_caixa' => $d]);
+                        $html .= '<a href="' . $h($audUrl) . '" title="Auditoria deste caixa" class="btn btn-dark btn-sm btn-icon" onclick="event.stopPropagation();"><i class="fa fa-history" aria-hidden="true"></i></a>';
+                    }
+                    $html .= '<a href="' . $h($printUrl) . '" target="_blank" title="Imprimir Fechamento" class="btn btn-primary btn-sm btn-icon" onclick="event.stopPropagation();"><i class="fa fa-file-pdf-o"></i></a>';
+                } else {
+                    $html .= '<button type="button" title="Ver Depósitos do Caixa" class="btn btn-success btn-sm btn-icon" onclick="event.stopPropagation(); verDepositosCaixa(' . $js($l['data']) . ')"><i class="fa fa-list" aria-hidden="true"></i></button>';
+                    $html .= '<a href="imprimir_fechamento_caixa_unificado.php?data=' . $h(urlencode($l['data'])) . '" target="_blank" title="Imprimir Fechamento Caixa Unificado" class="btn btn-primary btn-sm btn-icon" onclick="event.stopPropagation();"><i class="fa fa-file-pdf-o"></i></a>';
+                }
+                return $html;
+            };
+
+            $renderLock = function (array $l) use ($modoVisualizacao, $js) {
+                if ($l['tipo'] !== 'individual' || $modoVisualizacao) {
+                    return '';
+                }
+                // Fecha com saldo positivo, ou caixa aberto já zerado (sem valor a transportar)
+                $podeFechar = cx_centavos($l['em_caixa']) > 0
+                    || ($l['caixa_status'] === 'aberto' && $l['ultimo_caixa'] && cx_centavos($l['em_caixa']) === 0);
+                return '<button type="button" class="btn btn-lock btn-sm btn-icon" ' . ($podeFechar ? '' : 'disabled') . ' title="Fechar caixa" onclick="event.stopPropagation(); fecharCaixaRapido('
+                    . $js($l['funcionario']) . ', ' . $js($l['data']) . ')"><i class="fa fa-lock"></i></button>';
+            };
+
+            $renderPendencias = function (array $l) use ($h) {
+                $tags = [];
+                if ($l['tipo'] === 'individual') {
+                    if ($l['caixa_id'] === null) {
+                        $tags[] = '<span class="cxf-tag info" title="Houve movimento neste dia sem abertura de caixa"><i class="fa fa-info-circle"></i> Sem abertura</span>';
+                    } elseif ($l['pode_lancar_saldo'] && $l['origem'] === 'zerado') {
+                        $tags[] = '<span class="cxf-tag warn" title="Caixa aberto sem saldo inicial — o administrador pode lançar o saldo"><i class="fa fa-hourglass-half"></i> Aberto zerado</span>';
+                    } elseif ($l['origem'] === 'administrador') {
+                        $tags[] = '<span class="cxf-tag ok" title="Saldo inicial lançado pelo administrador"><i class="fa fa-user-secret"></i> Saldo pelo admin</span>';
+                    }
+                    if ($l['caixa_status'] === 'fechado') {
+                        $tags[] = '<span class="cxf-tag ok"><i class="fa fa-check"></i> Fechamento registrado</span>';
+                    }
+                }
+                if ($l['sem_comprovante'] > 0) {
+                    $tags[] = '<span class="cxf-tag warn"><i class="fa fa-paperclip"></i> ' . (int) $l['sem_comprovante'] . ' depósito(s) sem comprovante</span>';
+                }
+                if (cx_centavos($l['em_caixa']) < 0) {
+                    $tags[] = '<span class="cxf-tag danger"><i class="fa fa-exclamation-triangle"></i> Saldo negativo</span>';
+                }
+                return $tags ? '<div class="cxf-pend">' . implode('', $tags) . '</div>' : '';
+            };
+            ?>
+
+            <?php echo $avisoTopo; ?>
+
+            <?php if (!$redirecionarPeriodo): ?>
+            <!-- ============================ RESULTADOS ============================ -->
+            <div class="cxf-active">
+                <?php foreach ($chips as $c): ?>
+                    <span class="cxf-chip"><i class="fa fa-filter" aria-hidden="true"></i> <?php echo $h($c); ?></span>
+                <?php endforeach; ?>
+                <?php if ($limitado): ?>
+                    <span class="cxf-chip" style="background:#fff7ed;color:#c2410c;"><i class="fa fa-info-circle"></i> Exibindo os 50 dias mais recentes — use um período para ver mais</span>
+                <?php endif; ?>
+            </div>
+
+            <div class="cxf-kpis">
+                <div class="cxf-kpi k-qtd"><div class="lb">Caixas</div><div class="vl"><?php echo (int) $kpi['qtd']; ?></div><div class="sb"><?php echo (int) $kpi['abertos']; ?> abertos · <?php echo (int) $kpi['fechados']; ?> fechados</div></div>
+                <div class="cxf-kpi k-atos"><div class="lb">Atos liquidados</div><div class="vl"><?php echo $fmt($kpi['atos']); ?></div></div>
+                <div class="cxf-kpi k-esp"><div class="lb">Recebido em espécie</div><div class="vl"><?php echo $fmt($kpi['especie']); ?></div></div>
+                <div class="cxf-kpi k-conta"><div class="lb">Recebido em conta</div><div class="vl"><?php echo $fmt($kpi['conta']); ?></div></div>
+                <div class="cxf-kpi k-said"><div class="lb">Saídas e despesas</div><div class="vl"><?php echo $fmt($kpi['saidas']); ?></div></div>
+                <div class="cxf-kpi k-dep"><div class="lb">Depósitos</div><div class="vl"><?php echo $fmt($kpi['depositos']); ?></div></div>
+                <div class="cxf-kpi k-cx"><div class="lb">Total em caixa</div><div class="vl"><?php echo $fmt($kpi['em_caixa']); ?></div></div>
+            </div>
+
+            <div class="cxf-toolbar">
+                <h5>Resultados <span class="cxf-count" id="cxfCount"><?php echo (int) $kpi['qtd']; ?> caixa(s)</span></h5>
+                <div class="cxf-tools">
+                    <div class="cxf-search">
+                        <i class="fa fa-search" aria-hidden="true"></i>
+                        <input type="search" id="cxfBusca" class="form-control form-control-sm" placeholder="Buscar funcionário ou data na lista…" aria-label="Buscar na lista">
+                    </div>
+                    <div class="cxf-view" role="group" aria-label="Modo de exibição">
+                        <button type="button" class="cxf-view-btn active" data-view="cards" title="Cartões"><i class="fa fa-th-large"></i></button>
+                        <button type="button" class="cxf-view-btn" data-view="tabela" title="Tabela"><i class="fa fa-table"></i></button>
+                    </div>
+                    <button type="button" class="cxf-btn cxf-btn-sm cxf-btn-green-outline" id="cxfExportar" <?php echo $linhas ? '' : 'disabled'; ?>>
+                        <i class="fa fa-download" aria-hidden="true"></i> Exportar CSV
+                    </button>
+                </div>
+            </div>
+
+            <?php if (!$linhas): ?>
+                <div class="cxf-empty">
+                    <i class="fa fa-inbox" aria-hidden="true"></i>
+                    Nenhum caixa encontrado com os filtros atuais.<br>
+                    <small>Tente outro período ou limpe os filtros avançados.</small>
+                </div>
+            <?php endif; ?>
+
+            <div id="cardsResultados" class="row cards-wrap">
+                <?php foreach ($linhas as $l):
+                    $isClosed    = $l['fechado'];
                     $cardBgClass = $isClosed ? 'pastel-closed' : 'pastel-open';
-                    $badgeClass = $isClosed ? 'badge-closed' : 'badge-open';
+                    $badgeClass  = $isClosed ? 'badge-closed' : 'badge-open';
                     $statusLabel = $isClosed ? 'Fechado' : 'Aberto';
-                    $statusIcon = $isClosed ? 'fa-lock' : 'fa-unlock-alt';
+                    $statusIcon  = $isClosed ? 'fa-lock' : 'fa-unlock-alt';
+                    $busca       = mb_strtolower($l['funcionario'] . ' ' . $l['nome'] . ' ' . cx_data_br($l['data']), 'UTF-8');
+                ?>
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 caixa-col cxf-item" data-busca="<?php echo $h($busca); ?>">
+                        <div class="card caixa-card <?php echo $cardBgClass; ?>" onclick="verDetalhes(<?php echo $js($l['funcionario']); ?>, <?php echo $js($l['data']); ?>, <?php echo $js($l['tipo']); ?>)">
+                            <div class="card-body">
+                                <div class="header-block topline">
+                                    <div class="title-strong"><?php echo $h($l['tipo'] === 'unificado' ? 'Caixa Unificado' : $l['funcionario']); ?></div>
+                                    <span class="badge-status <?php echo $badgeClass; ?>"><i class="fa <?php echo $statusIcon; ?>"></i> <?php echo $statusLabel; ?></span>
+                                </div>
+                                <?php if ($l['tipo'] === 'individual' && $l['nome'] !== ''): ?>
+                                    <div class="cxf-nome"><?php echo $h($l['nome']); ?></div>
+                                <?php endif; ?>
+                                <div class="muted">Data: <?php echo $h(cx_data_br($l['data'])); ?></div>
+                                <?php echo $renderPendencias($l); ?>
 
-                    // Helper de formatação
-                    $fmt = function($v){ return 'R$ ' . number_format(floatval($v), 2, ',', '.'); };
-                    $dataBR = date('d/m/Y', strtotime($data));
+                                <div class="metrics">
+                                    <div class="metric"><span class="chip chip-saldo">Saldo Inicial</span><div class="k"><?php echo $fmt($l['saldo_inicial']); ?></div></div>
+                                    <div class="metric"><span class="chip chip-atos">Atos Liquidados</span><div class="k"><?php echo $fmt($l['atos']); ?></div></div>
+                                    <div class="metric"><span class="chip chip-conta">Recebido em Conta</span><div class="k"><?php echo $fmt($l['conta']); ?></div></div>
+                                    <div class="metric"><span class="chip chip-especie">Recebido em Espécie</span><div class="k"><?php echo $fmt($l['especie']); ?></div></div>
+                                    <div class="metric"><span class="chip chip-devolucoes">Devoluções</span><div class="k"><?php echo $fmt($l['devolucoes']); ?></div></div>
+                                    <div class="metric"><span class="chip chip-saidas">Saídas e Despesas</span><div class="k"><?php echo $fmt($l['saidas']); ?></div></div>
+                                    <div class="metric"><span class="chip chip-deposito">Depósito do Caixa</span><div class="k"><?php echo $fmt($l['depositos']); ?></div></div>
+                                    <div class="metric"><span class="chip chip-total">Total em Caixa</span><div class="k"><?php echo $fmt($l['em_caixa']); ?></div></div>
+                                </div>
 
-                    echo '<div class="col-12 col-sm-6 col-md-4 col-lg-3 caixa-col">
-                            <div class="card caixa-card '.$cardBgClass.'" onclick="verDetalhes(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\', \''.($isUnificado ? 'unificado' : 'individual').'\')">
-                                <div class="card-body">
-                                    <div class="header-block topline">
-                                        <div class="title-strong">'.htmlspecialchars($isUnificado ? "Caixa Unificado" : $funcionariosList).'</div>
-                                        <span class="badge-status '.$badgeClass.'"><i class="fa '.$statusIcon.'"></i> '.$statusLabel.'</span>
-                                    </div>
-                                    <div class="muted">Data: '.$dataBR.'</div>
-
-                                    <div class="metrics">';
-
-                    if (!$isUnificado) {
-                        echo '      <div class="metric">
-                                        <span class="chip chip-saldo">Saldo Inicial</span>
-                                        <div class="k">'.$fmt($saldoInicial).'</div>
-                                    </div>';
-                    }
-                    echo '              <div class="metric">
-                                        <span class="chip chip-atos">Atos Liquidados</span>
-                                        <div class="k">'.$fmt($total_atos).'</div>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="chip chip-conta">Recebido em Conta</span>
-                                        <div class="k">'.$fmt($totalRecebidoConta).'</div>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="chip chip-especie">Recebido em Espécie</span>
-                                        <div class="k">'.$fmt($totalRecebidoEspecie).'</div>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="chip chip-devolucoes">Devoluções</span>
-                                        <div class="k">'.$fmt($total_devolucoes).'</div>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="chip chip-saidas">Saídas e Despesas</span>
-                                        <div class="k">'.$fmt($total_saidas).'</div>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="chip chip-deposito">Depósito do Caixa</span>
-                                        <div class="k">'.$fmt($totalDepositoCaixa).'</div>
-                                    </div>';
-                    if (!$isUnificado) {
-                        echo '      <div class="metric">
-                                        <span class="chip chip-total">Total em Caixa</span>
-                                        <div class="k">'.$fmt($totalEmCaixa_calc).'</div>
-                                    </div>';
-                    }
-
-                    echo '          </div>';
-
-                    // Ações (preservadas) — padronizadas com .btn-icon — impedir propagação para não abrir detalhes junto
-                    echo '          <div class="card-footer-eq">
-                                        <div class="card-actions">';
-
-                    if (!$isUnificado) {
-                        // Ações operacionais só fora do modo de visualização
-                        if (!$modoVisualizacao) {
-                            echo '          <button title="Saídas e Despesas" class="btn btn-delete btn-sm btn-icon" onclick="event.stopPropagation(); cadastrarSaida(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
-                                        <i class="fa fa-sign-out" aria-hidden="true"></i>
-                                    </button>
-                                    <button title="Depósito do Caixa" class="btn btn-success btn-sm btn-icon" onclick="event.stopPropagation(); cadastrarDeposito(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
-                                        <i class="fa fa-university" aria-hidden="true"></i>
-                                    </button>';
-                        }
-                        // Botão de impressão do fechamento — sempre disponível (consulta/relatório).
-                        // Com caixa aberto usa o id; sem caixa (ex.: só liquidou atos) usa funcionário + data.
-                        if ($idCaixa) {
-                            $printUrl = 'imprimir_fechamento_caixa.php?id='.urlencode($idCaixa);
-                        } else {
-                            $printUrl = 'imprimir_fechamento_caixa.php?funcionario='.urlencode($funcionariosList).'&data='.urlencode($data);
-                        }
-                        echo '<a href="'.$printUrl.'" target="_blank" title="Imprimir Fechamento" class="btn btn-primary btn-sm btn-icon" onclick="event.stopPropagation();">
-                                <i class="fa fa-file-pdf-o"></i>
-                              </a>';
-                    } else {
-                        echo '      <button title="Ver Depósitos do Caixa" class="btn btn-success btn-sm btn-icon" onclick="event.stopPropagation(); verDepositosCaixa(\''.$data.'\')">
-                                    <i class="fa fa-list" aria-hidden="true"></i>
-                                  </button>
-                                  <a href="imprimir_fechamento_caixa_unificado.php?data='.urlencode($data).'" target="_blank" title="Imprimir Fechamento Caixa Unificado" class="btn btn-primary btn-sm btn-icon" onclick="event.stopPropagation();">
-                                    <i class="fa fa-file-pdf-o"></i>
-                                  </a>';
-                    }
-
-                    echo '          </div>';
-
-                    // Botão de Fechamento (cadeado dourado) — só fora do modo de visualização
-                    if (!$isUnificado && !$modoVisualizacao) {
-                        $disabledLock = $isClosed ? 'disabled' : '';
-                        echo '<button class="btn btn-lock btn-sm btn-icon" '.$disabledLock.' title="Fechar caixa" onclick="event.stopPropagation(); fecharCaixaRapido(\''.htmlspecialchars($funcionariosList, ENT_QUOTES).'\', \''.$data.'\')">
-                                <i class="fa fa-lock"></i>
-                              </button>';
-                    }
-
-                    echo '      </div>
+                                <div class="card-footer-eq">
+                                    <div class="card-actions"><?php echo $renderAcoes($l); ?></div>
+                                    <?php echo $renderLock($l); ?>
                                 </div>
                             </div>
-                        </div>';
-                }
-                } // fim if(!$redirecionarPeriodo) — em modo de visualização não lista por dia
-                ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div><!-- /cardsResultados -->
+
+            <div id="tabelaResultadosWrap" class="cxf-table-wrap cxf-hidden">
+                <table class="table cxf-table" id="tabelaResultados">
+                    <thead>
+                        <tr>
+                            <th>Funcionário</th>
+                            <th>Data</th>
+                            <th>Situação</th>
+                            <th class="num">Saldo inicial</th>
+                            <th class="num">Atos</th>
+                            <th class="num">Conta</th>
+                            <th class="num">Espécie</th>
+                            <th class="num">Devoluções</th>
+                            <th class="num">Saídas</th>
+                            <th class="num">Depósitos</th>
+                            <th class="num">Em caixa</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($linhas as $l):
+                            $busca = mb_strtolower($l['funcionario'] . ' ' . $l['nome'] . ' ' . cx_data_br($l['data']), 'UTF-8');
+                        ?>
+                            <tr class="cxf-item" data-busca="<?php echo $h($busca); ?>" onclick="verDetalhes(<?php echo $js($l['funcionario']); ?>, <?php echo $js($l['data']); ?>, <?php echo $js($l['tipo']); ?>)">
+                                <td>
+                                    <strong><?php echo $h($l['tipo'] === 'unificado' ? 'Caixa Unificado' : $l['funcionario']); ?></strong>
+                                    <?php if ($l['tipo'] === 'individual' && $l['nome'] !== ''): ?><div class="cxf-nome"><?php echo $h($l['nome']); ?></div><?php endif; ?>
+                                </td>
+                                <td><?php echo $h(cx_data_br($l['data'])); ?></td>
+                                <td>
+                                    <span class="badge-status <?php echo $l['fechado'] ? 'badge-closed' : 'badge-open'; ?>">
+                                        <i class="fa <?php echo $l['fechado'] ? 'fa-lock' : 'fa-unlock-alt'; ?>"></i> <?php echo $l['fechado'] ? 'Fechado' : 'Aberto'; ?>
+                                    </span>
+                                    <?php echo $renderPendencias($l); ?>
+                                </td>
+                                <td class="num"><?php echo $fmt($l['saldo_inicial']); ?></td>
+                                <td class="num"><?php echo $fmt($l['atos']); ?></td>
+                                <td class="num"><?php echo $fmt($l['conta']); ?></td>
+                                <td class="num"><?php echo $fmt($l['especie']); ?></td>
+                                <td class="num"><?php echo $fmt($l['devolucoes']); ?></td>
+                                <td class="num"><?php echo $fmt($l['saidas']); ?></td>
+                                <td class="num"><?php echo $fmt($l['depositos']); ?></td>
+                                <td class="num"><strong><?php echo $fmt($l['em_caixa']); ?></strong></td>
+                                <td><div class="card-actions"><?php echo $renderAcoes($l) . $renderLock($l); ?></div></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                    <?php if ($linhas): ?>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4">Totais (<?php echo (int) $kpi['qtd']; ?>)</td>
+                            <td class="num"><?php echo $fmt($kpi['atos']); ?></td>
+                            <td class="num"><?php echo $fmt($kpi['conta']); ?></td>
+                            <td class="num"><?php echo $fmt($kpi['especie']); ?></td>
+                            <td class="num"><?php echo $fmt(array_sum(array_column($linhas, 'devolucoes'))); ?></td>
+                            <td class="num"><?php echo $fmt($kpi['saidas']); ?></td>
+                            <td class="num"><?php echo $fmt($kpi['depositos']); ?></td>
+                            <td class="num"><?php echo $fmt($kpi['em_caixa']); ?></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                    <?php endif; ?>
+                </table>
+            </div>
+
+            <div id="cxfSemResultadoBusca" class="cxf-empty cxf-hidden" style="margin-top:10px;">
+                <i class="fa fa-search" aria-hidden="true"></i> Nenhum caixa corresponde à busca.
+            </div>
+
+            <script>
+                window.CX_LINHAS = <?php echo json_encode(array_map(function ($l) {
+                    return [
+                        'funcionario' => $l['tipo'] === 'unificado' ? 'Caixa Unificado' : $l['funcionario'],
+                        'nome' => $l['nome'], 'data' => $l['data'], 'situacao' => $l['fechado'] ? 'Fechado' : 'Aberto',
+                        'saldo_inicial' => $l['saldo_inicial'], 'atos' => $l['atos'], 'conta' => $l['conta'],
+                        'especie' => $l['especie'], 'devolucoes' => $l['devolucoes'], 'saidas' => $l['saidas'],
+                        'depositos' => $l['depositos'], 'transportado' => $l['transportado'], 'em_caixa' => $l['em_caixa'],
+                        'sem_comprovante' => $l['sem_comprovante'],
+                    ];
+                }, $linhas), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+            </script>
+            <?php endif; ?>
+
+            <div class="cxf-versao">Fluxo de Caixa · versão <?php echo $h(ATLAS_CAIXA_VERSAO); ?></div>
         </div>
     </div>
+    <script>window.CX_IS_ADMIN = <?php echo $isAdmin ? 'true' : 'false'; ?>; window.CX_USUARIO = <?php echo json_encode($user['usuario'], JSON_HEX_TAG); ?>;</script>
 
     <!-- Modal de Detalhes -->
     <div class="modal fade" id="detalhesModal" tabindex="-1" role="dialog" aria-labelledby="detalhesModalLabel" aria-hidden="true">
@@ -1041,6 +1394,13 @@ date_default_timezone_set('America/Sao_Paulo');
                     <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">&times;</button>
                 </div>
                 <div class="modal-body">
+                    <div class="cxf-disp" id="saidaDisponivelBox">
+                        <div>
+                            <div class="lb">Disponível em caixa</div>
+                            <small class="text-muted">A saída não pode ultrapassar este valor.</small>
+                        </div>
+                        <div class="vl" id="saidaDisponivel">R$ 0,00</div>
+                    </div>
                     <form id="formCadastroSaida" enctype="multipart/form-data">
                         <div class="form-row">
                             <div class="form-group col-12 col-md-8">
@@ -1076,7 +1436,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         <input type="hidden" id="data_caixa_saida" name="data_caixa_saida">
                         <input type="hidden" id="funcionario_saida" name="funcionario_saida">
 
-                        <button type="submit" class="btn btn-primary btn-block">
+                        <button type="submit" id="btnAdicionarSaida" class="btn btn-primary btn-block">
                             <i class="fa fa-plus-circle" aria-hidden="true"></i> Adicionar
                         </button>
                     </form>
@@ -1116,7 +1476,7 @@ date_default_timezone_set('America/Sao_Paulo');
                         <div class="col-12 col-md-4">
                             <div class="card mb-4">
                                 <div class="card-body">
-                                    <h5 class="card-title2">Total em Caixa</h5>
+                                    <h5 class="card-title2">Disponível em Caixa</h5>
                                     <p class="card-text" id="total_em_caixa" style="font-size:1.5em;">R$ 0,00</p>
                                 </div>
                             </div>
@@ -1179,6 +1539,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             </div>
                         </div>
 
+                        <small class="input-hint d-block mb-2"><i class="fa fa-shield" aria-hidden="true"></i> O depósito não pode ultrapassar o valor disponível em caixa.</small>
                         <input type="hidden" id="data_caixa_deposito" name="data_caixa_deposito">
                         <input type="hidden" id="funcionario_deposito" name="funcionario_deposito">
 
@@ -1281,29 +1642,71 @@ date_default_timezone_set('America/Sao_Paulo');
     <div class="modal fade" id="abrirCaixaModal" tabindex="-1" role="dialog" aria-labelledby="abrirCaixaModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content modal-abrir-caixa">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="abrirCaixaModalLabel">Abrir Caixa do Dia</h5>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="abrirCaixaModalLabel"><i class="fa fa-unlock-alt" aria-hidden="true"></i> Abrir Caixa do Dia</h5>
+                </div>
+                <div class="modal-body">
+                    <!-- Caixas anteriores abertos com saldo: impedem a abertura -->
+                    <div class="cxf-pendentes" id="abrirCaixaPendentes" style="display:none;">
+                        <h6><i class="fa fa-ban" aria-hidden="true"></i> Não é possível abrir um novo caixa</h6>
+                        <p class="mb-2" style="font-size:.88rem;">Você tem caixa aberto com saldo. Feche-o e transporte o saldo antes de abrir o caixa de hoje.</p>
+                        <ul id="abrirCaixaPendentesLista"></ul>
                     </div>
-                    <div class="modal-body">
-                        <form id="formAbrirCaixa">
-                            <div class="form-group">
-                                <label for="saldo_inicial">Saldo Inicial</label>
-                                <input type="text" class="form-control" id="saldo_inicial" name="saldo_inicial" required>
-                            </div>
-                            <button type="submit" style="width: 100%" class="btn btn-primary">Abrir Caixa</button>
-                        </form>
 
-                        <!-- NOVO: opção para entrar sem abrir agora -->
-                        <div class="text-center mt-3">
-                            <button type="button" class="btn btn-outline-secondary" style="width:100%" onclick="pularAberturaCaixa()">
-                                Entrar sem abrir agora
-                            </button>
-                            <small class="form-text text-muted mt-2">
-                                Você poderá abrir o caixa a qualquer momento.
-                            </small>
+                    <form id="formAbrirCaixa">
+                        <div class="form-group">
+                            <label for="saldo_inicial">Saldo Inicial</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+                                <input type="text" class="form-control" id="saldo_inicial" name="saldo_inicial" readonly>
+                            </div>
+                            <small class="form-text text-muted" id="abrirCaixaHint"></small>
                         </div>
+                        <button type="submit" id="btnAbrirCaixa" style="width: 100%" class="btn btn-primary">Abrir Caixa</button>
+                    </form>
+
+                    <div class="text-center mt-3">
+                        <button type="button" class="btn btn-outline-secondary" style="width:100%" onclick="pularAberturaCaixa()">
+                            Entrar sem abrir agora
+                        </button>
+                        <small class="form-text text-muted mt-2">
+                            Você poderá abrir o caixa a qualquer momento.
+                        </small>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Saldo inicial lançado pelo administrador -->
+    <div class="modal fade" id="saldoInicialAdminModal" tabindex="-1" role="dialog" aria-labelledby="saldoInicialAdminLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="saldoInicialAdminLabel"><i class="fa fa-plus-square" aria-hidden="true"></i> Lançar saldo inicial</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3" style="font-size:.9rem;">
+                        Caixa de <strong id="siaFuncionario"></strong> em <strong id="siaData"></strong>.<br>
+                        <span class="text-muted">Disponível apenas para caixas abertos zerados. Somente o administrador pode lançar este valor; a operação fica registrada.</span>
+                    </p>
+                    <form id="formSaldoInicialAdmin">
+                        <input type="hidden" id="sia_caixa_id" name="caixa_id">
+                        <div class="form-group">
+                            <label class="input-label" for="sia_valor">Saldo inicial</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+                                <input type="text" class="form-control" id="sia_valor" name="saldo_inicial" required placeholder="0,00">
+                            </div>
+                            <small class="input-hint" id="siaAtual"></small>
+                        </div>
+                        <div class="form-group">
+                            <label class="input-label" for="sia_motivo">Motivo / observação</label>
+                            <textarea class="form-control" id="sia_motivo" name="motivo" rows="2" maxlength="500" placeholder="Ex.: troco inicial entregue pela gerência"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-saldo-admin btn-block"><i class="fa fa-check" aria-hidden="true"></i> Salvar saldo inicial</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -1318,50 +1721,136 @@ date_default_timezone_set('America/Sao_Paulo');
     <script src="../script/sweetalert2.js"></script>
     <script>
         $(document).ready(function() {
-            // Preencher datas com base no período rápido ao mudar o select
-            function applyPeriodoToDates() {
-                const periodo = $('#periodo').val();
-                const hoje = new Date();
-                function toISO(d){ return d.toISOString().slice(0,10); }
-
-                if (periodo === 'hoje') {
-                    $('#data_inicial').val(toISO(hoje));
-                    $('#data_final').val(toISO(hoje));
-                } else if (periodo === 'ultimos7') {
-                    const d = new Date();
-                    d.setDate(d.getDate() - 6);
-                    $('#data_inicial').val(toISO(d));
-                    $('#data_final').val(toISO(hoje));
-                } else if (periodo === 'ultimoMes') {
-                    const d = new Date();
-                    d.setDate(d.getDate() - 30);
-                    $('#data_inicial').val(toISO(d));
-                    $('#data_final').val(toISO(hoje));
-                } else {
-                    // todos: limpa
-                    $('#data_inicial').val('');
-                    $('#data_final').val('');
+            // ===== Período rápido (pílulas) =====
+            function isoLocal(d){
+                return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+            }
+            function intervaloPeriodo(p){
+                const hoje = new Date(); hoje.setHours(0,0,0,0);
+                const d = (y,m,dd) => new Date(y,m,dd);
+                const y = hoje.getFullYear(), m = hoje.getMonth();
+                const dow = (hoje.getDay() + 6) % 7; // 0 = segunda
+                const seg = new Date(hoje); seg.setDate(hoje.getDate() - dow);
+                const dom = new Date(seg); dom.setDate(seg.getDate() + 6);
+                switch (p) {
+                    case 'hoje':   return [hoje, hoje];
+                    case 'ontem':  { const o = new Date(hoje); o.setDate(o.getDate() - 1); return [o, o]; }
+                    case 'ultimos7':  { const a = new Date(hoje); a.setDate(a.getDate() - 6); return [a, hoje]; }
+                    case 'semanal':   return [seg, dom];
+                    case 'semana_passada': { const a = new Date(seg); a.setDate(a.getDate() - 7); const b = new Date(seg); b.setDate(b.getDate() - 1); return [a, b]; }
+                    case 'mensal':    return [d(y,m,1), d(y,m+1,0)];
+                    case 'mes_passado': return [d(y,m-1,1), d(y,m,0)];
+                    case 'ultimos30': { const a = new Date(hoje); a.setDate(a.getDate() - 29); return [a, hoje]; }
+                    case 'anual':     return [d(y,0,1), d(y,11,31)];
+                    default: return null;
                 }
             }
+            $('.cxf-pill').on('click', function(){
+                const p = $(this).data('periodo');
+                $('#periodo').val(p);
+                $('.cxf-pill').removeClass('active');
+                $(this).addClass('active');
+                if (p === 'personalizado') { $('#data_inicial').trigger('focus'); return; }
+                const r = intervaloPeriodo(p);
+                $('#data_inicial').val(r ? isoLocal(r[0]) : '');
+                $('#data_final').val(r ? isoLocal(r[1]) : '');
+                $('#pesquisarForm').trigger('submit');
+            });
+            // Editar uma data muda o período para "Personalizado"
+            $('#data_inicial, #data_final').on('input change', function(){
+                if ($('#periodo').val() !== 'personalizado') {
+                    $('#periodo').val('personalizado');
+                    $('.cxf-pill').removeClass('active');
+                    $('.cxf-pill[data-periodo="personalizado"]').addClass('active');
+                }
+            });
+            $('#pesquisarForm').on('submit', function(){
+                // Não envia campos vazios (URL mais limpa)
+                $(this).find('input[type=text], input[type=date]').each(function(){
+                    if (!$(this).val()) { $(this).prop('disabled', true); }
+                });
+                if ($('#situacao').val() === 'todas') { $('#situacao').prop('disabled', true); }
+                if ($('#ordenar').val() === 'data_desc') { $('#ordenar').prop('disabled', true); }
+            });
 
-            // Na primeira carga, se não houver parâmetros, aplicar "hoje" (evita sobrecarga)
-            <?php if (!isset($_GET['periodo']) && empty($_GET['data_inicial']) && empty($_GET['data_final'])): ?>
-                $('#periodo').val('hoje');
-                applyPeriodoToDates();
-            <?php endif; ?>
+            // Voltar pelo navegador não deixa campos desabilitados
+            $(window).on('pageshow', function(){ $('#pesquisarForm').find(':disabled').not('#funcionario').prop('disabled', false); });
 
-            $('#periodo').on('change', function(){
-                applyPeriodoToDates();
+            // ===== Cartões x tabela (preferência guardada neste navegador) =====
+            function aplicarVisao(v){
+                const tabela = (v === 'tabela');
+                $('#cardsResultados').toggleClass('cxf-hidden', tabela);
+                $('#tabelaResultadosWrap').toggleClass('cxf-hidden', !tabela);
+                $('.cxf-view .cxf-view-btn').removeClass('active');
+                $('.cxf-view .cxf-view-btn[data-view="' + (tabela ? 'tabela' : 'cards') + '"]').addClass('active');
+            }
+            let visaoSalva = 'cards';
+            try { visaoSalva = localStorage.getItem('atlas_caixa_visao') || 'cards'; } catch (e) {}
+            aplicarVisao(visaoSalva);
+            $('.cxf-view .cxf-view-btn').on('click', function(){
+                const v = $(this).data('view');
+                aplicarVisao(v);
+                try { localStorage.setItem('atlas_caixa_visao', v); } catch (e) {}
+            });
+
+            // ===== Busca rápida na lista =====
+            $('#cxfBusca').on('input', function(){
+                const termo = $(this).val().toLowerCase().trim();
+                let visiveis = 0;
+                $('#cardsResultados .cxf-item').each(function(){
+                    const ok = !termo || String($(this).data('busca')).indexOf(termo) !== -1;
+                    $(this).toggleClass('cxf-hidden', !ok);
+                    if (ok) visiveis++;
+                });
+                $('#tabelaResultados tbody .cxf-item').each(function(){
+                    const ok = !termo || String($(this).data('busca')).indexOf(termo) !== -1;
+                    $(this).toggleClass('cxf-hidden', !ok);
+                });
+                $('#cxfCount').text(visiveis + ' caixa(s)');
+                $('#cxfSemResultadoBusca').toggleClass('cxf-hidden', visiveis > 0 || !(window.CX_LINHAS || []).length);
+            });
+
+            // ===== Exportar CSV (abre no Excel) =====
+            $('#cxfExportar').on('click', function(){
+                const linhas = window.CX_LINHAS || [];
+                if (!linhas.length) return;
+                const num = v => (parseFloat(v) || 0).toFixed(2).replace('.', ',');
+                const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+                const cab = ['Funcionário','Nome','Data','Situação','Saldo inicial','Atos liquidados','Recebido em conta','Recebido em espécie','Devoluções','Saídas e despesas','Depósitos','Saldo transportado','Total em caixa','Depósitos sem comprovante'];
+                const corpo = linhas.map(l => [
+                    esc(l.funcionario), esc(l.nome), esc(formatDateForDisplay(l.data)), esc(l.situacao),
+                    num(l.saldo_inicial), num(l.atos), num(l.conta), num(l.especie), num(l.devolucoes),
+                    num(l.saidas), num(l.depositos), num(l.transportado), num(l.em_caixa), l.sem_comprovante
+                ].join(';'));
+                const csv = '\uFEFF' + cab.map(esc).join(';') + '\r\n' + corpo.join('\r\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'fluxo_de_caixa_' + isoLocal(new Date()) + '.csv';
+                document.body.appendChild(a); a.click();
+                setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
             });
 
             // Máscaras
             $('#valor_saida').mask('#.##0,00', {reverse: true});
             $('#valor_deposito').mask('#.##0,00', {reverse: true});
             $('#saldo_inicial').mask('#.##0,00', {reverse: true});
+            $('#sia_valor').mask('#.##0,00', {reverse: true});
+            $('.cxf-money').mask('#.##0,00', {reverse: true});
 
             // Envio de Saída
             $('#formCadastroSaida').on('submit', function(e) {
                 e.preventDefault();
+
+                var valorSaida = parseBRMoney($('#valor_saida').val());
+                if (valorSaida <= 0) {
+                    Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'Informe o valor da saída.', confirmButtonText: 'OK' });
+                    return;
+                }
+                if (typeof window.__saidaDisponivel === 'number' && Math.round(valorSaida * 100) > Math.round(window.__saidaDisponivel * 100)) {
+                    Swal.fire({ icon: 'error', title: 'Saldo insuficiente', html: 'A saída de <b>' + formatCurrency(valorSaida) + '</b> é maior que o disponível em caixa (<b>' + formatCurrency(Math.max(0, window.__saidaDisponivel)) + '</b>).', confirmButtonText: 'OK' });
+                    return;
+                }
 
                 var formData = new FormData(this);
                 $.ajax({
@@ -1427,11 +1916,15 @@ date_default_timezone_set('America/Sao_Paulo');
             $('#formCadastroDeposito').on('submit', function(e) {
                 e.preventDefault();
 
-                var totalEmCaixa = parseFloat($('#total_em_caixa').text().replace('R$ ', '').replace(/\./g, '').replace(',', '.')) || 0;
-                var valorDeposito = parseFloat($('#valor_deposito').val().replace(/\./g, '').replace(',', '.')) || 0;
+                var totalEmCaixa = (typeof window.__cxSaldoAtual === 'number') ? window.__cxSaldoAtual : parseBRMoney($('#total_em_caixa').text());
+                var valorDeposito = parseBRMoney($('#valor_deposito').val());
 
-                if (valorDeposito > totalEmCaixa) {
-                    Swal.fire({ icon: 'error', title: 'Erro!', text: 'O valor do depósito não pode ser maior do que o total disponível em caixa.', confirmButtonText: 'OK' });
+                if (valorDeposito <= 0) {
+                    Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'Informe o valor do depósito.', confirmButtonText: 'OK' });
+                    return;
+                }
+                if (Math.round(valorDeposito * 100) > Math.round(totalEmCaixa * 100)) {
+                    Swal.fire({ icon: 'error', title: 'Saldo insuficiente', html: 'O depósito de <b>' + formatCurrency(valorDeposito) + '</b> é maior que o disponível em caixa (<b>' + formatCurrency(Math.max(0, totalEmCaixa)) + '</b>).', confirmButtonText: 'OK' });
                     return;
                 }
 
@@ -1474,6 +1967,17 @@ date_default_timezone_set('America/Sao_Paulo');
             $('#cadastroSaidaModal').on('shown.bs.modal', function () {
                 var funcionario = $('#funcionario_saida').val();
                 var data_caixa = $('#data_caixa_saida').val();
+
+                carregarSaldoCaixa(funcionario, data_caixa, function(saldo){
+                    window.__saidaDisponivel = parseFloat(saldo.disponivel) || 0;
+                    $('#saidaDisponivel').text(formatCurrency(window.__saidaDisponivel));
+                    var semSaldo = Math.round(window.__saidaDisponivel * 100) <= 0;
+                    var fechado = saldo.caixa_status === 'fechado';
+                    $('#saidaDisponivelBox').toggleClass('zero', semSaldo || fechado);
+                    $('#btnAdicionarSaida').prop('disabled', semSaldo || fechado)
+                        .html(fechado ? '<i class="fa fa-lock"></i> Caixa fechado'
+                              : (semSaldo ? '<i class="fa fa-ban"></i> Sem saldo em caixa' : '<i class="fa fa-plus-circle" aria-hidden="true"></i> Adicionar'));
+                });
 
                 $.ajax({
                     url: 'listar_saidas.php',
@@ -1534,21 +2038,51 @@ date_default_timezone_set('America/Sao_Paulo');
 
         function abrirCaixaModal() {
             if (window.__skipAbrirCaixa === true) return;
+            try { if (new URLSearchParams(window.location.search).get('pular_abertura') === '1') return; } catch (e) {}
 
             $.ajax({
                 url: 'verificar_caixa_aberto.php',
                 type: 'GET',
                 dataType: 'json',
                 success: function(response) {
-                    if (response.aberto) {
-                        return;
+                    if (response.error) { console.error(response.error); return; }
+                    if (response.aberto) return;
+
+                    var transportado = parseFloat(response.saldo_transportado) || 0;
+                    var isAdmin = !!response.is_admin;
+
+                    // Caixas anteriores abertos com saldo
+                    var $lista = $('#abrirCaixaPendentesLista').empty();
+                    (response.pendentes || []).forEach(function(p){
+                        var url = 'index.php?funcionario=' + encodeURIComponent(response.funcionario || '')
+                                + '&periodo=personalizado&data_inicial=' + encodeURIComponent(p.data) + '&data_final=' + encodeURIComponent(p.data) + '&pular_abertura=1';
+                        $lista.append(
+                            '<li><span><i class="fa fa-calendar"></i> ' + escaparHtmlCx(p.data_br) + ' &middot; <b>' + escaparHtmlCx(p.disponivel_br) + '</b></span>' +
+                            '<a class="btn btn-sm btn-danger" href="' + url + '" onclick="window.__skipAbrirCaixa=true;"><i class="fa fa-lock"></i> Ir para o caixa</a></li>'
+                        );
+                    });
+                    $('#abrirCaixaPendentes').toggle(!!response.bloqueado);
+                    $('#btnAbrirCaixa').prop('disabled', !!response.bloqueado);
+                    $('#formAbrirCaixa .form-group').toggle(!response.bloqueado);
+
+                    // Saldo inicial: transporte, ou digitado apenas pelo administrador
+                    var $saldo = $('#saldo_inicial');
+                    $saldo.val(transportado.toFixed(2).replace('.', ','));
+                    if (transportado > 0) {
+                        $saldo.prop('readonly', true);
+                        $('#abrirCaixaHint').html('<i class="fa fa-share"></i> Saldo transportado do caixa anterior.');
+                    } else if (isAdmin) {
+                        $saldo.prop('readonly', false);
+                        $('#abrirCaixaHint').html('<i class="fa fa-user-secret"></i> Como administrador, você pode informar o saldo inicial.');
                     } else {
-                        $('#abrirCaixaModal').modal('show');
-                        var v = response.saldo_transportado || 0;
-                        $('#saldo_inicial').val(parseFloat(v).toFixed(2).replace('.', ','));
+                        $saldo.prop('readonly', true);
+                        $('#abrirCaixaHint').html('<i class="fa fa-info-circle"></i> Não há saldo transportado: o caixa será aberto <b>zerado</b>. Somente o administrador pode lançar um saldo inicial depois.');
                     }
+                    window.__abrirCaixaAdminLivre = (isAdmin && transportado <= 0);
+
+                    $('#abrirCaixaModal').modal('show');
                 },
-                error: function() { alert('Erro ao verificar caixa.'); }
+                error: function() { console.error('Erro ao verificar caixa.'); }
             });
         }
 
@@ -1571,7 +2105,9 @@ date_default_timezone_set('America/Sao_Paulo');
                     $('#detalhesModalLabel').html(`CAIXA DO DIA ${dataFormatada} - FUNCIONÁRIO: ${funcionarios}`);
 
                     // Status (com cadeado) no cabeçalho do modal
-                    var fechado = (parseFloat(detalhes.totalEmCaixa) === 0);
+                    var zerado = Math.round((parseFloat(detalhes.totalEmCaixa) || 0) * 100) === 0;
+                    var fechado = detalhes.caixaStatus === 'fechado'
+                        || (zerado && !(detalhes.caixaStatus === 'aberto' && detalhes.ultimoCaixa));
                     var statusText = fechado ? 'Fechado' : 'Aberto';
                     var statusClass = fechado ? 'badge-closed' : 'badge-open';
                     var icon = fechado ? 'fa-lock' : 'fa-unlock-alt';
@@ -2170,21 +2706,27 @@ date_default_timezone_set('America/Sao_Paulo');
                     var totalDepositoCaixa = parseFloat(response.totalDepositoCaixa) || 0;
                     var totalSaldoTransportado = parseFloat(response.totalSaldoTransportado) || 0;
 
-                    var totalEmCaixa = saldoInicial + totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidasDespesas - totalDepositoCaixa;
-                    if (response.data_caixa === data && response.funcionario === funcionarios) {
-                        totalEmCaixa -= totalSaldoTransportado;
-                    }
+                    // Saldo calculado no servidor (mesma regra das validações)
+                    var totalEmCaixa = (response.saldoDisponivel !== undefined && response.saldoDisponivel !== null)
+                        ? (parseFloat(response.saldoDisponivel) || 0)
+                        : (saldoInicial + totalRecebidoEspecie - totalDevolvidoEspecie - totalSaidasDespesas - totalDepositoCaixa - totalSaldoTransportado);
+                    totalEmCaixa = Math.round(totalEmCaixa * 100) / 100;
+                    window.__cxSaldoAtual = totalEmCaixa;
+                    window.__cxCaixaStatus = response.caixaStatus || null;
 
                     $('#total_em_caixa').text(formatCurrency(totalEmCaixa));
                     $('#total_depositos').text(formatCurrency(totalDepositoCaixa));
                     $('#saldo_transportado').text(formatCurrency(totalSaldoTransportado));
 
-                    if (totalEmCaixa === 0) {
-                        $('#btnTransportarSaldo').prop('disabled', true);
-                        $('#btnAdicionarDeposito').prop('disabled', true);
+                    var centavos = Math.round(totalEmCaixa * 100);
+                    var fechado = (response.caixaStatus === 'fechado');
+                    var podeFechar = !fechado && (centavos > 0 || (centavos === 0 && response.caixaStatus === 'aberto'));
+                    $('#btnAdicionarDeposito').prop('disabled', fechado || centavos <= 0);
+                    $('#btnTransportarSaldo').prop('disabled', !podeFechar);
+                    if (centavos > 0) {
+                        $('#btnTransportarSaldo').html('<i class="fa fa-lock" aria-hidden="true"></i> Fechar Caixa e Transportar Saldo <i class="fa fa-share" aria-hidden="true"></i>');
                     } else {
-                        $('#btnTransportarSaldo').prop('disabled', false);
-                        $('#btnAdicionarDeposito').prop('disabled', false);
+                        $('#btnTransportarSaldo').html('<i class="fa fa-lock" aria-hidden="true"></i> ' + (fechado ? 'Caixa fechado' : 'Fechar Caixa (sem saldo a transportar)'));
                     }
 
                     $('#tabelaDepositosRegistrados').DataTable({
@@ -2288,7 +2830,7 @@ date_default_timezone_set('America/Sao_Paulo');
         }
 
         function removerDeposito(button) {
-            var id = $(button).attr('data-id');
+            var id = (typeof button === 'object') ? $(button).attr('data-id') : button;
             if (!id || id === 'undefined') { console.error('ID do depósito a ser removido é indefinido.'); return; }
 
             Swal.fire({
@@ -2329,7 +2871,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Saída/Despesa removida com sucesso!', confirmButtonText: 'OK' })
                             .then(() => { location.reload(); });
                         } else {
-                            Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao remover saída/despesa.', confirmButtonText: 'OK' });
+                            Swal.fire({ icon: 'error', title: 'Erro!', text: response.error || 'Erro ao remover saída/despesa.', confirmButtonText: 'OK' });
                         }
                     }, 'json');
                 }
@@ -2369,12 +2911,25 @@ date_default_timezone_set('America/Sao_Paulo');
         }
 
         function transportarSaldoFecharCaixa() {
-            var totalEmCaixa = $('#total_em_caixa').text().replace(/\./g, '').replace(',', '.').replace('R$ ', '');
-            var totalEmCaixaFormatado = $('#total_em_caixa').text();
+            var saldo = (typeof window.__cxSaldoAtual === 'number') ? window.__cxSaldoAtual : parseBRMoney($('#total_em_caixa').text());
+            var centavos = Math.round(saldo * 100);
+            var totalEmCaixa = (centavos / 100).toFixed(2);
+            var totalEmCaixaFormatado = formatCurrency(centavos / 100);
+
+            if (window.__cxCaixaStatus === 'fechado') {
+                Swal.fire({ icon: 'info', title: 'Caixa fechado', text: 'Este caixa já está fechado.', confirmButtonText: 'OK' });
+                return;
+            }
+            if (centavos < 0) {
+                Swal.fire({ icon: 'error', title: 'Saldo negativo', text: 'O saldo deste caixa está negativo (' + totalEmCaixaFormatado + '). Revise as saídas e depósitos antes de fechar.', confirmButtonText: 'OK' });
+                return;
+            }
 
             Swal.fire({
                 title: 'Tem certeza?',
-                text: `Você realmente deseja fechar o caixa e transportar o saldo de ${totalEmCaixaFormatado} para o caixa seguinte?`,
+                text: centavos > 0
+                    ? `Você realmente deseja fechar o caixa e transportar o saldo de ${totalEmCaixaFormatado} para o caixa seguinte?`
+                    : 'O caixa não tem saldo a transportar. Deseja fechá-lo?',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#3085d6',
@@ -2411,6 +2966,65 @@ date_default_timezone_set('America/Sao_Paulo');
                 }
             });
         }
+
+        // Saldo do caixa (funcionário + data) calculado no servidor
+        function carregarSaldoCaixa(funcionario, data, callback) {
+            $.getJSON('saldo_caixa.php', { funcionario: funcionario, data_caixa: data })
+                .done(function(r){
+                    if (r && r.success && r.saldo) { callback(r.saldo); }
+                    else { Swal.fire({ icon: 'error', title: 'Erro!', text: (r && r.error) || 'Não foi possível obter o saldo do caixa.' }); }
+                })
+                .fail(function(){ Swal.fire({ icon: 'error', title: 'Erro!', text: 'Não foi possível obter o saldo do caixa.' }); });
+        }
+
+        // Saldo inicial lançado pelo administrador (caixas abertos zerados)
+        function abrirSaldoInicialAdmin(caixaId, funcionario, data, saldoAtual) {
+            if (!window.CX_IS_ADMIN) {
+                Swal.fire({ icon: 'warning', title: 'Acesso restrito', text: 'Somente o administrador pode lançar o saldo inicial.' });
+                return;
+            }
+            $('#sia_caixa_id').val(caixaId);
+            $('#siaFuncionario').text(funcionario);
+            $('#siaData').text(formatDateForDisplay(data));
+            var atual = parseFloat(saldoAtual) || 0;
+            $('#sia_valor').val(atual > 0 ? atual.toFixed(2).replace('.', ',') : '').trigger('input');
+            $('#sia_motivo').val('');
+            $('#siaAtual').text('Saldo inicial atual: ' + formatCurrency(atual));
+            $('#saldoInicialAdminModal').modal('show');
+        }
+
+        $('#formSaldoInicialAdmin').on('submit', function(e){
+            e.preventDefault();
+            var valor = parseBRMoney($('#sia_valor').val());
+            if (valor < 0 || $('#sia_valor').val().trim() === '') {
+                Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'Informe o saldo inicial.' });
+                return;
+            }
+            Swal.fire({
+                title: 'Confirmar saldo inicial?',
+                html: 'O caixa de <b>' + escaparHtmlCx($('#siaFuncionario').text()) + '</b> (' + escaparHtmlCx($('#siaData').text()) + ') passará a ter saldo inicial de <b>' + formatCurrency(valor) + '</b>.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, salvar',
+                cancelButtonText: 'Cancelar'
+            }).then(function(res){
+                if (!res.isConfirmed) return;
+                $.post('definir_saldo_inicial.php', {
+                    caixa_id: $('#sia_caixa_id').val(),
+                    saldo_inicial: valor.toFixed(2),
+                    motivo: $('#sia_motivo').val()
+                }, function(r){
+                    if (r && r.success) {
+                        Swal.fire({ icon: 'success', title: 'Saldo inicial lançado!', text: 'Disponível em caixa: ' + formatCurrency(r.disponivel), confirmButtonText: 'OK' })
+                            .then(function(){ location.reload(); });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Não foi possível salvar', text: (r && r.error) || 'Erro ao lançar o saldo inicial.' });
+                    }
+                }, 'json').fail(function(x, t, er){
+                    Swal.fire({ icon: 'error', title: 'Erro!', text: 'Falha ao lançar o saldo inicial: ' + t + ' - ' + er });
+                });
+            });
+        });
 
         // NOVO: Fechamento rápido via botão com cadeado dourado no card
         function fecharCaixaRapido(funcionario, data) {
@@ -2466,16 +3080,19 @@ date_default_timezone_set('America/Sao_Paulo');
         $('#formAbrirCaixa').on('submit', function(e) {
             e.preventDefault();
 
-            var saldoInicial = $('#saldo_inicial').val().replace(/\./g, '').replace(',', '.');
+            var dadosAbertura = {};
+            if (window.__abrirCaixaAdminLivre) {
+                dadosAbertura.saldo_inicial = parseBRMoney($('#saldo_inicial').val()).toFixed(2);
+            }
 
             $.ajax({
                 url: 'abrir_caixa.php',
                 type: 'POST',
-                data: { saldo_inicial: saldoInicial },
+                data: dadosAbertura,
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
-                        Swal.fire({ icon: 'success', title: 'Caixa aberto com sucesso!', showConfirmButton: true, confirmButtonText: 'OK' })
+                        Swal.fire({ icon: 'success', title: 'Caixa aberto com sucesso!', text: response.zerado ? 'O caixa foi aberto zerado.' : ('Saldo inicial: ' + formatCurrency(response.saldo_inicial)), showConfirmButton: true, confirmButtonText: 'OK' })
                         .then((result) => {
                             if (result.isConfirmed) {
                                 $('#abrirCaixaModal').modal('hide');
