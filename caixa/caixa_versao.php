@@ -4,5 +4,5 @@
  * Altere a cada entrega.
  */
 if (!defined('ATLAS_CAIXA_VERSAO')) {
-    define('ATLAS_CAIXA_VERSAO', '2026.10.19.1');
+    define('ATLAS_CAIXA_VERSAO', '2026.10.19.2');
 }

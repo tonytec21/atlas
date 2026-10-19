@@ -101,6 +101,8 @@ date_default_timezone_set('America/Sao_Paulo');
         .cxf-disp.zero .lb, .cxf-disp.zero .vl{ color:#b91c1c; }
         .btn-saldo-admin{ background:#7c3aed; border-color:#7c3aed; color:#fff; }
         .btn-saldo-admin:hover{ background:#6d28d9; color:#fff; }
+        .cxf-btn-saldo-card{ display:flex; width:100%; align-items:center; justify-content:center; gap:6px; margin:8px 0 4px; font-weight:600; border-radius:8px; }
+        .cxf-table .cxf-btn-saldo-card{ width:auto; display:inline-flex; margin:6px 0 0; }
         .cxf-saldo-admin-aviso{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
                                 background:#f5f3ff; border:1px solid #c4b5fd; color:#4c1d95; border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:.9rem; }
         body.dark-mode .cxf-saldo-admin-aviso{ background:#2e1065; border-color:#6d28d9; color:#ede9fe; }
@@ -725,6 +727,17 @@ date_default_timezone_set('America/Sao_Paulo');
                     . $js($l['funcionario']) . ', ' . $js($l['data']) . ')"><i class="fa fa-lock"></i></button>';
             };
 
+            // Botão com texto (além do ícone) para o administrador lançar o saldo inicial
+            $renderBotaoSaldo = function (array $l) use ($modoVisualizacao, $isAdmin, $js) {
+                if ($l['tipo'] !== 'individual' || $modoVisualizacao || !$isAdmin || !$l['pode_lancar_saldo']) {
+                    return '';
+                }
+                $rotulo = cx_centavos($l['saldo_inicial']) > 0 ? 'Ajustar saldo inicial' : 'Lançar saldo inicial';
+                return '<button type="button" class="btn btn-saldo-admin btn-sm cxf-btn-saldo-card" onclick="event.stopPropagation(); abrirSaldoInicialAdmin('
+                    . $js($l['caixa_id']) . ', ' . $js($l['funcionario']) . ', ' . $js($l['data']) . ', ' . $js($l['saldo_inicial'])
+                    . ')"><i class="fa fa-plus-square" aria-hidden="true"></i> ' . $rotulo . '</button>';
+            };
+
             $renderPendencias = function (array $l) use ($h) {
                 $tags = [];
                 if ($l['tipo'] === 'individual') {
@@ -817,7 +830,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                     <div class="cxf-nome"><?php echo $h($l['nome']); ?></div>
                                 <?php endif; ?>
                                 <div class="muted">Data: <?php echo $h(cx_data_br($l['data'])); ?></div>
-                                <?php echo $renderPendencias($l); ?>
+                                <?php echo $renderPendencias($l) . $renderBotaoSaldo($l); ?>
 
                                 <div class="metrics">
                                     <div class="metric"><span class="chip chip-saldo">Saldo Inicial</span><div class="k"><?php echo $fmt($l['saldo_inicial']); ?></div></div>
@@ -872,7 +885,7 @@ date_default_timezone_set('America/Sao_Paulo');
                                     <span class="badge-status <?php echo $l['fechado'] ? 'badge-closed' : 'badge-open'; ?>">
                                         <i class="fa <?php echo $l['fechado'] ? 'fa-lock' : 'fa-unlock-alt'; ?>"></i> <?php echo $l['fechado'] ? 'Fechado' : 'Aberto'; ?>
                                     </span>
-                                    <?php echo $renderPendencias($l); ?>
+                                    <?php echo $renderPendencias($l) . $renderBotaoSaldo($l); ?>
                                 </td>
                                 <td class="num"><?php echo $fmt($l['saldo_inicial']); ?></td>
                                 <td class="num"><?php echo $fmt($l['atos']); ?></td>
