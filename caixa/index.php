@@ -101,6 +101,11 @@ date_default_timezone_set('America/Sao_Paulo');
         .cxf-disp.zero .lb, .cxf-disp.zero .vl{ color:#b91c1c; }
         .btn-saldo-admin{ background:#7c3aed; border-color:#7c3aed; color:#fff; }
         .btn-saldo-admin:hover{ background:#6d28d9; color:#fff; }
+        .cxf-saldo-admin-aviso{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+                                background:#f5f3ff; border:1px solid #c4b5fd; color:#4c1d95; border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:.9rem; }
+        body.dark-mode .cxf-saldo-admin-aviso{ background:#2e1065; border-color:#6d28d9; color:#ede9fe; }
+        /* Modal do saldo inicial aberto por cima do detalhe do caixa */
+        #saldoInicialAdminModal{ z-index:1065; }
         @media (max-width: 576px){
             .cxf-search input{ min-width:0; width:100%; }
             .cxf-search, .cxf-tools{ width:100%; }
@@ -149,7 +154,7 @@ date_default_timezone_set('America/Sao_Paulo');
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user || $user['status'] !== 'ativo') {
+    if (!$user || cx_norm($user['status']) !== 'ativo') {
         echo "<script>alert('O usuário não tem acesso à página.'); window.location.href='../index.php';</script>";
         exit;
     }
@@ -163,14 +168,14 @@ date_default_timezone_set('America/Sao_Paulo');
     $temAcessoFluxoDeCaixa = false;
 
     // Verifica se o nível de acesso é "usuario" e se tem o acesso adicional "Fluxo de Caixa"
-    if ($user['nivel_de_acesso'] === 'usuario' && !empty($user['acesso_adicional'])) {
+    if (cx_norm($user['nivel_de_acesso']) === 'usuario' && !empty($user['acesso_adicional'])) {
         $acessosAdicionais = array_map('trim', explode(',', $user['acesso_adicional']));
         if (in_array('Fluxo de Caixa', $acessosAdicionais)) {
             $temAcessoFluxoDeCaixa = true;
         }
     }
 
-    $isAdmin           = ($user['nivel_de_acesso'] === 'administrador');
+    $isAdmin           = cx_nivel_admin($user['nivel_de_acesso']);
     $temAcessoCompleto = ($isAdmin || $temAcessoFluxoDeCaixa);
 
     // ============================ Helpers de saída ============================
@@ -932,6 +937,11 @@ date_default_timezone_set('America/Sao_Paulo');
                     <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" style="position:absolute; right:12px; top:8px;">&times;</button>
                 </div>
                 <div class="modal-body">
+                    <!-- Administrador: caixa aberto zerado aguardando o saldo inicial -->
+                    <div id="detalhesSaldoAdmin" class="cxf-saldo-admin-aviso" style="display:none;">
+                        <span><i class="fa fa-hourglass-half" aria-hidden="true"></i> <span id="detalhesSaldoAdminTexto"></span></span>
+                        <button type="button" class="btn btn-saldo-admin btn-sm" id="detalhesSaldoAdminBtn"><i class="fa fa-plus-square" aria-hidden="true"></i> Lançar saldo inicial</button>
+                    </div>
                     <div class="row">
                         <div class="col-6 col-sm-6 col-md-3 col-lg-3">
                             <div class="card text-white bg-primary mb-3" style="background-color: #005d15 !important">
@@ -2068,6 +2078,7 @@ date_default_timezone_set('America/Sao_Paulo');
                     // Saldo inicial: transporte, ou digitado apenas pelo administrador
                     var $saldo = $('#saldo_inicial');
                     $saldo.val(transportado.toFixed(2).replace('.', ','));
+                    $saldo.closest('.input-group').show();
                     if (transportado > 0) {
                         $saldo.prop('readonly', true);
                         $('#abrirCaixaHint').html('<i class="fa fa-share"></i> Saldo transportado do caixa anterior.');
@@ -2075,8 +2086,8 @@ date_default_timezone_set('America/Sao_Paulo');
                         $saldo.prop('readonly', false);
                         $('#abrirCaixaHint').html('<i class="fa fa-user-secret"></i> Como administrador, você pode informar o saldo inicial.');
                     } else {
-                        $saldo.prop('readonly', true);
-                        $('#abrirCaixaHint').html('<i class="fa fa-info-circle"></i> Não há saldo transportado: o caixa será aberto <b>zerado</b>. Somente o administrador pode lançar um saldo inicial depois.');
+                        $saldo.prop('readonly', true).closest('.input-group').hide();
+                        $('#abrirCaixaHint').html('<i class="fa fa-info-circle"></i> Não há saldo transportado: o caixa será aberto <b>zerado</b>. O saldo inicial (troco) é lançado pelo administrador, que verá este caixa como <b>Aberto zerado</b>.');
                     }
                     window.__abrirCaixaAdminLivre = (isAdmin && transportado <= 0);
 
@@ -2137,6 +2148,19 @@ date_default_timezone_set('America/Sao_Paulo');
 
                     toggleCard('#cardSaldoTransportado', detalhes.totalSaldoTransportado);
                     toggleCard('#cardSaldoInicial', detalhes.saldoInicial);
+
+                    // Administrador: lançar/ajustar o saldo inicial direto do detalhe do caixa
+                    if (window.CX_IS_ADMIN && detalhes.podeLancarSaldo && detalhes.caixaId) {
+                        var si = parseFloat(detalhes.saldoInicial) || 0;
+                        $('#detalhesSaldoAdminTexto').text(si > 0
+                            ? 'Saldo inicial lançado pelo administrador: ' + formatCurrency(si) + '. Você pode ajustá-lo enquanto o caixa estiver aberto.'
+                            : 'Caixa aberto zerado: o saldo inicial ainda não foi lançado.');
+                        $('#detalhesSaldoAdminBtn').html('<i class="fa fa-plus-square" aria-hidden="true"></i> ' + (si > 0 ? 'Ajustar saldo inicial' : 'Lançar saldo inicial'))
+                            .off('click').on('click', function(){ abrirSaldoInicialAdmin(detalhes.caixaId, funcionarios, data, si); });
+                        $('#detalhesSaldoAdmin').css('display', 'flex');
+                    } else {
+                        $('#detalhesSaldoAdmin').hide();
+                    }
 
 
                     // Atos Liquidados
@@ -2992,6 +3016,11 @@ date_default_timezone_set('America/Sao_Paulo');
             $('#siaAtual').text('Saldo inicial atual: ' + formatCurrency(atual));
             $('#saldoInicialAdminModal').modal('show');
         }
+
+        // Empilhamento sobre o modal de detalhes
+        $('#saldoInicialAdminModal')
+            .on('shown.bs.modal', function(){ $('.modal-backdrop').last().css('z-index', 1062); })
+            .on('hidden.bs.modal', function(){ if ($('.modal.show').length) { $('body').addClass('modal-open'); } });
 
         $('#formSaldoInicialAdmin').on('submit', function(e){
             e.preventDefault();

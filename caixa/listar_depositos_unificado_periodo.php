@@ -48,7 +48,7 @@ try {
             ':data_caixa'  => $dataSomente
         ]);
         $cx = $stStatus->fetch(PDO::FETCH_ASSOC);
-        $row['pode_excluir'] = ($cx && $cx['status'] === 'aberto') ? 1 : 0;
+        $row['pode_excluir'] = ($cx && strtolower(trim((string) $cx['status'])) === 'aberto') ? 1 : 0;
         $out[] = $row;
     }
 

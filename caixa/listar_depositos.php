@@ -49,8 +49,8 @@ try {
     $caixa = $stmt->fetch(PDO::FETCH_ASSOC);
 
     $saldoInicial = $caixa ? floatval($caixa['saldo_inicial']) : 0.0;
-    $caixaFechado = ($caixa && $caixa['status'] === 'fechado') ? true : false;
-    $podeExcluir  = ($caixa && $caixa['status'] === 'aberto') ? 1 : 0;
+    $caixaFechado = ($caixa && strtolower(trim((string) $caixa['status'])) === 'fechado') ? true : false;
+    $podeExcluir  = ($caixa && strtolower(trim((string) $caixa['status'])) === 'aberto') ? 1 : 0;
 
     // Seleciona o total recebido em espécie
     $stmt = $conn->prepare('SELECT SUM(total_pagamento) as total_recebido_especie

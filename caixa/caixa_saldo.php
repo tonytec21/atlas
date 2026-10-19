@@ -90,6 +90,21 @@ if (!defined('CX_SALDO_LIB')) {
         return $t ? date('d/m/Y', $t) : $data;
     }
 
+    /**
+     * Normaliza textos de situação vindos do banco ("Aberto", " ABERTO ",
+     * ENUM('Aberto','Fechado') etc.) para comparação: minúsculo e sem espaços.
+     */
+    function cx_norm($valor): string
+    {
+        return mb_strtolower(trim((string) $valor), 'UTF-8');
+    }
+
+    /** Nível de acesso é de administrador? ("administrador", "Administrador", "admin") */
+    function cx_nivel_admin($nivel): bool
+    {
+        return in_array(cx_norm($nivel), ['administrador', 'admin'], true);
+    }
+
     /** Usuário logado é administrador? (somente nível "administrador") */
     function cx_eh_admin(PDO $conn, ?string $usuario): bool
     {
@@ -99,7 +114,7 @@ if (!defined('CX_SALDO_LIB')) {
         $st = $conn->prepare('SELECT nivel_de_acesso, status FROM funcionarios WHERE usuario = :u LIMIT 1');
         $st->execute([':u' => $usuario]);
         $f = $st->fetch(PDO::FETCH_ASSOC);
-        return $f && $f['nivel_de_acesso'] === 'administrador' && $f['status'] === 'ativo';
+        return $f && cx_nivel_admin($f['nivel_de_acesso']) && cx_norm($f['status']) === 'ativo';
     }
 
     /**
@@ -215,7 +230,7 @@ if (!defined('CX_SALDO_LIB')) {
         $st->execute([':f' => $funcionario, ':d0' => $d0, ':d1' => $d1]);
         if ($cx = $st->fetch(PDO::FETCH_ASSOC)) {
             $r['caixa_id']      = (int) $cx['id'];
-            $r['caixa_status']  = (string) $cx['status'];
+            $r['caixa_status']  = cx_norm($cx['status']);
             $r['saldo_inicial'] = (float) $cx['saldo_inicial'];
         }
 

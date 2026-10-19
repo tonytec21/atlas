@@ -13,14 +13,14 @@ $stmt->bindParam(':usuario', $_SESSION['username']);
 $stmt->execute();
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$user || $user['status'] !== 'ativo') {
+if (!$user || strtolower(trim((string) $user['status'])) !== 'ativo') {
     echo "<script>alert('O usuário não tem acesso à página.'); window.location.href='../index.php';</script>";
     exit;
 }
 
 /** Verifica se possui acesso ao Fluxo de Caixa */
 $temAcessoFluxo = false;
-if ($user['nivel_de_acesso'] === 'administrador') {
+if (in_array(strtolower(trim((string) $user['nivel_de_acesso'])), ['administrador', 'admin'], true)) {
     $temAcessoFluxo = true;
 } else {
     $acessosAdicionais = array_map('trim', explode(',', (string)($user['acesso_adicional'] ?? '')));
@@ -36,7 +36,7 @@ $funcionarioSelected = isset($_GET['funcionario']) ? $_GET['funcionario'] : 'tod
 
 /** Carrega lista de funcionários (ativos) quando permitido */
 $listaFuncionarios = [];
-if ($user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxo) {
+if (in_array(strtolower(trim((string) $user['nivel_de_acesso'])), ['administrador', 'admin'], true) || $temAcessoFluxo) {
     $stF = $conn->prepare("SELECT usuario, nome_completo FROM funcionarios WHERE status = 'ativo' ORDER BY nome_completo");
     $stF->execute();
     $listaFuncionarios = $stF->fetchAll(PDO::FETCH_ASSOC);
@@ -250,9 +250,9 @@ function dtBR($d){ return date('d/m/Y', strtotime($d)); }
                 <div class="form-group col-md-4">
                     <label for="funcionario">Funcionário:</label>
                     <select class="form-control" id="funcionario" name="funcionario" <?php
-                        echo ($user['nivel_de_acesso'] !== 'administrador' && !$temAcessoFluxo) ? 'disabled' : '';
+                        echo (!in_array(strtolower(trim((string) $user['nivel_de_acesso'])), ['administrador', 'admin'], true) && !$temAcessoFluxo) ? 'disabled' : '';
                     ?>>
-                        <?php if ($user['nivel_de_acesso'] === 'administrador' || $temAcessoFluxo): ?>
+                        <?php if (in_array(strtolower(trim((string) $user['nivel_de_acesso'])), ['administrador', 'admin'], true) || $temAcessoFluxo): ?>
                             <option value="todos" <?= ($funcionarioSelected==='todos')?'selected':''; ?>>Unificado (Todos)</option>
                             <?php foreach ($listaFuncionarios as $f): ?>
                                 <option value="<?= htmlspecialchars($f['usuario']) ?>" <?= ($funcionarioSelected===$f['usuario'])?'selected':''; ?>>

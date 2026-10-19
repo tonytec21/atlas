@@ -34,7 +34,7 @@ try {
         ':data_caixa'  => $data_caixa
     ]);
     $cx = $st->fetch(PDO::FETCH_ASSOC);
-    $podeExcluir = ($cx && $cx['status'] === 'aberto') ? 1 : 0;
+    $podeExcluir = ($cx && strtolower(trim((string) $cx['status'])) === 'aberto') ? 1 : 0;
 
     // Busca saídas ativas da data/funcionário
     $sql = '

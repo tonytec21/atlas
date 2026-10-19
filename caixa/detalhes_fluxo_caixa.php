@@ -548,7 +548,9 @@ try {
         // Situação do caixa (individual)
         'caixaStatus' => $caixaInfo ? $caixaInfo['caixa_status'] : null,
         'origemSaldo' => $caixaInfo ? $caixaInfo['origem_saldo'] : null,
-        'ultimoCaixa' => $caixaInfo ? $caixaInfo['ultimo_caixa'] : false
+        'ultimoCaixa' => $caixaInfo ? $caixaInfo['ultimo_caixa'] : false,
+        'caixaId' => $caixaInfo ? $caixaInfo['caixa_id'] : null,
+        'podeLancarSaldo' => $caixaInfo ? cx_pode_lancar_saldo_inicial($caixaInfo) : false
     ]);
 } catch (Exception $e) {
     echo json_encode(['error' => $e->getMessage()]);
