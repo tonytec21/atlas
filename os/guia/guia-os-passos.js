@@ -2998,7 +2998,10 @@
                     window.GuiaOS.definirBotaoAjuda(nomeGuia, rotulo);
                     var atual = window.GuiaOS.emExecucao();
                     if (atual && atual.nome !== nomeGuia) { guiaAnterior = atual; }
-                    if (guiaAnterior || !window.GuiaOS.jaConcluido(nomeGuia)) {
+                    /* Só abre sozinho se o usuário já estava num guia (que ele mesmo
+                       iniciou pelo botão “?”). Fora disso, o guia da janela fica
+                       disponível no botão, sem abrir automaticamente. */
+                    if (guiaAnterior || (window.GuiaOS.autoIniciarAtivo() && !window.GuiaOS.jaConcluido(nomeGuia))) {
                         window.GuiaOS.iniciar(nomeGuia, { reiniciar: true });
                     }
                 },
@@ -3336,7 +3339,10 @@
                     window.GuiaOS.definirBotaoAjuda(nomeGuia, rotulo);
                     var atual = window.GuiaOS.emExecucao();
                     if (atual && atual.nome !== nomeGuia) { guiaAnterior = atual; }
-                    if (guiaAnterior || !window.GuiaOS.jaConcluido(nomeGuia)) {
+                    /* Só abre sozinho se o usuário já estava num guia (que ele mesmo
+                       iniciou pelo botão “?”). Fora disso, o guia da janela fica
+                       disponível no botão, sem abrir automaticamente. */
+                    if (guiaAnterior || (window.GuiaOS.autoIniciarAtivo() && !window.GuiaOS.jaConcluido(nomeGuia))) {
                         window.GuiaOS.iniciar(nomeGuia, { reiniciar: true });
                     }
                 },

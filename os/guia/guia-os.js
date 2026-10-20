@@ -32,7 +32,7 @@
 
     var PREFIXO = 'atlasGuiaOS.';
     var CHAVE_PENDENTE = PREFIXO + 'pendente';
-    var VERSAO = '1.0.0';
+    var VERSAO = '1.0.1';
 
     /* Abertura automática do guia ao entrar na tela.
        Desligada por padrão — o guia só abre pelo botão "?" ou por um
