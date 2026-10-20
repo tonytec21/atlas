@@ -19,7 +19,7 @@
  */
 
 if (!defined('TS_VERSAO')) {
-    define('TS_VERSAO', '1.0.0');
+    define('TS_VERSAO', '1.0.1');
 }
 
 require_once __DIR__ . '/db_connection.php';

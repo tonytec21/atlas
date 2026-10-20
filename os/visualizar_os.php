@@ -1376,6 +1376,11 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                            padding:10px 14px;margin:12px 0;font-size:.85rem;color:#92400e}
 
         /* ===== Transferências de saldo entre O.S. ===== */
+        /* botão próprio: a classe global .btn-info do Atlas é um ícone 40x40 */
+        .btn-transferir{ background:linear-gradient(135deg,#8b5cf6 0%,#6d28d9 100%); color:#fff !important; border:none;
+            width:auto; height:auto; margin:0; display:inline-flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; }
+        .btn-transferir:hover, .btn-transferir:focus{ color:#fff; opacity:.92; box-shadow:0 4px 12px rgba(109,40,217,.3); }
+        .btn-transferir:disabled{ opacity:.55; }
         .ts-card{ border:1px solid var(--border-primary); border-radius:12px; padding:14px 16px; background:var(--bg-secondary, transparent); }
         .ts-card-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
         .ts-card-head h5{ font-weight:700; color:var(--text-primary); }
@@ -1651,7 +1656,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     <small class="text-muted">Valores movidos entre O.S. sem passar pelo caixa. Cada registro tem código, motivo e responsável.</small>
                 </div>
                 <?php if ($ts_pode_agora): ?>
-                <button type="button" class="btn btn-info btn-sm" onclick="tsAbrirModal()">
+                <button type="button" class="btn btn-transferir btn-sm" onclick="tsAbrirModal()">
                     <i class="fa fa-share"></i> Transferir saldo (<?php echo ts_moeda($ts_disponivel); ?> disponível)
                 </button>
                 <?php endif; ?>
@@ -2326,7 +2331,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         </button>  
                     <?php endif; ?>  
                     <?php if ($ts_mostra_btn): ?>
-                        <button type="button" class="btn btn-info" id="btnTransferirSaldo" onclick="tsAbrirModal()">
+                        <button type="button" class="btn btn-transferir" id="btnTransferirSaldo" onclick="tsAbrirModal()">
                             <i class="fa fa-exchange"></i> Transferir saldo p/ outra O.S.
                         </button>
                     <?php endif; ?>
@@ -2655,8 +2660,8 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         <label for="ts_destino">Nº da O.S. de destino</label>
                         <input type="number" min="1" class="form-control" id="ts_destino" placeholder="Ex.: 1250">
                     </div>
-                    <div class="form-group col-md-3">
-                        <button type="button" class="btn btn-secondary w-100" id="ts_btnConsultar" onclick="tsConsultar()">
+                    <div class="form-group col-md-auto">
+                        <button type="button" class="btn btn-secondary w-100 text-nowrap" id="ts_btnConsultar" onclick="tsConsultar()">
                             <i class="fa fa-search"></i> Conferir O.S.
                         </button>
                     </div>
@@ -2691,7 +2696,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-                <button type="button" class="btn btn-info" id="ts_btnTransferir" onclick="tsTransferir()" disabled>
+                <button type="button" class="btn btn-transferir" id="ts_btnTransferir" onclick="tsTransferir()" disabled>
                     <i class="fa fa-check"></i> Transferir
                 </button>
             </div>
