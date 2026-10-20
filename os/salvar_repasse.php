@@ -53,7 +53,11 @@ try {
     $total_dev = $getSum("SELECT COALESCE(SUM(total_devolucao),0) s FROM devolucao_os WHERE ordem_de_servico_id = ?", $os_id);
     $total_rep = $getSum("SELECT COALESCE(SUM(total_repasse),0) s FROM repasse_credor WHERE ordem_de_servico_id = ?", $os_id);
 
-    $saldo_disponivel = ($total_pag - $total_dev) - $total_os_val - $total_rep;
+    // Transferências de saldo entre O.S. (recebida soma, enviada subtrai)
+    require_once __DIR__ . '/transferencia_saldo_lib.php';
+    $tsT = ts_totais($os_id);
+
+    $saldo_disponivel = ($total_pag + $tsT['entrada'] - $total_dev - $tsT['saida']) - $total_os_val - $total_rep;
 
     if ($total_repasse > $saldo_disponivel + 0.01) {
         throw new Exception('O valor do repasse (R$ ' . number_format($total_repasse, 2, ',', '.') .

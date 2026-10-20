@@ -39,6 +39,8 @@ function osaud_colunas(string $sec, array $linhas): array
         'entregas'     => ['recebido_por', 'recebido_doc', 'entregue_por', 'entregue_em', 'data_entrega', 'observacoes'],
         'nfse'         => ['id', 'numero_nfse', 'numero', 'chave_acesso', 'status', 'valor_servico', 'valor_iss', 'criado_em', 'emitida_em', 'cancelada_em'],
         'assinaturas'  => ['tipo', 'assinado_por', 'assinante_cert', 'assinado_em', 'assinatura_codigo'],
+        'transf_entrada' => ['codigo', 'data_transferencia', 'os_origem_id', 'valor', 'usuario', 'motivo', 'status', 'estornado_por', 'estornado_em', 'motivo_estorno'],
+        'transf_saida'   => ['codigo', 'data_transferencia', 'os_destino_id', 'valor', 'usuario', 'motivo', 'status', 'estornado_por', 'estornado_em', 'motivo_estorno'],
     ];
     $existe = [];
     foreach ($linhas as $l) {
@@ -169,21 +171,24 @@ function osaud_html_secao(string $sec, ?array $la, ?array $ld, ?callable $link =
 /** Resumo financeiro lado a lado. */
 function osaud_html_financeiro(?array $a, ?array $d): string
 {
-    $ta = $a ? osaud_totais($a) : ['pagamentos' => null, 'devolucoes' => null, 'repasses' => null];
-    $td = $d ? osaud_totais($d) : ['pagamentos' => null, 'devolucoes' => null, 'repasses' => null];
+    $ta = $a ? osaud_totais($a) : ['pagamentos' => null, 'devolucoes' => null, 'repasses' => null, 'transf_entrada' => null, 'transf_saida' => null];
+    $td = $d ? osaud_totais($d) : ['pagamentos' => null, 'devolucoes' => null, 'repasses' => null, 'transf_entrada' => null, 'transf_saida' => null];
     $osA = $a['os']['total_os'] ?? null;
     $osD = $d['os']['total_os'] ?? null;
     $saldo = static function ($os, $t) {
         if ($os === null || $t['pagamentos'] === null) {
             return null;
         }
-        return $t['pagamentos'] - (float) ($t['devolucoes'] ?? 0) - (float) $os - (float) ($t['repasses'] ?? 0);
+        return $t['pagamentos'] + (float) ($t['transf_entrada'] ?? 0) - (float) ($t['devolucoes'] ?? 0)
+             - (float) ($t['transf_saida'] ?? 0) - (float) $os - (float) ($t['repasses'] ?? 0);
     };
     $linhas = [
         ['Total da O.S.', $osA, $osD],
         ['Pago', $ta['pagamentos'], $td['pagamentos']],
         ['Devolvido', $ta['devolucoes'], $td['devolucoes']],
         ['Repassado', $ta['repasses'], $td['repasses']],
+        ['Crédito recebido de outra O.S.', $ta['transf_entrada'] ?? null, $td['transf_entrada'] ?? null],
+        ['Transferido para outra O.S.', $ta['transf_saida'] ?? null, $td['transf_saida'] ?? null],
         ['Saldo', $saldo($osA, $ta), $saldo($osD, $td)],
     ];
     $h = '<div class="aud-fin">';

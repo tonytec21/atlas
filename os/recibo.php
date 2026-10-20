@@ -157,6 +157,12 @@ if (isset($_GET['id'])) {
     $pagamentos_result = $pagamentos_query->get_result();
     $pagamentos = $pagamentos_result->fetch_all(MYSQLI_ASSOC);
 
+    // Crédito recebido de outra O.S. (transferência de saldo) entra na lista de pagamentos
+    require_once __DIR__ . '/transferencia_saldo_lib.php';
+    $__tsT      = ts_totais($os_id);
+    $ts_saida   = (float) $__tsT['saida'];
+    $pagamentos = array_merge($pagamentos, ts_linhas_credito($os_id, $ordem_servico['cliente'] ?? '', true));
+
     // Calcular total dos pagamentos
     $total_pagamentos = 0;
     foreach ($pagamentos as $pagamento) {
@@ -367,7 +373,7 @@ if (isset($_GET['id'])) {
     }
 
     // Calcular saldo a restituir subtraindo o valor devolvido e o repasse credor
-    $saldo_a_restituir = $saldo - $total_devolucoes - $total_repasses;
+    $saldo_a_restituir = $saldo - $total_devolucoes - $total_repasses - $ts_saida;
 
     // Adicionar o saldo com a condição
     if ($saldo_a_restituir > 0) {
@@ -379,6 +385,11 @@ if (isset($_GET['id'])) {
     // Adicionar valor devolvido se houver
     if ($total_devolucoes > 0) {
         $pdf->writeHTML('<div style="text-align: right; line-height: 1.3;">Valor Restituído: R$ ' . number_format($total_devolucoes, 2, ',', '.') . '</div>', true, false, true, false, '');
+    }
+
+    // Saldo transferido para outra O.S.
+    if ($ts_saida > 0) {
+        $pdf->writeHTML('<div style="text-align: right; line-height: 1.3;">Transferido p/ outra O.S.: R$ ' . number_format($ts_saida, 2, ',', '.') . '</div>', true, false, true, false, '');
     }
 
     $pdf->Ln(3);

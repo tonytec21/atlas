@@ -205,6 +205,12 @@ if (isset($_GET['id'])) {
     $pagamentos_result = $pagamentos_query->get_result();
     $pagamentos = $pagamentos_result->fetch_all(MYSQLI_ASSOC);
 
+    // Crédito recebido de outra O.S. (transferência de saldo) entra na lista de pagamentos
+    require_once __DIR__ . '/transferencia_saldo_lib.php';
+    $__tsT      = ts_totais($os_id);
+    $ts_saida   = (float) $__tsT['saida'];
+    $pagamentos = array_merge($pagamentos, ts_linhas_credito($os_id, $ordem_servico['cliente'] ?? '', false));
+
     $total_pagamentos = 0;
     foreach ($pagamentos as $pagamento) {
         $total_pagamentos += $pagamento['total_pagamento'];

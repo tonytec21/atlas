@@ -32,6 +32,7 @@ if ($checkColumn2 && $checkColumn2->num_rows == 0) {
 /* ===================== CONTROLE DO BOTÃO "CANCELAR OS" POR JSON ===================== */
 // Lê os/cancelamento_os_config.json (restringir_cancelamento / nivel_liberacao)
 require_once __DIR__ . '/cancelamento_os_lib.php';
+require_once __DIR__ . '/transferencia_saldo_lib.php';
 $podeCancelarOS = cancel_os_usuario_pode($conn);
 /* ================================================================================ */
 
@@ -252,11 +253,43 @@ while ($repasse = $repasse_result->fetch_assoc()) {
     $repasses[] = $repasse;
 }
 
+// ===== Transferências de saldo entre O.S. (não passam pelo caixa) =====
+// Crédito recebido conta como depósito prévio; o valor enviado sai do saldo
+// desta O.S. como uma devolução, mas sem movimentar o caixa de ninguém.
+$ts_totais          = ts_totais($os_id);
+$ts_lista           = ts_listar($os_id);
+$ts_entrada         = (float) $ts_totais['entrada'];
+$ts_saida           = (float) $ts_totais['saida'];
+$total_pagamentos_caixa = $total_pagamentos;        // somente o que entrou no caixa por esta O.S.
+$total_pagamentos  += $ts_entrada;
+$qtde_pagamentos   += (int) $ts_totais['qtd_entrada'];
+$ts_pode_transferir = ts_pode_transferir($_SESSION['username'] ?? '');
+$ts_pode_estornar   = ts_pode_estornar($_SESSION['username'] ?? '');
+
 // Calcular valor líquido pago
-$valor_pago_liquido = $total_pagamentos - $total_devolucoes;
+$valor_pago_liquido = $total_pagamentos - $total_devolucoes - $ts_saida;
 
 // Calcular saldo
 $saldo = $valor_pago_liquido - $ordem_servico['total_os'] - $total_repasses;
+
+// Todo o valor recebido saiu por transferência: a O.S. não tem mais dinheiro
+// para liquidar (os botões de liquidação dependem de $qtde_pagamentos).
+$ts_tudo_transferido = ($ts_saida > 0 && $valor_pago_liquido <= 0.009 && !$isIsento);
+if ($ts_tudo_transferido) {
+    $qtde_pagamentos = 0;
+}
+
+// Valor que ainda pode sair desta O.S. (devolver ou transferir)
+$ts_disponivel = round(max(0, $valor_pago_liquido - $total_repasses - $total_liquidado), 2);
+$ts_origens = [];
+$ts_destinos = [];
+foreach ($ts_lista as $__t) {
+    if ($__t['status'] !== 'ativa') continue;
+    if ((int) $__t['os_destino_id'] === (int) $os_id) $ts_origens[] = (int) $__t['os_origem_id'];
+    else $ts_destinos[] = (int) $__t['os_destino_id'];
+}
+$ts_origens = array_values(array_unique($ts_origens));
+$ts_destinos = array_values(array_unique($ts_destinos));
 
 // ===== Saldo em espécie no caixa do dia do funcionário (para devoluções em espécie) =====
 $func_atual_caixa    = $_SESSION['username'] ?? '';
@@ -546,7 +579,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
         body.dark-mode .ent-modal .ent-btn-cancel:hover{ background:#4b5563 !important; color:#fff !important; border-color:#6b7280 !important; }
 
         /* ===================== BADGES STATUS ===================== */  
-        .situacao-pago, .situacao-ativo, .situacao-cancelado, .situacao-isento {  
+        .situacao-pago, .situacao-ativo, .situacao-cancelado, .situacao-isento, .situacao-transferido {  
             padding: 6px 16px;  
             border-radius: var(--radius-lg);  
             display: inline-flex;  
@@ -574,6 +607,8 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
             background: var(--gradient-error);  
             color: white;  
         }  
+
+        .situacao-transferido{ background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color:#fff; }
 
         /* ISENTO (cinza) */
         .situacao-isento{
@@ -1339,6 +1374,27 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
         .card-base-ato.falta{background:#fef2f2;border-left-color:#dc2626;color:#b91c1c}
         .aviso-base-legado{background:#fffbeb;border-left:4px solid #b45309;border-radius:0 8px 8px 0;
                            padding:10px 14px;margin:12px 0;font-size:.85rem;color:#92400e}
+
+        /* ===== Transferências de saldo entre O.S. ===== */
+        .ts-card{ border:1px solid var(--border-primary); border-radius:12px; padding:14px 16px; background:var(--bg-secondary, transparent); }
+        .ts-card-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+        .ts-card-head h5{ font-weight:700; color:var(--text-primary); }
+        .ts-card-head h5 .fa{ color:var(--brand-info); }
+        .ts-tabela th{ font-size:.78rem; text-transform:uppercase; letter-spacing:.02em; color:var(--text-secondary); white-space:nowrap; }
+        .ts-tabela td{ vertical-align:middle; color:var(--text-primary); }
+        .ts-tabela .ts-motivo{ max-width:320px; font-size:.86rem; }
+        .ts-estornada td{ opacity:.6; } .ts-estornada td strong{ text-decoration:line-through; }
+        .ts-dir{ font-weight:600; font-size:.85rem; } .ts-in{ color:var(--brand-success); } .ts-out{ color:var(--brand-warning); }
+        .ts-rodape{ margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-primary); }
+        .ts-nota a{ font-weight:600; }
+        .ts-resumo{ border:1px solid var(--border-primary); border-left:4px solid var(--brand-info); border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+        .ts-resumo.ts-bloq{ border-left-color:var(--brand-error); }
+        .ts-resumo-tit{ font-weight:700; margin-bottom:8px; color:var(--text-primary); }
+        .ts-resumo-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+        .ts-resumo-grid span{ display:block; font-size:.72rem; text-transform:uppercase; color:var(--text-tertiary); }
+        .ts-resumo-grid strong{ display:block; color:var(--text-primary); word-break:break-word; }
+        .ts-resumo-grid small{ color:var(--text-secondary); }
+        .ts-explica{ font-size:.9rem; }
 </style>  
 </head>  
 <body>  
@@ -1457,6 +1513,10 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         $statusLegenda = 'Isento';
                         $statusClass = 'situacao-isento';
 
+                    } elseif ($ts_tudo_transferido) {
+                        $statusLegenda = 'Saldo transferido';
+                        $statusClass = 'situacao-transferido';
+
                     } elseif ($total_pagamentos > 0) {
                         $statusLegenda = 'Pago (Depósito Prévio)';
                         $statusClass = 'situacao-pago';
@@ -1521,7 +1581,23 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                 <div class="form-group col-md-3">  
                     <label for="deposito_previo">Depósito Prévio:</label>  
                     <input type="text" class="form-control" id="deposito_previo" name="deposito_previo" value="<?php echo 'R$ ' . number_format($total_pagamentos, 2, ',', '.'); ?>" readonly>  
+                    <?php if ($ts_entrada > 0): ?>
+                    <small class="form-text text-info ts-nota">
+                        <i class="fa fa-sign-in"></i> Inclui <?php echo ts_moeda($ts_entrada); ?> transferidos da
+                        <?php foreach ($ts_origens as $__i => $__o): ?><?php echo $__i ? ', ' : ''; ?><a href="visualizar_os.php?id=<?php echo $__o; ?>">O.S. nº <?php echo $__o; ?></a><?php endforeach; ?>
+                    </small>
+                    <?php endif; ?>
                 </div>  
+                <?php if ($ts_saida > 0): ?>
+                <div class="form-group col-md-3">
+                    <label for="valor_transferido">Transferido p/ outra O.S.:</label>
+                    <input type="text" class="form-control" id="valor_transferido" value="<?php echo ts_moeda($ts_saida); ?>" readonly>
+                    <small class="form-text text-info ts-nota">
+                        <i class="fa fa-sign-out"></i> Para a
+                        <?php foreach ($ts_destinos as $__i => $__o): ?><?php echo $__i ? ', ' : ''; ?><a href="visualizar_os.php?id=<?php echo $__o; ?>">O.S. nº <?php echo $__o; ?></a><?php endforeach; ?>
+                    </small>
+                </div>
+                <?php endif; ?>
                 <?php if ($total_liquidado > 0): ?>  
                 <div class="form-group col-md-3">  
                     <label for="valor_liquidado">Valor Liquidado:</label>  
@@ -1564,6 +1640,94 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                 </div>  
             </div>  
         </form>  
+
+        <!-- ===================== TRANSFERÊNCIAS DE SALDO ENTRE O.S. ===================== -->
+        <?php $ts_pode_agora = ($ts_disponivel > 0.01 && $ordem_servico['status'] !== 'Cancelado' && $ts_pode_transferir); ?>
+        <?php if (!empty($ts_lista) || $ts_pode_agora): ?>
+        <div class="ts-card mt-4" id="tsCard">
+            <div class="ts-card-head">
+                <div>
+                    <h5 class="m-0"><i class="fa fa-exchange"></i> Transferências de saldo</h5>
+                    <small class="text-muted">Valores movidos entre O.S. sem passar pelo caixa. Cada registro tem código, motivo e responsável.</small>
+                </div>
+                <?php if ($ts_pode_agora): ?>
+                <button type="button" class="btn btn-info btn-sm" onclick="tsAbrirModal()">
+                    <i class="fa fa-share"></i> Transferir saldo (<?php echo ts_moeda($ts_disponivel); ?> disponível)
+                </button>
+                <?php endif; ?>
+            </div>
+            <?php if (!empty($ts_lista)): ?>
+            <div class="table-responsive">
+                <table class="table table-sm ts-tabela mb-0">
+                    <thead>
+                        <tr><th>Código</th><th>Data</th><th>Movimento</th><th class="text-right">Valor</th><th>Responsável</th><th>Motivo</th><th>Situação</th><?php if ($ts_pode_estornar): ?><th></th><?php endif; ?></tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($ts_lista as $t):
+                        $recebida = ((int) $t['os_destino_id'] === (int) $os_id);
+                        $outra    = $recebida ? (int) $t['os_origem_id'] : (int) $t['os_destino_id'];
+                        $ativa    = ($t['status'] === 'ativa');
+                    ?>
+                        <tr class="<?php echo $ativa ? '' : 'ts-estornada'; ?>">
+                            <td><code><?php echo htmlspecialchars($t['codigo']); ?></code></td>
+                            <td><?php echo date('d/m/Y H:i', strtotime($t['data_transferencia'])); ?></td>
+                            <td>
+                                <?php if ($recebida): ?>
+                                    <span class="ts-dir ts-in"><i class="fa fa-sign-in"></i> Recebido da</span>
+                                <?php else: ?>
+                                    <span class="ts-dir ts-out"><i class="fa fa-sign-out"></i> Enviado para</span>
+                                <?php endif; ?>
+                                <a href="visualizar_os.php?id=<?php echo $outra; ?>">O.S. nº <?php echo $outra; ?></a>
+                                <?php if ((int) $t['documentos_divergentes'] === 1): ?>
+                                    <i class="fa fa-exclamation-triangle text-warning" title="CPF/CNPJ das O.S. diferentes — transferência confirmada pelo usuário"></i>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-right"><strong><?php echo ($recebida ? '+ ' : '− ') . ts_moeda($t['valor']); ?></strong></td>
+                            <td><?php echo htmlspecialchars($t['usuario_nome'] ?: $t['usuario']); ?></td>
+                            <td class="ts-motivo"><?php echo nl2br(htmlspecialchars($t['motivo'])); ?></td>
+                            <td>
+                                <?php if ($ativa): ?>
+                                    <span class="badge badge-success">Ativa</span>
+                                <?php else: ?>
+                                    <span class="badge badge-secondary" title="<?php echo htmlspecialchars('Estornada por ' . $t['estornado_por'] . ' em ' . date('d/m/Y H:i', strtotime($t['estornado_em'])) . ': ' . $t['motivo_estorno']); ?>">Estornada</span>
+                                    <div class="small text-muted"><?php echo htmlspecialchars($t['estornado_por']); ?> · <?php echo date('d/m/Y H:i', strtotime($t['estornado_em'])); ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <?php if ($ts_pode_estornar): ?>
+                            <td class="text-nowrap">
+                                <?php if ($ativa): ?>
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="tsEstornar(<?php echo (int) $t['id']; ?>, <?php echo htmlspecialchars(json_encode($t['codigo']), ENT_QUOTES); ?>)">
+                                    <i class="fa fa-undo"></i> Estornar
+                                </button>
+                                <?php endif; ?>
+                            </td>
+                            <?php endif; ?>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+            <?php if ($ts_tudo_transferido && $ordem_servico['status'] !== 'Cancelado' && $total_liquidado <= 0): ?>
+            <div class="alert alert-secondary mt-2 mb-0 small">
+                <i class="fa fa-lightbulb-o"></i> Todo o valor desta O.S. foi transferido. Se ela não será mais executada,
+                use <strong>Cancelar OS</strong> para que não fique pendente — o histórico da transferência continua ligado às duas O.S.
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($ts_lista) && $ts_pode_estornar):
+                $ts_integ = ts_verificar_integridade();
+                if (!$ts_integ['ok']): ?>
+            <div class="alert alert-danger mt-2 mb-0 small">
+                <i class="fa fa-exclamation-triangle"></i> <strong>Atenção:</strong> a verificação de integridade encontrou registro(s) de transferência alterado(s) fora do sistema:
+                <?php echo htmlspecialchars(implode(', ', $ts_integ['codigos'])); ?>. Comunique o suporte.
+            </div>
+            <?php endif; endif; ?>
+            <div class="ts-rodape small text-muted">
+                <i class="fa fa-shield"></i> As transferências não entram no caixa nem no fechamento do dia: o dinheiro já foi recebido na O.S. de origem.
+                Estorno somente por administrador. Recurso v<?php echo TS_VERSAO; ?>.
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- ===================== NFS-e NACIONAL ===================== -->
         <?php
@@ -2083,6 +2247,20 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         <input type="text" class="form-control" id="total_repasses_modal" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>  
                     </div>  
                     <?php endif; ?>  
+
+                    <?php if ($ts_entrada > 0): ?>
+                    <div class="stat-card">
+                        <div class="stat-label">Crédito de outra O.S.</div>
+                        <input type="text" class="form-control" value="<?php echo ts_moeda($ts_entrada); ?>" readonly>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($ts_saida > 0): ?>
+                    <div class="stat-card">
+                        <div class="stat-label">Transferido p/ outra O.S.</div>
+                        <input type="text" class="form-control" value="<?php echo ts_moeda($ts_saida); ?>" readonly>
+                    </div>
+                    <?php endif; ?>
                 </div>  
 
                 <?php if ((float)$ordem_servico['total_os'] > 0.0): ?>
@@ -2133,7 +2311,8 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                 </div>
                 <?php endif; ?>
 
-                <?php if ($saldo > 0.01 || $has_ato_17): ?>  
+                <?php $ts_mostra_btn = ($ts_disponivel > 0.01 && $ordem_servico['status'] !== 'Cancelado' && $ts_pode_transferir); ?>
+                <?php if ($saldo > 0.01 || $has_ato_17 || $ts_mostra_btn): ?>  
                 <h6 class="section-title">Ações rápidas</h6>  
                 <div class="form-grid">  
                     <?php if ($saldo > 0.01 && $has_ato_17): ?>  
@@ -2146,6 +2325,11 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <i class="fa fa-undo"></i> Devolver valores  
                         </button>  
                     <?php endif; ?>  
+                    <?php if ($ts_mostra_btn): ?>
+                        <button type="button" class="btn btn-info" id="btnTransferirSaldo" onclick="tsAbrirModal()">
+                            <i class="fa fa-exchange"></i> Transferir saldo p/ outra O.S.
+                        </button>
+                    <?php endif; ?>
                 </div>  
                 <?php endif; ?>  
 
@@ -2436,6 +2620,85 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
 </div>  
 
 <!-- ===================== MODAL DE DEVOLUÇÃO ===================== -->  
+<!-- ===================== MODAL: TRANSFERIR SALDO PARA OUTRA O.S. ===================== -->
+<div class="modal fade modal-modern" id="tsModal" tabindex="-1" role="dialog" aria-labelledby="tsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header modern">
+                <div class="d-flex align-items-center">
+                    <span class="md-title-icon mr-2"><i class="fa fa-exchange"></i></span>
+                    <h5 class="modal-title m-0" id="tsModalLabel">Transferir saldo para outra O.S.</h5>
+                </div>
+                <button type="button" class="btn-close modern" data-dismiss="modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info ts-explica">
+                    <i class="fa fa-info-circle"></i>
+                    Use quando o cliente já pagou nesta O.S. e o valor deve ser aproveitado em outra
+                    (por exemplo, um novo orçamento do mesmo serviço). <strong>Não gera pagamento nem devolução no caixa</strong>:
+                    o dinheiro continua registrado no dia em que entrou. As duas O.S. ficam ligadas pelo código da transferência.
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">O.S. de origem</div>
+                        <input type="text" class="form-control" value="Nº <?php echo (int) $os_id; ?>" readonly>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Disponível para transferir</div>
+                        <input type="text" class="form-control" id="ts_disponivel" value="<?php echo ts_moeda($ts_disponivel); ?>" readonly>
+                    </div>
+                </div>
+
+                <h6 class="section-title">1. O.S. que vai receber o valor</h6>
+                <div class="form-row align-items-end">
+                    <div class="form-group col-md-4">
+                        <label for="ts_destino">Nº da O.S. de destino</label>
+                        <input type="number" min="1" class="form-control" id="ts_destino" placeholder="Ex.: 1250">
+                    </div>
+                    <div class="form-group col-md-3">
+                        <button type="button" class="btn btn-secondary w-100" id="ts_btnConsultar" onclick="tsConsultar()">
+                            <i class="fa fa-search"></i> Conferir O.S.
+                        </button>
+                    </div>
+                </div>
+                <div id="ts_resumo" style="display:none"></div>
+
+                <div id="ts_etapa2" style="display:none">
+                    <h6 class="section-title">2. Valor e motivo</h6>
+                    <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label for="ts_valor">Valor a transferir</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend"><span class="input-group-text">R$</span></div>
+                                <input type="text" class="form-control" id="ts_valor" inputmode="decimal">
+                            </div>
+                            <small class="form-text text-muted">Sugerido: o que falta pagar na O.S. de destino, até o disponível.</small>
+                        </div>
+                        <div class="form-group col-md-8">
+                            <label for="ts_motivo">Motivo <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="ts_motivo" rows="3" maxlength="500"
+                                      placeholder="Ex.: Serviço pago em 2025 na O.S. antiga e não executado por falta de documentos; novo orçamento com a tabela de emolumentos atual."></textarea>
+                            <small class="form-text text-muted">Mínimo de 10 caracteres. Fica gravado nas duas O.S. e na auditoria.</small>
+                        </div>
+                    </div>
+                    <div class="form-check mb-2" id="ts_docBox" style="display:none">
+                        <input class="form-check-input" type="checkbox" id="ts_confirmaDoc">
+                        <label class="form-check-label" for="ts_confirmaDoc">
+                            Confirmo que o valor pertence ao mesmo cliente / foi autorizado, mesmo com CPF/CNPJ diferente ou não informado.
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-info" id="ts_btnTransferir" onclick="tsTransferir()" disabled>
+                    <i class="fa fa-check"></i> Transferir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade modal-modern" id="devolucaoModal" tabindex="-1" role="dialog" aria-labelledby="devolucaoModalLabel" aria-hidden="true">  
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">  
         <div class="modal-content">  
@@ -2726,6 +2989,10 @@ const TEM_CAIXA_ABERTO    = <?php echo $tem_caixa_aberto ? 'true' : 'false'; ?>;
 const TOTAL_LIQUIDADO_JS  = parseFloat('<?php echo $total_liquidado; ?>');
 const TOTAL_REPASSES     = parseFloat('<?php echo $total_repasses; ?>');
 const ISENTO_SERVER = <?php echo $isIsento ? 'true' : 'false'; ?>;
+// Transferências de saldo entre O.S. (ativas): crédito recebido e valor enviado
+const TS_ENTRADA = parseFloat('<?php echo $ts_entrada; ?>') || 0;
+const TS_SAIDA   = parseFloat('<?php echo $ts_saida; ?>') || 0;
+const TS_OS_ID   = <?php echo (int) $os_id; ?>;
 
 // ===== Utilidades de formatação =====
 function formatCurrencyBRL(n) {
@@ -2733,7 +3000,8 @@ function formatCurrencyBRL(n) {
     return 'R$ ' + n.toFixed(2).replace('.', ',');
 }
 function sumPagamentos() {
-    return pagamentos.reduce((acc, p) => acc + parseFloat(p.total_pagamento || 0), 0);
+    // pagamentos lançados + crédito recebido de outra O.S.
+    return pagamentos.reduce((acc, p) => acc + parseFloat(p.total_pagamento || 0), 0) + TS_ENTRADA;
 }
 
 function temAlgumPagamento() {
@@ -2743,7 +3011,7 @@ function temAlgumPagamento() {
 // ===== Atualiza os campos do topo e o status da O.S. sem recarregar =====
 function refreshOsHeaderAndStats() {
     const totalPagos = sumPagamentos();
-    const saldo = totalPagos - TOTAL_DEVOLUCOES - TOTAL_OS - TOTAL_REPASSES;
+    const saldo = totalPagos - TOTAL_DEVOLUCOES - TS_SAIDA - TOTAL_OS - TOTAL_REPASSES;
 
     // Atualiza inputs do formulário principal
     const depositoEl = document.getElementById('deposito_previo');
@@ -2767,6 +3035,9 @@ function refreshOsHeaderAndStats() {
             if (isentoFlag) {
                 badge.className = 'situacao-isento';
                 badge.textContent = 'Isento de Pagamento';
+            } else if (TS_SAIDA > 0 && (sumPagamentos() - TOTAL_DEVOLUCOES - TS_SAIDA) <= 0.009) {
+                badge.className = 'situacao-transferido';
+                badge.textContent = 'Saldo transferido';
             } else if (sumPagamentos() > 0) {
                 badge.className = 'situacao-pago';
                 badge.textContent = 'Pago (Depósito Prévio)';
@@ -2940,6 +3211,7 @@ $(document).ready(function() {
     $('#valor_pagamento').mask('#.##0,00', { reverse: true });
     $('#valor_devolucao').mask('#.##0,00', { reverse: true });
     $('#valor_repasse').mask('#.##0,00', { reverse: true });
+    $('#ts_valor').mask('#.##0,00', { reverse: true });
 
     atualizarTabelaPagamentos();
     atualizarSaldo();
@@ -3359,8 +3631,8 @@ $(document).ready(function() {
 
 
     function atualizarSaldo() {
-        var totalPagamentos = pagamentos.reduce((acc, pagamento) => acc + parseFloat(pagamento.total_pagamento), 0);
-        var totalDevolucoes = <?php echo $total_devolucoes; ?>;
+        var totalPagamentos = pagamentos.reduce((acc, pagamento) => acc + parseFloat(pagamento.total_pagamento), 0) + TS_ENTRADA;
+        var totalDevolucoes = <?php echo $total_devolucoes; ?> + TS_SAIDA;
         var totalRepasses = <?php echo $total_repasses; ?>;
         var totalOS = <?php echo $ordem_servico['total_os']; ?>;
 
@@ -3633,6 +3905,133 @@ $(document).ready(function() {
 
 
     // Função para abrir modal de devolução
+    /* ===================== TRANSFERÊNCIA DE SALDO ENTRE O.S. ===================== */
+    var tsConsulta = null;
+    function tsBRL(v) { return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+    function tsEsc(t) { return $('<div>').text(t == null ? '' : String(t)).html(); }
+    function tsValorNum(txt) {
+        txt = String(txt || '').trim();
+        if (txt.indexOf(',') >= 0) txt = txt.replace(/\./g, '').replace(',', '.');
+        var n = parseFloat(txt);
+        return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+    }
+    function tsPost(dados) {
+        dados.csrf = CSRF_PEDIDOS;
+        return $.ajax({ url: 'transferir_saldo.php', type: 'POST', data: dados, dataType: 'json' })
+            .then(null, function (xhr) {
+                var r = xhr.responseJSON || { ok: false, erro: 'Falha de comunicação com o servidor.' };
+                return $.Deferred().resolve(r).promise();
+            });
+    }
+    function tsAbrirModal() {
+        tsConsulta = null;
+        $('#ts_destino').val('');
+        $('#ts_resumo').hide().empty();
+        $('#ts_etapa2').hide();
+        $('#ts_valor').val('');
+        $('#ts_motivo').val('');
+        $('#ts_confirmaDoc').prop('checked', false);
+        $('#ts_docBox').hide();
+        $('#ts_btnTransferir').prop('disabled', true);
+        $('#tsModal').modal('show');
+        setTimeout(function () { $('#ts_destino').trigger('focus'); }, 400);
+    }
+    $(document).on('keydown', '#ts_destino', function (e) { if (e.key === 'Enter') { e.preventDefault(); tsConsultar(); } });
+    $(document).on('input', '#ts_destino', function () {
+        if (tsConsulta) { tsConsulta = null; $('#ts_resumo').hide(); $('#ts_etapa2').hide(); $('#ts_btnTransferir').prop('disabled', true); }
+    });
+    function tsConsultar() {
+        var destino = parseInt($('#ts_destino').val(), 10);
+        if (!destino) { Swal.fire({ icon: 'warning', title: 'Informe a O.S.', text: 'Digite o número da O.S. que vai receber o valor.' }); return; }
+        var btn = $('#ts_btnConsultar').prop('disabled', true);
+        tsPost({ acao: 'consultar', origem: TS_OS_ID, destino: destino }).then(function (r) {
+            btn.prop('disabled', false);
+            if (!r.ok) { Swal.fire({ icon: 'error', title: 'Não foi possível', text: r.erro }); return; }
+            tsConsulta = r;
+            var d = r.destino, o = r.origem;
+            var cancel = (d.status === 'Cancelado');
+            var html = '<div class="ts-resumo ' + (cancel ? 'ts-bloq' : '') + '">'
+                + '<div class="ts-resumo-tit"><a href="visualizar_os.php?id=' + d.id + '" target="_blank">O.S. nº ' + d.id + '</a> · ' + tsEsc(d.data)
+                + (cancel ? ' <span class="badge badge-danger">Cancelada</span>' : '') + '</div>'
+                + '<div class="ts-resumo-grid">'
+                + '<div><span>Cliente</span><strong>' + tsEsc(d.cliente) + '</strong><small>' + tsEsc(d.documento || 'sem CPF/CNPJ') + '</small></div>'
+                + '<div><span>Título</span><strong>' + tsEsc(d.titulo || '—') + '</strong></div>'
+                + '<div><span>Total da O.S.</span><strong>' + tsBRL(d.total) + '</strong></div>'
+                + '<div><span>Já pago</span><strong>' + tsBRL(d.pago_liquido) + '</strong></div>'
+                + '<div><span>Falta pagar</span><strong class="' + (d.falta > 0 ? 'text-danger' : 'text-success') + '">' + tsBRL(d.falta) + '</strong></div>'
+                + '</div>';
+            if (!r.documento_confere) {
+                html += '<div class="alert alert-warning mt-2 mb-0"><i class="fa fa-exclamation-triangle"></i> '
+                    + 'O CPF/CNPJ das duas O.S. não confere (origem: <strong>' + tsEsc(o.documento || 'não informado') + '</strong> · '
+                    + 'destino: <strong>' + tsEsc(d.documento || 'não informado') + '</strong>). Confira antes de transferir.</div>';
+            }
+            if (cancel) html += '<div class="alert alert-danger mt-2 mb-0">Não é possível transferir para uma O.S. cancelada.</div>';
+            html += '</div>';
+            $('#ts_resumo').html(html).show();
+            if (cancel) { $('#ts_etapa2').hide(); $('#ts_btnTransferir').prop('disabled', true); return; }
+            $('#ts_valor').val(Number(r.sugerido).toFixed(2).replace('.', ',')).trigger('input');
+            $('#ts_docBox').toggle(!r.documento_confere);
+            $('#ts_etapa2').show();
+            $('#ts_btnTransferir').prop('disabled', false);
+            $('#ts_motivo').trigger('focus');
+        });
+    }
+    function tsTransferir() {
+        if (!tsConsulta) return;
+        var valor = tsValorNum($('#ts_valor').val());
+        var motivo = $.trim($('#ts_motivo').val());
+        var disp = Number(tsConsulta.origem.disponivel);
+        if (valor <= 0) { Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'Informe o valor a transferir.' }); return; }
+        if (valor > disp + 0.001) { Swal.fire({ icon: 'warning', title: 'Valor acima do disponível', text: 'O máximo que pode sair desta O.S. é ' + tsBRL(disp) + '.' }); return; }
+        if (motivo.length < 10) { Swal.fire({ icon: 'warning', title: 'Motivo obrigatório', text: 'Descreva o motivo da transferência (mínimo de 10 caracteres).' }); return; }
+        if (!tsConsulta.documento_confere && !$('#ts_confirmaDoc').is(':checked')) {
+            Swal.fire({ icon: 'warning', title: 'Confirme o cliente', text: 'O CPF/CNPJ das O.S. não confere. Marque a confirmação para prosseguir.' }); return;
+        }
+        var d = tsConsulta.destino;
+        Swal.fire({
+            icon: 'question',
+            title: 'Confirmar transferência?',
+            html: '<p><strong>' + tsBRL(valor) + '</strong> sairão da <strong>O.S. nº ' + TS_OS_ID + '</strong> e entrarão como crédito na <strong>O.S. nº ' + d.id + '</strong>.</p>'
+                + '<p class="small text-muted mb-0">Não é lançado pagamento nem devolução no caixa. A operação fica registrada nas duas O.S. e só pode ser desfeita por estorno de um administrador.</p>',
+            showCancelButton: true, confirmButtonText: 'Sim, transferir', cancelButtonText: 'Voltar', reverseButtons: true
+        }).then(function (res) {
+            if (!res.isConfirmed) return;
+            var btn = $('#ts_btnTransferir').prop('disabled', true);
+            tsPost({
+                acao: 'transferir', origem: TS_OS_ID, destino: d.id, valor: valor.toFixed(2), motivo: motivo,
+                confirma_documento: $('#ts_confirmaDoc').is(':checked') ? 1 : 0
+            }).then(function (r) {
+                if (!r.ok) { btn.prop('disabled', false); Swal.fire({ icon: 'error', title: 'Transferência não realizada', text: r.erro }); return; }
+                Swal.fire({
+                    icon: 'success', title: 'Transferência registrada', text: r.mensagem,
+                    showCancelButton: true, confirmButtonText: 'Abrir O.S. nº ' + d.id, cancelButtonText: 'Ficar nesta O.S.'
+                }).then(function (x) {
+                    window.location.href = x.isConfirmed ? ('visualizar_os.php?id=' + d.id) : window.location.href.split('#')[0];
+                });
+            });
+        });
+    }
+    function tsEstornar(id, codigo) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Estornar ' + codigo + '?',
+            html: '<p class="small">O valor volta para a O.S. de origem. O registro não é apagado: fica marcado como estornado, com o seu usuário, data e motivo.</p>',
+            input: 'textarea', inputPlaceholder: 'Motivo do estorno (mínimo de 10 caracteres)',
+            showCancelButton: true, confirmButtonText: 'Estornar', cancelButtonText: 'Cancelar', reverseButtons: true,
+            preConfirm: function (m) {
+                m = $.trim(m || '');
+                if (m.length < 10) { Swal.showValidationMessage('Informe o motivo (mínimo de 10 caracteres).'); return false; }
+                return tsPost({ acao: 'estornar', id: id, motivo: m }).then(function (r) {
+                    if (!r.ok) { Swal.showValidationMessage(r.erro); return false; }
+                    return r;
+                });
+            }
+        }).then(function (res) {
+            if (!res.isConfirmed || !res.value) return;
+            Swal.fire({ icon: 'success', title: 'Estorno registrado', text: res.value.mensagem }).then(function () { window.location.reload(); });
+        });
+    }
+
     function abrirDevolucaoModal() {
         $('#devolucaoModal').modal('show');
     }
@@ -3917,7 +4316,19 @@ $(document).ready(function() {
 
     function cancelarOS() {
         var totalPagamentos = parseFloat('<?php echo $total_pagamentos; ?>');
-        var totalDevolucoes = parseFloat('<?php echo $total_devolucoes; ?>');
+        var totalDevolucoes = parseFloat('<?php echo $total_devolucoes; ?>') + TS_SAIDA;
+
+        // Crédito recebido de outra O.S. ainda ativo: deve voltar por estorno, não por devolução no caixa
+        if (TS_ENTRADA > 0 && totalPagamentos > totalDevolucoes + 0.009) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Atenção',
+                html: 'Esta O.S. recebeu <strong>' + tsBRL(TS_ENTRADA) + '</strong> transferidos de outra O.S. '
+                    + 'Antes de cancelar, peça a um administrador para <strong>estornar a transferência</strong> '
+                    + '(o valor volta para a O.S. de origem, sem passar pelo caixa) e devolva os demais pagamentos, se houver.'
+            });
+            return;
+        }
 
         // Se o total de pagamentos for maior que o total de devoluções, alertar e abrir o modal de devolução
         if (totalPagamentos > totalDevolucoes) {

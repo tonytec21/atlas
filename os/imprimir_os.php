@@ -253,11 +253,19 @@ if (isset($_GET['id'])) {
     $repasses_result = $repasses_query->get_result();
     $total_repasses = $repasses_result->fetch_assoc()['total_repasses'];
 
+    // Transferências de saldo entre O.S. (ativas)
+    require_once __DIR__ . '/transferencia_saldo_lib.php';
+    $__tsT      = ts_totais($os_id);
+    $ts_entrada = (float) $__tsT['entrada'];
+    $ts_saida   = (float) $__tsT['saida'];
+
     /* AUDITORIA O.S.: totais e assinatura da versão reproduzida */
     if (is_array($__osaud)) {
         if ($__osaud['totais']['pagamentos'] !== null) { $total_pagamentos = $__osaud['totais']['pagamentos']; }
         if ($__osaud['totais']['devolucoes'] !== null) { $total_devolucoes = $__osaud['totais']['devolucoes']; }
         if ($__osaud['totais']['repasses']   !== null) { $total_repasses   = $__osaud['totais']['repasses']; }
+        $ts_entrada = (float) ($__osaud['totais']['transf_entrada'] ?? 0);
+        $ts_saida   = (float) ($__osaud['totais']['transf_saida'] ?? 0);
         $saldo = $total_pagamentos - $ordem_servico['total_os'];
         $logged_in_user_nome  = 'REPRODUÇÃO PARA AUDITORIA';
         $logged_in_user_cargo = 'Documento sem valor — gerado a partir do registro de auditoria';
@@ -416,11 +424,19 @@ if (isset($_GET['id'])) {
     $pdf->Ln(0);
 
     $pdf->SetFont('helvetica', 'B', 10);
+    // Crédito recebido de outra O.S. conta como depósito prévio
+    $total_pagamentos = (float) $total_pagamentos + $ts_entrada;
+    $saldo = $total_pagamentos - $ordem_servico['total_os'];
     $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Dep. Prévio: R$ ' . number_format($total_pagamentos, 2, ',', '.') . '</div>', true, false, true, false, '');
+    if ($ts_entrada > 0) {
+        $pdf->SetFont('helvetica', '', 8);
+        $pdf->writeHTML('<div style="text-align: right;">(inclui R$ ' . number_format($ts_entrada, 2, ',', '.') . ' de crédito transferido de outra O.S.)</div>', true, false, true, false, '');
+        $pdf->SetFont('helvetica', 'B', 10);
+    }
     $pdf->Ln(0);
 
     // Calcular saldo a restituir subtraindo o valor devolvido e o repasse credor
-    $saldo_a_restituir = $saldo - $total_devolucoes - $total_repasses;
+    $saldo_a_restituir = $saldo - $total_devolucoes - $total_repasses - $ts_saida;
 
     // Adicionar o saldo com a condição
     if ($saldo_a_restituir > 0) {
@@ -437,6 +453,11 @@ if (isset($_GET['id'])) {
     // Adicionar valor de repasse credor se houver
     if ($total_repasses > 0) {
         $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Repasse Credor: R$ ' . number_format($total_repasses, 2, ',', '.') . '</div>', true, false, true, false, '');
+    }
+
+    // Saldo transferido para outra O.S. (não é restituição em dinheiro)
+    if ($ts_saida > 0) {
+        $pdf->writeHTML('<div style="text-align: right; margin-top: 10px;">Transferido p/ outra O.S.: R$ ' . number_format($ts_saida, 2, ',', '.') . '</div>', true, false, true, false, '');
     }
 
     $pdf->Ln(12);

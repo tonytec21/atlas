@@ -125,7 +125,11 @@ function api_os_saldo(int $osId, ?array $os = null): array
     $liqN = $soma("SELECT COALESCE(SUM(total),0) FROM atos_liquidados WHERE ordem_servico_id = ?");
     $liqM = $soma("SELECT COALESCE(SUM(total),0) FROM atos_manuais_liquidados WHERE ordem_servico_id = ?");
 
-    $pagoLiquido    = api_dinheiro($pago - $dev);
+    // Transferências de saldo entre O.S. (somente ativas; não passam pelo caixa)
+    $tsEnt = $soma("SELECT COALESCE(SUM(valor),0) FROM os_transferencias_saldo WHERE os_destino_id = ? AND status = 'ativa'");
+    $tsSai = $soma("SELECT COALESCE(SUM(valor),0) FROM os_transferencias_saldo WHERE os_origem_id = ? AND status = 'ativa'");
+
+    $pagoLiquido    = api_dinheiro($pago + $tsEnt - $dev - $tsSai);
     $totalLiquidado = api_dinheiro($liqN + $liqM);
     $totalOs        = api_dinheiro($os['total_os'] ?? 0);
 
@@ -148,6 +152,8 @@ function api_os_saldo(int $osId, ?array $os = null): array
         'total_os'            => $totalOs,
         'total_pago'          => api_dinheiro($pago),
         'total_devolvido'     => api_dinheiro($dev),
+        'credito_transferido_recebido' => api_dinheiro($tsEnt),
+        'credito_transferido_enviado'  => api_dinheiro($tsSai),
         'pago_liquido'        => $pagoLiquido,
         'total_liquidado'     => $totalLiquidado,
         'saldo_liquidacao'    => api_dinheiro($pagoLiquido - $totalLiquidado),

@@ -1,7 +1,9 @@
 <?php  
 include(__DIR__ . '/session_check.php');  
 checkSession();  
-include(__DIR__ . '/db_connection.php');  
+include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/transferencia_saldo_lib.php';
+try { ts_migrar(); } catch (Throwable $e) { error_log('[transferencia_saldo] ' . $e->getMessage()); }  
 date_default_timezone_set('America/Sao_Paulo');  
 ?>  
 <?php include(__DIR__ . '/guia/guia.php'); ?>
@@ -346,7 +348,10 @@ table.dataTable tbody tr:hover {
 /* ===================== BADGES DE SITUAÇÃO ===================== */  
 .situacao-pago,  
 .situacao-ativo,  
+
+
 .situacao-cancelado,
+.situacao-transferido,
 .situacao-isento {  
   color: #fff;  
   width: 90px;  
@@ -372,6 +377,11 @@ table.dataTable tbody tr:hover {
 .situacao-cancelado {  
   background: var(--gradient-error);  
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);  
+}
+
+.situacao-transferido {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.25);
 }
 
 .situacao-isento {
@@ -1142,6 +1152,11 @@ body.dark-mode footer .footer-content a:hover {
   color: white;
 }
 
+.badge-transferido {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  color: white;
+}
+
 .badge-ativo {
   background: var(--gradient-warning);
   color: white;
@@ -1642,6 +1657,13 @@ body.dark-mode footer .footer-content a:hover {
                             $stmt->execute();
                             $total_devolvido = $stmt->fetchColumn() ?: 0;
 
+                            // Transferências de saldo entre O.S. (não passam pelo caixa):
+                            // crédito recebido conta como depósito; o enviado sai como devolução.
+                            $tsT = ts_totais($ordem['id']);
+                            $deposito_previo += $tsT['entrada'];
+                            $total_devolvido += $tsT['saida'];
+                            $saldoTransferido = ($tsT['saida'] > 0 && ($deposito_previo - $total_devolvido) <= 0.009);
+
                             // Verificar status dos atos
                             $stmt = $conn->prepare('SELECT status FROM ordens_de_servico_itens WHERE ordem_servico_id = :os_id');
                             $stmt->bindParam(':os_id', $ordem['id']);
@@ -1728,6 +1750,7 @@ body.dark-mode footer .footer-content a:hover {
                                 'temPagamentoRelevante' => $temPagamentoRelevante,
                                 'temAnexos' => $temAnexos,
                                 'temIsencao' => $temIsencao, // NOVO
+                                'saldoTransferido' => $saldoTransferido,
                                 'botaoAnexoClasses' => $botaoAnexoClasses,
                                 'botaoAnexoIcone' => $botaoAnexoIcone
                             ];
@@ -1755,6 +1778,9 @@ body.dark-mode footer .footer-content a:hover {
                                         /* NOVO: Situação Isento */
                                         $statusClass = 'situacao-isento';
                                         $statusText = 'Isento';
+                                    } elseif ($saldoTransferido) {
+                                        $statusClass = 'situacao-transferido';
+                                        $statusText = 'Transferida';
                                     } elseif ($deposito_previo > 0) {
                                         $statusClass = 'situacao-pago';
                                         $statusText = 'Pago';
@@ -1816,6 +1842,9 @@ body.dark-mode footer .footer-content a:hover {
                             } elseif (!empty($data['temIsencao']) && $data['temIsencao']) { /* NOVO */
                                 $situacaoBadge = 'badge-isento';
                                 $situacaoText = 'Isento';
+                            } elseif (!empty($data['saldoTransferido'])) {
+                                $situacaoBadge = 'badge-transferido';
+                                $situacaoText = 'Transferida';
                             } elseif ($data['deposito_previo'] > 0) {
                                 $situacaoBadge = 'badge-pago';
                                 $situacaoText = 'Pago';

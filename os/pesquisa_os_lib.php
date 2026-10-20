@@ -408,7 +408,13 @@ function pos_montar_where(array $f): array
                    WHERE pg.ordem_de_servico_id = o.id)";
         $devolvido = "(SELECT COALESCE(SUM(dv.total_devolucao), 0) FROM devolucao_os dv
                         WHERE dv.ordem_de_servico_id = o.id)";
-        $liquido = "({$pago} - {$devolvido})";
+        /* Transferências de saldo entre O.S. (os_transferencias_saldo, somente
+           ativas): recebida soma como pagamento, enviada sai como devolução. */
+        $tsEntrada = "(SELECT COALESCE(SUM(ts.valor), 0) FROM os_transferencias_saldo ts
+                        WHERE ts.os_destino_id = o.id AND ts.status = 'ativa')";
+        $tsSaida = "(SELECT COALESCE(SUM(ts.valor), 0) FROM os_transferencias_saldo ts
+                      WHERE ts.os_origem_id = o.id AND ts.status = 'ativa')";
+        $liquido = "({$pago} + {$tsEntrada} - {$devolvido} - {$tsSaida})";
 
         $rotulos = [
             'sem'      => 'Sem pagamento',

@@ -180,6 +180,8 @@ function osaud_secoes(): array
         'entregas'     => ['rotulo' => 'Entrega',              'icone' => 'fa-handshake-o',   'tabela' => 'os_entregas',             'fk' => 'ordem_servico_id',    'ordem' => 'id ASC'],
         'nfse'         => ['rotulo' => 'NFS-e',                'icone' => 'fa-file-text-o',   'tabela' => 'nfse_notas',              'fk' => 'ordem_servico_id',    'ordem' => 'id ASC'],
         'assinaturas'  => ['rotulo' => 'Documentos assinados', 'icone' => 'fa-pencil-square-o', 'tabela' => 'os_documentos_assinados', 'fk' => 'os_id',             'ordem' => 'id ASC'],
+        'transf_entrada' => ['rotulo' => 'Saldo recebido de outra O.S.', 'icone' => 'fa-sign-in',  'tabela' => 'os_transferencias_saldo', 'fk' => 'os_destino_id',   'ordem' => 'id ASC'],
+        'transf_saida'   => ['rotulo' => 'Saldo transferido para outra O.S.', 'icone' => 'fa-sign-out', 'tabela' => 'os_transferencias_saldo', 'fk' => 'os_origem_id', 'ordem' => 'id ASC'],
     ];
 }
 
@@ -216,6 +218,8 @@ function osaud_acoes(): array
         'nfse_emitida'         => ['NFS-e emitida',               'fa-file-text-o',    'info'],
         'nfse_cancelada'       => ['NFS-e cancelada',             'fa-ban',            'del'],
         'nfse_reemitida'       => ['NFS-e reemitida',             'fa-refresh',        'info'],
+        'saldo_transferido'             => ['Saldo transferido entre O.S.', 'fa-exchange', 'edit'],
+        'saldo_transferencia_estornada' => ['Transferência de saldo estornada', 'fa-undo', 'del'],
         'alteracao'            => ['Alteração',                   'fa-pencil',         'edit'],
     ];
 }
@@ -391,6 +395,8 @@ function osaud_totais(array $snap): array
         'pagamentos' => is_array($snap['pagamentos'] ?? null) ? $soma($snap['pagamentos'], 'total_pagamento') : null,
         'devolucoes' => is_array($snap['devolucoes'] ?? null) ? $soma($snap['devolucoes'], 'total_devolucao') : null,
         'repasses'   => is_array($snap['repasses'] ?? null)   ? $soma($snap['repasses'], 'total_repasse')     : null,
+        'transf_entrada' => is_array($snap['transf_entrada'] ?? null) ? $soma(array_filter($snap['transf_entrada'], static function ($r) { return ($r['status'] ?? '') === 'ativa'; }), 'valor') : null,
+        'transf_saida'   => is_array($snap['transf_saida'] ?? null)   ? $soma(array_filter($snap['transf_saida'], static function ($r) { return ($r['status'] ?? '') === 'ativa'; }), 'valor') : null,
     ];
 }
 
@@ -548,6 +554,10 @@ function osaud_rotulo_linha(string $sec, array $r): string
             return 'NFS-e ' . ($n ? 'nº ' . $n : '#' . ($r['id'] ?? '?')) . (isset($r['status']) ? ' (' . $r['status'] . ')' : '');
         case 'assinaturas':
             return 'Documento assinado "' . ($r['tipo'] ?? '') . '"';
+        case 'transf_entrada':
+            return 'Transferência ' . ($r['codigo'] ?? '') . ' de ' . osaud_brl($r['valor'] ?? null) . ' da O.S. nº ' . ($r['os_origem_id'] ?? '?');
+        case 'transf_saida':
+            return 'Transferência ' . ($r['codigo'] ?? '') . ' de ' . osaud_brl($r['valor'] ?? null) . ' para a O.S. nº ' . ($r['os_destino_id'] ?? '?');
     }
     return '#' . ($r['id'] ?? '?');
 }
@@ -570,6 +580,7 @@ function osaud_resumo(array $diff): array
         'anexos' => ['incluído', 'excluído'], 'devolucoes' => ['lançada', 'EXCLUÍDA'], 'repasses' => ['lançado', 'EXCLUÍDO'],
         'liquidacoes' => ['registrada', 'desfeita'], 'entregas' => ['registrada', 'excluída'], 'nfse' => ['registrada', 'excluída'],
         'assinaturas' => ['registrado', 'excluído'],
+        'transf_entrada' => ['recebida', 'EXCLUÍDA'], 'transf_saida' => ['enviada', 'EXCLUÍDA'],
     ];
     foreach ($diff['secoes'] as $sec => $d) {
         foreach ($d['incluidos'] as $r) {
@@ -581,6 +592,9 @@ function osaud_resumo(array $diff): array
         foreach ($d['alterados'] as $a) {
             $partes = [];
             foreach ($a['campos'] as $c) {
+                if (strpos((string) $c['campo'], 'hash_') === 0) {
+                    continue; // selos técnicos ficam só no detalhe
+                }
                 $partes[] = osaud_rotulo_campo($c['campo']) . ' ' . mb_strimwidth(osaud_fmt_valor($c['campo'], $c['antes']), 0, 40, '…')
                           . ' → ' . mb_strimwidth(osaud_fmt_valor($c['campo'], $c['depois']), 0, 40, '…');
             }
@@ -957,6 +971,7 @@ function osaud_legado_snapshot(PDO $pdo, int $logId): ?array
         /* demais seções não existiam no log antigo */
         'pagamentos' => null, 'comprovantes' => null, 'anexos' => null, 'devolucoes' => null,
         'repasses' => null, 'liquidacoes' => null, 'entregas' => null, 'nfse' => null, 'assinaturas' => null,
+        'transf_entrada' => null, 'transf_saida' => null,
     ];
 }
 
@@ -971,7 +986,7 @@ function osaud_legado_atual(PDO $pdo, int $osId): ?array
         $s['itens'][$k]['_chave'] = ($i['ato'] ?? '') . '#' . ($i['ordem_exibicao'] ?? '') . '#' . ($i['descricao'] ?? '');
         unset($s['itens'][$k]['id']);
     }
-    foreach (['pagamentos', 'comprovantes', 'anexos', 'devolucoes', 'repasses', 'liquidacoes', 'entregas', 'nfse', 'assinaturas'] as $c) {
+    foreach (['pagamentos', 'comprovantes', 'anexos', 'devolucoes', 'repasses', 'liquidacoes', 'entregas', 'nfse', 'assinaturas', 'transf_entrada', 'transf_saida'] as $c) {
         $s[$c] = null;
     }
     return $s;

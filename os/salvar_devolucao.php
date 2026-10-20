@@ -28,6 +28,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($total_devolucao <= 0)  { throw new Exception('Informe um valor de devolução válido.'); }
         if ($forma_devolucao === '') { throw new Exception('Selecione a forma de devolução.'); }
 
+        // Limite: só pode devolver o que ainda está disponível na O.S.
+        // (pagamentos + crédito recebido − devoluções − transferências enviadas − repasses − liquidado)
+        require_once __DIR__ . '/transferencia_saldo_lib.php';
+        $tsSit = ts_situacao($os_id);
+        if ($tsSit && $total_devolucao > $tsSit['disponivel'] + 0.01) {
+            throw new Exception('O valor da devolução excede o disponível na O.S. (R$ ' . number_format($tsSit['disponivel'], 2, ',', '.') . ').');
+        }
+
         // ===== Regras específicas para devolução em ESPÉCIE =====
         if ($forma_devolucao === 'Espécie') {
             // Centavos devem terminar em 0 ou 5
