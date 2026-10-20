@@ -1621,7 +1621,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     <input type="text" class="form-control" id="total_repasses" name="total_repasses" value="<?php echo 'R$ ' . number_format($total_repasses, 2, ',', '.'); ?>" readonly>  
                 </div>  
                 <?php endif; ?>  
-                <?php if ($saldo != 0): ?>  
+                <?php if ($saldo != 0 && !$ts_tudo_transferido): ?>  
                 <div class="form-group col-md-3">  
                     <label for="saldo">Saldo:</label>  
                     <input type="text" class="form-control" id="saldo" name="saldo" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>  
@@ -2232,7 +2232,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     </div>  
                     <?php endif; ?>  
 
-                    <?php if ($saldo != 0): ?>  
+                    <?php if ($saldo != 0 && !$ts_tudo_transferido): ?>  
                     <div class="stat-card">  
                         <div class="stat-label">Saldo</div>  
                         <input type="text" class="form-control" id="saldo_modal" value="<?php echo 'R$ ' . number_format($saldo, 2, ',', '.'); ?>" readonly>  
@@ -3016,7 +3016,7 @@ function temAlgumPagamento() {
 // ===== Atualiza os campos do topo e o status da O.S. sem recarregar =====
 function refreshOsHeaderAndStats() {
     const totalPagos = sumPagamentos();
-    const saldo = totalPagos - TOTAL_DEVOLUCOES - TS_SAIDA - TOTAL_OS - TOTAL_REPASSES;
+    const saldo = Math.round((totalPagos - TOTAL_DEVOLUCOES - TS_SAIDA - TOTAL_OS - TOTAL_REPASSES) * 100) / 100 || 0;
 
     // Atualiza inputs do formulário principal
     const depositoEl = document.getElementById('deposito_previo');
@@ -3641,7 +3641,7 @@ $(document).ready(function() {
         var totalRepasses = <?php echo $total_repasses; ?>;
         var totalOS = <?php echo $ordem_servico['total_os']; ?>;
 
-        var saldo = totalPagamentos - totalDevolucoes - totalOS - totalRepasses;
+        var saldo = Math.round((totalPagamentos - totalDevolucoes - totalOS - totalRepasses) * 100) / 100 || 0;
 
         $('#saldo_modal').val('R$ ' + saldo.toFixed(2).replace('.', ','));
     }

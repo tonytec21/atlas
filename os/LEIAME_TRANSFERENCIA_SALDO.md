@@ -1,4 +1,4 @@
-# Transferência de saldo entre O.S. — v1.0.1 (módulo O.S. do Atlas)
+# Transferência de saldo entre O.S. — v1.0.2 (módulo O.S. do Atlas)
 
 Permite aproveitar em outra O.S. um valor que o cliente **já pagou** e que não foi
 usado, sem lançar pagamento nem devolução no caixa.
