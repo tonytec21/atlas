@@ -101,6 +101,11 @@ date_default_timezone_set('America/Sao_Paulo');
         .cxf-disp.zero .lb, .cxf-disp.zero .vl{ color:#b91c1c; }
         .btn-saldo-admin{ background:#7c3aed; border-color:#7c3aed; color:#fff; }
         .btn-saldo-admin:hover{ background:#6d28d9; color:#fff; }
+        .btn-desfazer{ background:#d97706; border-color:#d97706; color:#fff; }
+        .btn-desfazer:hover{ background:#b45309; color:#fff; }
+        .cxf-desfazer-resumo{ text-align:left; font-size:14px; line-height:1.5; }
+        .cxf-desfazer-resumo ul{ padding-left:18px; margin:8px 0; }
+        .cxf-desfazer-resumo .aviso{ background:#fff7ed; border-left:4px solid #d97706; padding:8px 10px; border-radius:6px; margin-top:8px; }
         .cxf-btn-saldo-card{ display:flex; width:100%; align-items:center; justify-content:center; gap:6px; margin:8px 0 4px; font-weight:600; border-radius:8px; }
         .cxf-table .cxf-btn-saldo-card{ width:auto; display:inline-flex; margin:6px 0 0; }
         .cxf-saldo-admin-aviso{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
@@ -108,6 +113,8 @@ date_default_timezone_set('America/Sao_Paulo');
         body.dark-mode .cxf-saldo-admin-aviso{ background:#2e1065; border-color:#6d28d9; color:#ede9fe; }
         /* Modal do saldo inicial aberto por cima do detalhe do caixa */
         #saldoInicialAdminModal{ z-index:1065; }
+        /* os avisos (SweetAlert) precisam ficar acima do modal do saldo inicial */
+        .swal2-container{ z-index:2000 !important; }
         @media (max-width: 576px){
             .cxf-search input{ min-width:0; width:100%; }
             .cxf-search, .cxf-tools{ width:100%; }
@@ -527,7 +534,7 @@ date_default_timezone_set('America/Sao_Paulo');
                     FROM deposito_caixa WHERE status = "ativo"
                     UNION ALL
                     SELECT funcionario, data_caixa as data, "caixa" as tipo, saldo_inicial as total
-                    FROM caixa WHERE status = "aberto"';
+                    FROM caixa';  // abertos e fechados: um caixa fechado sem outro movimento (só saldo inicial) também precisa aparecer
 
                 $campos = '
                     DATE(data) as data,
@@ -611,6 +618,7 @@ date_default_timezone_set('America/Sao_Paulo');
                             'em_caixa' => $s['disponivel'], 'caixa_id' => $s['caixa_id'], 'caixa_status' => $s['caixa_status'],
                             'origem' => $s['origem_saldo'], 'sem_comprovante' => $s['depositos_sem_comprovante'],
                             'pode_lancar_saldo' => cx_pode_lancar_saldo_inicial($s), 'ultimo_caixa' => $s['ultimo_caixa'],
+                            'desfeito' => $s['caixa_id'] ? cx_qtd_fechamento_desfeito($conn, (int) $s['caixa_id']) : 0,
                         ];
                     }
                 }
@@ -704,6 +712,9 @@ date_default_timezone_set('America/Sao_Paulo');
                     $printUrl = $l['caixa_id']
                         ? 'imprimir_fechamento_caixa.php?id=' . urlencode((string) $l['caixa_id'])
                         : 'imprimir_fechamento_caixa.php?funcionario=' . urlencode($f) . '&data=' . urlencode($d);
+                    if ($isAdmin && !$modoVisualizacao && $l['caixa_status'] === 'fechado') {
+                        $html .= '<button type="button" title="Desfazer fechamento (somente o Oficial)" class="btn btn-desfazer btn-sm btn-icon" onclick="event.stopPropagation(); desfazerFechamentoCaixa(' . $js($f) . ', ' . $js($d) . ')"><i class="fa fa-undo" aria-hidden="true"></i></button>';
+                    }
                     if ($isAdmin) {
                         $audUrl = 'auditoria.php?' . http_build_query(['funcionario_caixa' => $f, 'data_caixa' => $d]);
                         $html .= '<a href="' . $h($audUrl) . '" title="Auditoria deste caixa" class="btn btn-dark btn-sm btn-icon" onclick="event.stopPropagation();"><i class="fa fa-history" aria-hidden="true"></i></a>';
@@ -750,6 +761,9 @@ date_default_timezone_set('America/Sao_Paulo');
                     }
                     if ($l['caixa_status'] === 'fechado') {
                         $tags[] = '<span class="cxf-tag ok"><i class="fa fa-check"></i> Fechamento registrado</span>';
+                    }
+                    if (!empty($l['desfeito'])) {
+                        $tags[] = '<span class="cxf-tag warn" title="O Oficial desfez o fechamento deste caixa (veja a justificativa na auditoria)"><i class="fa fa-undo"></i> Fechamento desfeito' . ($l['desfeito'] > 1 ? ' (' . (int) $l['desfeito'] . 'x)' : '') . '</span>';
                     }
                 }
                 if ($l['sem_comprovante'] > 0) {
@@ -1593,6 +1607,10 @@ date_default_timezone_set('America/Sao_Paulo');
                         <button type="button" id="btnTransportarSaldo" style="width: 100%" class="btn btn-danger" onclick="transportarSaldoFecharCaixa()">
                             <i class="fa fa-lock" aria-hidden="true"></i> Fechar Caixa e Transportar Saldo <i class="fa fa-share" aria-hidden="true"></i>
                         </button>
+                        <button type="button" id="btnDesfazerFechamento" style="width: 100%; display:none; margin-top:8px;" class="btn btn-desfazer"
+                                onclick="desfazerFechamentoCaixa($('#funcionario_deposito').val(), $('#data_caixa_deposito').val())">
+                            <i class="fa fa-undo" aria-hidden="true"></i> Desfazer fechamento (somente o Oficial)
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2273,17 +2291,17 @@ date_default_timezone_set('America/Sao_Paulo');
                     var totalRecebidoConta = 0;
                     var totalRecebidoEspecie = 0;
                     $('#detalhesTotalPorTipo').empty();
-                    for (var tipo in totalPorTipo) {
+                    for (var formaTipo in totalPorTipo) {
                         $('#detalhesTotalPorTipo').append(`
                             <tr>
-                                <td>${tipo}</td>
-                                <td>${formatCurrency(totalPorTipo[tipo])}</td>
+                                <td>${formaTipo}</td>
+                                <td>${formatCurrency(totalPorTipo[formaTipo])}</td>
                             </tr>
                         `);
-                        if (['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Depósito Bancário', 'Crédito', 'Débito'].includes(tipo)) {
-                            totalRecebidoConta += totalPorTipo[tipo];
-                        } else if (tipo === 'Espécie') {
-                            totalRecebidoEspecie += totalPorTipo[tipo];
+                        if (['PIX', 'Centrais Eletrônicas', 'Boleto', 'Transferência Bancária', 'Depósito Bancário', 'Crédito', 'Débito'].includes(formaTipo)) {
+                            totalRecebidoConta += totalPorTipo[formaTipo];
+                        } else if (formaTipo === 'Espécie') {
+                            totalRecebidoEspecie += totalPorTipo[formaTipo];
                         }
                     }
                     $('#cardTotalRecebidoConta').text(formatCurrency(totalRecebidoConta));
@@ -2760,6 +2778,7 @@ date_default_timezone_set('America/Sao_Paulo');
                     var podeFechar = !fechado && (centavos > 0 || (centavos === 0 && response.caixaStatus === 'aberto'));
                     $('#btnAdicionarDeposito').prop('disabled', fechado || centavos <= 0);
                     $('#btnTransportarSaldo').prop('disabled', !podeFechar);
+                    $('#btnDesfazerFechamento').toggle(!!(window.CX_IS_ADMIN && fechado));
                     if (centavos > 0) {
                         $('#btnTransportarSaldo').html('<i class="fa fa-lock" aria-hidden="true"></i> Fechar Caixa e Transportar Saldo <i class="fa fa-share" aria-hidden="true"></i>');
                     } else {
@@ -3069,6 +3088,72 @@ date_default_timezone_set('America/Sao_Paulo');
         });
 
         // NOVO: Fechamento rápido via botão com cadeado dourado no card
+        // ===== Desfazer fechamento do caixa (somente o Oficial / administrador) =====
+        function desfazerFechamentoCaixa(funcionario, data) {
+            if (!window.CX_IS_ADMIN) {
+                Swal.fire({ icon: 'warning', title: 'Acesso restrito', text: 'Somente o Oficial pode desfazer o fechamento do caixa.' });
+                return;
+            }
+            $.post('desfazer_fechamento_caixa.php', { acao: 'previa', funcionario: funcionario, data_caixa: data }, function (r) {
+                if (!r || r.error || !r.plano) {
+                    Swal.fire({ icon: 'error', title: 'Não foi possível', text: (r && r.error) || 'Falha ao consultar o caixa.' });
+                    return;
+                }
+                var p = r.plano;
+                var cab = 'Caixa de <b>' + escaparHtmlCx(funcionario) + '</b> em <b>' + escaparHtmlCx(p.data_br) + '</b>';
+                if (!p.pode) {
+                    Swal.fire({ icon: 'warning', title: 'Não é possível desfazer', html: '<div class="cxf-desfazer-resumo">' + cab + '<div class="aviso">' + escaparHtmlCx(p.motivo || '') + '</div></div>' });
+                    return;
+                }
+                var itens = ['O caixa volta a ficar <b>aberto</b>.'];
+                if (p.status_transporte === 'em_aberto') {
+                    itens.push('O saldo transportado de <b>' + p.valor_br + '</b> é estornado e volta para este caixa.');
+                } else if (p.status_transporte === 'usado') {
+                    itens.push('O saldo de <b>' + p.valor_br + '</b> já tinha entrado no caixa de <b>' + escaparHtmlCx(p.destino_data_br) + '</b>: '
+                        + 'o saldo inicial daquele caixa passa de ' + p.destino_saldo_inicial_br + ' para <b>' + p.destino_saldo_inicial_depois_br + '</b>, e o valor volta para este caixa.');
+                } else {
+                    itens.push('Não houve saldo transportado neste fechamento.');
+                }
+                itens.push('Depois, o colaborador fecha o caixa de novo, na hora certa.');
+                Swal.fire({
+                    title: 'Desfazer fechamento do caixa',
+                    icon: 'warning',
+                    html: '<div class="cxf-desfazer-resumo">' + cab + '<ul><li>' + itens.join('</li><li>') + '</li></ul>'
+                        + '<div class="aviso">A justificativa é obrigatória e fica registrada na auditoria do caixa, com o seu usuário.</div></div>',
+                    input: 'textarea',
+                    inputLabel: 'Justificativa',
+                    inputPlaceholder: 'Ex.: colaborador fechou o caixa e transportou o saldo antes do fim do expediente.',
+                    inputAttributes: { maxlength: 1000, 'aria-label': 'Justificativa' },
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fa fa-undo"></i> Desfazer fechamento',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#d97706',
+                    showLoaderOnConfirm: true,
+                    inputValidator: function (v) {
+                        if (!v || v.trim().length < p.min_justificativa) {
+                            return 'Escreva a justificativa (pelo menos ' + p.min_justificativa + ' caracteres).';
+                        }
+                    },
+                    preConfirm: function (justificativa) {
+                        return $.post('desfazer_fechamento_caixa.php', { acao: 'desfazer', funcionario: funcionario, data_caixa: data, justificativa: justificativa })
+                            .then(function (res) {
+                                if (!res || res.error) { throw new Error((res && res.error) || 'Falha ao desfazer o fechamento.'); }
+                                return res;
+                            }, function () { throw new Error('Não foi possível contatar o servidor.'); })
+                            .catch(function (err) { Swal.showValidationMessage(err.message); });
+                    },
+                    allowOutsideClick: function () { return !Swal.isLoading(); }
+                }).then(function (res) {
+                    if (!res.isConfirmed || !res.value) return;
+                    Swal.fire({ icon: 'success', title: 'Fechamento desfeito',
+                        html: 'O caixa de <b>' + escaparHtmlCx(funcionario) + '</b> (' + escaparHtmlCx(p.data_br) + ') está aberto de novo, com ' + formatCurrency(res.value.saldo) + ' em caixa.' })
+                        .then(function () { location.reload(); });
+                });
+            }, 'json').fail(function () {
+                Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível contatar o servidor.' });
+            });
+        }
+
         function fecharCaixaRapido(funcionario, data) {
             $('#data_caixa_deposito').val(data);
             $('#funcionario_deposito').val(funcionario);

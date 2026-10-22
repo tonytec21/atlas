@@ -28,6 +28,7 @@ if (!defined('CX_AUDIT_LIB')) {
         'comprovante_anexado'   => 'Comprovante anexado',
         'caixa_fechado'         => 'Caixa fechado / saldo transportado',
         'saldo_inicial_lancado' => 'Saldo inicial lançado (admin)',
+        'fechamento_desfeito'   => 'Fechamento desfeito (Oficial)',
     ]);
 
     define('CX_AUDIT_RESULTADOS', [

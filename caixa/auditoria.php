@@ -145,6 +145,7 @@ $iconeAcao = [
     'caixa_aberto' => 'fa-unlock-alt', 'saida_cadastrada' => 'fa-sign-out', 'saida_removida' => 'fa-trash',
     'deposito_cadastrado' => 'fa-university', 'deposito_removido' => 'fa-trash', 'comprovante_anexado' => 'fa-paperclip',
     'caixa_fechado' => 'fa-lock', 'saldo_inicial_lancado' => 'fa-plus-square', 'auditoria_exportada' => 'fa-download',
+    'fechamento_desfeito' => 'fa-undo',
 ];
 ?>
 <!DOCTYPE html>

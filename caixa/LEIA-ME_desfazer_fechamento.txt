@@ -1,0 +1,53 @@
+FLUXO DE CAIXA — DESFAZER FECHAMENTO (versão 2026.10.22.2)
+==========================================================
+
+Para que serve
+--------------
+Quando um colaborador fecha o caixa e transporta o saldo antes da hora, o
+Oficial (usuário com nível "administrador") pode desfazer esse fechamento.
+O caixa volta a ficar aberto, com o dinheiro de volta, e o colaborador
+fecha de novo na hora certa.
+
+Onde fica
+---------
+- Pesquisar Fluxo de Caixa: nos caixas fechados aparece o botão laranja
+  com a seta circular (Desfazer fechamento) — só para o administrador.
+- Janela de Depósitos/Fechamento do caixa: botão "Desfazer fechamento
+  (somente o Oficial)" abaixo do botão de fechar.
+
+Regras
+------
+- Só o administrador. Para os demais, o botão não aparece e o servidor recusa.
+- A justificativa é obrigatória (mínimo 15 caracteres).
+- Antes de confirmar, a tela mostra exatamente o que vai mudar.
+- Se o saldo transportado ainda não foi usado: o transporte é estornado e o
+  valor volta para o caixa reaberto.
+- Se o saldo já entrou como saldo inicial do caixa seguinte (o colaborador já
+  abriu o caixa do outro dia): o valor sai do saldo inicial do caixa seguinte e
+  volta para o caixa reaberto. Isso só é permitido se o caixa seguinte estiver
+  aberto e ainda tiver esse valor em espécie.
+- Se o caixa seguinte também estiver fechado, desfaça primeiro o fechamento
+  dele (sempre do mais recente para o mais antigo).
+- O caixa reaberto ganha a etiqueta "Fechamento desfeito".
+
+Registro
+--------
+- Tabela caixa_fechamento_desfeito (criada automaticamente): caixa, valor,
+  caixa seguinte afetado, saldo inicial antes/depois, justificativa,
+  administrador e IP.
+- Auditoria do Caixa: ação "Fechamento desfeito (Oficial)", inclusive as
+  tentativas bloqueadas.
+
+Correção 2026.10.22.2
+---------------------
+A pesquisa só listava o caixa se ele estivesse aberto ou tivesse algum
+movimento (ato, pagamento, saída...). Um caixa aberto só com saldo inicial e
+fechado em seguida sumia da lista — e, com ele, o botão de desfazer. Agora os
+caixas fechados também aparecem.
+
+Arquivos
+--------
+Novo:      caixa/desfazer_fechamento_caixa.php
+           caixa/LEIA-ME_desfazer_fechamento.txt
+Alterados: caixa/index.php, caixa/caixa_saldo.php, caixa/caixa_auditoria.php,
+           caixa/auditoria.php, caixa/caixa_versao.php (2026.10.22.2)

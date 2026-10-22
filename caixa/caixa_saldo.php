@@ -405,6 +405,25 @@ if (!defined('CX_SALDO_LIB')) {
         cx_json(array_merge(['error' => $mensagem], $resposta));
     }
 
+    /** Quantas vezes o Oficial desfez o fechamento deste caixa (0 se a tabela ainda não existe). */
+    function cx_qtd_fechamento_desfeito(PDO $conn, int $caixaId): int
+    {
+        static $existe = null;
+        try {
+            if ($existe === null) {
+                $existe = (bool) $conn->query("SHOW TABLES LIKE 'caixa_fechamento_desfeito'")->fetchColumn();
+            }
+            if (!$existe) {
+                return 0;
+            }
+            $st = $conn->prepare('SELECT COUNT(*) FROM caixa_fechamento_desfeito WHERE caixa_id = :id');
+            $st->execute([':id' => $caixaId]);
+            return (int) $st->fetchColumn();
+        } catch (Throwable $e) {
+            return 0;
+        }
+    }
+
     /** Resposta JSON padrão + encerramento. */
     function cx_json(array $dados, int $http = 200): void
     {
