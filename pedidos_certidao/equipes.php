@@ -7,7 +7,40 @@ include(__DIR__ . '/../os/session_check.php');
 checkSession();  
 include(__DIR__ . '/../os/db_connection.php');  
 date_default_timezone_set('America/Sao_Paulo');  
-header_remove('X-Powered-By');  
+header_remove('X-Powered-By');
+
+/* ===== Acesso: somente administradores ou quem tem o acesso adicional "Controle de Tarefas"
+   (a mesma regra que mostra o botão "Gerenciar Equipes" na fila de tarefas). ===== */
+function equipes_pode_gerenciar(PDO $conn): bool {
+  $usuario = trim((string)($_SESSION['username'] ?? ''));
+  $nivel = ''; $extra = '';
+  try {
+    if ($usuario !== '') {
+      $st = $conn->prepare("SELECT nivel_de_acesso, acesso_adicional FROM funcionarios WHERE usuario = ? LIMIT 1");
+      $st->execute([$usuario]);
+      if ($r = $st->fetch(PDO::FETCH_ASSOC)) { $nivel = (string)($r['nivel_de_acesso'] ?? ''); $extra = (string)($r['acesso_adicional'] ?? ''); }
+    }
+  } catch (Throwable $e) {}
+  if ($nivel === '') $nivel = (string)($_SESSION['nivel_de_acesso'] ?? '');
+  if ($extra === '') { $t = $_SESSION['acesso_adicional'] ?? ''; $extra = is_array($t) ? implode(',', $t) : (string)$t; }
+  $norm = function ($s) {
+    $s = mb_strtolower(trim((string)$s), 'UTF-8');
+    $no = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+    if ($no !== false && $no !== null) $s = $no;
+    return trim(preg_replace('/\s+/u', ' ', $s));
+  };
+  return $norm($nivel) === 'administrador' || strpos($norm($extra), $norm('Controle de Tarefas')) !== false;
+}
+try { $__podeEquipes = equipes_pode_gerenciar(getDatabaseConnection()); } catch (Throwable $e) { $__podeEquipes = false; }
+if (!$__podeEquipes) {
+  if (isset($_GET['action']) || isset($_POST['action'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'error' => 'Acesso restrito ao administrador ou a quem tem o acesso "Controle de Tarefas".'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  header('Location: tarefas.php');
+  exit;
+}  
 
 /* ========================================================================  
    SCHEMA - MySQL 8+  
@@ -1378,7 +1411,7 @@ small.muted {
         <h5 class="modal-title">  
           <i class="fas fa-users"></i> Cadastro de Equipe  
         </h5>  
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>  
+        <button type="button" class="btn-close" data-dismiss="modal" data-bs-dismiss="modal" aria-label="Fechar"></button>  
       </div>  
       <div class="modal-body">  
         <input type="hidden" name="id" id="eq_id">  
@@ -1403,7 +1436,7 @@ small.muted {
         </div>  
       </div>  
       <div class="modal-footer">  
-        <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">  
+        <button class="btn btn-secondary" data-dismiss="modal" data-bs-dismiss="modal" type="button">  
           <i class="fas fa-times"></i> Cancelar  
         </button>  
         <button class="btn btn-primary" type="submit">  

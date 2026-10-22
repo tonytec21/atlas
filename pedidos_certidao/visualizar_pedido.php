@@ -1031,7 +1031,9 @@ label {
 }  
 
 #viewerModal .btn-close {  
-  filter: invert(1);  
+  /* Bootstrap 4 não desenha o .btn-close (classe do Bootstrap 5): o X ficava invisível */
+  width: 32px; height: 32px; border: 0; padding: 0;
+  background: transparent url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath d='M.293.293a1 1 0 011.414 0L8 6.586 14.293.293a1 1 0 111.414 1.414L9.414 8l6.293 6.293a1 1 0 01-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 01-1.414-1.414L6.586 8 .293 1.707a1 1 0 010-1.414z'/%3e%3c/svg%3e") center/1em auto no-repeat;
   opacity: 0.8;  
 }  
 
@@ -1618,7 +1620,7 @@ body.dark-mode footer .footer-content a:hover {
             <i class="fa fa-download"></i> Baixar
           </a>
         </div>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        <button type="button" class="btn-close" data-dismiss="modal" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="modal-body" id="viewerBody">
         <!-- Conteúdo trocado via JS (iframe para pdf / img para imagens) -->

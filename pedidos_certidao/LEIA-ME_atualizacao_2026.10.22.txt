@@ -1,0 +1,68 @@
+PEDIDOS DE CERTIDÃO — ATUALIZAÇÃO 2026.10.22.1
+================================================
+
+A versão aparece no rodapé da lista de pedidos e da Fila de Tarefas
+(arquivo pedidos_certidao/versao.php).
+
+1) FILA DE TAREFAS MAIS LEVE (tarefas.php)
+------------------------------------------
+Antes, a fila buscava TODAS as tarefas de uma vez, inclusive as concluídas e
+canceladas de anos anteriores, e o navegador montava um cartão para cada uma.
+Com muitas tarefas, a tela ficava pesada e demorava a abrir.
+
+Agora:
+- Cada coluna traz só as primeiras tarefas: Pendentes e Em andamento até 50,
+  Suspensas até 30, Concluídas e Canceladas só as 20 mais recentes.
+- No fim de cada coluna aparece o botão "Carregar mais (N restantes)", que busca
+  as próximas 30 daquela coluna. Os totais dos quadros continuam exatos.
+- A ordenação (Classificar por / Direção) passou a ser feita no banco de dados.
+  As colunas encerradas (Concluídas e Canceladas) mostram sempre as mais
+  recentes primeiro; a classificação escolhida vale para as colunas de trabalho.
+- Índices criados automaticamente na tabela tarefas_pedido (uma única vez):
+    idx_status_criado        (status, criado_em)
+    idx_func_status_criado   (funcionario_id, status, criado_em)
+    idx_equipe_status_criado (equipe_id, status, criado_em)
+- A verificação/criação das tabelas roda uma vez por sessão, e não mais a cada
+  chamada da tela.
+
+Medição com 20.000 tarefas: a resposta da lista caiu de 11,5 MB (748 ms) para
+96 KB (cerca de 40 ms), e a tela passou de 20.000 cartões para cerca de 170.
+
+2) CORREÇÕES
+------------
+- salvar_pedido.php e jobs_distribuir_tarefas_pedidos_antigos.php: a regra com
+  tipo "*" (qualquer tipo), oferecida na tela de Equipes, nunca distribuía:
+  a busca só aceitava o tipo exato. Agora o curinga funciona. Na mesma
+  prioridade, a regra do tipo exato vence o curinga.
+- tarefas.php: ao arrastar um cartão para Concluídas ou Suspensas (sem campo de
+  texto), a observação da tarefa era gravada como "true". Corrigido.
+- equipes.php: a página e as ações (salvar equipe, membro, regra, excluir) podiam
+  ser usadas por qualquer usuário que digitasse o endereço. Agora só
+  administradores ou quem tem o acesso adicional "Controle de Tarefas" (a mesma
+  regra do botão "Gerenciar Equipes"); os demais voltam para a fila.
+- index.php (lista de pedidos): o filtro Atribuição "Registro de Imóveis" usava o
+  valor "RI" e nunca encontrava nada. Corrigido; incluída a opção "O.S.
+  (rastreio)". O filtro instantâneo por atribuição passou a casar só o início.
+- anexos_compilar.php ("Baixar PDF" dos anexos): o caminho do ImageMagick era fixo
+  no Windows e a compilação falhava em servidores Linux. Agora usa o mesmo
+  critério do envio de anexos (magick.exe no Windows, convert no Linux).
+- Janelas (Bootstrap 4): os botões Fechar/Cancelar/X usavam só o atributo do
+  Bootstrap 5 (data-bs-dismiss) e não fechavam; o X ficava invisível. Corrigido
+  em tarefas.php, equipes.php, visualizar_pedido.php e no Resumo de Tarefas da
+  tela inicial (atlas/index.php).
+
+3) ARQUIVOS
+-----------
+Novos:     pedidos_certidao/versao.php
+           pedidos_certidao/LEIA-ME_atualizacao_2026.10.22.txt
+Alterados: pedidos_certidao/tarefas.php
+           pedidos_certidao/index.php
+           pedidos_certidao/salvar_pedido.php
+           pedidos_certidao/jobs_distribuir_tarefas_pedidos_antigos.php
+           pedidos_certidao/equipes.php
+           pedidos_certidao/visualizar_pedido.php
+           pedidos_certidao/anexos_compilar.php
+           index.php (tela inicial: botão fechar do Resumo de Tarefas)
+
+Não há script de banco para rodar: os índices são criados sozinhos na primeira
+abertura da fila.

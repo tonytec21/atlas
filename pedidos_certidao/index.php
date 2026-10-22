@@ -2,7 +2,8 @@
 // pedidos_certidao/index.php  
 include(__DIR__ . '/../os/session_check.php');  
 checkSession();  
-include(__DIR__ . '/../os/db_connection.php');  
+include(__DIR__ . '/../os/db_connection.php');
+require_once __DIR__ . '/versao.php';  
 date_default_timezone_set('America/Sao_Paulo');  
 
 /* ============================================================  
@@ -1625,9 +1626,10 @@ body.dark-mode footer .footer-content a:hover {
             <option value="">Todas</option>  
             <option value="Notas">Notas</option>  
             <option value="Registro Civil">Registro Civil</option>  
-            <option value="RI">Registro de Imóveis</option>  
+            <option value="Registro de Imóveis">Registro de Imóveis</option>  
             <option value="Títulos e Documentos">Títulos e Documentos</option>  
             <option value="Pessoas Jurídicas">Pessoas Jurídicas</option>  
+            <option value="OS">O.S. (rastreio)</option>  
           </select>  
         </div>  
 
@@ -1857,6 +1859,7 @@ body.dark-mode footer .footer-content a:hover {
     </div>
 
   </div>
+<p class="text-center text-muted" style="font-size:.74rem;margin:6px 0 90px">Pedidos de Certidão · v<?php echo htmlspecialchars(PEDIDOS_VERSAO); ?></p>
 </main>
 
 <script src="../script/jquery-3.5.1.min.js"></script>
@@ -2028,7 +2031,7 @@ $(function(){
     table.columns(2).search(status ? status.replace('_',' ') : '', false, false);
 
     const tipoR = tipo ? '.*' + regexEscape(tipo) : '';
-    const atrTipo = (atr ? regexEscape(atr) : '') + tipoR;
+    const atrTipo = (atr ? '^' + regexEscape(atr) + ' /' : '') + tipoR;  // ancorado: "OS" não casa com "Documentos"
     table.columns(3).search(atrTipo, true, false);
 
     table.columns(4).search('');

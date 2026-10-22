@@ -1243,7 +1243,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                         <small class="text-white opacity-75">Visualização completa das suas pendências</small>
                     </div>
                 </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>  
+                <button type="button" class="btn-close btn-close-white" data-dismiss="modal" data-bs-dismiss="modal" aria-label="Fechar" style="line-height:1;width:40px;height:40px;"><span aria-hidden="true">&times;</span></button>  
             </div> 
             <div class="modal-body">  
                 <!-- Seção para novas tarefas -->  
@@ -1285,7 +1285,7 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
                 <h5 class="modal-title" id="accessDeniedLabel">
                     <i class="mdi mdi-lock"></i> Acesso Negado
                 </h5>  
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                <button type="button" class="btn-close" data-dismiss="modal" data-bs-dismiss="modal" aria-label="Fechar">
                     <span aria-hidden="true">&times;</span>
                 </button>  
             </div>  

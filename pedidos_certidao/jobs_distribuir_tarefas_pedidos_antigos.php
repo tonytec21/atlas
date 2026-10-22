@@ -153,8 +153,8 @@ function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?
           JOIN equipes e ON e.id = r.equipe_id AND e.ativa = 1
           WHERE r.ativa = 1
             AND r.atribuicao = :a
-            AND r.tipo       = :t
-          ORDER BY r.prioridade ASC, r.id ASC
+            AND (r.tipo = :t OR r.tipo = '*')
+          ORDER BY r.prioridade ASC, (r.tipo = '*') ASC, r.id ASC
           LIMIT 1";
   $st = $conn->prepare($sql);
   $st->execute([':a' => $atrCanon, ':t' => $tipoCanon]);

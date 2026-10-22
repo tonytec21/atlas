@@ -7,8 +7,13 @@ include(__DIR__ . '/../os/db_connection.php');
 if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 header('Content-Type: application/json; charset=utf-8');
 
-// Caminho do ImageMagick
-define('IM_CONVERT', '"C:\\Program Files\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe"');
+// Caminho do ImageMagick: o mesmo critério do anexos_upload.php
+// (Windows: magick.exe na pasta padrão; Linux/Unix: "convert" do sistema).
+// Antes o caminho do Windows era fixo, e a compilação falhava em servidores Linux.
+define('IM_CONVERT_WIN', 'C:\\Program Files\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe');
+define('IM_CONVERT', stripos(PHP_OS, 'WIN') === 0
+  ? (file_exists(IM_CONVERT_WIN) ? '"' . IM_CONVERT_WIN . '"' : 'magick')  // no Windows, "convert" é outro programa
+  : 'convert');
 
 $csrf = $_POST['csrf'] ?? '';
 $pedidoId = (int)($_POST['pedido_id'] ?? 0);

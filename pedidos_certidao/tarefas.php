@@ -5,7 +5,8 @@
 
 include(__DIR__ . '/../os/session_check.php');  
 checkSession();  
-include(__DIR__ . '/../os/db_connection.php');  
+include(__DIR__ . '/../os/db_connection.php');
+require_once __DIR__ . '/versao.php';  
 date_default_timezone_set('America/Sao_Paulo');  
 header_remove('X-Powered-By');  
 
@@ -163,6 +164,30 @@ function post_json_signed(string $url, string $apiKey, string $hmacSecret, array
 /* ========================================================================  
    SCHEMA - MySQL 8+ (mesmo padrão dos outros arquivos)  
    ======================================================================== */  
+/**
+ * Índices usados pela fila de tarefas (colunas do Kanban paginadas por status,
+ * com filtro por equipe/funcionário e ordenação pela data de criação).
+ */
+function ensureIndicesFila(PDO $conn) {
+  $indices = [
+    'idx_status_criado'      => '(status, criado_em)',
+    'idx_func_status_criado' => '(funcionario_id, status, criado_em)',
+    'idx_equipe_status_criado' => '(equipe_id, status, criado_em)',
+  ];
+  try {
+    $st = $conn->query("SELECT DISTINCT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tarefas_pedido'");
+    $existentes = $st ? $st->fetchAll(PDO::FETCH_COLUMN) : [];
+    foreach ($indices as $nome => $cols) {
+      if (!in_array($nome, $existentes, true)) {
+        $conn->exec("ALTER TABLE tarefas_pedido ADD INDEX `$nome` $cols");
+      }
+    }
+  } catch (Throwable $e) {
+    error_log('Aviso: não foi possível criar os índices da fila de tarefas: ' . $e->getMessage());
+  }
+}
+
 function ensureSchemaDistribuicao(PDO $conn) {
 
   // equipes  
@@ -275,8 +300,14 @@ function ensureSchemaDistribuicao(PDO $conn) {
 
 try {  
   $conn = getDatabaseConnection();  
-  ensureSchemaDistribuicao($conn);
-  ensureSchemaApi($conn);  // <<< garante api_outbox + status_log  
+  // A verificação de estrutura consulta o INFORMATION_SCHEMA; antes rodava a cada
+  // chamada AJAX da fila (contadores, lista, notificações). Agora roda uma vez por sessão.
+  if (empty($_SESSION['pc_schema_ok']) || $_SESSION['pc_schema_ok'] !== 2) {
+    ensureSchemaDistribuicao($conn);
+    ensureSchemaApi($conn);  // <<< garante api_outbox + status_log  
+    ensureIndicesFila($conn);
+    $_SESSION['pc_schema_ok'] = 2;
+  }
 } catch (Throwable $e) {   
   // UI mostra aviso simples se necessário  
 }  
@@ -582,8 +613,6 @@ if ($isAjax) {
       }
 
 
-      $wsql = $where ? ("WHERE ".implode(" AND ", $where)) : ""; 
-
       $sql = "SELECT 
           t.*,
           f.nome_completo, 
@@ -662,20 +691,61 @@ if ($isAjax) {
         LEFT JOIN funcionarios f ON f.id = t.funcionario_id  
         LEFT JOIN equipes e ON e.id = t.equipe_id  
         LEFT JOIN pedidos_certidao p ON p.id = t.pedido_id  
-        $wsql  
-        ORDER BY   
-            CASE t.status   
-            WHEN 'pendente' THEN 1  
-            WHEN 'em_andamento' THEN 2  
-            WHEN 'suspensa' THEN 3
-            WHEN 'concluida' THEN 4  
-            WHEN 'cancelada' THEN 5
-            ELSE 6  
-            END,  
-            t.atualizado_em DESC, t.criado_em DESC";
-      $st = $conn->prepare($sql);  
-      $st->execute($bind);  
-      J(['success'=>true,'data'=>$st->fetchAll(PDO::FETCH_ASSOC)]);  
+        %WHERE%
+        ORDER BY %ORDEM%
+        LIMIT %LIMITE% OFFSET %OFFSET%";
+
+      /* ------------------------------------------------------------------
+         Carregamento por coluna (paginado).
+         Antes, a fila trazia TODAS as tarefas de uma vez, inclusive as
+         concluídas e canceladas de anos anteriores, e o navegador montava
+         um cartão para cada uma. Agora cada coluna traz só as primeiras N
+         tarefas (as de andamento em quantidade maior, as encerradas em
+         quantidade menor) e o botão "Carregar mais" busca a página seguinte
+         daquela coluna. Os totais continuam vindo da action 'counts'.
+         ------------------------------------------------------------------ */
+      $ordemPor = (string)($_GET['sort_by'] ?? 'data');
+      $ordemDir = (strtolower((string)($_GET['sort_dir'] ?? 'desc')) === 'asc') ? 'ASC' : 'DESC';
+      if ($ordemPor === 'ordem') {
+        // nº da O.S.; tarefas sem O.S. ficam no fim em ordem crescente e no início em decrescente
+        $orderSql = "(p.ordem_servico_id IS NULL) $ordemDir, p.ordem_servico_id $ordemDir, t.id $ordemDir";
+      } elseif ($ordemPor === 'tipo') {
+        $orderSql = "p.tipo $ordemDir, t.criado_em DESC, t.id DESC";
+      } else {
+        $orderSql = "t.criado_em $ordemDir, t.id $ordemDir";
+      }
+
+      $limitesPadrao = ['pendente'=>50, 'em_andamento'=>50, 'suspensa'=>30, 'concluida'=>20, 'cancelada'=>20];
+      $limiteReq = isset($_GET['limite']) ? (int)$_GET['limite'] : 0;
+      $offsetReq = max(0, isset($_GET['offset']) ? (int)$_GET['offset'] : 0);
+
+      $colunas = ($status !== '' && isset($limitesPadrao[$status])) ? [$status] : array_keys($limitesPadrao);
+      $dados = [];
+      $mais  = [];
+      foreach ($colunas as $col) {
+        $lim = $limiteReq > 0 ? min($limiteReq, 200) : $limitesPadrao[$col];
+        $w = $where;
+        $b = $bind;
+        if ($status === '') { $w[] = "t.status = :col_st"; $b[':col_st'] = $col; }
+        // Colunas encerradas (concluídas/canceladas) mostram sempre as mais recentes primeiro;
+        // a classificação escolhida na tela vale para as colunas de trabalho.
+        $ordemCol = in_array($col, ['concluida', 'cancelada'], true)
+          ? 't.criado_em DESC, t.id DESC'   // usa o índice (status, criado_em)
+          : $orderSql;
+        $sqlCol = strtr($sql, [
+          '%WHERE%'  => $w ? ('WHERE ' . implode(' AND ', $w)) : '',
+          '%ORDEM%'  => $ordemCol,
+          '%LIMITE%' => (string)($lim + 1),          // +1 só para saber se há mais
+          '%OFFSET%' => (string)$offsetReq,
+        ]);
+        $st = $conn->prepare($sqlCol);
+        $st->execute($b);
+        $linhas = $st->fetchAll(PDO::FETCH_ASSOC);
+        $mais[$col] = count($linhas) > $lim;
+        if ($mais[$col]) array_pop($linhas);
+        foreach ($linhas as $l) $dados[] = $l;
+      }
+      J(['success'=>true,'data'=>$dados,'mais'=>$mais]);
     }
 
     if ($action === 'update_status') {
@@ -1731,6 +1801,21 @@ body {
   gap: var(--space-sm);  
 }  
 
+/* Botão "Carregar mais" no fim de cada coluna da fila */
+.col-mais {
+  width: 100%;
+  border: 1px dashed var(--border-color, #cbd5e1);
+  background: transparent;
+  color: var(--text-secondary, #64748b);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.col-mais:hover { background: rgba(99,102,241,.08); color: var(--brand-primary, #6366f1); }
+.col-mais[disabled] { opacity: .6; cursor: wait; }
+
 /* ===================== TASK CARDS ===================== */  
 .task {  
   background: var(--bg-tertiary);  
@@ -1970,7 +2055,9 @@ body {
 }  
 
 .btn-close {  
-  filter: brightness(0) invert(1);  
+  /* Bootstrap 4 não desenha o .btn-close (classe do Bootstrap 5): o X ficava invisível */
+  width: 32px; height: 32px; border: 0; padding: 0;
+  background: transparent url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23999'%3e%3cpath d='M.293.293a1 1 0 011.414 0L8 6.586 14.293.293a1 1 0 111.414 1.414L9.414 8l6.293 6.293a1 1 0 01-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 01-1.414-1.414L6.586 8 .293 1.707a1 1 0 010-1.414z'/%3e%3c/svg%3e") center/1em auto no-repeat;
   opacity: 0.7;  
   transition: opacity 0.2s ease;  
 }  
@@ -1980,7 +2067,7 @@ body {
 }  
 
 .dark-mode .btn-close {  
-  filter: brightness(1) invert(0);  
+  filter: none;  
 }  
 
 .modal-backdrop {  
@@ -2476,6 +2563,7 @@ body {
     </div>  
 
   </div>  
+<p class="text-center text-muted" style="font-size:.74rem;margin:6px 0 90px">Pedidos de Certidão · v<?php echo htmlspecialchars(PEDIDOS_VERSAO); ?></p>
 </main>
 
 <!-- Modal Reatribuir -->
@@ -2486,7 +2574,7 @@ body {
         <h5 class="modal-title">
           <i class="fas fa-exchange-alt"></i> Reatribuir Tarefa
         </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        <button type="button" class="btn-close" data-dismiss="modal" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="rea_tarefa_id">
@@ -2508,7 +2596,7 @@ body {
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+        <button class="btn btn-secondary" type="button" data-dismiss="modal" data-bs-dismiss="modal">
           <i class="fas fa-times"></i> Cancelar
         </button>
         <button class="btn btn-primary" type="submit">
@@ -2527,7 +2615,7 @@ body {
         <h5 class="modal-title">
           <i class="fas fa-history"></i> Histórico da Tarefa
         </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        <button type="button" class="btn-close" data-dismiss="modal" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
      <div class="modal-body" id="logBody">
         <div class="text-center py-3">
@@ -2538,7 +2626,7 @@ body {
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+        <button class="btn btn-secondary" type="button" data-dismiss="modal" data-bs-dismiss="modal">
           <i class="fas fa-times"></i> Fechar
         </button>
       </div>
@@ -2585,6 +2673,7 @@ $(function(){
 function initializeSortable() {
   $(".kanban .col-body").sortable({
     connectWith: ".kanban .col-body",
+    items: "> .task",            // o botão "Carregar mais" não é arrastável
     placeholder: "ui-state-highlight",
     tolerance: "pointer",
     cursor: "grabbing",
@@ -2630,7 +2719,7 @@ function initializeSortable() {
         } : undefined
       }).then((result) => {
         if (result.isConfirmed) {
-          mudarStatus(id, newStatus, (result.value || ''));
+          mudarStatus(id, newStatus, (typeof result.value === 'string' ? result.value : ''));  // sem campo de texto o Swal devolve true, que era gravado como observação "true"
         } else {
           // Reverte a mudança
           carregarKanban();
@@ -2723,7 +2812,11 @@ function paramsFiltro() {
     tipo: $('#f_tipo').val(),
     livro: $('#f_livro').val(),
     folha: $('#f_folha').val(),
-    termo: $('#f_termo').val()
+    termo: $('#f_termo').val(),
+
+    // ordenação feita no servidor (a fila é paginada por coluna)
+    sort_by: ($('#sort_by').val() || 'data'),
+    sort_dir: ($('#sort_dir').val() || 'desc')
   };
 }
 
@@ -2763,6 +2856,12 @@ function carregarContadores() {
     $('#count_concluida').text(r.data.concluida || 0);
     $('#count_cancelada').text(r.data.cancelada || 0);
     $('#count_suspensa').text(r.data.suspensa || 0);
+
+    // Os totais podem chegar depois da lista: atualiza o "restantes" dos botões
+    $('.col-mais').each(function () {
+      const st = $(this).data('col');
+      atualizarBotaoMais(st, true);
+    });
   });
 }
 
@@ -2846,7 +2945,7 @@ function carregarKanban() {
       return;
     }
 
-    // Agrupa por status
+    // Agrupa por status (o servidor já entrega cada coluna ordenada e limitada)
     const buckets = {
       pendente: [],
       em_andamento: [],
@@ -2859,16 +2958,13 @@ function carregarKanban() {
       (buckets[t.status] || buckets.pendente).push(t);
     });
 
-    // Lê opções de sort
-    const { by, mul } = getSortOptions();
-
-    // Ordena cada coluna e renderiza
     Object.keys(buckets).forEach(st => {
-      buckets[st].sort((a, b) => compareTasks(a, b, by, mul));
       buckets[st].forEach(t => {
         const $card = $(renderCard(t)).data('id', t.id);
         (cols[st] || $('#col_pendente')).append($card);
       });
+      cols[st].data('carregadas', buckets[st].length);
+      atualizarBotaoMais(st, !!(r.mais && r.mais[st]));
     });
 
     // Reaplica sortable após carregar novos cards
@@ -2912,6 +3008,39 @@ function carregarKanban() {
     return '';
   }
 
+
+// ===================== CARREGAR MAIS (por coluna) =====================
+const TAM_PAGINA_COLUNA = 30;
+
+function atualizarBotaoMais(st, temMais) {
+  const $col = $('#col_' + st);
+  $col.find('.col-mais').remove();
+  if (!temMais) return;
+  const total = parseInt($('#count_' + st).text(), 10) || 0;
+  const carregadas = $col.data('carregadas') || 0;
+  const restantes = Math.max(total - carregadas, 0);
+  const rotulo = restantes > 0 ? `Carregar mais (${restantes} restante${restantes === 1 ? '' : 's'})` : 'Carregar mais';
+  $col.append(`<button type="button" class="col-mais" data-col="${st}"><i class="fas fa-angle-down"></i> ${rotulo}</button>`);
+}
+
+$(document).on('click', '.col-mais', function () {
+  const $btn = $(this);
+  const st = $btn.data('col');
+  const $col = $('#col_' + st);
+  const p = paramsFiltro();
+  p.status = st;
+  p.offset = $col.data('carregadas') || 0;
+  p.limite = TAM_PAGINA_COLUNA;
+  $btn.prop('disabled', true).html('<i class="fas fa-circle-notch fa-spin"></i> Carregando...');
+  $.getJSON('tarefas.php', p, function (r) {
+    if (!r.success) { $btn.prop('disabled', false).text('Carregar mais'); return; }
+    $btn.remove();
+    r.data.forEach(t => $col.append($(renderCard(t)).data('id', t.id)));
+    $col.data('carregadas', (p.offset || 0) + r.data.length);
+    atualizarBotaoMais(st, !!(r.mais && r.mais[st]));
+    initializeSortable();
+  }).fail(function () { $btn.prop('disabled', false).text('Carregar mais'); });
+});
 
 // ===================== RENDERIZAR CARD =====================
 function renderCard(t) {
@@ -3138,7 +3267,7 @@ function mudarStatusComConfirmacao(id, novoStatus) {
     } : undefined
   }).then((result) => {
     if (result.isConfirmed) {
-      mudarStatus(id, novoStatus, result.value || '');
+      mudarStatus(id, novoStatus, (typeof result.value === 'string' ? result.value : ''));
     }
   });
 }

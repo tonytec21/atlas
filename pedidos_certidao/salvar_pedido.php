@@ -402,8 +402,9 @@ function candidatosTipo(string $tipo): array {
 
 /* ======================== DISTRIBUIÇÃO (NOVO) ======================== */
 /**
- * Encontra a equipe pela regra EXATA (atribuicao == tipo ==) sem curinga e sem LIKE.
- * Respeita prioridade ASC e somente equipes/regras ativas.
+ * Encontra a equipe pela regra (atribuicao == e tipo == ou curinga '*').
+ * Respeita prioridade ASC (a menor vence); no empate, a regra do tipo exato vence o curinga.
+ * Somente equipes/regras ativas.
  */
 function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?array {
   $sql = "SELECT r.*, e.nome AS equipe_nome
@@ -411,8 +412,8 @@ function encontrarEquipePorRegra(PDO $conn, string $atribuicao, string $tipo): ?
           JOIN equipes e ON e.id = r.equipe_id AND e.ativa = 1
           WHERE r.ativa = 1
             AND r.atribuicao = :a
-            AND r.tipo = :t
-          ORDER BY r.prioridade ASC, r.id ASC
+            AND (r.tipo = :t OR r.tipo = '*')
+          ORDER BY r.prioridade ASC, (r.tipo = '*') ASC, r.id ASC
           LIMIT 1";
   $st = $conn->prepare($sql);
   $st->execute([':a' => $atribuicao, ':t' => $tipo]);
