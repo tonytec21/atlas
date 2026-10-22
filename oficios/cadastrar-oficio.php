@@ -294,6 +294,8 @@ $loggedUser = $_SESSION['username'];
     outline: none !important;
 }
 
+            /* A barra de navegação inferior (fixa) cobria o botão de salvar no fim da página */
+        body { padding-bottom: 120px; }
     </style>
 </head>
 <body class="light-mode">
@@ -516,9 +518,9 @@ window.carregarOficios = function() {
                 html += `  
                     <tr>  
                         <td><div class="cell-content">${numero}</div></td>  
-                        <td><div class="cell-content">${oficio.data}</div></td>  
-                        <td><div class="cell-content" title="${destinatario}">${destinatario.length > 40 ? destinatario.substring(0, 37) + "..." : destinatario}</div></td>  
-                        <td><div class="cell-content" title="${assunto}">${assunto.length > 65 ? assunto.substring(0, 62) + "..." : assunto}</div></td>  
+                        <td data-order="${String(oficio.data || '').split('/').reverse().join('-')}"><div class="cell-content">${oficio.data}</div></td>  
+                        <td data-search="${destinatario}"><div class="cell-content" title="${destinatario}">${destinatario.length > 40 ? destinatario.substring(0, 37) + "..." : destinatario}</div></td>  
+                        <td data-search="${assunto}"><div class="cell-content" title="${assunto}">${assunto.length > 65 ? assunto.substring(0, 62) + "..." : assunto}</div></td>  
                         <td>  
                             <div class="action-buttons">  
                                 <button class="btn-action btn-view" onclick="verCorpo('${numero}')" title="Visualizar ofício">  
@@ -558,7 +560,7 @@ function initializeDataTable() {
             url: '../style/Portuguese-Brasil.json'  
         },  
         pageLength: 15,  
-        order: [[1, 'asc']],  
+        order: [[1, 'desc']], // data no formato AAAA-MM-DD (data-order): mais recentes primeiro  
         columnDefs: [  
             { orderable: false, targets: 4 }  
         ],  

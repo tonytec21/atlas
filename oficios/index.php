@@ -1,6 +1,7 @@
 <?php
 include(__DIR__ . '/session_check.php');
 checkSession();
+require_once __DIR__ . '/versao.php';
 
 // Módulo de assinatura eletrônica: garante as colunas de assinatura na tabela
 require_once __DIR__ . '/assinatura_config.php';
@@ -1254,6 +1255,7 @@ include(__DIR__ . '/../menu.php');
         });
     </script>
 
+<p class="text-center text-muted" style="font-size:.74rem;margin:6px 0 90px">Ofícios · v<?php echo htmlspecialchars(OFICIOS_VERSAO); ?></p>
 <?php
 include(__DIR__ . '/../rodape.php');
 ?>

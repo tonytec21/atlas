@@ -69,6 +69,8 @@ $atlasConn->close();
     <script src="table_helper.js"></script>
     <style>
         .cke_notification_warning { display: none !important; }
+            /* A barra de navegação inferior (fixa) cobria o botão de salvar no fim da página */
+        body { padding-bottom: 120px; }
     </style>
 </head>
 <body class="light-mode">

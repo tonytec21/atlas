@@ -9,7 +9,7 @@ if (!is_dir($lixeira_dir)) {
 }
 
 if (is_dir($anexos_dir)) {
-    $files = array_diff(scandir($anexos_dir), array('.', '..'));
+    $files = array_values(array_diff(scandir($anexos_dir), array('.', '..'))); // reindexa: a numeracao comecava em 3
     if (count($files) > 0) {
         foreach ($files as $index => $file) {
             $filePath = "anexos/$numero/$file";

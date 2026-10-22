@@ -1117,7 +1117,7 @@ function ofb_facetas(array $p, $limitePorFaceta = 8)
     if (ofb_has_col('data')) {
         $sql = "SELECT LEFT(`data`, 4) AS valor, COUNT(*) AS total
                 FROM `oficios` {$where['sql']}
-                " . ($where['sql'] ? "AND" : "WHERE") . " `data` IS NOT NULL AND `data` <> ''
+                " . ($where['sql'] ? "AND" : "WHERE") . " `data` IS NOT NULL AND `data` > '1000-01-01'
                 GROUP BY LEFT(`data`, 4)
                 ORDER BY valor DESC
                 LIMIT 12";

@@ -486,7 +486,9 @@ function renderCorpoOficioPdf($pdf, $conteudoOficio, $contentWidthMm = 160) {
     $conteudoOficio = normalizeImagesForPdf($conteudoOficio, $contentWidthMm, $pdf);
 
     // Dividir conteudo em blockquote, table e o restante
-    $partes = preg_split('/(<blockquote>.*?<\/blockquote>|<table.*?<\/table>)/is', $conteudoOficio, -1, PREG_SPLIT_DELIM_CAPTURE);
+    // Listas (<ul>/<ol>) tambem saem como bloco proprio: antes elas caiam no trecho
+    // "texto com <p>" e eram descartadas, junto com qualquer <div> ou titulo colado.
+    $partes = preg_split('/(<blockquote>.*?<\/blockquote>|<table.*?<\/table>|<ul[\s>].*?<\/ul>|<ol[\s>].*?<\/ol>)/is', $conteudoOficio, -1, PREG_SPLIT_DELIM_CAPTURE);
 
     foreach ($partes as $parte) {
         $parte = trim($parte);
@@ -502,6 +504,16 @@ function renderCorpoOficioPdf($pdf, $conteudoOficio, $contentWidthMm = 160) {
             $pdf->SetY($pdf->GetY() + 3);
         }
         // Tabela
+        // Lista numerada ou com marcadores
+        elseif (preg_match('/^<(ul|ol)[\s>]/i', $parte)) {
+            // <p> dentro de <li> (comum no texto colado do Word) vira quebra simples
+            $lista = preg_replace('/<p[^>]*>/i', '', $parte);
+            $lista = preg_replace('/<\/p>\s*(?=<\/li>)/i', '', $lista);
+            $lista = preg_replace('/<\/p>/i', '<br />', $lista);
+            $pdf->SetFont('helvetica', '', 12);
+            $pdf->writeHTML('<div style="text-align: justify;">' . $lista . '</div>', true, false, true, false);
+            $pdf->Ln(3);
+        }
         elseif (preg_match('/<table.*?<\/table>/is', $parte)) {
             $tabelaNormalizada = normalizeTableForPdf($parte, $contentWidthMm);
             $tabelaNormalizada = preg_replace('/\s*data-atlas-h\s*=\s*["\'][0-9.]+["\']/i', '', $tabelaNormalizada);
@@ -513,15 +525,33 @@ function renderCorpoOficioPdf($pdf, $conteudoOficio, $contentWidthMm = 160) {
             $pdf->SetFont('helvetica', '', 12);
 
             // Regex com suporte a <p> COM ou SEM atributos: <p>, <p style="...">, <p class="...">
-            if (preg_match_all('/<p[^>]*>(.*?)<\/p>/is', $parte, $matchesParagrafo)) {
-                foreach ($matchesParagrafo[1] as $paragrafoTexto) {
-                    if (preg_match('/<img\s/i', $paragrafoTexto)) {
-                        // Paragrafo com imagem: renderizar centralizado, sem text-indent
-                        atlasWriteBlocoImagem($pdf, $paragrafoTexto, 'center');
+            if (preg_match('/<p[\s>]/i', $parte)) {
+                // Percorre os paragrafos E o que estiver entre eles. Antes so o conteudo
+                // de <p> era impresso: texto em <div>, titulos (<h1>..<h6>) e outros
+                // blocos vindos de texto colado (Word, navegador, e-mail) sumiam do PDF.
+                $trechos = preg_split('/(<p(?:\s[^>]*)?>.*?<\/p>)/is', $parte, -1, PREG_SPLIT_DELIM_CAPTURE);
+                foreach ($trechos as $trecho) {
+                    if (trim($trecho) === '') continue;
+                    if (preg_match('/^<p(?:\s[^>]*)?>(.*?)<\/p>$/is', trim($trecho), $mP)) {
+                        $paragrafoTexto = $mP[1];
+                        if (preg_match('/<img\s/i', $paragrafoTexto)) {
+                            // Paragrafo com imagem: renderizar centralizado, sem text-indent
+                            atlasWriteBlocoImagem($pdf, $paragrafoTexto, 'center');
+                        } else {
+                            $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $paragrafoTexto . '</div>', true, false, true, false);
+                        }
+                        $pdf->Ln(5);
                     } else {
-                        $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $paragrafoTexto . '</div>', true, false, true, false);
+                        // Bloco fora de <p>: imprime se tiver texto ou imagem
+                        $temImg = preg_match('/<img\s/i', $trecho);
+                        if (!$temImg && trim(html_entity_decode(strip_tags($trecho), ENT_QUOTES, 'UTF-8'), " \t\n\r\0\x0B\xC2\xA0") === '') continue;
+                        if ($temImg) {
+                            atlasWriteBlocoImagem($pdf, $trecho, 'center');
+                        } else {
+                            $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $trecho . '</div>', true, false, true, false);
+                        }
+                        $pdf->Ln(5);
                     }
-                    $pdf->Ln(5);
                 }
             } else {
                 // Conteudo fora de <p> - pode ser imagem solta ou texto
