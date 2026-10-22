@@ -3,6 +3,7 @@ include(__DIR__ . '/session_check.php');
 checkSession();  
 include(__DIR__ . '/db_connection.php');
 require_once __DIR__ . '/transferencia_saldo_lib.php';
+require_once __DIR__ . '/os_versao.php';
 try { ts_migrar(); } catch (Throwable $e) { error_log('[transferencia_saldo] ' . $e->getMessage()); }  
 date_default_timezone_set('America/Sao_Paulo');  
 ?>  
@@ -2428,11 +2429,11 @@ body.dark-mode footer .footer-content a:hover {
                                         title: 'Sucesso', 
                                         text: 'Pagamento adicionado com sucesso!' 
                                     });
-                                } else {
+                                } else if (!(window.osErroPagamento && window.osErroPagamento(response))) {
                                     Swal.fire({ 
                                         icon: 'error', 
                                         title: 'Erro', 
-                                        text: 'Erro ao adicionar pagamento.' 
+                                        text: response.error || 'Erro ao adicionar pagamento.' 
                                     });
                                 }
                             } catch (e) {
@@ -2542,7 +2543,7 @@ body.dark-mode footer .footer-content a:hover {
                             atualizarTabelaPagamentos();
                             exibirMensagem('Pagamento removido com sucesso!', 'success');
                         } else {
-                            exibirMensagem('Erro ao remover pagamento.', 'error');
+                            exibirMensagem(response.error || 'Erro ao remover pagamento.', 'error');
                         }
                     } catch (e) {
                         exibirMensagem('Erro ao processar resposta do servidor.', 'error');
@@ -2809,7 +2810,7 @@ body.dark-mode footer .footer-content a:hover {
                                     Swal.fire({ 
                                         icon: 'error', 
                                         title: 'Erro', 
-                                        text: response.message || 'Erro ao registrar isenção.' 
+                                        text: response.error || response.message || 'Erro ao registrar isenção.' 
                                     });
                                 }
                             } catch (e) {
@@ -2957,6 +2958,7 @@ body.dark-mode footer .footer-content a:hover {
         });
     </script>
 
+    <p class="text-center text-muted" style="font-size:.74rem;margin:6px 0 90px">Ordens de Serviço · v<?php echo htmlspecialchars(OS_VERSAO); ?></p>
     <?php include(__DIR__ . '/../rodape.php'); ?>
 
 <script>
@@ -3130,5 +3132,6 @@ body.dark-mode footer .footer-content a:hover {
     });
 })();
 </script>
+<script src="caixa_pagamento.js?v=<?php echo urlencode(OS_VERSAO); ?>"></script>
 </body>
 </html>

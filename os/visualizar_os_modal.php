@@ -397,7 +397,7 @@ $saldo = $valor_pago_liquido - $ordem_servico['total_os'];
                     $('#valor_pagamento').val('');
                     exibirMensagem('Pagamento adicionado com sucesso!', 'success');
                 } else {
-                    exibirMensagem('Erro ao adicionar pagamento.', 'error');
+                    exibirMensagem(response.error || 'Erro ao adicionar pagamento.', 'error');
                 }
             },
             error: function() {

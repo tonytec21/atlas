@@ -3,6 +3,7 @@ include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection2.php');
 require_once __DIR__ . '/pagamento_observacao_config.php';
+require_once __DIR__ . '/caixa_pagamento_lib.php';
 /* AUDITORIA O.S. — registra o antes/depois desta operação */
 require_once __DIR__ . '/auditoria_os_lib.php';
 osaud_monitorar('pagamento_lancado', ['os_id' => $_POST['os_id'] ?? 0]);
@@ -12,7 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $os_id = $_POST['os_id'];
     $cliente = $_POST['cliente'];
     $total_os = $_POST['total_os'];
-    $funcionario = $_POST['funcionario'];
+    // O pagamento entra sempre no caixa de quem está logado (o valor enviado pela tela é ignorado)
+    $funcionario = (string) $_SESSION['username'];
     $forma_pagamento = $_POST['forma_pagamento'];
     $valor_pagamento = $_POST['valor_pagamento'];
     $observacao = po_obs_normalizar($_POST['observacao'] ?? '');
@@ -20,6 +22,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Verifique se a conexão está definida
     if (!isset($conn)) {
         die(json_encode(['error' => 'Erro ao conectar ao banco de dados']));
+    }
+
+    // Bloqueio: sem o caixa do dia aberto, não entra pagamento (exceto "Isento de Pagamento")
+    if (!os_caixa_forma_isenta((string) $forma_pagamento)) {
+        try {
+            $sitCaixa = os_caixa_situacao($conn, $funcionario);
+        } catch (Throwable $e) {
+            $sitCaixa = ['ok' => true];
+        }
+        if (empty($sitCaixa['ok'])) {
+            echo json_encode(['error' => $sitCaixa['mensagem'], 'caixa_bloqueio' => $sitCaixa['motivo']], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
     }
 
     try {

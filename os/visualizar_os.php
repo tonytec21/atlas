@@ -33,6 +33,7 @@ if ($checkColumn2 && $checkColumn2->num_rows == 0) {
 // Lê os/cancelamento_os_config.json (restringir_cancelamento / nivel_liberacao)
 require_once __DIR__ . '/cancelamento_os_lib.php';
 require_once __DIR__ . '/transferencia_saldo_lib.php';
+require_once __DIR__ . '/os_versao.php';
 $podeCancelarOS = cancel_os_usuario_pode($conn);
 /* ================================================================================ */
 
@@ -163,6 +164,16 @@ $pagamentos_query->bind_param("i", $os_id);
 $pagamentos_query->execute();
 $pagamentos_result = $pagamentos_query->get_result();
 $pagamentos = $pagamentos_result->fetch_all(MYSQLI_ASSOC);
+
+// Exclusão de pagamento: só quem lançou ou o Oficial, no dia, sem ato liquidado e com o caixa de quem lançou aberto
+require_once __DIR__ . '/pagamento_exclusao_lib.php';
+foreach ($pagamentos as &$__pg) {
+    $__rx = os_pagto_exclusao($conn, $__pg, (string) $_SESSION['username']);
+    $__pg['pode_excluir']    = $__rx['pode'];
+    $__pg['motivo_exclusao'] = $__rx['motivo'];
+    $__pg['mesmo_dia']       = $__rx['mesmo_dia'];
+}
+unset($__pg);
 
 // Comprovantes de pagamento (anexos por linha de pagamento)
 require_once __DIR__ . '/pagamento_anexos_config.php';
@@ -1400,6 +1411,8 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
         .ts-resumo-grid strong{ display:block; color:var(--text-primary); word-break:break-word; }
         .ts-resumo-grid small{ color:var(--text-secondary); }
         .ts-explica{ font-size:.9rem; }
+        .ts-pg-linha td{ background:rgba(139,92,246,.07) !important; }
+        .ts-pg{ font-weight:600; } .ts-pg a{ font-weight:700; }
 </style>  
 </head>  
 <body>  
@@ -2998,6 +3011,21 @@ const ISENTO_SERVER = <?php echo $isIsento ? 'true' : 'false'; ?>;
 const TS_ENTRADA = parseFloat('<?php echo $ts_entrada; ?>') || 0;
 const TS_SAIDA   = parseFloat('<?php echo $ts_saida; ?>') || 0;
 const TS_OS_ID   = <?php echo (int) $os_id; ?>;
+// Transferências ativas, para listar junto dos pagamentos (não são pagamentos do caixa)
+const TS_LINHAS  = <?php
+    $__tsJs = [];
+    foreach ($ts_lista as $__t) {
+        if ($__t['status'] !== 'ativa') continue;
+        $__rec = ((int) $__t['os_destino_id'] === (int) $os_id);
+        $__tsJs[] = [
+            'codigo' => $__t['codigo'], 'recebida' => $__rec,
+            'outra' => (int) ($__rec ? $__t['os_origem_id'] : $__t['os_destino_id']),
+            'valor' => (float) $__t['valor'], 'data' => $__t['data_transferencia'],
+            'usuario' => $__t['usuario'], 'motivo' => $__t['motivo'],
+        ];
+    }
+    echo json_encode($__tsJs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+?>;
 
 // ===== Utilidades de formatação =====
 function formatCurrencyBRL(n) {
@@ -3592,7 +3620,9 @@ $(document).ready(function() {
                         total_pagamento: valorPagamento,
                         data_pagamento:  response.data_pagamento || new Date().toISOString().slice(0,19).replace('T',' '),
                         funcionario:     '<?php echo $_SESSION['username']; ?>',
-                        observacao:      (typeof response.observacao === 'string') ? response.observacao : observacaoPagamento
+                        observacao:      (typeof response.observacao === 'string') ? response.observacao : observacaoPagamento,
+                        pode_excluir:    true,
+                        mesmo_dia:       true
                     });
 
                     atualizarTabelaPagamentos();
@@ -3611,11 +3641,11 @@ $(document).ready(function() {
                     });
 
 
-                } else {
+                } else if (!(window.osErroPagamento && window.osErroPagamento(response))) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro!',
-                        text: 'Erro ao adicionar pagamento.',
+                        text: response.error || 'Erro ao adicionar pagamento.',
                         confirmButtonText: 'OK'
                     });
                 }
@@ -3673,7 +3703,9 @@ $(document).ready(function() {
             const todayYmd  = ymdInSaoPaulo(new Date());
             const linhaDate = new Date((pagamento.data_pagamento || '').replace(' ', 'T'));
             const linhaYmd  = isNaN(linhaDate.getTime()) ? '' : ymdInSaoPaulo(linhaDate);
-            const canDelete = !<?php echo $has_liquidated ? 'true':'false'; ?> && (linhaYmd === todayYmd);
+            // Regra do servidor (pagamento_exclusao_lib.php): quem lançou ou o Oficial, no dia, sem ato liquidado e caixa aberto
+            const canDelete = !<?php echo $has_liquidated ? 'true':'false'; ?> && (linhaYmd === todayYmd) && pagamento.pode_excluir !== false;
+            const motivoBloqueio = (!canDelete && linhaYmd === todayYmd && pagamento.motivo_exclusao) ? String(pagamento.motivo_exclusao) : '';
 
             var acoesHtml = '';
             acoesHtml += '<button type="button" title="Observação do pagamento" class="btn btn-obs btn-sm js-obs-edit" data-pid="' + pagamento.id + '" onclick="editarObservacaoPagamento(' + pagamento.id + ')">' +
@@ -3687,6 +3719,8 @@ $(document).ready(function() {
             }
             if (canDelete) {
                 acoesHtml += '<button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(' + pagamento.id + ')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
+            } else if (motivoBloqueio) {
+                acoesHtml += '<button type="button" class="btn btn-secondary btn-sm pg-excl-bloq" title="' + escaparHtml(motivoBloqueio) + '" onclick="Swal.fire({icon:\'info\', title:\'Exclusão não permitida\', text: this.title})"><i class="fa fa-lock" aria-hidden="true"></i></button>';
             }
 
             var obsTexto = (pagamento.observacao == null) ? '' : String(pagamento.observacao).trim();
@@ -3714,6 +3748,29 @@ $(document).ready(function() {
                     <td class="pg-obs-cell">${cols[4]}</td>
                     <td>${cols[5]}</td>
                 </tr>`);
+            }
+        });
+
+        // Transferências de saldo entre O.S.: aparecem na lista, mas não são pagamentos do caixa
+        TS_LINHAS.forEach(function (t) {
+            if (t.recebida) total += t.valor;
+            var link = '<a href="visualizar_os.php?id=' + t.outra + '">O.S. nº ' + t.outra + '</a>';
+            var cols = [
+                '<span class="ts-pg ' + (t.recebida ? 'ts-in' : 'ts-out') + '"><i class="fa fa-exchange"></i> '
+                    + (t.recebida ? 'Crédito da ' : 'Transferido p/ ') + link + '</span>'
+                    + '<div class="small text-muted">' + escaparHtml(t.codigo) + ' · não entra no caixa</div>',
+                (t.recebida ? '' : '− ') + 'R$ ' + t.valor.toFixed(2).replace('.', ','),
+                formatarDataBr(t.data),
+                escaparHtml(t.usuario),
+                '<span class="pg-obs" title="' + escaparHtml(t.motivo) + '">' + escaparHtml(t.motivo) + '</span>',
+                '<span class="pg-obs-vazia" title="Transferência: estorno somente por administrador, no quadro Transferências de saldo">&mdash;</span>'
+            ];
+            if (dt) {
+                var no = dt.row.add(cols).node();
+                $(no).addClass('ts-pg-linha');
+            } else {
+                $tbody.append('<tr class="ts-pg-linha"><td>' + cols[0] + '</td><td>' + cols[1] + '</td><td>' + cols[2] + '</td><td>'
+                    + cols[3] + '</td><td class="pg-obs-cell">' + cols[4] + '</td><td>' + cols[5] + '</td></tr>');
             }
         });
 
@@ -3771,9 +3828,9 @@ $(document).ready(function() {
 
                         } else {
                             Swal.fire({
-                                icon: 'error',
-                                title: 'Erro!',
-                                text: 'Erro ao remover pagamento.',
+                                icon: response.bloqueado ? 'warning' : 'error',
+                                title: response.bloqueado ? 'Exclusão não permitida' : 'Erro!',
+                                text: response.error || 'Erro ao remover pagamento.',
                                 confirmButtonText: 'OK'
                             });
                         }
@@ -4897,7 +4954,9 @@ $(document).ready(function() {
                             total_pagamento: 0,
                             data_pagamento:  response.data_pagamento || new Date().toISOString().slice(0,19).replace('T',' '),
                             funcionario:     '<?php echo $_SESSION['username']; ?>',
-                            observacao:      ''
+                            observacao:      '',
+                            pode_excluir:    true,
+                            mesmo_dia:       true
                         });
 
                         atualizarTabelaPagamentos();
@@ -4937,5 +4996,6 @@ include(__DIR__ . '/../rodape.php');
 
 <?php if (!empty($__pePosAtivo)) include __DIR__ . '/pagamento_online/pe_ui.php'; ?>
 
+<script src="caixa_pagamento.js?v=<?php echo urlencode(OS_VERSAO); ?>"></script>
 </body>
 </html>

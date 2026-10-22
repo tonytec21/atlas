@@ -1,0 +1,59 @@
+O.S. — PAGAMENTOS E O CAIXA DO DIA (versão 2026.10.22.2)
+========================================================
+
+1) LANÇAR PAGAMENTO EXIGE O CAIXA ABERTO (2026.10.22.1)
+-------------------------------------------------------
+
+O que mudou
+-----------
+Para lançar um pagamento na O.S., quem está lançando precisa estar com o caixa
+de hoje ABERTO no Fluxo de Caixa.
+
+- Sem caixa aberto hoje: o pagamento é recusado, com o aviso "Abra o caixa no
+  Fluxo de Caixa antes de lançar pagamentos" e o botão "Abrir o caixa".
+- Caixa de hoje já fechado: o pagamento é recusado; o Oficial pode desfazer o
+  fechamento (Fluxo de Caixa 2026.10.22.2) para o colaborador voltar a lançar.
+- "Isento de Pagamento" não movimenta dinheiro e continua liberado.
+- Pagamentos automáticos (API e pagamento online) não mudam.
+
+Na tela
+-------
+Ao abrir a janela "Efetuar Pagamento" (na O.S. e na lista de O.S.), o sistema
+consulta o caixa do usuário. Se não estiver aberto, a janela já mostra o aviso
+e o botão Adicionar Pagamento avisa em vez de lançar. O servidor faz a mesma
+verificação, então o bloqueio vale mesmo fora da tela.
+
+Ajuste de segurança: o pagamento passa a ser gravado sempre em nome do usuário
+logado (antes o nome vinha da tela e podia ser alterado).
+
+A versão do módulo O.S. aparece no rodapé da lista de O.S.
+
+2) EXCLUSÃO DE PAGAMENTO PROTEGIDA (2026.10.22.2)
+-------------------------------------------------
+Antes, qualquer colaborador podia excluir um pagamento no mesmo dia, se nenhum
+ato estivesse liquidado (e o servidor não conferia nada). Agora a exclusão só
+acontece quando TODAS as condições valem:
+- quem exclui é o colaborador que lançou o pagamento ou o Oficial
+  (nível administrador);
+- o pagamento é de hoje;
+- nenhum ato da O.S. foi liquidado;
+- o caixa do colaborador que lançou o pagamento ainda está ABERTO. Depois que
+  esse caixa é fechado, ninguém exclui mais — nem o Oficial (se precisar, ele
+  desfaz o fechamento do caixa no Fluxo de Caixa).
+"Isento de Pagamento" segue as três primeiras regras (não depende do caixa).
+Pagamentos da API contam como lançados pelo colaborador indicado neles.
+
+Na tela, a lixeira só aparece quando a exclusão é permitida. Nos pagamentos de
+hoje que não podem ser excluídos aparece um cadeado; clicando nele, o sistema
+explica o motivo. O servidor confere tudo de novo antes de excluir.
+
+Arquivos
+--------
+Novos:     os/caixa_pagamento_lib.php   (regra)
+           os/caixa_situacao.php        (consulta usada pela tela)
+           os/caixa_pagamento.js        (aviso na janela de pagamento)
+           os/os_versao.php             (versão 2026.10.22.2)
+           os/pagamento_exclusao_lib.php (regra de exclusão)
+           os/LEIA-ME_pagamento_exige_caixa.txt
+Alterados: os/salvar_pagamento.php, os/remover_pagamento.php, os/index.php,
+           os/visualizar_os.php, os/visualizar_os_modal.php
