@@ -457,11 +457,14 @@
     }
 
     html += '<div class="arq-secao"><h3>Histórico</h3><ul class="arq-linha-tempo">';
+    // Mais recente primeiro; o cadastro (que também consta em modificacoes nos
+    // registros novos) aparece uma vez só, no fim da lista.
+    (a.modificacoes || []).filter(function (m) { return m.acao !== 'cadastro'; })
+      .slice().reverse().slice(0, 12).forEach(function (m) {
+        var rot = m.acao === 'restauracao' ? 'Restaurado' : 'Alterado';
+        html += '<li><b>' + rot + ' por ' + esc(m.usuario || '—') + '</b><span>' + fmtDataHora(m.data_hora) + '</span></li>';
+      });
     html += '<li><b>Cadastrado por ' + esc(a.cadastrado_por || '—') + '</b><span>' + fmtDataHora(a.data_cadastro) + '</span></li>';
-    (a.modificacoes || []).slice().reverse().slice(0, 12).forEach(function (m) {
-      var rot = m.acao === 'restauracao' ? 'Restaurado' : (m.acao === 'cadastro' ? 'Cadastrado' : 'Alterado');
-      html += '<li><b>' + rot + ' por ' + esc(m.usuario || '—') + '</b><span>' + fmtDataHora(m.data_hora) + '</span></li>';
-    });
     html += '</ul></div>';
 
     /* --------- Coluna de anexos --------- */

@@ -1,4 +1,20 @@
-# Atlas · Arquivamento Digital — versão 2.1.0
+# Atlas · Arquivamento Digital — versão 2.1.1
+
+> **Correções da 2.1.1:**
+> - A busca rápida passa a encontrar o arquivamento pelo **CPF/CNPJ** das partes
+>   (com ou sem pontos e traço), pelo **número do arquivamento** e pelos códigos
+>   digitados sem pontuação (ex.: `9310` encontra a matrícula `9.310`). O índice em
+>   cache (`meta-dados/.indice.json`) ganhou número de versão e é refeito sozinho
+>   na primeira consulta depois da atualização — não é preciso apagá-lo.
+> - O histórico do painel do arquivamento mostrava o cadastro duas vezes nos
+>   registros criados pela tela nova. Agora aparece uma vez, no fim da lista,
+>   com as alterações mais recentes primeiro.
+> - O botão flutuante de ajuda ("?") ficava por cima do botão **Anexar ao
+>   arquivamento** na janela de digitalização; ele some enquanto a janela está aberta.
+>
+> Arquivos alterados: `config.php`, `index.php` (o `?v=` do script passou a seguir a versão), `lib/Repositorio.php`, `assets/js/arquivamento.js`,
+> `assets/css/digitalizador.css` e este LEIAME.
+
 
 > **Novo na 2.1.0:** digitalização direta do scanner (TWAIN) no cadastro e na
 > edição de arquivamentos, pelo **TCloud Scanner**. Ver a seção 11.

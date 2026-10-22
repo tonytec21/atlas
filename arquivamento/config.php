@@ -25,7 +25,7 @@ if (is_file(__DIR__ . '/config.local.php')) {
  * Versão do módulo (aparece no rodapé do acervo e do cadastro e vai como
  * cache-busting nos .js/.css). Mude a cada entrega.
  * ------------------------------------------------------------------ */
-define('ARQ_VERSAO', '2.1.0');
+define('ARQ_VERSAO', '2.1.1');
 
 /* ------------------------------------------------------------------ *
  * Banco de dados

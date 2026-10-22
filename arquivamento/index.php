@@ -266,7 +266,7 @@ window.ARQ_CFG = {
 };
 </script>
 <script src="assets/js/compilador.js?v=6"></script>
-<script src="assets/js/arquivamento.js?v=7"></script>
+<script src="assets/js/arquivamento.js?v=<?= arq_e(ARQ_VERSAO) ?>"></script>
 <?php include(__DIR__ . '/../rodape.php'); ?>
 </body>
 </html>

@@ -189,7 +189,8 @@ function arq_indice()
         }
         if ($valido) {
             $cache = json_decode(@file_get_contents($indiceArq), true);
-            if (is_array($cache) && isset($cache['itens']) && count($cache['itens']) === count($arquivos)) {
+            if (is_array($cache) && isset($cache['itens']) && count($cache['itens']) === count($arquivos)
+                && isset($cache['versao']) && $cache['versao'] === ARQ_INDICE_VERSAO) {
                 $memoria = $cache['itens'];
                 return $memoria;
             }
@@ -241,7 +242,7 @@ function arq_indice()
 
     @file_put_contents(
         $indiceArq,
-        json_encode(['gerado' => date('c'), 'itens' => $itens], JSON_UNESCAPED_UNICODE),
+        json_encode(['gerado' => date('c'), 'versao' => ARQ_INDICE_VERSAO, 'itens' => $itens], JSON_UNESCAPED_UNICODE),
         LOCK_EX
     );
 
@@ -249,14 +250,30 @@ function arq_indice()
     return $memoria;
 }
 
+/**
+ * Versão do formato do índice em cache. Mudou o que entra no índice (ex.: o
+ * texto da busca)? Aumente aqui, e o índice antigo é refeito na próxima consulta.
+ */
+defined('ARQ_INDICE_VERSAO') or define('ARQ_INDICE_VERSAO', 2);
+
 /** Texto concatenado e normalizado usado na busca livre. */
 function arq_texto_busca(array $ato, array $nomes)
 {
     $partes = array_merge(
-        [$ato['atribuicao'], $ato['categoria'], $ato['livro'], $ato['folha'], $ato['termo'],
+        [$ato['id'], $ato['atribuicao'], $ato['categoria'], $ato['livro'], $ato['folha'], $ato['termo'],
          $ato['protocolo'], $ato['matricula'], $ato['descricao'], $ato['cadastrado_por']],
         $nomes
     );
+    // CPF/CNPJ das partes, como foi digitado e só com os números, para que a
+    // busca rápida encontre "529.982.247-25" e "52998224725".
+    foreach ($ato['partes_envolvidas'] as $p) {
+        if ($p['cpf'] !== '') { $partes[] = $p['cpf']; $partes[] = preg_replace('/\D/', '', $p['cpf']); }
+    }
+    // Livro, folha, termo, protocolo e matrícula também sem pontuação ("9310" acha "9.310").
+    foreach (['livro', 'folha', 'termo', 'protocolo', 'matricula'] as $c) {
+        $so = preg_replace('/[^0-9A-Za-z]/', '', $ato[$c]);
+        if ($so !== '' && $so !== $ato[$c]) { $partes[] = $so; }
+    }
     foreach ($ato['anexos'] as $a) { $partes[] = $a['nome']; }
     return arq_normalizar_texto(implode(' ', $partes));
 }
