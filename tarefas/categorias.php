@@ -44,7 +44,7 @@ $origens    = listar_com_uso('origem', 'origem');
     <link rel="stylesheet" href="../style/css/font-awesome.min.css">
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="stylesheet" href="../style/css/sweetalert2.min.css">
-    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.1.1">
+    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.1.2">
 
     <script src="../script/jquery-3.5.1.min.js"></script>
 </head>
@@ -138,6 +138,7 @@ $origens    = listar_com_uso('origem', 'origem');
 
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/sweetalert2.js"></script>
+<link rel="stylesheet" href="../style/css/toastr.min.css">
 <script src="../script/toastr.min.js"></script>
 
 <script>

@@ -44,8 +44,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     // Inserir dados da tarefa no banco de dados
-    $sql = "INSERT INTO tarefas (token, titulo, categoria, origem, descricao, data_limite, funcionario_responsavel, criado_por, data_criacao, caminho_anexo) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $sql = "INSERT INTO tarefas (token, titulo, categoria, origem, descricao, data_limite, funcionario_responsavel, criado_por, data_criacao, caminho_anexo, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendente')";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("ssssssssss", $token, $titulo, $categoria, $origem, $descricao, $data_limite, $funcionario_responsavel, $criado_por, $data_criacao, $caminho_anexo);
 

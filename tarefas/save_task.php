@@ -38,6 +38,7 @@ $campos = array(
     'caminho_anexo'           => implode(';', $up['caminhos']),
     'nivel_de_prioridade'     => entrada('priority', 'Média', $_POST),
     'revisor'                 => entrada('reviewer', '', $_POST),
+    'status'                  => TAREFAS_STATUS_INICIAL,
 );
 
 foreach (array('tags', 'apresentante') as $col) {

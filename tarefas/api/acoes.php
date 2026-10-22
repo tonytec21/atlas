@@ -103,6 +103,7 @@ case 'criar_subtarefa':
         'caminho_anexo'           => $caminhoAnexo,
         'nivel_de_prioridade'     => $prioridade,
         'revisor'                 => entrada('reviewer', entrada('revisor', '', $_POST), $_POST),
+        'status'                  => TAREFAS_STATUS_INICIAL,
     );
 
     if ($eSub) {
@@ -201,6 +202,15 @@ case 'editar':
         if (db_tem_coluna('tarefas', $col) && isset($_POST[$col])) {
             $set[$col] = entrada($col, '', $_POST);
         }
+    }
+
+    /* Status escolhido na tela de edição (antes era ignorado). */
+    $novoStatus = entrada('status', '', $_POST);
+    if ($novoStatus !== '' && array_key_exists($novoStatus, tarefas_status_catalogo())
+        && $novoStatus !== (string) $t['status']) {
+        $set['status'] = $novoStatus;
+        $set['data_conclusao'] = in_array($novoStatus, tarefas_status_conclui(), true) ? date('Y-m-d H:i:s') : null;
+        registrar_historico($id, 'status', 'Status alterado', $t['status'], $novoStatus);
     }
 
     $partes = array();

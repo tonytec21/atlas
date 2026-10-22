@@ -236,6 +236,26 @@ foreach ($indices as $ix) {
 }
 
 /* ================================================================== */
+/* 3b. Status com a grafia do catálogo                                 */
+/* ================================================================== */
+/* O padrão antigo da coluna era 'pendente' (minúsculo), que não existe
+   no catálogo: a tarefa ficava sem cor e criava uma coluna extra no
+   Kanban. Ajusta o padrão e a grafia — o valor continua o mesmo. */
+try {
+    $col = $pdo->query("SHOW COLUMNS FROM tarefas LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
+    if ($col && (string) $col['Default'] !== 'Pendente') {
+        $pdo->exec("ALTER TABLE tarefas ALTER COLUMN status SET DEFAULT 'Pendente'");
+        passo($log, 'novo', "Padrão da coluna <code>tarefas.status</code> ajustado para <code>Pendente</code>.");
+    } else {
+        passo($log, 'ok', "Padrão da coluna <code>tarefas.status</code> já era <code>Pendente</code>.");
+    }
+    $n = $pdo->exec("UPDATE tarefas SET status = 'Pendente' WHERE status IS NULL OR status = '' OR BINARY status = 'pendente'");
+    passo($log, $n ? 'novo' : 'ok', $n ? "$n tarefa(s) com status <code>pendente</code> ajustada(s) para <code>Pendente</code>." : 'Nenhuma tarefa com status fora do catálogo.');
+} catch (Exception $e) {
+    passo($log, 'erro', 'Falha ao ajustar o status padrão: ' . e($e->getMessage()));
+}
+
+/* ================================================================== */
 /* 4. Configuração e catálogo de modelos                               */
 /* ================================================================== */
 

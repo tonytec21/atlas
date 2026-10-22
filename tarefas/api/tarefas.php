@@ -243,7 +243,9 @@ foreach (array('tags', 'apresentante', 'ia_resumo', 'ia_risco', 'ordem_kanban') 
 }
 
 $limite = '';
-if ($visao !== 'calendario') {
+if ($visao === 'kanban') {
+    $limite = ' LIMIT 1000';           // o quadro mostra todas as colunas de uma vez
+} elseif ($visao !== 'calendario') {
     $offset = ($pagina - 1) * $porPagina;
     $limite = ' LIMIT ' . (int) $porPagina . ' OFFSET ' . (int) $offset;
 } else {

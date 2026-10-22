@@ -78,7 +78,7 @@ ksort($porFuncionario);
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <style>
 /* ======= Layout / cores ======= */
-.main-container{max-width:1200px;margin:30px auto;padding:0 20px}
+.main-container{max-width:1200px;margin:90px auto 30px;padding:0 20px}
 .page-title{font-size:28px;font-weight:600;margin-bottom:5px}
 .title-divider{height:4px;width:120px;background:#0d6efd;margin-bottom:28px;border-radius:2px}
 .form-card,.table-box,.chart-box{background:#fff;border-radius:12px;box-shadow:0 5px 15px rgba(0,0,0,.05)}
@@ -135,7 +135,7 @@ body.dark-mode .table-hist thead th{background:#1f1f1f}
 <?php include(__DIR__.'/menu.php'); ?>
 
 <div class="main-container">
-  <h1 class="page-title"></h1><div class="title-divider"></div>
+  <h1 class="page-title">Tarefas Recorrentes</h1><div class="title-divider"></div>
 
   <?php if(isset($_GET['ok'])): ?>
     <script>Swal.fire({icon:'success',title:'Tarefa cadastrada!',timer:2000,showConfirmButton:false});</script>

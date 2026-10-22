@@ -1,4 +1,4 @@
-# Atlas · Módulo de Tarefas — versão 2 (revisão 2.1.1)
+# Atlas · Módulo de Tarefas — versão 2 (revisão 2.1.2)
 
 Refatoração completa do módulo, com o acervo existente preservado.
 
@@ -515,6 +515,43 @@ campo "Prioridade" deixou de vir marcado como "Média" e passa a mostrar
 Crítica) — antes, se o campo chegasse vazio, gravava "Média" por conta própria.
 A sugestão da IA continua podendo preencher a prioridade quando o usuário pede.
 O `?v=` dos CSS/JS passou para 2.1.1.
+
+---
+
+## 6m. Revisão 2.1.2
+
+**Situação inicial "Pendente".** Toda tarefa nova (cadastro, subtarefa e
+"Criar Tarefa" da O.S.) passa a nascer com a situação "Pendente", definida em
+`TAREFAS_STATUS_INICIAL` (`core/config.php`). Antes algumas nasciam com a
+situação vazia ou em minúsculas e sumiam de painéis e filtros. A migração
+(`migracao_v2.php`, etapa 3b) e o `update_atlas/execute67.php` ajustam o
+padrão da coluna e normalizam os registros antigos.
+
+**Edição da situação.** A tela `edit_task.php` mostrava o campo Situação, mas
+o `api/acoes.php` (ação `editar`) ignorava o valor. Agora a mudança é gravada,
+atualiza a data de conclusão e entra no histórico.
+
+**Kanban completo.** A visão Kanban carrega até 1.000 tarefas, em vez de só a
+página atual, para que as colunas mostrem todas as tarefas de cada situação.
+
+**Botões de IA ocultos sem IA.** Com a integração desativada, os botões
+"Sugerir com IA", "Redigir com IA" e "Analisar com IA" (anexos) não aparecem
+mais, como já informava a tela de configuração.
+
+**Documentos.** O recibo de entrega passa a usar o recibo mais recente da
+tarefa (`ORDER BY id DESC`); o histórico de guias alinha as colunas com o
+cabeçalho; o modal de subtarefa deixou de repetir o id `selectedFiles` do
+cadastro.
+
+**Avisos (toastr).** As páginas que usam toastr passaram a carregar o CSS dele,
+e as mensagens deixaram de aparecer sem formatação.
+
+**Tarefas recorrentes.** A tabela `tarefas_recorrentes_exec` passou a aceitar
+a situação "pendente" (o aviso obrigatório da tela inicial falhava ao gravar a
+ocorrência) — ver `update_atlas/execute67.php`. A página
+`tarefas_recorrentes.php` ganhou o título, que estava vazio.
+
+O `?v=` dos CSS/JS passou para 2.1.2.
 
 ---
 

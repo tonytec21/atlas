@@ -40,7 +40,7 @@ $iaAtiva = !$migracaoPendente && ia_disponivel();
     <link rel="stylesheet" href="../style/css/style.css">
     <link rel="stylesheet" href="../style/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../style/css/sweetalert2.min.css">
-    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.1.1">
+    <link rel="stylesheet" href="assets/css/tarefas.css?v=2.1.2">
 
     <script src="../script/jquery-3.5.1.min.js"></script>
     <?php
@@ -404,6 +404,7 @@ include(__DIR__ . '/partials/_modais_legado.php');
 
 <script src="../script/bootstrap.bundle.min.js"></script>
 <script src="../script/sweetalert2.js"></script>
+<link rel="stylesheet" href="../style/css/toastr.min.css">
 <script src="../script/toastr.min.js"></script>
 
 <script>
@@ -420,11 +421,11 @@ window.TarefasConfig = {
 };
 </script>
 
-<script src="assets/js/tarefas-core.js?v=2.1.1"></script>
-<script src="assets/js/tarefas-calendario.js?v=2.1.1"></script>
-<script src="assets/js/tarefas-detalhe.js?v=2.1.1"></script>
-<script src="assets/js/tarefas-documentos.js?v=2.1.1"></script>
-<script src="assets/js/tarefas-compilado.js?v=2.1.1"></script>
+<script src="assets/js/tarefas-core.js?v=2.1.2"></script>
+<script src="assets/js/tarefas-calendario.js?v=2.1.2"></script>
+<script src="assets/js/tarefas-detalhe.js?v=2.1.2"></script>
+<script src="assets/js/tarefas-documentos.js?v=2.1.2"></script>
+<script src="assets/js/tarefas-compilado.js?v=2.1.2"></script>
 
 <script>
 jQuery(function ($) {

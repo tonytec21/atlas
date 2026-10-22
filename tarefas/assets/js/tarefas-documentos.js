@@ -143,11 +143,12 @@ var TarefasDocumentos = (function ($) {
             $tbody.append(''
                 + '<tr' + (i === 0 ? ' class="guia-hist-atual"' : '') + '>'
                 + '<td>' + esc(g.id) + (i === 0 ? ' <span class="guia-hist-badge">atual</span>' : '') + '</td>'
+                + '<td>' + esc(g.data_recebimento_br || '—') + '</td>'
                 + '<td>' + esc(g.cliente || '—') + '</td>'
-                + '<td>' + esc(g.criado_em_br || g.data_recebimento_br || '—') + '</td>'
-                + '<td>' + esc(g.emitido_por || g.funcionario || '—') + '</td>'
-                + '<td>' + esc(g.impressoes || 0) + '</td>'
-                + '<td>' + esc(g.ultima_impressao_br || '—') + '</td>'
+                + '<td>' + esc(g.funcionario || '—') + '</td>'
+                + '<td>' + esc(g.criado_em_br || '—') + '</td>'
+                + '<td>' + esc(g.emitido_por || '—') + '</td>'
+                + '<td class="text-center">' + esc(g.impressoes || 0) + '</td>'
                 + '<td><button class="tf-btn tf-btn-sm" data-guia="' + esc(g.id) + '">'
                 + '<i class="fa fa-print"></i> Imprimir</button></td>'
                 + '</tr>');
@@ -320,7 +321,7 @@ var TarefasDocumentos = (function ($) {
 
     /** Lista os arquivos escolhidos para a subtarefa. */
     function desenharArquivosSubtarefa() {
-        var $l = $('#selectedFiles').empty();
+        var $l = $('#subTaskSelectedFiles').empty();
         arquivosSubtarefa.forEach(function (f, i) {
             $l.append('<div class="tf-anexo">'
                 + '<div class="tf-anexo-icone"><i class="fa fa-file-o"></i></div>'

@@ -14,7 +14,7 @@ if ($conn->connect_error) {
 }
 
 // Buscar dados do recibo de entrega
-$stmt = $conn->prepare("SELECT * FROM recibos_de_entrega WHERE task_id = ?");
+$stmt = $conn->prepare("SELECT * FROM recibos_de_entrega WHERE task_id = ? ORDER BY id DESC LIMIT 1");
 $stmt->bind_param("i", $task_id);
 $stmt->execute();
 $result = $stmt->get_result();

@@ -154,7 +154,7 @@ $tfUsuarioSub = usuario_atual();
                                 <input type="file" id="subTaskAttachments" name="attachments[]" multiple
                                        style="display:none">
                             </div>
-                            <div class="tf-anexos" id="selectedFiles" style="margin-top:12px"></div>
+                            <div class="tf-anexos" id="subTaskSelectedFiles" style="margin-top:12px"></div>
                         </div>
                     </div>
 

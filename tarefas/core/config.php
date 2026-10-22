@@ -52,6 +52,11 @@ define('TAREFAS_EXT_PERMITIDAS', 'pdf,doc,docx,xls,xlsx,csv,txt,rtf,odt,ods,'
  * NÃO remova nenhum item: são exatamente os mesmos textos já gravados na
  * coluna `status` das tarefas antigas.
  */
+/** Status de toda tarefa nova (o padrão antigo do banco era 'pendente', em minúsculas). */
+if (!defined('TAREFAS_STATUS_INICIAL')) {
+    define('TAREFAS_STATUS_INICIAL', 'Pendente');
+}
+
 function tarefas_status_catalogo()
 {
     return array(

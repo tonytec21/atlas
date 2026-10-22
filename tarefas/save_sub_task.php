@@ -57,8 +57,8 @@ try {
         "INSERT INTO tarefas
             (token, titulo, categoria, origem, descricao, data_limite, funcionario_responsavel,
              criado_por, data_criacao, caminho_anexo, nivel_de_prioridade, sub_categoria,
-             id_tarefa_principal, revisor)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Sim', ?, ?)",
+             id_tarefa_principal, revisor, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Sim', ?, ?, 'Pendente')",
         array(
             $token,
             $titulo,

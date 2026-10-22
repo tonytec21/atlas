@@ -231,7 +231,7 @@ var TarefasDetalhe = (function ($) {
                           + '<a class="tf-btn tf-btn-sm" href="' + esc(a.url) + '" download title="Baixar">'
                           + '<i class="fa fa-download"></i></a>'
                         : '')
-                    + (podeIA && a.existe
+                    + (podeIA && a.existe && Tarefas.cfg.ia_ativa
                         ? '<button class="tf-btn tf-btn-sm tf-btn-ia" data-analisar="' + esc(a.rel)
                           + '" title="Analisar com IA"><i class="fa fa-magic"></i></button>' : '')
                     + (t.permissoes.editar
@@ -303,7 +303,7 @@ var TarefasDetalhe = (function ($) {
             + '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'
             + '<input type="text" class="tf-input" id="tfNovoItem" placeholder="Novo item de conferência…" style="flex:1;min-width:200px">'
             + '<button class="tf-btn tf-btn-primario" id="tfAddItem"><i class="fa fa-plus"></i> Adicionar</button>'
-            + '<button class="tf-btn tf-btn-ia" id="tfSugerirCheck"><i class="fa fa-magic"></i> Sugerir com IA</button>'
+            + (Tarefas.cfg.ia_ativa ? '<button class="tf-btn tf-btn-ia" id="tfSugerirCheck"><i class="fa fa-magic"></i> Sugerir com IA</button>' : '')
             + '</div>'
             + '<div class="tf-check-lista">' + itens + '</div>'
             + '</div>';
@@ -346,8 +346,8 @@ var TarefasDetalhe = (function ($) {
             + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">'
             + '<button class="tf-btn tf-btn-primario" id="tfNovoComentario">'
             + '<i class="fa fa-comment-o"></i> Registrar andamento</button>'
-            + '<button class="tf-btn tf-btn-ia" id="tfRedigirIA">'
-            + '<i class="fa fa-magic"></i> Redigir com IA</button>'
+            + (Tarefas.cfg.ia_ativa ? '<button class="tf-btn tf-btn-ia" id="tfRedigirIA">'
+                + '<i class="fa fa-magic"></i> Redigir com IA</button>' : '')
             + '</div>'
             + '<div class="tf-tempo">' + itens + '</div>'
             + '</div>';
