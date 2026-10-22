@@ -1,7 +1,7 @@
 <?php  
 // Ativar exibição de erros para debug (remover em produção)  
-ini_set('display_errors', 1);  
-ini_set('display_startup_errors', 1);  
+ini_set('display_errors', 0);          // não exibir erros técnicos ao usuário
+ini_set('display_startup_errors', 0);  
 error_reporting(E_ALL);  
 
 // Criar arquivo de log para esta execução  
@@ -13,6 +13,20 @@ file_put_contents($log_file, $log_message, FILE_APPEND);
 include(__DIR__ . '/session_check.php');  
 checkSession();  
 include(__DIR__ . '/db_connection2.php');  
+
+// Nota assinada digitalmente não pode mais ser alterada (o botão Editar some da lista;
+// esta trava vale também para quem tentar pelo endereço).
+if (!empty($_POST['numero'])) {
+    $__st = $conn->prepare("SELECT assinado FROM notas_devolutivas WHERE numero = ? LIMIT 1");
+    if ($__st) {
+        $__num = trim((string)$_POST['numero']);
+        $__st->bind_param('s', $__num);
+        $__st->execute();
+        $__r = $__st->get_result()->fetch_assoc();
+        $__st->close();
+        if (!empty($__r['assinado'])) { header('Location: index.php?erro=nota_assinada'); exit; }
+    }
+}
 
 // Verificar se é uma requisição POST  
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {  
@@ -89,6 +103,13 @@ else {
         else {  
             $nota_original = $check_result->fetch_assoc();  
             $check_stmt->close();  
+
+            // Campos que a tela de edição não envia continuam como estavam.
+            // (Antes, editar a nota voltava o status para "Pendente" e apagava os dados complementares.)
+            foreach (['status', 'dados_complementares', 'tratamento', 'processo_referencia'] as $__campo) {
+                if (!array_key_exists($__campo, $_POST)) { ${$__campo} = (string)($nota_original[$__campo] ?? ''); }
+            }
+            if ($status === '') { $status = 'Pendente'; }
 
             // Inserir log antes da atualização  
             $usuario = $_SESSION['username'];  

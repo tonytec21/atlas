@@ -191,15 +191,42 @@ function nd_render_rich($pdf, $conteudo)
             $pdf->writeHTML($parte, true, false, true, false, '');
             $pdf->Ln(5);
         } else {
-            if (preg_match_all('/<p>(.*?)<\/p>/is', $parte, $mm)) {
-                foreach ($mm[1] as $txt) {
-                    $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $txt . '</div>', true, false, true, false);
-                    $pdf->Ln(5);
-                }
-            } else {
-                $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $parte . '</div>', true, false, true, false);
-                $pdf->Ln(5);
-            }
+            nd_render_blocos($pdf, $parte);
         }
     }
+}
+
+/**
+ * Parágrafos, listas, títulos e textos soltos, na ordem em que aparecem.
+ * Antes só os <p> eram impressos: listas numeradas/marcadores (<ol>/<ul>) e
+ * textos fora de <p> sumiam do PDF da nota.
+ */
+function nd_render_blocos($pdf, $html)
+{
+    $html = (string)$html;
+    $pos = 0;
+    $paragrafo = function ($conteudo) use ($pdf) {
+        if (trim(strip_tags($conteudo, '<img>')) === '' && stripos($conteudo, '<img') === false) return;
+        $pdf->writeHTML('<div style="text-indent: 20mm; text-align: justify;">' . $conteudo . '</div>', true, false, true, false);
+        $pdf->Ln(5);
+    };
+    if (preg_match_all('~<(p|ol|ul|h[1-6]|div)\b[^>]*>(.*?)</\1>~is', $html, $mm, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+        foreach ($mm as $m) {
+            $ini = $m[0][1];
+            if ($ini > $pos) { $paragrafo(substr($html, $pos, $ini - $pos)); }
+            $tag = strtolower($m[1][0]);
+            $interno = $m[2][0];
+            if ($tag === 'ol' || $tag === 'ul') {
+                $pdf->writeHTML('<' . $tag . ' style="text-align: justify;">' . $interno . '</' . $tag . '>', true, false, true, false, '');
+                $pdf->Ln(3);
+            } elseif ($tag[0] === 'h') {
+                $pdf->writeHTML('<div style="text-align: justify;"><b>' . $interno . '</b></div>', true, false, true, false);
+                $pdf->Ln(3);
+            } else {
+                $paragrafo($interno);
+            }
+            $pos = $ini + strlen($m[0][0]);
+        }
+    }
+    if ($pos < strlen($html)) { $paragrafo(substr($html, $pos)); }
 }

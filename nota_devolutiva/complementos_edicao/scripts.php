@@ -1,26 +1,28 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>  
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>  
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>  
+<!-- DataTables: usado na lista "Ver Notas Anteriores" -->
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap4.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap4.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>  
 <script src="../ckeditor/ckeditor.js"></script>
 <script>  
         // Inicializar o editor CKEditor para os campos de texto rico  
         document.addEventListener('DOMContentLoaded', function() {  
             if (typeof CKEDITOR !== 'undefined') {  
-                CKEDITOR.replace('corpo', {  
+                if (document.getElementById('corpo')) CKEDITOR.replace('corpo', {  
                     height: 300,  
                     removeButtons: 'Cut,Copy,Paste,Undo,Redo,Anchor,Strike,Subscript,Superscript'  
                 });  
                 
-                CKEDITOR.replace('prazo_cumprimento', {  
+                if (document.getElementById('prazo_cumprimento')) CKEDITOR.replace('prazo_cumprimento', {  
                     height: 150,  
                     removeButtons: 'Cut,Copy,Paste,Undo,Redo,Anchor,Strike,Subscript,Superscript'  
                 });  
-                
-                CKEDITOR.replace('dados_complementares', {  
-                    height: 150,  
-                    removeButtons: 'Cut,Copy,Paste,Undo,Redo,Anchor,Strike,Subscript,Superscript'  
-                });  
+
+                // Dados complementares: texto simples, como no cadastro
             }  
             
             // Verifica se há mensagem de erro ou sucesso na URL  
@@ -72,7 +74,7 @@
         
         // Função para consultar CNPJ na API  
         function consultarCnpj() {  
-            const cnpj = $('#cpf_cnpj').val().replace(/[^\d]/g, '');  
+            const cnpj = ($('#cpf_cnpj').val() || '').replace(/[^\d]/g, '');  
             
             if (cnpj.length !== 14) {  
                 Swal.fire({  
@@ -215,7 +217,7 @@
             };  
             
             // Aplicar máscara apropriada ao carregar a página  
-            var cpfCnpjValue = $('#cpf_cnpj').val().replace(/[^\d]/g, '');  
+            var cpfCnpjValue = ($('#cpf_cnpj').val() || '').replace(/[^\d]/g, '');  
             if (cpfCnpjValue.length > 0) {  
                 if (cpfCnpjValue.length > 11) {  
                     $('#cpf_cnpj').mask(cnpjMascara, options);  
@@ -228,7 +230,7 @@
             
             // Evento para consultar o CNPJ ao clicar no botão  
             $('#consultarCpfCnpj').on('click', function() {  
-                let documento = $('#cpf_cnpj').val().replace(/[^\d]/g, '');  
+                let documento = ($('#cpf_cnpj').val() || '').replace(/[^\d]/g, '');  
                 
                 // Apenas consultar se for um CNPJ (14 dígitos)  
                 if (documento.length === 14) {  

@@ -148,6 +148,7 @@ function nd_val($k){ return isset($_GET[$k]) ? htmlspecialchars($_GET[$k], ENT_Q
                 </tbody>
             </table>
         </div>
+        <p class="text-center text-muted" style="font-size:.74rem;margin:14px 0 0">Notas Devolutivas · v<?php echo htmlspecialchars(defined('ND_VERSAO') ? ND_VERSAO : ''); ?></p>
 
     </div>
 </div>

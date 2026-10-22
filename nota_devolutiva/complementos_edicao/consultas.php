@@ -21,6 +21,12 @@ if ($result->num_rows === 0) {
 
 $nota = $result->fetch_assoc();  
 
+// Nota assinada digitalmente não pode mais ser editada
+if (!empty($nota['assinado'])) {
+    header('Location: index.php?erro=nota_assinada');
+    exit;
+}
+
 // Registrar acesso à página de edição na tabela de logs - VERSÃO CORRIGIDA  
 $usuario = $_SESSION['username'];
 $log_query = "INSERT INTO logs_notas_devolutivas (  

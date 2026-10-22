@@ -3,6 +3,7 @@ include(__DIR__ . '/session_check.php');
 checkSession();  
 require_once(__DIR__ . '/db_connection2.php');  
 require_once(__DIR__ . '/assinatura_nota_config.php');
+require_once(__DIR__ . '/versao.php');
 try { nd_ensure_schema(); } catch (Throwable $e) { /* segue sem travar a listagem */ }
 ?>  
 <?php include(__DIR__ . '/complementos_index/consultas.php'); ?>  
@@ -24,6 +25,14 @@ try { nd_ensure_schema(); } catch (Throwable $e) { /* segue sem travar a listage
 <?php include(__DIR__ . '/complementos_index/modais.php'); ?>
 <?php include(__DIR__ . '/complementos_index/scripts.php'); ?>
 <?php include(__DIR__ . '/complementos_index/anexos_modal.php'); ?>
+<?php if (($_GET['erro'] ?? '') === 'nota_assinada'): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.Swal) Swal.fire({ icon: 'info', title: 'Nota assinada', text: 'Esta nota devolutiva já foi assinada digitalmente e não pode mais ser editada. Use o botão "Ver PDF assinado".' });
+    if (window.history && history.replaceState) history.replaceState(null, '', 'index.php');
+});
+</script>
+<?php endif; ?>
 <?php include(__DIR__ . '/../rodape.php'); ?>  
 </body>  
 </html>

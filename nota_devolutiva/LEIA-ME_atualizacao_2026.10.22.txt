@@ -1,0 +1,71 @@
+NOTAS DEVOLUTIVAS — ATUALIZAÇÃO 2026.10.22.1
+=============================================
+
+A versão aparece no rodapé da Pesquisa de Notas Devolutivas
+(arquivo nota_devolutiva/versao.php).
+
+Correções encontradas durante a preparação dos vídeos de treinamento.
+
+1) PDF DA NOTA SEM AS LISTAS (nota_pdf_lib.php)
+-----------------------------------------------
+O PDF (botão Imprimir e tela de assinatura) só imprimia os parágrafos <p> dos
+"Motivos da devolução" e do "Prazo". Listas numeradas ou com marcadores
+(botões Lista numerada / Lista com marcadores do editor), títulos e textos
+soltos sumiam do PDF — justamente as exigências, que costumam ser numeradas.
+Agora o texto é impresso na ordem em que foi escrito: parágrafos com recuo,
+listas numeradas/com marcadores, títulos em negrito e textos soltos.
+
+2) EDIÇÃO APAGAVA DADOS (atualizar_nota_devolutiva.php)
+------------------------------------------------------
+Ao salvar uma edição, o status voltava sempre para "Pendente" e os "Dados
+complementares" eram apagados, porque esses campos não existiam na tela de
+edição. Agora:
+- campos que não vêm da tela (status, tratamento, processo de referência)
+  mantêm o valor que a nota já tinha;
+- a tela de edição ganhou o campo "Dados complementares" (texto simples,
+  igual ao cadastro), já preenchido.
+Também foi desligada a exibição de erros do PHP na tela (display_errors).
+
+3) NOTA ASSINADA PODIA SER EDITADA PELO ENDEREÇO
+------------------------------------------------
+O botão de editar some depois da assinatura, mas digitando o endereço
+editar-nota-devolutiva.php?numero=... a nota assinada ainda abria e podia ser
+salva. Agora a edição e a gravação recusam notas assinadas e voltam para a
+pesquisa com o aviso "Esta nota devolutiva já foi assinada digitalmente e não
+pode mais ser editada". (complementos_edicao/consultas.php,
+atualizar_nota_devolutiva.php, index.php)
+
+4) "VER NOTAS ANTERIORES" NÃO ABRIA NA EDIÇÃO
+---------------------------------------------
+Na tela de edição o botão usava atributos do Bootstrap 5, mas a página usa o
+Bootstrap 4, e a biblioteca DataTables não era carregada: a janela não abria
+e o navegador acusava erro. Corrigido (botões, X e Fechar da janela, e
+carregamento do DataTables). (complementos_edicao/container.php,
+complementos_edicao/modais.php, complementos_edicao/scripts.php)
+
+5) AJUSTES DE TELA
+------------------
+- Cadastro e edição: o botão Salvar ficava parcialmente escondido atrás da
+  barra de navegação fixa do rodapé, e o clique podia cair no botão "Início".
+  Incluído espaço no fim do formulário. (style_nota_extra.php)
+- Anexos: os cartões dos arquivos eram estreitos e quebravam o nome do arquivo
+  letra a letra. Cartões mais largos. (complementos_index/anexos_modal.php)
+- Edição: removidos erros de JavaScript (editor aplicado a campo inexistente e
+  leitura do CPF/CNPJ em página sem o campo). (complementos_edicao/scripts.php)
+
+6) ARQUIVOS
+-----------
+Novos:     nota_devolutiva/versao.php
+           nota_devolutiva/LEIA-ME_atualizacao_2026.10.22.txt
+Alterados: nota_devolutiva/nota_pdf_lib.php
+           nota_devolutiva/atualizar_nota_devolutiva.php
+           nota_devolutiva/index.php
+           nota_devolutiva/style_nota_extra.php
+           nota_devolutiva/complementos_index/container.php
+           nota_devolutiva/complementos_index/anexos_modal.php
+           nota_devolutiva/complementos_edicao/consultas.php
+           nota_devolutiva/complementos_edicao/container.php
+           nota_devolutiva/complementos_edicao/modais.php
+           nota_devolutiva/complementos_edicao/scripts.php
+
+Não há script de banco para rodar.

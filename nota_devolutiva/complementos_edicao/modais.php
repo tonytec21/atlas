@@ -4,7 +4,7 @@
             <div class="modal-content">  
                 <div class="modal-header">  
                     <h5 class="modal-title" id="notasAnterioresModalLabel">Notas Devolutivas Anteriores</h5>  
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>  
+                    <button type="button" class="close" data-dismiss="modal" data-bs-dismiss="modal" aria-label="Fechar"><span aria-hidden="true">&times;</span></button>  
                 </div>  
                 <div class="modal-body">  
                     <table id="notasTable" class="table table-striped table-bordered dt-responsive nowrap" style="width:100%">  
@@ -25,7 +25,7 @@
                     </table>  
                 </div>  
                 <div class="modal-footer">  
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>  
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" data-bs-dismiss="modal">Fechar</button>  
                 </div>  
             </div>  
         </div>  

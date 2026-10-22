@@ -1,4 +1,6 @@
 <style>
+/* espaço para a barra de navegação fixa do rodapé não cobrir o botão Salvar */
+#notaForm { padding-bottom: 96px; }
 /* STATUS CONTROLS NO MODAL */
 .status-controls { display: flex; align-items: center; gap: 0.75rem; background: var(--bg-light); border-radius: var(--radius-full); padding: 0.5rem 0.75rem 0.5rem 1rem; box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.1); width: 100%; margin-top: 0.75rem; }
 @media (min-width: 768px) { .status-controls { width: auto; min-width: 320px; max-width: 400px; margin-top: 0; } }

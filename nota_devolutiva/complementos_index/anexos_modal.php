@@ -25,7 +25,7 @@
     .ax-qitem .fi{ width:36px;height:36px;border-radius:9px; display:flex;align-items:center;justify-content:center; color:#fff; flex:0 0 auto; }
     .ax-qitem .nm{ font-weight:600; font-size:.9rem; word-break:break-all; } .ax-qitem .mt{ color:#94a3b8; font-size:.78rem; }
     .ax-qitem .bar{ height:6px; border-radius:99px; background:#e2e8f0; overflow:hidden; margin-top:5px; } .ax-qitem .bar>i{ display:block; height:100%; width:0; background:linear-gradient(90deg,#2563eb,#4f46e5); transition:width .2s; }
-    .ax-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; }
+    .ax-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:10px; }
     .ax-item{ display:flex; align-items:center; gap:11px; padding:11px; border:1px solid #eef1f6; border-radius:14px; transition:.15s; background:#fff; }
     .ax-item:hover{ box-shadow:0 8px 20px rgba(15,23,42,.08); transform:translateY(-1px); }
     .ax-item .fi{ width:42px;height:42px;border-radius:11px; display:flex;align-items:center;justify-content:center; color:#fff; font-size:1.05rem; flex:0 0 auto; }

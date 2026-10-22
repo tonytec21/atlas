@@ -6,7 +6,7 @@
                     <a href="index.php" class="btn btn-secondary me-2">  
                         <i class="fa fa-arrow-left"></i> Voltar  
                     </a>  
-                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#notasAnterioresModal" onclick="carregarNotas()">  
+                    <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#notasAnterioresModal" data-bs-toggle="modal" data-bs-target="#notasAnterioresModal" onclick="carregarNotas()">  
                         <i class="fa fa-history"></i> Ver Notas Anteriores  
                     </button>  
                 </div>  
@@ -26,7 +26,7 @@
                 }  
                 echo $mensagem;  
                 ?>  
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>  
+                <button type="button" class="close" data-dismiss="alert" data-bs-dismiss="alert" aria-label="Fechar"><span aria-hidden="true">&times;</span></button>  
             </div>  
             <?php endif; ?>  
             
@@ -112,6 +112,11 @@
                     </div>  
                 </div>  
                 
+                <div class="form-group">
+                    <label for="dados_complementares">Dados Complementares:</label>
+                    <textarea class="form-control" id="dados_complementares" name="dados_complementares" rows="4"><?php echo htmlspecialchars($nota['dados_complementares'] ?? ''); ?></textarea>
+                </div>
+
                 <div class="form-group mt-4 d-flex justify-content-end">  
                     <a href="index.php" class="btn btn-secondary">Cancelar</a>  
                     <button type="submit" class="btn btn-primary">Salvar Alterações</button>  
