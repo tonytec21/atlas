@@ -1,0 +1,56 @@
+VERTEX — ATUALIZAÇÃO 2026.10.22.1
+==================================
+
+A versão fica registrada no marcador ATLAS-VERTEX-BUILD do vertex/index.php.
+Arquivos alterados: vertex/index.php e vertex/geo_extract_v2.php.
+Não há mudança no banco de dados nem nos arquivos de configuração
+(config_gemini.json, config_onr.json): basta substituir os dois arquivos.
+
+Correções encontradas durante a preparação dos vídeos de treinamento.
+
+1) KML COM VÁRIOS POLÍGONOS PELA ABA IMPORTAR (index.php)
+---------------------------------------------------------
+Ao enviar, pela aba Importar, um KML com mais de um polígono, o painel
+"Importar do KML" (nomear e gravar cada polígono) abria escondido, atrás da
+aba, e parecia que nada tinha acontecido. Agora o sistema muda para o mapa e
+abre o painel.
+
+2) MEMORIAL EM GRAUS (GMS) COM INCONSISTÊNCIAS FALSAS (geo_extract_v2.php)
+------------------------------------------------------------------------
+Em memoriais narrativos com coordenadas em graus, minutos e segundos, os
+ângulos de AZIMUTE/RUMO pequenos (ex.: "azimute de 12°05'30"") eram lidos
+como se fossem coordenadas. Resultado: o alerta "Área calculada diverge" sem
+motivo e, no painel do imóvel, uma área errada (ex.: 3.174 ha num imóvel de
+54,52 ha). Agora os ângulos de azimute/rumo são ignorados na leitura das
+coordenadas. A planilha do SIGEF continua sendo lida como antes.
+
+3) AUTOTUTELA: PARTES PRÉ-PREENCHIDAS COM O NOME DO IMÓVEL (index.php)
+----------------------------------------------------------------------
+Ao instaurar a autotutela a partir de uma sobreposição, a lista de partes
+interessadas vinha com o NOME DO IMÓVEL no lugar do titular. Agora vem com os
+proprietários de cada matrícula e o CPF/CNPJ de cada um.
+
+4) PALETA DE CORES DO DESTAQUE (index.php)
+------------------------------------------
+Na aba Cadastrar, os quadrados de cor de "Cor de destaque do imóvel" ficavam
+enormes, ocupando a largura toda. Agora ficam em grade compacta.
+
+5) MENSAGEM DO 3D QUANDO O FOTORREALISTA NÃO ESTÁ LIBERADO (index.php)
+---------------------------------------------------------------------
+O texto explicativo saía quebrado em colunas. Agora fica centralizado, em um
+bloco legível, com o link para o visualizador com relevo.
+
+6) FORA DO MUNICÍPIO / ULTRAPASSA GRAVADO NO IMÓVEL ERRADO (index.php)
+---------------------------------------------------------------------
+Com o limite do município carregado, ao abrir um imóvel pela lista logo depois
+de outro, a verificação "dentro / fora / ultrapassa o limite" era gravada no
+imóvel aberto ANTES. Ex.: abrir a Fazenda Paciência (ultrapassa) e depois o
+Sítio Itapera (fora) apagava a marcação "ultrapassa" da Fazenda Paciência, que
+sumia do filtro "Ultrapassam". Agora a verificação é sempre gravada no imóvel
+que está sendo aberto.
+
+7) "MOSTRAR LIMITE NO MAPA" NA ABA LIMITES (index.php)
+-----------------------------------------------------
+O botão desenhava o limite com o mapa escondido atrás da aba, e o mapa ficava
+enquadrado em um ponto qualquer (só mar ou só mata). Agora o sistema mostra o
+mapa e enquadra o município inteiro.

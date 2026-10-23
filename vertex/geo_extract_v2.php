@@ -822,6 +822,13 @@ function extractPlanilhaSigefGeo($texto)
 
     $coords = [];
     foreach ($ms as $m) {
+        // Em memorial NARRATIVO ("... Latitude: -2°38'42"; ... com azimute de 3°28'06" e
+        // distância de ...") os azimutes ficam entre as coordenadas. Um azimute pequeno
+        // (1° a 10°) passa pelo filtro de latitude e desalinha o pareamento lon/lat —
+        // o painel do imóvel e as inconsistências passavam a mostrar áreas absurdas.
+        // Valor precedido de "azimute", "rumo" ou "Az" nunca é coordenada.
+        $antesAz = substr($t, max(0, $m[0][1] - 24), min(24, $m[0][1]));
+        if (preg_match('/(?:azimute|rumo|\bAz)\s*(?:de|=|:)?\s*$/iu', $antesAz)) continue;
         $v = geoV2LerDmsAssinado($m[1][0] ?? '', $m[2][0], $m[3][0], $m[4][0], $m[5][0] ?? '');
         if ($v === null) continue;
         $coords[] = ['val' => $v, 'ini' => $m[0][1], 'fim' => $m[0][1] + strlen($m[0][0])];
