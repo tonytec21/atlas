@@ -1,0 +1,66 @@
+CONTAS A PAGAR — ATUALIZAÇÃO 2026.10.22.1
+===========================================
+
+A versão aparece no rodapé do painel (arquivo contas_a_pagar/versao.php).
+
+Correções encontradas durante a preparação dos vídeos de treinamento.
+
+1) CONFIGURAÇÕES NÃO SALVAVAM (config.php)
+------------------------------------------
+Ao clicar em Salvar na janela "Notificações & E-mail", aparecia o erro "The
+number of elements in the type definition string must match the number of bind
+variables" e nada era gravado: e-mail de alerta, dias de aviso e SMTP ficavam
+sempre vazios. O botão "Enviar alerta agora" também usava a configuração antiga,
+sem avisar. Corrigido; e o teste agora avisa se não conseguiu salvar
+(complementos/app.js).
+
+2) CHAVE "ATIVO" DOS ALERTAS NÃO DESLIGAVA (config_salvar.php)
+--------------------------------------------------------------
+Desmarcar "Ativo" continuava gravando os alertas como ligados. Corrigido.
+
+3) DEPÓSITO REMOVIDO NO CAIXA CONTINUAVA NO SALDO (config.php, extrato.php)
+--------------------------------------------------------------------------
+Depósitos removidos no Controle de Caixa (status "removido") continuavam
+somando no saldo das contas virtuais e apareciam no extrato. Agora só contam os
+depósitos ativos.
+
+4) "ISENTO DE PAGAMENTO" DA O.S. NO EXTRATO (config.php, extrato.php)
+--------------------------------------------------------------------
+A isenção da O.S. aparecia no extrato do Saldo bancário como "Recebimento" de
+R$ 0,00. Isenções e lançamentos zerados não entram mais como recebimento.
+
+5) CONTA MENSAL DO DIA 31 "ESCORREGAVA" PARA O DIA 28 (config.php,
+   salvar_conta.php, definir_pago.php)
+-----------------------------------------------------------------
+Uma conta recorrente ou parcela com vencimento no dia 31 (ou 30) ia para 28/02
+em fevereiro e, a partir daí, passava a vencer sempre no dia 28. Agora ela
+volta ao dia original nos meses seguintes (31/01 -> 28/02 -> 31/03 -> 30/04).
+
+6) ENVIO DE ALERTAS PELO NAVEGADOR SEM CONTROLE DE ACESSO (enviar_alertas.php)
+----------------------------------------------------------------------------
+Qualquer usuário logado podia abrir enviar_alertas.php e disparar o e-mail.
+Agora, pela web, só administrador ou quem tem o acesso "Controle de Contas a
+Pagar". O agendamento no servidor (linha de comando) continua igual.
+
+7) AJUSTES DE TELA
+------------------
+- Gráficos de valores (painel e relatórios) começam no zero; antes, sem contas
+  pagas, o eixo mostrava valores negativos (complementos/app.js, relatorios.php).
+- Anexos: cartões mais largos, o nome do arquivo não quebra letra a letra
+  (index.php).
+
+8) ARQUIVOS
+-----------
+Novos:     contas_a_pagar/versao.php
+           contas_a_pagar/LEIA-ME_atualizacao_2026.10.22.txt
+Alterados: contas_a_pagar/config.php
+           contas_a_pagar/config_salvar.php
+           contas_a_pagar/salvar_conta.php
+           contas_a_pagar/definir_pago.php
+           contas_a_pagar/extrato.php
+           contas_a_pagar/relatorios.php
+           contas_a_pagar/enviar_alertas.php
+           contas_a_pagar/index.php
+           contas_a_pagar/complementos/app.js
+
+Não há script de banco para rodar.

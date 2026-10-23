@@ -240,10 +240,10 @@ $qs = http_build_query(['de'=>$de,'ate'=>$ate,'base'=>$baseSel,'categoria'=>$cat
   var brl=function(v){ return 'R$ '+Number(v).toLocaleString('pt-BR'); };
   new Chart(document.getElementById('chartCat'),{ type:'bar',
     data:{ labels:<?php echo json_encode($catLabels, JSON_UNESCAPED_UNICODE); ?>, datasets:[{ data:<?php echo json_encode(array_map(fn($v)=>round($v,2),$catVals)); ?>, backgroundColor:'#4f46e5', borderRadius:6 }] },
-    options:{ plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:brl } } } } });
+    options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, ticks:{ callback:brl } } } } });
   new Chart(document.getElementById('chartMes'),{ type:'line',
     data:{ labels:<?php echo json_encode($mesLabels); ?>, datasets:[{ data:<?php echo json_encode(array_map(fn($v)=>round($v,2),$mesVals)); ?>, borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,.15)', fill:true, tension:.35 }] },
-    options:{ plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:brl } } } } });
+    options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, ticks:{ callback:brl } } } } });
 })();
 </script>
 <script>

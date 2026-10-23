@@ -2,6 +2,7 @@
 require_once __DIR__ . '/session_check.php'; checkSession();
 require_once __DIR__ . '/guard_acesso.php'; cap_guard();
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/versao.php';
 cap_ensure_schema();
 // Sincroniza automaticamente as contas de fundos do selo (throttled internamente).
 try { cap_sync_fundos_selo(false); } catch (Throwable $e) { /* não bloqueia o dashboard */ }
@@ -125,7 +126,7 @@ $FORMAS = cap_formas_pagamento();
     .cap-dz{ border:2.5px dashed #c7d2fe; border-radius:16px; background:linear-gradient(180deg,#f8faff,#eef3ff); padding:26px 18px; text-align:center; cursor:pointer; transition:.2s; }
     .cap-dz:hover{ border-color:var(--cap2); } .cap-dz.drag{ border-color:var(--cap2); background:#e0e9ff; transform:scale(1.01); }
     .cap-dz .ic{ width:56px;height:56px;border-radius:50%;background:#dbeafe;color:var(--cap2);display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 10px; }
-    .ax-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; }
+    .ax-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:10px; }
     .ax-item{ display:flex;align-items:center;gap:11px;padding:11px;border:1px solid #eef1f6;border-radius:14px;background:#fff; }
     .ax-item .fi{ width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.05rem;flex:0 0 auto; }
     .ax-item .nm{ font-weight:700;font-size:.86rem;word-break:break-word; } .ax-item .sub{ color:#94a3b8;font-size:.74rem; }
@@ -259,6 +260,7 @@ $FORMAS = cap_formas_pagamento();
                 </tbody>
             </table>
         </div>
+        <p class="text-center text-muted" style="font-size:.74rem;margin:14px 0 0">Contas a Pagar · v<?php echo hh(CAP_VERSAO); ?></p>
     </div>
 </div>
 

@@ -39,11 +39,11 @@
     var c=CAP.chartCat||{labels:[],vals:[]};
     new Chart($('#chartCat'),{ type:'bar',
       data:{ labels:c.labels, datasets:[{ label:'Em aberto', data:c.vals, backgroundColor:'#2563eb', borderRadius:6 }] },
-      options:{ plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:function(v){ return 'R$ '+v.toLocaleString('pt-BR'); } } } } } });
+      options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, ticks:{ callback:function(v){ return 'R$ '+v.toLocaleString('pt-BR'); } } } } } });
     var e=CAP.chartEvol||{labels:[],vals:[]};
     new Chart($('#chartEvol'),{ type:'line',
       data:{ labels:e.labels, datasets:[{ label:'Pago', data:e.vals, borderColor:'#16a34a', backgroundColor:'rgba(22,163,74,.15)', fill:true, tension:.35, pointRadius:3 }] },
-      options:{ plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:function(v){ return 'R$ '+v.toLocaleString('pt-BR'); } } } } } });
+      options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, ticks:{ callback:function(v){ return 'R$ '+v.toLocaleString('pt-BR'); } } } } } });
   }
 
   /* ---------------- DataTable ---------------- */
@@ -180,7 +180,8 @@
     try{
       // salva antes para usar as configs atuais
       var f=$('#configForm'), data={}; new FormData(f).forEach(function(v,k){ data[k]=v; }); data.notif_ativo=$('#cfg_ativo').checked?'1':'';
-      await postForm('config_salvar.php', data);
+      var sv=await postForm('config_salvar.php', data);
+      if(!sv || !sv.success) throw new Error((sv && sv.message) || 'Não foi possível salvar as configurações.');
       var r=await postForm('alertas_testar.php', {});
       if(window.Swal) Swal.fire(r.success?'OK':'Aviso', r.message||'Concluído', r.success?'success':'info');
     }catch(e){ if(window.Swal) Swal.fire('Erro', e.message,'error'); }

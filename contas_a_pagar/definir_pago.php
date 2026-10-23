@@ -56,7 +56,16 @@ try {
         $u->bind_param('sssi', $dataPag, $forma, $co, $id);
         $u->execute(); $u->close();
 
-        $novoId = null; $prox = cap_proximo_vencimento($c['data_vencimento'], $c['recorrencia']);
+        $novoId = null;
+        // dia-base: o dia de vencimento da conta que originou a recorrência
+        $diaBase = null;
+        if (!empty($c['origem_id'])) {
+            $so = $conn->prepare("SELECT data_vencimento FROM contas_a_pagar WHERE id=? LIMIT 1");
+            $so->bind_param('i', $c['origem_id']); $so->execute();
+            $ro = $so->get_result()->fetch_assoc(); $so->close();
+            if ($ro && $ro['data_vencimento']) $diaBase = (int)date('d', strtotime($ro['data_vencimento']));
+        }
+        $prox = cap_proximo_vencimento($c['data_vencimento'], $c['recorrencia'], $diaBase);
         if ($prox !== null) {
             $agora = date('Y-m-d H:i:s'); $origem = $c['origem_id'] ?: $id;
             $ins = $conn->prepare("INSERT INTO contas_a_pagar (titulo, categoria, fornecedor, valor, data_vencimento, descricao, recorrencia, funcionario, status, origem_id, created_at) VALUES (?,?,?,?,?,?,?,?,'Pendente',?,?)");

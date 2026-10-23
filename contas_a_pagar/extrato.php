@@ -22,7 +22,7 @@ $mov = [];
 $entPeriodo = 0.0;
 if ($temCaixa) {
     $in = "'" . implode("','", array_map([$conn,'real_escape_string'], $meta['tipos'])) . "'";
-    $st = $conn->prepare("SELECT data_caixa, valor_do_deposito, tipo_deposito, funcionario FROM deposito_caixa WHERE tipo_deposito IN ($in) AND data_caixa BETWEEN ? AND ? ORDER BY data_caixa");
+    $st = $conn->prepare("SELECT data_caixa, valor_do_deposito, tipo_deposito, funcionario FROM deposito_caixa WHERE tipo_deposito IN ($in) AND " . cap_filtro_deposito_ativo() . " AND data_caixa BETWEEN ? AND ? ORDER BY data_caixa");
     $st->bind_param('ss', $de, $ate); $st->execute();
     $r = $st->get_result();
     while ($x = $r->fetch_assoc()) {
@@ -69,6 +69,8 @@ if ($conta === 'banco' && cap_tem_pagamento_os()) {
                           FROM pagamento_os
                           WHERE status='pago'
                             AND LOWER(TRIM(forma_de_pagamento)) NOT IN ('espécie','especie','dinheiro')
+                             AND LOWER(TRIM(forma_de_pagamento)) NOT LIKE 'isento%'  -- isenção não é recebimento
+                             AND total_pagamento <> 0
                             AND DATE(data_pagamento) BETWEEN ? AND ?
                           ORDER BY data_pagamento");
     $so->bind_param('ss', $de, $ate); $so->execute();

@@ -14,7 +14,7 @@ try {
     cap_settings_save([
         'email_notificacao' => $email ?: null,
         'dias_aviso' => (int)($_POST['dias_aviso'] ?? 3),
-        'notif_ativo' => isset($_POST['notif_ativo']) ? 1 : 0,
+        'notif_ativo' => !empty($_POST['notif_ativo']) ? 1 : 0, // o formulário envia '' quando desmarcado
         'smtp_host' => trim((string)($_POST['smtp_host'] ?? '')) ?: null,
         'smtp_port' => $_POST['smtp_port'] ?? '',
         'smtp_secure' => trim((string)($_POST['smtp_secure'] ?? '')) ?: null,

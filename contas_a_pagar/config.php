@@ -201,6 +201,21 @@ function cap_tem_deposito_caixa()
     return $r && $r->num_rows > 0;
 }
 
+/**
+ * Filtro SQL dos depósitos válidos do Caixa: depósitos removidos no módulo
+ * Caixa ficam com status='removido' e não podem entrar no saldo/extrato.
+ * (bases antigas sem a coluna status: considera todos)
+ */
+function cap_filtro_deposito_ativo()
+{
+    static $f = null;
+    if ($f !== null) return $f;
+    $conn = cap_db();
+    $r = $conn->query("SHOW COLUMNS FROM deposito_caixa LIKE 'status'");
+    $f = ($r && $r->num_rows > 0) ? "(status IS NULL OR status <> 'removido')" : "1=1";
+    return $f;
+}
+
 /** Existe a tabela de pagamentos do módulo de O.S.? */
 function cap_tem_pagamento_os()
 {
@@ -235,7 +250,7 @@ function cap_saldos()
 
     // Entradas (depósitos do Caixa)
     if (cap_tem_deposito_caixa()) {
-        $r = $conn->query("SELECT tipo_deposito, COALESCE(SUM(valor_do_deposito),0) t FROM deposito_caixa GROUP BY tipo_deposito");
+        $r = $conn->query("SELECT tipo_deposito, COALESCE(SUM(valor_do_deposito),0) t FROM deposito_caixa WHERE " . cap_filtro_deposito_ativo() . " GROUP BY tipo_deposito");
         while ($r && $row = $r->fetch_assoc()) {
             foreach (cap_contas_virtuais() as $cod => $meta) {
                 if (in_array($row['tipo_deposito'], $meta['tipos'], true)) $out[$cod]['entradas'] += (float)$row['t'];
@@ -249,7 +264,9 @@ function cap_saldos()
     if (cap_tem_pagamento_os()) {
         $r = $conn->query("SELECT COALESCE(SUM(total_pagamento),0) t FROM pagamento_os
                            WHERE status='pago'
-                             AND LOWER(TRIM(forma_de_pagamento)) NOT IN ('espécie','especie','dinheiro')");
+                             AND LOWER(TRIM(forma_de_pagamento)) NOT IN ('espécie','especie','dinheiro')
+                             AND LOWER(TRIM(forma_de_pagamento)) NOT LIKE 'isento%'  -- isenção não é recebimento
+                             AND total_pagamento <> 0");
         $row = $r ? $r->fetch_row() : [0];
         $out['banco']['entradas'] += (float)($row[0] ?? 0);
     }
@@ -416,7 +433,7 @@ function cap_settings_save(array $d)
     $pass  = $d['smtp_pass'] ?? null;
     $fmail = $d['smtp_from_email'] ?? null;
     $fname = $d['smtp_from_name'] ?? null;
-    $stmt->bind_param('siisissssss', $email, $dias, $ativo, $host, $port, $sec, $user, $pass, $fmail, $fname);
+    $stmt->bind_param('siisisssss', $email, $dias, $ativo, $host, $port, $sec, $user, $pass, $fmail, $fname);
     $stmt->execute(); $stmt->close();
 }
 
@@ -463,13 +480,17 @@ function cap_status_efetivo($conta)
 }
 
 /* --------------------------------------------------- recorrência (próxima) */
-function cap_proximo_vencimento($data, $recorrencia)
+function cap_proximo_vencimento($data, $recorrencia, $diaBase = null)
 {
     $ts = strtotime($data);
     switch ($recorrencia) {
         case 'Mensal':
             $d = new DateTime($data);
             $day = (int)$d->format('d');
+            // $diaBase: dia de vencimento original (ex.: 31). Quando o mês anterior
+            // encurtou o dia (31/01 -> 28/02), volta ao dia original (-> 31/03).
+            // Sem isso, a conta passaria a vencer sempre no dia 28.
+            if ($diaBase !== null && (int)$diaBase > $day && $day === (int)$d->format('t')) $day = min(31, (int)$diaBase);
             $d->modify('first day of next month');
             $last = (int)$d->format('t');
             $d->setDate((int)$d->format('Y'), (int)$d->format('m'), min($day, $last));

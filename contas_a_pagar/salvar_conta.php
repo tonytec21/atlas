@@ -39,7 +39,7 @@ try {
         $ins = $conn->prepare("INSERT INTO contas_a_pagar (titulo, categoria, fornecedor, nota_fiscal, valor, data_vencimento, descricao, recorrencia, funcionario, status, parcela_num, parcela_total, parcela_grupo, created_at) VALUES (?,?,?,?,?,?,?,'Nenhuma',?,'Pendente',?,?,?,?)");
         $conn->begin_transaction();
         try {
-            $ids = []; $dataParc = $venc;
+            $ids = []; $dataParc = $venc; $diaBase = (int)date('d', strtotime($venc));
             for ($i = 1; $i <= $parcelas; $i++) {
                 $vParc = $vBase;
                 if ($parcTipo === 'total' && $i === $parcelas) {
@@ -49,7 +49,7 @@ try {
                 $ins->bind_param('ssssdsssiiss', $tit, $categoria, $fornecedor, $nota_fiscal, $vParc, $dataParc, $descricao, $func, $i, $parcelas, $grupo, $agora);
                 if (!$ins->execute()) throw new RuntimeException('Erro ao salvar a parcela ' . $i . ': ' . $ins->error);
                 $ids[] = $ins->insert_id;
-                $dataParc = cap_proximo_vencimento($dataParc, 'Mensal');
+                $dataParc = cap_proximo_vencimento($dataParc, 'Mensal', $diaBase);
             }
             $ins->close();
             $conn->commit();
