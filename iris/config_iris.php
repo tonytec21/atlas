@@ -7,7 +7,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 date_default_timezone_set('America/Fortaleza');
 
-define('IRIS_VERSAO', '2.0.1');
+define('IRIS_VERSAO', '2.0.2');
 
 if (!function_exists('array_is_list')) {   // PHP < 8.1
     function array_is_list(array $a) { $i = 0; foreach ($a as $k => $_) { if ($k !== $i++) return false; } return true; }

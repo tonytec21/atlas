@@ -35,7 +35,9 @@ function iris_docx_gerar($texto, $titulo = '', $realcar = true)
     foreach (preg_split("~\n{2,}~", trim($texto)) as $par) {
         $linhas = explode("\n", $par); $runs = [];
         foreach ($linhas as $i => $l) $runs[] = ($i > 0 ? '<w:r><w:br/></w:r>' : '') . iris_docx_linha($l, $realcar);
-        $corpo .= '<w:p><w:pPr><w:spacing w:after="160" w:line="300" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr>' . implode('', $runs) . '</w:p>';
+        // justificado só em parágrafo corrido: com quebras de linha (texto "como no livro"), o Word esticaria cada linha
+        $jc = count($linhas) > 1 ? 'left' : 'both';
+        $corpo .= '<w:p><w:pPr><w:spacing w:after="160" w:line="300" w:lineRule="auto"/><w:jc w:val="' . $jc . '"/></w:pPr>' . implode('', $runs) . '</w:p>';
     }
     $doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
          . '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' . $corpo

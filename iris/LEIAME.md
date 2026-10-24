@@ -1,4 +1,4 @@
-# Atlas Iris 2.0.1 — Extração de texto e dados (OCR) de imagens e PDFs
+# Atlas Iris 2.0.2 — Extração de texto e dados (OCR) de imagens e PDFs
 
 Módulo do Atlas que usa o **Gemini** para transcrever, na íntegra e fiel ao original,
 documentos impressos e **manuscritos**. Também extrai os **dados estruturados**
@@ -75,6 +75,9 @@ usados (agora tudo passa por `api.php`) e podem ser apagados. O `extrair.php` co
 para compatibilidade.
 
 ## Histórico de versões
+- **2.0.2**: realce do editor alinhado ao texto (as marcações amarelas, vermelhas e cinzas apareciam deslocadas da palavra);
+  no .docx, o texto linha a linha (como no livro) não é mais esticado pelo alinhamento justificado;
+  ao abrir pelo Histórico, mostra "Abrindo o arquivo…" em vez de "arquivo não guardado" enquanto o original carrega.
 - **2.0.1**: removida a escolha de modelo na tela de extração; todas as extrações usam o modelo padrão.
 - **2.0.0**: reestruturação completa. Leitura página a página, modo Máxima precisão com
   verificação, releitura de região, dúvidas destacadas, dados estruturados com validação,

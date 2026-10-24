@@ -132,6 +132,8 @@ body.tem-doc .dz-ic{ width:36px; height:36px; font-size:1rem; margin:0; } body.t
 .ed-back{ position:absolute; inset:0; overflow-y:scroll; color:transparent; pointer-events:none; border-radius:14px; scrollbar-width:auto; }
 .ed-back::-webkit-scrollbar{ background:transparent; }
 .ed-back mark{ color:transparent; border-radius:3px; padding:0; }
+/* o realce precisa da MESMA fonte do editor: o estilo global do Atlas (* { font-family } ) não pode valer aqui */
+.ed-back *{ font:inherit; letter-spacing:inherit; word-spacing:inherit; }
 mark.m-duv{ background:var(--m-duv); } mark.m-ileg{ background:var(--m-ileg); } mark.m-esp{ background:var(--m-esp); } mark.m-pag{ background:var(--m-pag); }
 mark.m-foco{ outline:2px solid var(--ir-primary); }
 .editor{ position:relative; display:block; width:100%; min-height:58vh; border:0; border-radius:14px; background:transparent; color:var(--ir-text); outline:none; resize:vertical; overflow-y:scroll; margin:0; }

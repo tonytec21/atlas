@@ -318,7 +318,7 @@
     el('vwReextrair').disabled = !d.file || !n || d.status === 'processando';
     if (semVisual) {
       wrap.style.display = 'none'; msg.style.display = 'flex';
-      msg.innerHTML = !d.carregado ? '<div><i class="fa fa-spinner fa-spin fa-2x"></i><br><br>Abrindo o arquivo…</div>'
+      msg.innerHTML = (!d.carregado || d.baixando) ? '<div><i class="fa fa-spinner fa-spin fa-2x"></i><br><br>Abrindo o arquivo…</div>'
         : !d.file ? '<div><i class="fa fa-file-o fa-2x"></i><br><br>O arquivo original não está guardado no histórico<br>(ou já passou do prazo de retenção).</div>'
         : '<div><i class="fa fa-eye-slash fa-2x"></i><br><br>' + esc(d.erroCarga || 'Pré-visualização indisponível para este formato') + '.<br>O arquivo será enviado à IA como está.</div>';
       return;
@@ -1128,6 +1128,7 @@
     d.nome = it.arquivo_nome; d.histId = it.id; d.texto = it.texto || ''; d.dados = it.dados; d.status = 'pronto'; d.carregado = true;
     d.modelo = it.modelo || ''; d.tamanho = +it.arquivo_tamanho || 0; d.mime = it.arquivo_mime || ''; d.hash = it.arquivo_hash; d.unido = false;
     d.opcoes = { modo: it.modo, precisao: it.precisao, tipo: it.tipo_slug || 'auto', marcadores: true, digital: false };
+    d.baixando = !!it.tem_arquivo;   // enquanto o original é baixado, mostra "Abrindo o arquivo…" (e não "não está guardado")
     docs.push(d); exibirDoc(d);
     if (it.tem_arquivo) {
       try {
@@ -1135,12 +1136,12 @@
         if (!r.ok || (r.headers.get('Content-Type') || '').indexOf('application/json') === 0) throw new Error('arquivo indisponível');
         var blob = await r.blob();
         d.file = new File([blob], it.arquivo_nome, { type: it.arquivo_mime || blob.type });
-        d.tipoArq = tipoDoArquivo(d.file) || 'bruto'; d.carregado = false;
+        d.tipoArq = tipoDoArquivo(d.file) || 'bruto'; d.carregado = false; d.baixando = false;
         if (d === atual) mostrarPagina(0);
         await carregarDoc(d);
         d.paginas.forEach(function (p) { p.status = 'ok'; });
         if (d === atual) exibirDoc(d);
-      } catch (e) { d.file = null; if (d === atual) mostrarPagina(0); }
+      } catch (e) { d.file = null; d.baixando = false; if (d === atual) mostrarPagina(0); }
     }
   }
 

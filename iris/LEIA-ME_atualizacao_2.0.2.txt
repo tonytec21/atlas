@@ -1,0 +1,33 @@
+ATLAS IRIS — ATUALIZAÇÃO 2.0.2 (24/10/2026)
+=========================================
+
+A versão aparece ao lado do nome do módulo, nas telas do Iris (v2.0.2).
+Arquivos alterados: iris/config_iris.php (versão), iris/assets/iris.css,
+iris/assets/iris.js, iris/lib/docx.php e iris/LEIAME.md. Não há mudança no banco de dados.
+Basta copiar os arquivos por cima e, no Apache, reiniciar (OPcache).
+
+Correções encontradas durante a preparação dos vídeos de treinamento.
+
+1) REALCE DO EDITOR DESLOCADO DA PALAVRA (assets/iris.css)
+---------------------------------------------------------
+No editor de texto, o fundo colorido das marcações ([?leitura provável?] em
+amarelo, [ilegível] em vermelho, [assinatura], [carimbo], [selo] em cinza)
+aparecia deslocado: em linhas longas, o amarelo caía em outra palavra, às vezes
+na linha de baixo. A causa: o estilo geral do Atlas aplica a fonte Inter a todos
+os elementos, e o realce usava essa fonte, mais larga que a do editor. Agora o
+realce usa exatamente a mesma fonte do texto e fica sobre a palavra certa.
+
+2) DOCX COM AS LINHAS ESTICADAS (lib/docx.php)
+---------------------------------------------
+Ao baixar em Word um texto mantido linha a linha (como no livro, sem "Unir
+linhas"), cada linha saía esticada de margem a margem pelo alinhamento
+justificado ("Fls.          87"). Agora parágrafos com quebras de linha saem
+alinhados à esquerda; o texto corrido continua justificado.
+
+3) "ARQUIVO NÃO ESTÁ GUARDADO" AO ABRIR PELO HISTÓRICO (assets/iris.js)
+---------------------------------------------------------------------
+Ao abrir uma extração pelo Histórico (ou pelo aviso "Abrir o resultado
+anterior"), o visualizador mostrava por um instante "O arquivo original não
+está guardado no histórico", enquanto o original ainda estava sendo baixado.
+Agora aparece "Abrindo o arquivo…" até a imagem carregar; a mensagem de
+arquivo não guardado só aparece quando ele realmente não existe mais.
