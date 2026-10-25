@@ -20,7 +20,7 @@ function cap_pode_acessar()
     $username = $_SESSION['username'] ?? null;
     if (!$username) return false;
 
-    $conn = new mysqli('localhost', 'root', '', 'atlas');
+    $conn = new mysqli('localhost', 'root', '', 'atlas'); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
     if ($conn->connect_error) return false;
     $conn->set_charset('utf8mb4');
 

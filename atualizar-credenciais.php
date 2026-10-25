@@ -9,14 +9,14 @@ function saveFuncionario($id, $usuario, $senha, $nome_completo, $cargo) {
     $senha_base64 = base64_encode($senha);
 
     // Conexão com o banco de dados "atlas"
-    $connAtlas = new mysqli("localhost", "root", "", "atlas");
+    $connAtlas = new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlas); }
     if ($connAtlas->connect_error) {
         die("Falha na conexão com o banco atlas: " . $connAtlas->connect_error);
     }
     $connAtlas->set_charset("utf8");
 
     // Conexão com o banco de dados "oficios_db"
-    $connOficios = new mysqli("localhost", "root", "", "oficios_db");
+    $connOficios = new mysqli("localhost", "root", "", "oficios_db"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connOficios); }
     if ($connOficios->connect_error) {
         $connAtlas->close();
         die("Falha na conexão com o banco oficios_db: " . $connOficios->connect_error);
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Carregar dados do funcionário logado (atlas)
-$connAtlas = new mysqli("localhost", "root", "", "atlas");
+$connAtlas = new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlas); }
 if ($connAtlas->connect_error) {
     die("Falha na conexão com o banco atlas: " . $connAtlas->connect_error);
 }

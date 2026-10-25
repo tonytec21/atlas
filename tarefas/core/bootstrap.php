@@ -91,6 +91,7 @@ function db()
         ));
     }
 
+    /* atlas-auditoria */ if (is_file(__DIR__ . '/../../auditoria/hook.php')) { include_once __DIR__ . '/../../auditoria/hook.php'; atlas_aud_conexao($pdo); }
     return $pdo;
 }
 
@@ -105,7 +106,7 @@ function db_mysqli()
     if ($mysqli instanceof mysqli) {
         return $mysqli;
     }
-    $mysqli = new mysqli(TAREFAS_DB_HOST, TAREFAS_DB_USER, TAREFAS_DB_PASS, TAREFAS_DB_NAME);
+    $mysqli = new mysqli(TAREFAS_DB_HOST, TAREFAS_DB_USER, TAREFAS_DB_PASS, TAREFAS_DB_NAME); /* atlas-auditoria */ if (is_file(__DIR__ . '/../../auditoria/hook.php')) { include_once __DIR__ . '/../../auditoria/hook.php'; atlas_aud_conexao($mysqli); }
     if ($mysqli->connect_error) {
         throw new RuntimeException('Falha na conexão: ' . $mysqli->connect_error);
     }

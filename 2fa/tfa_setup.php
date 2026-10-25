@@ -15,7 +15,7 @@ if (!isset($_SESSION['username'])) {
 }
 $usuario = $_SESSION['username'];
 
-$conn = new mysqli('localhost', 'root', '', 'atlas');
+$conn = new mysqli('localhost', 'root', '', 'atlas'); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
 if ($conn->connect_error) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'erro' => 'Falha na conexão com o banco.']);

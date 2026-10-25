@@ -7,7 +7,7 @@ include(__DIR__ . '/db_connection.php');
 
 // Verificar o nível de acesso do usuário logado  
 $username = $_SESSION['username'];  
-$connAtlas = new mysqli("localhost", "root", "", "atlas");  
+$connAtlas = new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlas); }
 
 if ($connAtlas->connect_error) {  
     die("Falha na conexão com o banco atlas: " . $connAtlas->connect_error);  
@@ -1310,6 +1310,12 @@ $mode_query->close();
             <?php if ($nivel_de_acesso === 'administrador' || $tem_acesso_cadastro_funcionarios): ?>
             <div class="menu-section">
                 <div class="section-title">Administração</div>
+                <?php if ($nivel_de_acesso === 'administrador'): ?>
+                <a href="<?='http://'.$_SERVER['HTTP_HOST'].'/atlas/painel_admin/index.php'?>" class="menu-link">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Painel do Administrador</span>
+                </a>
+                <?php endif; ?>
                 
                 <button class="submenu-toggle" onclick="toggleSubmenu(this)">
                     <div class="submenu-toggle-content">

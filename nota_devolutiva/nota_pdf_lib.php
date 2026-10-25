@@ -48,7 +48,7 @@ function nd_build_nota_pdf($numero, $conn = null)
 {
     $ownConn = false;
     if (!($conn instanceof mysqli)) {
-        $conn = new mysqli('localhost', 'root', '', 'atlas');
+        $conn = new mysqli('localhost', 'root', '', 'atlas'); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
         if ($conn->connect_error) throw new RuntimeException('Falha na conexão com o banco.');
         $conn->set_charset('utf8');
         $ownConn = true;

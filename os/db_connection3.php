@@ -1,4 +1,5 @@
 <?php
+/* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; }
 require_once __DIR__ . '/atlas_tempo.php';
 
 $servername = "localhost";
@@ -7,7 +8,7 @@ $password = "";
 $dbname = "atlas";
 
 // Criar conexão
-$conn = new mysqli($servername, $username, $password, $dbname);
+$conn = new mysqli($servername, $username, $password, $dbname); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
 
 // Verificar conexão
 if ($conn->connect_error) {

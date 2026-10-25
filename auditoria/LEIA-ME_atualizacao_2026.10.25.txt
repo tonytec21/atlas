@@ -1,0 +1,243 @@
+ATLAS — ATUALIZAÇÃO 2026.10.25: PAINEL DO ADMINISTRADOR + AUDITORIA CENTRAL
+==========================================================================
+Versão: Painel do Administrador 1.0.0 · Auditoria central 1.0.0
+(a versão aparece no rodapé do Painel do Administrador)
+
+NOVO
+----
+• Pasta painel_admin/  — Painel do Administrador (veja painel_admin/LEIA-ME.txt).
+• Pasta auditoria/     — Auditoria central de todos os módulos (gancho, trilhas,
+                         gatilhos do banco, selagem em cadeia SHA-256).
+• Tabelas criadas sozinhas no primeiro acesso: atlas_auditoria,
+  atlas_auditoria_dados, atlas_auditoria_navegacao, atlas_auditoria_meta,
+  painel_config, painel_ia_analises.
+
+ALTERADOS
+---------
+• index.php  — card "Painel do Administrador" (só para o administrador).
+• menu.php   — item "Painel do Administrador" na seção Administração (só administrador).
+
+• Ligação da auditoria nos módulos: uma linha marcada com "atlas-auditoria"
+  foi acrescentada (sem mudar nenhuma outra linha nem a lógica dos módulos):
+    - no início dos arquivos de sessão/conexão (inclui auditoria/hook.php);
+    - logo depois de cada conexão com o banco (marca a conexão com o usuário,
+      para os gatilhos saberem quem alterou cada registro).
+  Se a pasta auditoria/ não existir, essas linhas não fazem nada.
+
+  2fa:
+      2fa/tfa_setup.php
+  agendamento:
+      agendamento/db_connection.php
+      agendamento/logout.php
+      agendamento/session_check.php
+  arquivamento:
+      arquivamento/bootstrap.php
+      arquivamento/db_connection.php
+      arquivamento/diagnostico-capa.php
+      arquivamento/logout.php
+      arquivamento/session_check.php
+      arquivamento/session_check2.php
+  (raiz do Atlas):
+      atualizar-credenciais.php
+      cadastro-funcionario.php
+      cadastro-serventia.php
+      checar_acesso_cadastro.php
+      checar_acesso_caixa.php
+      checar_acesso_de_administrador.php
+      check_login.php
+      db_connection.php
+      execute-all.php
+      index.php
+      index_antigo.php
+      liberar_os.php
+      logout.php
+      menu.php
+      session_check.php
+      verificar-2fa.php
+  caixa:
+      caixa/db_connection.php
+      caixa/db_connection2.php
+      caixa/logout.php
+      caixa/session_check.php
+  checklist:
+      checklist/db_connection.php
+      checklist/db_connection2.php
+      checklist/logout.php
+      checklist/session_check.php
+  contas_a_pagar:
+      contas_a_pagar/checar_acesso_de_administrador.php
+      contas_a_pagar/config.php
+      contas_a_pagar/guard_acesso.php
+      contas_a_pagar/logout.php
+      contas_a_pagar/session_check.php
+  dimensor:
+      dimensor/db_connection.php
+      dimensor/db_connection2.php
+      dimensor/logout.php
+      dimensor/session_check.php
+  forja:
+      forja/db_connection.php
+      forja/session_check.php
+  gerador_de_registro:
+      gerador_de_registro/cadastro-hipoteca.php
+      gerador_de_registro/cadastro-penhor.php
+      gerador_de_registro/db_connection.php
+      gerador_de_registro/session_check.php
+  gnomon:
+      gnomon/config.php
+      gnomon/guard_acesso.php
+      gnomon/logout.php
+      gnomon/session_check.php
+  guia_de_recebimento:
+      guia_de_recebimento/db_connection.php
+      guia_de_recebimento/guia-recebimento.php
+      guia_de_recebimento/guia_recebimento.php
+      guia_de_recebimento/logout.php
+      guia_de_recebimento/session_check.php
+      guia_de_recebimento/triagem_comunitario/db_connection.php
+      guia_de_recebimento/triagem_comunitario/guia_de_impressao.php
+      guia_de_recebimento/triagem_comunitario/logout.php
+      guia_de_recebimento/triagem_comunitario/session_check.php
+      guia_de_recebimento/triagem_comunitario_online/db_connection.php
+      guia_de_recebimento/triagem_comunitario_online/guia_de_impressao.php
+      guia_de_recebimento/triagem_comunitario_online/logout.php
+      guia_de_recebimento/triagem_comunitario_online/session_check.php
+      guia_de_recebimento/vincular_tarefa.php
+  indexador:
+      indexador/carga_crc/db_connection.php
+      indexador/carga_crc/logout.php
+      indexador/carga_crc/session_check.php
+      indexador/casamento/db_connection.php
+      indexador/casamento/logout.php
+      indexador/casamento/session_check.php
+      indexador/db_connection.php
+      indexador/index.php
+      indexador/logout.php
+      indexador/nascimento/db_connection.php
+      indexador/nascimento/logout.php
+      indexador/nascimento/session_check.php
+      indexador/obito/db_connection.php
+      indexador/obito/logout.php
+      indexador/obito/session_check.php
+      indexador/session_check.php
+      indexador/validar_xml/db_connection.php
+      indexador/validar_xml/logout.php
+      indexador/validar_xml/session_check.php
+  iris:
+      iris/db_connection.php
+      iris/session_check.php
+  manuais:
+      manuais/conexao_bd.php
+      manuais/db_connection.php
+      manuais/logout.php
+      manuais/session_check.php
+  nota_devolutiva:
+      nota_devolutiva/assinatura_nota_config.php
+      nota_devolutiva/db_connection.php
+      nota_devolutiva/db_connection2.php
+      nota_devolutiva/logout.php
+      nota_devolutiva/nota_pdf_lib.php
+      nota_devolutiva/session_check.php
+  oficios:
+      oficios/assinatura_config.php
+      oficios/busca_helper.php
+      oficios/cadastrar-oficio.php
+      oficios/config.php
+      oficios/corrigir_escapes_corpo.php
+      oficios/db_connection.php
+      oficios/db_connection2.php
+      oficios/edit_oficio.php
+      oficios/get_oficio_details.php
+      oficios/get_status.php
+      oficios/get_tarefa_token.php
+      oficios/listar_oficios.php
+      oficios/lock_oficio.php
+      oficios/logout.php
+      oficios/save_oficio.php
+      oficios/session_check.php
+      oficios/verificar_tarefa.php
+      oficios/view-oficio.php
+      oficios/view_oficio.php
+  oraculo:
+      oraculo/db_connection.php
+  os:
+      os/assinatura_os_config.php
+      os/buscar_ano_os.php
+      os/db_connection.php
+      os/db_connection2.php
+      os/db_connection3.php
+      os/db_connection_guia.php
+      os/logout.php
+      os/pagamento_anexos_config.php
+      os/pagamento_online/pe_lib.php
+      os/session_check.php
+  pedidos_certidao:
+      pedidos_certidao/db_connection.php
+      pedidos_certidao/logout.php
+  prov213:
+      prov213/p213_lib.php
+  provimentos:
+      provimentos/db_connection.php
+      provimentos/db_connection2.php
+      provimentos/logout.php
+      provimentos/session_check.php
+  relatorios:
+      relatorios/checar_acesso_de_administrador.php
+      relatorios/db_connection.php
+      relatorios/db_connection2.php
+      relatorios/logout.php
+      relatorios/session_check.php
+  requerimento_retificacao:
+      requerimento_retificacao/db_connection.php
+      requerimento_retificacao/session_check.php
+  reurb:
+      reurb/db_connection.php
+      reurb/db_connection_kml.php
+      reurb/logout.php
+      reurb/session_check.php
+  selador:
+      selador/db_connection.php
+  signum:
+      signum/config_assinatura.php
+      signum/db_connection.php
+      signum/session_check.php
+  suas_notas:
+      suas_notas/db_connection.php
+      suas_notas/helpers.php
+      suas_notas/logout.php
+      suas_notas/session_check.php
+  tabela_de_emolumentos:
+      tabela_de_emolumentos/db_connection.php
+      tabela_de_emolumentos/session_check.php
+  tarefas:
+      tarefas/core/bootstrap.php
+      tarefas/db_connection.php
+      tarefas/logout.php
+      tarefas/protocolo-geral.php
+      tarefas/protocolo_geral.php
+      tarefas/recibo-entrega.php
+      tarefas/recibo_entrega.php
+      tarefas/session_check.php
+      tarefas/ver-oficio.php
+      tarefas/ver_oficio.php
+  update_atlas:
+      update_atlas/db_connection_atualizacao.php
+      update_atlas/execute63.php
+  vertex:
+      vertex/db_connection.php
+      vertex/db_connection2.php
+      vertex/logout.php
+      vertex/session_check.php
+
+COMO INSTALAR
+-------------
+1. Copie as pastas auditoria/ e painel_admin/ e os arquivos acima para a pasta
+   do Atlas (substituindo).
+2. Entre com o usuário administrador e abra o Painel do Administrador: as tabelas
+   são criadas e os gatilhos do banco instalados. Confira a aba Integridade.
+3. (Opcional) Configure a análise com IA em Configurações › Análise com IA.
+
+Requisitos: PHP 7.4+ com openssl e curl; MySQL 5.7.8+ ou MariaDB 10.2.3+ para a
+trilha de dados (antes/depois). Sem isso, a trilha de operações funciona normalmente.
+Desligamento de emergência: criar o arquivo vazio auditoria/dados/DESLIGAR.
+Manutenção agendada (opcional): php auditoria/manutencao.php (veja painel_admin/LEIA-ME.txt).

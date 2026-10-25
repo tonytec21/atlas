@@ -1,4 +1,5 @@
 <?php  
+/* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; }
 /**  
  * Arquivo de conexão com o banco de dados  
  * Estabelece a conexão PDO e define funções auxiliares para o sistema  
@@ -28,7 +29,7 @@ $dsn = "mysql:host=$host;dbname=$banco;charset=$charset";
 
 // Estabelecer a conexão  
 try {  
-    $conexao = new PDO($dsn, $usuario, $senha, $opcoes);  
+    $conexao = new PDO($dsn, $usuario, $senha, $opcoes); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conexao); }
 } catch (PDOException $e) {  
     // Registrar erro no log e exibir mensagem genérica  
     error_log("Erro de conexão: " . $e->getMessage());  

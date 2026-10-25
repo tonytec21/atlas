@@ -7,7 +7,7 @@ date_default_timezone_set('America/Sao_Paulo');
 $triagem_id = isset($_GET['id']) ? $_GET['id'] : 0;
 
 // Conexão com o banco de dados
-$conn = new mysqli($servername, $username, $password, $dbname);
+$conn = new mysqli($servername, $username, $password, $dbname); /* atlas-auditoria */ if (is_file(__DIR__ . '/../../auditoria/hook.php')) { include_once __DIR__ . '/../../auditoria/hook.php'; atlas_aud_conexao($conn); }
 $conn->set_charset("utf8");
 
 if ($conn->connect_error) {

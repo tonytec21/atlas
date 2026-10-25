@@ -1,4 +1,5 @@
 <?php
+/* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; }
 session_start();
 include(__DIR__ . '/db_connection.php');
 
@@ -29,7 +30,7 @@ function saveAccessLog($username, $nomeCompleto) {
     $dataHora = date('Y-m-d H:i:s');
 
     // Conexão com o banco de dados "atlas"
-    $conn = new mysqli("localhost", "root", "", "atlas");
+    $conn = new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($conn); }
     if ($conn->connect_error) {
         die("Falha na conexão com o banco atlas: " . $conn->connect_error);
     }
@@ -50,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'];
 
     // Conexão com o banco de dados "atlas"
-    $conn = new mysqli("localhost", "root", "", "atlas");
+    $conn = new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($conn); }
     if ($conn->connect_error) {
         die("Falha na conexão com o banco atlas: " . $conn->connect_error);
     }

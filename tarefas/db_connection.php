@@ -1,4 +1,5 @@
 <?php
+/* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; }
 /**
  * Atlas · Tarefas — compatibilidade: db_connection.php.
  *

@@ -297,6 +297,7 @@ function arq_db()
         error_log('[arquivamento] Falha de conexão: ' . $e->getMessage());
         return null; // o módulo continua funcionando sem selos
     }
+    /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($pdo); }
     return $pdo;
 }
 

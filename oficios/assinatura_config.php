@@ -40,7 +40,7 @@ function assin_db()
     if ($conn instanceof mysqli) {
         return $conn;
     }
-    $conn = new mysqli('localhost', 'root', '', 'oficios_db');
+    $conn = new mysqli('localhost', 'root', '', 'oficios_db'); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
     if ($conn->connect_error) {
         throw new RuntimeException('Falha na conexão com o banco: ' . $conn->connect_error);
     }

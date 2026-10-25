@@ -1,0 +1,100 @@
+ATLAS — PAINEL DO ADMINISTRADOR E AUDITORIA CENTRAL (v1.0.0)
+============================================================
+
+O QUE É
+-------
+Um painel exclusivo do administrador (nível "administrador") com:
+
+  • Visão geral ...... saúde da serventia (0 a 100), indicadores do período com
+                       comparação com o período anterior, alertas inteligentes,
+                       destaques da equipe e eventos críticos da auditoria.
+  • Faturamento ...... recebido, atos praticados, emolumentos x fundos, formas de
+                       pagamento, balanço (entradas x saídas), acumulado x período
+                       anterior, atos que mais faturaram, depósito prévio parado.
+  • Equipe ........... pontuação de cada colaborador (produção, atendimento,
+                       recebimentos, tarefas, pontualidade e qualidade), gráfico
+                       radar, mapa de calor dos horários e comparativo completo.
+  • Serventia ........ O.S., tempo até o primeiro ato, tarefas no prazo, pedidos de
+                       certidão, tabelas de atos e uso dos módulos.
+  • Auditoria ........ trilha de TODAS as operações de TODOS os módulos (quem, quando,
+                       de onde, o que enviou, resultado), alterações registro a
+                       registro com ANTES e DEPOIS, telas abertas e as trilhas que
+                       cada módulo já mantinha. Filtros, busca e exportação em CSV.
+  • Acessos .......... entradas, tentativas recusadas, acessos negados, horários,
+                       IPs (inclusive IPs novos), dispositivos e situação do 2FA.
+  • Integridade ...... verificação das cadeias de hash (SHA-256) da auditoria central
+                       e das trilhas do Caixa, das O.S. e das transferências de saldo.
+  • Análise IA ....... relatório escrito pelo Google Gemini ou pelo Anthropic Claude
+                       (opcional, em Configurações).
+
+Acesso: card "Painel do Administrador" na tela inicial e item no menu lateral
+(Administração), visíveis só para o administrador. Endereço: /atlas/painel_admin/
+
+
+COMO A AUDITORIA FUNCIONA (pasta auditoria/)
+--------------------------------------------
+1) Trilha de operações (tabela atlas_auditoria)
+   O arquivo auditoria/hook.php é carregado pelos arquivos de sessão e de conexão
+   de todos os módulos (session_check.php, db_connection*.php e afins — linhas
+   marcadas com "atlas-auditoria"). Ele não muda nada na página: no fim de cada
+   requisição registra a operação (inclusões, alterações, exclusões, downloads,
+   entradas e saídas do sistema, tentativas recusadas, acessos negados).
+   Senhas, chaves, tokens e códigos são gravados mascarados (••••••).
+
+2) Trilha de dados (tabela atlas_auditoria_dados)
+   Gatilhos (triggers) do MySQL em cada tabela gravam o valor ANTES e DEPOIS de
+   cada registro incluído, alterado ou excluído — inclusive alterações feitas
+   direto no banco, fora do Atlas. Cada linha aponta para a operação que a gerou.
+   Colunas de senha/segredo aparecem como "[protegido]".
+   Os gatilhos são instalados sozinhos (ao abrir o painel ou em poucos minutos de
+   uso) e refeitos quando surge tabela/coluna nova ou quando algum some.
+   Requer MySQL 5.7.8+ ou MariaDB 10.2.3+ (funções JSON).
+
+3) Telas abertas (tabela atlas_auditoria_navegacao)
+   Cada tela aberta por cada usuário. Guardada por 180 dias (configurável).
+
+Integridade: as linhas das três trilhas são seladas em cadeia SHA-256 segundos
+depois de gravadas; uma âncora fora do banco (auditoria/dados/ancora.json) acusa
+até a remoção das últimas linhas.
+
+Regra de ouro: a auditoria nunca impede o uso do sistema. Qualquer falha dela vai
+só para o error_log do PHP; os gatilhos têm tratamento de erro próprio.
+
+Manutenção (selagem, gatilhos de tabelas novas, prazo de guarda): roda ao abrir o
+Painel do Administrador. Para rodar também fora do horário, agende no Windows:
+    C:\xampp\php\php.exe C:\xampp\htdocs\atlas\auditoria\manutencao.php
+As páginas comuns nunca recriam gatilhos (isso não atrasa o atendimento).
+
+Backups: inclua as tabelas atlas_auditoria* no backup do banco. Se um backup for
+restaurado sem elas, a própria auditoria recria as tabelas na primeira operação.
+Se o banco for levado para outro servidor, abra o painel: os gatilhos são
+recriados com o usuário do MySQL daquele servidor.
+
+Desligamento de emergência: crie o arquivo vazio auditoria/dados/DESLIGAR
+(o gancho para de registrar imediatamente; os gatilhos podem ser removidos
+desligando "Trilha de dados" em Configurações › Auditoria).
+
+
+ANÁLISE COM IA
+--------------
+Configurações › Análise com IA:
+  1. Ative, escolha Google Gemini ou Anthropic Claude e cole a chave da API
+     (aistudio.google.com ou console.anthropic.com).
+  2. Clique em "Carregar modelos": a lista vem da API do provedor e mostra só os
+     modelos que a chave pode usar. Escolha um e salve.
+  3. Opcional: geração automática (1x por dia por período), anonimização dos
+     nomes dos funcionários e orientações próprias (ex.: metas).
+A chave fica criptografada (AES-256-GCM) com a chave-mestra em
+painel_admin/seguranca/.masterkey — faça backup dessa pasta junto com o banco.
+Só indicadores agregados são enviados; nomes de clientes, CPFs, documentos e o
+conteúdo das operações nunca saem do servidor.
+
+
+INSTALAÇÃO / ATUALIZAÇÃO
+------------------------
+Copie as pastas auditoria/ e painel_admin/ e os arquivos alterados (lista em
+LEIA-ME_atualizacao_2026.10.25.txt). Nada precisa ser executado: as tabelas são
+criadas no primeiro acesso. Abra o Painel do Administrador uma vez para instalar
+os gatilhos e conferir a aba Integridade.
+Servidor web: as pastas auditoria/ e painel_admin/seguranca/ já trazem .htaccess
+negando acesso pela web.

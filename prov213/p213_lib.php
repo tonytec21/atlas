@@ -29,7 +29,7 @@ function p213_db() {
     static $conn = null;
     if ($conn instanceof mysqli) return $conn;
     mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-    $conn = new mysqli(P213_DB_HOST, P213_DB_USER, P213_DB_PASS, P213_DB_NAME);
+    $conn = new mysqli(P213_DB_HOST, P213_DB_USER, P213_DB_PASS, P213_DB_NAME); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
     $conn->set_charset(P213_DB_CHARSET);
 
     // Auto-provisionamento: cria/atualiza o schema no primeiro acesso ao módulo,

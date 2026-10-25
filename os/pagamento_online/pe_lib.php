@@ -49,6 +49,7 @@ function pe_pdo(): PDO
 
     atlas_alinhar_fuso($pdo);
 
+    /* atlas-auditoria */ if (is_file(__DIR__ . '/../../auditoria/hook.php')) { include_once __DIR__ . '/../../auditoria/hook.php'; atlas_aud_conexao($pdo); }
     return $pdo;
 }
 
@@ -277,7 +278,27 @@ function pe_saldo_devido(int $osId): float
     } catch (Throwable $e) {
     }
 
-    return round($totalOs + $repasses - ($pago - $devolvido), 2);
+    // Transferências de saldo entre O.S. (somente ativas): recebida abate o
+    // devido, enviada volta a ser devida. A tabela pode não existir.
+    $tsEntrada = 0.0;
+    $tsSaida = 0.0;
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(CASE WHEN os_destino_id = ? THEN valor ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN os_origem_id  = ? THEN valor ELSE 0 END), 0)
+               FROM os_transferencias_saldo
+              WHERE status = 'ativa' AND (os_origem_id = ? OR os_destino_id = ?)"
+        );
+        $stmt->execute([$osId, $osId, $osId, $osId]);
+        $r = $stmt->fetch(PDO::FETCH_NUM);
+        if ($r) {
+            $tsEntrada = (float) $r[0];
+            $tsSaida = (float) $r[1];
+        }
+    } catch (Throwable $e) {
+    }
+
+    return round($totalOs + $repasses - ($pago + $tsEntrada - $devolvido - $tsSaida), 2);
 }
 
 /**

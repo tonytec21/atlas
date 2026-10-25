@@ -1,4 +1,5 @@
 <?php
+/* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; }
 /**
  * Conexão unificada com o banco:
  *  - $conn  => mysqli (usado pelos scripts que chamam bind_param, prepare(), etc.)
@@ -16,7 +17,7 @@ if (!isset($GLOBALS['conn']) || !($GLOBALS['conn'] instanceof mysqli)) {
     $DB_CHARSET = 'utf8mb4';
 
     // Conexão mysqli (padrão do sistema)
-    $conn = @new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
+    $conn = @new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
     if ($conn->connect_errno) {
         // Pare com mensagem clara (você pode trocar por um throw se preferir)
         die('Erro ao conectar ao MySQL (mysqli): ' . $conn->connect_error);
@@ -52,7 +53,7 @@ if (!function_exists('getDatabaseConnection')) {
         ];
 
         try {
-            $pdo = new PDO($dsn, $user, $pass, $options);
+            $pdo = new PDO($dsn, $user, $pass, $options); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($pdo); }
         } catch (PDOException $e) {
             // Propaga o erro de forma clara
             throw new PDOException('Erro ao conectar ao MySQL (PDO): ' . $e->getMessage(), (int)$e->getCode());

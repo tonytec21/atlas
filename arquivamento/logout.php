@@ -1,4 +1,5 @@
 <?php
+/* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; }
 require_once __DIR__ . '/bootstrap.php';
 $_SESSION = [];
 if (ini_get('session.use_cookies')) {

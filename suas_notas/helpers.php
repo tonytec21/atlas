@@ -12,7 +12,7 @@ function notas_db()
 {
     static $c = null;
     if ($c instanceof mysqli && @$c->ping()) return $c;
-    $c = new mysqli('localhost', 'root', '', 'atlas');
+    $c = new mysqli('localhost', 'root', '', 'atlas'); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($c); }
     if ($c->connect_error) throw new RuntimeException('Falha na conexão com o banco.');
     $c->set_charset('utf8mb4');
     return $c;

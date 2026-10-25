@@ -7,13 +7,13 @@ date_default_timezone_set('America/Sao_Paulo');
 // Função para atualizar os dados nos dois bancos de dados
 function updateServentia($razao_social, $cidade, $status, $cns) {
     // Conexão com o banco de dados "atlas"
-    $connAtlas = new mysqli("localhost", "root", "", "atlas");
+    $connAtlas = new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlas); }
     if ($connAtlas->connect_error) {
         die("Falha na conexão com o banco atlas: " . $connAtlas->connect_error);
     }
 
     // Conexão com o banco de dados "oficios_db"
-    $connOficios = new mysqli("localhost", "root", "", "oficios_db");
+    $connOficios = new mysqli("localhost", "root", "", "oficios_db"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connOficios); }
     if ($connOficios->connect_error) {
         die("Falha na conexão com o banco oficios_db: " . $connOficios->connect_error);
     }
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Conexão com o banco de dados "atlas"
-$connAtlas = new mysqli("localhost", "root", "", "atlas");
+$connAtlas = new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlas); }
 if ($connAtlas->connect_error) {
     die("Falha na conexão com o banco atlas: " . $connAtlas->connect_error);
 }

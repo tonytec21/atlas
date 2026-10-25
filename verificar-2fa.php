@@ -1,4 +1,5 @@
 <?php
+/* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; }
 /**
  * Segunda etapa do login (2FA / TOTP).
  * Só é alcançada quando o usuário tem a verificação em duas etapas ativada:
@@ -34,7 +35,7 @@ function tfaGetUserIp() {
 
 function tfaSaveAccessLog($username, $nomeCompleto) {
     date_default_timezone_set('America/Sao_Paulo');
-    $conn = new mysqli('localhost', 'root', '', 'atlas');
+    $conn = new mysqli('localhost', 'root', '', 'atlas'); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($conn); }
     if ($conn->connect_error) return;
     $ip = tfaGetUserIp();
     $dataHora = date('Y-m-d H:i:s');

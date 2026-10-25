@@ -31,7 +31,7 @@ function brDatetime(?string $s): string {
    0) MIGRAÇÃO: tabela de log
    ========================================================================= */
 try {
-    $connAtlasMig = new mysqli("localhost","root","","atlas");
+    $connAtlasMig = new mysqli("localhost","root","","atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlasMig); }
     if (!$connAtlasMig->connect_error) {
         $connAtlasMig->set_charset("utf8mb4");
         $sqlLog = <<<SQL
@@ -95,7 +95,7 @@ if (isset($_POST['acao']) && in_array($_POST['acao'], ['resumo','liberar'], true
     }
 
     try {
-        $connAtlas = new mysqli("localhost","root","","atlas");
+        $connAtlas = new mysqli("localhost","root","","atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlas); }
         if ($connAtlas->connect_error) {
             echo json_encode(['ok'=>false,'message'=>'Falha na conexão com banco atlas: '.$connAtlas->connect_error]);
             error_reporting($prevReporting); @ini_set('display_errors', $prevDisplay); exit;
@@ -244,7 +244,7 @@ if (isset($_POST['acao']) && in_array($_POST['acao'], ['resumo','liberar'], true
    ========================================================================= */
 $logs = [];
 try {
-    $connAtlasList = new mysqli("localhost","root","","atlas");
+    $connAtlasList = new mysqli("localhost","root","","atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlasList); }
     if (!$connAtlasList->connect_error) {
         $connAtlasList->set_charset("utf8mb4");
         $rs = $connAtlasList->query("SELECT id, ordem_servico_id, usuario_id, usuario_nome, ip, criado_em,

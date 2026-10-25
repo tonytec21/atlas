@@ -7,7 +7,7 @@ date_default_timezone_set('America/Sao_Paulo');
 
 // Verificar o nível de acesso do usuário logado  
 $username = $_SESSION['username'];  
-$connAtlas = new mysqli("localhost", "root", "", "atlas");  
+$connAtlas = new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlas); }
 
 // Consulta para verificar o nível de acesso e acesso adicional do usuário  
 $sql = "SELECT nivel_de_acesso, acesso_adicional FROM funcionarios WHERE usuario = ?";  
@@ -1210,6 +1210,23 @@ $tem_acesso_controle_tarefas = in_array('Controle de Tarefas', $acessos);
             </button>  
         </div> 
         
+        <!-- Painel do Administrador (somente administrador) -->
+        <?php if ($nivel_de_acesso === 'administrador'): ?>
+        <div class="module-card" id="card-painel-admin">
+            <div class="card-header">
+                <span class="card-badge badge-administrativo">Administrativo</span>
+                <div class="card-icon" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #0e7490 100%); color: white;">
+                    <i class="fa fa-shield"></i>
+                </div>
+            </div>
+            <h3 class="card-title">Painel do Administrador</h3>
+            <p class="card-description">Auditoria de todos os módulos, acessos, faturamento, desempenho da equipe e análise com IA.</p>
+            <button class="card-button" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white;" onclick="window.location.href='painel_admin/index.php'">
+                <i class="fa fa-arrow-right"></i> Acessar Módulo
+            </button>
+        </div>
+        <?php endif; ?>
+
         <!-- Pedidos de Certidão -->
         <div class="module-card" id="card-pedidos-certidao">
             <div class="card-header">

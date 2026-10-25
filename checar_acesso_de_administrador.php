@@ -1,7 +1,7 @@
 <?php
 // Verificar o nível de acesso do usuário logado
 $username = $_SESSION['username'];
-$connAtlas = new mysqli("localhost", "root", "", "atlas");
+$connAtlas = new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlas); }
 
 // Consulta para verificar o nível de acesso do usuário
 $sql = "SELECT nivel_de_acesso FROM funcionarios WHERE usuario = ?";

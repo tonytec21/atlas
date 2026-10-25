@@ -3,7 +3,7 @@ include(__DIR__ . '/session_check.php');
 include(__DIR__ . '/db_connection.php');
 checkSession();
 
-$conn = new mysqli($servername, $username, $password, "atlas");
+$conn = new mysqli($servername, $username, $password, "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
 if ($conn->connect_error) {
     die("Falha na conexão: " . $conn->connect_error);
 }

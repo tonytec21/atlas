@@ -91,7 +91,7 @@ echo "\n";
 
 /* ---------- Selos ---------- */
 echo "-- SELOS --\n";
-$conn = @new mysqli(ARQ_DB_HOST, ARQ_DB_USER, ARQ_DB_PASS, ARQ_DB_NAME);
+$conn = @new mysqli(ARQ_DB_HOST, ARQ_DB_USER, ARQ_DB_PASS, ARQ_DB_NAME); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
 if ($conn->connect_error) {
     linha('Conexão mysqli', 'FALHOU — ' . $conn->connect_error);
 } else {

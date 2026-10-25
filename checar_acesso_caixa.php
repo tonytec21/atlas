@@ -6,7 +6,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 $username = $_SESSION['username'] ?? '';
 
 // Conexão
-$connAtlas = @new mysqli("localhost", "root", "", "atlas");
+$connAtlas = @new mysqli("localhost", "root", "", "atlas"); /* atlas-auditoria */ if (is_file(__DIR__ . '/auditoria/hook.php')) { include_once __DIR__ . '/auditoria/hook.php'; atlas_aud_conexao($connAtlas); }
 if ($connAtlas && !$connAtlas->connect_error) {
     $connAtlas->set_charset("utf8mb4");
 

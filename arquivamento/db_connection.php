@@ -1,4 +1,5 @@
 <?php
+/* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; }
 /**
  * Compatibilidade: expõe $conn (mysqli) para arquivos antigos deste módulo.
  * Código novo deve usar arq_db() (PDO com prepared statements).
@@ -6,7 +7,7 @@
  */
 require_once __DIR__ . '/config.php';
 
-$conn = new mysqli(ARQ_DB_HOST, ARQ_DB_USER, ARQ_DB_PASS, ARQ_DB_NAME);
+$conn = new mysqli(ARQ_DB_HOST, ARQ_DB_USER, ARQ_DB_PASS, ARQ_DB_NAME); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
 if ($conn->connect_error) {
     error_log('[arquivamento] Falha de conexao mysqli: ' . $conn->connect_error);
     if (!headers_sent()) { http_response_code(503); }

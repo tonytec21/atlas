@@ -8,7 +8,7 @@ $username = "root";
 $password = "";
 $dbname = "atlas";
 
-$conn = new mysqli($servername, $username, $password, $dbname);
+$conn = new mysqli($servername, $username, $password, $dbname); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
 
 // Verifica a conexão
 if ($conn->connect_error) {

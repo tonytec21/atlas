@@ -36,7 +36,7 @@ function ofb_db()
     $password   = "";
     $dbname     = "oficios_db";
 
-    $conn = new mysqli($servername, $username, $password, $dbname);
+    $conn = new mysqli($servername, $username, $password, $dbname); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
     if ($conn->connect_error) {
         throw new RuntimeException('Falha na conexao com o banco: ' . $conn->connect_error);
     }

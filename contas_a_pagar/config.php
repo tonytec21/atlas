@@ -294,7 +294,7 @@ function cap_db()
 {
     static $conn = null;
     if ($conn instanceof mysqli && @$conn->ping()) return $conn;
-    $conn = new mysqli('localhost', 'root', '', 'atlas');
+    $conn = new mysqli('localhost', 'root', '', 'atlas'); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($conn); }
     if ($conn->connect_error) throw new RuntimeException('Falha na conexão com o banco.');
     $conn->set_charset('utf8mb4');
     return $conn;

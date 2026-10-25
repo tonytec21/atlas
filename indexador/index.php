@@ -21,7 +21,7 @@ function atlasDb() {
         }
     }
     if (defined('DB_HOST') && defined('DB_USER') && defined('DB_PASS') && defined('DB_NAME')) {
-        $m = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+        $m = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME); /* atlas-auditoria */ if (is_file(__DIR__ . '/../auditoria/hook.php')) { include_once __DIR__ . '/../auditoria/hook.php'; atlas_aud_conexao($m); }
         if ($m && !$m->connect_errno) {
             return ['driver' => 'mysqli', 'conn' => $m];
         }
