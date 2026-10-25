@@ -295,6 +295,19 @@ try {
     }
     $whereDepSql = 'WHERE ' . implode(' AND ', $whereDep);
 
+    /* Transferências de saldo entre O.S. (módulo O.S.): o crédito RECEBIDO conta como
+       depósito da O.S. de destino e o ENVIADO sai do saldo da O.S. de origem — mesma regra
+       do saldo da O.S. e do Livro de Depósito Prévio. Estornadas não contam. */
+    $temTransf = false;
+    $rt = $conn->query("SHOW TABLES LIKE 'os_transferencias_saldo'");
+    if ($rt) { $temTransf = $rt->num_rows > 0; $rt->free(); }
+    $depTransfEntrada   = $temTransf ? "UNION ALL SELECT os_destino_id, valor FROM os_transferencias_saldo WHERE status = 'ativa'" : '';
+    $depTransfSaidaJoin = $temTransf ? "LEFT JOIN (
+                SELECT os_origem_id, SUM(valor) AS env
+                FROM os_transferencias_saldo WHERE status = 'ativa' GROUP BY os_origem_id
+            ) ts ON ts.os_origem_id = os.id" : '';
+    $depTransfSaidaCol  = $temTransf ? 'COALESCE(ts.env, 0)' : '0';
+
     $sqlDep = "
         SELECT * FROM (
             SELECT
@@ -303,14 +316,18 @@ try {
                 COALESCE(a.cons, 0) + COALESCE(am.cons, 0)      AS consumido,
                 COALESCE(r.rep, 0)                              AS repassado,
                 COALESCE(d.dev, 0)                              AS devolvido,
+                $depTransfSaidaCol                              AS transferido,
                 COALESCE(p.dep, 0)
                   - (COALESCE(a.cons, 0) + COALESCE(am.cons, 0))
                   - COALESCE(r.rep, 0)
-                  - COALESCE(d.dev, 0)                          AS saldo
+                  - COALESCE(d.dev, 0)
+                  - $depTransfSaidaCol                          AS saldo
             FROM ordens_de_servico os
             INNER JOIN (
-                SELECT ordem_de_servico_id, SUM(total_pagamento) AS dep
-                FROM pagamento_os GROUP BY ordem_de_servico_id
+                SELECT ordem_de_servico_id, SUM(v) AS dep FROM (
+                    SELECT ordem_de_servico_id, total_pagamento AS v FROM pagamento_os
+                    $depTransfEntrada
+                ) dd GROUP BY ordem_de_servico_id
             ) p  ON p.ordem_de_servico_id = os.id
             LEFT JOIN (
                 SELECT ordem_servico_id, SUM(total) AS cons
@@ -328,6 +345,7 @@ try {
                 SELECT ordem_de_servico_id, SUM(total_devolucao) AS dev
                 FROM devolucao_os GROUP BY ordem_de_servico_id
             ) d  ON d.ordem_de_servico_id = os.id
+            $depTransfSaidaJoin
             $whereDepSql
         ) t
         WHERE t.saldo > 0.009
@@ -336,13 +354,14 @@ try {
     $listaDep = runQuery($conn, $sqlDep, $typesDep, $paramsDep);
 
     // Totais do depósito prévio
-    $depTotais = ['total_saldo'=>0,'total_depositado'=>0,'total_consumido'=>0,'total_repassado'=>0,'total_devolvido'=>0,'qtd_os'=>0];
+    $depTotais = ['total_saldo'=>0,'total_depositado'=>0,'total_consumido'=>0,'total_repassado'=>0,'total_devolvido'=>0,'total_transferido'=>0,'qtd_os'=>0];
     foreach ($listaDep as $row) {
         $depTotais['total_saldo']       += (float)$row['saldo'];
         $depTotais['total_depositado']  += (float)$row['depositado'];
         $depTotais['total_consumido']   += (float)$row['consumido'];
         $depTotais['total_repassado']   += (float)$row['repassado'];
         $depTotais['total_devolvido']   += (float)$row['devolvido'];
+        $depTotais['total_transferido'] += (float)$row['transferido'];
         $depTotais['qtd_os']++;
     }
 
@@ -373,9 +392,10 @@ try {
 
     $sqlRep = "
         SELECT rc.id, rc.ordem_de_servico_id, rc.cliente,
-               TRIM(rc.funcionario) AS funcionario,
+               COALESCE(NULLIF(f.nome_completo,''), TRIM(rc.funcionario)) AS funcionario,
                rc.data_repasse, rc.total_repasse, rc.forma_repasse
         FROM repasse_credor rc
+        LEFT JOIN funcionarios f ON f.usuario = TRIM(rc.funcionario)
         $whereRepSql
         ORDER BY rc.data_repasse DESC
     ";

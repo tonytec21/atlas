@@ -27,7 +27,12 @@ $responsaveis = [];
 $rr = $conn->query("SELECT DISTINCT TRIM(funcionario_responsavel) AS r FROM tarefas WHERE funcionario_responsavel IS NOT NULL AND TRIM(funcionario_responsavel) <> ''");
 if ($rr) { while ($x = $rr->fetch_assoc()) { $responsaveis[$x['r']] = true; } }
 $rr2 = $conn->query("SELECT DISTINCT TRIM(COALESCE(NULLIF(atualizado_por,''), criado_por)) AS r FROM pedidos_certidao WHERE TRIM(COALESCE(NULLIF(atualizado_por,''), criado_por)) <> ''");
-if ($rr2) { while ($x = $rr2->fetch_assoc()) { if (!empty($x['r'])) $responsaveis[$x['r']] = true; } }
+/* Pedidos gravam o usuário: converte para o nome completo, igual às tarefas (sem duplicar a pessoa) */
+$nomeUsu = [];
+foreach ($funcionarios as $f) { if (trim((string)$f['nome_completo']) !== '') $nomeUsu[mb_strtolower($f['usuario'])] = trim($f['nome_completo']); }
+$rfa = $conn->query("SELECT usuario, nome_completo FROM funcionarios");
+if ($rfa) { while ($x = $rfa->fetch_assoc()) { if (trim((string)$x['nome_completo']) !== '' && !isset($nomeUsu[mb_strtolower($x['usuario'])])) $nomeUsu[mb_strtolower($x['usuario'])] = trim($x['nome_completo']); } }
+if ($rr2) { while ($x = $rr2->fetch_assoc()) { if (!empty($x['r'])) $responsaveis[$nomeUsu[mb_strtolower($x['r'])] ?? $x['r']] = true; } }
 $responsaveis = array_keys($responsaveis);
 usort($responsaveis, function($a, $b){ return strcasecmp($a, $b); });
 

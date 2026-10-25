@@ -62,13 +62,25 @@ function statusLabel($fonte, $orig) {
     return ucfirst($o);
 }
 function statusNorm($label) {
-    // agrupa para KPIs/gráficos
+    // agrupa para KPIs/gráficos — mesmos grupos do módulo Tarefas (core/config.php):
+    // "aberta" = Em andamento; "parada" = Pendente; "entrega" e "encerrada" = Concluída
     $l = mb_strtolower(trim($label));
-    if (in_array($label, ['Concluída','Emitida','Entregue'])) return 'Concluída';
-    if (strpos($l, 'finaliz') !== false) return 'Concluída'; // ex.: "Finalizado sem prática do ato"
-    if ($label === 'Em andamento') return 'Em andamento';
-    if ($label === 'Cancelada')    return 'Cancelada';
-    return 'Pendente';
+    if (in_array($l, ['concluída','concluida','emitida','entregue','aguardando retirada'], true)) return 'Concluída';
+    if (strpos($l, 'finaliz') !== false) return 'Concluída'; // "Finalizado sem prática do ato"
+    if (in_array($l, ['em andamento','iniciada','exigência cumprida','exigencia cumprida'], true)) return 'Em andamento';
+    if ($l === 'cancelada') return 'Cancelada';
+    return 'Pendente';   // Pendente, Em espera, Aguardando pagamento, Prazo de edital
+}
+
+/* Pedidos gravam o USUÁRIO (joao.lima); tarefas gravam o NOME (João Carlos Lima).
+   Para o mesmo funcionário não aparecer duas vezes, o responsável do pedido vira o nome completo. */
+$nomePorUsuario = [];
+$rfn = $conn->query("SELECT usuario, nome_completo FROM funcionarios");
+if ($rfn) { while ($x = $rfn->fetch_assoc()) { if (trim((string)$x['nome_completo']) !== '') $nomePorUsuario[mb_strtolower(trim($x['usuario']))] = trim($x['nome_completo']); } }
+function respPedido($u) {
+    global $nomePorUsuario;
+    $u = trim((string)$u);
+    return $u === '' ? '—' : ($nomePorUsuario[mb_strtolower($u)] ?? $u);
 }
 
 $linhas = [];
@@ -146,7 +158,7 @@ try {
                 'ref'          => $r['protocolo'] ?: ('#'.$r['id']),
                 'titulo'       => $titulo,
                 'categoria'    => $r['tipo'] ?: ($r['atribuicao'] ?: '—'),
-                'responsavel'  => trim($r['responsavel']) ?: '—',
+                'responsavel'  => respPedido($r['responsavel']),
                 'status'       => $label,
                 'status_norm'  => $norm,
                 'prioridade'   => '—',
@@ -282,7 +294,7 @@ try {
             $emAberto[] = [
                 'fonte'=>'Pedido de Certidão', 'ref'=>$r['protocolo'] ?: ('#'.$r['id']),
                 'titulo'=>$titulo, 'categoria'=>$r['tipo'] ?: ($r['atribuicao'] ?: '—'),
-                'responsavel'=>trim($r['responsavel']) ?: '—', 'status'=>$label, 'status_norm'=>$norm,
+                'responsavel'=>respPedido($r['responsavel']), 'status'=>$label, 'status_norm'=>$norm,
                 'prioridade'=>'—', 'data_criacao'=>$r['criado_em'], 'prazo'=>null, 'atrasada'=>false,
             ];
         }

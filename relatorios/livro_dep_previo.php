@@ -80,6 +80,22 @@ function carregarOsElegiveis($conn, $cfg)
     }
     $res->free();
 
+    // 1b) Crédito recebido por transferência de saldo entre O.S. conta como depósito
+    if (livroTemTransferencias($conn)) {
+        $res = $conn->query("SELECT os_destino_id, DATE(data_transferencia) FROM os_transferencias_saldo WHERE status = 'ativa'");
+        if ($res) {
+            while ($r = $res->fetch_row()) {
+                $id = (int) $r[0];
+                if ($por_qualquer) {
+                    $pag[$id][(string) $r[1]] = true;
+                } elseif (!isset($pag[$id]) || $r[1] < $pag[$id]) {
+                    $pag[$id] = $r[1];
+                }
+            }
+            $res->free();
+        }
+    }
+
     // 2) Datas de liquidação por O.S. (atos + atos manuais)
     $liq = array(); // modo qualquer_pagamento: id => [datas]
     $agg = array(); // modo primeiro_pagamento: id => menor/maior data e nulos
@@ -154,6 +170,18 @@ function carregarOsElegiveis($conn, $cfg)
     unset($pag, $liq, $agg);
 
     return $elegiveis;
+}
+
+/** A tabela de transferências de saldo entre O.S. existe? (criada pelo módulo O.S.) */
+function livroTemTransferencias($conn)
+{
+    static $tem = null;
+    if ($tem === null) {
+        $r = $conn->query("SHOW TABLES LIKE 'os_transferencias_saldo'");
+        $tem = ($r && $r->num_rows > 0);
+        if ($r) { $r->free(); }
+    }
+    return $tem;
 }
 
 // Configuração do PDF  
@@ -242,6 +270,19 @@ $pagamento_stmt = $conn->prepare("SELECT total_pagamento, forma_de_pagamento, da
 $atos_stmt = $conn->prepare("SELECT ato, quantidade_liquidada, total, data FROM atos_liquidados WHERE ordem_servico_id = ?");  
 $atos_manuais_stmt = $conn->prepare("SELECT ato, quantidade_liquidada, total, data FROM atos_manuais_liquidados WHERE ordem_servico_id = ?");  
 $devolucao_stmt = $conn->prepare("SELECT total_devolucao, forma_devolucao, data_devolucao FROM devolucao_os WHERE ordem_de_servico_id = ?");  
+// Repasses ao credor (protesto): parte do depósito que pertence ao credor e sai da serventia;
+// consome o depósito prévio, como no saldo da O.S. e no Relatório de O.S. (cancelados não contam)
+$rt_rep = $conn->query("SHOW TABLES LIKE 'repasse_credor'");
+$repasse_stmt = ($rt_rep && $rt_rep->num_rows > 0)
+    ? $conn->prepare("SELECT total_repasse, forma_repasse, data_repasse FROM repasse_credor WHERE ordem_de_servico_id = ? AND status = 'ativo' ORDER BY data_repasse, id")
+    : null;
+
+// Transferências de saldo entre O.S. (não passam pelo caixa; ficam registradas no livro)
+$tem_transferencias = livroTemTransferencias($conn);
+$transf_stmt = $tem_transferencias
+    ? $conn->prepare("SELECT codigo, os_origem_id, os_destino_id, valor, data_transferencia, status, estornado_em
+                        FROM os_transferencias_saldo WHERE os_origem_id = ? OR os_destino_id = ? ORDER BY id")
+    : null;
 
 // Conjunto de O.S. elegíveis quando o filtro está ligado
 $os_elegiveis = array();
@@ -256,7 +297,10 @@ if ($filtro_divergentes) {
 $os_query = $conn->query("
     SELECT DISTINCT os.id, os.cliente, os.cpf_cliente, os.total_os, os.data_criacao
     FROM ordens_de_servico os
-    INNER JOIN pagamento_os po ON os.id = po.ordem_de_servico_id
+    INNER JOIN (
+        SELECT ordem_de_servico_id AS os_id FROM pagamento_os
+        " . ($tem_transferencias ? "UNION SELECT os_destino_id FROM os_transferencias_saldo" : "") . "
+    ) dep ON dep.os_id = os.id
     ORDER BY os.id
 ");
 
@@ -310,6 +354,35 @@ while ($os = $os_query->fetch_assoc()) {
         $deposito_previo_total += $valor;  
         $pagamentos[] = 'R$ ' . number_format($valor, 2, ',', '.') . " - $forma - $data_pagamento";  
     }  
+
+    // Transferências de saldo: recebida entra como depósito; enviada sai do saldo
+    $total_transf_enviado = 0;
+    $transf_enviadas = [];
+    $transf_estornadas = [];
+    if ($transf_stmt) {
+        $transf_stmt->bind_param("ii", $os_id, $os_id);
+        $transf_stmt->execute();
+        $transf_result = $transf_stmt->get_result();
+        while ($t = $transf_result->fetch_assoc()) {
+            $recebida = ((int) $t['os_destino_id'] === (int) $os_id);
+            $outra = $recebida ? $t['os_origem_id'] : $t['os_destino_id'];
+            $data_t = date('d/m/Y', strtotime($t['data_transferencia']));
+            $valor_t = 'R$ ' . number_format($t['valor'], 2, ',', '.');
+            if ($t['status'] !== 'ativa') {
+                $transf_estornadas[] = $t['codigo'] . ' (' . $valor_t . ($recebida ? ' da O.S. nº ' : ' para a O.S. nº ') . $outra
+                    . ', estornada em ' . date('d/m/Y', strtotime($t['estornado_em'])) . ')';
+                continue;
+            }
+            if ($recebida) {
+                $deposito_previo_total += $t['valor'];
+                $pagamentos[] = $valor_t . " - Crédito transferido da O.S. nº $outra (" . $t['codigo'] . ") - $data_t";
+            } else {
+                $total_transf_enviado += $t['valor'];
+                $transf_enviadas[] = $valor_t . " - para a O.S. nº $outra (" . $t['codigo'] . ") - $data_t";
+            }
+        }
+        $transf_result->free();
+    }
 
     $observacoes .= implode(' | ', $pagamentos);  
     $observacoes .= " | <b>TOTAL EM DEP. PRÉVIO: </b> R$ " . number_format($deposito_previo_total, 2, ',', '.');  
@@ -367,8 +440,30 @@ while ($os = $os_query->fetch_assoc()) {
         $observacoes .= implode(' | ', $devolucoes);  
     }  
 
+    $total_repasses = 0;
+    if ($repasse_stmt) {
+        $repasse_stmt->bind_param("i", $os_id);
+        $repasse_stmt->execute();
+        $repasse_result = $repasse_stmt->get_result();
+        $repasses = [];
+        while ($rep = $repasse_result->fetch_assoc()) {
+            $total_repasses += $rep['total_repasse'];
+            $repasses[] = 'R$ ' . number_format($rep['total_repasse'], 2, ',', '.') . ' - ' . $rep['forma_repasse'] . ' - ' . date('d/m/Y', strtotime($rep['data_repasse']));
+        }
+        $repasse_result->free();
+        if ($repasses) {
+            $observacoes .= " | <b>REPASSE AO CREDOR: </b>" . implode(' | ', $repasses);
+        }
+    }
+    if ($transf_enviadas) {
+        $observacoes .= " | <b>SALDO TRANSFERIDO P/ OUTRA O.S.: </b>" . implode(' | ', $transf_enviadas);
+    }
+    if ($transf_estornadas) {
+        $observacoes .= " | <b>TRANSFERÊNCIAS ESTORNADAS: </b>" . implode(' | ', $transf_estornadas);
+    }
+
     // Cálculo do Saldo  
-    $saldo = $deposito_previo_total - $total_geral_atos - $total_devolucoes;  
+    $saldo = $deposito_previo_total - $total_geral_atos - $total_devolucoes - $total_transf_enviado - $total_repasses;  
     if (round($saldo, 2) != 0) {  
         $observacoes .= " | <b>SALDO: </b> R$ " . number_format($saldo, 2, ',', '.');  
     }  
@@ -429,7 +524,9 @@ if ($contador === 0) {
 $pagamento_stmt->close();  
 $atos_stmt->close();  
 $atos_manuais_stmt->close();  
-$devolucao_stmt->close();  
+$devolucao_stmt->close();
+if ($transf_stmt) { $transf_stmt->close(); }  
+if ($repasse_stmt) { $repasse_stmt->close(); }
 
 // Limpar buffer antes de gerar o PDF  
 ob_end_clean();  

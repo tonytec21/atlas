@@ -6,6 +6,7 @@
 include(__DIR__ . '/session_check.php');
 checkSession();
 include(__DIR__ . '/db_connection.php');
+require_once __DIR__ . '/versao.php';
 date_default_timezone_set('America/Sao_Paulo');
 
 $username = $_SESSION['username'];
@@ -101,6 +102,7 @@ $mq->close();
         .btn-blue{ background:linear-gradient(135deg,#4e73df,#6f9bff); }
         .btn-teal{ background:linear-gradient(135deg,#00897b,#1cc88a); }
         .btn-purple{ background:linear-gradient(135deg,#5e35b1,#9575cd); }
+        .btn-orange{ background:linear-gradient(135deg,#ff9800,#ffb74d); }
         .btn-soon{ background:var(--rel-input-bd); color:var(--rel-muted); cursor:not-allowed; }
         .report-card .btn:not(.btn-soon):hover{ filter:brightness(1.06); }
 
@@ -166,15 +168,16 @@ $mq->close();
 
             <div class="col-12 col-sm-6 col-xl-3 report-col animate-up" id="card-contas" style="animation-delay:.24s;">
                 <div class="report-card">
-                    <span class="chip chip-soon">Em breve</span>
+                    <span class="chip chip-fin">Financeiro</span>
                     <div class="report-icon ic-orange"><i class="fa fa-credit-card"></i></div>
                     <h5>Contas a Pagar</h5>
-                    <p>Controle de despesas e vencimentos com acompanhamento de pagamentos. Em desenvolvimento.</p>
-                    <a href="#" class="btn btn-soon" onclick="return false;"><i class="fa fa-clock-o"></i> Em breve</a>
+                    <p>Despesas pagas, a vencer e vencidas por categoria e período, com gráficos e exportação.</p>
+                    <a href="../contas_a_pagar/relatorios.php" class="btn btn-orange"><i class="fa fa-bar-chart"></i> Acessar</a>
                 </div>
             </div>
 
         </div>
+        <p class="text-center" style="color:var(--rel-muted);font-size:.74rem;margin:6px 0 0">Relatórios e Livros · v<?php echo htmlspecialchars(REL_VERSAO); ?></p>
     </div>
 </div>
 

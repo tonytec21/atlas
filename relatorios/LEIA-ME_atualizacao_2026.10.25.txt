@@ -1,0 +1,59 @@
+RELATÓRIOS E LIVROS — ATUALIZAÇÃO 2026.10.25.1
+==============================================
+
+A versão aparece no rodapé da Central de Relatórios (relatorios/versao.php).
+Não há mudança no banco de dados. Copie os arquivos para atlas/relatorios/ e
+reinicie o Apache (OPcache).
+
+Arquivos: index.php, versao.php (novo), relatorio_os.php,
+relatorio_os_dados.php, relatorio_tarefas.php, relatorio_tarefas_dados.php,
+livro_dep_previo.php.
+
+Correções encontradas durante a preparação dos vídeos de treinamento.
+
+1) SALDO DO DEPÓSITO PRÉVIO IGNORAVA AS TRANSFERÊNCIAS ENTRE O.S.
+   (relatorio_os_dados.php, relatorio_os.php)
+------------------------------------------------------------------
+O painel "Depósito prévio — saldo não consumido" do Relatório de O.S. não
+considerava as transferências de saldo feitas no módulo O.S.: a O.S. que
+enviou o saldo continuava aparecendo com o valor como se ainda o tivesse, e a
+O.S. que recebeu (sem pagamento próprio) nem aparecia. O total do saldo ficava
+maior que o real e diferente do saldo mostrado na própria O.S. e no Livro.
+Agora o crédito recebido conta como depósito e o enviado sai do saldo
+(transferências estornadas não contam). Nova estatística "Transferido p/
+outra O.S." e nova coluna "Transferido" na tabela.
+
+2) LIVRO DE DEPÓSITO PRÉVIO NÃO ABATIA O REPASSE AO CREDOR (livro_dep_previo.php)
+------------------------------------------------------------------------------
+No protesto, o valor do título pago é repassado ao credor. O livro não
+registrava esses repasses e mostrava esse valor como SALDO da O.S., em
+desacordo com o saldo da O.S. e com o Relatório de O.S. Agora o registro
+traz "REPASSE AO CREDOR" (valor, forma e data) e o saldo já desconta o
+repasse (repasses cancelados não contam).
+
+3) RELATÓRIO DE TAREFAS CONTAVA STATUS DO MÓDULO TAREFAS COMO "PENDENTE"
+   (relatorio_tarefas_dados.php)
+----------------------------------------------------------------------
+Os status do módulo Tarefas "Em Andamento", "Iniciada" e "Exigência
+Cumprida" eram contados como Pendente, e "Aguardando Retirada" (que o módulo
+Tarefas trata como encerrada) também. Com isso, o indicador "Em andamento"
+ficava zerado nas tarefas internas e a taxa de conclusão saía mais baixa.
+Agora os grupos seguem os do módulo Tarefas.
+
+4) MESMO FUNCIONÁRIO DUAS VEZES NO RELATÓRIO DE TAREFAS
+   (relatorio_tarefas_dados.php, relatorio_tarefas.php)
+-----------------------------------------------------
+As tarefas gravam o nome do responsável ("João Carlos Lima") e os pedidos
+de certidão gravam o usuário ("joao.lima"). A mesma pessoa aparecia duas vezes
+na produtividade e no filtro Responsável, e filtrar por ela mostrava só uma
+das fontes. Agora o pedido usa o nome completo do funcionário.
+
+5) CARTÃO "CONTAS A PAGAR" MARCADO "EM BREVE" (index.php)
+--------------------------------------------------------
+O módulo Contas a Pagar já existe; o cartão da Central agora abre os
+relatórios dele.
+
+6) REPASSE A CREDORES COM O USUÁRIO EM VEZ DO NOME (relatorio_os_dados.php)
+-------------------------------------------------------------------------
+A coluna Funcionário do painel "Repasse a credores" mostrava o usuário
+(carla.mendes); agora mostra o nome, como as demais tabelas.
