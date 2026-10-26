@@ -1,6 +1,6 @@
 ATLAS — ATUALIZAÇÃO 2026.10.25: PAINEL DO ADMINISTRADOR + AUDITORIA CENTRAL
 ==========================================================================
-Versão: Painel do Administrador 1.0.2 · Auditoria central 1.0.0
+Versão: Painel do Administrador 1.0.3 · Auditoria central 1.0.0
 (a versão aparece no rodapé do Painel do Administrador)
 
 NOVO
@@ -261,3 +261,12 @@ VERSÃO 1.0.2
   legível, com os parágrafos preservados — inclusive os registros antigos e os
   valores "antes/depois" das alterações (a conversão é só na exibição, o
   registro selado não é alterado).
+
+VERSÃO 1.0.3 (correção importante)
+----------------------------------
+• Assinatura de ofícios (e qualquer tela que gere PDF chamando o próprio
+  servidor): a pré-visualização ficava carregando sem fim. A auditoria abria a
+  sessão do usuário para saber quem estava operando; quando a tela principal
+  já estava com a sessão aberta e chamava o gerador de PDF internamente, as duas
+  ficavam esperando uma pela outra. Agora a auditoria NUNCA abre a sessão: lê o
+  usuário direto do arquivo da sessão, sem trava. Nada mais precisa ser feito.

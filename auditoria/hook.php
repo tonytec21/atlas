@@ -76,16 +76,13 @@ function atlas_aud__iniciar(): void
         $c['usuario'] = 'sistema';
         return;
     }
-    // Lê a sessão sem prendê-la (read_and_close): a página continua abrindo a sua normalmente.
+    // Descobre o usuário SEM abrir a sessão. Nunca chamar session_start() aqui: se outra
+    // requisição do mesmo usuário estiver com a sessão aberta (ex.: geradores de PDF chamados
+    // pelo próprio servidor com o cookie do usuário), a espera pela trava travaria as duas.
     if (session_status() === PHP_SESSION_ACTIVE) {
         $c['usuario'] = $_SESSION['username'] ?? null;
-    } elseif (session_status() === PHP_SESSION_NONE && !headers_sent() && !empty($_COOKIE[session_name()])) {
-        $lim = session_cache_limiter();
-        @session_cache_limiter('');
-        if (@session_start(['read_and_close' => true])) {
-            $c['usuario'] = $_SESSION['username'] ?? null;
-        }
-        @session_cache_limiter($lim);
+    } elseif (!empty($_COOKIE[session_name()])) {
+        $c['usuario'] = atlas_aud__usuario_sem_trava((string) $_COOKIE[session_name()]);
     }
     // Observa o começo da resposta (para saber se a operação deu certo ou foi negada). Repassa tudo sem mexer.
     // Por segurança, NÃO observa scripts que mexem nos próprios buffers de saída, transmitem arquivos
@@ -104,6 +101,34 @@ function atlas_aud__iniciar(): void
             return $buf;
         }, 8192);
     }
+}
+
+/**
+ * Lê o login gravado na sessão direto do arquivo da sessão, sem trava (leitura simples,
+ * sem flock), só para o handler padrão "files". Não altera nem prende a sessão.
+ */
+function atlas_aud__usuario_sem_trava(string $sid): ?string
+{
+    if (!preg_match('/^[A-Za-z0-9,-]{16,128}$/', $sid) || strtolower((string) ini_get('session.save_handler')) !== 'files') {
+        return null;
+    }
+    $dir = (string) session_save_path();
+    if (strpos($dir, ';') !== false) {
+        $dir = substr($dir, strrpos($dir, ';') + 1);   // formato "N;/caminho" ou "N;MODE;/caminho"
+    }
+    if ($dir === '') {
+        $dir = sys_get_temp_dir();
+    }
+    $f = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . 'sess_' . $sid;
+    $dados = is_file($f) ? @file_get_contents($f, false, null, 0, 262144) : false;
+    if (!$dados) {
+        return null;
+    }
+    // formato "php" (padrão): username|s:9:"ana.paula";  ·  formato "php_serialize": "username";s:9:"ana.paula";
+    if (preg_match('/(?:^|[;}])username\|s:\d+:"([^"]*)";/', $dados, $m) || preg_match('/"username";s:\d+:"([^"]*)";/', $dados, $m)) {
+        return $m[1];
+    }
+    return null;
 }
 
 /** Contexto da requisição atual (usado por atlas_auditar()). */
