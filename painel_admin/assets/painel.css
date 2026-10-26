@@ -509,3 +509,5 @@ body.pa-body { background: var(--pa-bg) !important; color: var(--pa-text); }
   .pa-filtros .pa-select { flex: 1 1 calc(50% - 4px); min-width: 0; }
   .pa-filtros .pa-btn, .pa-filtros .pa-toggle-chip { flex: 1 1 calc(50% - 4px); justify-content: center; }
 }
+.pa-kv code { font-family: inherit; font-size: .84rem; line-height: 1.55; }
+.pa-diff td { white-space: pre-wrap; }

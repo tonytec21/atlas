@@ -40,6 +40,18 @@ function pa_aud_filtros(array $q, array $per, string $alias = ''): array
     return [implode(' AND ', $w), $p];
 }
 
+/** Mostra textos de editor (HTML com acentos codificados) de forma legível; registros antigos inclusive. */
+function pa_legivel($v)
+{
+    if (is_array($v)) {
+        foreach ($v as $k => $x) {
+            $v[$k] = pa_legivel($x);
+        }
+        return $v;
+    }
+    return is_string($v) ? aud_html_para_texto($v) : $v;
+}
+
 function pa_aud_linha(array $r): array
 {
     $cats = aud_categorias();
@@ -91,7 +103,7 @@ function pa_auditoria_evento(int $id): ?array
     $ev['user_agent'] = $r['user_agent'];
     $ev['dispositivo'] = pa_dispositivo((string) $r['user_agent']);
     $ev['status_http'] = $r['status_http'];
-    $ev['parametros'] = $r['parametros'] ? json_decode($r['parametros'], true) : null;
+    $ev['parametros'] = $r['parametros'] ? pa_legivel(json_decode($r['parametros'], true)) : null;
     $ev['req_id'] = $r['req_id'];
     $ev['selo'] = ['seq' => $r['selo_seq'], 'hash' => $r['hash'], 'anterior' => $r['hash_anterior']];
     $ev['dados'] = pa_dados_da_requisicao($r['req_id']);
@@ -119,8 +131,8 @@ function pa_dados_da_requisicao(string $req): array
 
 function pa_dado_linha(array $d): array
 {
-    $antes = $d['antes'] !== null ? json_decode($d['antes'], true) : null;
-    $depois = $d['depois'] !== null ? json_decode($d['depois'], true) : null;
+    $antes = $d['antes'] !== null ? pa_legivel(json_decode($d['antes'], true)) : null;
+    $depois = $d['depois'] !== null ? pa_legivel(json_decode($d['depois'], true)) : null;
     $campos = [];
     $chaves = array_unique(array_merge(array_keys((array) $antes), array_keys((array) $depois)));
     foreach ($chaves as $k) {

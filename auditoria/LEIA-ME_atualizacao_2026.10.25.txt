@@ -1,6 +1,6 @@
 ATLAS — ATUALIZAÇÃO 2026.10.25: PAINEL DO ADMINISTRADOR + AUDITORIA CENTRAL
 ==========================================================================
-Versão: Painel do Administrador 1.0.1 · Auditoria central 1.0.0
+Versão: Painel do Administrador 1.0.2 · Auditoria central 1.0.0
 (a versão aparece no rodapé do Painel do Administrador)
 
 NOVO
@@ -252,3 +252,12 @@ VERSÃO 1.0.1
   funcionando. Resposta cortada pelo limite é mostrada com aviso.
 • Integridade: a "Cobertura por módulo" mostra só os módulos usados nos últimos
   30 dias (os demais continuam auditados).
+
+VERSÃO 1.0.2
+------------
+• Trilha de auditoria: textos vindos de editores (corpo e prazo das notas
+  devolutivas, ofícios etc.) apareciam em HTML com acentos codificados
+  ("P&uacute;blicos", "<p>..."). Agora são gravados e exibidos como texto
+  legível, com os parágrafos preservados — inclusive os registros antigos e os
+  valores "antes/depois" das alterações (a conversão é só na exibição, o
+  registro selado não é alterado).

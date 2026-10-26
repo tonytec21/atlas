@@ -600,14 +600,46 @@ function aud_limpar_parametros($v, string $chave = '', int $nivel = 0)
     if ($chave !== '' && aud_chave_sensivel($chave)) {
         return '••••••';
     }
-    if (strlen($s) > 600) {
-        $limpo = trim(preg_replace('/\s+/', ' ', strip_tags($s)));
-        return mb_substr($limpo, 0, 400) . '… (' . number_format(strlen($s), 0, ',', '.') . ' caracteres)';
-    }
     if (!mb_check_encoding($s, 'UTF-8')) {
         $s = mb_convert_encoding($s, 'UTF-8', 'ISO-8859-1');
     }
+    // Textos de editor (CKEditor etc.) chegam em HTML com acentos codificados: guarda legível
+    $s = aud_html_para_texto($s);
+    if (mb_strlen($s) > 600) {
+        return mb_substr($s, 0, 500) . '… (' . number_format(mb_strlen($s), 0, ',', '.') . ' caracteres)';
+    }
     return $s;
+}
+
+/**
+ * Converte HTML (de editores de texto) em texto legível: decodifica &atilde;, &ccedil;,
+ * &ordm; etc., troca parágrafos/quebras por nova linha e remove as marcas.
+ * Texto comum (sem marcas nem entidades) volta inalterado.
+ */
+function aud_html_para_texto(string $s): string
+{
+    if (strpos($s, '<') === false && strpos($s, '&') === false) {
+        return $s;
+    }
+    $temHtml = (bool) preg_match('/<\/?(p|br|div|span|strong|b|i|em|u|li|ul|ol|table|tr|td|th|h[1-6]|blockquote|a|font|sub|sup)\b[^>]*>/i', $s);
+    $temEntidade = (bool) preg_match('/&(#\d+|#x[0-9a-f]+|[a-z][a-z0-9]{1,31});/i', $s);
+    if (!$temHtml && !$temEntidade) {
+        return $s;
+    }
+    $s = str_replace(["\r\n", "\r"], "\n", $s);
+    if ($temHtml) {
+        $s = preg_replace('/<\s*br\s*\/?>/i', "\n", $s);
+        $s = preg_replace('/<\/(p|div|li|tr|h[1-6]|blockquote)>/i', "\n", $s);
+        $s = preg_replace('/<li\b[^>]*>/i', '• ', $s);
+        $s = preg_replace('/<\/t[dh]>/i', ' | ', $s);
+        $s = strip_tags($s);
+    }
+    $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $s = str_replace("\xC2\xA0", ' ', $s);                       // &nbsp;
+    $s = preg_replace("/[ \t]+/u", ' ', $s);
+    $s = preg_replace("/ *\n */u", "\n", $s);
+    $s = preg_replace("/\n{3,}/u", "\n\n", $s);
+    return trim($s);
 }
 
 /** Identificadores do registro alvo (id da O.S., da tarefa etc.). */
