@@ -422,45 +422,10 @@ function pa_ia_analisar(array $per, bool $automatica = false, string $foco = 'ge
     $tin = 0;
     $tout = 0;
     $erro = null;
-    if ($prov === 'gemini') {
-        [$code, $j, $err] = pa_http('POST', PA_GEMINI_BASE . '/models/' . rawurlencode($modelo) . ':generateContent', ['x-goog-api-key: ' . $chave], [
-            'systemInstruction' => ['parts' => [['text' => $sistema]]],
-            'contents' => [['role' => 'user', 'parts' => [['text' => $msg]]]],
-            'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 8192],
-        ], 180);
-        if ($err) {
-            $erro = $err;
-        } else {
-            foreach ((array) ($j['candidates'][0]['content']['parts'] ?? []) as $p) {
-                if (empty($p['thought']) && isset($p['text'])) {
-                    $texto .= $p['text'];
-                }
-            }
-            $tin = (int) ($j['usageMetadata']['promptTokenCount'] ?? 0);
-            $tout = (int) ($j['usageMetadata']['candidatesTokenCount'] ?? 0) + (int) ($j['usageMetadata']['thoughtsTokenCount'] ?? 0);
-            if ($texto === '') {
-                $erro = 'O modelo não devolveu texto (' . ($j['candidates'][0]['finishReason'] ?? ($j['promptFeedback']['blockReason'] ?? 'sem motivo informado')) . ').';
-            }
-        }
-    } else {
-        [$code, $j, $err] = pa_http('POST', PA_CLAUDE_BASE . '/messages', ['x-api-key: ' . $chave, 'anthropic-version: 2023-06-01'], [
-            'model' => $modelo, 'max_tokens' => 8000, 'system' => $sistema,
-            'messages' => [['role' => 'user', 'content' => $msg]],
-        ], 180);
-        if ($err) {
-            $erro = $err;
-        } else {
-            foreach ((array) ($j['content'] ?? []) as $p) {
-                if (($p['type'] ?? '') === 'text') {
-                    $texto .= $p['text'];
-                }
-            }
-            $tin = (int) ($j['usage']['input_tokens'] ?? 0);
-            $tout = (int) ($j['usage']['output_tokens'] ?? 0);
-            if ($texto === '') {
-                $erro = 'O modelo não devolveu texto (' . ($j['stop_reason'] ?? 'sem motivo informado') . ').';
-            }
-        }
+    $r = $prov === 'gemini' ? pa_ia_gemini($chave, $modelo, $sistema, $msg) : pa_ia_claude($chave, $modelo, $sistema, $msg);
+    [$texto, $tin, $tout, $erro, $parcial] = [$r['texto'], $r['tin'], $r['tout'], $r['erro'], $r['parcial']];
+    if ($texto !== '' && $parcial) {
+        $texto .= "\n\n> *A resposta atingiu o limite de tamanho do modelo e pode ter ficado incompleta. Gere de novo com uma ênfase específica para um texto mais curto.*";
     }
     // Devolve os nomes reais no lugar dos apelidos (a anonimização vale só para o que saiu do servidor)
     if ($texto !== '' && $apelidos) {
@@ -482,6 +447,138 @@ function pa_ia_analisar(array $per, bool $automatica = false, string $foco = 'ge
         return ['ok' => false, 'erro' => $erro, 'id' => $id];
     }
     return ['ok' => true, 'id' => $id, 'texto' => $texto, 'provedor' => $prov, 'modelo' => $modelo, 'tokens_entrada' => $tin, 'tokens_saida' => $tout, 'duracao_ms' => $dur];
+}
+
+/**
+ * Claude: os modelos novos (4.5/5.x) pensam antes de responder (raciocínio adaptativo) e esse
+ * raciocínio divide o max_tokens com a resposta. Por isso: limite folgado, esforço "medium"
+ * (output_config.effort) e, se ainda assim faltar espaço, nova tentativa com esforço "low"
+ * e limite maior. Modelos antigos que não aceitam output_config recebem o pedido sem ele.
+ */
+function pa_ia_claude(string $chave, string $modelo, string $sistema, string $msg): array
+{
+    $max = 32000;
+    $esforco = 'medium';
+    $tin = 0;
+    $tout = 0;
+    $ultimoErro = null;
+    for ($tent = 0; $tent < 6; $tent++) {
+        $corpo = ['model' => $modelo, 'max_tokens' => $max, 'system' => $sistema, 'messages' => [['role' => 'user', 'content' => $msg]]];
+        if ($esforco !== null) {
+            $corpo['output_config'] = ['effort' => $esforco];
+        }
+        [$code, $j, $err] = pa_http('POST', PA_CLAUDE_BASE . '/messages', ['x-api-key: ' . $chave, 'anthropic-version: 2023-06-01'], $corpo, 300);
+        if ($err) {
+            $ultimoErro = $err;
+            if ($code === 400 && $esforco !== null && preg_match('/output_config|effort/i', $err)) {
+                $esforco = null;            // modelo antigo: sem controle de esforço
+                continue;
+            }
+            if ($code === 400 && preg_match('/max_tokens/i', $err) && $max > 4096) {
+                $max = $max > 8192 ? 8192 : 4096;   // modelo com limite de saída menor
+                continue;
+            }
+            return ['texto' => '', 'tin' => $tin, 'tout' => $tout, 'erro' => 'Claude: ' . $err, 'parcial' => false];
+        }
+        $texto = '';
+        foreach ((array) ($j['content'] ?? []) as $p) {
+            if (($p['type'] ?? '') === 'text') {
+                $texto .= $p['text'];
+            }
+        }
+        $tin += (int) ($j['usage']['input_tokens'] ?? 0);
+        $tout += (int) ($j['usage']['output_tokens'] ?? 0);
+        $parada = (string) ($j['stop_reason'] ?? '');
+        if (trim($texto) !== '') {
+            return ['texto' => $texto, 'tin' => $tin, 'tout' => $tout, 'erro' => null, 'parcial' => $parada === 'max_tokens'];
+        }
+        if ($parada === 'max_tokens') {
+            // O raciocínio consumiu todo o limite: pensa menos e dá mais espaço
+            if ($esforco !== null && $esforco !== 'low') {
+                $esforco = 'low';
+            }
+            if ($max < 64000) {
+                $max = min(64000, $max * 2);
+            } elseif ($esforco === null || $esforco === 'low') {
+                break;
+            }
+            $ultimoErro = 'o modelo usou todo o limite de tokens raciocinando, sem escrever a resposta';
+            continue;
+        }
+        if ($parada === 'refusal') {
+            return ['texto' => '', 'tin' => $tin, 'tout' => $tout, 'erro' => 'O modelo recusou o pedido.', 'parcial' => false];
+        }
+        $ultimoErro = 'o modelo não devolveu texto (' . ($parada ?: 'sem motivo informado') . ')';
+        break;
+    }
+    return ['texto' => '', 'tin' => $tin, 'tout' => $tout, 'erro' => 'Claude: ' . ($ultimoErro ?: 'sem resposta') . '. Tente outro modelo em Configurações.', 'parcial' => false];
+}
+
+/**
+ * Gemini: os modelos 2.5 e 3 também pensam antes de responder, e o raciocínio conta no
+ * maxOutputTokens. Limite folgado e, se faltar espaço, nova tentativa com raciocínio
+ * reduzido (thinkingLevel nos modelos 3; thinkingBudget nos 2.5).
+ */
+function pa_ia_gemini(string $chave, string $modelo, string $sistema, string $msg): array
+{
+    $max = 32768;
+    $pensar = null;   // null = padrão do modelo
+    $tin = 0;
+    $tout = 0;
+    $ultimoErro = null;
+    for ($tent = 0; $tent < 6; $tent++) {
+        $gc = ['maxOutputTokens' => $max];
+        if ($pensar !== null) {
+            $gc['thinkingConfig'] = $pensar;
+        }
+        [$code, $j, $err] = pa_http('POST', PA_GEMINI_BASE . '/models/' . rawurlencode($modelo) . ':generateContent', ['x-goog-api-key: ' . $chave], [
+            'systemInstruction' => ['parts' => [['text' => $sistema]]],
+            'contents' => [['role' => 'user', 'parts' => [['text' => $msg]]]],
+            'generationConfig' => $gc,
+        ], 300);
+        if ($err) {
+            $ultimoErro = $err;
+            if ($code === 400 && $pensar !== null && preg_match('/thinking/i', $err)) {
+                $pensar = isset($pensar['thinkingLevel']) ? ['thinkingBudget' => 2048] : false;
+                if ($pensar === false) {
+                    break;
+                }
+                continue;
+            }
+            if ($code === 400 && preg_match('/max_?output_?tokens/i', $err) && $max > 8192) {
+                $max = 8192;
+                continue;
+            }
+            return ['texto' => '', 'tin' => $tin, 'tout' => $tout, 'erro' => 'Gemini: ' . $err, 'parcial' => false];
+        }
+        $texto = '';
+        foreach ((array) ($j['candidates'][0]['content']['parts'] ?? []) as $p) {
+            if (empty($p['thought']) && isset($p['text'])) {
+                $texto .= $p['text'];
+            }
+        }
+        $tin += (int) ($j['usageMetadata']['promptTokenCount'] ?? 0);
+        $tout += (int) ($j['usageMetadata']['candidatesTokenCount'] ?? 0) + (int) ($j['usageMetadata']['thoughtsTokenCount'] ?? 0);
+        $fim = (string) ($j['candidates'][0]['finishReason'] ?? ($j['promptFeedback']['blockReason'] ?? ''));
+        if (trim($texto) !== '') {
+            return ['texto' => $texto, 'tin' => $tin, 'tout' => $tout, 'erro' => null, 'parcial' => $fim === 'MAX_TOKENS'];
+        }
+        if ($fim === 'MAX_TOKENS') {
+            $ultimoErro = 'o modelo usou todo o limite de tokens raciocinando, sem escrever a resposta';
+            if ($pensar === null) {
+                $pensar = ['thinkingLevel' => 'low'];
+                continue;
+            }
+            if (isset($pensar['thinkingLevel'])) {
+                $pensar = ['thinkingBudget' => 2048];
+                continue;
+            }
+            break;
+        }
+        $ultimoErro = 'o modelo não devolveu texto (' . ($fim ?: 'sem motivo informado') . ')';
+        break;
+    }
+    return ['texto' => '', 'tin' => $tin, 'tout' => $tout, 'erro' => 'Gemini: ' . ($ultimoErro ?: 'sem resposta') . '. Tente outro modelo em Configurações.', 'parcial' => false];
 }
 
 function pa_ia_historico(int $limite = 30): array

@@ -651,11 +651,13 @@
         '<div class="pa-membro-st" style="grid-template-columns:repeat(3,1fr)">' + mini('Operações', int(tot.operacoes)) + mini('Alterações', int(tot.dados)) + mini('Telas', int(tot.navegacao)) + '</div>' +
         '<div class="pa-campo pa-mt"><div class="pa-ajuda">Auditoria central instalada em ' + dataHoraBR(tot.instalado_em) + '. Atualizada por último em ' + dataHoraBR(est.em) + '.</div></div>' +
         '<button class="pa-btn" id="intReinstalar"><i class="fas fa-tools"></i> Reinstalar gatilhos</button></div></div>';
-      h += '<div class="pa-card pa-mt"><div class="pa-card-h"><h3><i class="fas fa-th-list"></i> Cobertura por módulo</h3><span class="pa-dica">últimos 30 dias</span></div><div class="pa-tabela-wrap"><table class="pa-tabela"><thead><tr><th>Módulo</th><th class="num">Operações</th><th class="num">Telas abertas</th><th class="num">Registros alterados</th><th>Último registro</th></tr></thead><tbody>' +
-        r.cobertura.map(function (m) {
-          var ativo = m.operacoes + m.telas + m.dados > 0;
-          return '<tr><td><span class="pa-dot" style="background:' + (ativo ? 'var(--pa-green)' : 'var(--pa-border-2)') + ';margin-right:8px"></span><b style="color:var(--pa-text)">' + esc(m.rotulo) + '</b></td><td class="num">' + int(m.operacoes) + '</td><td class="num">' + int(m.telas) + '</td><td class="num">' + int(m.dados) + '</td><td>' + (m.ultimo ? relativo(m.ultimo) : '<span style="color:var(--pa-muted)">sem uso no período</span>') + '</td></tr>';
-        }).join('') + '</tbody></table></div><div class="pa-campo pa-mt"><div class="pa-ajuda">Todos os módulos estão ligados à auditoria central. Um módulo sem registros simplesmente não foi usado nos últimos 30 dias.</div></div></div>';
+      var emUso = r.cobertura.filter(function (m) { return m.operacoes + m.telas + m.dados > 0; }), semUso = r.cobertura.length - emUso.length;
+      h += '<div class="pa-card pa-mt"><div class="pa-card-h"><h3><i class="fas fa-th-list"></i> Cobertura por módulo</h3><span class="pa-dica">módulos em uso nos últimos 30 dias</span></div>' +
+        (emUso.length ? '<div class="pa-tabela-wrap"><table class="pa-tabela"><thead><tr><th>Módulo</th><th class="num">Operações</th><th class="num">Telas abertas</th><th class="num">Registros alterados</th><th>Último registro</th></tr></thead><tbody>' +
+        emUso.map(function (m) {
+          return '<tr><td><span class="pa-dot" style="background:var(--pa-green);margin-right:8px"></span><b style="color:var(--pa-text)">' + esc(m.rotulo) + '</b></td><td class="num">' + int(m.operacoes) + '</td><td class="num">' + int(m.telas) + '</td><td class="num">' + int(m.dados) + '</td><td>' + (m.ultimo ? relativo(m.ultimo) : '—') + '</td></tr>';
+        }).join('') + '</tbody></table></div>' : '<div class="pa-vazio"><i class="fas fa-info-circle"></i>Nenhum módulo usado nos últimos 30 dias.</div>') +
+        '<div class="pa-campo pa-mt"><div class="pa-ajuda">Todos os módulos estão ligados à auditoria central' + (semUso ? '; ' + semUso + ' módulo' + (semUso > 1 ? 's' : '') + ' sem uso nos últimos 30 dias não aparece' + (semUso > 1 ? 'm' : '') + ' nesta lista' : '') + '.</div></div></div>';
       c.innerHTML = h;
       $('#intVerificar').onclick = function () { renderizadores.integridade(c); toast('Verificando as trilhas…'); };
       $('#intReinstalar').onclick = function () {

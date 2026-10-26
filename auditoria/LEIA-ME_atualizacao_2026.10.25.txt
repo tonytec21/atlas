@@ -1,6 +1,6 @@
 ATLAS — ATUALIZAÇÃO 2026.10.25: PAINEL DO ADMINISTRADOR + AUDITORIA CENTRAL
 ==========================================================================
-Versão: Painel do Administrador 1.0.0 · Auditoria central 1.0.0
+Versão: Painel do Administrador 1.0.1 · Auditoria central 1.0.0
 (a versão aparece no rodapé do Painel do Administrador)
 
 NOVO
@@ -241,3 +241,14 @@ Requisitos: PHP 7.4+ com openssl e curl; MySQL 5.7.8+ ou MariaDB 10.2.3+ para a
 trilha de dados (antes/depois). Sem isso, a trilha de operações funciona normalmente.
 Desligamento de emergência: criar o arquivo vazio auditoria/dados/DESLIGAR.
 Manutenção agendada (opcional): php auditoria/manutencao.php (veja painel_admin/LEIA-ME.txt).
+
+VERSÃO 1.0.1
+------------
+• Análise com IA: corrigido o erro "O modelo não devolveu texto (max_tokens)".
+  Os modelos novos do Claude e do Gemini raciocinam antes de responder e esse
+  raciocínio consumia todo o limite. Agora o limite é maior, o esforço de
+  raciocínio é ajustado, e se faltar espaço o painel tenta de novo sozinho
+  (pensando menos). Modelos antigos que não aceitam esses ajustes continuam
+  funcionando. Resposta cortada pelo limite é mostrada com aviso.
+• Integridade: a "Cobertura por módulo" mostra só os módulos usados nos últimos
+  30 dias (os demais continuam auditados).

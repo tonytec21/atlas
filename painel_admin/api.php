@@ -206,6 +206,8 @@ try {
                 pa_responder(['pulada' => true]);
             }
             session_write_close();
+            @set_time_limit(900);       // modelos que raciocinam podem levar alguns minutos
+            @ignore_user_abort(true);
             $r = pa_ia_analisar($per, $auto, $foco);
             $r['ok'] ? pa_responder($r) : pa_responder($r['erro'], 422);
 
