@@ -840,21 +840,31 @@ function aud_selar(int $limite = 300): array
                 $extra = $cadeia === 'dados'
                     ? " AND (criado_em <= NOW(3) - INTERVAL 300 SECOND OR (req_id IS NOT NULL AND usuario IS NOT NULL AND usuario <> ''))"
                     : '';
-                $st = $pdo->query("SELECT * FROM $tab WHERE hash IS NULL AND criado_em <= NOW(3) - INTERVAL 5 SECOND$extra ORDER BY id ASC LIMIT " . (int) $limite);
-                $linhas = $st->fetchAll();
-                if (!$linhas) {
+                // Primeiro só os ids; depois UMA linha por vez (o antes/depois pode ser grande:
+                // carregar o lote inteiro de uma vez elevava a memória da requisição em dezenas de MB).
+                $ids = $pdo->query("SELECT id FROM $tab WHERE hash IS NULL AND criado_em <= NOW(3) - INTERVAL 5 SECOND$extra ORDER BY id ASC LIMIT " . (int) $limite)
+                           ->fetchAll(PDO::FETCH_COLUMN);
+                if (!$ids) {
                     continue;
                 }
                 $seq = (int) aud_meta_get("selo_{$cadeia}_seq", 0, $pdo);
                 $ant = (string) aud_meta_get("selo_{$cadeia}_hash", '', $pdo);
                 $up = $pdo->prepare("UPDATE $tab SET selo_seq = ?, hash_anterior = ?, hash = ? WHERE id = ? AND hash IS NULL");
+                $um = $pdo->prepare("SELECT * FROM $tab WHERE id = ? AND hash IS NULL");
                 $pdo->beginTransaction();
-                foreach ($linhas as $r) {
+                foreach ($ids as $idLinha) {
+                    $um->execute([(int) $idLinha]);
+                    $r = $um->fetch();
+                    $um->closeCursor();
+                    if (!$r) {
+                        continue;
+                    }
                     $seq++;
                     $h = aud_hash_linha($cadeia, $r, $ant);
                     $up->execute([$seq, $ant, $h, $r['id']]);
                     $ant = $h;
                     $feito[$cadeia]++;
+                    unset($r);
                 }
                 aud_meta_set("selo_{$cadeia}_seq", $seq, $pdo);
                 aud_meta_set("selo_{$cadeia}_hash", $ant, $pdo);
@@ -907,9 +917,19 @@ function aud_verificar(string $cadeia): array
     $total = 0;
     $quebras = [];
     $motivo = '';
-    $st = $pdo->prepare("SELECT * FROM $tab WHERE selo_seq >= ? ORDER BY selo_seq ASC");
-    $st->execute([$esperado]);
-    while ($r = $st->fetch()) {
+    // Em páginas de 25 linhas: o driver do MySQL traria a trilha inteira para a memória de uma vez.
+    $pg = $pdo->prepare("SELECT * FROM $tab WHERE selo_seq >= ? ORDER BY selo_seq ASC LIMIT 25");
+    $desde = $esperado;
+    $parar = false;
+    while (!$parar) {
+    $pg->execute([$desde]);
+    $pagina = $pg->fetchAll();
+    $pg->closeCursor();
+    if (!$pagina) {
+        break;
+    }
+    $desde = (int) end($pagina)['selo_seq'] + 1;
+    foreach ($pagina as $r) {
         $total++;
         $seq = (int) $r['selo_seq'];
         if ($seq !== $esperado) {
@@ -924,8 +944,11 @@ function aud_verificar(string $cadeia): array
         $ant = (string) $r['hash'];
         $esperado = $seq + 1;
         if (count($quebras) >= 50) {
+            $parar = true;
             break;
         }
+    }
+    unset($pagina);
     }
     $ultimo = $esperado - 1;
     $anc = aud_ancora_ler()[$cadeia] ?? null;

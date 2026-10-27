@@ -123,7 +123,7 @@ function pa_auditoria_evento(int $id): ?array
 function pa_dados_da_requisicao(string $req): array
 {
     $out = [];
-    foreach (pa_all('SELECT id, criado_em, banco, tabela, operacao, registro_id, campos, antes, depois, hash FROM atlas_auditoria_dados WHERE req_id = ? ORDER BY id LIMIT 200', [$req]) as $d) {
+    foreach (pa_all('SELECT id, criado_em, banco, tabela, operacao, registro_id, campos, antes, depois, hash FROM atlas_auditoria_dados WHERE req_id = ? ORDER BY id LIMIT 100', [$req]) as $d) {
         $out[] = pa_dado_linha($d);
     }
     return $out;
@@ -153,7 +153,7 @@ function pa_historico_registro(string $tabela, string $id): array
 {
     aud_estrutura();
     $out = [];
-    foreach (pa_all('SELECT * FROM atlas_auditoria_dados WHERE tabela = ? AND registro_id = ? ORDER BY id DESC LIMIT 300', [$tabela, $id]) as $d) {
+    foreach (pa_all('SELECT * FROM atlas_auditoria_dados WHERE tabela = ? AND registro_id = ? ORDER BY id DESC LIMIT 100', [$tabela, $id]) as $d) {
         $l = pa_dado_linha($d);
         $l['nome'] = $d['usuario'] ? pa_nome_de((string) $d['usuario']) : ($d['req_id'] ? 'não identificado' : 'direto no banco (fora do Atlas)');
         $op = $d['req_id'] ? pa_one('SELECT id, acao, pagina FROM atlas_auditoria WHERE req_id = ? LIMIT 1', [$d['req_id']]) : null;

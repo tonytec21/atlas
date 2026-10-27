@@ -1,6 +1,6 @@
 ATLAS — ATUALIZAÇÃO 2026.10.25: PAINEL DO ADMINISTRADOR + AUDITORIA CENTRAL
 ==========================================================================
-Versão: Painel do Administrador 1.0.3 · Auditoria central 1.0.0
+Versão: Painel do Administrador 1.0.4 · Auditoria central 1.0.0
 (a versão aparece no rodapé do Painel do Administrador)
 
 NOVO
@@ -270,3 +270,18 @@ VERSÃO 1.0.3 (correção importante)
   já estava com a sessão aberta e chamava o gerador de PDF internamente, as duas
   ficavam esperando uma pela outra. Agora a auditoria NUNCA abre a sessão: lê o
   usuário direto do arquivo da sessão, sem trava. Nada mais precisa ser feito.
+
+VERSÃO 1.0.4 (correção importante — memória do Apache)
+-----------------------------------------------------
+• Erro "Fatal error: Out of memory" em telas comuns (ex.: imprimir O.S.).
+  A cada operação, a auditoria selava até 150 registros de uma vez,
+  carregando o antes/depois completo de cada um (chegava a 70 MB por
+  requisição quando havia registros grandes, como textos da Iris). No Windows,
+  o Apache roda o PHP em várias threads de um único processo, e cada thread
+  guarda a memória do seu maior pico: o processo inteiro inchava até faltar
+  memória para qualquer tela.
+  Agora a selagem carrega um registro por vez (pico de ~1,6 MB) e faz lotes
+  pequenos durante o uso; a verificação de integridade lê em páginas
+  (de ~95 MB para ~13 MB). Custo da auditoria por operação: ~0,15 MB.
+• Depois de atualizar, reinicie o Apache no painel do XAMPP para devolver a
+  memória que o processo já tinha acumulado.

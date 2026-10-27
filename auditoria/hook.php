@@ -369,7 +369,7 @@ register_shutdown_function(function () {
                 $ev['nome'] = $_SESSION['tfa_pending']['nome_completo'] ?? null;
             }
             aud_registrar($ev);
-            aud_selar(150);
+            aud_selar(25);
             return;
         }
 
@@ -490,7 +490,7 @@ register_shutdown_function(function () {
             } elseif ($docNav && $usuario && $status < 400) {
                 aud_registrar_navegacao($comum + ['consulta' => mb_substr((string) ($_SERVER['QUERY_STRING'] ?? ''), 0, 300)]);
                 if (mt_rand(1, 20) === 1) {
-                    aud_selar(150);
+                    aud_selar(25);
                 }
                 return;
             }
@@ -506,7 +506,7 @@ register_shutdown_function(function () {
         }
         if (!$registrar) {
             if (mt_rand(1, 50) === 1) {
-                aud_selar(150);
+                aud_selar(25);
             }
             return;
         }
@@ -533,7 +533,7 @@ register_shutdown_function(function () {
             'mensagem' => $mensagem, 'alvo' => aud_alvo($params) ?: null, 'parametros' => $limpos ?: null,
             'dados_resumo' => $resumo, 'dados_linhas' => $linhas,
         ]);
-        aud_selar(150);
+        aud_selar(25);
     } catch (Throwable $e) {
         error_log('[atlas_auditoria] gancho: ' . $e->getMessage());
     } finally {
