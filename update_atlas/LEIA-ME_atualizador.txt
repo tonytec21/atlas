@@ -1,0 +1,32 @@
+ATUALIZADOR AUTOMÁTICO DO ATLAS — REPOSITÓRIO PRIVADO (2026.10.27)
+=================================================================
+
+O que mudou
+- login.php: o antigo "git pull" (que continua comentado) foi substituído pelo item 2a,
+  que chama update_atlas/atualizador_git.php.
+- update_atlas/atualizador_git.php (novo): pede à API Atlas uma credencial temporária
+  de LEITURA do GitHub e roda "git pull --ff-only" com ela. Nenhuma senha ou token fica
+  gravado na VM (nem no .git/config, nem no Gerenciador de Credenciais do Windows).
+- gitpull.bat: agora chama o mesmo atualizador, então também funciona com o repositório
+  privado.
+
+Como funciona
+- Roda na abertura da tela de login, no máximo 1 vez a cada 10 minutos.
+- Na primeira vez, cria a chave desta instalação em .git\atlas_chave (nunca vai para o
+  repositório). Não apague esse arquivo; se apagar, libere uma nova chave no painel da API.
+- Se a API estiver fora do ar, tenta o pull simples, sem abrir janela pedindo senha.
+- Qualquer falha é silenciosa: o login nunca é impedido.
+- O resultado (commit atual e situação) aparece no painel da API Atlas.
+
+Atualização manual
+- Dê dois cliques em gitpull.bat, ou rode no prompt, dentro da pasta do Atlas:
+    php update_atlas\atualizador_git.php
+
+Ordem para tornar o repositório privado
+1. Configure o GitHub na API Atlas 1.5.0 (README da API) e confira no painel o card
+   "Código em dia".
+2. Publique este commit com o repositório ainda PÚBLICO.
+3. Em cada VM que ficou com o login sem git pull, rode uma única vez "git pull" na pasta
+   do Atlas (ou o gitpull.bat antigo). As demais pegam sozinhas no próximo login.
+4. No painel da API, espere todas as serventias mostrarem "Código em dia".
+5. Torne o repositório privado. Depois, mude aceitar_novas_chaves para false na API.

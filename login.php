@@ -59,7 +59,7 @@ function fetchJsonFast($url, $timeoutConnect = 2, $timeoutTotal = 4) {
 }
 
 /* 1. git pull automático -------------------------------- */
-/* DESATIVADO: a tela de login não executa mais o git pull. Para reativar, retire as barras (//) das linhas abaixo. */
+/* DESATIVADO: substituído pelo atualizador do item 2a (update_atlas/atualizador_git.php), que funciona com o repositório privado. */
 // shell_exec('git config --global --add safe.directory C:/xampp/htdocs/atlas');
 // $out = shell_exec('git pull 2>&1');
 // $mensagemAtualizacao =
@@ -73,6 +73,14 @@ require_once __DIR__.'/db_connection.php';     // $conn (mysqli)
 $cns = '';
 $res = $conn->query("SELECT cns FROM cadastro_serventia LIMIT 1");
 if ($res) $cns = $res->fetch_assoc()['cns'] ?? '';
+
+/* 2a. Atualização automática do código (repositório privado) -------------- */
+/* Pede à API Atlas uma credencial temporária de leitura e roda o git pull.  */
+/* No máximo 1 vez a cada 10 min; nunca impede o login se algo falhar.      */
+if (is_file(__DIR__.'/update_atlas/atualizador_git.php')) {
+  require_once __DIR__.'/update_atlas/atualizador_git.php';
+  $mensagemAtualizacao = atlas_atualizar_git((string)$cns);
+}
 
 /* 2b. Registro da serventia no painel Atlas (api-atlas) -------------------- */
 /* Envia CNS, razão social e cidade uma vez por dia (marcador em arquivo).     */
