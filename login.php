@@ -59,12 +59,14 @@ function fetchJsonFast($url, $timeoutConnect = 2, $timeoutTotal = 4) {
 }
 
 /* 1. git pull automático -------------------------------- */
-shell_exec('git config --global --add safe.directory C:/xampp/htdocs/atlas');
-$out = shell_exec('git pull 2>&1');
-$mensagemAtualizacao =
-    str_contains($out,'Already up to date.') ? 'Sistema atualizado. Nenhuma atualização pendente.' :
-    (str_contains($out,'Updating')           ? 'Atualização do código aplicada com sucesso.'       :
-                                               'Erro ao executar a atualização via git: '.$out );
+/* DESATIVADO: a tela de login não executa mais o git pull. Para reativar, retire as barras (//) das linhas abaixo. */
+// shell_exec('git config --global --add safe.directory C:/xampp/htdocs/atlas');
+// $out = shell_exec('git pull 2>&1');
+// $mensagemAtualizacao =
+//     str_contains($out,'Already up to date.') ? 'Sistema atualizado. Nenhuma atualização pendente.' :
+//     (str_contains($out,'Updating')           ? 'Atualização do código aplicada com sucesso.'       :
+//                                                'Erro ao executar a atualização via git: '.$out );
+$mensagemAtualizacao = '';
 
 /* 2. CNS local ------------------------------------------------------------- */
 require_once __DIR__.'/db_connection.php';     // $conn (mysqli)
