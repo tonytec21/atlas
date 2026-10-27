@@ -19,6 +19,8 @@ Como funciona
 - O resultado (commit atual e situação) aparece no painel da API Atlas.
 
 Atualização manual
+- Versão 1.0.1: o gitpull.bat não mostra mais avisos de extensões do PHP que faltam na
+  máquina (como "Unable to load dynamic library 'imagick'"). Eles não afetavam a atualização.
 - Dê dois cliques em gitpull.bat, ou rode no prompt, dentro da pasta do Atlas:
     php update_atlas\atualizador_git.php
 

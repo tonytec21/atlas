@@ -1,6 +1,6 @@
 <?php
 /* ======================================================================
- * ATLAS • Atualizador automático do código (git) — 1.0.0
+ * ATLAS • Atualizador automático do código (git) — 1.0.1
  * ----------------------------------------------------------------------
  * Substitui o antigo "git pull" da tela de login e funciona com o
  * repositório PRIVADO, sem guardar senha em nenhuma VM:

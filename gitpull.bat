@@ -9,6 +9,7 @@ if not "%PHPEXE%"=="php" goto rodar
 where php >nul 2>nul && goto rodar
 for /d %%D in ("%SystemDrive%\laragon\bin\php\php-*") do set "PHPEXE=%%D\php.exe"
 :rodar
-"%PHPEXE%" update_atlas\atualizador_git.php
+rem -d display_startup_errors=0 e 2>nul escondem avisos de extensoes do php.ini que nao existem na maquina (ex.: imagick)
+"%PHPEXE%" -d display_startup_errors=0 update_atlas\atualizador_git.php 2>nul
 echo.
 timeout /t 120
