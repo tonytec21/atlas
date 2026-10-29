@@ -1,6 +1,6 @@
 <?php
 /* ======================================================================
- * ATLAS • Guarda de rotas — 1.0.5
+ * ATLAS • Guarda de rotas — 1.0.6
  * ----------------------------------------------------------------------
  * Carregado no começo de toda requisição do Atlas (pela auditoria, que já
  * está em todos os módulos, e pela primeira linha dos scripts avulsos).
@@ -24,7 +24,7 @@
 if (defined('ATLAS_GUARDA')) {
     return;
 }
-define('ATLAS_GUARDA', '1.0.5');
+define('ATLAS_GUARDA', '1.0.6');
 
 if (PHP_SAPI === 'cli' || is_file(__DIR__ . '/dados/DESLIGAR')) {
     return;
@@ -590,21 +590,37 @@ function atlas_guarda__moldura(string $base): void
     $alvo = (string) ($_SERVER['REQUEST_URI'] ?? $base);
     $j = function ($v) { return json_encode($v, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); };
     $icone = is_file(dirname(__DIR__) . '/style/img/favicon.png') ? $base . 'style/img/favicon.png' : '';
+    $logo = is_file(dirname(__DIR__) . '/style/img/atlas_2026.png') ? $base . 'style/img/atlas_2026.png' : '';
+    $cor = (string) ($_COOKIE['atlas_cor'] ?? '');
+    $cor = preg_match('/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*[\d.]+\s*)?\)$/', $cor) ? $cor : '';
     ?>
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR"<?= $cor !== '' ? ' style="--f:' . $cor . ';background:' . $cor . '"' : '' ?>>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlas</title>
 <?php if ($icone): ?><link rel="icon" href="<?= htmlspecialchars($icone, ENT_QUOTES) ?>"><?php endif; ?>
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:#fff}
-#atlas-quadro{position:fixed;inset:0;width:100%;height:100%;border:0;display:block;background:#fff}
+/* transparente por padrão: quando esta página aparece dentro do quadro (navegação sem Sec-Fetch),
+   ela só se reabre direto, sem piscar nada */
+html,body{margin:0;height:100%;overflow:hidden;background:transparent}
+html.topo,html.topo body{background:var(--f,#f4f6fa)}
+#atlas-quadro{position:fixed;inset:0;width:100%;height:100%;border:0;display:block;background:transparent;opacity:0;transition:opacity .15s}
+html.pronto #atlas-quadro{opacity:1}
+#atlas-carregando{position:fixed;inset:0;z-index:1;display:grid;place-items:center;background:var(--f,#f4f6fa);transition:opacity .18s ease;pointer-events:none}
+#atlas-carregando.oculto{opacity:0}
+#atlas-carregando .caixa{display:flex;flex-direction:column;align-items:center;gap:18px}
+#atlas-carregando img{max-width:170px;max-height:56px;opacity:.9}
+#atlas-carregando .barra{width:150px;height:3px;border-radius:99px;background:var(--b,rgba(15,23,42,.1));overflow:hidden;position:relative}
+#atlas-carregando .barra i{position:absolute;top:0;bottom:0;width:40%;border-radius:inherit;background:var(--c,#4f46e5);animation:atlas-vai 1s ease-in-out infinite}
+@keyframes atlas-vai{0%{left:-40%}100%{left:100%}}
+html:not(.topo) #atlas-carregando{display:none}
 #atlas-aviso{position:fixed;inset:0;display:none;place-items:center;font:500 15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:#0f172a;color:#e2e8f0;z-index:2}
 #atlas-aviso div{max-width:420px;padding:26px;border:1px solid #334155;border-radius:16px;background:#111c33;text-align:center}
 #atlas-aviso p{color:#94a3b8;margin:6px 0 16px}
 #atlas-aviso a{display:inline-block;padding:9px 16px;border-radius:10px;background:#6366f1;color:#fff;text-decoration:none;font-weight:600;cursor:pointer}
+@media (prefers-reduced-motion:reduce){#atlas-carregando .barra i{animation:none;left:30%}}
 </style>
 <script>
 (function(){
@@ -616,6 +632,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:#fff}
     location.replace(ALVO + (ALVO.indexOf('?') < 0 ? '?' : '&') + '_atlas_sem_moldura=1');
     return;
   }
+  /* fundo da tela de carregamento na cor da última tela aberta (tema claro ou escuro) */
+  var h = document.documentElement;
+  h.className = 'topo';
+  try {
+    var cor = sessionStorage.getItem('atlas_moldura_cor') || localStorage.getItem('atlas_moldura_cor');
+    if (cor) h.style.setProperty('--f', cor);
+    var esc = sessionStorage.getItem('atlas_moldura_escuro') || localStorage.getItem('atlas_moldura_escuro');
+    if (esc === '1') { h.style.setProperty('--b', 'rgba(255,255,255,.12)'); h.style.setProperty('--c', '#818cf8'); }
+  } catch (e) {}
   /* F5 no endereço do sistema volta para a última tela aberta */
   try {
     var ultimo = sessionStorage.getItem(CHAVE);
@@ -629,18 +654,62 @@ html,body{margin:0;height:100%;overflow:hidden;background:#fff}
 </head>
 <body>
 <iframe id="atlas-quadro" title="Atlas" allow="clipboard-read; clipboard-write; camera; microphone; fullscreen; geolocation; usb; serial; hid" allowfullscreen></iframe>
+<div id="atlas-carregando" aria-hidden="true"><div class="caixa"><?php if ($logo): ?><img src="<?= htmlspecialchars($logo, ENT_QUOTES) ?>" alt=""><?php endif; ?><div class="barra"><i></i></div></div></div>
 <div id="atlas-aviso" role="status"><div><strong>Download iniciado</strong><p>Se um arquivo foi baixado, confira a pasta de downloads do navegador.</p><a id="atlas-voltar">Voltar ao sistema</a></div></div>
 <script>
 (function(){
   if (!window.__atlasMolduraAlvo) return;
   var BASE = <?= $j($base) ?>, CHAVE = 'atlas_moldura_atual';
-  var q = document.getElementById('atlas-quadro'), aviso = document.getElementById('atlas-aviso'), carregou = false;
+  var h = document.documentElement, q = document.getElementById('atlas-quadro'), car = document.getElementById('atlas-carregando'),
+      aviso = document.getElementById('atlas-aviso'), carregou = false, reserva = null;
+  function carregando() {
+    car.classList.remove('oculto');
+    clearTimeout(reserva);
+    reserva = setTimeout(pronto, 20000);   // nunca deixa a tela presa no carregamento
+  }
+  function pronto() { clearTimeout(reserva); h.classList.add('pronto'); car.classList.add('oculto'); }
+  /* cor de fundo da tela, pelo tema do Atlas (classe dark-mode/light-mode no body). A cor calculada
+     não basta sozinha: o Atlas anima a troca de fundo e, no carregamento, ela ainda pode estar clara. */
+  function corDe(d) {
+    try {
+      var w = d.defaultView, b = d.body, vazio = function (c) { return !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c); };
+      var c = w.getComputedStyle(b).backgroundColor;
+      if (vazio(c)) c = w.getComputedStyle(d.documentElement).backgroundColor;
+      if (vazio(c)) c = 'rgb(255, 255, 255)';
+      if (b.classList.contains('dark-mode') && !escuro(c)) c = 'rgb(51, 51, 51)';
+      if (b.classList.contains('light-mode') && escuro(c)) c = 'rgb(255, 255, 255)';
+      return c;
+    } catch (e) { return null; }
+  }
+  function aplicarCor(d) {
+    var c = corDe(d);
+    if (!c) return;
+    var e = escuro(c);
+    h.style.setProperty('--f', c);
+    h.style.setProperty('--b', e ? 'rgba(255,255,255,.12)' : 'rgba(15,23,42,.1)');
+    h.style.setProperty('--c', e ? '#818cf8' : '#4f46e5');
+    try { sessionStorage.setItem('atlas_moldura_cor', c); localStorage.setItem('atlas_moldura_cor', c); sessionStorage.setItem('atlas_moldura_escuro', e ? '1' : '0'); localStorage.setItem('atlas_moldura_escuro', e ? '1' : '0'); } catch (x) {}
+    /* o servidor já entrega a próxima moldura nesta cor (sem quadro branco no F5); vale para /atlas e /atlas/... */
+    document.cookie = 'atlas_cor=' + encodeURIComponent(c) + '; path=' + (BASE.length > 1 ? BASE.replace(/\/+$/, '') : '/') + '; max-age=31536000; samesite=lax';
+  }
+  function escuro(c) {
+    var m = String(c).match(/\d+(\.\d+)?/g); if (!m) return false;
+    return (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) < 128;
+  }
+  carregando();
   q.addEventListener('load', function(){
     carregou = true; aviso.style.display = 'none';
     try {
       var w = q.contentWindow, d = q.contentDocument;
       if (w.location.href === 'about:blank') return;
+      if (d.getElementById('atlas-quadro')) return;   // passo intermediário: a tela de verdade ainda vem
       document.title = d.title || 'Atlas';
+      /* a tela de carregamento passa a usar a cor desta tela (claro/escuro) — e acompanha a troca de
+         tema que o Atlas faz depois de carregar (ele busca o tema do usuário por AJAX) */
+      aplicarCor(d);
+      try { new MutationObserver(function () { aplicarCor(d); }).observe(d.body, { attributes: true, attributeFilter: ['class'] }); } catch (x) {}
+      /* ao sair desta tela (clique, envio de formulário), mostra o carregamento até a próxima terminar */
+      w.addEventListener('pagehide', carregando);
       var u = w.location.pathname + w.location.search;
       /* guarda a tela para o F5 — nunca endereços que executam ações (não podem rodar de novo) */
       var nome = (w.location.pathname.split('/').pop() || '').toLowerCase();
@@ -650,17 +719,18 @@ html,body{margin:0;height:100%;overflow:hidden;background:#fff}
       else if (/^(login|logout)\.php$/.test(nome)) sessionStorage.removeItem(CHAVE);
       var ic = d.querySelector('link[rel~="icon"]');
       if (ic) { var l = document.querySelector('link[rel~="icon"]') || document.head.appendChild(document.createElement('link')); l.rel = 'icon'; l.href = ic.href; }
-      try { history.replaceState(null, '', BASE.length > 1 ? BASE.replace(/\/+$/, '') : BASE); } catch (e) {}
-    } catch (e) {}
+      try { history.replaceState(null, '', BASE.length > 1 ? BASE.replace(/\/+$/, '') : BASE); } catch (x) {}
+    } catch (x) {}
+    pronto();
   });
   q.src = window.__atlasMolduraAlvo;
   /* se o endereço só baixou um arquivo, o quadro fica vazio: avisa e oferece voltar */
   setTimeout(function(){
-    try { if (!carregou && q.contentWindow.location.href === 'about:blank') aviso.style.display = 'grid'; } catch (e) {}
+    try { if (!carregou && q.contentWindow.location.href === 'about:blank') { pronto(); aviso.style.display = 'grid'; } } catch (e) {}
   }, 6000);
   document.getElementById('atlas-voltar').addEventListener('click', function(){
     var u = BASE; try { u = sessionStorage.getItem(CHAVE) || BASE; } catch (e) {}
-    aviso.style.display = 'none'; q.src = u;
+    aviso.style.display = 'none'; carregando(); q.src = u;
   });
 })();
 </script>

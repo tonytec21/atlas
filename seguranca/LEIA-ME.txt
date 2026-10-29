@@ -1,4 +1,4 @@
-ATLAS · PROTEÇÃO DE ROTAS E MOLDURA — 1.0.5
+ATLAS · PROTEÇÃO DE ROTAS E MOLDURA — 1.0.6
 
 *** Vem DESLIGADA em todos os cartórios. Para ligar em um cartório, entre na página do
     suporte dele (seguranca/suporte.php), escolha "Bloquear" e salve. Opções salvas antes
@@ -26,6 +26,8 @@ O que faz
    sistema, sem a barra final (ex.: http://servidor/atlas). F5 volta para a última tela aberta (nunca
    repete um endereço de ação, como excluir ou salvar).
    Impressões, PDFs e downloads abrem fora da moldura para não atrapalhar.
+   Enquanto uma tela carrega, a moldura mostra uma tela de carregamento na cor do tema
+   (claro ou escuro) da pessoa, sem piscar em branco.
 
 4. Links sem endereço no canto da tela
    Ao passar o mouse num link, o canto inferior da tela não mostra mais o endereço.
