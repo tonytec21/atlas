@@ -6,6 +6,7 @@
  * ============================================================================
  */
 declare(strict_types=1);
+/* atlas-guarda */ if (is_file(__DIR__ . '/../../seguranca/guarda.php')) { include_once __DIR__ . '/../../seguranca/guarda.php'; }
 
 if (!defined('IX_ROOT')) {
     define('IX_ROOT', dirname(__DIR__));          // .../indexador

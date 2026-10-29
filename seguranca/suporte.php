@@ -158,6 +158,7 @@ function sup_dados(string $ini, string $fim): array
         'config' => [
             'modo' => $cfg['modo'], 'moldura' => (bool) $cfg['moldura'], 'ocultar_links' => (bool) $cfg['ocultar_links'],
             'estrito' => (bool) $cfg['estrito'], 'emergencia' => is_file($raiz . '/dados/DESLIGAR'),
+            'contexto_seguro' => atlas_guarda__contexto_seguro(),
             'config_local' => is_file($raiz . '/config.local.php'),
             'alterado_em' => atlas_guarda_config_painel()['alterado_em'] ?? null, 'versao' => ATLAS_GUARDA,
         ],
@@ -447,7 +448,7 @@ document.getElementById('fEntrar').addEventListener('submit', async function (e)
       }).join('') + '</div>' +
       chave('oMoldura', 'Esconder o endereço das páginas', 'As telas abrem numa moldura; a barra mostra só o endereço do sistema.', cfg.moldura) +
       chave('oLinks', 'Esconder o endereço dos links', 'O canto inferior da tela não mostra para onde o link leva.', cfg.ocultar_links) +
-      chave('oEstrito', 'Modo estrito', 'Também recusa consultas de ferramentas sem navegador, mesmo com login.', cfg.estrito) +
+      chave('oEstrito', 'Modo estrito', 'Também recusa consultas de ferramentas sem navegador, mesmo com login. Só tem efeito com o Atlas em HTTPS ou localhost.' + (cfg.contexto_seguro ? '' : ' <b>Nesta serventia (HTTP pelo IP) não está em efeito.</b>'), cfg.estrito) +
       (cfg.config_local ? '<div class="aviso">Esta máquina tem um seguranca/config.local.php. O que for salvo aqui vale por cima dele.</div>' : '') +
       '<button class="btn pri" id="salvar">Salvar opções</button>' + (cfg.alterado_em ? '<div style="margin-top:8px;color:var(--ink3);font-size:12px">Alterado em ' + dhBR(cfg.alterado_em) + '</div>' : '') + '</div></div>';
     function topo(t, lista, fmt) {

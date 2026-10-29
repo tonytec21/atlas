@@ -1,6 +1,6 @@
 <?php
 /* ======================================================================
- * ATLAS • Guarda de rotas — 1.0.2
+ * ATLAS • Guarda de rotas — 1.0.4
  * ----------------------------------------------------------------------
  * Carregado no começo de toda requisição do Atlas (pela auditoria, que já
  * está em todos os módulos, e pela primeira linha dos scripts avulsos).
@@ -24,7 +24,7 @@
 if (defined('ATLAS_GUARDA')) {
     return;
 }
-define('ATLAS_GUARDA', '1.0.2');
+define('ATLAS_GUARDA', '1.0.4');
 
 if (PHP_SAPI === 'cli' || is_file(__DIR__ . '/dados/DESLIGAR')) {
     return;
@@ -342,6 +342,19 @@ function atlas_guarda__mesmo_host(string $url): bool
 
 function atlas_guarda__executar(): void
 {
+    // Desligada no config.php/config.local.php: desliga de vez, por cima do que estiver salvo na página do suporte.
+    $arquivo = [];
+    foreach ([__DIR__ . '/config.php', __DIR__ . '/config.local.php'] as $f) {
+        if (is_file($f)) {
+            $v = include $f;
+            if (is_array($v)) {
+                $arquivo = array_merge($arquivo, $v);
+            }
+        }
+    }
+    if (($arquivo['modo'] ?? '') === 'desligado') {
+        return;
+    }
     $cfg = atlas_guarda_config();
     if (($cfg['modo'] ?? 'bloquear') === 'desligado') {
         return;
@@ -424,7 +437,10 @@ function atlas_guarda__executar(): void
           Consultas do próprio navegador, a partir das telas, seguem só com login e mesma origem —
           isso inclui páginas estáticas como o visualizador de PDF, que não recebem o token. */
     if (!$entrada) {
-        $semNavegador = $site === '' && $modo === '';
+        // Os cabeçalhos Sec-Fetch só são mandados pelo navegador em HTTPS ou em localhost. Em HTTP
+        // pelo IP da rede (como nas serventias) eles nunca vêm, então lá o modo estrito não tem como
+        // separar navegador de ferramenta e não é aplicado (senão recusaria as próprias telas).
+        $semNavegador = $site === '' && $modo === '' && atlas_guarda__contexto_seguro();
         $exige = $grava || (!empty($cfg['estrito']) && $semNavegador);
         if ($exige) {
             $esperado = atlas_guarda_token();
@@ -436,7 +452,11 @@ function atlas_guarda__executar(): void
     }
 
     /* 5) moldura: navegação principal abre a página dentro do quadro */
-    if (!empty($cfg['moldura']) && !$semMoldura && !headers_sent() && atlas_guarda__nada_impresso() && $metodo === 'GET' && $dest === 'document' && $modo === 'navigate' && !$ajax
+    // Navegação de página: com Sec-Fetch, só a principal (document). Sem Sec-Fetch (HTTP pelo IP), qualquer
+    // navegação que pede HTML; se for dentro do quadro, a própria moldura percebe e abre a página direto.
+    $navegacao = ($dest === 'document' && $modo === 'navigate')
+        || ($dest === '' && $modo === '' && strpos(strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? '')), 'text/html') !== false);
+    if (!empty($cfg['moldura']) && !$semMoldura && !headers_sent() && atlas_guarda__nada_impresso() && $metodo === 'GET' && $navegacao && !$ajax
         && !atlas_guarda__casa($rel, array_merge(['oauth2callback.php', 'logout.php', 'seguranca/suporte.php'], (array) $cfg['sem_moldura']))
         && !preg_match('/pdf|imprim|impress|print|download|baixar|export|xls|csv|zip|recibo|comprovante|etiqueta|capa|espelho|carne|boleto|guia_de_impressao|view[-_]?oficio|ver[-_]oficio|visualizar_arquivo|^arquivo\.php|^anexo|^gerar_|_pdf|^api|ajax|json|ping/i', basename($rel))) {
         $GLOBALS['__atlas_guarda']['moldura'] = true;
@@ -451,6 +471,20 @@ function atlas_guarda__executar(): void
     if ($abrindoTela) {
         atlas_guarda__injetar($base, !empty($cfg['ocultar_links']));
     }
+}
+
+/** O navegador manda os cabeçalhos Sec-Fetch aqui? (só em HTTPS ou localhost) */
+function atlas_guarda__contexto_seguro(): bool
+{
+    $https = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+        || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+    if ($https) {
+        return true;
+    }
+    $h = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $h = preg_replace('/:\d+$/', '', trim($h, '[]'));
+    $h = trim((string) $h, '[]');
+    return $h === 'localhost' || substr($h, -10) === '.localhost' || strpos($h, '127.') === 0 || $h === '::1';
 }
 
 /** A página ainda não imprimiu nada (em nenhum nível de buffer)? */
@@ -570,7 +604,7 @@ function atlas_guarda__moldura(string $base): void
 <title>Atlas</title>
 <?php if ($icone): ?><link rel="icon" href="<?= htmlspecialchars($icone, ENT_QUOTES) ?>"><?php endif; ?>
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:#0b1220}
+html,body{margin:0;height:100%;overflow:hidden;background:#fff}
 #atlas-quadro{position:fixed;inset:0;width:100%;height:100%;border:0;display:block;background:#fff}
 #atlas-aviso{position:fixed;inset:0;display:none;place-items:center;font:500 15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:#0f172a;color:#e2e8f0;z-index:2}
 #atlas-aviso div{max-width:420px;padding:26px;border:1px solid #334155;border-radius:16px;background:#111c33;text-align:center}

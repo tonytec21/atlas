@@ -1,4 +1,7 @@
-ATLAS · PROTEÇÃO DE ROTAS E MOLDURA — 1.0.2
+ATLAS · PROTEÇÃO DE ROTAS E MOLDURA — 1.0.4
+
+*** 1.0.4: PROTEÇÃO DESLIGADA. Para religar, troque 'modo' => 'desligado' por
+    'bloquear' em seguranca/config.php (com o 'desligado' lá, a página do suporte não religa). ***
 ===========================================
 
 O que faz
@@ -14,8 +17,8 @@ O que faz
    telas do Atlas recebem, ligado à sessão de quem está usando, e precisa vir do
    próprio endereço do sistema. Copiar o endereço no "Inspecionar elemento" e usar em
    outra ferramenta (Postman, curl, script, outro site) para enviar dados é recusado.
-   Consultas vindas de outro site também são recusadas, e consultas feitas por
-   ferramentas sem navegador (mesmo com login) também — modo estrito, ligado por padrão.
+   Consultas vindas de outro site também são recusadas. Com o Atlas em HTTPS (ou
+   localhost), consultas feitas por ferramentas sem navegador também — modo estrito.
 
 3. Moldura
    As telas abrem dentro de um quadro: a barra de endereço mostra só o endereço do
@@ -49,7 +52,11 @@ Opções (página do suporte)
 - Esconder o endereço das páginas (moldura)
 - Esconder o endereço dos links
 - Modo estrito (ligado por padrão): também recusa consultas feitas por ferramentas
-  sem navegador, mesmo com o login de um usuário.
+  sem navegador, mesmo com o login de um usuário. Só tem efeito quando o Atlas é aberto
+  por HTTPS ou por localhost: em HTTP pelo IP da rede o navegador não manda os
+  cabeçalhos (Sec-Fetch) que separam navegador de ferramenta, e aplicar a regra ali
+  recusaria as próprias telas. Nesse caso continuam valendo o login obrigatório e o
+  token em tudo o que grava.
 
 Emergência
 ----------

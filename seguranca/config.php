@@ -9,7 +9,7 @@ return [
     // bloquear  = recusa pedidos de fora do sistema (recomendado)
     // observar  = só registra o que seria bloqueado, sem recusar (use para conferir antes)
     // desligado = sem proteção
-    'modo' => 'bloquear',
+    'modo' => 'desligado',   // DESLIGADA nesta versão (vale por cima do que estiver salvo na página do suporte)
 
     // true: até consultas (GET) feitas por ferramentas sem navegador precisam do token.
     'estrito' => true,
