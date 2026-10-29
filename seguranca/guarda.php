@@ -1,6 +1,6 @@
 <?php
 /* ======================================================================
- * ATLAS • Guarda de rotas — 1.0.4
+ * ATLAS • Guarda de rotas — 1.0.5
  * ----------------------------------------------------------------------
  * Carregado no começo de toda requisição do Atlas (pela auditoria, que já
  * está em todos os módulos, e pela primeira linha dos scripts avulsos).
@@ -24,7 +24,7 @@
 if (defined('ATLAS_GUARDA')) {
     return;
 }
-define('ATLAS_GUARDA', '1.0.4');
+define('ATLAS_GUARDA', '1.0.5');
 
 if (PHP_SAPI === 'cli' || is_file(__DIR__ . '/dados/DESLIGAR')) {
     return;
@@ -49,7 +49,7 @@ function atlas_guarda_config(): array
         return $c;
     }
     $c = [
-        'modo'          => 'bloquear',  // bloquear | observar (só registra) | desligado
+        'modo'          => 'desligado', // bloquear | observar (só registra) | desligado
         'estrito'       => true,        // até GET sem cabeçalhos de navegador precisa do token
         'moldura'       => true,
         'ocultar_links' => true,
@@ -65,8 +65,12 @@ function atlas_guarda_config(): array
             }
         }
     }
-    // escolhas feitas na página do suporte (seguranca/suporte.php) valem por último
+    // escolhas feitas na página do suporte (seguranca/suporte.php) valem por último. Só as salvas a partir
+    // da 1.0.5 (geração 2): as anteriores ficam sem efeito, para nenhum cartório religar sozinho.
     $p = atlas_guarda_config_painel();
+    if ((int) ($p['geracao'] ?? 0) < 2) {
+        $p = [];
+    }
     foreach (['modo', 'estrito', 'moldura', 'ocultar_links'] as $k) {
         if (array_key_exists($k, $p)) {
             $c[$k] = $p[$k];
@@ -90,11 +94,15 @@ function atlas_guarda_config_painel(): array
 function atlas_guarda_salvar_config_painel(array $v): bool
 {
     $atual = atlas_guarda_config_painel();
+    if ((int) ($atual['geracao'] ?? 0) < 2) {
+        $atual = [];
+    }
     foreach (['modo', 'estrito', 'moldura', 'ocultar_links'] as $k) {
         if (array_key_exists($k, $v)) {
             $atual[$k] = $v[$k];
         }
     }
+    $atual['geracao'] = 2;
     $atual['alterado_em'] = atlas_guarda__agora('Y-m-d H:i:s');
     return @file_put_contents(atlas_guarda_dados() . '/config_painel.php',
         "<?php http_response_code(404); exit; ?>\n" . json_encode($atual, JSON_UNESCAPED_UNICODE), LOCK_EX) !== false;
@@ -342,19 +350,6 @@ function atlas_guarda__mesmo_host(string $url): bool
 
 function atlas_guarda__executar(): void
 {
-    // Desligada no config.php/config.local.php: desliga de vez, por cima do que estiver salvo na página do suporte.
-    $arquivo = [];
-    foreach ([__DIR__ . '/config.php', __DIR__ . '/config.local.php'] as $f) {
-        if (is_file($f)) {
-            $v = include $f;
-            if (is_array($v)) {
-                $arquivo = array_merge($arquivo, $v);
-            }
-        }
-    }
-    if (($arquivo['modo'] ?? '') === 'desligado') {
-        return;
-    }
     $cfg = atlas_guarda_config();
     if (($cfg['modo'] ?? 'bloquear') === 'desligado') {
         return;

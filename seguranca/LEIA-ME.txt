@@ -1,7 +1,8 @@
-ATLAS · PROTEÇÃO DE ROTAS E MOLDURA — 1.0.4
+ATLAS · PROTEÇÃO DE ROTAS E MOLDURA — 1.0.5
 
-*** 1.0.4: PROTEÇÃO DESLIGADA. Para religar, troque 'modo' => 'desligado' por
-    'bloquear' em seguranca/config.php (com o 'desligado' lá, a página do suporte não religa). ***
+*** Vem DESLIGADA em todos os cartórios. Para ligar em um cartório, entre na página do
+    suporte dele (seguranca/suporte.php), escolha "Bloquear" e salve. Opções salvas antes
+    da 1.0.5 foram descartadas, para nenhum cartório religar sozinho. ***
 ===========================================
 
 O que faz

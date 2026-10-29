@@ -160,7 +160,7 @@ function sup_dados(string $ini, string $fim): array
             'estrito' => (bool) $cfg['estrito'], 'emergencia' => is_file($raiz . '/dados/DESLIGAR'),
             'contexto_seguro' => atlas_guarda__contexto_seguro(),
             'config_local' => is_file($raiz . '/config.local.php'),
-            'alterado_em' => atlas_guarda_config_painel()['alterado_em'] ?? null, 'versao' => ATLAS_GUARDA,
+            'alterado_em' => (int) (atlas_guarda_config_painel()['geracao'] ?? 0) >= 2 ? (atlas_guarda_config_painel()['alterado_em'] ?? null) : null, 'versao' => ATLAS_GUARDA,
         ],
         'totais' => ['total' => count($lista), 'externos' => count($lista) - $porMotivo['sessao'], 'usuarios' => count($porUsuario), 'ips' => count($porIp)],
         'por_motivo' => $porMotivo,
