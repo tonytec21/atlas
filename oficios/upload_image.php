@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 /**
  * Atlas - Upload de imagens para o editor de ofícios
  * Salva em: oficios/imagens/{dir_token}/

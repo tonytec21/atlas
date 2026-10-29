@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $termo = $_POST['termo'];
     $livro = $_POST['livro'];

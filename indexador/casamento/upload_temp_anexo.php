@@ -1,4 +1,6 @@
-<?php require_once __DIR__ . '/../_core/legacy_guard.php';
+<?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../../seguranca/guarda.php')) { include_once __DIR__ . '/../../seguranca/guarda.php'; }
+require_once __DIR__ . '/../_core/legacy_guard.php';
 session_start();
 $base = __DIR__ . '/anexos/temp/';
 if (!file_exists($base)) { @mkdir($base, 0777, true); }

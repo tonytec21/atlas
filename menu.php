@@ -71,6 +71,7 @@ $mode_query->close();
 <!DOCTYPE html>  
 <html lang="pt-BR">  
 <head>  
+<?php /* atlas-guarda */ if (function_exists('atlas_guarda_tag')) { echo atlas_guarda_tag(); } ?>
     <meta charset="UTF-8">  
     <meta name="viewport" content="width=device-width, initial-scale=1.0">  
     <title>Atlas - Sistema de Gestão</title>  

@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 if (isset($_POST['file']) && isset($_POST['numero'])) {
     // Sanitizar as entradas
     $file = filter_input(INPUT_POST, 'file', FILTER_SANITIZE_STRING);

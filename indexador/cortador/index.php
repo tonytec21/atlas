@@ -1,4 +1,5 @@
 <?php  
+/* atlas-guarda */ if (is_file(__DIR__ . '/../../seguranca/guarda.php')) { include_once __DIR__ . '/../../seguranca/guarda.php'; }
 // Configuração  
 $uploadDir = __DIR__ . '/uploads/';  
 $pythonPath = 'C:\Users\tonyt\AppData\Local\Programs\Python\Python313\python.exe';  

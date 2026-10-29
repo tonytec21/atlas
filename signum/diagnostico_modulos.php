@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 /**
  * signum/diagnostico_modulos.php — diagnóstico da integração do TCloud Assinador com os módulos
  * (ofícios, notas devolutivas, O.S.). Mostra versões, arquivos e, com "Testar página", executa a página

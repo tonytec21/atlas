@@ -174,13 +174,14 @@ function assin_generate_pdf_bytes($numero, $timbrado)
 function assin_http_get_pdf($url)
 {
     $cookieHeader = null;
-    if (isset($_COOKIE[session_name()])) {
+    if (isset($_COOKIE[session_name()]) && (!function_exists('atlas_guarda_url_local') || atlas_guarda_url_local($url))) { // o cookie da sessão só vai para esta máquina
         $cookieHeader = session_name() . '=' . $_COOKIE[session_name()];
     }
 
     if (function_exists('curl_init')) {
         $ch = curl_init();
         $headers = ['Accept: application/pdf'];
+        if (function_exists('atlas_guarda_url_local') && atlas_guarda_url_local($url)) { $headers[] = atlas_guarda_cabecalho_interno(); }
         if ($cookieHeader) {
             $headers[] = 'Cookie: ' . $cookieHeader;
         }
@@ -203,6 +204,7 @@ function assin_http_get_pdf($url)
 
     // Fallback file_get_contents
     $opts = ['http' => ['method' => 'GET', 'header' => "Accept: application/pdf\r\n", 'ignore_errors' => true, 'timeout' => 90]];
+    if (function_exists('atlas_guarda_url_local') && atlas_guarda_url_local($url)) { $opts['http']['header'] .= atlas_guarda_cabecalho_interno() . "\r\n"; }
     if ($cookieHeader) {
         $opts['http']['header'] .= 'Cookie: ' . $cookieHeader . "\r\n";
     }

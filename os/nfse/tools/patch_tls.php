@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../../../seguranca/guarda.php')) { include_once __DIR__ . '/../../../seguranca/guarda.php'; }
 /**
  * ATLAS-NFSE — Correção do HTTP 403 do IIS da SEFIN Nacional.
  *

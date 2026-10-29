@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 $output = shell_exec('ping selador.local -4');
 $test = explode("[", $output);
 $test2 = explode("]", $test[1]);

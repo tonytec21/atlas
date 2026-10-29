@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 /* oficios/cache_pdf_oficio.php
  * Gera e salva o PDF do ofício em disco, respeitando "timbrado" (S/N), e retorna a URL do arquivo salvo.
  * POST:
@@ -96,7 +97,8 @@ function download_via_curl($url){
         return ['ok'=>false,'err'=>'cURL não disponível'];
     }
     $headers = ['Accept: application/pdf'];
-    if(isset($_COOKIE[session_name()])){
+    if (function_exists('atlas_guarda_url_local') && atlas_guarda_url_local($url)) { $headers[] = atlas_guarda_cabecalho_interno(); }
+    if(isset($_COOKIE[session_name()]) && (!function_exists('atlas_guarda_url_local') || atlas_guarda_url_local($url))){ // o cookie da sessão só vai para esta máquina
         $headers[] = 'Cookie: ' . session_name() . '=' . $_COOKIE[session_name()];
     }
 
@@ -136,7 +138,8 @@ function download_via_curl($url){
 
 function download_via_fgc($url){
     $opts = ['http'=>['method'=>'GET','header'=>"Accept: application/pdf\r\n",'ignore_errors'=>true, 'timeout'=>90]];
-    if(isset($_COOKIE[session_name()])){
+    if (function_exists('atlas_guarda_url_local') && atlas_guarda_url_local($url)) { $opts['http']['header'] .= atlas_guarda_cabecalho_interno() . "\r\n"; }
+    if(isset($_COOKIE[session_name()]) && (!function_exists('atlas_guarda_url_local') || atlas_guarda_url_local($url))){
         $opts['http']['header'] .= 'Cookie: '.session_name().'='.$_COOKIE[session_name()]."\r\n";
     }
     // https permissivo

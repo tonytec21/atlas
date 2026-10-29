@@ -1,4 +1,4 @@
-<?php  
+<?php /* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; } ?><?php  
 ob_start();  
 if (session_status() === PHP_SESSION_NONE) {  
     session_start();  

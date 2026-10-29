@@ -1,0 +1,90 @@
+ATLAS · PROTEÇÃO DE ROTAS E MOLDURA — 1.0.2
+===========================================
+
+O que faz
+---------
+1. Login obrigatório em todo o sistema
+   Nenhuma página ou endereço do Atlas responde sem login, inclusive os que antes
+   não conferiam (ex.: rotinas de casamento/óbito, exclusão de ofício, cadastro de
+   funcionário). Exceções: tela de login e 2FA; a API da O.S. (token do sistema
+   integrador) e as estações TCloud Scanner e TCloud Assinador (credencial própria).
+
+2. Pedidos só pelas telas do sistema
+   Tudo o que grava ou envia dados (POST, PUT, DELETE) precisa de um token que só as
+   telas do Atlas recebem, ligado à sessão de quem está usando, e precisa vir do
+   próprio endereço do sistema. Copiar o endereço no "Inspecionar elemento" e usar em
+   outra ferramenta (Postman, curl, script, outro site) para enviar dados é recusado.
+   Consultas vindas de outro site também são recusadas, e consultas feitas por
+   ferramentas sem navegador (mesmo com login) também — modo estrito, ligado por padrão.
+
+3. Moldura
+   As telas abrem dentro de um quadro: a barra de endereço mostra só o endereço do
+   sistema, sem a barra final (ex.: http://servidor/atlas). F5 volta para a última tela aberta (nunca
+   repete um endereço de ação, como excluir ou salvar).
+   Impressões, PDFs e downloads abrem fora da moldura para não atrapalhar.
+
+4. Links sem endereço no canto da tela
+   Ao passar o mouse num link, o canto inferior da tela não mostra mais o endereço.
+
+5. Registro
+   Cada pedido recusado fica registrado com usuário, IP, endereço visado e o programa
+   usado, na página do suporte (abaixo) e também na trilha de auditoria.
+
+Página do suporte
+-----------------
+    http://<servidor>/atlas/seguranca/suporte.php
+Não aparece em nenhum menu e não usa os usuários do Atlas: entra só com a senha do
+suporte (5 senhas erradas do mesmo IP bloqueiam por 15 minutos, com espera maior a cada
+erro; a sessão expira após 2 horas sem uso). A sessão do suporte é separada (cookie
+próprio): entrar no suporte num navegador onde alguém usa o Atlas não mexe na sessão
+dessa pessoa. Mostra os pedidos recusados e as opções abaixo.
+Use uma senha longa e aleatória: o hash vai junto no código.
+Trocar a senha (vale para todas as serventias na próxima atualização):
+    php -r "echo password_hash('NOVA-SENHA', PASSWORD_BCRYPT, ['cost' => 12]);"
+e cole o resultado em seguranca/suporte_acesso.php.
+
+Opções (página do suporte)
+--------------------------
+- Bloquear (padrão) · Só registrar (não recusa nada, mostra o que seria recusado) · Desligado
+- Esconder o endereço das páginas (moldura)
+- Esconder o endereço dos links
+- Modo estrito (ligado por padrão): também recusa consultas feitas por ferramentas
+  sem navegador, mesmo com o login de um usuário.
+
+Emergência
+----------
+Se alguma tela parar de funcionar por causa da proteção, crie o arquivo vazio
+    seguranca\dados\DESLIGAR
+e tudo volta a funcionar como antes, na hora. Depois apague o arquivo para religar.
+Também dá para pôr a proteção em "Só registrar" pela página do suporte e ver na lista
+o que estaria sendo recusado.
+
+Para quem desenvolve
+--------------------
+- O guarda é carregado pela auditoria (auditoria/hook.php, presente nas conexões de
+  todos os módulos) e pela primeira linha dos scripts avulsos (marca "atlas-guarda").
+  Script novo que inclui o db_connection.php já fica protegido.
+- As telas recebem o seguranca/protecao.js automaticamente (logo após o <head>).
+  Ele coloca o token em jQuery/XMLHttpRequest, fetch, formulários (inclusive
+  form.submit()) e sendBeacon. Não é preciso mudar nada nas telas.
+- O token chega como cabeçalho X-Atlas-Token ou campo _atlas_token; o guarda o retira
+  antes da página ver os dados.
+- Página do Atlas chamada pelo próprio servidor (ex.: gerar PDF por cURL): mande o
+  cabeçalho de atlas_guarda_cabecalho_interno(), e só quando atlas_guarda_url_local($url)
+  confirmar que o endereço é desta máquina (o Host do pedido pode ser forjado).
+- O login é conferido pela chave "username" da sessão, lida pelo próprio PHP. Quem
+  ainda não digitou o código 2FA (tfa_pending) não conta como logado.
+- Rota nova com credencial própria (API para outro sistema): acrescente em 'livres'
+  no seguranca/config.php.
+- Arquivos em seguranca/dados/ (segredo, opções salvas pelo suporte, registros) são gerados
+  na máquina e não vão para o git.
+
+Limite importante
+-----------------
+Nenhuma proteção num sistema web impede totalmente alguém que JÁ TEM login de copiar
+o que o próprio navegador dele envia. O que esta proteção garante: sem login nada
+funciona; pedidos de fora das telas são recusados; quem tentar contornar precisa
+extrair o token da sessão de propósito, e cada tentativa recusada fica registrada
+com o nome do usuário. A moldura e os links sem endereço escondem os endereços do
+uso comum, mas as ferramentas de desenvolvedor do navegador continuam mostrando o
+tráfego — por isso a proteção de verdade é a do servidor (itens 1 e 2).

@@ -1,4 +1,6 @@
-<?php require_once __DIR__ . '/../_core/legacy_guard.php';
+<?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../../seguranca/guarda.php')) { include_once __DIR__ . '/../../seguranca/guarda.php'; }
+require_once __DIR__ . '/../_core/legacy_guard.php';
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['arquivo_pdf'])) {
     $dir = 'anexos/temp/';
     if (!file_exists($dir)) {

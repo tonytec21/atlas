@@ -23,6 +23,9 @@ if (defined('ATLAS_AUD_HOOK')) {
 define('ATLAS_AUD_HOOK', 1);
 
 if (is_file(__DIR__ . '/dados/DESLIGAR')) {
+    if (is_file(dirname(__DIR__) . '/seguranca/guarda.php')) {
+        include_once dirname(__DIR__) . '/seguranca/guarda.php';   // a proteção não depende da auditoria
+    }
     return;   // as funções abaixo continuam existindo, mas sem contexto não fazem nada
 }
 
@@ -214,6 +217,9 @@ register_shutdown_function(function () {
     set_error_handler(function () { return true; });   // avisos daqui iriam parar no fim da resposta
     try {
         $ctx = &$GLOBALS['__atlas_aud'];
+        if (!empty($GLOBALS['__atlas_guarda']['moldura'])) {
+            return;   // só a moldura; a tela de verdade é registrada quando carrega dentro dela
+        }
         // O PHP só esvazia os buffers de saída depois desta função: lê o que ainda está pendente.
         if (!$ctx['cli'] && ob_get_level() > 0) {
             $pend = (string) ob_get_contents();
@@ -445,6 +451,15 @@ register_shutdown_function(function () {
                 $acao = 'Acesso negado · ' . aud_modulo_rotulo($modulo) . ' · ' . aud_rotulo_script($pagina);
             }
         }
+        $guardaMotivo = $GLOBALS['__atlas_guarda']['motivo'] ?? null;
+        if ($guardaMotivo) {
+            $rotulosGuarda = ['sessao' => 'sem login', 'token' => 'pedido feito fora das telas do sistema', 'origem' => 'pedido vindo de outro endereço'];
+            $categoria = 'seguranca';
+            $severidade = $guardaMotivo === 'sessao' ? 'aviso' : 'critico';
+            $resultado = 'negado';
+            $acao = 'Bloqueado pela proteção (' . ($rotulosGuarda[$guardaMotivo] ?? $guardaMotivo) . ') · ' . aud_modulo_rotulo($modulo) . ' · ' . aud_rotulo_script($pagina);
+            $mensagem = 'Pedido recusado pela proteção de rotas';
+        }
 
         $resumo = null;
         if ($dados) {
@@ -540,3 +555,9 @@ register_shutdown_function(function () {
         restore_error_handler();
     }
 });
+
+/* atlas-guarda: proteção de rotas (login obrigatório, token, moldura). Carregada depois do registro
+   acima para que os pedidos bloqueados também fiquem na trilha de auditoria. */
+if (is_file(dirname(__DIR__) . '/seguranca/guarda.php')) {
+    include_once dirname(__DIR__) . '/seguranca/guarda.php';
+}

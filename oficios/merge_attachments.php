@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 if (isset($_POST['files']) && !empty($_POST['files']) && isset($_POST['numero'])) {
     $files = $_POST['files'];
     $numero = $_POST['numero'];

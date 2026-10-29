@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 if (isset($_GET['task_id'])) {
     $task_id = intval($_GET['task_id']);
     header("Location: edit_task.php?id=$task_id");

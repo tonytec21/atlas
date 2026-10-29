@@ -1,4 +1,5 @@
 <?php  
+/* atlas-guarda */ if (is_file(__DIR__ . '/../../seguranca/guarda.php')) { include_once __DIR__ . '/../../seguranca/guarda.php'; }
 // Configuração para capturar erros em formato JSON  
 ini_set('display_errors', 0);  
 ini_set('log_errors', 1);  

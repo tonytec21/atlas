@@ -1,4 +1,5 @@
 <?php  
+/* atlas-guarda */ if (is_file(__DIR__ . '/../../seguranca/guarda.php')) { include_once __DIR__ . '/../../seguranca/guarda.php'; }
 header('Content-Type: application/json');  
 
 // Verificar se o ID do trabalho foi fornecido  

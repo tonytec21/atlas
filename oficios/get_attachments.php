@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 $numero = isset($_GET['numero']) ? $_GET['numero'] : '';
 $anexos_dir = __DIR__ . "/anexos/$numero/";
 $lixeira_dir = __DIR__ . "/lixeira/$numero/"; // Diretório para a lixeira

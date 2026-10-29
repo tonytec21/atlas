@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 /* oficios/get_cached_pdf.php
  * Retorna JSON informando se há PDF em cache para o número informado.
  * Saída:

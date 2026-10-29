@@ -5,6 +5,7 @@
  *   POST action=validate (tipo + ids)     -> regras + XSD por registro
  */
 declare(strict_types=1);
+/* atlas-guarda */ if (is_file(__DIR__ . '/../../seguranca/guarda.php')) { include_once __DIR__ . '/../../seguranca/guarda.php'; }
 
 require_once __DIR__ . '/../_core/crc.php';
 @ini_set('display_errors', '0');

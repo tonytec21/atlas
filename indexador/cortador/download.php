@@ -1,4 +1,5 @@
 <?php  
+/* atlas-guarda */ if (is_file(__DIR__ . '/../../seguranca/guarda.php')) { include_once __DIR__ . '/../../seguranca/guarda.php'; }
 // Verificar se o nome do arquivo foi fornecido  
 if (!isset($_GET['file'])) {  
     header('HTTP/1.1 400 Bad Request');  

@@ -1,4 +1,5 @@
 <?php
+/* atlas-guarda */ if (is_file(__DIR__ . '/../seguranca/guarda.php')) { include_once __DIR__ . '/../seguranca/guarda.php'; }
 /**
  * painel_admin/api.php — Endpoints JSON do Painel do Administrador.
  * Acesso restrito ao nível "administrador". Operações que alteram algo
