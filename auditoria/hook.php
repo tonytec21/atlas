@@ -451,7 +451,7 @@ register_shutdown_function(function () {
                 $acao = 'Acesso negado · ' . aud_modulo_rotulo($modulo) . ' · ' . aud_rotulo_script($pagina);
             }
         }
-        $guardaMotivo = $GLOBALS['__atlas_guarda']['motivo'] ?? null;
+        $guardaMotivo = !empty($GLOBALS['__atlas_guarda']['bloqueado']) ? ($GLOBALS['__atlas_guarda']['motivo'] ?? null) : null;
         if ($guardaMotivo) {
             $rotulosGuarda = ['sessao' => 'sem login', 'token' => 'pedido feito fora das telas do sistema', 'origem' => 'pedido vindo de outro endereço'];
             $categoria = 'seguranca';

@@ -94,7 +94,7 @@ function sup_dados(string $ini, string $fim): array
         return ($e['em'] ?? '') >= $iniDt && ($e['em'] ?? '') <= $fimDt;
     }));
 
-    $porMotivo = ['token' => 0, 'origem' => 0, 'sessao' => 0];
+    $porMotivo = ['token' => 0, 'origem' => 0, 'sessao' => 0, 'ferramenta' => 0, 'consulta' => 0];
     $porUsuario = $porIp = $porRota = $porDia = [];
     foreach ($lista as $e) {
         $m = $e['motivo'] ?? '?';
@@ -162,7 +162,8 @@ function sup_dados(string $ini, string $fim): array
             'config_local' => is_file($raiz . '/config.local.php'),
             'alterado_em' => (int) (atlas_guarda_config_painel()['geracao'] ?? 0) >= 2 ? (atlas_guarda_config_painel()['alterado_em'] ?? null) : null, 'versao' => ATLAS_GUARDA,
         ],
-        'totais' => ['total' => count($lista), 'externos' => count($lista) - $porMotivo['sessao'], 'usuarios' => count($porUsuario), 'ips' => count($porIp)],
+        'totais' => ['total' => count($lista), 'externos' => count($lista) - $porMotivo['sessao'], 'usuarios' => count($porUsuario), 'ips' => count($porIp),
+            'recusados' => count(array_filter($lista, function ($e) { return ($e['acao'] ?? '') === 'bloqueado'; }))],
         'por_motivo' => $porMotivo,
         'por_usuario' => $top($porUsuario),
         'por_ip' => $top($porIp),
@@ -414,8 +415,9 @@ document.getElementById('fEntrar').addEventListener('submit', async function (e)
     return j.dados;
   }
 
-  var MOT = { token: 'Fora das telas do sistema', origem: 'De outro endereço', sessao: 'Sem login' };
-  var COR = { token: 'var(--red)', origem: 'var(--ora)', sessao: 'var(--ink3)' };
+  var MOT = { token: 'Envio fora das telas', origem: 'De outro endereço', sessao: 'Sem login', ferramenta: 'Consulta por ferramenta', consulta: 'Consulta por script sem token' };
+  var COR = { token: 'var(--red)', origem: 'var(--ora)', sessao: 'var(--ink3)', ferramenta: '#a855f7', consulta: '#eab308' };
+  var SIT = { bloqueado: ['red', 'recusado'], observado: ['amb', 'só registrado'], monitorado: ['amb', 'registrado (proteção desligada)'], registrado: ['amb', 'registrado'] };
   function programa(ua) {
     ua = String(ua || ''); if (!ua) return 'programa não informado';
     var f = ua.match(/curl|wget|python[-\w]*|postman|insomnia|httpie|axios|node-fetch|okhttp|java|go-http|powershell|guzzle|php/i);
@@ -434,16 +436,17 @@ document.getElementById('fEntrar').addEventListener('submit', async function (e)
     $('#serv').textContent = (p.serventia.nome || 'Serventia') + (p.serventia.cns ? ' · CNS ' + p.serventia.cns : '');
     var tipo = cfg.emergencia || cfg.modo === 'desligado' ? 'ruim' : cfg.modo === 'observar' ? 'obs' : 'ok';
     var h = '<div class="faixa ' + tipo + '"><div class="ic"><?= $escudo ?></div><div><h2>' +
-      (cfg.emergencia ? 'Proteção desligada pelo arquivo de emergência' : cfg.modo === 'bloquear' ? 'Proteção ativa: pedidos de fora do sistema são recusados' : cfg.modo === 'observar' ? 'Só registrando: nada está sendo recusado' : 'Proteção desligada') +
-      '</h2><p>' + (cfg.emergencia ? 'Apague o arquivo seguranca/dados/DESLIGAR para religar.' : ext ? int(ext) + ' pedido' + (ext > 1 ? 's' : '') + ' por fora das telas no período.' : 'Nenhum pedido por fora das telas no período.') + '</p></div></div>';
+      (cfg.emergencia ? 'Proteção desligada pelo arquivo de emergência (sem registro)' : cfg.modo === 'bloquear' ? 'Proteção ativa: pedidos de fora do sistema são recusados' : cfg.modo === 'observar' ? 'Só registrando: nada está sendo recusado' : 'Proteção desligada, monitorando: o que vier de fora das telas fica registrado') +
+      '</h2><p>' + (cfg.emergencia ? 'Apague o arquivo seguranca/dados/DESLIGAR para religar.' : ext ? int(ext) + ' pedido' + (ext > 1 ? 's' : '') + ' por fora das telas no período' + (p.totais.recusados ? ', ' + int(p.totais.recusados) + ' recusado' + (p.totais.recusados > 1 ? 's' : '') : '') + '.' : 'Nenhum pedido por fora das telas no período.') + '</p></div></div>';
     h += '<div class="kpis">' +
-      '<div class="kpi" style="--c:var(--red)"><span>Fora das telas</span><strong>' + int(p.por_motivo.token) + '</strong><small>sem o token do sistema</small></div>' +
+      '<div class="kpi" style="--c:var(--red)"><span>Envios fora das telas</span><strong>' + int(p.por_motivo.token) + '</strong><small>gravar/excluir sem o token</small></div>' +
+      '<div class="kpi" style="--c:#a855f7"><span>Consultas fora das telas</span><strong>' + int((p.por_motivo.ferramenta || 0) + (p.por_motivo.consulta || 0)) + '</strong><small>' + int(p.por_motivo.ferramenta || 0) + ' por ferramenta · ' + int(p.por_motivo.consulta || 0) + ' por script</small></div>' +
       '<div class="kpi" style="--c:var(--ora)"><span>De outro endereço</span><strong>' + int(p.por_motivo.origem) + '</strong><small>outro site ou ferramenta</small></div>' +
       '<div class="kpi" style="--c:var(--ink3)"><span>Sem login</span><strong>' + int(p.por_motivo.sessao) + '</strong><small>sessão expirada ou acesso direto</small></div>' +
-      '<div class="kpi" style="--c:var(--pri)"><span>Usuários envolvidos</span><strong>' + int(p.totais.usuarios) + '</strong><small>' + int(p.totais.ips) + ' IP' + (p.totais.ips === 1 ? '' : 's') + '</small></div></div>';
-    h += '<div class="grade g64"><div class="card"><h3>Pedidos recusados por dia</h3><div class="graf"><canvas id="gDia"></canvas></div></div>' +
+      '<div class="kpi" style="--c:var(--pri)" hidden><span>Usuários envolvidos</span><strong>' + int(p.totais.usuarios) + '</strong><small>' + int(p.totais.ips) + ' IP' + (p.totais.ips === 1 ? '' : 's') + '</small></div></div>';
+    h += '<div class="grade g64"><div class="card"><h3>Pedidos de fora das telas por dia</h3><div class="graf"><canvas id="gDia"></canvas></div></div>' +
       '<div class="card"><h3>Opções da proteção <small>v' + esc(cfg.versao) + '</small></h3><div class="modos" role="radiogroup" aria-label="Modo">' +
-      [['bloquear', 'Bloquear', 'Recusa pedidos de fora das telas. Recomendado.'], ['observar', 'Só registrar', 'Não recusa; lista o que seria recusado.'], ['desligado', 'Desligado', 'Sem proteção nenhuma.']].map(function (m) {
+      [['bloquear', 'Bloquear', 'Recusa pedidos de fora das telas. Recomendado.'], ['observar', 'Só registrar', 'Não recusa; lista o que seria recusado.'], ['desligado', 'Desligado', 'Não recusa nada; só registra o que vier de fora.']].map(function (m) {
         return '<label class="modo"><input type="radio" name="modo" value="' + m[0] + '"' + (cfg.modo === m[0] ? ' checked' : '') + '><b>' + m[1] + '</b><small>' + m[2] + '</small></label>';
       }).join('') + '</div>' +
       chave('oMoldura', 'Esconder o endereço das páginas', 'As telas abrem numa moldura; a barra mostra só o endereço do sistema.', cfg.moldura) +
@@ -461,7 +464,7 @@ document.getElementById('fEntrar').addEventListener('submit', async function (e)
       topo('Quem tentou por fora', p.por_usuario, function (u) { var n = p.nomes[u]; return n ? '<b>' + esc(n) + '</b> <small style="color:var(--ink3)">' + esc(u) + '</small>' : esc(u); }) +
       topo('De quais IPs', p.por_ip, esc) +
       topo('Endereços mais visados', p.por_rota, function (r) { return '<code>' + esc(r) + '</code>'; }) + '</div>';
-    h += '<div class="card" style="margin-top:14px"><h3>Pedidos recusados <small>' + (p.recentes.length >= 300 ? 'os 300 mais recentes' : int(p.recentes.length) + ' no período') + '</small></h3>' +
+    h += '<div class="card" style="margin-top:14px"><h3>Pedidos de fora das telas <small>' + (p.recentes.length >= 300 ? 'os 300 mais recentes' : int(p.recentes.length) + ' no período') + '</small></h3>' +
       (p.recentes.length ? '<div class="tab-wrap"><table><thead><tr><th>Quando</th><th>Motivo</th><th>Usuário</th><th>IP</th><th>Pedido</th><th>Origem / programa</th><th>Situação</th></tr></thead><tbody>' +
       p.recentes.map(function (e) {
         var n = e.usuario && p.nomes[e.usuario];
@@ -471,7 +474,7 @@ document.getElementById('fEntrar').addEventListener('submit', async function (e)
           '<td>' + esc(e.ip) + '</td>' +
           '<td><span class="tag">' + esc(e.metodo) + '</span> <code>' + esc(e.rota) + (e.query ? '?' + esc(String(e.query).slice(0, 70)) : '') + '</code></td>' +
           '<td style="max-width:280px"><small style="word-break:break-all">' + esc(e.origem || 'sem origem (ferramenta externa)') + '</small><br><small title="' + esc(e.agente) + '">' + esc(programa(e.agente)) + '</small></td>' +
-          '<td>' + (e.acao === 'observado' ? '<span class="tag amb">só registrado</span>' : '<span class="tag red">recusado</span>') + '</td></tr>';
+          '<td>' + (function (x) { return '<span class="tag ' + x[0] + '">' + x[1] + '</span>'; })(SIT[e.acao] || ['red', 'recusado']) + '</td></tr>';
       }).join('') + '</tbody></table></div>' : '<div class="vazio">Nenhum pedido recusado no período.</div>') + '</div>';
     c.innerHTML = h;
 
@@ -479,7 +482,7 @@ document.getElementById('fEntrar').addEventListener('submit', async function (e)
       if (grafico) grafico.destroy();
       var cs = getComputedStyle(document.body);
       grafico = new Chart($('#gDia'), { type: 'bar', data: { labels: p.serie.map(function (x) { return dataBR(x.d).slice(0, 5); }), datasets: [
-        { label: 'Fora das telas / outro endereço', data: p.serie.map(function (x) { return x.externo; }), backgroundColor: 'rgba(239,68,68,.8)', borderRadius: 5, stack: 's', maxBarThickness: 26 },
+        { label: 'Fora das telas / outro endereço / ferramenta', data: p.serie.map(function (x) { return x.externo; }), backgroundColor: 'rgba(239,68,68,.8)', borderRadius: 5, stack: 's', maxBarThickness: 26 },
         { label: 'Sem login', data: p.serie.map(function (x) { return x.sessao; }), backgroundColor: 'rgba(148,163,184,.55)', borderRadius: 5, stack: 's', maxBarThickness: 26 }] },
         options: { maintainAspectRatio: false, plugins: { legend: { position: 'top', align: 'end', labels: { color: cs.getPropertyValue('--ink2'), boxWidth: 12 } } },
           scales: { x: { stacked: true, grid: { display: false }, ticks: { color: cs.getPropertyValue('--ink3'), maxTicksLimit: 15 } },

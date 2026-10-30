@@ -1,6 +1,6 @@
 <?php
 /* ======================================================================
- * ATLAS • Guarda de rotas — 1.0.6
+ * ATLAS • Guarda de rotas — 1.0.7
  * ----------------------------------------------------------------------
  * Carregado no começo de toda requisição do Atlas (pela auditoria, que já
  * está em todos os módulos, e pela primeira linha dos scripts avulsos).
@@ -24,7 +24,7 @@
 if (defined('ATLAS_GUARDA')) {
     return;
 }
-define('ATLAS_GUARDA', '1.0.6');
+define('ATLAS_GUARDA', '1.0.7');
 
 if (PHP_SAPI === 'cli' || is_file(__DIR__ . '/dados/DESLIGAR')) {
     return;
@@ -351,15 +351,19 @@ function atlas_guarda__mesmo_host(string $url): bool
 function atlas_guarda__executar(): void
 {
     $cfg = atlas_guarda_config();
-    if (($cfg['modo'] ?? 'bloquear') === 'desligado') {
+    $modoCfg = (string) ($cfg['modo'] ?? 'bloquear');
+    // Desligada: não recusa nada, sem moldura e sem esconder links — mas continua registrando os pedidos
+    // feitos por fora das telas (a menos que 'monitorar' => false no config). Desligar tudo: dados/DESLIGAR.
+    if ($modoCfg === 'desligado' && isset($cfg['monitorar']) && $cfg['monitorar'] === false) {
         return;
     }
+    $acaoRegistro = $modoCfg === 'bloquear' ? 'bloqueado' : ($modoCfg === 'observar' ? 'observado' : 'monitorado');
     $r = atlas_guarda__rota();
     if ($r === null) {
         return;
     }
     [$rel, $base] = $r;
-    $GLOBALS['__atlas_guarda'] = ['rel' => $rel, 'base' => $base, 'motivo' => null];
+    $GLOBALS['__atlas_guarda'] = ['rel' => $rel, 'base' => $base, 'motivo' => null, 'acao' => $acaoRegistro];
 
     /* 1) rotas com credencial própria: não mexe em nada */
     $livres = array_merge([
@@ -403,27 +407,24 @@ function atlas_guarda__executar(): void
     /* 2) de outro site: recusa (o retorno do login do Google é a única exceção) */
     if ($site === 'cross-site' && $rel !== 'oauth2callback.php') {
         atlas_guarda__negar('origem', 'Pedido vindo de outro site.', $base);
-        return;
     }
     if ($origin !== '' && $origin !== 'null' && !atlas_guarda__mesmo_host($origin)) {
         atlas_guarda__negar('origem', 'Pedido vindo de outro endereço.', $base);
-        return;
     }
     if ($origin === 'null' && $grava) {
         atlas_guarda__negar('origem', 'Pedido de origem desconhecida.', $base);
-        return;
     }
     if ($grava && $origin === '' && ($referer === '' || !atlas_guarda__mesmo_host($referer))) {
         // navegadores sempre mandam Origin ou Referer ao enviar dados; ferramentas externas não
         atlas_guarda__negar('origem', 'Envio de dados sem origem conhecida.', $base);
-        return;
     }
 
     /* 3) login */
     $usuario = $entrada ? null : atlas_guarda__usuario();
-    if (!$entrada && $usuario === null) {
+    $navegaTela = in_array($dest, ['document', 'iframe', 'frame'], true)
+        || ($dest === '' && !$ajax && strpos(strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? '')), 'text/html') !== false);
+    if (!$entrada && $usuario === null && !($acaoRegistro === 'monitorado' && $navegaTela && !$grava)) {
         atlas_guarda__negar('sessao', 'Sua sessão terminou. Entre novamente no sistema.', $base);
-        return;
     }
     $GLOBALS['__atlas_guarda']['usuario'] = $usuario;
 
@@ -436,12 +437,23 @@ function atlas_guarda__executar(): void
         // pelo IP da rede (como nas serventias) eles nunca vêm, então lá o modo estrito não tem como
         // separar navegador de ferramenta e não é aplicado (senão recusaria as próprias telas).
         $semNavegador = $site === '' && $modo === '' && atlas_guarda__contexto_seguro();
+        $esperado = atlas_guarda_token();
+        $tokenOk = $esperado !== '' && $tokenRecebido !== '' && hash_equals($esperado, $tokenRecebido);
         $exige = $grava || (!empty($cfg['estrito']) && $semNavegador);
-        if ($exige) {
-            $esperado = atlas_guarda_token();
-            if ($esperado === '' || $tokenRecebido === '' || !hash_equals($esperado, $tokenRecebido)) {
-                atlas_guarda__negar('token', 'Pedido recusado: use as telas do sistema.', $base);
-                return;
+        if ($exige && !$tokenOk) {
+            atlas_guarda__negar('token', 'Pedido recusado: use as telas do sistema.', $base);
+        }
+        /* Consultas feitas por fora das telas: só ficam registradas (não são recusadas, a não ser pelo
+           modo estrito acima). Ferramenta reconhecida pelo programa, ou chamada de script sem o token. */
+        if (!$grava && !$tokenOk && empty($GLOBALS['__atlas_guarda']['motivo'])) {
+            $ua = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
+            $aceita = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+            if ($ua === '' || preg_match('/curl|wget|python|postman|insomnia|httpie|axios|node-fetch|undici|okhttp|java\/|go-http|powershell|winhttp|libwww|guzzle|php\/|ruby|perl|apache-httpclient|restsharp|dart|thunder client|bruno|hoppscotch/i', $ua)) {
+                atlas_guarda__registrar_so('ferramenta');
+            } elseif (($ajax || strpos($aceita, 'application/json') !== false || ($dest === 'empty' && $modo !== 'navigate'))
+                // páginas estáticas do próprio Atlas (ex.: visualizador de PDF) não recebem o token: não contam
+                && !($referer !== '' && atlas_guarda__mesmo_host($referer) && preg_match('/\.html?$/i', (string) parse_url($referer, PHP_URL_PATH)))) {
+                atlas_guarda__registrar_so('consulta');
             }
         }
     }
@@ -451,7 +463,7 @@ function atlas_guarda__executar(): void
     // navegação que pede HTML; se for dentro do quadro, a própria moldura percebe e abre a página direto.
     $navegacao = ($dest === 'document' && $modo === 'navigate')
         || ($dest === '' && $modo === '' && strpos(strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? '')), 'text/html') !== false);
-    if (!empty($cfg['moldura']) && !$semMoldura && !headers_sent() && atlas_guarda__nada_impresso() && $metodo === 'GET' && $navegacao && !$ajax
+    if ($modoCfg !== 'desligado' && !empty($cfg['moldura']) && !$semMoldura && !headers_sent() && atlas_guarda__nada_impresso() && $metodo === 'GET' && $navegacao && !$ajax
         && !atlas_guarda__casa($rel, array_merge(['oauth2callback.php', 'logout.php', 'seguranca/suporte.php'], (array) $cfg['sem_moldura']))
         && !preg_match('/pdf|imprim|impress|print|download|baixar|export|xls|csv|zip|recibo|comprovante|etiqueta|capa|espelho|carne|boleto|guia_de_impressao|view[-_]?oficio|ver[-_]oficio|visualizar_arquivo|^arquivo\.php|^anexo|^gerar_|_pdf|^api|ajax|json|ping/i', basename($rel))) {
         $GLOBALS['__atlas_guarda']['moldura'] = true;
@@ -464,7 +476,8 @@ function atlas_guarda__executar(): void
     $abrindoTela = in_array($dest, ['document', 'iframe', 'frame'], true)
         || ($dest === '' && !$ajax && strpos(strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? '')), 'text/html') !== false);
     if ($abrindoTela) {
-        atlas_guarda__injetar($base, !empty($cfg['ocultar_links']));
+        // desligada: a tela recebe só o token (para o registro não confundir as telas com pedidos de fora)
+        atlas_guarda__injetar($base, $modoCfg !== 'desligado' && !empty($cfg['ocultar_links']));
     }
 }
 
@@ -496,12 +509,18 @@ function atlas_guarda__nada_impresso(): bool
 /** Recusa (ou só registra, no modo observar). */
 function atlas_guarda__negar(string $motivo, string $mensagem, string $base): void
 {
-    $cfg = atlas_guarda_config();
-    $GLOBALS['__atlas_guarda']['motivo'] = $motivo;
-    atlas_guarda__registrar($motivo, ($cfg['modo'] ?? '') === 'observar');
-    if (($cfg['modo'] ?? '') === 'observar') {
+    $acao = (string) ($GLOBALS['__atlas_guarda']['acao'] ?? 'bloqueado');
+    if ($acao !== 'bloqueado') {
+        // só registrando: anota o primeiro motivo da requisição e deixa seguir
+        if (empty($GLOBALS['__atlas_guarda']['motivo'])) {
+            $GLOBALS['__atlas_guarda']['motivo'] = $motivo;
+            atlas_guarda__registrar($motivo, $acao);
+        }
         return;
     }
+    $GLOBALS['__atlas_guarda']['motivo'] = $motivo;
+    $GLOBALS['__atlas_guarda']['bloqueado'] = true;
+    atlas_guarda__registrar($motivo, 'bloqueado');
     if (function_exists('atlas_aud_contexto') && isset($GLOBALS['__atlas_aud'])) {
         $GLOBALS['__atlas_aud']['guarda'] = $motivo;
     }
@@ -549,14 +568,26 @@ function atlas_guarda__negar(string $motivo, string $mensagem, string $base): vo
     exit;
 }
 
-/** Registro dos bloqueios (seguranca/dados/bloqueios-AAAA-MM.php, uma linha JSON por evento). */
-function atlas_guarda__registrar(string $motivo, bool $soObservado): void
+/** Só registra (nunca recusa): consultas por fora das telas. */
+function atlas_guarda__registrar_so(string $motivo): void
+{
+    if (empty($GLOBALS['__atlas_guarda']['motivo'])) {
+        $GLOBALS['__atlas_guarda']['motivo'] = $motivo;
+        $GLOBALS['__atlas_guarda']['so_registro'] = true;
+        $acao = (string) ($GLOBALS['__atlas_guarda']['acao'] ?? 'monitorado');
+        atlas_guarda__registrar($motivo, $acao === 'bloqueado' ? 'registrado' : $acao);
+    }
+}
+
+/** Registro dos pedidos (seguranca/dados/bloqueios-AAAA-MM.php, uma linha JSON por evento).
+ *  acao: bloqueado | observado (modo "só registrar") | monitorado (proteção desligada) | registrado (consulta, só anotada) */
+function atlas_guarda__registrar(string $motivo, string $acao): void
 {
     $g = $GLOBALS['__atlas_guarda'] ?? [];
     $linha = json_encode([
         'em'      => atlas_guarda__agora('Y-m-d H:i:s'),
         'motivo'  => $motivo,
-        'acao'    => $soObservado ? 'observado' : 'bloqueado',
+        'acao'    => $acao,
         'usuario' => $g['usuario'] ?? atlas_guarda__usuario(),
         'ip'      => (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
         'metodo'  => (string) ($_SERVER['REQUEST_METHOD'] ?? ''),
@@ -751,7 +782,8 @@ function atlas_guarda_tag(): string
         return '';
     }
     $cfg = atlas_guarda_config();
-    $cfgJs = json_encode(['t' => atlas_guarda_token(), 'b' => $g['base'], 'l' => !empty($cfg['ocultar_links']) ? 1 : 0], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+    $links = ($cfg['modo'] ?? '') !== 'desligado' && !empty($cfg['ocultar_links']);
+    $cfgJs = json_encode(['t' => atlas_guarda_token(), 'b' => $g['base'], 'l' => $links ? 1 : 0], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
     $v = @filemtime(__DIR__ . '/protecao.js') ?: 1;
     return '<script>window.__ATLAS_G=' . $cfgJs . ';</script><script src="' . htmlspecialchars($g['base'], ENT_QUOTES) . 'seguranca/protecao.js?v=' . $v . '"></script>';
 }

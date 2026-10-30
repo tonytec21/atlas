@@ -1,9 +1,10 @@
-ATLAS · PROTEÇÃO DE ROTAS E MOLDURA — 1.0.6
+ATLAS · PROTEÇÃO DE ROTAS E MOLDURA — 1.0.7
 
-*** Vem DESLIGADA em todos os cartórios. Para ligar em um cartório, entre na página do
-    suporte dele (seguranca/suporte.php), escolha "Bloquear" e salve. Opções salvas antes
-    da 1.0.5 foram descartadas, para nenhum cartório religar sozinho. ***
-===========================================
+*** Vem DESLIGADA em todos os cartórios, mas MONITORANDO: nada é recusado, não há moldura
+    nem links escondidos, e todo pedido feito por fora das telas fica registrado na página do
+    suporte (envios sem o token, consultas por ferramenta ou script, pedidos de outro site,
+    acessos sem login a endereços de dados). Para ligar a proteção num cartório, entre na
+    página do suporte dele (seguranca/suporte.php), escolha "Bloquear" e salve. ***
 
 O que faz
 ---------
@@ -61,11 +62,24 @@ Opções (página do suporte)
   recusaria as próprias telas. Nesse caso continuam valendo o login obrigatório e o
   token em tudo o que grava.
 
+Registro (vale em todos os modos)
+---------------------------------
+- Envio de dados (gravar/excluir) sem o token das telas ........ "Envio fora das telas"
+- Consulta feita por ferramenta (Postman, curl, Python, etc.) .. "Consulta por ferramenta"
+- Consulta de script (AJAX/JSON) sem o token das telas ......... "Consulta por script sem token"
+- Pedido vindo de outro site ou sem origem ...................... "De outro endereço"
+- Endereço de dados acessado sem login .......................... "Sem login"
+Situação: recusado (modo Bloquear), só registrado (modo Só registrar), registrado (proteção
+desligada ou consulta anotada sem recusar).
+Limite: uma consulta comum feita por uma ferramenta que se disfarça de navegador, em HTTP pelo
+IP, não tem como ser separada de um navegador — essa não aparece. Envios sempre aparecem.
+Para não registrar nada com a proteção desligada: 'monitorar' => false no config.local.php.
+
 Emergência
 ----------
 Se alguma tela parar de funcionar por causa da proteção, crie o arquivo vazio
     seguranca\dados\DESLIGAR
-e tudo volta a funcionar como antes, na hora. Depois apague o arquivo para religar.
+e tudo volta a funcionar como antes, na hora (inclusive sem registro). Depois apague o arquivo para religar.
 Também dá para pôr a proteção em "Só registrar" pela página do suporte e ver na lista
 o que estaria sendo recusado.
 

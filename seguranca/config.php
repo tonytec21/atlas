@@ -12,6 +12,9 @@ return [
     // Padrão: desligada. Liga por cartório na página do suporte (seguranca/suporte.php).
     'modo' => 'desligado',
 
+    // Mesmo desligada, registra os pedidos feitos por fora das telas (não recusa nada).
+    'monitorar' => true,
+
     // true: até consultas (GET) feitas por ferramentas sem navegador precisam do token.
     'estrito' => true,
 
