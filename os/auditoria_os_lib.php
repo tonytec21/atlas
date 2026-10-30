@@ -201,6 +201,7 @@ function osaud_acoes(): array
         'pagamento_lancado'    => ['Pagamento lançado',           'fa-money',          'ok'],
         'pagamento_removido'   => ['Pagamento excluído',          'fa-trash',          'del'],
         'pagamento_observacao' => ['Observação de pagamento',     'fa-comment',        'edit'],
+        'pagamento_forma_alterada' => ['Forma de pagamento alterada', 'fa-exchange',   'edit'],
         'pagamento_online'     => ['Pagamento online registrado', 'fa-credit-card',    'ok'],
         'comprovante_enviado'  => ['Comprovante enviado',         'fa-paperclip',      'ok'],
         'comprovante_removido' => ['Comprovante excluído',        'fa-trash',          'del'],

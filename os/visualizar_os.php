@@ -165,13 +165,18 @@ $pagamentos_query->execute();
 $pagamentos_result = $pagamentos_query->get_result();
 $pagamentos = $pagamentos_result->fetch_all(MYSQLI_ASSOC);
 
-// Exclusão de pagamento: só quem lançou ou o Oficial, no dia, sem ato liquidado e com o caixa de quem lançou aberto
+// Exclusão de pagamento: quem lançou ou o Oficial, no dia e com o caixa de quem lançou aberto;
+// com ato liquidado, só o Oficial e se o valor ainda estiver disponível.
+// Troca da forma de pagamento: só o Oficial, no dia e com o caixa de quem lançou aberto.
 require_once __DIR__ . '/pagamento_exclusao_lib.php';
+$__ehOficialPg = os_pagto_eh_oficial($conn, (string) $_SESSION['username']);
 foreach ($pagamentos as &$__pg) {
     $__rx = os_pagto_exclusao($conn, $__pg, (string) $_SESSION['username']);
     $__pg['pode_excluir']    = $__rx['pode'];
     $__pg['motivo_exclusao'] = $__rx['motivo'];
     $__pg['mesmo_dia']       = $__rx['mesmo_dia'];
+    $__ra = os_pagto_alteracao($conn, $__pg, (string) $_SESSION['username']);
+    $__pg['pode_alterar']    = $__ra['pode'];
 }
 unset($__pg);
 
@@ -1417,6 +1422,10 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
     #tabelaItensOS tfoot th { font-weight: 700; background: rgba(99,102,241,.08); border-top: 2px solid rgba(99,102,241,.35); white-space: nowrap; }
     body.dark-mode #tabelaItensOS tfoot th { background: rgba(129,140,248,.14); }
     .item-card-totais { border: 2px solid rgba(99,102,241,.35); }
+    /* Botão de trocar a forma de pagamento (Oficial) */
+    .btn-forma-pg { background: rgba(14,165,233,.12); color: #0369a1; border: 1px solid rgba(14,165,233,.35); }
+    .btn-forma-pg:hover { background: rgba(14,165,233,.22); color: #075985; }
+    body.dark-mode .btn-forma-pg { color: #7dd3fc; background: rgba(14,165,233,.18); }
 </style>  
 </head>  
 <body>  
@@ -2422,7 +2431,7 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                             <?php foreach ($pagamentos as $pagamento):  
                                 $dataPagtoBr = date('d/m/Y H:i', strtotime($pagamento['data_pagamento']));  
                                 $isToday   = (date('Y-m-d', strtotime($pagamento['data_pagamento'])) === date('Y-m-d'));  
-                                $canDelete = !$has_liquidated && $isToday;  
+                                $canDelete = $isToday && !empty($pagamento['pode_excluir']);  
                             ?>  
                             <tr>  
                                 <td><?php echo htmlspecialchars($pagamento['forma_de_pagamento']); ?></td>  
@@ -3675,7 +3684,8 @@ $(document).ready(function() {
                         data_pagamento:  response.data_pagamento || new Date().toISOString().slice(0,19).replace('T',' '),
                         funcionario:     '<?php echo $_SESSION['username']; ?>',
                         observacao:      (typeof response.observacao === 'string') ? response.observacao : observacaoPagamento,
-                        pode_excluir:    true,
+                        pode_excluir:    <?php echo ($__ehOficialPg || !($has_liquidated || (float) $total_liquidado > 0)) ? 'true' : 'false'; ?>,
+                        pode_alterar:    <?php echo $__ehOficialPg ? 'true' : 'false'; ?> && <?php echo json_encode(os_pagto_formas_troca(), JSON_UNESCAPED_UNICODE); ?>.indexOf(formaPagamento) >= 0,
                         mesmo_dia:       true
                     });
 
@@ -3757,8 +3767,10 @@ $(document).ready(function() {
             const todayYmd  = ymdInSaoPaulo(new Date());
             const linhaDate = new Date((pagamento.data_pagamento || '').replace(' ', 'T'));
             const linhaYmd  = isNaN(linhaDate.getTime()) ? '' : ymdInSaoPaulo(linhaDate);
-            // Regra do servidor (pagamento_exclusao_lib.php): quem lançou ou o Oficial, no dia, sem ato liquidado e caixa aberto
-            const canDelete = !<?php echo $has_liquidated ? 'true':'false'; ?> && (linhaYmd === todayYmd) && pagamento.pode_excluir !== false;
+            // Regra do servidor (pagamento_exclusao_lib.php): quem lançou ou o Oficial, no dia e com o caixa aberto;
+            // com ato liquidado, só o Oficial e se o valor ainda estiver disponível na O.S.
+            const canDelete = (linhaYmd === todayYmd) && pagamento.pode_excluir === true;
+            const canChange = (linhaYmd === todayYmd) && pagamento.pode_alterar === true;
             const motivoBloqueio = (!canDelete && linhaYmd === todayYmd && pagamento.motivo_exclusao) ? String(pagamento.motivo_exclusao) : '';
 
             var acoesHtml = '';
@@ -3770,6 +3782,9 @@ $(document).ready(function() {
                 acoesHtml += '<button type="button" title="Comprovante de pagamento" class="btn btn-attach btn-sm js-pa-open" data-pid="' + pagamento.id + '" data-forma="' + _forma + '">' +
                              '<i class="fa fa-paperclip" aria-hidden="true"></i>' +
                              '<span class="pa-badge' + (_n > 0 ? ' on' : '') + '" data-pid="' + pagamento.id + '">' + _n + '</span></button> ';
+            }
+            if (canChange) {
+                acoesHtml += '<button type="button" title="Alterar a forma de pagamento (Oficial)" class="btn btn-forma-pg btn-sm" onclick="alterarFormaPagamento(' + pagamento.id + ')"><i class="fa fa-exchange" aria-hidden="true"></i></button> ';
             }
             if (canDelete) {
                 acoesHtml += '<button type="button" title="Remover" class="btn btn-delete btn-sm" onclick="confirmarRemocaoPagamento(' + pagamento.id + ')"><i class="fa fa-trash" aria-hidden="true"></i></button>';
@@ -3837,19 +3852,14 @@ $(document).ready(function() {
 
     // Função para remover pagamento
     function confirmarRemocaoPagamento(pagamentoId) {
-        if (<?php echo $has_liquidated ? 'true' : 'false'; ?>) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro!',
-                text: 'Não é possível remover pagamentos após a liquidação de atos.',
-                confirmButtonText: 'OK'
-            });
-            return;
-        }
+        // A regra é do servidor (pagamento_exclusao_lib.php); com ato liquidado, só o Oficial e se o valor estiver disponível
+        const comLiquidacao = <?php echo $has_liquidated || (float) $total_liquidado > 0 ? 'true' : 'false'; ?>;
 
         Swal.fire({
             title: 'Tem certeza?',
-            text: 'Deseja realmente remover este pagamento?',
+            text: comLiquidacao
+                ? 'Esta O.S. já tem atos liquidados. O pagamento só será excluído se o valor dele ainda estiver disponível na O.S. Deseja remover este pagamento?'
+                : 'Deseja realmente remover este pagamento?',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#3085d6',
@@ -3899,6 +3909,56 @@ $(document).ready(function() {
                     }
                 });
             }
+        });
+    }
+
+    // Troca da forma de pagamento (somente o Oficial, no dia e com o caixa de quem lançou aberto)
+    function alterarFormaPagamento(pagamentoId) {
+        const pg = pagamentos.find(p => String(p.id) === String(pagamentoId));
+        if (!pg) return;
+        const formas = <?php echo json_encode(os_pagto_formas_troca(), JSON_UNESCAPED_UNICODE); ?>;
+        const opcoes = {};
+        formas.forEach(function (f) { if (f !== pg.forma_de_pagamento) opcoes[f] = f; });
+        const valorBr = 'R$ ' + parseFloat(pg.total_pagamento || 0).toFixed(2).replace('.', ',');
+
+        Swal.fire({
+            title: 'Alterar forma de pagamento',
+            html: '<p style="margin:0 0 6px">Pagamento de <b>' + escaparHtml(valorBr) + '</b> lançado por <b>' + escaparHtml(pg.funcionario || '') + '</b>.</p>'
+                + '<p style="margin:0 0 10px">Forma atual: <b>' + escaparHtml(pg.forma_de_pagamento || '') + '</b></p>'
+                + '<p style="margin:0;font-size:13px;color:#64748b">O valor não muda. O caixa de quem lançou passa a considerar a nova forma.</p>',
+            input: 'select',
+            inputOptions: opcoes,
+            inputPlaceholder: 'Escolha a nova forma',
+            showCancelButton: true,
+            confirmButtonText: 'Alterar',
+            cancelButtonText: 'Cancelar',
+            inputValidator: function (v) { return v ? undefined : 'Escolha a nova forma de pagamento.'; }
+        }).then(function (r) {
+            if (!r.isConfirmed) return;
+            $.ajax({
+                url: 'alterar_forma_pagamento.php',
+                type: 'POST',
+                data: { pagamento_id: pagamentoId, nova_forma: r.value },
+                success: function (resp) {
+                    try { resp = (typeof resp === 'object') ? resp : JSON.parse(resp); } catch (e) { resp = { error: 'Resposta inválida do servidor.' }; }
+                    if (resp && resp.success) {
+                        pg.forma_de_pagamento = resp.forma;
+                        atualizarTabelaPagamentos();
+                        refreshOsHeaderAndStats();
+                        Swal.fire({ icon: 'success', title: 'Forma de pagamento alterada', text: resp.mensagem || '', confirmButtonText: 'OK' });
+                    } else {
+                        Swal.fire({
+                            icon: resp && resp.bloqueado ? 'warning' : 'error',
+                            title: resp && resp.bloqueado ? 'Alteração não permitida' : 'Erro!',
+                            text: (resp && resp.error) || 'Erro ao alterar a forma de pagamento.',
+                            confirmButtonText: 'OK'
+                        });
+                    }
+                },
+                error: function () {
+                    Swal.fire({ icon: 'error', title: 'Erro!', text: 'Erro ao alterar a forma de pagamento.', confirmButtonText: 'OK' });
+                }
+            });
         });
     }
 

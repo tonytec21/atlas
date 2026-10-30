@@ -15,8 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die(json_encode(['error' => 'Erro ao conectar ao banco de dados']));
     }
 
-    // Proteção: só quem lançou ou o Oficial, no mesmo dia, sem ato liquidado e com o caixa de quem lançou ainda aberto
-    $st = $conn->prepare('SELECT id, ordem_de_servico_id, funcionario, data_pagamento, forma_de_pagamento FROM pagamento_os WHERE id = ?');
+    // Proteção: só quem lançou ou o Oficial, no mesmo dia e com o caixa de quem lançou ainda aberto;
+    // com ato liquidado, só o Oficial e se o valor ainda estiver disponível na O.S.
+    $st = $conn->prepare('SELECT id, ordem_de_servico_id, funcionario, data_pagamento, forma_de_pagamento, total_pagamento FROM pagamento_os WHERE id = ?');
     $st->bind_param('i', $pagamento_id);
     $st->execute();
     $pag = $st->get_result()->fetch_assoc();
