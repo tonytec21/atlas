@@ -1413,6 +1413,10 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
         .ts-explica{ font-size:.9rem; }
         .ts-pg-linha td{ background:rgba(139,92,246,.07) !important; }
         .ts-pg{ font-weight:600; } .ts-pg a{ font-weight:700; }
+    /* Linha de totais dos itens da O.S. */
+    #tabelaItensOS tfoot th { font-weight: 700; background: rgba(99,102,241,.08); border-top: 2px solid rgba(99,102,241,.35); white-space: nowrap; }
+    body.dark-mode #tabelaItensOS tfoot th { background: rgba(129,140,248,.14); }
+    .item-card-totais { border: 2px solid rgba(99,102,241,.35); }
 </style>  
 </head>  
 <body>  
@@ -1816,6 +1820,21 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
 
             <!-- TABELA DESKTOP -->
             <div class="table-responsive mobile-hidden"> 
+                <?php
+                    /* Somatório das colunas dos itens (linha "Totais" no rodapé da tabela e cartão no celular) */
+                    $somaItens = ['qtd' => 0.0, 'emol' => 0.0, 'ferc' => 0.0, 'fadep' => 0.0, 'femp' => 0.0, 'ferrfis' => 0.0, 'total' => 0.0, 'liq' => 0.0];
+                    foreach ($ordem_servico_itens as $__it) {
+                        $somaItens['qtd']     += (float) str_replace(',', '.', (string) ($__it['quantidade'] ?? 0));
+                        $somaItens['emol']    += (float) ($__it['emolumentos'] ?? 0);
+                        $somaItens['ferc']    += (float) ($__it['ferc'] ?? 0);
+                        $somaItens['fadep']   += (float) ($__it['fadep'] ?? 0);
+                        $somaItens['femp']    += (float) ($__it['femp'] ?? 0);
+                        $somaItens['ferrfis'] += (float) ($__it['ferrfis'] ?? 0);
+                        $somaItens['total']   += (float) ($__it['total'] ?? 0);
+                        $somaItens['liq']     += (float) ($__it['quantidade_liquidada'] ?? 0);
+                    }
+                    $__qtdFmt = static fn (float $q): string => fmod($q, 1.0) == 0.0 ? (string) (int) $q : number_format($q, 2, ',', '.');
+                ?>
                 <table id="tabelaItensOS" class="table table-striped table-bordered table-modern">  
                     <thead>  
                         <tr>  
@@ -1903,6 +1922,27 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                         </tr>  
                         <?php endforeach; ?>  
                                         </tbody>
+                    <?php if (!empty($ordem_servico_itens)): ?>
+                    <tfoot>
+                        <tr class="linha-totais-itens">
+                            <th></th>
+                            <th>Totais</th>
+                            <th><?php echo $__qtdFmt($somaItens['qtd']); ?></th>
+                            <th></th>
+                            <th></th>
+                            <th><?php echo number_format($somaItens['emol'], 2, ',', '.'); ?></th>
+                            <th><?php echo number_format($somaItens['ferc'], 2, ',', '.'); ?></th>
+                            <th><?php echo number_format($somaItens['fadep'], 2, ',', '.'); ?></th>
+                            <th><?php echo number_format($somaItens['femp'], 2, ',', '.'); ?></th>
+                            <th><?php echo number_format($somaItens['ferrfis'], 2, ',', '.'); ?></th>
+                            <th><?php echo number_format($somaItens['total'], 2, ',', '.'); ?></th>
+                            <th><?php echo $__qtdFmt($somaItens['liq']); ?></th>
+                            <th></th>
+                            <th></th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                    <?php endif; ?>
                 </table>
             </div>
 
@@ -2059,6 +2099,20 @@ $algum_item_liquidado   = $has_liquidated || ($total_liquidado > 0);
                     <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
+                <?php if (!empty($ordem_servico_itens)): ?>
+                <div class="item-card item-card-totais">
+                    <div class="card-header-mobile">
+                        <span class="card-ato"><i class="fa fa-calculator"></i> Totais dos itens</span>
+                    </div>
+                    <div class="info-row"><span class="info-label">Quantidade</span><span class="info-value"><?php echo $__qtdFmt($somaItens['qtd']); ?></span></div>
+                    <div class="info-row"><span class="info-label">Emolumentos</span><span class="info-value">R$ <?php echo number_format($somaItens['emol'], 2, ',', '.'); ?></span></div>
+                    <div class="info-row"><span class="info-label">FERC</span><span class="info-value">R$ <?php echo number_format($somaItens['ferc'], 2, ',', '.'); ?></span></div>
+                    <div class="info-row"><span class="info-label">FADEP</span><span class="info-value">R$ <?php echo number_format($somaItens['fadep'], 2, ',', '.'); ?></span></div>
+                    <div class="info-row"><span class="info-label">FEMP</span><span class="info-value">R$ <?php echo number_format($somaItens['femp'], 2, ',', '.'); ?></span></div>
+                    <div class="info-row"><span class="info-label">FERRFIS</span><span class="info-value">R$ <?php echo number_format($somaItens['ferrfis'], 2, ',', '.'); ?></span></div>
+                    <div class="info-row"><span class="info-label"><b>Total</b></span><span class="info-value"><b>R$ <?php echo number_format($somaItens['total'], 2, ',', '.'); ?></b></span></div>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 

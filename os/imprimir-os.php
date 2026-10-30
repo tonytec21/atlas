@@ -278,7 +278,16 @@ if (isset($_GET['id'])) {
     // Definir largura da descrição baseado em $show_ferrfis
     $descricaoWidth = $show_ferrfis ? '29%' : '35%';
 
+    // Somatório das colunas (linha TOTAIS no fim da tabela de itens)
+    $soma = ['qtd' => 0.0, 'emol' => 0.0, 'ferc' => 0.0, 'fadep' => 0.0, 'femp' => 0.0, 'ferrfis' => 0.0, 'total' => 0.0];
     foreach ($ordem_servico_itens as $index => $item) {
+        $soma['qtd']     += (float) str_replace(',', '.', (string) ($item['quantidade'] ?? 0));
+        $soma['emol']    += (float) ($item['emolumentos'] ?? 0);
+        $soma['ferc']    += (float) ($item['ferc'] ?? 0);
+        $soma['fadep']   += (float) ($item['fadep'] ?? 0);
+        $soma['femp']    += (float) ($item['femp'] ?? 0);
+        $soma['ferrfis'] += (float) ($item['ferrfis'] ?? 0);
+        $soma['total']   += (float) ($item['total'] ?? 0);
         $ferrfisTd = $show_ferrfis 
             ? '<td style="width: 6%; font-size: 7.5px;">R$ ' . number_format($item['ferrfis'] ?? 0, 2, ',', '.') . '</td>'
             : '';
@@ -307,6 +316,32 @@ if (isset($_GET['id'])) {
         }
     }
 
+    $fmtQtd = static fn (float $q): string => fmod($q, 1.0) == 0.0 ? (string) (int) $q : number_format($q, 2, ',', '.');
+    $fmtR = static fn (float $v): string => 'R$ ' . number_format($v, 2, ',', '.');
+    $estTot = 'font-size: 7.5px; font-weight: bold; background-color: #eef1f6;';
+    $totaisHtml = '<tr>
+            <td style="width: 8%; ' . $estTot . '">TOTAIS</td>
+            <td style="width: 5%; ' . $estTot . '">' . $fmtQtd($soma['qtd']) . '</td>
+            <td style="width: 8%; ' . $estTot . '"></td>
+            <td style="width: ' . $descricaoWidth . '; ' . $estTot . '"></td>
+            <td style="width: 10%; ' . $estTot . '">' . $fmtR($soma['emol']) . '</td>
+            <td style="width: 8%; ' . $estTot . '">' . $fmtR($soma['ferc']) . '</td>
+            <td style="width: 8%; ' . $estTot . '">' . $fmtR($soma['fadep']) . '</td>
+            <td style="width: 8%; ' . $estTot . '">' . $fmtR($soma['femp']) . '</td>'
+            . ($show_ferrfis ? '<td style="width: 6%; ' . $estTot . '">' . $fmtR($soma['ferrfis']) . '</td>' : '') .
+            '<td style="width: 10%; ' . $estTot . '">' . $fmtR($soma['total']) . '</td>
+        </tr>';
+    $__cab = static fn (): string => adicionarCabecalhoTabelaItens($pdf, $show_ferrfis);
+
+    // Linha de totais: na mesma página da tabela, ou numa página nova com o cabeçalho
+    if ($pdf->GetY() + 30 > $pdf->getPageHeight() - 30) {
+        $html .= '</tbody></table>';
+        $pdf->writeHTML($html, true, false, true, false, '');
+        $pdf->AddPage();
+        $html = $__cab() . $totaisHtml;
+    } else {
+        $html .= $totaisHtml;
+    }
     $html .= '</tbody></table>';
     $pdf->writeHTML($html, true, false, true, false, '');
 
